@@ -13,6 +13,7 @@ import CoreLocation
 struct MapView: UIViewRepresentable {
     @ObservedObject var locationManager = LocationManager()
     @Binding var searchResults: [GMSAutocompletePrediction]
+    @Binding var selectedPlace: GMSPlace?
     let mapView = GMSMapView()
 
     func makeUIView(context: Context) -> GMSMapView {
@@ -31,7 +32,19 @@ struct MapView: UIViewRepresentable {
     }
 
     func updateUIView(_ uiView: GMSMapView, context: Context) {
-        if let updatedLocation = locationManager.currentLocation {
+        if let place = selectedPlace {
+            let camera = GMSCameraPosition.camera(
+                withLatitude: place.coordinate.latitude,
+                longitude: place.coordinate.longitude,
+                zoom: 15.0
+            )
+            uiView.animate(to: camera)
+
+            // Add a marker for the selected place
+            let marker = GMSMarker(position: place.coordinate)
+            marker.title = place.name
+            marker.map = uiView
+        } else if let updatedLocation = locationManager.currentLocation {
             let camera = GMSCameraPosition.camera(
                 withLatitude: updatedLocation.coordinate.latitude,
                 longitude: updatedLocation.coordinate.longitude,
@@ -40,5 +53,5 @@ struct MapView: UIViewRepresentable {
             uiView.animate(to: camera)
         }
     }
-
 }
+
