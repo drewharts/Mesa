@@ -15,31 +15,28 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     override init() {
         super.init()
         locationManager.delegate = self
+        locationManager.requestWhenInUseAuthorization() // Request permission during initialization
+        locationManager.startUpdatingLocation()
     }
 
     func requestLocationPermission() {
-        // Request permission if not determined
+        // Ensure location services are enabled and request permission if needed
         if CLLocationManager.authorizationStatus() == .notDetermined {
             locationManager.requestWhenInUseAuthorization()
         }
         locationManager.startUpdatingLocation()
     }
 
-    // Delegate method called when authorization changes
-    func locationManager(_ manager: CLLocationManager, didChangeAuthorization status: CLAuthorizationStatus) {
-        if status == .authorizedWhenInUse || status == .authorizedAlways {
-            locationManager.startUpdatingLocation()
-        }
-    }
-
     // Delegate method called when location updates
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        currentLocation = locations.last
-        locationManager.stopUpdatingLocation() // Stop updating if only one location is needed
+        if let location = locations.last {
+            currentLocation = location
+        }
     }
 
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
         print("Location update failed: \(error.localizedDescription)")
     }
 }
+
 

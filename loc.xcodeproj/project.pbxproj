@@ -3,22 +3,19 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 56;
+	objectVersion = 70;
 	objects = {
 
 /* Begin PBXBuildFile section */
 		B054DC612C42F5DA00C98088 /* locApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B054DC602C42F5DA00C98088 /* locApp.swift */; };
-		B054DC632C42F5DA00C98088 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B054DC622C42F5DA00C98088 /* ContentView.swift */; };
 		B054DC652C42F5DB00C98088 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B054DC642C42F5DB00C98088 /* Assets.xcassets */; };
 		B054DC682C42F5DB00C98088 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B054DC672C42F5DB00C98088 /* Preview Assets.xcassets */; };
 		B054DC722C42F5DB00C98088 /* locTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B054DC712C42F5DB00C98088 /* locTests.swift */; };
 		B054DC7C2C42F5DB00C98088 /* locUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B054DC7B2C42F5DB00C98088 /* locUITests.swift */; };
 		B054DC7E2C42F5DB00C98088 /* locUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B054DC7D2C42F5DB00C98088 /* locUITestsLaunchTests.swift */; };
 		B054DC902C4301FB00C98088 /* GoogleMaps in Frameworks */ = {isa = PBXBuildFile; productRef = B054DC8F2C4301FB00C98088 /* GoogleMaps */; };
-		B05A6C312C43058400C6D114 /* MapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B05A6C302C43058400C6D114 /* MapView.swift */; };
 		B061F1DE2C5815FA00042CB0 /* GooglePlaces in Frameworks */ = {isa = PBXBuildFile; productRef = B061F1DD2C5815FA00042CB0 /* GooglePlaces */; };
 		B0821C682C641B9100BA126E /* CoreLocationUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B0821C672C641B9100BA126E /* CoreLocationUI.framework */; settings = {ATTRIBUTES = (Required, ); }; };
-		B0821C6A2C641C4A00BA126E /* LocationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0821C692C641C4A00BA126E /* LocationManager.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -41,7 +38,6 @@
 /* Begin PBXFileReference section */
 		B054DC5D2C42F5DA00C98088 /* loc.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = loc.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B054DC602C42F5DA00C98088 /* locApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = locApp.swift; sourceTree = "<group>"; };
-		B054DC622C42F5DA00C98088 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		B054DC642C42F5DB00C98088 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		B054DC672C42F5DB00C98088 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
 		B054DC6D2C42F5DB00C98088 /* locTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = locTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -49,11 +45,17 @@
 		B054DC772C42F5DB00C98088 /* locUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = locUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		B054DC7B2C42F5DB00C98088 /* locUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = locUITests.swift; sourceTree = "<group>"; };
 		B054DC7D2C42F5DB00C98088 /* locUITestsLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = locUITestsLaunchTests.swift; sourceTree = "<group>"; };
-		B05A6C302C43058400C6D114 /* MapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapView.swift; sourceTree = "<group>"; };
 		B061F1E22C581A3A00042CB0 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		B0821C672C641B9100BA126E /* CoreLocationUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreLocationUI.framework; path = System/Library/Frameworks/CoreLocationUI.framework; sourceTree = SDKROOT; };
-		B0821C692C641C4A00BA126E /* LocationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationManager.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		B00311FA2CDACD4B002AE03B /* Models */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Models; sourceTree = "<group>"; };
+		B00311FB2CDACD59002AE03B /* ViewModels */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = ViewModels; sourceTree = "<group>"; };
+		B00311FD2CDACD81002AE03B /* Views */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Views; sourceTree = "<group>"; };
+		B00311FE2CDACD8B002AE03B /* Services */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Services; sourceTree = "<group>"; };
+		B00311FF2CDACE01002AE03B /* Managers */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Managers; sourceTree = "<group>"; };
+/* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		B054DC5A2C42F5DA00C98088 /* Frameworks */ = {
@@ -108,13 +110,15 @@
 		B054DC5F2C42F5DA00C98088 /* loc */ = {
 			isa = PBXGroup;
 			children = (
+				B00311FF2CDACE01002AE03B /* Managers */,
+				B00311FE2CDACD8B002AE03B /* Services */,
+				B00311FD2CDACD81002AE03B /* Views */,
+				B00311FB2CDACD59002AE03B /* ViewModels */,
+				B00311FA2CDACD4B002AE03B /* Models */,
 				B061F1E22C581A3A00042CB0 /* Info.plist */,
 				B054DC602C42F5DA00C98088 /* locApp.swift */,
-				B054DC622C42F5DA00C98088 /* ContentView.swift */,
 				B054DC642C42F5DB00C98088 /* Assets.xcassets */,
 				B054DC662C42F5DB00C98088 /* Preview Content */,
-				B05A6C302C43058400C6D114 /* MapView.swift */,
-				B0821C692C641C4A00BA126E /* LocationManager.swift */,
 			);
 			path = loc;
 			sourceTree = "<group>";
@@ -166,6 +170,13 @@
 			buildRules = (
 			);
 			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				B00311FA2CDACD4B002AE03B /* Models */,
+				B00311FB2CDACD59002AE03B /* ViewModels */,
+				B00311FD2CDACD81002AE03B /* Views */,
+				B00311FE2CDACD8B002AE03B /* Services */,
+				B00311FF2CDACE01002AE03B /* Managers */,
 			);
 			name = loc;
 			packageProductDependencies = (
@@ -290,9 +301,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				B054DC632C42F5DA00C98088 /* ContentView.swift in Sources */,
-				B0821C6A2C641C4A00BA126E /* LocationManager.swift in Sources */,
-				B05A6C312C43058400C6D114 /* MapView.swift in Sources */,
 				B054DC612C42F5DA00C98088 /* locApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
