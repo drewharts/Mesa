@@ -19,6 +19,7 @@ struct MapView: UIViewRepresentable {
 
     func makeUIView(context: Context) -> GMSMapView {
         mapView.isMyLocationEnabled = true
+        mapView.delegate = context.coordinator // Set the coordinator as the delegate
 
         // Set a default camera position first (e.g., a global view)
         let defaultCamera = GMSCameraPosition.camera(withLatitude: 0, longitude: 0, zoom: 1.0)
@@ -30,8 +31,8 @@ struct MapView: UIViewRepresentable {
                 let camera = GMSCameraPosition.camera(withLatitude: currentLocation.coordinate.latitude,
                                                       longitude: currentLocation.coordinate.longitude,
                                                       zoom: 15.0)
-                mapView.animate(to: camera) // Animate to the location
-                hasCenteredOnUser = true // Mark as centered
+                mapView.animate(to: camera)
+                hasCenteredOnUser = true
             }
         }
 
@@ -47,10 +48,32 @@ struct MapView: UIViewRepresentable {
             uiView.animate(to: camera)
             
             // Add a marker for the selected place
-            uiView.clear() // Clear previous markers
+            uiView.clear()
             let marker = GMSMarker(position: place.coordinate)
             marker.title = place.name
             marker.map = uiView
+        } else {
+            // Clear the marker if no place is selected
+//            uiView.clear()
+        }
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+
+    class Coordinator: NSObject, GMSMapViewDelegate {
+        var parent: MapView
+
+        init(_ parent: MapView) {
+            self.parent = parent
+        }
+
+        func mapView(_ mapView: GMSMapView, didChange position: GMSCameraPosition) {
+            // Clear selected place if the camera position changes due to user interaction
+            DispatchQueue.main.async {
+                self.parent.selectedPlace = nil
+            }
         }
     }
 }

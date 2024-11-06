@@ -14,6 +14,7 @@ class SearchViewModel: ObservableObject {
     @Published var searchText = ""
     @Published var searchResults: [GMSAutocompletePrediction] = [] // Use GMSAutocompletePrediction directly
     @Published var selectedPlace: GMSPlace? // Use GMSPlace directly
+    @Published var userLocation: CLLocationCoordinate2D?
     
     private var cancellables = Set<AnyCancellable>()
     
@@ -36,6 +37,13 @@ class SearchViewModel: ObservableObject {
         let placesClient = GMSPlacesClient.shared()
         let filter = GMSAutocompleteFilter()
         filter.types = ["establishment"] // Use a string array directly for types
+        
+        if let location = userLocation {
+            filter.locationBias = GMSPlaceRectangularLocationOption(
+                CLLocationCoordinate2D(latitude: location.latitude + 0.01, longitude: location.longitude + 0.01),
+                CLLocationCoordinate2D(latitude: location.latitude - 0.01, longitude: location.longitude - 0.01)
+            )
+        }
         
         placesClient.findAutocompletePredictions(fromQuery: query, filter: filter, sessionToken: nil) { [weak self] results, error in
             if let error = error {
