@@ -20,9 +20,12 @@ struct ContentView: View {
         ZStack(alignment: .top) {
             MapView(searchResults: $viewModel.searchResults, selectedPlace: $viewModel.selectedPlace, locationManager: locationManager)
                 .edgesIgnoringSafeArea(.all)
+                .onTapGesture {
+                    hideKeyboard()
+                    viewModel.searchResults = [] // Clear search results when tapping on the map
+                }
 
             VStack(spacing: 0) {
-                // Search bar with a fixed max width
                 SearchBar(text: $viewModel.searchText)
                     .frame(maxWidth: .infinity)
                     .padding(.horizontal, 20)
@@ -33,7 +36,7 @@ struct ContentView: View {
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.horizontal, 20)
-                    .padding(.top, 10) // Adds space between search bar and results
+                    .padding(.top, 10)
                 }
             }
             .padding(.top, 40)
@@ -42,7 +45,13 @@ struct ContentView: View {
             locationManager.requestLocationPermission()
         }
     }
+
+    // Helper function to hide the keyboard
+    func hideKeyboard() {
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+    }
 }
+
 
 
 
