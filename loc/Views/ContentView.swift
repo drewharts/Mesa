@@ -5,12 +5,12 @@
 //  Created by Andrew Hartsfield II on 7/13/24.
 //
 
-import SwiftUICore
+import SwiftUI
 import UIKit
 
 struct ContentView: View {
     @StateObject private var viewModel = SearchViewModel()
-    @ObservedObject var locationManager: LocationManager // Make this a required parameter
+    @ObservedObject var locationManager: LocationManager
 
     init(locationManager: LocationManager = LocationManager()) {
         self.locationManager = locationManager
@@ -18,32 +18,31 @@ struct ContentView: View {
 
     var body: some View {
         ZStack(alignment: .top) {
-            // Pass locationManager to MapView
             MapView(searchResults: $viewModel.searchResults, selectedPlace: $viewModel.selectedPlace, locationManager: locationManager)
                 .edgesIgnoringSafeArea(.all)
 
-            // Floating Search Bar and Search Results
-            VStack {
+            VStack(spacing: 0) {
+                // Search bar with a fixed max width
                 SearchBar(text: $viewModel.searchText)
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, 20)
 
-                // Dynamic Search Results List
                 if !viewModel.searchResults.isEmpty {
                     SearchResultsView(results: viewModel.searchResults) { prediction in
                         viewModel.selectPlace(prediction)
                     }
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 10) // Adds space between search bar and results
                 }
             }
+            .padding(.top, 40)
         }
         .onAppear {
             locationManager.requestLocationPermission()
         }
-        .onTapGesture {
-            hideKeyboard()
-        }
-    }
-
-    // Helper function to hide the keyboard
-    func hideKeyboard() {
-        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     }
 }
+
+
+

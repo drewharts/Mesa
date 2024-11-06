@@ -1,17 +1,12 @@
-//
-//  SearchResultsView.swift
-//  loc
-//
-//  Created by Andrew Hartsfield II on 11/5/24.
-//
-
-
 import SwiftUI
 import GooglePlaces
 
 struct SearchResultsView: View {
     let results: [GMSAutocompletePrediction]
     let onSelect: (GMSAutocompletePrediction) -> Void
+
+    private let rowHeight: CGFloat = 60
+    private let maxHeight: CGFloat = 300
 
     var body: some View {
         ScrollView {
@@ -23,7 +18,7 @@ struct SearchResultsView: View {
                         VStack(alignment: .leading) {
                             Text(prediction.attributedPrimaryText.string)
                                 .font(.headline)
-                                .foregroundColor(.black)
+                                .foregroundColor(.gray)
                             
                             if let secondaryText = prediction.attributedSecondaryText?.string {
                                 Text(secondaryText)
@@ -35,14 +30,13 @@ struct SearchResultsView: View {
                         .background(Color.white)
                         .cornerRadius(10)
                         .shadow(color: .black.opacity(0.1), radius: 3, x: 0, y: 2)
-                        .padding(.horizontal, 10)
                     }
                 }
             }
-            .padding(.top, 10)
         }
         .background(Color.white.opacity(0.9))
         .cornerRadius(10)
-        .padding(.horizontal, 20)
+        .frame(height: min(CGFloat(results.count) * rowHeight, maxHeight)) // Dynamic height
     }
 }
+
