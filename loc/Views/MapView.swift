@@ -35,6 +35,10 @@ struct MapView: UIViewRepresentable {
                 hasCenteredOnUser = true
             }
         }
+        
+        // Add tap gesture recognizer to dismiss keyboard and clear search results
+        let tapGesture = UITapGestureRecognizer(target: context.coordinator, action: #selector(context.coordinator.mapTapped))
+        mapView.addGestureRecognizer(tapGesture)
 
         return mapView
     }
@@ -52,9 +56,6 @@ struct MapView: UIViewRepresentable {
             let marker = GMSMarker(position: place.coordinate)
             marker.title = place.name
             marker.map = uiView
-        } else {
-            // Clear the marker if no place is selected
-//            uiView.clear()
         }
     }
 
@@ -70,10 +71,16 @@ struct MapView: UIViewRepresentable {
         }
 
         func mapView(_ mapView: GMSMapView, didChange position: GMSCameraPosition) {
-            // Clear selected place if the camera position changes due to user interaction
+            // Clear selected place and search results if the camera position changes due to user interaction
             DispatchQueue.main.async {
                 self.parent.selectedPlace = nil
+                self.parent.searchResults = [] // Clear search results when the user moves the map
             }
+        }
+
+        @objc func mapTapped() {
+            parent.searchResults = []
         }
     }
 }
+
