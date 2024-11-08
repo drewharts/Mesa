@@ -13,7 +13,7 @@ struct MapView: UIViewRepresentable {
     @Binding var searchResults: [GMSAutocompletePrediction]
     @Binding var selectedPlace: GMSPlace?
     @ObservedObject var locationManager: LocationManager
-    @State private var hasCenteredOnUser = false
+    var onMapTap: (() -> Void)? // Callback to notify when the map is tapped
 
     let mapView = GMSMapView()
 
@@ -27,18 +27,14 @@ struct MapView: UIViewRepresentable {
 
         // Delay briefly, then animate to user's current location if available
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            if let currentLocation = locationManager.currentLocation, !hasCenteredOnUser {
+            if let currentLocation = locationManager.currentLocation, !context.coordinator.hasCenteredOnUser {
                 let camera = GMSCameraPosition.camera(withLatitude: currentLocation.coordinate.latitude,
                                                       longitude: currentLocation.coordinate.longitude,
                                                       zoom: 15.0)
                 mapView.animate(to: camera)
-                hasCenteredOnUser = true
+                context.coordinator.hasCenteredOnUser = true
             }
         }
-        
-        // Add tap gesture recognizer to dismiss keyboard and clear search results
-        let tapGesture = UITapGestureRecognizer(target: context.coordinator, action: #selector(context.coordinator.mapTapped))
-        mapView.addGestureRecognizer(tapGesture)
 
         return mapView
     }
@@ -65,22 +61,27 @@ struct MapView: UIViewRepresentable {
 
     class Coordinator: NSObject, GMSMapViewDelegate {
         var parent: MapView
+        var hasCenteredOnUser = false
 
         init(_ parent: MapView) {
             self.parent = parent
         }
 
-        func mapView(_ mapView: GMSMapView, didChange position: GMSCameraPosition) {
-            // Clear selected place and search results if the camera position changes due to user interaction
-            DispatchQueue.main.async {
-                self.parent.selectedPlace = nil
-                self.parent.searchResults = [] // Clear search results when the user moves the map
+        func mapView(_ mapView: GMSMapView, willMove gesture: Bool) {
+            if gesture {
+                // Clear selected place and search results when the user moves the map
+                DispatchQueue.main.async {
+                    self.parent.selectedPlace = nil
+                    self.parent.searchResults = []
+                    self.parent.onMapTap?()
+                }
             }
         }
 
-        @objc func mapTapped() {
-            parent.searchResults = []
-        }
+        // Remove or comment out the didChange method
+        // func mapView(_ mapView: GMSMapView, didChange position: GMSCameraPosition) {
+        //     // Your existing code here
+        // }
     }
 }
 

@@ -15,10 +15,10 @@ struct SearchBar: View {
         TextField("Search here...", text: $text)
             .padding()
             .background(Color.white)
-            .cornerRadius(10)
+            .cornerRadius(20)
             .shadow(color: .black.opacity(0.2), radius: 5, x: 0, y: 3)
             .padding(.horizontal, 20)
-            .padding(.top, 40)
+            .padding(.top, 20)
             .foregroundStyle(Color.gray)
     }
 }
