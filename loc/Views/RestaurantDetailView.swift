@@ -19,11 +19,13 @@ struct RestaurantDetailView: View {
                 // Collapsed State Content
                 Text(place.name ?? "Unknown")
                     .font(.headline)
+                    .foregroundStyle(.blue)
                     .padding()
             } else {
                 // Expanded State Content
                 Text(place.name ?? "Unknown")
                     .font(.title)
+                    .foregroundStyle(.blue)
                     .bold()
                 Text(place.formattedAddress ?? "Unknown Address")
                     .font(.subheadline)

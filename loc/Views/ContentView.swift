@@ -22,7 +22,6 @@ struct ContentView: View {
     @State private var minSheetHeight: CGFloat = 200 // Minimum height
     @State private var maxSheetHeight: CGFloat = UIScreen.main.bounds.height * 0.6 // Max height for the sheet
     @State private var showDetailSheet = false //controls visibility of the bottomsheetview
-    @State private var localSelectedPlace: GMSPlace?
     
     init(locationManager: LocationManager = LocationManager()) {
         self.locationManager = locationManager
@@ -68,7 +67,6 @@ struct ContentView: View {
                     if !viewModel.searchResults.isEmpty {
                         SearchResultsView(results: viewModel.searchResults) { prediction in
                             viewModel.selectPlace(prediction)
-                            localSelectedPlace = viewModel.selectedPlace
                             withAnimation {
                                 isSearchBarMinimized = true
                                 searchIsFocused = false
