@@ -8,25 +8,34 @@
 import SwiftUI
 import GooglePlaces
 
-
 struct RestaurantDetailView: View {
-    let place: GMSPlace // Accept GMSPlace directly
+    let place: GMSPlace
+    @Binding var sheetHeight: CGFloat
+    let minSheetHeight: CGFloat
 
     var body: some View {
         VStack(spacing: 16) {
-            Text(place.name ?? "Unknown") // Access name from GMSPlace
-                .font(.title)
-                .bold()
-            
-            Text(place.formattedAddress ?? "Unknown Address") // Access address from GMSPlace
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-            
-            Spacer()
+            if sheetHeight == minSheetHeight {
+                // Collapsed State Content
+                Text(place.name ?? "Unknown")
+                    .font(.headline)
+                    .padding()
+            } else {
+                // Expanded State Content
+                Text(place.name ?? "Unknown")
+                    .font(.title)
+                    .bold()
+                Text(place.formattedAddress ?? "Unknown Address")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                Spacer()
+            }
         }
         .padding()
+        .frame(maxWidth: .infinity)
     }
 }
+
 
 
 

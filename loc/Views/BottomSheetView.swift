@@ -10,12 +10,19 @@ import UIKit
 
 struct BottomSheetView<Content: View>: View {
     @Binding var sheetHeight: CGFloat
-    let minSheetHeight: CGFloat = 100 // <-- Ensure minimum height is set
+    @Binding var isPresented: Bool
+    let minSheetHeight: CGFloat = 201 // <-- Ensure minimum height is set
     let maxSheetHeight: CGFloat
     @GestureState private var dragTranslation: CGFloat = 0 // <-- Use dragTranslation instead of dragOffset
     let content: Content
 
-    init(sheetHeight: Binding<CGFloat>, maxSheetHeight: CGFloat, @ViewBuilder content: () -> Content) {
+    init(
+        isPresented: Binding<Bool>,
+        sheetHeight: Binding<CGFloat>,
+        maxSheetHeight: CGFloat,
+        @ViewBuilder content: () -> Content
+    ) {
+        self._isPresented = isPresented
         self._sheetHeight = sheetHeight
         self.maxSheetHeight = maxSheetHeight
         self.content = content()
@@ -48,8 +55,12 @@ struct BottomSheetView<Content: View>: View {
                     }
                     .onEnded { value in
                         let newHeight = sheetHeight - value.translation.height
+                        let dismissalThreshold: CGFloat = 100 //desired threshold for dismissing
                         withAnimation {
-                            if newHeight > (maxSheetHeight + minSheetHeight) / 2 {
+                            if value.translation.height > dismissalThreshold {
+                                isPresented = false
+                            }
+                            else if newHeight > (maxSheetHeight + minSheetHeight) / 2 {
                                 sheetHeight = maxSheetHeight
                             } else {
                                 sheetHeight = minSheetHeight

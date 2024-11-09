@@ -18,9 +18,11 @@ struct ContentView: View {
     @ObservedObject var locationManager: LocationManager
     @FocusState private var searchIsFocused: Bool
     @State private var isSearchBarMinimized = false
-    @State private var showDetailSheet = false
     @State private var sheetHeight: CGFloat = 100 // Initial height of the bottom sheet
+    @State private var minSheetHeight: CGFloat = 200 // Minimum height
     @State private var maxSheetHeight: CGFloat = UIScreen.main.bounds.height * 0.6 // Max height for the sheet
+    @State private var showDetailSheet = false //controls visibility of the bottomsheetview
+    @State private var localSelectedPlace: GMSPlace?
     
     init(locationManager: LocationManager = LocationManager()) {
         self.locationManager = locationManager
@@ -66,6 +68,7 @@ struct ContentView: View {
                     if !viewModel.searchResults.isEmpty {
                         SearchResultsView(results: viewModel.searchResults) { prediction in
                             viewModel.selectPlace(prediction)
+                            localSelectedPlace = viewModel.selectedPlace
                             withAnimation {
                                 isSearchBarMinimized = true
                                 searchIsFocused = false
@@ -82,9 +85,18 @@ struct ContentView: View {
             
             // Custom Bottom Sheet
             if showDetailSheet, let selectedPlace = viewModel.selectedPlace {
-                BottomSheetView(sheetHeight: $sheetHeight, maxSheetHeight: maxSheetHeight) {
-                    RestaurantDetailView(place: selectedPlace)
-                }
+                BottomSheetView(
+                    isPresented: $showDetailSheet,
+                    sheetHeight: $sheetHeight,
+                    maxSheetHeight: maxSheetHeight
+                ) {
+                    RestaurantDetailView(
+                        place: selectedPlace,
+                        sheetHeight: $sheetHeight,
+                        minSheetHeight: minSheetHeight
+                    )
+                    .frame(maxWidth: .infinity)
+                    }
             }
         }
         .onAppear {
