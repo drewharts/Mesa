@@ -10,12 +10,16 @@
 
 import SwiftUI
 import UIKit
+import GooglePlaces
+
 
 struct ContentView: View {
     @StateObject private var viewModel = SearchViewModel()
     @ObservedObject var locationManager: LocationManager
     @FocusState private var searchIsFocused: Bool
     @State private var isSearchBarMinimized = false
+    @State private var showDetailSheet = false
+    @State private var offsetY: CGFloat = UIScreen.main.bounds.height * 0.5
 
     init(locationManager: LocationManager = LocationManager()) {
         self.locationManager = locationManager
@@ -64,6 +68,7 @@ struct ContentView: View {
                             withAnimation {
                                 isSearchBarMinimized = true
                                 searchIsFocused = false
+                                showDetailSheet = true
                             }
                         }
                         .frame(maxWidth: .infinity)
@@ -77,7 +82,16 @@ struct ContentView: View {
         .onAppear {
             locationManager.requestLocationPermission()
         }
+        
+        .sheet(isPresented: $showDetailSheet) {
+            if let selectedPlace = viewModel.selectedPlace {
+                RestaurantDetailView(place: selectedPlace)
+                    .presentationDetents([.height(100),.medium,.large])
+                    .presentationBackgroundInteraction(.enabled(upThrough: .height(100)))
+            }
+        }
     }
+    
 
     // Handle the map tap to minimize the search bar
     private func handleMapTap() {
@@ -85,6 +99,24 @@ struct ContentView: View {
             isSearchBarMinimized = true
             searchIsFocused = false
             viewModel.searchResults = []
+        }
+    }
+    struct RestaurantDetailView: View {
+        let place: GMSPlace // Accept GMSPlace directly
+
+        var body: some View {
+            VStack(spacing: 16) {
+                Text(place.name ?? "Unknown") // Access name from GMSPlace
+                    .font(.title)
+                    .bold()
+                
+                Text(place.formattedAddress ?? "Unknown Address") // Access address from GMSPlace
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                
+                Spacer()
+            }
+            .padding()
         }
     }
 }

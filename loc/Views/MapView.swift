@@ -77,11 +77,6 @@ struct MapView: UIViewRepresentable {
                 }
             }
         }
-
-        // Remove or comment out the didChange method
-        // func mapView(_ mapView: GMSMapView, didChange position: GMSCameraPosition) {
-        //     // Your existing code here
-        // }
     }
 }
 
