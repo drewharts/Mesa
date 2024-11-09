@@ -11,7 +11,7 @@ import UIKit
 struct BottomSheetView<Content: View>: View {
     @Binding var sheetHeight: CGFloat
     @Binding var isPresented: Bool
-    let minSheetHeight: CGFloat = 201 // <-- Ensure minimum height is set
+    let minSheetHeight: CGFloat = 200 // <-- Ensure minimum height is set
     let maxSheetHeight: CGFloat
     @GestureState private var dragTranslation: CGFloat = 0 // <-- Use dragTranslation instead of dragOffset
     let content: Content

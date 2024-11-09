@@ -18,7 +18,7 @@ struct ContentView: View {
     @ObservedObject var locationManager: LocationManager
     @FocusState private var searchIsFocused: Bool
     @State private var isSearchBarMinimized = false
-    @State private var sheetHeight: CGFloat = 100 // Initial height of the bottom sheet
+    @State private var sheetHeight: CGFloat = 200 // Initial height of the bottom sheet
     @State private var minSheetHeight: CGFloat = 200 // Minimum height
     @State private var maxSheetHeight: CGFloat = UIScreen.main.bounds.height * 0.6 // Max height for the sheet
     @State private var showDetailSheet = false //controls visibility of the bottomsheetview
