@@ -19,12 +19,13 @@ struct ContentView: View {
     @FocusState private var searchIsFocused: Bool
     @State private var isSearchBarMinimized = false
     @State private var showDetailSheet = false
-    @State private var offsetY: CGFloat = UIScreen.main.bounds.height * 0.5
-
+    @State private var sheetHeight: CGFloat = 100 // Initial height of the bottom sheet
+    @State private var maxSheetHeight: CGFloat = UIScreen.main.bounds.height * 0.6 // Max height for the sheet
+    
     init(locationManager: LocationManager = LocationManager()) {
         self.locationManager = locationManager
     }
-
+    
     var body: some View {
         ZStack(alignment: .top) {
             MapView(
@@ -34,7 +35,7 @@ struct ContentView: View {
                 onMapTap: handleMapTap
             )
             .edgesIgnoringSafeArea(.all)
-
+            
             VStack(spacing: 0) {
                 if isSearchBarMinimized {
                     // Minimized Search Bar as a Blue Circle with a Magnifying Glass
@@ -61,7 +62,7 @@ struct ContentView: View {
                     // Expanded Search Bar
                     SearchBar(text: $viewModel.searchText)
                         .focused($searchIsFocused)
-
+                    
                     if !viewModel.searchResults.isEmpty {
                         SearchResultsView(results: viewModel.searchResults) { prediction in
                             viewModel.selectPlace(prediction)
@@ -78,45 +79,24 @@ struct ContentView: View {
                 }
             }
             .transition(.move(edge: .top).combined(with: .opacity))
+            
+            // Custom Bottom Sheet
+            if showDetailSheet, let selectedPlace = viewModel.selectedPlace {
+                BottomSheetView(sheetHeight: $sheetHeight, maxSheetHeight: maxSheetHeight) {
+                    RestaurantDetailView(place: selectedPlace)
+                }
+            }
         }
         .onAppear {
             locationManager.requestLocationPermission()
         }
-        
-        .sheet(isPresented: $showDetailSheet) {
-            if let selectedPlace = viewModel.selectedPlace {
-                RestaurantDetailView(place: selectedPlace)
-                    .presentationDetents([.height(100),.medium,.large])
-                    .presentationBackgroundInteraction(.enabled(upThrough: .height(100)))
-            }
-        }
     }
     
-
     // Handle the map tap to minimize the search bar
     private func handleMapTap() {
         withAnimation {
-            isSearchBarMinimized = true
             searchIsFocused = false
             viewModel.searchResults = []
-        }
-    }
-    struct RestaurantDetailView: View {
-        let place: GMSPlace // Accept GMSPlace directly
-
-        var body: some View {
-            VStack(spacing: 16) {
-                Text(place.name ?? "Unknown") // Access name from GMSPlace
-                    .font(.title)
-                    .bold()
-                
-                Text(place.formattedAddress ?? "Unknown Address") // Access address from GMSPlace
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                
-                Spacer()
-            }
-            .padding()
         }
     }
 }

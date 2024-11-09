@@ -40,18 +40,23 @@ struct MapView: UIViewRepresentable {
     }
 
     func updateUIView(_ uiView: GMSMapView, context: Context) {
-        // If a place is selected, move the camera to the selected place
+        // If a place is selected and we haven't moved to it yet, move the camera
         if let place = selectedPlace {
-            let camera = GMSCameraPosition.camera(withLatitude: place.coordinate.latitude,
-                                                  longitude: place.coordinate.longitude,
-                                                  zoom: 15.0)
-            uiView.animate(to: camera)
-            
-            // Add a marker for the selected place
-            uiView.clear()
-            let marker = GMSMarker(position: place.coordinate)
-            marker.title = place.name
-            marker.map = uiView
+            if context.coordinator.lastSelectedPlaceID != place.placeID {
+                let camera = GMSCameraPosition.camera(withLatitude: place.coordinate.latitude,
+                                                      longitude: place.coordinate.longitude,
+                                                      zoom: 15.0)
+                uiView.animate(to: camera)
+                
+                // Add a marker for the selected place
+                uiView.clear()
+                let marker = GMSMarker(position: place.coordinate)
+                marker.title = place.name
+                marker.map = uiView
+                
+                // Update the last selected place ID
+                context.coordinator.lastSelectedPlaceID = place.placeID
+            }
         }
     }
 
@@ -62,6 +67,7 @@ struct MapView: UIViewRepresentable {
     class Coordinator: NSObject, GMSMapViewDelegate {
         var parent: MapView
         var hasCenteredOnUser = false
+        var lastSelectedPlaceID: String? // Track the last selected place ID
 
         init(_ parent: MapView) {
             self.parent = parent
@@ -69,9 +75,8 @@ struct MapView: UIViewRepresentable {
 
         func mapView(_ mapView: GMSMapView, willMove gesture: Bool) {
             if gesture {
-                // Clear selected place and search results when the user moves the map
+                // Clear search results when the user moves the map
                 DispatchQueue.main.async {
-                    self.parent.selectedPlace = nil
                     self.parent.searchResults = []
                     self.parent.onMapTap?()
                 }
@@ -79,4 +84,3 @@ struct MapView: UIViewRepresentable {
         }
     }
 }
-
