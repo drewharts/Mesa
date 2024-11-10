@@ -6,10 +6,12 @@
 //
 
 import Foundation
+import SwiftUI
 
 class Profile {
     var firstName: String
     var lastName: String
+    var profilePhoto: Image? = nil
     var phoneNumber: String
     var placeLists: [PlaceList] = []
     
