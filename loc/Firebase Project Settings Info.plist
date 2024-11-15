@@ -3,17 +3,17 @@
 <plist version="1.0">
 <dict>
 	<key>API_KEY</key>
-	<string>AIzaSyCbUESju-wmjfGWgTTfTs0sZXdinRXvh6c</string>
+	<string>AIzaSyC0E01CU3eTTYk9r6zXea1UhFTYKQw1XEo</string>
 	<key>GCM_SENDER_ID</key>
-	<string>331777375746</string>
+	<string>743124616330</string>
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
 	<string>drewharts.locc</string>
 	<key>PROJECT_ID</key>
-	<string>locc-7598c</string>
+	<string>locapp-cfcdb</string>
 	<key>STORAGE_BUCKET</key>
-	<string>locc-7598c.firebasestorage.app</string>
+	<string>locapp-cfcdb.firebasestorage.app</string>
 	<key>IS_ADS_ENABLED</key>
 	<false></false>
 	<key>IS_ANALYTICS_ENABLED</key>
@@ -25,6 +25,6 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:331777375746:ios:ddf00511a6742634d1711b</string>
+	<string>1:743124616330:ios:fb8aa7b3670dcfce451973</string>
 </dict>
 </plist>
