@@ -1,107 +1,77 @@
-//
-//  LoginView.swift
-//  loc
-//
-//  Created by Andrew Hartsfield II on 11/11/24.
-//
-
-
 import SwiftUI
-import FirebaseAuth
+import GoogleSignIn
+import Firebase
 
-struct LoginView: View {
-    @State private var email: String = ""
-    @State private var password: String = ""
-    @State private var errorMessage: String?
-    @State private var isLoading: Bool = false
-
-    // Assuming `isUserLoggedIn` is an environment object that manages the login status
+struct GoogleSignInView: View {
     @EnvironmentObject var userSession: UserSession
+    @State private var errorMessage: String?
 
     var body: some View {
-        VStack(spacing: 20) {
-            Text("Welcome to Your App")
-                .font(.largeTitle)
-                .padding(.top, 60)
-
-            TextField("Email", text: $email)
-                .keyboardType(.emailAddress)
-                .textInputAutocapitalization(.never)
-                .padding()
-                .background(Color(.secondarySystemBackground))
-                .cornerRadius(10)
+        VStack {
+            Text("Sign in with Google")
+                .font(.title)
+                .padding(.bottom, 20)
             
-            SecureField("Password", text: $password)
+            Button(action: {
+                signInWithGoogle()
+            }) {
+                HStack {
+                    Image(systemName: "person.crop.circle.fill.badge.plus")
+                    Text("Sign in with Google")
+                        .font(.headline)
+                }
+                .foregroundColor(.white)
                 .padding()
-                .background(Color(.secondarySystemBackground))
+                .background(Color.blue)
                 .cornerRadius(10)
+            }
+            .padding()
 
             if let errorMessage = errorMessage {
                 Text(errorMessage)
                     .foregroundColor(.red)
                     .padding(.top, 10)
             }
-            
-            if isLoading {
-                ProgressView()
-                    .padding()
-            } else {
-                Button("Login") {
-                    loginUser()
-                }
-                .padding()
-                .background(Color.blue)
-                .foregroundColor(.white)
-                .cornerRadius(10)
-
-                Button("Create Account") {
-                    registerUser()
-                }
-                .padding()
-                .foregroundColor(.blue)
-            }
-            
-            Spacer()
         }
         .padding()
     }
     
-    // MARK: - Authentication Functions
-    private func loginUser() {
-        guard !email.isEmpty, !password.isEmpty else {
-            errorMessage = "Please fill in both fields"
+    // MARK: - Google Sign-In Method
+    private func signInWithGoogle() {
+        guard let clientID = FirebaseApp.app()?.options.clientID else {
+            errorMessage = "Failed to retrieve clientID"
             return
         }
 
-        isLoading = true
-        errorMessage = nil
-        
-        Auth.auth().signIn(withEmail: email, password: password) { result, error in
-            isLoading = false
+        let config = GIDConfiguration(clientID: clientID)
+        GIDSignIn.sharedInstance.configuration = config
+
+        // Start sign-in flow
+        GIDSignIn.sharedInstance.signIn(withPresenting: UIApplication.shared.windows.first?.rootViewController) { result, error in
             if let error = error {
                 errorMessage = error.localizedDescription
-            } else {
-                userSession.isUserLoggedIn = true
+                return
             }
-        }
-    }
 
-    private func registerUser() {
-        guard !email.isEmpty, !password.isEmpty else {
-            errorMessage = "Please fill in both fields"
-            return
-        }
+            guard let user = result?.user,
+                  let idToken = user.idToken?.tokenString else {
+                errorMessage = "Failed to get user information"
+                return
+            }
 
-        isLoading = true
-        errorMessage = nil
-        
-        Auth.auth().createUser(withEmail: email, password: password) { result, error in
-            isLoading = false
-            if let error = error {
-                errorMessage = error.localizedDescription
-            } else {
+            let credential = GoogleAuthProvider.credential(withIDToken: idToken, accessToken: user.accessToken.tokenString)
+
+            // Authenticate with Firebase
+            Auth.auth().signIn(with: credential) { authResult, error in
+                if let error = error {
+                    errorMessage = error.localizedDescription
+                    return
+                }
+
+                // Update user session
                 userSession.isUserLoggedIn = true
             }
         }
     }
 }
+
