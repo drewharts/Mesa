@@ -9,6 +9,7 @@ import SwiftUI
 
 struct ProfileView: View {
     let profile: Profile
+    @EnvironmentObject var userSession: UserSession // Access UserSession as an environment object
 
     var body: some View {
         VStack(spacing: 20) {
@@ -69,6 +70,21 @@ struct ProfileView: View {
             .padding(.horizontal)
             
             Spacer()
+            
+            // Logout Button
+            Button(action: {
+                userSession.logout() // Call the logout function
+            }) {
+                Text("Log Out")
+                    .foregroundColor(.white)
+                    .fontWeight(.bold)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.red)
+                    .cornerRadius(8)
+            }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 40)
         }
         .padding(.horizontal)
         .background(Color(.systemBackground))

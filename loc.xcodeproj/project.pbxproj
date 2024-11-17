@@ -13,9 +13,6 @@
 		B0384E892CE2D19A00FC72F7 /* FirebaseAppCheck in Frameworks */ = {isa = PBXBuildFile; productRef = B0384E882CE2D19A00FC72F7 /* FirebaseAppCheck */; };
 		B0384E8B2CE2D19A00FC72F7 /* FirebaseAppDistribution-Beta in Frameworks */ = {isa = PBXBuildFile; productRef = B0384E8A2CE2D19A00FC72F7 /* FirebaseAppDistribution-Beta */; };
 		B0384E8F2CE2D54200FC72F7 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = B0384E8E2CE2D54200FC72F7 /* FirebaseAuth */; };
-		B0384E912CE4377900FC72F7 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = B0384E902CE4377900FC72F7 /* GoogleService-Info.plist */; };
-		B0384E922CE4377900FC72F7 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = B0384E902CE4377900FC72F7 /* GoogleService-Info.plist */; };
-		B0384E932CE4377900FC72F7 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = B0384E902CE4377900FC72F7 /* GoogleService-Info.plist */; };
 		B054DC612C42F5DA00C98088 /* locApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B054DC602C42F5DA00C98088 /* locApp.swift */; };
 		B054DC652C42F5DB00C98088 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B054DC642C42F5DB00C98088 /* Assets.xcassets */; };
 		B054DC682C42F5DB00C98088 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B054DC672C42F5DB00C98088 /* Preview Assets.xcassets */; };
@@ -25,6 +22,9 @@
 		B054DC902C4301FB00C98088 /* GoogleMaps in Frameworks */ = {isa = PBXBuildFile; productRef = B054DC8F2C4301FB00C98088 /* GoogleMaps */; };
 		B061F1DE2C5815FA00042CB0 /* GooglePlaces in Frameworks */ = {isa = PBXBuildFile; productRef = B061F1DD2C5815FA00042CB0 /* GooglePlaces */; };
 		B0821C682C641B9100BA126E /* CoreLocationUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B0821C672C641B9100BA126E /* CoreLocationUI.framework */; settings = {ATTRIBUTES = (Required, ); }; };
+		B0A819152CEA5F2A0041416F /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = B0A819142CEA5F2A0041416F /* GoogleService-Info.plist */; };
+		B0A819182CEA5F970041416F /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = B0A819172CEA5F970041416F /* GoogleSignIn */; };
+		B0A8191A2CEA5F970041416F /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = B0A819192CEA5F970041416F /* GoogleSignInSwift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -45,7 +45,6 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		B0384E902CE4377900FC72F7 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		B054DC5D2C42F5DA00C98088 /* loc.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = loc.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B054DC602C42F5DA00C98088 /* locApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = locApp.swift; sourceTree = "<group>"; };
 		B054DC642C42F5DB00C98088 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -57,6 +56,7 @@
 		B054DC7D2C42F5DB00C98088 /* locUITestsLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = locUITestsLaunchTests.swift; sourceTree = "<group>"; };
 		B061F1E22C581A3A00042CB0 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		B0821C672C641B9100BA126E /* CoreLocationUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreLocationUI.framework; path = System/Library/Frameworks/CoreLocationUI.framework; sourceTree = SDKROOT; };
+		B0A819142CEA5F2A0041416F /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -78,10 +78,12 @@
 				B054DC902C4301FB00C98088 /* GoogleMaps in Frameworks */,
 				B0384E852CE2D19A00FC72F7 /* FirebaseAnalyticsOnDeviceConversion in Frameworks */,
 				B0384E8F2CE2D54200FC72F7 /* FirebaseAuth in Frameworks */,
+				B0A819182CEA5F970041416F /* GoogleSignIn in Frameworks */,
 				B0384E892CE2D19A00FC72F7 /* FirebaseAppCheck in Frameworks */,
 				B0384E832CE2D19A00FC72F7 /* FirebaseAnalytics in Frameworks */,
 				B061F1DE2C5815FA00042CB0 /* GooglePlaces in Frameworks */,
 				B0384E8B2CE2D19A00FC72F7 /* FirebaseAppDistribution-Beta in Frameworks */,
+				B0A8191A2CEA5F970041416F /* GoogleSignInSwift in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -110,7 +112,6 @@
 				B054DC7A2C42F5DB00C98088 /* locUITests */,
 				B054DC5E2C42F5DA00C98088 /* Products */,
 				B0821C662C641B9100BA126E /* Frameworks */,
-				B0384E902CE4377900FC72F7 /* GoogleService-Info.plist */,
 			);
 			sourceTree = "<group>";
 			usesTabs = 0;
@@ -138,6 +139,7 @@
 				B054DC602C42F5DA00C98088 /* locApp.swift */,
 				B054DC642C42F5DB00C98088 /* Assets.xcassets */,
 				B054DC662C42F5DB00C98088 /* Preview Content */,
+				B0A819142CEA5F2A0041416F /* GoogleService-Info.plist */,
 			);
 			path = loc;
 			sourceTree = "<group>";
@@ -207,6 +209,8 @@
 				B0384E882CE2D19A00FC72F7 /* FirebaseAppCheck */,
 				B0384E8A2CE2D19A00FC72F7 /* FirebaseAppDistribution-Beta */,
 				B0384E8E2CE2D54200FC72F7 /* FirebaseAuth */,
+				B0A819172CEA5F970041416F /* GoogleSignIn */,
+				B0A819192CEA5F970041416F /* GoogleSignInSwift */,
 			);
 			productName = loc;
 			productReference = B054DC5D2C42F5DA00C98088 /* loc.app */;
@@ -284,6 +288,7 @@
 				B054DC8A2C42F95A00C98088 /* XCRemoteSwiftPackageReference "ios-maps-sdk" */,
 				B061F1DC2C5290EF00042CB0 /* XCRemoteSwiftPackageReference "ios-places-sdk" */,
 				B0384E812CE2D19A00FC72F7 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+				B0A819162CEA5F970041416F /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
 			);
 			productRefGroup = B054DC5E2C42F5DA00C98088 /* Products */;
 			projectDirPath = "";
@@ -301,9 +306,9 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				B0384E932CE4377900FC72F7 /* GoogleService-Info.plist in Resources */,
 				B054DC682C42F5DB00C98088 /* Preview Assets.xcassets in Resources */,
 				B054DC652C42F5DB00C98088 /* Assets.xcassets in Resources */,
+				B0A819152CEA5F2A0041416F /* GoogleService-Info.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -311,7 +316,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				B0384E912CE4377900FC72F7 /* GoogleService-Info.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -319,7 +323,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				B0384E922CE4377900FC72F7 /* GoogleService-Info.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -491,13 +494,18 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_STYLE = Automatic;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
+				CODE_SIGN_STYLE = Manual;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"loc/Preview Content\"";
-				DEVELOPMENT_TEAM = 585YK2F2H6;
+				DEVELOPMENT_TEAM = "";
+				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = 585YK2F2H6;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = loc/Info.plist;
+				INFOPLIST_KEY_NSLocationAlwaysUsageDescription = "Access your location in the background";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Show your location on the map";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -508,8 +516,10 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = drewharts.loc;
+				PRODUCT_BUNDLE_IDENTIFIER = drewharts.locc;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = Locc;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -521,13 +531,18 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_STYLE = Automatic;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
+				CODE_SIGN_STYLE = Manual;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"loc/Preview Content\"";
-				DEVELOPMENT_TEAM = 585YK2F2H6;
+				DEVELOPMENT_TEAM = "";
+				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = 585YK2F2H6;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = loc/Info.plist;
+				INFOPLIST_KEY_NSLocationAlwaysUsageDescription = "Access your location in the background";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Show your location on the map";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -538,8 +553,10 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = drewharts.loc;
+				PRODUCT_BUNDLE_IDENTIFIER = drewharts.locc;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = Locc;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -686,6 +703,14 @@
 				minimumVersion = 9.0.0;
 			};
 		};
+		B0A819162CEA5F970041416F /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/google/GoogleSignIn-iOS";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 8.0.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -728,6 +753,16 @@
 			isa = XCSwiftPackageProductDependency;
 			package = B061F1DC2C5290EF00042CB0 /* XCRemoteSwiftPackageReference "ios-places-sdk" */;
 			productName = GooglePlaces;
+		};
+		B0A819172CEA5F970041416F /* GoogleSignIn */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B0A819162CEA5F970041416F /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignIn;
+		};
+		B0A819192CEA5F970041416F /* GoogleSignInSwift */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B0A819162CEA5F970041416F /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignInSwift;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

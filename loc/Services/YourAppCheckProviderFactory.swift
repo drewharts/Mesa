@@ -1,3 +1,11 @@
+//
+//  YourAppCheckProviderFactory.swift
+//  loc
+//
+//  Created by Andrew Hartsfield II on 11/12/24.
+//
+
+
 import Firebase
 
 class YourAppCheckProviderFactory: NSObject, AppCheckProviderFactory {
