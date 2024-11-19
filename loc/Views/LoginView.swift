@@ -1,15 +1,14 @@
-//
 //  LoginView.swift
 //  loc
 //
 //  Created by Andrew Hartsfield II on 11/11/24.
 //
 
-
 import SwiftUI
 import GoogleSignIn
 import FirebaseAuth
 import FirebaseCore
+import GoogleSignInSwift
 
 struct LoginView: View {
     @State private var errorMessage: String?
@@ -19,12 +18,12 @@ struct LoginView: View {
         ZStack {
             Color.white.ignoresSafeArea() // Set background color to white
 
-            VStack(spacing: 30) {
-                // App Title
-                Text("Locc")
-                    .font(.largeTitle)
-                    .fontWeight(.bold)
-                    .foregroundColor(.black)
+            VStack(spacing: 40) { // Stack items vertically with spacing
+                // Logo at the top
+                Image("LocLogo")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 150, height: 150) // Adjust size as needed
 
                 // Error Message (if any)
                 if let errorMessage = errorMessage {
@@ -35,28 +34,15 @@ struct LoginView: View {
                 }
 
                 // Google Sign-In Button
-                Button(action: signInWithGoogle) {
-                    HStack {
-                        Image("google_logo") // Add your Google logo image asset to the project
-                            .resizable()
-                            .frame(width: 24, height: 24)
-                        Text("Sign in with Google")
-                            .fontWeight(.medium)
-                    }
-                    .padding()
-                    .frame(maxWidth: .infinity)
-                    .background(Color.white)
-                    .cornerRadius(8)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(Color.gray, lineWidth: 1) // Add border for Google-like button
-                    )
-                }
-                .padding(.horizontal, 50) // Adjust button padding
+                GoogleSignInButton(action: signInWithGoogle)
+                    .frame(height: 60) // Adjust button height
+                    .padding(.horizontal, 40) // Add padding for aesthetics
             }
-            .padding()
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center) // Center VStack within the screen
         }
     }
+
+
 
     private func signInWithGoogle() {
         guard let clientID = FirebaseApp.app()?.options.clientID else {
@@ -95,11 +81,10 @@ struct LoginView: View {
                 if let error = error {
                     self.errorMessage = error.localizedDescription
                 } else {
-//                    self.saveUserToFirestore(authResult?.user)
+                    // Set user as logged in
                     self.userSession.isUserLoggedIn = true
                 }
             }
         }
     }
-    
 }
