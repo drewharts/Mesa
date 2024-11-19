@@ -1,5 +1,10 @@
-// ContentView.swift
-// loc
+//
+//  ContentView.swift
+//  loc
+//
+//  Created by Andrew Hartsfield II on 11/9/24.
+//
+//  Updated to align with Profile and UserSession changes
 
 import SwiftUI
 import UIKit
@@ -68,20 +73,15 @@ struct ContentView: View {
                                             Button(action: {
                                                 showProfileView = true
                                             }) {
-                                                if let profilePhotoURL = userSession.user?.profilePhotoURL {
-                                                    AsyncImage(url: profilePhotoURL) { image in
-                                                        image.resizable()
-                                                    } placeholder: {
-                                                        Image(systemName: "person.crop.circle")
-                                                            .resizable()
-                                                            .foregroundColor(.blue)
-                                                    }
-                                                    .frame(width: 60, height: 60)
-                                                    .clipShape(Circle())
-                                                    .overlay(
-                                                        Circle().stroke(Color.gray, lineWidth: 2)
-                                                    )
-                                                    .shadow(radius: 4)
+                                                if let profilePhoto = userSession.profile?.profilePhoto {
+                                                    profilePhoto
+                                                        .resizable()
+                                                        .frame(width: 60, height: 60)
+                                                        .clipShape(Circle())
+                                                        .overlay(
+                                                            Circle().stroke(Color.gray, lineWidth: 2)
+                                                        )
+                                                        .shadow(radius: 4)
                                                 } else {
                                                     Image(systemName: "person.crop.circle")
                                                         .resizable()

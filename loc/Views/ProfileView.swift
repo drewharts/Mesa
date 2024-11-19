@@ -13,17 +13,12 @@ struct ProfileView: View {
     var body: some View {
         VStack(spacing: 20) {
             // Profile Photo
-            if let profilePhotoURL = userSession.user?.profilePhotoURL {
-                AsyncImage(url: profilePhotoURL) { image in
-                    image.resizable()
-                } placeholder: {
-                    Image(systemName: "person.crop.circle.fill")
-                        .resizable()
-                        .foregroundColor(.blue)
-                }
-                .frame(width: 100, height: 100)
-                .clipShape(Circle())
-                .padding(.top, 40)
+            if let profilePhoto = userSession.profile?.profilePhoto {
+                profilePhoto
+                    .resizable()
+                    .frame(width: 100, height: 100)
+                    .clipShape(Circle())
+                    .padding(.top, 40)
             } else {
                 Image(systemName: "person.crop.circle.fill")
                     .resizable()
@@ -33,19 +28,19 @@ struct ProfileView: View {
             }
 
             // Name
-            Text("\(userSession.user?.firstName ?? "") \(userSession.user?.lastName ?? "")")
+            Text("\(userSession.profile?.firstName ?? "") \(userSession.profile?.lastName ?? "")")
                 .font(.title)
                 .fontWeight(.bold)
 
             // Email
-            Text(userSession.user?.email ?? "")
+            Text(userSession.profile?.email ?? "")
                 .foregroundColor(.gray)
                 .font(.subheadline)
 
             Divider().padding(.horizontal, 40)
 
             // Place Lists (if you have any logic for place lists)
-            // ...
+            // You can add your place list views here
 
             Spacer()
 

@@ -96,9 +96,14 @@ struct LoginView: View {
         let email = user.profile?.email ?? ""
         let profilePhotoURL = user.profile?.imageURL(withDimension: 200)
 
-        // Create a User object and store it in UserSession
+        // Create a User object
         let userProfile = User(firstName: firstName, lastName: lastName, email: email, profilePhotoURL: profilePhotoURL)
-        self.userSession.user = userProfile
+
+        // Create a Profile object using the User object
+        let profile = Profile(user: userProfile, phoneNumber: "") // Phone number might not be available yet
+
+        // Store the Profile object in UserSession
+        self.userSession.profile = profile
         self.userSession.isUserLoggedIn = true
     }
 }

@@ -11,7 +11,7 @@ import GoogleSignIn
 
 class UserSession: ObservableObject {
     @Published var isUserLoggedIn: Bool = false
-    @Published var user: User?
+    @Published var profile: Profile?
 
     func logout() {
         do {
@@ -20,7 +20,7 @@ class UserSession: ObservableObject {
             GIDSignIn.sharedInstance.signOut()
             // Update login state
             isUserLoggedIn = false
-            user = nil
+            profile = nil
         } catch let signOutError as NSError {
             print("Error signing out: \(signOutError)")
         }
