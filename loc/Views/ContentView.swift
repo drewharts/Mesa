@@ -1,10 +1,3 @@
-//
-//  ContentView.swift
-//  loc
-//
-//  Created by Andrew Hartsfield II on 7/13/24.
-//
-
 // ContentView.swift
 // loc
 
@@ -17,17 +10,17 @@ struct ContentView: View {
     @StateObject private var viewModel = SearchViewModel()
     @ObservedObject var locationManager: LocationManager
     @FocusState private var searchIsFocused: Bool
-    @State private var isSearchBarMinimized = false
+    @State private var isSearchBarMinimized = true // Set to true to show minimized search bar by default
     @State private var sheetHeight: CGFloat = 200 // Initial height of the bottom sheet
     @State private var minSheetHeight: CGFloat = 200 // Minimum height
     @State private var maxSheetHeight: CGFloat = UIScreen.main.bounds.height * 0.6 // Max height for the sheet
     @State private var showDetailSheet = false // Controls visibility of the BottomSheetView
     @State private var showProfileView = false // Controls navigation to the Profile view
-    
+
     init(locationManager: LocationManager = LocationManager()) {
         self.locationManager = locationManager
     }
-    
+
     var body: some View {
         // Show the LoginView if the user is not logged in
         Group {
@@ -46,45 +39,49 @@ struct ContentView: View {
                         VStack(spacing: 16) {
                             if isSearchBarMinimized {
                                 // Minimized Search Bar as a Blue Circle with a Magnifying Glass
-                                Button(action: {
-                                    withAnimation {
-                                        isSearchBarMinimized.toggle()
-                                        searchIsFocused = true
+                                HStack {
+                                    Spacer()
+                                    
+                                    VStack {
+                                        Button(action: {
+                                            withAnimation {
+                                                isSearchBarMinimized.toggle()
+                                                searchIsFocused = true
+                                            }
+                                        }) {
+                                            Image(systemName: "magnifyingglass")
+                                                .foregroundColor(.blue)
+                                                .frame(width: 60, height: 60)
+                                                .background(Color.white)
+                                                .clipShape(Circle())
+                                                .overlay(
+                                                    Circle().stroke(Color.gray, lineWidth: 2)
+                                                )
+                                                .shadow(radius: 4)
+                                        }
+                                        .padding(.top, 10)
+                                        .padding(.trailing, 20)
+                                        
+                                        // Profile Button
+                                        NavigationLink(destination: ProfileView(profile: SampleData.exampleProfile), isActive: $showProfileView) {
+                                            Button(action: {
+                                                showProfileView = true
+                                            }) {
+                                                Image(systemName: "person.crop.circle")
+                                                    .foregroundColor(.blue)
+                                                    .frame(width: 60, height: 60)
+                                                    .background(Color.white)
+                                                    .clipShape(Circle())
+                                                    .overlay(
+                                                        Circle().stroke(Color.gray, lineWidth: 2)
+                                                    )
+                                                    .shadow(radius: 4)
+                                            }
+                                        }
+                                        .padding(.top, 10)
+                                        .padding(.trailing, 20)
                                     }
-                                }) {
-                                    Image(systemName: "magnifyingglass")
-                                        .foregroundColor(.blue)
-                                        .frame(width: 60, height: 60)
-                                        .background(Color.white)
-                                        .clipShape(Circle())
-                                        .overlay(
-                                            Circle().stroke(Color.gray, lineWidth: 2)
-                                        )
-                                        .shadow(radius: 4)
                                 }
-                                .padding(.top, 10)
-                                .padding(.trailing, 20)
-                                .frame(maxWidth: .infinity, alignment: .topTrailing)
-                                
-                                // Profile Button
-                                NavigationLink(destination: ProfileView(profile: SampleData.exampleProfile), isActive: $showProfileView) {
-                                    Button(action: {
-                                        showProfileView = true
-                                    }) {
-                                        Image(systemName: "person.crop.circle")
-                                            .foregroundColor(.blue)
-                                            .frame(width: 60, height: 60)
-                                            .background(Color.white)
-                                            .clipShape(Circle())
-                                            .overlay(
-                                                Circle().stroke(Color.gray, lineWidth: 2)
-                                            )
-                                            .shadow(radius: 4)
-                                    }
-                                }
-                                .padding(.top, 10)
-                                .padding(.trailing, 20)
-                                .frame(maxWidth: .infinity, alignment: .topTrailing)
                             } else {
                                 // Expanded Search Bar
                                 SearchBar(text: $viewModel.searchText)
@@ -133,22 +130,22 @@ struct ContentView: View {
             }
         }
     }
-    
+
     // Handle the map tap to minimize the search bar
     private func handleMapTap() {
         withAnimation {
             searchIsFocused = false
             viewModel.searchResults = []
+            isSearchBarMinimized = true // Ensure the search bar is minimized when tapping the map
         }
     }
-    
+
     struct SampleData {
         static var exampleProfile: Profile {
             let profile = Profile(firstName: "Drew", lastName: "Hartsfield", phoneNumber: "555-1234")
             
             let placeList1 = PlaceList(name: "Wine Bars")
             let placeList2 = PlaceList(name: "New York")
-
             
             return profile
         }
