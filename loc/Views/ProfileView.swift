@@ -8,18 +8,22 @@
 import SwiftUI
 
 struct ProfileView: View {
-    let profile: Profile
     @EnvironmentObject var userSession: UserSession // Access UserSession as an environment object
 
     var body: some View {
         VStack(spacing: 20) {
             // Profile Photo
-            if let profilePhoto = profile.profilePhoto {
-                profilePhoto
-                    .resizable()
-                    .frame(width: 100, height: 100)
-                    .clipShape(Circle())
-                    .padding(.top, 40)
+            if let profilePhotoURL = userSession.user?.profilePhotoURL {
+                AsyncImage(url: profilePhotoURL) { image in
+                    image.resizable()
+                } placeholder: {
+                    Image(systemName: "person.crop.circle.fill")
+                        .resizable()
+                        .foregroundColor(.blue)
+                }
+                .frame(width: 100, height: 100)
+                .clipShape(Circle())
+                .padding(.top, 40)
             } else {
                 Image(systemName: "person.crop.circle.fill")
                     .resizable()
@@ -27,50 +31,24 @@ struct ProfileView: View {
                     .foregroundColor(.blue)
                     .padding(.top, 40)
             }
-            
+
             // Name
-            Text("\(profile.firstName) \(profile.lastName)")
+            Text("\(userSession.user?.firstName ?? "") \(userSession.user?.lastName ?? "")")
                 .font(.title)
                 .fontWeight(.bold)
-            
-            // Phone Number
-            Text(profile.phoneNumber)
+
+            // Email
+            Text(userSession.user?.email ?? "")
                 .foregroundColor(.gray)
                 .font(.subheadline)
-            
+
             Divider().padding(.horizontal, 40)
-            
-            // Place Lists
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Place Lists")
-                    .font(.headline)
-                    .fontWeight(.semibold)
-                
-                if profile.placeLists.isEmpty {
-                    Text("No place lists available")
-                        .foregroundColor(.gray)
-                        .font(.body)
-                } else {
-                    ForEach(profile.placeLists, id: \.name) { placeList in
-                        HStack {
-                            Text(placeList.name)
-                                .font(.body)
-                                .fontWeight(.medium)
-                            
-                            Spacer()
-                            
-                            Text("\(placeList.places.count) places")
-                                .foregroundColor(.gray)
-                                .font(.caption)
-                        }
-                        Divider()
-                    }
-                }
-            }
-            .padding(.horizontal)
-            
+
+            // Place Lists (if you have any logic for place lists)
+            // ...
+
             Spacer()
-            
+
             // Logout Button
             Button(action: {
                 userSession.logout() // Call the logout function

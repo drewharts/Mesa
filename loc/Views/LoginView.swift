@@ -83,8 +83,22 @@ struct LoginView: View {
                 } else {
                     // Set user as logged in
                     self.userSession.isUserLoggedIn = true
+                    fetchGoogleUserProfile(user: user)
                 }
             }
         }
+    }
+    
+    private func fetchGoogleUserProfile(user: GIDGoogleUser) {
+        // Access the user's profile information
+        let firstName = user.profile?.givenName ?? ""
+        let lastName = user.profile?.familyName ?? ""
+        let email = user.profile?.email ?? ""
+        let profilePhotoURL = user.profile?.imageURL(withDimension: 200)
+
+        // Create a User object and store it in UserSession
+        let userProfile = User(firstName: firstName, lastName: lastName, email: email, profilePhotoURL: profilePhotoURL)
+        self.userSession.user = userProfile
+        self.userSession.isUserLoggedIn = true
     }
 }
