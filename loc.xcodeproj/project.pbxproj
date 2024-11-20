@@ -45,6 +45,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		B021AF4B2CED816500642586 /* loc copy-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = "loc copy-Info.plist"; path = "/Users/drewhartsfield/Desktop/loc/loc copy-Info.plist"; sourceTree = "<absolute>"; };
 		B054DC5D2C42F5DA00C98088 /* loc.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = loc.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B054DC602C42F5DA00C98088 /* locApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = locApp.swift; sourceTree = "<group>"; };
 		B054DC642C42F5DB00C98088 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -112,6 +113,7 @@
 				B054DC7A2C42F5DB00C98088 /* locUITests */,
 				B054DC5E2C42F5DA00C98088 /* Products */,
 				B0821C662C641B9100BA126E /* Frameworks */,
+				B021AF4B2CED816500642586 /* loc copy-Info.plist */,
 			);
 			sourceTree = "<group>";
 			usesTabs = 0;
