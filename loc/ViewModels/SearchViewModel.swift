@@ -58,15 +58,16 @@ class SearchViewModel: ObservableObject {
     
     func selectPlace(_ prediction: GMSAutocompletePrediction) {
         let placesClient = GMSPlacesClient.shared()
-        placesClient.fetchPlace(fromPlaceID: prediction.placeID, placeFields: .all, sessionToken: nil) { [weak self] place, error in
-            if let error = error {
-                print("Error fetching place details: \(error)")
-                return
-            }
+
+        let myProperties = [GMSPlaceProperty.all].map {$0.rawValue}
+        let placeRequest = GMSFetchPlaceRequest(placeID: prediction.placeID, placeProperties: myProperties, sessionToken: nil)
+        placesClient.fetchPlace(with: placeRequest, callback: {
+            (place: GMSPlace?, error: Error?) in
+            guard let place, error == nil else { return }
             DispatchQueue.main.async {
-                self?.selectedPlace = place
-                self?.searchResults.removeAll() // Clear results after selecting a place
+                self.selectedPlace = place
+                self.searchResults.removeAll() // Clear results after selecting a place
             }
-        }
+        })
     }
 }
