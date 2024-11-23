@@ -10,6 +10,7 @@ import GooglePlaces
 
 struct RestaurantDetailView: View {
     let place: GMSPlace
+    @State private var currentPlaceID: String? = nil
     @Binding var sheetHeight: CGFloat
     let minSheetHeight: CGFloat
     @State private var photos: [UIImage] = [] // Store fetched photos
@@ -122,26 +123,47 @@ struct RestaurantDetailView: View {
             }
         }
         .onAppear(perform: fetchPhotos) // Fetch photos when the view appears
+        .onChange(of: place.placeID) { _ in
+            fetchPhotos()
+        }
         .padding(.vertical)
         .frame(maxWidth: .infinity)
     }
 
     private func fetchPhotos() {
-        guard let photosMetadata = place.photos else { return }
+        guard let photosMetadata = place.photos, !photosMetadata.isEmpty else {
+            print("No photos metadata found.")
+            return
+        }
+
+        // Track the current place
+        currentPlaceID = place.placeID
+
         let placesClient = GMSPlacesClient.shared()
 
         photosMetadata.forEach { photoMetadata in
-            placesClient.loadPlacePhoto(photoMetadata) { image, error in
+            let fetchPhotoRequest = GMSFetchPhotoRequest(photoMetadata: photoMetadata, maxSize: CGSize(width: 480, height: 480))
+            
+            placesClient.fetchPhoto(with: fetchPhotoRequest) { (photoImage, error) in
                 if let error = error {
-                    print("Error loading photo: \(error.localizedDescription)")
-                } else if let image = image {
+                    print("Error fetching photo: \(error.localizedDescription)")
+                } else if let photoImage = photoImage {
                     DispatchQueue.main.async {
-                        photos.append(image)
+                        // Ensure photos belong to the current place
+                        if self.currentPlaceID == self.place.placeID {
+                            self.photos.append(photoImage)
+                        } else {
+                            print("Discarding photo for outdated place.")
+                        }
                     }
                 }
             }
         }
     }
+
+
+
+
 }
 
 struct GridView: View {
@@ -162,4 +184,3 @@ struct GridView: View {
         }
     }
 }
-
