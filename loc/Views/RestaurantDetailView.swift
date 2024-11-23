@@ -131,6 +131,7 @@ struct RestaurantDetailView: View {
     }
 
     private func fetchPhotos() {
+        photos = []
         guard let photosMetadata = place.photos, !photosMetadata.isEmpty else {
             print("No photos metadata found.")
             return

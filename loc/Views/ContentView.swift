@@ -136,6 +136,8 @@ struct ContentView: View {
                                     minSheetHeight: minSheetHeight
                                 )
                                 .frame(maxWidth: .infinity)
+                                .id(selectedPlace.placeID) // This line ensures a new view instance
+
                             }
                         }
                     }
