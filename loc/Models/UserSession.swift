@@ -25,5 +25,9 @@ class UserSession: ObservableObject {
             print("Error signing out: \(signOutError)")
         }
     }
+    
+    // Add login and profile creation methods here
 }
+
+
 

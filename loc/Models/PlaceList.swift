@@ -8,9 +8,10 @@
 import Foundation
 import GooglePlaces
 
-class PlaceList {
+class PlaceList: Identifiable, ObservableObject {
+    let id = UUID()
     var name: String
-    var places: [GMSPlace] = []
+    @Published var places: [GMSPlace] = []
     
     init(name: String) {
         self.name = name
@@ -23,5 +24,5 @@ class PlaceList {
     func removePlace(byID placeID: String) {
         places.removeAll { $0.placeID == placeID }
     }
-
 }
+

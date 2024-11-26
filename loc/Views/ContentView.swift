@@ -30,7 +30,7 @@ struct ContentView: View {
     var body: some View {
         // Show the LoginView if the user is not logged in
         Group {
-            if userSession.isUserLoggedIn {
+            if userSession.isUserLoggedIn, let profile = userSession.profile {
                 // Main app content after login
                 NavigationView {
                     ZStack(alignment: .top) {
@@ -73,7 +73,7 @@ struct ContentView: View {
                                             Button(action: {
                                                 showProfileView = true
                                             }) {
-                                                if let profilePhoto = userSession.profile?.profilePhoto {
+                                                if let profilePhoto = profile.profilePhoto {
                                                     profilePhoto
                                                         .resizable()
                                                         .frame(width: 60, height: 60)
@@ -146,6 +146,7 @@ struct ContentView: View {
                     }
                 }
                 .navigationViewStyle(StackNavigationViewStyle()) // Ensures proper navigation behavior
+                .environmentObject(profile) // Inject Profile into the environment
             } else {
                 // Show LoginView if user is not logged in
                 LoginView()

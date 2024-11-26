@@ -14,7 +14,20 @@ struct RestaurantDetailView: View {
     @Binding var sheetHeight: CGFloat
     let minSheetHeight: CGFloat
     @State private var photos: [UIImage] = [] // Store fetched photos
-
+    
+    @EnvironmentObject var profile: Profile // Access Profile from environment
+    
+    @State private var showAlert = false // State to control alert visibility
+    @State private var alertMessage = "" // Alert message
+    
+    // States for handling new list creation
+    @State private var showNewListSheet = false
+    @State private var newListName = ""
+    
+    // States for selecting an existing list
+    @State private var showListSelection = false
+    @State private var selectedList: PlaceList? = nil
+    
     var body: some View {
         VStack(spacing: 16) {
             if sheetHeight == minSheetHeight {
@@ -28,7 +41,7 @@ struct RestaurantDetailView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
                         // Header
-                        HStack(alignment: .top, spacing: 8) { // Reduce spacing for better space management
+                        HStack(alignment: .top, spacing: 8) { // Reduced spacing for better space management
                             if let iconURL = place.iconImageURL {
                                 AsyncImage(url: iconURL) { phase in
                                     if let image = phase.image {
@@ -73,9 +86,8 @@ struct RestaurantDetailView: View {
                                 }
                             }
 
-
                             Button(action: {
-                                // Add action
+                                handleAddButton()
                             }) {
                                 Image(systemName: "plus")
                                     .padding(8)
@@ -85,8 +97,6 @@ struct RestaurantDetailView: View {
                             .frame(width: 40) // Fixed size for the button to ensure alignment
                         }
                         .padding(.horizontal)
-
-
 
                         // Photo Grid
                         if !photos.isEmpty {
@@ -128,6 +138,21 @@ struct RestaurantDetailView: View {
         }
         .padding(.vertical)
         .frame(maxWidth: .infinity)
+        .alert(isPresented: $showAlert) {
+            Alert(title: Text("Success"), message: Text(alertMessage), dismissButton: .default(Text("OK")))
+        }
+        .sheet(isPresented: $showNewListSheet) {
+            NewListView(isPresented: $showNewListSheet, onSave: { listName in
+                createNewList(named: listName)
+            })
+        }
+        .actionSheet(isPresented: $showListSelection) {
+            ActionSheet(
+                title: Text("Select a List"),
+                message: Text("Choose a list to add this place to."),
+                buttons: getActionSheetButtons()
+            )
+        }
     }
 
     private func fetchPhotos() {
@@ -161,11 +186,65 @@ struct RestaurantDetailView: View {
             }
         }
     }
-
-
-
-
+    
+    private func handleAddButton() {
+        if profile.placeLists.isEmpty {
+            // No lists exist; prompt to create a new list
+            showNewListSheet = true
+        } else {
+            // Lists exist; show action sheet to select a list or create a new one
+            showListSelection = true
+        }
+    }
+    
+    private func createNewList(named listName: String) {
+        let trimmedName = listName.trimmingCharacters(in: .whitespaces)
+        guard !trimmedName.isEmpty else {
+            alertMessage = "List name cannot be empty."
+            showAlert = true
+            return
+        }
+        
+        if profile.placeLists.contains(where: { $0.name.lowercased() == trimmedName.lowercased() }) {
+            alertMessage = "A list with this name already exists."
+            showAlert = true
+            return
+        }
+        
+        let newList = PlaceList(name: trimmedName)
+        profile.addPlacesList(newList)
+        profile.addPlace(place: place, to: newList)
+        
+        alertMessage = "\(place.name ?? "Place") has been added to \(trimmedName)."
+        showAlert = true
+    }
+    
+    private func addToExistingList(_ list: PlaceList) {
+        profile.addPlace(place: place, to: list)
+        
+        alertMessage = "\(place.name ?? "Place") has been added to \(list.name)."
+        showAlert = true
+    }
+    
+    private func getActionSheetButtons() -> [ActionSheet.Button] {
+        var buttons: [ActionSheet.Button] = []
+        
+        for list in profile.placeLists {
+            buttons.append(.default(Text(list.name)) {
+                addToExistingList(list)
+            })
+        }
+        
+        buttons.append(.default(Text("Create New List")) {
+            showNewListSheet = true
+        })
+        
+        buttons.append(.cancel())
+        
+        return buttons
+    }
 }
+
 
 struct GridView: View {
     let images: [UIImage]
