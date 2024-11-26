@@ -46,20 +46,17 @@ struct ProfileView: View {
                         .font(.headline)
                         .padding(.horizontal, 20)
 
-                    if let placeLists = userSession.profile?.placeLists, !placeLists.isEmpty {
-                        List {
-                            ForEach(placeLists) { list in
+                    // Inside ProfileView.swift
+
+                    List {
+                        ForEach(userSession.profile?.placeLists ?? []) { list in
+                            NavigationLink(destination: PlaceListView(placeList: list)) {
                                 Text(list.name)
                                     .font(.body)
                             }
                         }
-                        .listStyle(PlainListStyle())
-                        .frame(height: 300) // Adjust height as needed
-                    } else {
-                        Text("You have no lists yet.")
-                            .foregroundColor(.gray)
-                            .padding(.horizontal, 20)
                     }
+
                 }
 
                 Spacer()

@@ -5,6 +5,12 @@
 //  Created by Andrew Hartsfield II on 11/8/24.
 //
 
+//  RestaurantDetailView.swift
+//  loc
+//
+//  Created by Andrew Hartsfield II on 11/8/24.
+//
+
 import SwiftUI
 import GooglePlaces
 
@@ -20,11 +26,7 @@ struct RestaurantDetailView: View {
     @State private var showAlert = false // State to control alert visibility
     @State private var alertMessage = "" // Alert message
     
-    // States for handling new list creation
-    @State private var showNewListSheet = false
-    @State private var newListName = ""
-    
-    // States for selecting an existing list
+    // State for selecting an existing list
     @State private var showListSelection = false
     @State private var selectedList: PlaceList? = nil
     
@@ -141,17 +143,9 @@ struct RestaurantDetailView: View {
         .alert(isPresented: $showAlert) {
             Alert(title: Text("Success"), message: Text(alertMessage), dismissButton: .default(Text("OK")))
         }
-        .sheet(isPresented: $showNewListSheet) {
-            NewListView(isPresented: $showNewListSheet, onSave: { listName in
-                createNewList(named: listName)
-            })
-        }
-        .actionSheet(isPresented: $showListSelection) {
-            ActionSheet(
-                title: Text("Select a List"),
-                message: Text("Choose a list to add this place to."),
-                buttons: getActionSheetButtons()
-            )
+        .sheet(isPresented: $showListSelection) {
+            ListSelectionSheet(place: place, isPresented: $showListSelection)
+                .environmentObject(profile) // Pass Profile as environment object
         }
     }
 
@@ -188,13 +182,7 @@ struct RestaurantDetailView: View {
     }
     
     private func handleAddButton() {
-        if profile.placeLists.isEmpty {
-            // No lists exist; prompt to create a new list
-            showNewListSheet = true
-        } else {
-            // Lists exist; show action sheet to select a list or create a new one
-            showListSelection = true
-        }
+        showListSelection = true
     }
     
     private func createNewList(named listName: String) {
@@ -225,26 +213,7 @@ struct RestaurantDetailView: View {
         alertMessage = "\(place.name ?? "Place") has been added to \(list.name)."
         showAlert = true
     }
-    
-    private func getActionSheetButtons() -> [ActionSheet.Button] {
-        var buttons: [ActionSheet.Button] = []
-        
-        for list in profile.placeLists {
-            buttons.append(.default(Text(list.name)) {
-                addToExistingList(list)
-            })
-        }
-        
-        buttons.append(.default(Text("Create New List")) {
-            showNewListSheet = true
-        })
-        
-        buttons.append(.cancel())
-        
-        return buttons
-    }
 }
-
 
 struct GridView: View {
     let images: [UIImage]
