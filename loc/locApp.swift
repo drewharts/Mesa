@@ -28,8 +28,8 @@ struct locApp: App {
         AppCheck.setAppCheckProviderFactory(providerFactory)
 
         // Initialize Google Maps and Google Places API keys
-        GMSServices.provideAPIKey("AIzaSyAfhLbm8NlOqjqQRR9aAtNdSEYIfZocrVE")
-        GMSPlacesClient.provideAPIKey("AIzaSyAfhLbm8NlOqjqQRR9aAtNdSEYIfZocrVE")
+        GMSServices.provideAPIKey("AIzaSyD0E96aor4slzQTgo24aflktGJzbjgQkB4")
+        GMSPlacesClient.provideAPIKey("AIzaSyD0E96aor4slzQTgo24aflktGJzbjgQkB4")
     }
 
     var body: some Scene {
