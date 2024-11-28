@@ -81,8 +81,6 @@ struct LoginView: View {
                 if let error = error {
                     self.errorMessage = error.localizedDescription
                 } else {
-                    // Set user as logged in
-                    self.userSession.isUserLoggedIn = true
                     fetchGoogleUserProfile(user: user)
                 }
             }
