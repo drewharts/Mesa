@@ -38,6 +38,7 @@ struct LoginView: View {
             if isLoggedIn {
                 userSession.profile = viewModel.profile
                 userSession.isUserLoggedIn = true
+                
             }
         }
     }

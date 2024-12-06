@@ -32,6 +32,12 @@ class Profile: ObservableObject {
             loadImage(from: url)
         }
     }
+    
+    func loadPlaceListes() {
+        firestoreService.fetchLists(userId: userId) { placeLists in
+            self.placeLists = placeLists
+        }
+    }
 
     private func loadImage(from url: URL) {
         URLSession.shared.dataTask(with: url) { data, response, error in

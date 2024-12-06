@@ -69,8 +69,6 @@ class LoginViewModel: ObservableObject {
             return
         }
 
-        let db = Firestore.firestore()
-
         let userModel = User(
             firstName: user.profile?.givenName ?? "",
             lastName: user.profile?.familyName ?? "",
@@ -79,17 +77,10 @@ class LoginViewModel: ObservableObject {
         )
 
         let profile = Profile(user: userModel, phoneNumber: "", userId: uid)
-
-        let profileData: [String: Any] = [
-            "firstName": profile.firstName,
-            "lastName": profile.lastName,
-            "email": profile.email,
-            "profilePhotoURL": profile.profilePhoto ?? "",
-            "phoneNumber": profile.phoneNumber,
-            "createdAt": FieldValue.serverTimestamp()
-        ]
-
-        db.collection("profiles").document(uid).setData(profileData) { [weak self] error in
+        profile.loadPlaceListes()
+        
+        // Now delegate the saving logic to FirestoreService
+        FirestoreService().saveUserProfile(uid: uid, profile: profile) { [weak self] error in
             if let error = error {
                 self?.errorMessage = "Error saving profile: \(error.localizedDescription)"
             } else {
@@ -98,4 +89,5 @@ class LoginViewModel: ObservableObject {
             }
         }
     }
+
 }
