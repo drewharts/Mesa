@@ -9,7 +9,7 @@
 import SwiftUI
 import GooglePlaces
 
-class RestaurantDetailViewModel: ObservableObject {
+class PlaceDetailViewModel: ObservableObject {
     @Published var photos: [UIImage] = []
     @Published var showAlert = false
     @Published var alertMessage = ""

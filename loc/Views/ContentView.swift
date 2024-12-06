@@ -130,7 +130,7 @@ struct ContentView: View {
                                 sheetHeight: $sheetHeight,
                                 maxSheetHeight: maxSheetHeight
                             ) {
-                                RestaurantDetailView(
+                                PlaceDetailView(
                                     place: selectedPlace,
                                     sheetHeight: $sheetHeight,
                                     minSheetHeight: minSheetHeight

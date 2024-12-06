@@ -14,14 +14,14 @@
 import SwiftUI
 import GooglePlaces
 
-struct RestaurantDetailView: View {
+struct PlaceDetailView: View {
     let place: GMSPlace
     @Binding var sheetHeight: CGFloat
     let minSheetHeight: CGFloat
 
     @EnvironmentObject var profile: Profile
 
-    @StateObject private var viewModel = RestaurantDetailViewModel()
+    @StateObject private var viewModel = PlaceDetailViewModel()
 
     var body: some View {
         VStack(spacing: 16) {
