@@ -16,20 +16,24 @@ class Profile: ObservableObject {
     @Published var profilePhoto: Image? = nil
     @Published var phoneNumber: String
     @Published var placeLists: [PlaceList] = []
-    
-    init(user: User, phoneNumber: String) {
+
+    weak var delegate: ProfileDelegate?
+    private let firestoreService = FirestoreService()
+    private let userId: String // User's unique Firestore ID
+
+    init(user: User, phoneNumber: String, userId: String) {
         self.firstName = user.firstName
         self.lastName = user.lastName
         self.email = user.email
         self.phoneNumber = phoneNumber
-        
+        self.userId = userId
+
         if let url = user.profilePhotoURL {
             loadImage(from: url)
         }
     }
-    
+
     private func loadImage(from url: URL) {
-        // Asynchronously load the image from the URL
         URLSession.shared.dataTask(with: url) { data, response, error in
             guard let data = data, let uiImage = UIImage(data: data) else { return }
             DispatchQueue.main.async {
@@ -37,30 +41,21 @@ class Profile: ObservableObject {
             }
         }.resume()
     }
-    
-    func addPlacesList(_ placeList: PlaceList) {
-        placeLists.append(placeList)
-    }
-    
-    func removePlacesList(named name: String) {
-        placeLists.removeAll { $0.name == name }
-    }
-    
+
     func addPlaceToList(place: GMSPlace, listName: String = "Favorites") {
         if let list = placeLists.first(where: { $0.name == listName }) {
             if !list.places.contains(where: { $0.placeID == place.placeID }) {
                 list.addPlace(place)
+                firestoreService.addPlaceToList(userId: userId, listName: listName, place: place)
+                delegate?.didAddPlace(toList: listName, place: place)
             }
         } else {
             let newList = PlaceList(name: listName)
             newList.addPlace(place)
             placeLists.append(newList)
-        }
-    }
-    
-    func addPlace(place: GMSPlace, to list: PlaceList) {
-        if !list.places.contains(where: { $0.placeID == place.placeID }) {
-            list.addPlace(place)
+            firestoreService.createNewList(userId: userId, listName: listName)
+            firestoreService.addPlaceToList(userId: userId, listName: listName, place: place)
+            delegate?.didAddPlace(toList: listName, place: place)
         }
     }
 }

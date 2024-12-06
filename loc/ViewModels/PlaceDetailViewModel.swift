@@ -80,9 +80,7 @@ class PlaceDetailViewModel: ObservableObject {
             return
         }
 
-        let newList = PlaceList(name: trimmedName)
-        profile.addPlacesList(newList)
-        profile.addPlace(place: place, to: newList)
+        profile.addPlaceToList(place: place, listName: trimmedName)
 
         alertMessage = "\(place.name ?? "Place") has been added to \(trimmedName)."
         showAlert = true

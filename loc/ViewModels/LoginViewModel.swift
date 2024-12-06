@@ -78,7 +78,7 @@ class LoginViewModel: ObservableObject {
             profilePhotoURL: user.profile?.imageURL(withDimension: 200)
         )
 
-        let profile = Profile(user: userModel, phoneNumber: "")
+        let profile = Profile(user: userModel, phoneNumber: "", userId: uid)
 
         let profileData: [String: Any] = [
             "firstName": profile.firstName,

@@ -77,12 +77,11 @@ struct ListSelectionSheet: View {
         let trimmedName = listName.trimmingCharacters(in: .whitespaces)
         guard !trimmedName.isEmpty else { return }
 
-        let newList = PlaceList(name: trimmedName)
-        profile.addPlacesList(newList)
-        profile.addPlace(place: place, to: newList)
+        profile.addPlaceToList(place: place, listName: listName)
     }
 
     private func addToExistingList(_ list: PlaceList) {
-        profile.addPlace(place: place, to: list)
+        profile.addPlaceToList(place: place, listName: list.name)
     }
+
 }
