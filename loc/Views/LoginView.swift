@@ -5,103 +5,40 @@
 //
 
 import SwiftUI
-import GoogleSignIn
-import FirebaseAuth
-import FirebaseCore
 import GoogleSignInSwift
 
 struct LoginView: View {
-    @State private var errorMessage: String?
     @EnvironmentObject var userSession: UserSession
+    @StateObject private var viewModel = LoginViewModel()
 
     var body: some View {
         ZStack {
-            Color.white.ignoresSafeArea() // Set background color to white
+            Color.white.ignoresSafeArea()
 
-            VStack(spacing: 40) { // Stack items vertically with spacing
-                // Logo at the top
+            VStack(spacing: 40) {
                 Image("LocLogo")
                     .resizable()
                     .scaledToFit()
-                    .frame(width: 150, height: 150) // Adjust size as needed
+                    .frame(width: 150, height: 150)
 
-                // Error Message (if any)
-                if let errorMessage = errorMessage {
+                if let errorMessage = viewModel.errorMessage {
                     Text(errorMessage)
                         .foregroundColor(.red)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 20)
                 }
 
-                // Google Sign-In Button
-                GoogleSignInButton(action: signInWithGoogle)
-                    .frame(height: 60) // Adjust button height
-                    .padding(.horizontal, 40) // Add padding for aesthetics
+                GoogleSignInButton(action: viewModel.signInWithGoogle)
+                    .frame(height: 60)
+                    .padding(.horizontal, 40)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center) // Center VStack within the screen
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
         }
-    }
-
-
-
-    private func signInWithGoogle() {
-        guard let clientID = FirebaseApp.app()?.options.clientID else {
-            errorMessage = "Missing client ID"
-            return
-        }
-        
-        let config = GIDConfiguration(clientID: clientID)
-        GIDSignIn.sharedInstance.configuration = config
-        
-        guard let rootViewController = UIApplication.shared.connectedScenes
-                .compactMap({ $0 as? UIWindowScene })
-                .flatMap({ $0.windows })
-                .first(where: { $0.isKeyWindow })?.rootViewController else {
-            errorMessage = "Unable to access root view controller"
-            return
-        }
-
-        GIDSignIn.sharedInstance.signIn(withPresenting: rootViewController) { [self] result, error in
-            guard error == nil else {
-                self.errorMessage = error?.localizedDescription
-                return
-            }
-            
-            guard let user = result?.user,
-                  let idToken = user.idToken?.tokenString else {
-                self.errorMessage = "Failed to retrieve user credentials"
-                return
-            }
-            
-            let accessToken = user.accessToken.tokenString
-            
-            let credential = GoogleAuthProvider.credential(withIDToken: idToken, accessToken: accessToken)
-            
-            Auth.auth().signIn(with: credential) { authResult, error in
-                if let error = error {
-                    self.errorMessage = error.localizedDescription
-                } else {
-                    fetchGoogleUserProfile(user: user)
-                }
+        .onChange(of: viewModel.isUserLoggedIn) { isLoggedIn in
+            if isLoggedIn {
+                userSession.profile = viewModel.profile
+                userSession.isUserLoggedIn = true
             }
         }
-    }
-    
-    private func fetchGoogleUserProfile(user: GIDGoogleUser) {
-        // Access the user's profile information
-        let firstName = user.profile?.givenName ?? ""
-        let lastName = user.profile?.familyName ?? ""
-        let email = user.profile?.email ?? ""
-        let profilePhotoURL = user.profile?.imageURL(withDimension: 200)
-
-        // Create a User object
-        let userProfile = User(firstName: firstName, lastName: lastName, email: email, profilePhotoURL: profilePhotoURL)
-
-        // Create a Profile object using the User object
-        let profile = Profile(user: userProfile, phoneNumber: "") // Phone number might not be available yet
-
-        // Store the Profile object in UserSession
-        self.userSession.profile = profile
-        self.userSession.isUserLoggedIn = true
     }
 }
