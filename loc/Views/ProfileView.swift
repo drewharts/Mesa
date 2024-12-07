@@ -13,6 +13,7 @@ struct ProfileView: View {
     var body: some View {
         NavigationView {
             VStack(spacing: 20) {
+                
                 // Profile Photo
                 if let profilePhoto = userSession.profile?.profilePhoto {
                     profilePhoto
@@ -28,13 +29,16 @@ struct ProfileView: View {
                         .padding(.top, 40)
                 }
 
-                // Name
-                Text("\(userSession.profile?.firstName ?? "") \(userSession.profile?.lastName ?? "")")
+                // Display Name
+                let firstName = userSession.profile?.data.firstName ?? ""
+                let lastName = userSession.profile?.data.lastName ?? ""
+                Text("\(firstName) \(lastName)")
                     .font(.title)
                     .fontWeight(.bold)
 
                 // Email
-                Text(userSession.profile?.email ?? "")
+                let email = userSession.profile?.data.email ?? ""
+                Text(email)
                     .foregroundColor(.gray)
                     .font(.subheadline)
 
@@ -46,17 +50,15 @@ struct ProfileView: View {
                         .font(.headline)
                         .padding(.horizontal, 20)
 
-                    // Inside ProfileView.swift
+                    // Extract placeLists to a local constant
+                    let placeLists = userSession.profile?.data.placeLists ?? []
 
-                    List {
-                        ForEach(userSession.profile?.placeLists ?? []) { list in
-                            NavigationLink(destination: PlaceListView(placeList: list)) {
-                                Text(list.name)
-                                    .font(.body)
-                            }
+                    List(placeLists) { list in
+                        NavigationLink(destination: PlaceListView(placeList: list)) {
+                            Text(list.name)
+                                .font(.body)
                         }
                     }
-
                 }
 
                 Spacer()

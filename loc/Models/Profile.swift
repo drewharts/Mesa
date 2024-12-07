@@ -9,33 +9,40 @@ import Foundation
 import SwiftUI
 import GooglePlaces
 
-class Profile: ObservableObject {
-    @Published var firstName: String
-    @Published var lastName: String
-    @Published var email: String
-    @Published var profilePhoto: Image? = nil
-    @Published var phoneNumber: String
-    @Published var placeLists: [PlaceList] = []
+struct ProfileData: Codable {
+    var firstName: String
+    var lastName: String
+    var email: String
+    var profilePhotoURL: URL?
+    var phoneNumber: String
+    var placeLists: [PlaceList]
+}
 
+class Profile: ObservableObject {
+    @Published var data: ProfileData
+    @Published var profilePhoto: Image? = nil  // Image stored separately
     weak var delegate: ProfileDelegate?
     private let firestoreService = FirestoreService()
-    private let userId: String // User's unique Firestore ID
+    private let userId: String
 
     init(user: User, phoneNumber: String, userId: String) {
-        self.firstName = user.firstName
-        self.lastName = user.lastName
-        self.email = user.email
-        self.phoneNumber = phoneNumber
         self.userId = userId
-
-        if let url = user.profilePhotoURL {
-            loadImage(from: url)
-        }
+        // Convert user + phoneNumber to ProfileData
+        self.data = ProfileData(
+            firstName: user.firstName,
+            lastName: user.lastName,
+            email: user.email,
+            profilePhotoURL: user.profilePhotoURL,
+            phoneNumber: phoneNumber,
+            placeLists: []
+        )
+        loadPlaceListes()
+//        loadProfilePhoto() // separate method to load image from URL
     }
     
     func loadPlaceListes() {
         firestoreService.fetchLists(userId: userId) { placeLists in
-            self.placeLists = placeLists
+            self.data.placeLists = placeLists
         }
     }
 
@@ -49,7 +56,7 @@ class Profile: ObservableObject {
     }
 
     func addPlaceToList(place: GMSPlace, listName: String = "Favorites") {
-        if let list = placeLists.first(where: { $0.name == listName }) {
+        if let list = data.placeLists.first(where: { $0.name == listName }) {
             if !list.places.contains(where: { $0.placeID == place.placeID }) {
                 list.addPlace(place)
                 firestoreService.addPlaceToList(userId: userId, listName: listName, place: place)
@@ -58,7 +65,7 @@ class Profile: ObservableObject {
         } else {
             let newList = PlaceList(name: listName)
             newList.addPlace(place)
-            placeLists.append(newList)
+            data.placeLists.append(newList)
             firestoreService.createNewList(userId: userId, listName: listName)
             firestoreService.addPlaceToList(userId: userId, listName: listName, place: place)
             delegate?.didAddPlace(toList: listName, place: place)

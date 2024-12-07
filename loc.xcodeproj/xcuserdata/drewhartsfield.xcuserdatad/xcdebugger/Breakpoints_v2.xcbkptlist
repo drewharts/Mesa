@@ -30,8 +30,8 @@
             filePath = "loc/Models/Profile.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "38"
-            endingLineNumber = "38"
+            startingLineNumber = "45"
+            endingLineNumber = "45"
             landmarkName = "loadPlaceListes()"
             landmarkType = "7">
          </BreakpointContent>
@@ -40,14 +40,14 @@
          BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
          <BreakpointContent
             uuid = "0EEB3BE2-0C93-4AD0-90DE-9AE97BDCD85C"
-            shouldBeEnabled = "Yes"
+            shouldBeEnabled = "No"
             ignoreCount = "0"
             continueAfterRunningActions = "No"
             filePath = "loc/Services/FirestoreService.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "70"
-            endingLineNumber = "70"
+            startingLineNumber = "74"
+            endingLineNumber = "74"
             landmarkName = "fetchLists(userId:completion:)"
             landmarkType = "7">
          </BreakpointContent>
@@ -56,7 +56,23 @@
          BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
          <BreakpointContent
             uuid = "D95DC420-E81B-4BE1-B3A2-A113D086302C"
-            shouldBeEnabled = "Yes"
+            shouldBeEnabled = "No"
+            ignoreCount = "0"
+            continueAfterRunningActions = "No"
+            filePath = "loc/Services/FirestoreService.swift"
+            startingColumnNumber = "9223372036854775807"
+            endingColumnNumber = "9223372036854775807"
+            startingLineNumber = "71"
+            endingLineNumber = "71"
+            landmarkName = "fetchLists(userId:completion:)"
+            landmarkType = "7">
+         </BreakpointContent>
+      </BreakpointProxy>
+      <BreakpointProxy
+         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
+         <BreakpointContent
+            uuid = "918D6E74-B8D7-4BBB-9AC7-D0FB9211A059"
+            shouldBeEnabled = "No"
             ignoreCount = "0"
             continueAfterRunningActions = "No"
             filePath = "loc/Services/FirestoreService.swift"
@@ -66,51 +82,21 @@
             endingLineNumber = "67"
             landmarkName = "fetchLists(userId:completion:)"
             landmarkType = "7">
-            <Locations>
-               <Location
-                  uuid = "D95DC420-E81B-4BE1-B3A2-A113D086302C - d630eacbdc94c99c"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "closure #1 (Swift.Optional&lt;__C.FIRQuerySnapshot&gt;, Swift.Optional&lt;Swift.Error&gt;) -&gt; () in loc.FirestoreService.fetchLists(userId: Swift.String, completion: (Swift.Array&lt;loc.PlaceList&gt;) -&gt; ()) -&gt; ()"
-                  moduleName = "loc.debug.dylib"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/drewhartsfield/Desktop/loc/loc/Services/FirestoreService.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "67"
-                  endingLineNumber = "67">
-               </Location>
-               <Location
-                  uuid = "D95DC420-E81B-4BE1-B3A2-A113D086302C - 8c2fe29bf640f012"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "closure #1 (__C.FIRQueryDocumentSnapshot) -&gt; Swift.Optional&lt;loc.PlaceList&gt; in closure #1 (Swift.Optional&lt;__C.FIRQuerySnapshot&gt;, Swift.Optional&lt;Swift.Error&gt;) -&gt; () in loc.FirestoreService.fetchLists(userId: Swift.String, completion: (Swift.Array&lt;loc.PlaceList&gt;) -&gt; ()) -&gt; ()"
-                  moduleName = "loc.debug.dylib"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/drewhartsfield/Desktop/loc/loc/Services/FirestoreService.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "67"
-                  endingLineNumber = "67">
-               </Location>
-            </Locations>
          </BreakpointContent>
       </BreakpointProxy>
       <BreakpointProxy
          BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
          <BreakpointContent
-            uuid = "918D6E74-B8D7-4BBB-9AC7-D0FB9211A059"
-            shouldBeEnabled = "Yes"
+            uuid = "630C8922-0110-4F96-8F95-FA35FFE063B4"
+            shouldBeEnabled = "No"
             ignoreCount = "0"
             continueAfterRunningActions = "No"
-            filePath = "loc/Services/FirestoreService.swift"
+            filePath = "loc/Models/Profile.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "64"
-            endingLineNumber = "64"
-            landmarkName = "fetchLists(userId:completion:)"
+            startingLineNumber = "44"
+            endingLineNumber = "44"
+            landmarkName = "loadPlaceListes()"
             landmarkType = "7">
          </BreakpointContent>
       </BreakpointProxy>

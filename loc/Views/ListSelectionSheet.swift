@@ -40,7 +40,7 @@ struct ListSelectionSheet: View {
                         })
                     }
 
-                    ForEach(profile.placeLists) { list in
+                    ForEach(profile.data.placeLists) { list in
                         Button(action: {
                             addToExistingList(list)
                             isPresented = false

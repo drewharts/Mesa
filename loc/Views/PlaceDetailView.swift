@@ -5,12 +5,6 @@
 //  Created by Andrew Hartsfield II on 11/8/24.
 //
 
-//  RestaurantDetailView.swift
-//  loc
-//
-//  Created by Andrew Hartsfield II on 11/8/24.
-//
-
 import SwiftUI
 import GooglePlaces
 

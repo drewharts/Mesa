@@ -74,7 +74,7 @@ class PlaceDetailViewModel: ObservableObject {
             return
         }
 
-        if profile.placeLists.contains(where: { $0.name.lowercased() == trimmedName.lowercased() }) {
+        if profile.data.placeLists.contains(where: { $0.name.lowercased() == trimmedName.lowercased() }) {
             alertMessage = "A list with this name already exists."
             showAlert = true
             return
