@@ -13,6 +13,7 @@ struct MapView: UIViewRepresentable {
     @Binding var searchResults: [GMSAutocompletePrediction]
     @Binding var selectedPlace: GMSPlace?
     @ObservedObject var locationManager: LocationManager
+    @EnvironmentObject var userSession: UserSession
     var onMapTap: (() -> Void)? // Callback to notify when the map is tapped
 
     let mapView = GMSMapView()

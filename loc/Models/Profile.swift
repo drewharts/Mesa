@@ -56,6 +56,7 @@ class Profile: ObservableObject {
     }
 
     func addPlaceToList(place: GMSPlace, listName: String = "Favorites") {
+        var placeCity = place.addressComponents?.first(where: { $0.types.contains("locality") })?.name ?? ""
         if let list = data.placeLists.first(where: { $0.name == listName }) {
             if !list.places.contains(where: { $0.placeID == place.placeID }) {
                 list.addPlace(place)
@@ -63,10 +64,10 @@ class Profile: ObservableObject {
                 delegate?.didAddPlace(toList: listName, place: place)
             }
         } else {
-            let newList = PlaceList(name: listName)
+            let newList = PlaceList(name: listName,city: placeCity)
             newList.addPlace(place)
             data.placeLists.append(newList)
-            firestoreService.createNewList(userId: userId, listName: listName)
+            firestoreService.createNewList(userId: userId, listName: listName, city: placeCity)
             firestoreService.addPlaceToList(userId: userId, listName: listName, place: place)
             delegate?.didAddPlace(toList: listName, place: place)
         }

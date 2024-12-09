@@ -18,9 +18,11 @@ class PlaceList: Codable, Identifiable, ObservableObject {
 //    let id = UUID()
     var name: String
     var places: [SimplifiedPlace] = []
+    var city: String
     
-    init(name: String) {
+    init(name: String, city: String) {
         self.name = name
+        self.city = city
     }
     
     func addPlace(_ place: GMSPlace) {

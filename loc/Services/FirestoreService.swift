@@ -42,8 +42,8 @@ class FirestoreService {
             }
     }
 
-    func createNewList(userId: String, listName: String) {
-        let listData = PlaceList(name: listName)
+    func createNewList(userId: String, listName: String, city: String) {
+        let listData = PlaceList(name: listName,city: city)
         do {
             try db.collection("users").document(userId)
                 .collection("placeLists").document(listName)
