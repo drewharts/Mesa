@@ -37,7 +37,7 @@ class Profile: ObservableObject {
             placeLists: []
         )
         loadPlaceListes()
-//        loadProfilePhoto() // separate method to load image from URL
+        loadImage(from: data.profilePhotoURL!)
     }
     
     func loadPlaceListes() {

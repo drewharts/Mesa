@@ -11,7 +11,7 @@
 import SwiftUI
 import GooglePlaces
 
-struct PlaceListView: View {
+struct PlaceListView: View { 
     var placeList: PlaceList
 
     var body: some View {
