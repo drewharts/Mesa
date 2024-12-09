@@ -12,6 +12,11 @@ import GoogleSignIn
 class UserSession: ObservableObject {
     @Published var isUserLoggedIn: Bool = false
     @Published var profile: Profile?
+    @Published var locationManager: LocationManager
+    
+    init() {
+        self.locationManager = LocationManager()
+    }
 
     func logout() {
         do {
