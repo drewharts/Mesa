@@ -19,10 +19,14 @@ class PlaceList: Codable, Identifiable, ObservableObject {
     var name: String
     var places: [SimplifiedPlace] = []
     var city: String
+    var emoji: String
+    var image: String
     
-    init(name: String, city: String) {
+    init(name: String, city: String, emoji: String = "", image: String = "") {
         self.name = name
         self.city = city
+        self.emoji = emoji
+        self.image = image
     }
     
     func addPlace(_ place: GMSPlace) {

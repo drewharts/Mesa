@@ -66,7 +66,7 @@ class PlaceDetailViewModel: ObservableObject {
         // Handle directions logic
     }
 
-    func addToList(place: GMSPlace, listName: String, profile: Profile) {
+    func addToList(place: GMSPlace, listName: String, profile: ProfileViewModel) {
         let trimmedName = listName.trimmingCharacters(in: .whitespaces)
         guard !trimmedName.isEmpty else {
             alertMessage = "List name cannot be empty."

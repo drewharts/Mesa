@@ -9,7 +9,7 @@ import SwiftUI
 import GooglePlaces
 
 struct ListSelectionSheet: View {
-    @EnvironmentObject var profile: Profile
+    @EnvironmentObject var profile: ProfileViewModel
     let place: GMSPlace
     @Binding var isPresented: Bool
     @State private var showNewListSheet = false

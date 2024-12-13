@@ -13,7 +13,7 @@ struct PlaceDetailView: View {
     @Binding var sheetHeight: CGFloat
     let minSheetHeight: CGFloat
 
-    @EnvironmentObject var profile: Profile
+    @EnvironmentObject var profile: ProfileViewModel
 
     @StateObject private var viewModel = PlaceDetailViewModel()
 

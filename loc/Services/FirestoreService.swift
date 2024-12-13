@@ -12,12 +12,10 @@ import GooglePlaces
 class FirestoreService {
     private let db = Firestore.firestore()
     
-    func saveUserProfile(uid: String, profile: Profile, completion: @escaping (Error?) -> Void) {
+    func saveUserProfile(uid: String, profileData: ProfileData, completion: @escaping (Error?) -> Void) {
         do {
-            // Note the usage of profile.data here, which is Codable
-            try db.collection("profiles").document(uid).setData(from: profile.data) { error in
-                completion(error)
-            }
+            try db.collection("users").document(uid)
+                .setData(from: profileData, merge: true, completion: completion)
         } catch {
             completion(error)
         }

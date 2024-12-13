@@ -13,7 +13,7 @@ struct ProfileView: View {
     var body: some View {
         VStack(spacing: 20) {
             // Profile Photo
-            if let profilePhoto = userSession.profile?.profilePhoto {
+            if let profilePhoto = userSession.profileViewModel?.profilePhoto {
                 profilePhoto
                     .resizable()
                     .frame(width: 100, height: 100)
@@ -28,14 +28,14 @@ struct ProfileView: View {
             }
 
             // Display Name
-            let firstName = userSession.profile?.data.firstName ?? ""
-            let lastName = userSession.profile?.data.lastName ?? ""
+            let firstName = userSession.profileViewModel?.data.firstName ?? ""
+            let lastName = userSession.profileViewModel?.data.lastName ?? ""
             Text("\(firstName) \(lastName)")
                 .font(.title)
                 .fontWeight(.bold)
 
             // Email
-            let email = userSession.profile?.data.email ?? ""
+            let email = userSession.profileViewModel?.data.email ?? ""
             Text(email)
                 .foregroundColor(.gray)
                 .font(.subheadline)
@@ -49,7 +49,7 @@ struct ProfileView: View {
                     .padding(.horizontal, 20)
 
                 // Extract placeLists to a local constant
-                let placeLists = userSession.profile?.data.placeLists ?? []
+                let placeLists = userSession.profileViewModel?.data.placeLists ?? []
 
                 List(placeLists) { list in
                     NavigationLink(destination: PlaceListView(placeList: list)) {

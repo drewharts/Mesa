@@ -38,9 +38,9 @@ struct locApp: App {
                 .environmentObject(userSession) // Inject UserSession into the environment
                 .onAppear {
                     // Set `isUserLoggedIn` to true if a user is already authenticated
-//                    if Auth.auth().currentUser != nil {
-//                        userSession.isUserLoggedIn = true
-//                    }
+                    if Auth.auth().currentUser != nil {
+                        userSession.isUserLoggedIn = true
+                    }
                 }
         }
     }
