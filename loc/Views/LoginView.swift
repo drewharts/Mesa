@@ -12,12 +12,21 @@ struct LoginView: View {
     @StateObject var viewModel = LoginViewModel()
 
     var body: some View {
-        VStack {
-            Button("Sign in with Google") {
-                viewModel.signInWithGoogle(userSession: userSession)
-            }
-            if let errorMessage = viewModel.errorMessage {
-                Text(errorMessage).foregroundColor(.red)
+        ZStack {
+            Color.white
+                .ignoresSafeArea(.all)
+            VStack {
+                Button(action: {
+                    viewModel.signInWithGoogle(userSession: userSession)
+                }, label: {
+                    Image("ios_light_sq_SI")
+                        .resizable() // Allow resizing
+                        .scaledToFit() // Maintain aspect ratio
+                        .frame(width: 200, height: 200) // Adjust size as needed
+                })
+                if let errorMessage = viewModel.errorMessage {
+                    Text(errorMessage).foregroundColor(.red)
+                }
             }
         }
     }
