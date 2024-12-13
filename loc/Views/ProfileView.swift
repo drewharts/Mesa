@@ -8,76 +8,73 @@
 import SwiftUI
 
 struct ProfileView: View {
-    @EnvironmentObject var userSession: UserSession // Access UserSession as an environment object
+    @EnvironmentObject var userSession: UserSession
 
     var body: some View {
-        VStack(spacing: 20) {
-            // Profile Photo
-            if let profilePhoto = userSession.profileViewModel?.profilePhoto {
-                profilePhoto
-                    .resizable()
-                    .frame(width: 100, height: 100)
-                    .clipShape(Circle())
-                    .padding(.top, 40)
-            } else {
-                Image(systemName: "person.crop.circle.fill")
-                    .resizable()
-                    .frame(width: 100, height: 100)
-                    .foregroundColor(.blue)
-                    .padding(.top, 40)
-            }
-
-            // Display Name
-            let firstName = userSession.profileViewModel?.data.firstName ?? ""
-            let lastName = userSession.profileViewModel?.data.lastName ?? ""
-            Text("\(firstName) \(lastName)")
-                .font(.title)
-                .fontWeight(.bold)
-
-            // Email
-            let email = userSession.profileViewModel?.data.email ?? ""
-            Text(email)
-                .foregroundColor(.gray)
-                .font(.subheadline)
-
-            Divider().padding(.horizontal, 40)
-
-            // Place Lists Section
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Your Lists")
-                    .font(.headline)
-                    .padding(.horizontal, 20)
-
-                // Extract placeLists to a local constant
-                let placeLists = userSession.profileViewModel?.data.placeLists ?? []
-
-                List(placeLists) { list in
-                    NavigationLink(destination: PlaceListView(placeList: list)) {
-                        Text(list.name)
-                            .font(.body)
-                    }
+        ScrollView {
+            VStack(spacing: 20) {
+                // Profile Picture
+                if let profilePhoto = userSession.profileViewModel?.profilePhoto {
+                    profilePhoto
+                        .resizable()
+                        .frame(width: 120, height: 120)
+                        .clipShape(Circle())
+                        .padding(.top, 40)
+                } else {
+                    Image(systemName: "person.crop.circle.fill")
+                        .resizable()
+                        .frame(width: 120, height: 120)
+                        .foregroundColor(.blue)
+                        .padding(.top, 40)
                 }
-            }
 
-            Spacer()
-
-            // Logout Button
-            Button(action: {
-                userSession.logout() // Call the logout function
-            }) {
-                Text("Log Out")
-                    .foregroundColor(.white)
+                // Name
+                let firstName = userSession.profileViewModel?.data.firstName ?? "First Name"
+                let lastName = userSession.profileViewModel?.data.lastName ?? "Last Name"
+                Text("\(firstName) \(lastName)")
+                    .font(.title)
                     .fontWeight(.bold)
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color.red)
-                    .cornerRadius(8)
+
+                // Email
+                let email = userSession.profileViewModel?.data.email ?? "example@example.com"
+                Text(email)
+                    .foregroundColor(.gray)
+                    .font(.subheadline)
+
+                Divider()
+
+                // Lists Section
+//                VStack(alignment: .leading) {
+//                    Text("LISTS")
+//                        .font(.headline)
+//                        .padding(.horizontal, 16)
+//
+//                    ForEach(userSession.profileViewModel?.data.placeLists ?? []) { list in
+//                        NavigationLink(destination: PlaceListView(placeList: list)) {
+//                            HStack {
+//                                Rectangle() // Placeholder for list image
+//                                    .frame(width: 60, height: 60)
+//                                    .foregroundColor(.gray)
+//                                VStack(alignment: .leading) {
+//                                    Text(list.name)
+//                                        .font(.body)
+//                                    Text("\(list.itemCount) Places")
+//                                        .font(.caption)
+//                                        .foregroundColor(.gray)
+//                                }
+//                                Spacer()
+//                            }
+//                            .padding()
+//                        }
+//                        .background(Color(.secondarySystemBackground))
+//                        .cornerRadius(8)
+//                        .padding(.horizontal, 16)
+//                    }
+//                }
             }
-            .padding(.horizontal, 20)
-            .padding(.bottom, 40)
+            .padding(.bottom, 40) // Space for scrollable content
         }
-        .padding(.horizontal)
         .background(Color(.systemBackground))
-        .navigationBarTitle("Profile", displayMode: .inline) // Navigation managed by parent
+        .navigationBarTitle("Profile", displayMode: .inline)
     }
 }
