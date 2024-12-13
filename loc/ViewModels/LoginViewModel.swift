@@ -1,0 +1,95 @@
+//
+//  LoginViewModel.swift
+//  loc
+//
+//  Created by Andrew Hartsfield II on 12/5/24.
+//
+
+
+import SwiftUI
+import GoogleSignIn
+import FirebaseAuth
+import FirebaseCore
+import FirebaseFirestore
+
+class LoginViewModel: ObservableObject {
+    @Published var errorMessage: String?
+    
+    // Instead of having isUserLoggedIn and profile here,
+    // we'll rely on the UserSession environment object passed from the view.
+    // That means your login view should pass `UserSession` as an environment object.
+
+    func signInWithGoogle(userSession: UserSession) {
+        guard let clientID = FirebaseApp.app()?.options.clientID else {
+            errorMessage = "Missing client ID"
+            return
+        }
+
+        let config = GIDConfiguration(clientID: clientID)
+        GIDSignIn.sharedInstance.configuration = config
+
+        guard let rootViewController = UIApplication.shared.connectedScenes
+            .compactMap({ $0 as? UIWindowScene })
+            .flatMap({ $0.windows })
+            .first(where: { $0.isKeyWindow })?.rootViewController else {
+                errorMessage = "Unable to access root view controller"
+                return
+        }
+
+        GIDSignIn.sharedInstance.signIn(withPresenting: rootViewController) { [weak self] result, error in
+            if let error = error {
+                self?.errorMessage = error.localizedDescription
+                return
+            }
+
+            guard let user = result?.user,
+                  let idToken = user.idToken?.tokenString else {
+                self?.errorMessage = "Failed to retrieve user credentials"
+                return
+            }
+
+            let accessToken = user.accessToken.tokenString
+            self?.authenticateWithFirebase(idToken: idToken, accessToken: accessToken, user: user, userSession: userSession)
+        }
+    }
+
+    private func authenticateWithFirebase(idToken: String, accessToken: String, user: GIDGoogleUser, userSession: UserSession) {
+        let credential = GoogleAuthProvider.credential(withIDToken: idToken, accessToken: accessToken)
+
+        Auth.auth().signIn(with: credential) { [weak self] authResult, error in
+            if let error = error {
+                self?.errorMessage = error.localizedDescription
+            } else {
+                self?.fetchGoogleUserProfile(user: user, userSession: userSession)
+            }
+        }
+    }
+
+    private func fetchGoogleUserProfile(user: GIDGoogleUser, userSession: UserSession) {
+        guard let uid = Auth.auth().currentUser?.uid else {
+            errorMessage = "Failed to get user UID"
+            return
+        }
+
+        let profileData = ProfileData(
+            firstName: user.profile?.givenName ?? "",
+            lastName: user.profile?.familyName ?? "",
+            email: user.profile?.email ?? "",
+            profilePhotoURL: user.profile?.imageURL(withDimension: 200),
+            phoneNumber: "", // add phone number later if needed
+            placeLists: []
+        )
+
+        let profileViewModel = ProfileViewModel(data: profileData, userId: uid)
+
+        FirestoreService().saveUserProfile(uid: uid, profileData: profileViewModel.data) { [weak self] error in
+            if let error = error {
+                self?.errorMessage = "Error saving profile: \(error.localizedDescription)"
+            } else {
+                userSession.profileViewModel = profileViewModel
+                userSession.isUserLoggedIn = true
+            }
+        }
+    }
+
+}
