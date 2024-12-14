@@ -8,16 +8,10 @@
 import Foundation
 import GooglePlaces
 
-struct SimplifiedPlace: Codable {
-    let placeID: String
-    let name: String
-    let address: String
-}
-
 class PlaceList: Codable, Identifiable, ObservableObject {
 //    let id = UUID()
     var name: String
-    var places: [SimplifiedPlace] = []
+    var places: [Place] = []
     var city: String
     var emoji: String
     var image: String
@@ -31,7 +25,7 @@ class PlaceList: Codable, Identifiable, ObservableObject {
     
     func addPlace(_ place: GMSPlace) {
         if let placeID = place.placeID {
-            places.append(SimplifiedPlace(placeID: placeID, name: place.name ?? "", address: place.formattedAddress ?? ""))
+            places.append(Place(placeID: placeID, name: place.name ?? "", address: place.formattedAddress ?? ""))
         }
     }
     
