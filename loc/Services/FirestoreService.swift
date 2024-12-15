@@ -55,6 +55,34 @@ class FirestoreService {
             print("Error encoding listData: \(error.localizedDescription)")
         }
     }
+    
+    
+    func fetchList(userId: String, listName: String, completion: @escaping (Result<PlaceList, Error>) -> Void) {
+        db.collection("users").document(userId)
+            .collection("placeLists").document(listName)
+            .getDocument { document, error in
+                if let error = error {
+                    print("Error fetching list: \(error.localizedDescription)")
+                    completion(.failure(error))
+                    return
+                }
+
+                guard let document = document, document.exists else {
+                    let notFoundError = NSError(domain: "FirestoreError", code: 404, userInfo: [NSLocalizedDescriptionKey: "List not found"])
+                    completion(.failure(notFoundError))
+                    return
+                }
+
+                do {
+                    let placeList = try document.data(as: PlaceList.self)
+                    completion(.success(placeList))
+                } catch {
+                    print("Error decoding list: \(error.localizedDescription)")
+                    completion(.failure(error))
+                }
+            }
+    }
+
 
     
     func fetchLists(userId: String, completion: @escaping ([PlaceList]) -> Void) {

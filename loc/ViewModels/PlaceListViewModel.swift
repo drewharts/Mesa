@@ -18,7 +18,20 @@ class PlaceListViewModel: ObservableObject {
         self.placeList = placeList
         self.firestoreService = firestoreService
         self.userId = userId
+        loadPlaceLists()
     }
+    
+    func loadPlaceLists() {
+        firestoreService.fetchList(userId: userId, listName: placeList.name) { [weak self] result in
+            switch result {
+            case .success(let fetchedPlaceList):
+                self?.placeList = fetchedPlaceList
+            case .failure(let error):
+                print("Failed to load place list: \(error.localizedDescription)")
+            }
+        }
+    }
+
     
     func addPlace(_ place: GMSPlace) {
         if let placeID = place.placeID {
