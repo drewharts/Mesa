@@ -40,16 +40,15 @@ class FirestoreService {
             }
     }
 
-    func createNewList(userId: String, listName: String, city: String) {
-        let listData = PlaceList(name: listName,city: city)
+    func createNewList(placeList: PlaceList,userID: String) {
         do {
-            try db.collection("users").document(userId)
-                .collection("placeLists").document(listName)
-                .setData(from: listData) { error in
+            try db.collection("users").document(userID)
+                .collection("placeLists").document(placeList.name)
+                .setData(from: placeList) { error in
                     if let error = error {
                         print("Error creating new list: \(error.localizedDescription)")
                     } else {
-                        print("List successfully created: \(listName)")
+                        print("List successfully created: \(placeList.name)")
                     }
                 }
         } catch {

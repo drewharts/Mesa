@@ -12,23 +12,30 @@ import GooglePlaces
 
 class ProfileViewModel: ObservableObject {
     @Published var data: ProfileData
+    @Published var placeListViewModels: [PlaceListViewModel] = []
     @Published var profilePhoto: Image? = nil
     weak var delegate: ProfileDelegate?
-    private let firestoreService = FirestoreService()
+    private let firestoreService: FirestoreService
     private let userId: String
 
-    init(data: ProfileData, userId: String) {
+    init(data: ProfileData, firestoreService: FirestoreService, userId: String) {
         self.data = data
+        self.firestoreService = firestoreService
         self.userId = userId
         loadPlaceLists()
         if let url = data.profilePhotoURL {
             loadImage(from: url)
         }
     }
+    
+    func getPlaceListViewModel(named name: String) -> PlaceListViewModel? {
+        return placeListViewModels.first { $0.placeList.name == name }
+    }
 
     func loadPlaceLists() {
         firestoreService.fetchLists(userId: userId) { [weak self] placeLists in
             self?.data.placeLists = placeLists
+            self?.placeListViewModels = placeLists.map { PlaceListViewModel(placeList: $0,firestoreService: self!.firestoreService, userId: self!.userId) }
         }
     }
 
@@ -40,23 +47,18 @@ class ProfileViewModel: ObservableObject {
             }
         }.resume()
     }
-
-    func addPlaceToList(place: GMSPlace, listName: String = "Favorites") {
-        let placeCity = place.addressComponents?.first(where: { $0.types.contains("locality") })?.name ?? ""
-        if let listIndex = data.placeLists.firstIndex(where: { $0.name == listName }) {
-            let list = data.placeLists[listIndex]
-            if !list.places.contains(where: { $0.placeID == place.placeID }) {
-                data.placeLists[listIndex].addPlace(place)
-                firestoreService.addPlaceToList(userId: userId, listName: listName, place: place)
-                delegate?.didAddPlace(toList: listName, place: place)
-            }
-        } else {
-            var newList = PlaceList(name: listName, city: placeCity)
-            newList.addPlace(place)
-            data.placeLists.append(newList)
-            firestoreService.createNewList(userId: userId, listName: listName, city: placeCity)
-            firestoreService.addPlaceToList(userId: userId, listName: listName, place: place)
-            delegate?.didAddPlace(toList: listName, place: place)
-        }
+    
+    func addNewPlaceList(named name: String, city: String, emoji: String, image: String) {
+        let newPlaceList = PlaceList(name: name, city: city, emoji: emoji, image: image);
+        let placeListViewModel = PlaceListViewModel(placeList: newPlaceList,firestoreService: firestoreService, userId: userId)
+        placeListViewModels.append(placeListViewModel)
+        data.placeLists.append(newPlaceList)
+        
+        firestoreService.createNewList(placeList: newPlaceList, userID: userId)
+    }
+    
+    func removePlaceList(at index: Int) {
+        guard placeListViewModels.indices.contains(index) else { return }
+        placeListViewModels.remove(at: index)
     }
 }

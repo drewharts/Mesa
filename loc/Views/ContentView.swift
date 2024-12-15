@@ -14,19 +14,18 @@ struct ContentView: View {
     @ObservedObject var locationManager = LocationManager()
 
     var body: some View {
-        Group {
-            if userSession.isUserLoggedIn {
-                if let profileViewModel = userSession.profileViewModel {
-                    // Once profileViewModel is available, inject it into the environment
-                    MainView(locationManager: locationManager)
-                        .environmentObject(profileViewModel)
-                } else {
-                    // If profileViewModel isn't loaded yet, show a loading state or nothing
-                    ProgressView("Loading profile...")
-                }
+        if userSession.isUserLoggedIn {
+            if let profileViewModel = userSession.profileViewModel {
+                // Once profileViewModel is available, inject it into the environment
+                MainView()
+                    .environmentObject(profileViewModel)
+                    .environmentObject(locationManager)
             } else {
-                LoginView()
+                ProgressView("Loading profile...")
             }
-        }
+        } else {
+            LoginView(viewModel: LoginViewModel(firestoreService: FirestoreService()))
+                .environmentObject(userSession)        }
     }
 }
+

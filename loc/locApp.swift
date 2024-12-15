@@ -17,7 +17,7 @@ import GoogleSignIn
 @main
 struct locApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
-    @StateObject private var userSession = UserSession() // Initialize UserSession
+    @StateObject private var userSession = UserSession(firestoreService: FirestoreService()) // Inject FirestoreService
 
     init() {
         // Configure Firebase
