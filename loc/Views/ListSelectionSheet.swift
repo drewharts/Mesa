@@ -10,6 +10,7 @@ import GooglePlaces
 
 struct ListSelectionSheet: View {
     @EnvironmentObject var profile: ProfileViewModel
+    @EnvironmentObject var lists: PlaceListViewModel
     let place: GMSPlace
     @Binding var isPresented: Bool
     @State private var showNewListSheet = false
@@ -17,18 +18,19 @@ struct ListSelectionSheet: View {
 
     var body: some View {
         VStack(spacing: 20) {
-            Text("Add to collection")
+            Text("Add to Collection")
                 .font(.headline)
                 .padding()
 
             ScrollView {
                 VStack(spacing: 15) {
+                    // Button for creating a new collection
                     Button(action: {
                         showNewListSheet = true
                     }) {
                         HStack {
                             Image(systemName: "plus.circle")
-                            Text("Create collection")
+                            Text("Create New Collection")
                                 .fontWeight(.bold)
                         }
                         .foregroundColor(.blue)
@@ -36,17 +38,18 @@ struct ListSelectionSheet: View {
                     }
                     .sheet(isPresented: $showNewListSheet) {
                         NewListView(isPresented: $showNewListSheet, onSave: { listName in
-                            createNewList(named: listName)
+                            profile.addNewPlaceList(named: listName, city: "", emoji: "", image: "")
                         })
                     }
 
-                    ForEach(profile.data.placeLists) { list in
+                    // List of existing collections
+                    ForEach(profile.placeListViewModels, id: \.placeList.id) { listViewModel in
                         Button(action: {
-                            addToExistingList(list)
+                            profile.getPlaceListViewModel(named: listViewModel.placeList.name)?.addPlace(place)
                             isPresented = false
                         }) {
                             HStack {
-                                Text(list.name)
+                                Text(listViewModel.placeList.name)
                                 Spacer()
                                 Image(systemName: "chevron.right")
                                     .foregroundColor(.gray)
@@ -62,6 +65,7 @@ struct ListSelectionSheet: View {
 
             Spacer()
 
+            // Cancel button
             Button("Cancel") {
                 isPresented = false
             }
@@ -71,17 +75,6 @@ struct ListSelectionSheet: View {
         .background(Color(.systemBackground))
         .cornerRadius(20)
         .padding()
-    }
-
-    private func createNewList(named listName: String) {
-        let trimmedName = listName.trimmingCharacters(in: .whitespaces)
-        guard !trimmedName.isEmpty else { return }
-
-        profile.addPlaceToList(place: place, listName: listName)
-    }
-
-    private func addToExistingList(_ list: PlaceList) {
-        profile.addPlaceToList(place: place, listName: list.name)
     }
 
 }

@@ -9,7 +9,11 @@ import GoogleSignInSwift
 
 struct LoginView: View {
     @EnvironmentObject var userSession: UserSession
-    @StateObject var viewModel = LoginViewModel()
+    @StateObject var viewModel: LoginViewModel
+
+    init(viewModel: LoginViewModel) {
+        _viewModel = StateObject(wrappedValue: viewModel)
+    }
 
     var body: some View {
         ZStack {
@@ -20,15 +24,17 @@ struct LoginView: View {
                     viewModel.signInWithGoogle(userSession: userSession)
                 }, label: {
                     Image("ios_light_sq_SI")
-                        .resizable() // Allow resizing
-                        .scaledToFit() // Maintain aspect ratio
-                        .frame(width: 200, height: 200) // Adjust size as needed
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 200, height: 200)
                 })
                 if let errorMessage = viewModel.errorMessage {
-                    Text(errorMessage).foregroundColor(.red)
+                    Text(errorMessage)
+                        .foregroundColor(.red)
                 }
             }
         }
     }
 }
+
 

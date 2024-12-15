@@ -14,10 +14,11 @@ class UserSession: ObservableObject {
     @Published var isUserLoggedIn: Bool = false
     @Published var profileViewModel: ProfileViewModel?
     @Published var locationManager: LocationManager
+    private let firestoreService: FirestoreService
     
-    init() {
+    init(firestoreService: FirestoreService) {
         self.locationManager = LocationManager()
-        
+        self.firestoreService = firestoreService
         // Check if a user is already signed in
         if let currentUser = Auth.auth().currentUser {
             self.isUserLoggedIn = true
@@ -62,7 +63,7 @@ class UserSession: ObservableObject {
                 let profileData = try document.data(as: ProfileData.self)
                 
                 // Create a ProfileViewModel from ProfileData
-                let profileViewModel = ProfileViewModel(data: profileData, userId: uid)
+                let profileViewModel = ProfileViewModel(data: profileData,firestoreService: self.firestoreService, userId: uid)
                 
                 // Assign it to our session
                 self.profileViewModel = profileViewModel
