@@ -42,35 +42,7 @@ struct ProfileView: View {
                     .font(.subheadline)
 
                 Divider()
-
-                // Lists Section
-//                VStack(alignment: .leading) {
-//                    Text("LISTS")
-//                        .font(.headline)
-//                        .padding(.horizontal, 16)
-//
-//                    ForEach(userSession.profileViewModel?.data.placeLists ?? []) { list in
-//                        NavigationLink(destination: PlaceListView(placeList: list)) {
-//                            HStack {
-//                                Rectangle() // Placeholder for list image
-//                                    .frame(width: 60, height: 60)
-//                                    .foregroundColor(.gray)
-//                                VStack(alignment: .leading) {
-//                                    Text(list.name)
-//                                        .font(.body)
-//                                    Text("\(list.itemCount) Places")
-//                                        .font(.caption)
-//                                        .foregroundColor(.gray)
-//                                }
-//                                Spacer()
-//                            }
-//                            .padding()
-//                        }
-//                        .background(Color(.secondarySystemBackground))
-//                        .cornerRadius(8)
-//                        .padding(.horizontal, 16)
-//                    }
-//                }
+                ProfileViewListsView()
             }
             .padding(.bottom, 40) // Space for scrollable content
         }
