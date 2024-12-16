@@ -16,20 +16,22 @@ struct ProfileViewListsView: View {
                 .font(.headline)
                 .padding(.horizontal)
 
-            if let placeLists = userSession.profileViewModel?.data.placeLists, !placeLists.isEmpty {
+            if let placeListViewModels = userSession.profileViewModel?.placeListViewModels,
+               !placeListViewModels.isEmpty {
                 ScrollView {
-                    ForEach(placeLists) { list in
-                        NavigationLink(destination: PlaceListView(placeList: list)) {
+                    ForEach(placeListViewModels, id: \.placeList.id) { listVM in
+                        NavigationLink(destination: PlaceListView(placeList: listVM.placeList)) {
                             HStack {
-                                Rectangle() // Placeholder for list image
+                                // Placeholder for list image
+                                Rectangle()
                                     .frame(width: 60, height: 60)
                                     .foregroundColor(.gray)
                                     .cornerRadius(8)
 
                                 VStack(alignment: .leading, spacing: 4) {
-                                    Text(list.name)
+                                    Text(listVM.placeList.name)
                                         .font(.body)
-                                    Text("\(list.places.count) Places")
+                                    Text("\(listVM.placeList.places.count) Places")
                                         .font(.caption)
                                         .foregroundColor(.gray)
                                 }
