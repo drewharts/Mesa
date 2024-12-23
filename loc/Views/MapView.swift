@@ -12,26 +12,39 @@ import GooglePlaces
 struct MapView: UIViewRepresentable {
     @Binding var searchResults: [GMSAutocompletePrediction]
     @Binding var selectedPlace: GMSPlace?
+    
     @ObservedObject var locationManager: LocationManager
     @EnvironmentObject var userSession: UserSession
+    
     var onMapTap: (() -> Void)? // Callback to notify when the map is tapped
-
+    
     let mapView = GMSMapView()
-
+    
     func makeUIView(context: Context) -> GMSMapView {
+        // Enable showing user's current location
         mapView.isMyLocationEnabled = true
-        mapView.delegate = context.coordinator // Set the coordinator as the delegate
-
-        // Set a default camera position first (e.g., a global view)
-        let defaultCamera = GMSCameraPosition.camera(withLatitude: 0, longitude: 0, zoom: 1.0)
+        
+        // Set the coordinator as the delegate for map interactions
+        mapView.delegate = context.coordinator
+        
+        // Set a default camera position (global view to start)
+        let defaultCamera = GMSCameraPosition.camera(
+            withLatitude: 0,
+            longitude: 0,
+            zoom: 1.0
+        )
         mapView.camera = defaultCamera
 
-        // Delay briefly, then animate to user's current location if available
+        // After a brief delay, center on user location if available (only once)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            if let currentLocation = locationManager.currentLocation, !context.coordinator.hasCenteredOnUser {
-                let camera = GMSCameraPosition.camera(withLatitude: currentLocation.coordinate.latitude,
-                                                      longitude: currentLocation.coordinate.longitude,
-                                                      zoom: 15.0)
+            if let currentLocation = locationManager.currentLocation,
+               !context.coordinator.hasCenteredOnUser {
+                
+                let camera = GMSCameraPosition.camera(
+                    withLatitude: currentLocation.coordinate.latitude,
+                    longitude: currentLocation.coordinate.longitude,
+                    zoom: 15.0
+                )
                 mapView.animate(to: camera)
                 context.coordinator.hasCenteredOnUser = true
             }
@@ -39,36 +52,69 @@ struct MapView: UIViewRepresentable {
 
         return mapView
     }
-
+    
     func updateUIView(_ uiView: GMSMapView, context: Context) {
-        // If a place is selected and we haven't moved to it yet, move the camera
+        // Clear all existing markers before adding new ones
+        uiView.clear()
+
+        // 1) Loop through each placeListViewModel in the user session
+        if let placeListVMs = userSession.profileViewModel?.placeListViewModels {
+            for listVM in placeListVMs {
+                // 2) Each list might have its own array of “places” with placeIDs
+                //    Replace this with your real data structure:
+                for place in listVM.placeList.places {
+                    // For each placeID, call fetchPlace to get the actual GMSPlace
+                    GMSPlacesClient.shared().fetchPlace(
+                        fromPlaceID: place.placeID, // e.g. "ChIJN1t_tDeuEmsRUsoyG83frY4"
+                        placeFields: [.coordinate, .name], // Request whatever fields you need
+                        sessionToken: nil
+                    ) { fetchedPlace, error in
+                        if let error = error {
+                            print("Error fetching place: \(error)")
+                            return
+                        }
+                        guard let fetchedPlace = fetchedPlace else { return }
+                        
+                        // Create a marker at the fetched coordinate
+                        let marker = GMSMarker(position: fetchedPlace.coordinate)
+                        marker.title = fetchedPlace.name
+                        marker.map = uiView
+                    }
+                }
+            }
+        }
+
+        // 3) If a place is selected from search/autocomplete,
+        //    move the camera & add a special marker for it
         if let place = selectedPlace {
+            // Only animate if this is a new selection
             if context.coordinator.lastSelectedPlaceID != place.placeID {
-                let camera = GMSCameraPosition.camera(withLatitude: place.coordinate.latitude,
-                                                      longitude: place.coordinate.longitude,
-                                                      zoom: 15.0)
+                let camera = GMSCameraPosition.camera(
+                    withLatitude: place.coordinate.latitude,
+                    longitude: place.coordinate.longitude,
+                    zoom: 15.0
+                )
                 uiView.animate(to: camera)
                 
-                // Add a marker for the selected place
-                uiView.clear()
+                // Marker for the selected place
                 let marker = GMSMarker(position: place.coordinate)
                 marker.title = place.name
                 marker.map = uiView
                 
-                // Update the last selected place ID
+                // Record that we’ve moved to this place
                 context.coordinator.lastSelectedPlaceID = place.placeID
             }
         }
     }
-
+    
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
     }
-
+    
     class Coordinator: NSObject, GMSMapViewDelegate {
         var parent: MapView
         var hasCenteredOnUser = false
-        var lastSelectedPlaceID: String? // Track the last selected place ID
+        var lastSelectedPlaceID: String?
 
         init(_ parent: MapView) {
             self.parent = parent
@@ -76,7 +122,7 @@ struct MapView: UIViewRepresentable {
 
         func mapView(_ mapView: GMSMapView, willMove gesture: Bool) {
             if gesture {
-                // Clear search results when the user moves the map
+                // If user manually pans the map, clear any search results & call onMapTap
                 DispatchQueue.main.async {
                     self.parent.searchResults = []
                     self.parent.onMapTap?()
