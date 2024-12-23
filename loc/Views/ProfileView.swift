@@ -41,7 +41,7 @@ struct ProfileView: View {
                     .foregroundColor(.gray)
                     .font(.subheadline)
 
-                Divider()
+                ProfileFavoriteListView()
                 ProfileViewListsView()
             }
             .padding(.bottom, 40) // Space for scrollable content
