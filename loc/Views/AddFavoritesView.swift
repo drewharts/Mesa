@@ -6,11 +6,14 @@
 //
 
 import SwiftUI
-import GooglePlaces  // If you’re using GMSAutocompletePrediction, etc.
+import GooglePlaces
 
 struct AddFavoritesView: View {
     @EnvironmentObject var userSession: UserSession
     @StateObject private var viewModel = SearchViewModel()
+    
+    // Track the ID of the most recently tapped place
+    @State private var lastTappedPlaceID: String?
 
     var body: some View {
         NavigationStack {
@@ -24,11 +27,34 @@ struct AddFavoritesView: View {
                 // SEARCH RESULTS
                 if !viewModel.searchResults.isEmpty {
                     List(viewModel.searchResults, id: \.self) { prediction in
-                        // Display prediction text
-                        Text(prediction.attributedPrimaryText.string)
-                            .onTapGesture {
-                                addPlaceToFavorites(prediction)
+                        // Highlight if this row's placeID matches lastTappedPlaceID
+                        HStack {
+                            Text(prediction.attributedPrimaryText.string)
+                                .foregroundColor(.primary)
+                            Spacer()
+                        }
+                        .padding(.vertical, 6)
+                        .background(
+                            // If placeID matches, highlight the row
+                            (prediction.placeID == lastTappedPlaceID)
+                            ? Color.blue.opacity(0.2)
+                            : Color.clear
+                        )
+                        .onTapGesture {
+                            // 1) Append to favorites
+                            addPlaceToFavorites(prediction)
+                            
+                            // 2) Highlight this row
+                            lastTappedPlaceID = prediction.placeID
+                            
+                            // 3) If you want the highlight to go away after 2 seconds:
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                                withAnimation {
+                                    // Clear the highlight
+                                    lastTappedPlaceID = nil
+                                }
                             }
+                        }
                     }
                     .listStyle(.plain)
                 } else {
@@ -38,7 +64,7 @@ struct AddFavoritesView: View {
                 
                 Divider()
                 
-                // SHOW CURRENT FAVORITES
+                // Current Favorites
                 Text("Current Favorites")
                     .font(.headline)
 
@@ -75,9 +101,6 @@ struct AddFavoritesView: View {
     
     /// Converts a search `prediction` into a `Place` and appends to user favorites.
     private func addPlaceToFavorites(_ prediction: GMSAutocompletePrediction) {
-        // Example: You might convert the GMSAutocompletePrediction into a Place
-        // by calling GMSPlacesClient. For demonstration, let's create a dummy Place:
-        
         let newPlace = Place(
             id: prediction.placeID ?? UUID().uuidString,
             name: prediction.attributedPrimaryText.string,

@@ -24,7 +24,7 @@ class FirestoreService {
 
     func addPlaceToList(userId: String, listName: String, place: GMSPlace) {
         let placeDict: [String: Any] = [
-            "placeID": place.placeID ?? "",
+            "id": place.placeID ?? "",
             "name": place.name ?? "",
             "address": place.formattedAddress ?? ""
         ]
