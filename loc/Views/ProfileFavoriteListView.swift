@@ -49,7 +49,10 @@ struct ProfileFavoriteListView: View {
             }
         }
         // 3) Present a sheet for searching & adding restaurants
-        .sheet(isPresented: $showSearch) {
+        .sheet(isPresented: $showSearch, onDismiss: {
+            // Refresh favorites
+            userSession.profileViewModel?.loadPlaceLists()
+        }) {
             AddFavoritesView()
         }
     }

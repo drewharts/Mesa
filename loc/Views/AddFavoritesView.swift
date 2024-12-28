@@ -107,6 +107,6 @@ struct AddFavoritesView: View {
             address: prediction.attributedSecondaryText?.string ?? "Unknown"
         )
         
-        userSession.profileViewModel?.favoritePlaces.append(newPlace)
+        userSession.profileViewModel?.addFavoritePlace(place: newPlace)
     }
 }

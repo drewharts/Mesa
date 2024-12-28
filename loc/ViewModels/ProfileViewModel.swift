@@ -31,7 +31,7 @@ class ProfileViewModel: ObservableObject {
     
     func addFavoritePlace(place: Place) {
         favoritePlaces.append(place)
-        //add function in firebase to add place to profile favorites
+        firestoreService.addProfileFavorite(userId: userId, place: place)
     }
     
     func getPlaceListViewModel(named name: String) -> PlaceListViewModel? {
@@ -39,10 +39,16 @@ class ProfileViewModel: ObservableObject {
     }
 
     func loadPlaceLists() {
+        //fetch profile lists
         firestoreService.fetchLists(userId: userId) { [weak self] placeLists in
             self?.data.placeLists = placeLists
             self?.placeListViewModels = placeLists.map { PlaceListViewModel(placeList: $0,firestoreService: self!.firestoreService, userId: self!.userId) }
         }
+        //fetch profile favorites
+        firestoreService.fetchProfileFavorites(userId: userId) { [weak self] fetchedPlaces in
+            self?.favoritePlaces = fetchedPlaces
+        }
+
     }
 
     private func loadImage(from url: URL) {
