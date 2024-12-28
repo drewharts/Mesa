@@ -35,13 +35,13 @@ class PlaceListViewModel: ObservableObject {
     
     func addPlace(_ place: GMSPlace) {
         if let placeID = place.placeID {
-            placeList.places.append(Place(placeID: placeID, name: place.name ?? "", address: place.formattedAddress ?? ""))
+            placeList.places.append(Place(id: placeID, name: place.name ?? "", address: place.formattedAddress ?? ""))
             firestoreService.addPlaceToList(userId: userId, listName: placeList.name, place: place)
         }
     }
     
     func removePlace(byID placeID: String) {
-        placeList.places.removeAll { $0.placeID == placeID }
+        placeList.places.removeAll { $0.id == placeID }
     }
     
     func fetchFullPlaces(completion: @escaping ([GMSPlace]) -> Void) {
@@ -51,7 +51,7 @@ class PlaceListViewModel: ObservableObject {
         
         for simplifiedPlace in placeList.places {
             dispatchGroup.enter()
-            placesClient.lookUpPlaceID(simplifiedPlace.placeID) { place, error in
+            placesClient.lookUpPlaceID(simplifiedPlace.id) { place, error in
                 if let place = place {
                     fullPlaces.append(place)
                 } else if let error = error {

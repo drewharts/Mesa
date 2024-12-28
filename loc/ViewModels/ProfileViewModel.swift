@@ -13,6 +13,7 @@ import GooglePlaces
 class ProfileViewModel: ObservableObject {
     @Published var data: ProfileData
     @Published var placeListViewModels: [PlaceListViewModel] = []
+    @Published var favoritePlaces: [Place] = []
     @Published var profilePhoto: Image? = nil
     weak var delegate: ProfileDelegate?
     private let firestoreService: FirestoreService
@@ -26,6 +27,11 @@ class ProfileViewModel: ObservableObject {
         if let url = data.profilePhotoURL {
             loadImage(from: url)
         }
+    }
+    
+    func addFavoritePlace(place: Place) {
+        favoritePlaces.append(place)
+        //add function in firebase to add place to profile favorites
     }
     
     func getPlaceListViewModel(named name: String) -> PlaceListViewModel? {

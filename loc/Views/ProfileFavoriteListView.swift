@@ -9,39 +9,37 @@ import SwiftUI
 
 struct ProfileFavoriteListView: View {
     @EnvironmentObject var userSession: UserSession
+    
+    // State to control showing the search sheet
+    @State private var showSearch = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("FAVORITES")
-                .font(.headline)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.leading, 20)
+            
+            // 1) Wrap Text in a Button to trigger search popup
+            Button(action: {
+                showSearch = true
+            }) {
+                Text("FAVORITES")
+                    .font(.headline)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.leading, 20)
+                    // You can customize button style here
+            }
+            .buttonStyle(.plain)
 
-            if let placeListViewModels = userSession.profileViewModel?.placeListViewModels,
-               !placeListViewModels.isEmpty {
+            if let profileFavoritePlaces = userSession.profileViewModel?.favoritePlaces,
+               !profileFavoritePlaces.isEmpty {
                 
-                // 1) Use HStack
+                // If you want indices
                 HStack {
-                    ForEach(placeListViewModels.indices, id: \.self) { index in
-                        let listVM = placeListViewModels[index]
-                        
-                        // 2) Each item goes directly in HStack
-                        NavigationLink(
-                            destination: PlaceListView(placeList: listVM.placeList)
-                        ) {
-                            // Placeholder for list image
-                            Rectangle()
-                                .frame(width: 100, height: 100)
-                                .cornerRadius(8)
-                        }
-                        
-                        // 3) Spacer after each item, except the last
-                        if index < placeListViewModels.count - 1 {
-                            Spacer()
-                        }
+                    ForEach(profileFavoritePlaces) { place in
+                        Rectangle()
+                            .fill(Color.blue.opacity(0.3))
+                            .frame(width: 100, height: 100)
+                            .cornerRadius(8)
                     }
                 }
-                // 4) One horizontal padding to shift entire row
                 .padding(.horizontal, 20)
                 
             } else {
@@ -50,10 +48,12 @@ struct ProfileFavoriteListView: View {
                     .padding(.horizontal)
             }
         }
+        // 3) Present a sheet for searching & adding restaurants
+        .sheet(isPresented: $showSearch) {
+            AddFavoritesView()
+        }
     }
 }
 
-
 #Preview {
-    ProfileFavoriteListView()
 }

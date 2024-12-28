@@ -41,8 +41,24 @@ struct ProfileView: View {
                     .foregroundColor(.gray)
                     .font(.subheadline)
 
+                // Favorites & Lists
                 ProfileFavoriteListView()
                 ProfileViewListsView()
+
+                // Logout Button
+                Button(action: {
+                    userSession.logout()
+                }) {
+                    Text("Log Out")
+                        .fontWeight(.semibold)
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.red)
+                        .cornerRadius(8)
+                }
+                .padding(.horizontal, 40)
+                .padding(.top, 20)
             }
             .padding(.bottom, 40) // Space for scrollable content
         }
