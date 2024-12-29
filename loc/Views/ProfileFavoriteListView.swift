@@ -12,6 +12,8 @@ struct ProfileFavoriteListView: View {
     
     // State to control showing the search sheet
     @State private var showSearch = false
+    let onFavoritesDismissed: () -> Void
+
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -31,16 +33,24 @@ struct ProfileFavoriteListView: View {
             if let profileFavoritePlaces = userSession.profileViewModel?.favoritePlaces,
                !profileFavoritePlaces.isEmpty {
                 
-                // If you want indices
                 HStack {
                     ForEach(profileFavoritePlaces) { place in
-                        Rectangle()
-                            .fill(Color.blue.opacity(0.3))
-                            .frame(width: 100, height: 100)
-                            .cornerRadius(8)
+                        ZStack {
+                            Rectangle()
+                                .fill(Color.blue.opacity(0.3))
+                                .frame(width: 100, height: 100)
+                                .cornerRadius(8)
+
+                            Text(place.name)
+                                .foregroundColor(.white)
+                                .font(.headline)
+                                .multilineTextAlignment(.center)
+                                .padding(8)
+                        }
                     }
                 }
                 .padding(.horizontal, 20)
+
                 
             } else {
                 Text("No lists available")
@@ -51,7 +61,7 @@ struct ProfileFavoriteListView: View {
         // 3) Present a sheet for searching & adding restaurants
         .sheet(isPresented: $showSearch, onDismiss: {
             // Refresh favorites
-            userSession.profileViewModel?.loadPlaceLists()
+            onFavoritesDismissed()
         }) {
             AddFavoritesView()
         }

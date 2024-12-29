@@ -42,8 +42,14 @@ struct ProfileView: View {
                     .font(.subheadline)
 
                 // Favorites & Lists
-                ProfileFavoriteListView()
+                ProfileFavoriteListView(
+                    onFavoritesDismissed: {
+                        // This closure is called when sheet dismisses
+                        userSession.profileViewModel?.loadPlaceLists()
+                    }
+                )
                 ProfileViewListsView()
+
 
                 // Logout Button
                 Button(action: {

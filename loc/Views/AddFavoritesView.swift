@@ -74,21 +74,18 @@ struct AddFavoritesView: View {
                     ScrollView(.horizontal) {
                         HStack(spacing: 16) {
                             ForEach(favorites) { place in
-                                Rectangle()
-                                    .fill(Color.blue.opacity(0.3))
-                                    .frame(width: 100, height: 100)
-                                    .cornerRadius(8)
-                                    .overlay(
-                                        Text(place.name)
-                                            .foregroundColor(.white)
-                                            .font(.caption)
-                                            .padding(4),
-                                        alignment: .bottom
-                                    )
+                                ZStack {
+                                    Text(place.name)
+                                        .foregroundColor(.white)
+                                        .font(.headline)
+                                        .multilineTextAlignment(.center)
+                                        .padding(8)
+                                }
                             }
                         }
                         .padding(.horizontal, 20)
                     }
+
                 } else {
                     Text("No favorites yet.")
                         .foregroundColor(.gray)

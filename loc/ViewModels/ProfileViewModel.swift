@@ -34,6 +34,11 @@ class ProfileViewModel: ObservableObject {
         firestoreService.addProfileFavorite(userId: userId, place: place)
     }
     
+    func numberOfFavoritePlaces() -> Int {
+        return favoritePlaces.count
+    }
+
+    
     func getPlaceListViewModel(named name: String) -> PlaceListViewModel? {
         return placeListViewModels.first { $0.placeList.name == name }
     }
