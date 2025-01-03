@@ -29,6 +29,17 @@ class ProfileViewModel: ObservableObject {
         }
     }
     
+    // Converts prediction -> Place, then adds it.
+    func addFavoritePlace(prediction: GMSAutocompletePrediction) {
+        let newPlace = Place(
+            id: prediction.placeID ?? UUID().uuidString,
+            name: prediction.attributedPrimaryText.string,
+            address: prediction.attributedSecondaryText?.string ?? "Unknown"
+        )
+        addFavoritePlace(place: newPlace)
+    }
+    
+    // Actually appends the place to local state and Firestore.
     func addFavoritePlace(place: Place) {
         favoritePlaces.append(place)
         firestoreService.addProfileFavorite(userId: userId, place: place)

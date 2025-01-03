@@ -10,10 +10,11 @@ import GooglePlaces
 
 struct AddFavoritesView: View {
     @EnvironmentObject var userSession: UserSession
+    @EnvironmentObject var profile: ProfileViewModel  // Using the ProfileViewModel directly
+    
     @StateObject private var viewModel = SearchViewModel()
     @FocusState private var searchBarFocus: Bool
     
-    // Track the ID of the most recently tapped place
     @State private var lastTappedPlaceID: String?
 
     var body: some View {
@@ -29,7 +30,6 @@ struct AddFavoritesView: View {
                 // SEARCH RESULTS
                 if !viewModel.searchResults.isEmpty {
                     List(viewModel.searchResults, id: \.self) { prediction in
-                        // Highlight if this row's placeID matches lastTappedPlaceID
                         HStack {
                             Text(prediction.attributedPrimaryText.string)
                                 .foregroundColor(.primary)
@@ -37,22 +37,20 @@ struct AddFavoritesView: View {
                         }
                         .padding(.vertical, 6)
                         .background(
-                            // If placeID matches, highlight the row
-                            (prediction.placeID == lastTappedPlaceID)
-                            ? Color.blue.opacity(0.2)
-                            : Color.clear
+                            prediction.placeID == lastTappedPlaceID
+                                ? Color.blue.opacity(0.2)
+                                : Color.clear
                         )
                         .onTapGesture {
-                            // 1) Append to favorites
-                            addPlaceToFavorites(prediction)
+                            // 1) Append to favorites (directly via ProfileViewModel)
+                            profile.addFavoritePlace(prediction: prediction)
                             
                             // 2) Highlight this row
                             lastTappedPlaceID = prediction.placeID
                             
-                            // 3) If you want the highlight to go away after 2 seconds:
+                            // 3) Clear highlight after 2 seconds
                             DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
                                 withAnimation {
-                                    // Clear the highlight
                                     lastTappedPlaceID = nil
                                 }
                             }
@@ -76,13 +74,12 @@ struct AddFavoritesView: View {
                     ScrollView(.horizontal) {
                         HStack(spacing: 16) {
                             ForEach(favorites) { place in
-                                ZStack {
-                                    Text(place.name)
-                                        .foregroundColor(.white)
-                                        .font(.headline)
-                                        .multilineTextAlignment(.center)
-                                        .padding(8)
-                                }
+                                Text(place.name)
+                                    .foregroundColor(.white)
+                                    .font(.headline)
+                                    .padding(8)
+                                    .background(Color.blue)
+                                    .cornerRadius(8)
                             }
                         }
                         .padding(.horizontal, 20)
@@ -96,19 +93,11 @@ struct AddFavoritesView: View {
             .navigationTitle("Add to Favorites")
             .navigationBarTitleDisplayMode(.inline)
             .onAppear {
-                self.searchBarFocus.toggle()
+                // Auto-focus the search bar
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    self.searchBarFocus = true
+                }
             }
         }
-    }
-    
-    /// Converts a search `prediction` into a `Place` and appends to user favorites.
-    private func addPlaceToFavorites(_ prediction: GMSAutocompletePrediction) {
-        let newPlace = Place(
-            id: prediction.placeID ?? UUID().uuidString,
-            name: prediction.attributedPrimaryText.string,
-            address: prediction.attributedSecondaryText?.string ?? "Unknown"
-        )
-        
-        userSession.profileViewModel?.addFavoritePlace(place: newPlace)
     }
 }
