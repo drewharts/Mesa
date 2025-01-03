@@ -11,6 +11,7 @@ import GooglePlaces
 struct AddFavoritesView: View {
     @EnvironmentObject var userSession: UserSession
     @StateObject private var viewModel = SearchViewModel()
+    @FocusState private var searchBarFocus: Bool
     
     // Track the ID of the most recently tapped place
     @State private var lastTappedPlaceID: String?
@@ -21,6 +22,7 @@ struct AddFavoritesView: View {
                 
                 // SEARCH BAR
                 SearchBar(text: $viewModel.searchText)
+                    .focused($searchBarFocus)
                     .padding(.horizontal, 20)
                     .padding(.top, 10)
                 
@@ -93,6 +95,9 @@ struct AddFavoritesView: View {
             }
             .navigationTitle("Add to Favorites")
             .navigationBarTitleDisplayMode(.inline)
+            .onAppear {
+                self.searchBarFocus.toggle()
+            }
         }
     }
     
