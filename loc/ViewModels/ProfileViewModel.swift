@@ -18,6 +18,8 @@ class ProfileViewModel: ObservableObject {
     weak var delegate: ProfileDelegate?
     private let firestoreService: FirestoreService
     private let userId: String
+    
+    @Published var showMaxFavoritesAlert: Bool = false
 
     init(data: ProfileData, firestoreService: FirestoreService, userId: String) {
         self.data = data
@@ -31,13 +33,24 @@ class ProfileViewModel: ObservableObject {
     
     // Converts prediction -> Place, then adds it.
     func addFavoritePlace(prediction: GMSAutocompletePrediction) {
+        // 1) If 4 favorites exist, do nothing (or show a message, etc.)
+        guard favoritePlaces.count < 4 else {
+            // You could display an alert or some UI feedback if you like
+            showMaxFavoritesAlert = true
+            return
+        }
+        
+        // 2) Convert the prediction into a Place
         let newPlace = Place(
             id: prediction.placeID ?? UUID().uuidString,
             name: prediction.attributedPrimaryText.string,
             address: prediction.attributedSecondaryText?.string ?? "Unknown"
         )
+        
+        // 3) Add the place to local + Firestore
         addFavoritePlace(place: newPlace)
     }
+
     
     // Actually appends the place to local state and Firestore.
     func addFavoritePlace(place: Place) {

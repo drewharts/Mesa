@@ -68,12 +68,15 @@ struct AddFavoritesView: View {
                 Text("Current Favorites")
                     .font(.headline)
 
-                if let favorites = userSession.profileViewModel?.favoritePlaces,
-                   !favorites.isEmpty {
-                    
+                if profile.favoritePlaces.isEmpty {
+                    // If the array is empty, show "No favorites" message
+                    Text("No favorites yet.")
+                        .foregroundColor(.gray)
+                } else {
+                    // Otherwise, show the favorites in a horizontal scroll
                     ScrollView(.horizontal) {
                         HStack(spacing: 16) {
-                            ForEach(favorites) { place in
+                            ForEach(profile.favoritePlaces) { place in
                                 Text(place.name)
                                     .foregroundColor(.white)
                                     .font(.headline)
@@ -84,10 +87,6 @@ struct AddFavoritesView: View {
                         }
                         .padding(.horizontal, 20)
                     }
-
-                } else {
-                    Text("No favorites yet.")
-                        .foregroundColor(.gray)
                 }
             }
             .navigationTitle("Add to Favorites")
@@ -98,6 +97,12 @@ struct AddFavoritesView: View {
                     self.searchBarFocus = true
                 }
             }
+        }
+        // 4) Alert to notify user if they’ve hit the 4-favorite limit
+        .alert("Max Favorites Reached", isPresented: $profile.showMaxFavoritesAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("You already have 4 favorites. Remove one before adding a new one.")
         }
     }
 }
