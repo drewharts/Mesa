@@ -27,6 +27,41 @@ struct AddFavoritesView: View {
                     .padding(.horizontal, 20)
                     .padding(.top, 10)
                 
+                // Current Favorites
+                if !profile.favoritePlaces.isEmpty {
+                    ScrollView(.horizontal) {
+                        HStack(spacing: 16) {
+                            ForEach(profile.favoritePlaces) { place in
+                                // Blue box with the restaurant name and "X" icon
+                                HStack {
+                                    // Restaurant name
+                                    Text(place.name)
+                                        .foregroundColor(.white)
+                                        .font(.headline)
+                                        .padding(.leading, 8) // Add leading padding for text
+                                    
+                                    Spacer()
+                                    
+                                    // "X" icon
+                                    Button(action: {
+                                        // Remove the selected favorite
+                                        profile.removeFavoritePlace(place: place)
+                                    }) {
+                                        Image(systemName: "xmark.circle.fill")
+                                            .foregroundColor(.white)
+                                            .font(.headline) // Match font size for better proportions
+                                    }
+                                    .padding(.trailing, 8) // Add trailing padding for the icon
+                                }
+                                .padding(.vertical, 8) // Vertical padding inside the blue box
+                                .background(Color.blue)
+                                .cornerRadius(8)
+                            }
+                        }
+                        .padding(.horizontal, 20)
+                    }
+                }
+                
                 // SEARCH RESULTS
                 if !viewModel.searchResults.isEmpty {
                     List(viewModel.searchResults, id: \.self) { prediction in
@@ -57,57 +92,7 @@ struct AddFavoritesView: View {
                         }
                     }
                     .listStyle(.plain)
-                } else {
-                    Text("Type to search for new places")
-                        .foregroundColor(.gray)
                 }
-                
-                Divider()
-                
-                // Current Favorites
-                Text("Current Favorites")
-                    .font(.headline)
-
-                if profile.favoritePlaces.isEmpty {
-                    // If the array is empty, show "No favorites" message
-                    Text("No favorites yet.")
-                        .foregroundColor(.gray)
-                } else {
-                    // Otherwise, show the favorites in a horizontal scroll
-                    ScrollView(.horizontal) {
-                        HStack(spacing: 16) {
-                            ForEach(profile.favoritePlaces) { place in
-                                // Blue box with the restaurant name and "X" icon
-                                HStack {
-                                    // Restaurant name
-                                    Text(place.name)
-                                        .foregroundColor(.white)
-                                        .font(.headline)
-                                        .padding(.leading, 8) // Add leading padding for text
-                                    
-                                    Spacer()
-                                    
-                                    // "X" icon
-                                    Button(action: {
-                                        // Remove the selected favorite
-                                        profile.removeFavoritePlace(place: place)
-                                    }) {
-                                        Image(systemName: "xmark.circle.fill")
-                                            .foregroundColor(.white)
-                                            .font(.headline) // Match font size for better proportions
-                                    }
-                                    .padding(.trailing, 8) // Add trailing padding for the icon
-                                }
-                                .padding(.vertical, 8) // Vertical padding inside the blue box
-                                .background(Color.blue)
-                                .cornerRadius(8)
-                            }
-                        }
-
-                        .padding(.horizontal, 20)
-                    }
-                }
-
             }
             .navigationTitle("Add to Favorites")
             .navigationBarTitleDisplayMode(.inline)
@@ -118,7 +103,7 @@ struct AddFavoritesView: View {
                 }
             }
         }
-        // 4) Alert to notify user if they’ve hit the 4-favorite limit
+        // Alert to notify user if they’ve hit the 4-favorite limit
         .alert("Max Favorites Reached", isPresented: $profile.showMaxFavoritesAlert) {
             Button("OK", role: .cancel) { }
         } message: {
