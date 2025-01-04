@@ -118,6 +118,24 @@ class FirestoreService {
             print("Error encoding place: \(error.localizedDescription)")
         }
     }
+    
+    func removeProfileFavorite(userId: String, placeId: String) {
+        // Reference to the user's favorites collection
+        let favoritesRef = Firestore.firestore()
+            .collection("users")
+            .document(userId)
+            .collection("favorites")
+            .document(placeId)
+        
+        // Delete the document for the place
+        favoritesRef.delete { error in
+            if let error = error {
+                print("Error removing favorite place: \(error.localizedDescription)")
+            } else {
+                print("Favorite place successfully removed!")
+            }
+        }
+    }
 
     
     func fetchProfileFavorites(userId: String, completion: @escaping ([Place]) -> Void) {

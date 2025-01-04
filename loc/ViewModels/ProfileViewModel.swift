@@ -58,6 +58,18 @@ class ProfileViewModel: ObservableObject {
         firestoreService.addProfileFavorite(userId: userId, place: place)
     }
     
+    func removeFavoritePlace(place: Place) {
+        // 1) Find the index of the place to remove
+        if let index = favoritePlaces.firstIndex(where: { $0.id == place.id }) {
+            // 2) Remove from local state
+            favoritePlaces.remove(at: index)
+            
+            // 3) Remove from Firestore
+            firestoreService.removeProfileFavorite(userId: userId, placeId: place.id)
+        }
+    }
+
+    
     func numberOfFavoritePlaces() -> Int {
         return favoritePlaces.count
     }

@@ -77,17 +77,37 @@ struct AddFavoritesView: View {
                     ScrollView(.horizontal) {
                         HStack(spacing: 16) {
                             ForEach(profile.favoritePlaces) { place in
-                                Text(place.name)
-                                    .foregroundColor(.white)
-                                    .font(.headline)
-                                    .padding(8)
-                                    .background(Color.blue)
-                                    .cornerRadius(8)
+                                // Blue box with the restaurant name and "X" icon
+                                HStack {
+                                    // Restaurant name
+                                    Text(place.name)
+                                        .foregroundColor(.white)
+                                        .font(.headline)
+                                        .padding(.leading, 8) // Add leading padding for text
+                                    
+                                    Spacer()
+                                    
+                                    // "X" icon
+                                    Button(action: {
+                                        // Remove the selected favorite
+                                        profile.removeFavoritePlace(place: place)
+                                    }) {
+                                        Image(systemName: "xmark.circle.fill")
+                                            .foregroundColor(.white)
+                                            .font(.headline) // Match font size for better proportions
+                                    }
+                                    .padding(.trailing, 8) // Add trailing padding for the icon
+                                }
+                                .padding(.vertical, 8) // Vertical padding inside the blue box
+                                .background(Color.blue)
+                                .cornerRadius(8)
                             }
                         }
+
                         .padding(.horizontal, 20)
                     }
                 }
+
             }
             .navigationTitle("Add to Favorites")
             .navigationBarTitleDisplayMode(.inline)
