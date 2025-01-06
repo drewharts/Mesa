@@ -46,8 +46,8 @@
             filePath = "loc/ViewModels/ProfileViewModel.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "28"
-            endingLineNumber = "28"
+            startingLineNumber = "30"
+            endingLineNumber = "30"
             landmarkName = "init(data:firestoreService:userId:)"
             landmarkType = "7">
          </BreakpointContent>
@@ -62,8 +62,8 @@
             filePath = "loc/ViewModels/ProfileViewModel.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "84"
-            endingLineNumber = "84"
+            startingLineNumber = "94"
+            endingLineNumber = "94"
             landmarkName = "loadPlaceLists()"
             landmarkType = "7">
          </BreakpointContent>
@@ -78,8 +78,8 @@
             filePath = "loc/ViewModels/ProfileViewModel.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "86"
-            endingLineNumber = "86"
+            startingLineNumber = "96"
+            endingLineNumber = "96"
             landmarkName = "loadPlaceLists()"
             landmarkType = "7">
          </BreakpointContent>

@@ -14,10 +14,12 @@ class ProfileViewModel: ObservableObject {
     @Published var data: ProfileData
     @Published var placeListViewModels: [PlaceListViewModel] = []
     @Published var favoritePlaces: [Place] = []
+    @Published var favoritePlaceImages: [String: UIImage] = [:]
     @Published var profilePhoto: Image? = nil
     weak var delegate: ProfileDelegate?
     private let firestoreService: FirestoreService
     private let userId: String
+    private let googlePlacesService = GooglePlacesService()
     
     @Published var showMaxFavoritesAlert: Bool = false
 
@@ -28,6 +30,14 @@ class ProfileViewModel: ObservableObject {
         loadPlaceLists()
         if let url = data.profilePhotoURL {
             loadImage(from: url)
+        }
+    }
+    
+    func loadPhoto(for placeID: String) {
+        googlePlacesService.fetchPhoto(placeID: placeID) { [weak self] image in
+            DispatchQueue.main.async {
+                self?.favoritePlaceImages[placeID] = image
+            }
         }
     }
     
