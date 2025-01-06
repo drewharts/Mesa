@@ -65,7 +65,7 @@ struct MapView: UIViewRepresentable {
                 for place in listVM.placeList.places {
                     // For each placeID, call fetchPlace to get the actual GMSPlace
                     GMSPlacesClient.shared().fetchPlace(
-                        fromPlaceID: place.placeID, // e.g. "ChIJN1t_tDeuEmsRUsoyG83frY4"
+                        fromPlaceID: place.id, // e.g. "ChIJN1t_tDeuEmsRUsoyG83frY4"
                         placeFields: [.coordinate, .name], // Request whatever fields you need
                         sessionToken: nil
                     ) { fetchedPlace, error in

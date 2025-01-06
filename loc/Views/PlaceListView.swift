@@ -16,7 +16,7 @@ struct PlaceListView: View {
 
     var body: some View {
         List {
-            ForEach(placeList.places, id: \.placeID) { place in
+            ForEach(placeList.places, id: \.id) { place in
                 HStack(spacing: 16) {
                     Rectangle()
                         .frame(width: 60, height: 60)

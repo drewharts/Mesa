@@ -13,10 +13,15 @@ import GooglePlaces
 class ProfileViewModel: ObservableObject {
     @Published var data: ProfileData
     @Published var placeListViewModels: [PlaceListViewModel] = []
+    @Published var favoritePlaces: [Place] = []
+    @Published var favoritePlaceImages: [String: UIImage] = [:]
     @Published var profilePhoto: Image? = nil
     weak var delegate: ProfileDelegate?
     private let firestoreService: FirestoreService
     private let userId: String
+    private let googlePlacesService = GooglePlacesService()
+    
+    @Published var showMaxFavoritesAlert: Bool = false
 
     init(data: ProfileData, firestoreService: FirestoreService, userId: String) {
         self.data = data
@@ -28,15 +33,73 @@ class ProfileViewModel: ObservableObject {
         }
     }
     
+    func loadPhoto(for placeID: String) {
+        googlePlacesService.fetchPhoto(placeID: placeID) { [weak self] image in
+            DispatchQueue.main.async {
+                self?.favoritePlaceImages[placeID] = image
+            }
+        }
+    }
+    
+    // Converts prediction -> Place, then adds it.
+    func addFavoritePlace(prediction: GMSAutocompletePrediction) {
+        // 1) If 4 favorites exist, do nothing (or show a message, etc.)
+        guard favoritePlaces.count < 4 else {
+            // You could display an alert or some UI feedback if you like
+            showMaxFavoritesAlert = true
+            return
+        }
+        
+        // 2) Convert the prediction into a Place
+        let newPlace = Place(
+            id: prediction.placeID ?? UUID().uuidString,
+            name: prediction.attributedPrimaryText.string,
+            address: prediction.attributedSecondaryText?.string ?? "Unknown"
+        )
+        
+        // 3) Add the place to local + Firestore
+        addFavoritePlace(place: newPlace)
+    }
+
+    
+    // Actually appends the place to local state and Firestore.
+    func addFavoritePlace(place: Place) {
+        favoritePlaces.append(place)
+        firestoreService.addProfileFavorite(userId: userId, place: place)
+    }
+    
+    func removeFavoritePlace(place: Place) {
+        // 1) Find the index of the place to remove
+        if let index = favoritePlaces.firstIndex(where: { $0.id == place.id }) {
+            // 2) Remove from local state
+            favoritePlaces.remove(at: index)
+            
+            // 3) Remove from Firestore
+            firestoreService.removeProfileFavorite(userId: userId, placeId: place.id)
+        }
+    }
+
+    
+    func numberOfFavoritePlaces() -> Int {
+        return favoritePlaces.count
+    }
+
+    
     func getPlaceListViewModel(named name: String) -> PlaceListViewModel? {
         return placeListViewModels.first { $0.placeList.name == name }
     }
 
     func loadPlaceLists() {
+        //fetch profile lists
         firestoreService.fetchLists(userId: userId) { [weak self] placeLists in
             self?.data.placeLists = placeLists
             self?.placeListViewModels = placeLists.map { PlaceListViewModel(placeList: $0,firestoreService: self!.firestoreService, userId: self!.userId) }
         }
+        //fetch profile favorites
+        firestoreService.fetchProfileFavorites(userId: userId) { [weak self] fetchedPlaces in
+            self?.favoritePlaces = fetchedPlaces
+        }
+
     }
 
     private func loadImage(from url: URL) {

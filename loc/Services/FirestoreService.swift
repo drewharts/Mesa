@@ -24,7 +24,7 @@ class FirestoreService {
 
     func addPlaceToList(userId: String, listName: String, place: GMSPlace) {
         let placeDict: [String: Any] = [
-            "placeID": place.placeID ?? "",
+            "id": place.placeID ?? "",
             "name": place.name ?? "",
             "address": place.formattedAddress ?? ""
         ]
@@ -100,5 +100,65 @@ class FirestoreService {
                 }
             }
     }
+    
+    func addProfileFavorite(userId: String, place: Place) {
+        do {
+            try db.collection("users")
+                .document(userId)
+                .collection("favorites")
+                .document(place.id)
+                .setData(from: place) { error in
+                    if let error = error {
+                        print("Error adding place to favorites: \(error.localizedDescription)")
+                    } else {
+                        print("Place successfully added to favorites")
+                    }
+                }
+        } catch {
+            print("Error encoding place: \(error.localizedDescription)")
+        }
+    }
+    
+    func removeProfileFavorite(userId: String, placeId: String) {
+        // Reference to the user's favorites collection
+        let favoritesRef = Firestore.firestore()
+            .collection("users")
+            .document(userId)
+            .collection("favorites")
+            .document(placeId)
+        
+        // Delete the document for the place
+        favoritesRef.delete { error in
+            if let error = error {
+                print("Error removing favorite place: \(error.localizedDescription)")
+            } else {
+                print("Favorite place successfully removed!")
+            }
+        }
+    }
+
+    
+    func fetchProfileFavorites(userId: String, completion: @escaping ([Place]) -> Void) {
+        db.collection("users")
+            .document(userId)
+            .collection("favorites")
+            .getDocuments { snapshot, error in
+                
+                if let error = error {
+                    print("Error fetching favorites: \(error.localizedDescription)")
+                    completion([])
+                } else {
+                    // Attempt to decode each document into a Place
+                    let places = snapshot?.documents.compactMap {
+                        try? $0.data(as: Place.self)
+                    } ?? []
+                    
+                    completion(places)
+                }
+            }
+    }
+
+
+
 
 }

@@ -9,12 +9,14 @@ import SwiftUI
 
 struct ProfileView: View {
     @EnvironmentObject var userSession: UserSession
+    @EnvironmentObject var profile: ProfileViewModel
+
 
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
                 // Profile Picture
-                if let profilePhoto = userSession.profileViewModel?.profilePhoto {
+                if let profilePhoto = profile.profilePhoto {
                     profilePhoto
                         .resizable()
                         .frame(width: 120, height: 120)
@@ -29,20 +31,37 @@ struct ProfileView: View {
                 }
 
                 // Name
-                let firstName = userSession.profileViewModel?.data.firstName ?? "First Name"
-                let lastName = userSession.profileViewModel?.data.lastName ?? "Last Name"
+                let firstName = profile.data.firstName ?? "First Name"
+                let lastName = profile.data.lastName ?? "Last Name"
                 Text("\(firstName) \(lastName)")
                     .font(.title)
                     .fontWeight(.bold)
 
                 // Email
-                let email = userSession.profileViewModel?.data.email ?? "example@example.com"
+                let email = profile.data.email ?? "example@example.com"
                 Text(email)
                     .foregroundColor(.gray)
                     .font(.subheadline)
 
+                // Favorites & Lists
                 ProfileFavoriteListView()
                 ProfileViewListsView()
+
+
+                // Logout Button
+                Button(action: {
+                    userSession.logout()
+                }) {
+                    Text("Log Out")
+                        .fontWeight(.semibold)
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.red)
+                        .cornerRadius(8)
+                }
+                .padding(.horizontal, 40)
+                .padding(.top, 20)
             }
             .padding(.bottom, 40) // Space for scrollable content
         }
