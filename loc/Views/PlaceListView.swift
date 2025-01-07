@@ -23,7 +23,7 @@ struct PlaceListView: View {
                         Image(uiImage: image)
                             .resizable()
                             .scaledToFill()
-                            .frame(width: 60, height: 60)
+                            .frame(width: 80, height: 80)
                             .cornerRadius(8)
                             .clipped()
                     } else {

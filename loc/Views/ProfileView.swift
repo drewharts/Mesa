@@ -37,12 +37,6 @@ struct ProfileView: View {
                     .font(.title)
                     .fontWeight(.bold)
 
-                // Email
-                let email = profile.data.email
-                Text(email)
-                    .foregroundColor(.gray)
-                    .font(.subheadline)
-
                 // Favorites & Lists
                 ProfileFavoriteListView()
                 ProfileViewListsView()

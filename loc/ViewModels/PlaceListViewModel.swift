@@ -8,7 +8,7 @@
 import Foundation
 import GooglePlaces
 
-class PlaceListViewModel: ObservableObject {
+class PlaceListViewModel: ObservableObject,Identifiable {
     @Published var placeList: PlaceList
     private let firestoreService: FirestoreService
     private let userId: String
