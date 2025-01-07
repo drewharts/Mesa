@@ -13,14 +13,29 @@ import GooglePlaces
 
 struct PlaceListView: View {
     var placeList: PlaceList
+    @EnvironmentObject var profile: ProfileViewModel
 
     var body: some View {
         List {
             ForEach(placeList.places, id: \.id) { place in
                 HStack(spacing: 16) {
-                    Rectangle()
-                        .frame(width: 60, height: 60)
-                        .cornerRadius(8)
+                    if let image = profile.favoritePlaceImages[place.id] {
+                        Image(uiImage: image)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 60, height: 60)
+                            .cornerRadius(8)
+                            .clipped()
+                    } else {
+                        // Placeholder if we don't yet have the image
+                        Rectangle()
+                            .fill(Color.blue.opacity(0.3))
+                            .frame(width: 100, height: 100)
+                            .cornerRadius(8)
+                            .onAppear {
+                                profile.loadPhoto(for: place.id)
+                            }
+                    }
                     
                     VStack(alignment: .leading, spacing: 4) {
                         Text(place.name)
