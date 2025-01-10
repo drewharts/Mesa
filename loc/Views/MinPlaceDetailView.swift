@@ -41,7 +41,7 @@ struct MinPlaceDetailView: View {
                 
                 // Row: type / status / drive time
                 HStack(spacing: 8) {
-                    Text(place.types?.first ?? "N/A")
+                    Text(viewModel.getRestaurantType(for: place) ?? "Unknown")
                         .font(.subheadline)
                         .foregroundColor(.gray)
                     
