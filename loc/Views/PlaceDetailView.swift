@@ -19,12 +19,9 @@ struct PlaceDetailView: View {
 
     var body: some View {
         VStack(spacing: 16) {
+            // minimum sheet
             if sheetHeight == minSheetHeight {
-                // Collapsed State Content
-                Text(viewModel.placeName)
-                    .font(.title)
-                    .foregroundColor(.gray)
-                    .padding()
+                MinPlaceDetailView(viewModel: viewModel, place: place)
             } else {
                 // Expanded State Content
                 ScrollView {
