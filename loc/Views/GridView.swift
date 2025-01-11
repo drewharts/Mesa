@@ -10,19 +10,28 @@ import SwiftUI
 
 struct GridView: View {
     let images: [UIImage]
-
-    let columns = [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())]
-
+    
+    // Three flexible columns
+    private let columns = [
+        GridItem(.flexible()),
+        GridItem(.flexible()),
+        GridItem(.flexible())
+    ]
+    
     var body: some View {
         LazyVGrid(columns: columns, spacing: 10) {
             ForEach(images.indices, id: \.self) { index in
-                Image(uiImage: images[index]) // Wrap UIImage in a SwiftUI Image
+                // Instead of specifying .frame(width: 115, height: 115), do:
+                Image(uiImage: images[index])
                     .resizable()
                     .scaledToFill()
-                    .frame(width: 125, height: 100)
+                    .aspectRatio(1, contentMode: .fill) // keep them square
                     .clipped()
-                    .cornerRadius(8)
+                    .cornerRadius(4)
             }
         }
+        // Overall grid padding
+        .padding(.horizontal, 20)
+        .padding(.vertical, 20)
     }
 }

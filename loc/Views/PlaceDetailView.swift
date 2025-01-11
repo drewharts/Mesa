@@ -24,20 +24,7 @@ struct PlaceDetailView: View {
                 MinPlaceDetailView(viewModel: viewModel, place: place)
             } else {
                 // Expanded State Content
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 16) {
-                        headerView
-                        if !viewModel.photos.isEmpty {
-                            GridView(images: viewModel.photos)
-                        } else {
-                            ProgressView("Loading Photos...")
-                                .frame(maxWidth: .infinity)
-                                .padding()
-                        }
-                        addressAndHoursView
-                    }
-                    .padding(.horizontal)
-                }
+                MinPlaceDetailView(viewModel: viewModel, place: place)
             }
         }
         .onAppear { viewModel.loadData(for: place) }

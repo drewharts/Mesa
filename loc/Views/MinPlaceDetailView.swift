@@ -40,25 +40,28 @@ struct MinPlaceDetailView: View {
                 .padding(.bottom, 3)
                 
                 // Row: type / status / drive time
-                HStack(spacing: 8) {
+                HStack(spacing: 10) {
                     Text(viewModel.getRestaurantType(for: place) ?? "Unknown")
                         .font(.subheadline)
                         .foregroundColor(.gray)
-                    
-                    Image(systemName: "circle.fill")
-                        .font(.system(size: 8))
-                        .foregroundColor(.green)
-                    
-                    Text("Open")
-                        .font(.subheadline)
-                        .foregroundColor(.green)
-                    
-                    Image(systemName: "car.fill")
-                        .foregroundColor(.gray)
-                    
-                    Text("5 min")
-                        .font(.subheadline)
-                        .foregroundColor(.gray)
+                    HStack(spacing:4) {
+                        Image(systemName: "circle.fill")
+                            .font(.system(size: 8))
+                            .foregroundColor(.green)
+                        
+                        Text("Open")
+                            .font(.subheadline)
+                            .foregroundColor(.green)
+                    }
+
+                    HStack(spacing: 4) {
+                        Image(systemName: "car.fill")
+                            .foregroundColor(.gray)
+                        
+                        Text("5 min")
+                            .font(.subheadline)
+                            .foregroundColor(.gray)
+                    }
                 }
                 .padding(.bottom, 10)
                 
@@ -82,7 +85,6 @@ struct MinPlaceDetailView: View {
                             .font(.subheadline)
                             .foregroundColor(.black)
                             .fontWeight(.semibold)
-
                     }
                     
                     // Example avatar stack
@@ -120,10 +122,14 @@ struct MinPlaceDetailView: View {
                     .font(.footnote)
                     .foregroundColor(.black)
                     .fixedSize(horizontal: false, vertical: true)
+                Divider()
+                    .padding(.top, 15)
+                    .padding(.bottom, 15)
+                MaxPlaceDetailView(viewModel: viewModel)
+                //make the rest of the view
             }
             // Add horizontal padding here so it’s not flush with the screen edges
             .padding(.horizontal, 30)
-//            .padding(.top, 20) // optional
         }
         .navigationBarTitleDisplayMode(.inline)
     }
