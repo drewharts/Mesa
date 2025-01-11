@@ -6,26 +6,36 @@
 //
 
 import SwiftUI
+import UIKit
+import GooglePlaces
 
 struct MaxPlaceDetailView: View {
     @ObservedObject var viewModel: PlaceDetailViewModel
+    let place: GMSPlace
 
     var body: some View {
         HStack(alignment: .center, spacing: 15) {
             
-            // CALL Bubble
-            HStack(spacing: 8) {
-                Image(systemName: "phone")
-                    .font(.subheadline)
-                    .foregroundColor(.black)
-                Text("CALL")
-                    .font(.subheadline)
-                    .foregroundColor(.black)
+            // CALL Bubble (Button)
+            Button(action: {
+                if let phoneNumber = place.phoneNumber,
+                   let url = URL(string: "tel://\(phoneNumber)") {
+                    UIApplication.shared.open(url)
+                }
+            }) {
+                HStack(spacing: 8) {
+                    Image(systemName: "phone")
+                        .font(.subheadline)
+                        .foregroundColor(.black)
+                    Text("CALL")
+                        .font(.subheadline)
+                        .foregroundColor(.black)
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .background(Color.gray.opacity(0.2))
+                .clipShape(Capsule())
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
-            .background(Color.gray.opacity(0.2))
-            .clipShape(Capsule()) // Gives that rounded “pill” shape
 
             // HOURS Bubble
             HStack(spacing: 8) {
@@ -61,7 +71,6 @@ struct MaxPlaceDetailView: View {
             .padding(.top, 15)
             .padding(.bottom, 15)
         
-        //photos
         Text("PHOTOS")
             .font(.subheadline)
             .foregroundColor(.black)
@@ -70,8 +79,6 @@ struct MaxPlaceDetailView: View {
         
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                
-                // The actual grid
                 if !viewModel.photos.isEmpty {
                     GridView(images: viewModel.photos)
                 } else {
@@ -80,9 +87,7 @@ struct MaxPlaceDetailView: View {
                         .padding()
                 }
             }
-            // Optional: adjust if you want more/less vertical spacing
             .padding(.bottom, 20)
         }
-
     }
 }

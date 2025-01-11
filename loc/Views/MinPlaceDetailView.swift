@@ -125,7 +125,7 @@ struct MinPlaceDetailView: View {
                 Divider()
                     .padding(.top, 15)
                     .padding(.bottom, 15)
-                MaxPlaceDetailView(viewModel: viewModel)
+                MaxPlaceDetailView(viewModel: viewModel, place: place)
                 //make the rest of the view
             }
             // Add horizontal padding here so it’s not flush with the screen edges
