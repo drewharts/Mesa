@@ -27,6 +27,31 @@ class PlaceDetailViewModel: ObservableObject {
         openingHours = place.currentOpeningHours?.weekdayText
         fetchPhotos(for: place)
     }
+    
+    func getRestaurantType(for place: GMSPlace) -> String? {
+        // 1. Define a list (or “dictionary”) of recognized restaurant types.
+        //    Could also come from a server, a config file, etc.
+        let recognizedTypes = ["American", "Japanese", "Korean", "Mexican", "Italian", "Chinese", "Greek"]
+        
+        // 2. Get the types from the GMSPlace (e.g., ["japanese_restaurant", "sushi"]).
+        //    If there are no types, just return nil.
+        guard let placeTypes = place.types else {
+            return nil
+        }
+        
+        // 3. Look for the first recognized type that appears in any of the place’s types.
+        //    We do a `.lowercased()` check so it’s case‐insensitive.
+        for recognizedType in recognizedTypes {
+            // If any string in `placeTypes` contains the recognizedType (e.g. “japanese” in “japanese_restaurant”)
+            if placeTypes.contains(where: { $0.lowercased().contains(recognizedType.lowercased()) }) {
+                return recognizedType
+            }
+        }
+        
+        // 4. If no match found, return nil
+        return nil
+    }
+
 
     func fetchPhotos(for place: GMSPlace) {
         photos = []

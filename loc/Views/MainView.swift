@@ -18,8 +18,8 @@ struct MainView: View {
     @FocusState private var searchIsFocused: Bool
     @State private var isSearchBarMinimized = true
     @State private var sheetHeight: CGFloat = 200
-    @State private var minSheetHeight: CGFloat = 200
-    @State private var maxSheetHeight: CGFloat = UIScreen.main.bounds.height * 0.6
+    @State private var minSheetHeight: CGFloat = 250
+    @State private var maxSheetHeight: CGFloat = UIScreen.main.bounds.height * 0.75
     @State private var showDetailSheet = false
     @State private var showProfileView = false
 

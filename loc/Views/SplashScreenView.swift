@@ -25,7 +25,7 @@ struct SplashScreenView: View {
             }
             .edgesIgnoringSafeArea(.all)
             .onAppear {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                DispatchQueue.main.asyncAfter(deadline: .now()) {
                     withAnimation {
                         isActive = true
                     }

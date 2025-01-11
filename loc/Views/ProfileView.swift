@@ -31,17 +31,11 @@ struct ProfileView: View {
                 }
 
                 // Name
-                let firstName = profile.data.firstName ?? "First Name"
-                let lastName = profile.data.lastName ?? "Last Name"
+                let firstName = profile.data.firstName
+                let lastName = profile.data.lastName
                 Text("\(firstName) \(lastName)")
                     .font(.title)
                     .fontWeight(.bold)
-
-                // Email
-                let email = profile.data.email ?? "example@example.com"
-                Text(email)
-                    .foregroundColor(.gray)
-                    .font(.subheadline)
 
                 // Favorites & Lists
                 ProfileFavoriteListView()
