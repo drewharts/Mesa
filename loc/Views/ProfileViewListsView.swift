@@ -25,6 +25,8 @@ struct ProfileViewListsView: View {
                 .font(.headline)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.leading, 20)
+                .foregroundStyle(.black)
+
 
             if !profile.placeListViewModels.isEmpty {
                 ScrollView {
@@ -50,9 +52,11 @@ struct ProfileViewListsView: View {
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text(listVM.placeList.name)
                                         .font(.body)
+                                        .foregroundStyle(.black)
+
                                     Text("\(listVM.placeList.places.count) Places")
                                         .font(.caption)
-                                        .foregroundColor(.gray)
+                                        .foregroundStyle(.black)
                                 }
                                 Spacer()
                             }

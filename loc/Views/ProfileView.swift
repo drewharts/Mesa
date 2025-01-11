@@ -36,6 +36,7 @@ struct ProfileView: View {
                 Text("\(firstName) \(lastName)")
                     .font(.title)
                     .fontWeight(.bold)
+                    .foregroundStyle(.black)
 
                 // Favorites & Lists
                 ProfileFavoriteListView()
@@ -59,7 +60,7 @@ struct ProfileView: View {
             }
             .padding(.bottom, 40) // Space for scrollable content
         }
-        .background(Color(.systemBackground))
+        .background(Color(.white))
         .navigationBarTitle("Profile", displayMode: .inline)
     }
 }

@@ -25,6 +25,8 @@ struct ProfileFavoriteListView: View {
                     .font(.headline)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.leading, 20)
+                    .foregroundStyle(.black)
+
             }
             .buttonStyle(.plain)
             
