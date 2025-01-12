@@ -37,20 +37,6 @@ struct MaxPlaceDetailView: View {
                 .clipShape(Capsule())
             }
 
-            // HOURS Bubble
-            HStack(spacing: 8) {
-                Image(systemName: "clock")
-                    .font(.subheadline)
-                    .foregroundColor(.black)
-                Text("HOURS")
-                    .font(.subheadline)
-                    .foregroundColor(.black)
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
-            .background(Color.gray.opacity(0.2))
-            .clipShape(Capsule())
-
             // MENU Bubble
             HStack(spacing: 8) {
                 Image(systemName: "fork.knife.circle")
