@@ -12,6 +12,9 @@ struct MinPlaceDetailView: View {
     @ObservedObject var viewModel: PlaceDetailViewModel
     let place: GMSPlace
     
+    @Binding var selectedImage: UIImage?
+
+    
     // Tracks which tab is selected: ABOUT or REVIEWS
     @State private var selectedTab: DetailTab = .about
     
@@ -172,7 +175,7 @@ struct MinPlaceDetailView: View {
                         .padding(.bottom, 15)
                     
                     // Example: embedding MaxPlaceDetailView here
-                    MaxPlaceDetailView(viewModel: viewModel, place: place)
+                    MaxPlaceDetailView(viewModel: viewModel, place: place,selectedImage: $selectedImage)
                     
                 case .reviews:
                     // “Reviews” content

@@ -5,11 +5,13 @@
 //  Created by Andrew Hartsfield II on 12/5/24.
 //
 
-
 import SwiftUI
 
 struct GridView: View {
     let images: [UIImage]
+    
+    // NEW: Binding for the selected image
+    @Binding var selectedImage: UIImage?
     
     // For a 3-column grid
     let columns = [
@@ -46,8 +48,11 @@ struct GridView: View {
                             .font(.headline)
                     }
                 }
+                .onTapGesture {
+                    // Assign the tapped image to selectedImage to show the overlay
+                    selectedImage = images[index]
+                }
             }
         }
     }
 }
-
