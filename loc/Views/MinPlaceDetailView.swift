@@ -13,7 +13,6 @@ struct MinPlaceDetailView: View {
     let place: GMSPlace
     
     @Binding var selectedImage: UIImage?
-
     
     // Tracks which tab is selected: ABOUT or REVIEWS
     @State private var selectedTab: DetailTab = .about
@@ -40,7 +39,8 @@ struct MinPlaceDetailView: View {
                         }
                         
                         Button(action: {
-                            // your action for the “bookmark” button
+                            // 1) Present the ListSelectionSheet to add this place to a list
+                            viewModel.showListSelection = true
                         }) {
                             Image(systemName: "bookmark")
                                 .font(.title3)
@@ -79,7 +79,7 @@ struct MinPlaceDetailView: View {
                 // MARK: - Row: ABOUT / Rating / REVIEWS / Avatars
                 HStack(spacing: 12) {
                     
-                    // ABOUT button (custom “underline”)
+                    // ABOUT button
                     Button(action: {
                         selectedTab = .about
                     }) {
@@ -87,16 +87,14 @@ struct MinPlaceDetailView: View {
                             .font(.subheadline)
                             .fontWeight(.semibold)
                             .foregroundColor(.black)
-                            // Add a bit of bottom padding so there’s room for the line
                             .padding(.bottom, 5)
-                            // Overlay a Rectangle only if this tab is selected
                             .overlay(
                                 Group {
                                     if selectedTab == .about {
                                         Rectangle()
                                             .fill(Color.blue)
-                                            .frame(height: 3)    // Thicker line
-                                            .offset(y: 6)        // Move it farther below the text
+                                            .frame(height: 3)
+                                            .offset(y: 6)
                                     }
                                 },
                                 alignment: .bottom
@@ -112,7 +110,7 @@ struct MinPlaceDetailView: View {
                         .background(Color.yellow)
                         .cornerRadius(10)
                     
-                    // REVIEWS button (custom “underline”)
+                    // REVIEWS button
                     Button(action: {
                         selectedTab = .reviews
                     }) {
@@ -174,8 +172,12 @@ struct MinPlaceDetailView: View {
                         .padding(.top, 15)
                         .padding(.bottom, 15)
                     
-                    // Example: embedding MaxPlaceDetailView here
-                    MaxPlaceDetailView(viewModel: viewModel, place: place,selectedImage: $selectedImage)
+                    // Example: embedding MaxPlaceDetailView
+                    MaxPlaceDetailView(
+                        viewModel: viewModel,
+                        place: place,
+                        selectedImage: $selectedImage
+                    )
                     
                 case .reviews:
                     // “Reviews” content
@@ -183,9 +185,6 @@ struct MinPlaceDetailView: View {
                         .font(.footnote)
                         .foregroundColor(.black)
                         .fixedSize(horizontal: false, vertical: true)
-                    
-                    // or a custom ReviewsView, e.g.:
-                    // ReviewsView(viewModel: viewModel, place: place)
                 }
             }
             .padding(.horizontal, 30)
