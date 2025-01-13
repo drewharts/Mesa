@@ -49,6 +49,12 @@ struct MainView: View {
                                 // Minimized Search Bar Button
                                 Button(action: {
                                     withAnimation {
+                                        // If the sheet is currently at max height, bring it back to the min height
+                                        if sheetHeight == maxSheetHeight {
+                                            sheetHeight = minSheetHeight
+                                        }
+                                        
+                                        // Now handle showing the expanded search bar
                                         isSearchBarMinimized.toggle()
                                         searchIsFocused = true
                                     }
@@ -65,6 +71,7 @@ struct MainView: View {
                                 }
                                 .padding(.top, 10)
                                 .padding(.trailing, 20)
+
 
                                 // Profile Button
                                 NavigationLink(destination: ProfileView(), isActive: $showProfileView) {
