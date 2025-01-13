@@ -36,7 +36,7 @@ class SearchViewModel: ObservableObject {
         
         let placesClient = GMSPlacesClient.shared()
         let filter = GMSAutocompleteFilter()
-        filter.types = ["establishment"] // Use a string array directly for types
+        filter.types = ["restaurant"] // Use a string array directly for types
         
         if let location = userLocation {
             filter.locationBias = GMSPlaceRectangularLocationOption(
