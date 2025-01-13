@@ -31,9 +31,7 @@ struct MinPlaceDetailView: View {
                     Spacer()
                     
                     HStack(spacing: 16) {
-                        Button(action: {
-                            // your action for the “plus” button
-                        }) {
+                        NavigationLink(destination: PlaceReviewView(isPresented: .constant(false))) {
                             Image(systemName: "plus")
                                 .font(.title3)
                         }
