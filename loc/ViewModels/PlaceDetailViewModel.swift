@@ -31,7 +31,7 @@ class PlaceDetailViewModel: ObservableObject {
     func getRestaurantType(for place: GMSPlace) -> String? {
         // 1. Define a list (or “dictionary”) of recognized restaurant types.
         //    Could also come from a server, a config file, etc.
-        let recognizedTypes = ["American", "Japanese", "Korean", "Mexican", "Italian", "Chinese", "Greek"]
+        let recognizedTypes = ["American", "Japanese", "Korean", "Mexican", "Italian", "Chinese", "Greek", "Vietnamese"]
         
         // 2. Get the types from the GMSPlace (e.g., ["japanese_restaurant", "sushi"]).
         //    If there are no types, just return nil.

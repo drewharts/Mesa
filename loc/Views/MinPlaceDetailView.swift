@@ -12,11 +12,16 @@ struct MinPlaceDetailView: View {
     @ObservedObject var viewModel: PlaceDetailViewModel
     let place: GMSPlace
     
+    @Binding var selectedImage: UIImage?
+    
+    // Tracks which tab is selected: ABOUT or REVIEWS
+    @State private var selectedTab: DetailTab = .about
+    
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 5) {
                 
-                // Top row: Title + icons
+                // MARK: - Top Row: Title + Icons
                 HStack(alignment: .center) {
                     Text(place.name ?? "Unnamed Place")
                         .font(.largeTitle)
@@ -26,12 +31,17 @@ struct MinPlaceDetailView: View {
                     Spacer()
                     
                     HStack(spacing: 16) {
-                        Button(action: { /* your action */ }) {
+                        Button(action: {
+                            // your action for the “plus” button
+                        }) {
                             Image(systemName: "plus")
                                 .font(.title3)
                         }
                         
-                        Button(action: { /* your action */ }) {
+                        Button(action: {
+                            // 1) Present the ListSelectionSheet to add this place to a list
+                            viewModel.showListSelection = true
+                        }) {
                             Image(systemName: "bookmark")
                                 .font(.title3)
                         }
@@ -39,12 +49,13 @@ struct MinPlaceDetailView: View {
                 }
                 .padding(.bottom, 3)
                 
-                // Row: type / status / drive time
+                // MARK: - Row: Type / Status / Drive Time
                 HStack(spacing: 10) {
                     Text(viewModel.getRestaurantType(for: place) ?? "Unknown")
                         .font(.subheadline)
                         .foregroundColor(.gray)
-                    HStack(spacing:4) {
+                    
+                    HStack(spacing: 4) {
                         Image(systemName: "circle.fill")
                             .font(.system(size: 8))
                             .foregroundColor(.green)
@@ -53,7 +64,7 @@ struct MinPlaceDetailView: View {
                             .font(.subheadline)
                             .foregroundColor(.green)
                     }
-
+                    
                     HStack(spacing: 4) {
                         Image(systemName: "car.fill")
                             .foregroundColor(.gray)
@@ -65,31 +76,64 @@ struct MinPlaceDetailView: View {
                 }
                 .padding(.bottom, 10)
                 
-                // Row: ABOUT / rating / REVIEWS / avatars
+                // MARK: - Row: ABOUT / Rating / REVIEWS / Avatars
                 HStack(spacing: 12) {
-                    Text("ABOUT")
-                        .font(.subheadline)
-                        .foregroundColor(.black)
-                        .fontWeight(.semibold)
-                    HStack(spacing: 4) {
-                        Text(String(format: "%.1f", place.rating))
-                            .font(.caption)
+                    
+                    // ABOUT button
+                    Button(action: {
+                        selectedTab = .about
+                    }) {
+                        Text("ABOUT")
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
                             .foregroundColor(.black)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 4)
-                            .background(Color.yellow)
-                            .cornerRadius(10)
-                            
-                        
+                            .padding(.bottom, 5)
+                            .overlay(
+                                Group {
+                                    if selectedTab == .about {
+                                        Rectangle()
+                                            .fill(Color.blue)
+                                            .frame(height: 3)
+                                            .offset(y: 6)
+                                    }
+                                },
+                                alignment: .bottom
+                            )
+                    }
+                    
+                    // Rating label (not a button)
+                    Text(String(format: "%.1f", place.rating))
+                        .font(.caption)
+                        .foregroundColor(.black)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 4)
+                        .background(Color.yellow)
+                        .cornerRadius(10)
+                    
+                    // REVIEWS button
+                    Button(action: {
+                        selectedTab = .reviews
+                    }) {
                         Text("REVIEWS")
                             .font(.subheadline)
-                            .foregroundColor(.black)
                             .fontWeight(.semibold)
+                            .foregroundColor(.black)
+                            .padding(.bottom, 5)
+                            .overlay(
+                                Group {
+                                    if selectedTab == .reviews {
+                                        Rectangle()
+                                            .fill(Color.blue)
+                                            .frame(height: 3)
+                                            .offset(y: 6)
+                                    }
+                                },
+                                alignment: .bottom
+                            )
                     }
                     
                     // Example avatar stack
                     HStack(spacing: -10) {
-                        // The first 3 “avatar” circles
                         ForEach(0..<3) { _ in
                             Circle()
                                 .fill(Color.gray)
@@ -99,7 +143,6 @@ struct MinPlaceDetailView: View {
                                 )
                         }
                         
-                        // The “+5” circle
                         ZStack {
                             Circle()
                                 .fill(Color.gray)
@@ -109,28 +152,50 @@ struct MinPlaceDetailView: View {
                                 )
                             
                             Text("+5")
-                                .font(.caption)        // adjust font size as needed
+                                .font(.caption)
                                 .foregroundColor(.white)
                         }
                     }
-
                 }
                 .padding(.bottom, 10)
                 
-                // Description
-                Text(place.editorialSummary ?? "No description available")
-                    .font(.footnote)
-                    .foregroundColor(.black)
-                    .fixedSize(horizontal: false, vertical: true)
-                Divider()
-                    .padding(.top, 15)
-                    .padding(.bottom, 15)
-                MaxPlaceDetailView(viewModel: viewModel)
-                //make the rest of the view
+                // MARK: - Tab-Specific Content
+                switch selectedTab {
+                case .about:
+                    // “About” content
+                    Text(place.editorialSummary ?? "No description available")
+                        .font(.footnote)
+                        .foregroundColor(.black)
+                        .fixedSize(horizontal: false, vertical: true)
+                    
+                    Divider()
+                        .padding(.top, 15)
+                        .padding(.bottom, 15)
+                    
+                    // Example: embedding MaxPlaceDetailView
+                    MaxPlaceDetailView(
+                        viewModel: viewModel,
+                        place: place,
+                        selectedImage: $selectedImage
+                    )
+                    
+                case .reviews:
+                    // “Reviews” content
+                    Text("Reviews content here...")
+                        .font(.footnote)
+                        .foregroundColor(.black)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
-            // Add horizontal padding here so it’s not flush with the screen edges
             .padding(.horizontal, 30)
         }
         .navigationBarTitleDisplayMode(.inline)
     }
+}
+
+// MARK: - Sub-Types
+
+enum DetailTab {
+    case about
+    case reviews
 }

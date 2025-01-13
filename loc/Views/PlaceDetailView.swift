@@ -1,5 +1,5 @@
 //
-//  RestaurantDetailView.swift
+//  RestaurantDetailView.swift (PlaceDetailView)
 //  loc
 //
 //  Created by Andrew Hartsfield II on 11/8/24.
@@ -12,39 +12,80 @@ struct PlaceDetailView: View {
     let place: GMSPlace
     @Binding var sheetHeight: CGFloat
     let minSheetHeight: CGFloat
+    
+    @State private var selectedImage: UIImage?
 
     @EnvironmentObject var profile: ProfileViewModel
-
     @StateObject private var viewModel = PlaceDetailViewModel()
 
     var body: some View {
-        VStack(spacing: 16) {
-            // minimum sheet
-            if sheetHeight == minSheetHeight {
-                MinPlaceDetailView(viewModel: viewModel, place: place)
-            } else {
-                // Expanded State Content
-                MinPlaceDetailView(viewModel: viewModel, place: place)
+        ZStack {
+            // 1) Main content (the sheet UI), blurred if an image is selected
+            VStack(spacing: 16) {
+                if sheetHeight == minSheetHeight {
+                    MinPlaceDetailView(viewModel: viewModel,
+                                       place: place,
+                                       selectedImage: $selectedImage)
+                } else {
+                    // Or MaxPlaceDetailView if you prefer for expanded state
+                    MinPlaceDetailView(viewModel: viewModel,
+                                       place: place,
+                                       selectedImage: $selectedImage)
+                }
+            }
+            .onAppear {
+                viewModel.loadData(for: place)
+            }
+            .alert(isPresented: $viewModel.showAlert) {
+                Alert(title: Text("Success"),
+                      message: Text(viewModel.alertMessage),
+                      dismissButton: .default(Text("OK")))
+            }
+            .sheet(isPresented: $viewModel.showListSelection) {
+                ListSelectionSheet(place: place, isPresented: $viewModel.showListSelection)
+                    .environmentObject(profile)
+            }
+            .padding(.vertical)
+            .frame(maxWidth: .infinity)
+            // Apply blur when we have a selected image
+            .blur(radius: selectedImage != nil ? 10 : 0)
+
+            // 2) Overlay with the selected photo, centered
+            if let selectedImage = selectedImage {
+                // A fill container to detect taps outside the photo
+                Color.clear
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        self.selectedImage = nil
+                    }
+                    .ignoresSafeArea()
+
+                // Centered enlarged photo
+                VStack {
+                    Image(uiImage: selectedImage)
+                        .resizable()
+                        .scaledToFit()
+                        .padding()
+                        .onTapGesture {
+                            // Tapping the photo also dismisses it
+                            self.selectedImage = nil
+                        }
+                }
+                // You can animate or transition if desired
+                .transition(.opacity)
+                .animation(.easeInOut, value: selectedImage)
             }
         }
-        .onAppear { viewModel.loadData(for: place) }
-        .alert(isPresented: $viewModel.showAlert) {
-            Alert(title: Text("Success"), message: Text(viewModel.alertMessage), dismissButton: .default(Text("OK")))
-        }
-        .sheet(isPresented: $viewModel.showListSelection) {
-            ListSelectionSheet(place: place, isPresented: $viewModel.showListSelection)
-                .environmentObject(profile)
-        }
-        .padding(.vertical)
-        .frame(maxWidth: .infinity)
     }
 
+    // MARK: - Example subviews if still needed
     private var headerView: some View {
         HStack(alignment: .top, spacing: 8) {
             if let iconURL = viewModel.placeIconURL {
                 AsyncImage(url: iconURL) { phase in
                     if let image = phase.image {
-                        image.resizable()
+                        image
+                            .resizable()
                             .scaledToFit()
                             .frame(width: 75, height: 75)
                             .cornerRadius(8)
@@ -75,7 +116,8 @@ struct PlaceDetailView: View {
                         .font(.subheadline)
                         .foregroundStyle(.gray)
                         .padding(8)
-                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.gray, lineWidth: 2))
+                        .overlay(RoundedRectangle(cornerRadius: 10)
+                                    .stroke(Color.gray, lineWidth: 2))
                 }
             }
 
