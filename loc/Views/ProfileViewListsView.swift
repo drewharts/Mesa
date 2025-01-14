@@ -61,7 +61,7 @@ struct ProfileViewListsView: View {
                                 Spacer()
                             }
                             .padding()
-                            .padding(.horizontal)
+                            .padding(.horizontal,5)
                         }
                         // Context menu (long-press) to add a photo
                         .contextMenu {

@@ -41,14 +41,14 @@ struct ProfileFavoriteListView: View {
                                     .resizable()
                                     .scaledToFill()
                                     .frame(width: 100, height: 100)
-                                    .cornerRadius(8)
+                                    .cornerRadius(50)
                                     .clipped()
                             } else {
                                 // Placeholder if we don't yet have the image
                                 Rectangle()
                                     .fill(Color.blue.opacity(0.3))
                                     .frame(width: 100, height: 100)
-                                    .cornerRadius(8)
+                                    .cornerRadius(50)
                                     .onAppear {
                                         profile.loadPhoto(for: place.id)
                                     }
@@ -66,13 +66,16 @@ struct ProfileFavoriteListView: View {
                         }
                     }
                 }
-                .padding(.horizontal, 20)
+                .padding(.horizontal, 5)
                 
             } else {
                 Text("No lists available")
                     .foregroundColor(.gray)
                     .padding(.horizontal)
             }
+            Divider()
+                .padding(.top, 15)
+                .padding(.bottom, 15)
         }
         // 4) Present AddFavoritesView in a sheet
         .sheet(isPresented: $showSearch) {

@@ -37,7 +37,9 @@ struct ProfileView: View {
                     .font(.title)
                     .fontWeight(.bold)
                     .foregroundStyle(.black)
-
+                
+                Divider()
+                    .padding(.top, 15)
                 // Favorites & Lists
                 ProfileFavoriteListView()
                 ProfileViewListsView()
