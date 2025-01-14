@@ -26,7 +26,7 @@ struct ProfileViewListsView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.leading, 20)
                 .foregroundStyle(.black)
-                .padding(.vertical, -10)
+                .padding(.vertical, -25)
                 .padding(.horizontal, 15)
 
 
@@ -60,6 +60,7 @@ struct ProfileViewListsView: View {
                                         .font(.caption)
                                         .foregroundStyle(.black)
                                 }
+                                .padding(.horizontal, 15)
                                 Spacer()
                             }
                             .padding(.vertical, 10)

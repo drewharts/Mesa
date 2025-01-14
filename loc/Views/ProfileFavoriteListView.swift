@@ -26,6 +26,7 @@ struct ProfileFavoriteListView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.leading, 20)
                     .foregroundStyle(.black)
+                    .padding(.top,-10)
 
             }
             .buttonStyle(.plain)
@@ -34,41 +35,47 @@ struct ProfileFavoriteListView: View {
             
             // 2) Favorite places
             if !profile.favoritePlaces.isEmpty {
-                HStack {
-                    ForEach(profile.favoritePlaces) { place in
-                        ZStack {
-                            // If we have the photo for this place, use it
-                            if let image = profile.favoritePlaceImages[place.id] {
-                                Image(uiImage: image)
-                                    .resizable()
-                                    .scaledToFill()
-                                    .frame(width: 85, height: 85)
-                                    .cornerRadius(50)
-                                    .clipped()
-                            } else {
-                                // Placeholder if we don't yet have the image
-                                Rectangle()
-                                    .fill(Color.blue.opacity(0.3))
-                                    .frame(width: 85, height: 85)
-                                    .cornerRadius(50)
-                                    .onAppear {
-                                        profile.loadPhoto(for: place.id)
+                ScrollView(.horizontal, showsIndicators: false) { // Horizontal scrolling enabled
+                    HStack {
+                        ForEach(profile.favoritePlaces) { place in
+                            VStack { // Place image and name vertically
+                                ZStack {
+                                    // If we have the photo for this place, use it
+                                    if let image = profile.favoritePlaceImages[place.id] {
+                                        Image(uiImage: image)
+                                            .resizable()
+                                            .scaledToFill()
+                                            .frame(width: 85, height: 85)
+                                            .cornerRadius(50)
+                                            .clipped()
+                                    } else {
+                                        // Placeholder if we don't yet have the image
+                                        Rectangle()
+                                            .fill(Color.blue.opacity(0.3))
+                                            .frame(width: 85, height: 85)
+                                            .cornerRadius(50)
+                                            .onAppear {
+                                                profile.loadPhoto(for: place.id)
+                                            }
                                     }
+                                }
+                                
+                                Text(place.name.prefix(15)) // Limit to 15 characters
+                                    .foregroundColor(.black)
+                                    .font(.footnote)
+                                    .multilineTextAlignment(.center)
+                                    .lineLimit(1)
+                                    .frame(width: 85) // Fixed width
                             }
-                            
-                            Text(place.name)
-                                .foregroundColor(.white)
-                                .font(.headline)
-                                .multilineTextAlignment(.center)
-                                .padding(8)
-                        }
-                        // 3) Tapping a place sets `selectedPlace`
-                        .onTapGesture {
-                            selectedPlace = place
+                            .padding(.trailing, 10) // Add padding between items
+                            // 3) Tapping a place sets `selectedPlace`
+                            .onTapGesture {
+                                selectedPlace = place
+                            }
                         }
                     }
+                    .padding(.horizontal, 20)
                 }
-                .padding(.horizontal, 20)
                 
             } else {
                 Text("No lists available")
