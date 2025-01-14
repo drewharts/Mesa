@@ -1,4 +1,4 @@
-# Loc
+# MESA
 Save, organize, and share places with friends
 
 ## How does it look? 
