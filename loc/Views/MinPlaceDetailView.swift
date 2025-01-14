@@ -31,7 +31,7 @@ struct MinPlaceDetailView: View {
                     Spacer()
                     
                     HStack(spacing: 16) {
-                        NavigationLink(destination: PlaceReviewView(isPresented: .constant(false))) {
+                        NavigationLink(destination: PlaceReviewView(isPresented: .constant(false), place: place)) {
                             Image(systemName: "plus")
                                 .font(.title3)
                         }
