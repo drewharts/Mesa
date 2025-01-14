@@ -29,6 +29,8 @@ struct ProfileFavoriteListView: View {
 
             }
             .buttonStyle(.plain)
+            .padding(.horizontal, 10)
+
             
             // 2) Favorite places
             if !profile.favoritePlaces.isEmpty {
@@ -40,14 +42,14 @@ struct ProfileFavoriteListView: View {
                                 Image(uiImage: image)
                                     .resizable()
                                     .scaledToFill()
-                                    .frame(width: 100, height: 100)
+                                    .frame(width: 85, height: 85)
                                     .cornerRadius(50)
                                     .clipped()
                             } else {
                                 // Placeholder if we don't yet have the image
                                 Rectangle()
                                     .fill(Color.blue.opacity(0.3))
-                                    .frame(width: 100, height: 100)
+                                    .frame(width: 85, height: 85)
                                     .cornerRadius(50)
                                     .onAppear {
                                         profile.loadPhoto(for: place.id)
@@ -66,7 +68,7 @@ struct ProfileFavoriteListView: View {
                         }
                     }
                 }
-                .padding(.horizontal, 5)
+                .padding(.horizontal, 20)
                 
             } else {
                 Text("No lists available")
@@ -75,7 +77,8 @@ struct ProfileFavoriteListView: View {
             }
             Divider()
                 .padding(.top, 15)
-                .padding(.bottom, 15)
+                .padding(.horizontal, 20)
+
         }
         // 4) Present AddFavoritesView in a sheet
         .sheet(isPresented: $showSearch) {

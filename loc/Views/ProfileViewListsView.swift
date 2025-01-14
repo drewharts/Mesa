@@ -26,6 +26,8 @@ struct ProfileViewListsView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.leading, 20)
                 .foregroundStyle(.black)
+                .padding(.vertical, -10)
+                .padding(.horizontal, 15)
 
 
             if !profile.placeListViewModels.isEmpty {
@@ -38,13 +40,13 @@ struct ProfileViewListsView: View {
                                     Image(uiImage: decodedImage)
                                         .resizable()
                                         .scaledToFill()
-                                        .frame(width: 100, height: 100)
+                                        .frame(width: 85, height: 85)
                                         .clipped()
                                         .cornerRadius(4)
                                 } else {
                                     // Fallback placeholder
                                     Rectangle()
-                                        .frame(width: 100, height: 100)
+                                        .frame(width: 85, height: 85)
                                         .foregroundColor(.gray)
                                         .cornerRadius(4)
                                 }
@@ -60,8 +62,8 @@ struct ProfileViewListsView: View {
                                 }
                                 Spacer()
                             }
-                            .padding()
-                            .padding(.horizontal,5)
+                            .padding(.vertical, 10)
+                            .padding(.horizontal,35)
                         }
                         // Context menu (long-press) to add a photo
                         .contextMenu {

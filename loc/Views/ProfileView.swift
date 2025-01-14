@@ -40,6 +40,7 @@ struct ProfileView: View {
                 
                 Divider()
                     .padding(.top, 15)
+                    .padding(.horizontal, 20)
                 // Favorites & Lists
                 ProfileFavoriteListView()
                 ProfileViewListsView()
@@ -58,7 +59,6 @@ struct ProfileView: View {
                         .cornerRadius(8)
                 }
                 .padding(.horizontal, 40)
-                .padding(.top, 20)
             }
             .padding(.bottom, 40) // Space for scrollable content
         }
