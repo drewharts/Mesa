@@ -10,17 +10,17 @@ import PhotosUI
 
 struct ProfileViewListsView: View {
     @EnvironmentObject var profile: ProfileViewModel
-    
+
     // State for handling image picker
     @State private var showingImagePicker = false
     @State private var inputImage: UIImage?
-    
+
     // State to remember which list was selected for adding a photo
     @State private var selectedList: PlaceListViewModel?
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            
+
             Text("LISTS")
                 .font(.headline)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -28,8 +28,7 @@ struct ProfileViewListsView: View {
                 .foregroundStyle(.black)
                 .padding(.vertical, -25)
                 .padding(.horizontal, 15)
-            
-            
+
             if !profile.placeListViewModels.isEmpty {
                 ScrollView {
                     ForEach(profile.placeListViewModels) { listVM in
@@ -67,12 +66,12 @@ struct ProfileViewListsView: View {
                                         .foregroundColor(.gray)
                                         .cornerRadius(4)
                                 }
-                                
+
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text(listVM.placeList.name)
                                         .font(.body)
                                         .foregroundStyle(.black)
-                                    
+
                                     Text("\(listVM.placeList.places.count) Places")
                                         .font(.caption)
                                         .foregroundStyle(.black)
@@ -102,27 +101,19 @@ struct ProfileViewListsView: View {
             }
         }
         .padding(.vertical)
-        
+
         // Present the image picker as a sheet
-        .sheet(isPresented: $showingImagePicker, onDismiss: handleImagePicked) {
+        .sheet(isPresented: $showingImagePicker) {
             ImagePicker(image: $inputImage)
         }
-    }
-    
-    /// Called after the user finishes picking an image
-    private func handleImagePicked() {
-        guard let uiImage = inputImage,
-              let selectedList = selectedList else {
-            return
+        .onChange(of: inputImage) {
+            // Zero-parameter onChange (best when you don't need old/new values)
+            if let newImage = inputImage {
+                selectedList?.addPhotoToList(image: newImage)
+            }
+            // Reset states after handling the image
+            inputImage = nil
+            selectedList = nil
         }
-        
-        // Call the addPhotoToList function in the selected PlaceListViewModel
-        selectedList.addPhotoToList(image: uiImage)
-        
-        // Reset states
-        self.inputImage = nil
-        self.selectedList = nil
     }
 }
-
-
