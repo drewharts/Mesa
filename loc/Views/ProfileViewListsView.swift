@@ -17,7 +17,7 @@ struct ProfileViewListsView: View {
     
     // State to remember which list was selected for adding a photo
     @State private var selectedList: PlaceListViewModel?
-
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             
@@ -28,25 +28,42 @@ struct ProfileViewListsView: View {
                 .foregroundStyle(.black)
                 .padding(.vertical, -25)
                 .padding(.horizontal, 15)
-
-
+            
+            
             if !profile.placeListViewModels.isEmpty {
                 ScrollView {
                     ForEach(profile.placeListViewModels) { listVM in
                         NavigationLink(destination: PlaceListView(placeList: listVM.placeList)) {
                             HStack {
                                 // Display the list’s image if available:
-                                if let decodedImage = decodedUIImage(from: listVM.placeList.image) {
-                                    Image(uiImage: decodedImage)
-                                        .resizable()
-                                        .scaledToFill()
-                                        .frame(width: 85, height: 85)
-                                        .clipped()
-                                        .cornerRadius(4)
+                                if !listVM.placeList.image.isEmpty {
+                                    AsyncImage(url: URL(string: listVM.placeList.image)) { phase in
+                                        switch phase {
+                                        case .success(let image):
+                                            image
+                                                .resizable()
+                                                .scaledToFill()
+                                                .frame(width: 90, height: 90)
+                                                .clipped()
+                                                .cornerRadius(4)
+                                        case .failure(_):
+                                            // Placeholder in case of error
+                                            Rectangle()
+                                                .frame(width: 90, height: 90)
+                                                .foregroundColor(.gray)
+                                                .cornerRadius(4)
+                                        case .empty:
+                                            // Placeholder while loading
+                                            ProgressView()
+                                                .frame(width: 90, height: 90)
+                                        @unknown default:
+                                            EmptyView()
+                                        }
+                                    }
                                 } else {
                                     // Fallback placeholder
                                     Rectangle()
-                                        .frame(width: 85, height: 85)
+                                        .frame(width: 90, height: 90)
                                         .foregroundColor(.gray)
                                         .cornerRadius(4)
                                 }
@@ -55,7 +72,7 @@ struct ProfileViewListsView: View {
                                     Text(listVM.placeList.name)
                                         .font(.body)
                                         .foregroundStyle(.black)
-
+                                    
                                     Text("\(listVM.placeList.places.count) Places")
                                         .font(.caption)
                                         .foregroundStyle(.black)
@@ -99,29 +116,13 @@ struct ProfileViewListsView: View {
             return
         }
         
-        // Example: Convert the UIImage to Base64 and store it in the model
-        if let imageData = uiImage.jpegData(compressionQuality: 0.8) {
-            let base64 = imageData.base64EncodedString()
-            
-            // Update the PlaceList's image property
-            selectedList.placeList.image = base64
-            
-            // Optionally, persist this to Firestore or your backend here
-            // e.g. profile.firestoreService.updateListImage(...)
-        }
+        // Call the addPhotoToList function in the selected PlaceListViewModel
+        selectedList.addPhotoToList(image: uiImage)
         
         // Reset states
         self.inputImage = nil
         self.selectedList = nil
     }
-    
-    /// Helper to decode a Base64 string into a UIImage
-    private func decodedUIImage(from base64: String) -> UIImage? {
-        guard let data = Data(base64Encoded: base64),
-              let uiImage = UIImage(data: data) else {
-            return nil
-        }
-        return uiImage
-    }
 }
+
 

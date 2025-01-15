@@ -12,6 +12,9 @@ class PlaceListViewModel: ObservableObject,Identifiable {
     @Published var placeList: PlaceList
     private let firestoreService: FirestoreService
     private let userId: String
+    
+    @Published private var imageUpdateID = UUID()
+
 
     
     init(placeList: PlaceList, firestoreService: FirestoreService, userId: String) {
@@ -39,7 +42,7 @@ class PlaceListViewModel: ObservableObject,Identifiable {
             firestoreService.addPlaceToList(userId: userId, listName: placeList.name, place: place)
         }
     }
-    
+        
     func removePlace(byID placeID: String) {
         placeList.places.removeAll { $0.id == placeID }
     }
@@ -63,6 +66,23 @@ class PlaceListViewModel: ObservableObject,Identifiable {
         
         dispatchGroup.notify(queue: .main) {
             completion(fullPlaces)
+        }
+    }
+    
+    func addPhotoToList(image: UIImage) {
+        firestoreService.uploadImageAndUpdatePlaceList(userId: userId, placeList: placeList, image: image) { [weak self] error in
+            DispatchQueue.main.async {
+                if let error = error {
+                    print("Error adding photo to list: \(error.localizedDescription)")
+                    // Handle error, possibly update UI to show an error message
+                } else {
+                    print("Photo added to list successfully")
+                    // Update the imageUpdateID to trigger a re-render
+                    self?.imageUpdateID = UUID()
+                    // Optionally refresh the list or update the UI to reflect the change
+                    self?.loadPlaceLists() // Reload the list to show the new image
+                }
+            }
         }
     }
 }
