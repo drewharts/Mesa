@@ -92,10 +92,7 @@ class ProfileViewModel: ObservableObject {
             self?.data.placeLists = placeLists
             self?.placeListViewModels = placeLists.map {
                 let viewModel = PlaceListViewModel(placeList: $0, firestoreService: self!.firestoreService, userId: self!.userId)
-                // Set the updateHandler closure to reload the list view models
-                viewModel.updateHandler = { [weak self] in
-                    self?.loadPlaceLists()
-                }
+
                 return viewModel
             }
         }
@@ -117,10 +114,7 @@ class ProfileViewModel: ObservableObject {
     func addNewPlaceList(named name: String, city: String, emoji: String, image: String) {
         let newPlaceList = PlaceList(name: name, city: city, emoji: emoji, image: image);
         let placeListViewModel = PlaceListViewModel(placeList: newPlaceList, firestoreService: firestoreService, userId: userId)
-        // Set the updateHandler for the new PlaceListViewModel
-        placeListViewModel.updateHandler = { [weak self] in
-            self?.loadPlaceLists() // Reload lists to reflect changes
-        }
+
         placeListViewModels.append(placeListViewModel)
         data.placeLists.append(newPlaceList)
 

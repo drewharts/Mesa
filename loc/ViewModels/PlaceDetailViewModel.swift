@@ -87,24 +87,4 @@ class PlaceDetailViewModel: ObservableObject {
     func showDirections() {
         // Handle directions logic
     }
-
-//    func addToList(place: GMSPlace, listName: String, profile: ProfileViewModel) {
-//        let trimmedName = listName.trimmingCharacters(in: .whitespaces)
-//        guard !trimmedName.isEmpty else {
-//            alertMessage = "List name cannot be empty."
-//            showAlert = true
-//            return
-//        }
-//
-//        if profile.data.placeLists.contains(where: { $0.name.lowercased() == trimmedName.lowercased() }) {
-//            alertMessage = "A list with this name already exists."
-//            showAlert = true
-//            return
-//        }
-//
-//        profile.addPlaceToList(place: place, listName: trimmedName)
-//
-//        alertMessage = "\(place.name ?? "Place") has been added to \(trimmedName)."
-//        showAlert = true
-//    }
 }
