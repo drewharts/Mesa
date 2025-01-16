@@ -29,17 +29,14 @@ class PlaceDetailViewModel: ObservableObject {
     }
     
     func getRestaurantType(for place: GMSPlace) -> String? {
-        // 1. Define a list (or “dictionary”) of recognized restaurant types.
-        //    Could also come from a server, a config file, etc.
         let recognizedTypes = ["American", "Japanese", "Korean", "Mexican", "Italian", "Chinese", "Greek", "Vietnamese"]
         
-        // 2. Get the types from the GMSPlace (e.g., ["japanese_restaurant", "sushi"]).
-        //    If there are no types, just return nil.
+        // Get the types from the GMSPlace (e.g., ["japanese_restaurant", "sushi"]).
         guard let placeTypes = place.types else {
             return nil
         }
         
-        // 3. Look for the first recognized type that appears in any of the place’s types.
+        // Look for the first recognized type that appears in any of the place’s types.
         //    We do a `.lowercased()` check so it’s case‐insensitive.
         for recognizedType in recognizedTypes {
             // If any string in `placeTypes` contains the recognizedType (e.g. “japanese” in “japanese_restaurant”)
@@ -90,24 +87,4 @@ class PlaceDetailViewModel: ObservableObject {
     func showDirections() {
         // Handle directions logic
     }
-
-//    func addToList(place: GMSPlace, listName: String, profile: ProfileViewModel) {
-//        let trimmedName = listName.trimmingCharacters(in: .whitespaces)
-//        guard !trimmedName.isEmpty else {
-//            alertMessage = "List name cannot be empty."
-//            showAlert = true
-//            return
-//        }
-//
-//        if profile.data.placeLists.contains(where: { $0.name.lowercased() == trimmedName.lowercased() }) {
-//            alertMessage = "A list with this name already exists."
-//            showAlert = true
-//            return
-//        }
-//
-//        profile.addPlaceToList(place: place, listName: trimmedName)
-//
-//        alertMessage = "\(place.name ?? "Place") has been added to \(trimmedName)."
-//        showAlert = true
-//    }
 }

@@ -20,7 +20,7 @@ class ProfileViewModel: ObservableObject {
     private let firestoreService: FirestoreService
     private let userId: String
     private let googlePlacesService = GooglePlacesService()
-    
+
     @Published var showMaxFavoritesAlert: Bool = false
 
     init(data: ProfileData, firestoreService: FirestoreService, userId: String) {
@@ -32,7 +32,7 @@ class ProfileViewModel: ObservableObject {
             loadImage(from: url)
         }
     }
-    
+
     func loadPhoto(for placeID: String) {
         googlePlacesService.fetchPhoto(placeID: placeID) { [weak self] image in
             DispatchQueue.main.async {
@@ -40,7 +40,7 @@ class ProfileViewModel: ObservableObject {
             }
         }
     }
-    
+
     // Converts prediction -> Place, then adds it.
     func addFavoritePlace(prediction: GMSAutocompletePrediction) {
         // 1) If 4 favorites exist, do nothing (or show a message, etc.)
@@ -49,57 +49,57 @@ class ProfileViewModel: ObservableObject {
             showMaxFavoritesAlert = true
             return
         }
-        
+
         // 2) Convert the prediction into a Place
         let newPlace = Place(
             id: prediction.placeID ?? UUID().uuidString,
             name: prediction.attributedPrimaryText.string,
             address: prediction.attributedSecondaryText?.string ?? "Unknown"
         )
-        
+
         // 3) Add the place to local + Firestore
         addFavoritePlace(place: newPlace)
     }
 
-    
     // Actually appends the place to local state and Firestore.
     func addFavoritePlace(place: Place) {
         favoritePlaces.append(place)
         firestoreService.addProfileFavorite(userId: userId, place: place)
     }
-    
+
     func removeFavoritePlace(place: Place) {
         // 1) Find the index of the place to remove
         if let index = favoritePlaces.firstIndex(where: { $0.id == place.id }) {
             // 2) Remove from local state
             favoritePlaces.remove(at: index)
-            
+
             // 3) Remove from Firestore
             firestoreService.removeProfileFavorite(userId: userId, placeId: place.id)
         }
     }
 
-    
     func numberOfFavoritePlaces() -> Int {
         return favoritePlaces.count
     }
 
-    
     func getPlaceListViewModel(named name: String) -> PlaceListViewModel? {
         return placeListViewModels.first { $0.placeList.name == name }
     }
 
     func loadPlaceLists() {
-        //fetch profile lists
+        // Fetch profile lists
         firestoreService.fetchLists(userId: userId) { [weak self] placeLists in
             self?.data.placeLists = placeLists
-            self?.placeListViewModels = placeLists.map { PlaceListViewModel(placeList: $0,firestoreService: self!.firestoreService, userId: self!.userId) }
+            self?.placeListViewModels = placeLists.map {
+                let viewModel = PlaceListViewModel(placeList: $0, firestoreService: self!.firestoreService, userId: self!.userId)
+
+                return viewModel
+            }
         }
-        //fetch profile favorites
+        // Fetch profile favorites
         firestoreService.fetchProfileFavorites(userId: userId) { [weak self] fetchedPlaces in
             self?.favoritePlaces = fetchedPlaces
         }
-
     }
 
     private func loadImage(from url: URL) {
@@ -110,16 +110,17 @@ class ProfileViewModel: ObservableObject {
             }
         }.resume()
     }
-    
+
     func addNewPlaceList(named name: String, city: String, emoji: String, image: String) {
         let newPlaceList = PlaceList(name: name, city: city, emoji: emoji, image: image);
-        let placeListViewModel = PlaceListViewModel(placeList: newPlaceList,firestoreService: firestoreService, userId: userId)
+        let placeListViewModel = PlaceListViewModel(placeList: newPlaceList, firestoreService: firestoreService, userId: userId)
+
         placeListViewModels.append(placeListViewModel)
         data.placeLists.append(newPlaceList)
-        
+
         firestoreService.createNewList(placeList: newPlaceList, userID: userId)
     }
-    
+
     func removePlaceList(at index: Int) {
         guard placeListViewModels.indices.contains(index) else { return }
         placeListViewModels.remove(at: index)

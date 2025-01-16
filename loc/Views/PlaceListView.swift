@@ -30,7 +30,7 @@ struct PlaceListView: View {
                         // Placeholder if we don't yet have the image
                         Rectangle()
                             .fill(Color.blue.opacity(0.3))
-                            .frame(width: 100, height: 100)
+                            .frame(width: 80, height: 80)
                             .cornerRadius(8)
                             .onAppear {
                                 profile.loadPhoto(for: place.id)

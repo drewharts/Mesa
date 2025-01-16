@@ -37,7 +37,10 @@ struct ProfileView: View {
                     .font(.title)
                     .fontWeight(.bold)
                     .foregroundStyle(.black)
-
+                
+                Divider()
+                    .padding(.top, 15)
+                    .padding(.horizontal, 20)
                 // Favorites & Lists
                 ProfileFavoriteListView()
                 ProfileViewListsView()
@@ -56,9 +59,9 @@ struct ProfileView: View {
                         .cornerRadius(8)
                 }
                 .padding(.horizontal, 40)
-                .padding(.top, 20)
             }
-            .padding(.bottom, 40) // Space for scrollable content
+            .padding(.bottom, 40)
+            .padding(.top,-30)
         }
         .background(Color(.white))
         .navigationBarTitle("Profile", displayMode: .inline)
