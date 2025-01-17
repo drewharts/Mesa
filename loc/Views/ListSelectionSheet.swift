@@ -51,6 +51,7 @@ struct ListSelectionSheet: View {
                             if selectedListIds.contains(listVM.placeList.id) {
                                 // Deselect the list if already selected
                                 selectedListIds.remove(listVM.placeList.id)
+                                profile.getPlaceListViewModel(named: listVM.placeList.name)?.removePlace(place)
                             } else {
                                 // Select the list and add the place
                                 selectedListIds.insert(listVM.placeList.id)

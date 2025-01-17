@@ -85,6 +85,25 @@ class FirestoreService {
                 }
             }
     }
+    
+    func removePlaceFromList(userId: String, listName: String, place: GMSPlace) {
+        let placeDict: [String: Any] = [
+            "id": place.placeID ?? "",
+            "name": place.name ?? "",
+            "address": place.formattedAddress ?? ""
+        ]
+
+        db.collection("users").document(userId)
+            .collection("placeLists").document(listName)
+            .updateData(["places": FieldValue.arrayRemove([placeDict])]) { error in
+                if let error = error {
+                    print("Error removing place from list: \(error.localizedDescription)")
+                } else {
+                    print("Place successfully removed from list: \(listName)")
+                }
+            }
+    }
+
 
     func createNewList(placeList: PlaceList,userID: String) {
         do {
