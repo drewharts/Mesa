@@ -162,50 +162,6 @@
             endingLineNumber = "65"
             landmarkName = "submitReview(completion:)"
             landmarkType = "7">
-            <Locations>
-               <Location
-                  uuid = "AE86A31F-07C4-42B6-B189-F3BFF8ED6211 - 6f52979aa4053496"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "loc.PlaceReviewViewModel.submitReview(completion: (Swift.Bool) -&gt; ()) -&gt; ()"
-                  moduleName = "loc.debug.dylib"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/drewhartsfield/Desktop/Loc/loc/ViewModels/PlaceReviewViewModel.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "65"
-                  endingLineNumber = "65">
-               </Location>
-               <Location
-                  uuid = "AE86A31F-07C4-42B6-B189-F3BFF8ED6211 - cf799c6a37b98000"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "closure #1 (Swift.Result&lt;(), Swift.Error&gt;) -&gt; () in loc.PlaceReviewViewModel.submitReview(completion: (Swift.Bool) -&gt; ()) -&gt; ()"
-                  moduleName = "loc.debug.dylib"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/drewhartsfield/Desktop/Loc/loc/ViewModels/PlaceReviewViewModel.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "65"
-                  endingLineNumber = "65">
-               </Location>
-               <Location
-                  uuid = "AE86A31F-07C4-42B6-B189-F3BFF8ED6211 - c59c53443f485ee0"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "closure #1 @Swift.MainActor () -&gt; () in closure #1 (Swift.Result&lt;(), Swift.Error&gt;) -&gt; () in loc.PlaceReviewViewModel.submitReview(completion: (Swift.Bool) -&gt; ()) -&gt; ()"
-                  moduleName = "loc.debug.dylib"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/drewhartsfield/Desktop/Loc/loc/ViewModels/PlaceReviewViewModel.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "65"
-                  endingLineNumber = "65">
-               </Location>
-            </Locations>
          </BreakpointContent>
       </BreakpointProxy>
       <BreakpointProxy

@@ -153,13 +153,15 @@ struct UpvoteFavDishesView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Upvote favorite dishes (max 3)")
+            Text("Upvote favorite dishes")
                 .font(.footnote)
                 .foregroundStyle(.black)
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack {
                     ForEach(favoriteDishes, id: \.self) { dish in
                         Text(dish)
+                            .font(.footnote)
+                            .foregroundStyle(.black)
                             .padding(8)
                             .background(Capsule().fill(Color.gray.opacity(0.2)))
                             .onTapGesture {
