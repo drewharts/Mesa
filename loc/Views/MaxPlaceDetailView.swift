@@ -64,7 +64,9 @@ struct MaxPlaceDetailView: View {
                 .font(.subheadline)
                 .foregroundColor(.black)
                 .fontWeight(.semibold)
-                .padding(.bottom, 15)
+                .padding(.bottom, 5)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
             
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {

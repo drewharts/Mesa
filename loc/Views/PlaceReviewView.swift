@@ -11,14 +11,25 @@ import GooglePlaces
 struct PlaceReviewView: View {
     @Environment(\.presentationMode) var presentationMode: Binding<PresentationMode>
     @Binding var isPresented: Bool
+    @EnvironmentObject var profile: ProfileViewModel
+
     let place: GMSPlace
 
-    @State private var foodRating: Double = 0
-    @State private var serviceRating: Double = 0
-    @State private var ambienceRating: Double = 0
-    @State private var favoriteDishes: [String] = []
-    @State private var reviewText: String = ""
-    @State private var isReviewTextEmpty: Bool = true
+    @StateObject private var viewModel: PlaceReviewViewModel
+    
+    init(isPresented: Binding<Bool>, place: GMSPlace, userId: String, userName: String) {
+        self._isPresented = isPresented
+        self.place = place
+
+        // Initialize the ViewModel with place/user info
+        _viewModel = StateObject(
+            wrappedValue: PlaceReviewViewModel(
+                place: place,
+                userId: userId,
+                userName: userName
+            )
+        )
+    }
     
     var btnBack : some View { Button(action: {
         self.presentationMode.wrappedValue.dismiss()
@@ -47,11 +58,11 @@ struct PlaceReviewView: View {
 
 
                     VStack(spacing: 8) {
-                        SliderRow(title: "Food", value: $foodRating)
+                        SliderRow(title: "Food", value: $viewModel.foodRating)
                             .accessibilityIdentifier("foodSlider")
-                        SliderRow(title: "Service", value: $serviceRating)
+                        SliderRow(title: "Service", value: $viewModel.serviceRating)
                             .accessibilityIdentifier("serviceSlider")
-                        SliderRow(title: "Ambience", value: $ambienceRating)
+                        SliderRow(title: "Ambience", value: $viewModel.ambienceRating)
                             .accessibilityIdentifier("ambienceSlider")
                     }
                     Divider()
@@ -59,7 +70,7 @@ struct PlaceReviewView: View {
                         .padding(.bottom, 10)
                         .padding(.horizontal, -20)
                     
-                    UpvoteFavDishesView()
+                    UpvoteFavDishesView(favoriteDishes: $viewModel.favoriteDishes) // Pass the binding here
                     Divider()
                         .padding(.top, 15)
                         .padding(.bottom, 15)
@@ -67,18 +78,15 @@ struct PlaceReviewView: View {
 
 
                     ZStack(alignment: .topLeading) {
-                        TextEditor(text: $reviewText)
+                        TextEditor(text: $viewModel.reviewText)
                             .font(.subheadline)
                             .frame(height: 100)
                             .scrollContentBackground(.hidden)
                             .background(.gray.opacity(0.3))
                             .cornerRadius(8)
                             .foregroundStyle(.black)
-                            .onChange(of: reviewText) {
-                                isReviewTextEmpty = reviewText.isEmpty
-                            }
 
-                        if isReviewTextEmpty {
+                        if viewModel.reviewText.isEmpty {
                             Text("Add a review...")
                                 .font(.subheadline)
                                 .foregroundColor(.black)
@@ -112,7 +120,13 @@ struct PlaceReviewView: View {
                         .padding(.horizontal, -10)
 
 
-                    Button(action: { isPresented = false }) {
+                    Button(action: {
+                        viewModel.submitReview { success in
+                            if success {
+                                isPresented = false
+                            }
+                        }
+                    }) {
                         Text("POST REVIEW")
                             .bold()
                             .frame(maxWidth: .infinity)
@@ -132,11 +146,14 @@ struct PlaceReviewView: View {
 }
 
 struct UpvoteFavDishesView: View {
-    @State private var favoriteDishes: [String] = []
+    @Binding var favoriteDishes: [String]
+    @State private var showTextField: Bool = false
+    @State private var newDish: String = ""
+    @FocusState private var isTextFieldFocused: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Upvote favorite dishes")
+            Text("Upvote favorite dishes (max 3)")
                 .font(.footnote)
                 .foregroundStyle(.black)
             ScrollView(.horizontal, showsIndicators: false) {
@@ -146,22 +163,51 @@ struct UpvoteFavDishesView: View {
                             .padding(8)
                             .background(Capsule().fill(Color.gray.opacity(0.2)))
                             .onTapGesture {
-                                favoriteDishes.removeAll { $0 == dish }
+                                if let index = favoriteDishes.firstIndex(of: dish) {
+                                    favoriteDishes.remove(at: index)
+                                }
                             }
                     }
-                    Button(action: {
-                        favoriteDishes.append("New Dish") // Replace with actual input logic
-                    }) {
-                        Image(systemName: "plus")
-                            .foregroundColor(.black)
-                            .padding(8)
-                            .background(Circle().fill(Color.gray.opacity(0.2)))
+
+                    if favoriteDishes.count < 3 {
+                        if showTextField {
+                            TextField("Add dish", text: $newDish)
+                                .padding(8)
+                                .background(Capsule().fill(Color.gray.opacity(0.2)))
+                                .foregroundStyle(.black)
+                                .onSubmit {
+                                    if !newDish.isEmpty {
+                                        favoriteDishes.append(newDish)
+                                        newDish = ""
+                                        showTextField = false
+                                        isTextFieldFocused = false // Unfocus after submit
+                                    }
+                                }
+                                .onDisappear {
+                                    showTextField = false
+                                    isTextFieldFocused = false
+                                }
+                                .focused($isTextFieldFocused) // Bind the FocusState
+                        }
+
+                        if !showTextField {
+                            Button(action: {
+                                showTextField = true
+                                isTextFieldFocused = true // Focus after showing
+                            }) {
+                                Image(systemName: "plus")
+                                    .foregroundColor(.black)
+                                    .padding(8)
+                                    .background(Circle().fill(Color.gray.opacity(0.2)))
+                            }
+                        }
                     }
                 }
             }
         }
     }
 }
+
 struct SliderRow: View {
     let title: String
     @Binding var value: Double

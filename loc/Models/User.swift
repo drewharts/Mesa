@@ -9,6 +9,7 @@
 import Foundation
 
 struct User: Codable {
+    let id: String //firestore document ID
     let firstName: String
     let lastName: String
     let email: String

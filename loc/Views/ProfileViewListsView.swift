@@ -16,7 +16,7 @@ struct ListHeaderView: View {
             .padding(.leading, 20)
             .foregroundStyle(.black)
             .padding(.vertical, -25)
-            .padding(.horizontal, 15)
+            .padding(.horizontal, 10)
     }
 }
 
@@ -57,7 +57,7 @@ struct PlaceListCellView: View {
                 Spacer()
             }
             .padding(.vertical, 10)
-            .padding(.horizontal, 35)
+            .padding(.horizontal, 30)
         }
         .contextMenu {
             Button {

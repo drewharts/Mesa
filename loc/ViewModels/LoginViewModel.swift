@@ -77,6 +77,7 @@ class LoginViewModel: ObservableObject {
         }
 
         let profileData = ProfileData(
+            id: uid,
             firstName: user.profile?.givenName ?? "",
             lastName: user.profile?.familyName ?? "",
             email: user.profile?.email ?? "",

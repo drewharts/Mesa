@@ -10,6 +10,7 @@ import SwiftUI
 import GooglePlaces
 
 struct ProfileData: Codable {
+    let id: String
     var firstName: String
     var lastName: String
     var email: String

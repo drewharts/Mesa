@@ -32,6 +32,10 @@ class ProfileViewModel: ObservableObject {
             loadImage(from: url)
         }
     }
+    
+    func getUserId() -> String {
+        return userId
+    }
 
     func loadPhoto(for placeID: String) {
         googlePlacesService.fetchPhoto(placeID: placeID) { [weak self] image in

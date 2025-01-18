@@ -38,6 +38,11 @@ struct ListSelectionSheet: View {
                         .padding(8)
                         .background(Circle().fill(.white))
                 }
+                .sheet(isPresented: $showNewListSheet) {
+                    NewListView(isPresented: $showNewListSheet, onSave: { listName in
+                        profile.addNewPlaceList(named: listName, city: "", emoji: "", image: "")
+                    })
+                }
             }
             .padding(.horizontal, 20)
             .padding(.top, 10)

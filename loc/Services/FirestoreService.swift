@@ -14,7 +14,12 @@ class FirestoreService {
     private let db = Firestore.firestore()
     private let storage = Storage.storage() // Add a storage reference
 
-    // ... (your other existing functions: saveUserProfile, addPlaceToList, etc.)
+    func saveReview(_ review: Review, completion: @escaping (Result<Void, Error>) -> Void) {
+        // Perform Firestore .addDocument or .setData logic here...
+        // For now, just call success:
+        completion(.success(()))
+    }
+
 
     // Function to upload an image and update the PlaceList's image field
     func uploadImageAndUpdatePlaceList(userId: String, placeList: PlaceList, image: UIImage, completion: @escaping (Error?) -> Void) {
