@@ -75,7 +75,7 @@ struct ProfileViewListsView: View {
 
     // State for handling image picker
     @State private var showingImagePicker = false
-    @State private var inputImage: UIImage?
+    @State private var inputImage: [UIImage] = []
 
     // State to remember which list was selected for adding a photo
     @State private var selectedList: PlaceListViewModel?
@@ -104,12 +104,12 @@ struct ProfileViewListsView: View {
 
         // Present the image picker as a sheet
         .sheet(isPresented: $showingImagePicker) {
-            ImagePicker(image: $inputImage)
+            ImagePicker(images: $inputImage, selectionLimit: 1)
         }
         .onChange(of: inputImage) {
-            selectedList?.addPhotoToList(image: inputImage!)
+            selectedList?.addPhotoToList(image: inputImage.first!)
             
-            inputImage = nil
+            inputImage = []
             selectedList = nil
         }
     }

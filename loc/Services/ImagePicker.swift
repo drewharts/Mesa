@@ -10,41 +10,54 @@ import SwiftUI
 import PhotosUI
 
 struct ImagePicker: UIViewControllerRepresentable {
-    @Binding var image: UIImage?
-    @Environment(\.presentationMode) var presentationMode
+    @Binding var images: [UIImage]
+    var selectionLimit: Int // 0 for multiple, 1 for single
 
-    func makeUIViewController(context: Context) -> PHPickerViewController {
-        var config = PHPickerConfiguration()
-        config.filter = .images
-        let picker = PHPickerViewController(configuration: config)
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let picker = UIImagePickerController()
         picker.delegate = context.coordinator
+        picker.sourceType = .photoLibrary
+
+        // For multiple image selection (iOS 14+), set the limit
+        if #available(iOS 14, *), selectionLimit != 1 {
+            picker.sourceType = .photoLibrary
+            picker.delegate = context.coordinator
+        } else {
+            picker.sourceType = .photoLibrary
+            picker.delegate = context.coordinator
+        }
+
         return picker
     }
 
-    func updateUIViewController(_ uiViewController: PHPickerViewController, context: Context) {
+
+    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {
+        // No updates needed here
     }
 
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
     }
 
-    class Coordinator: NSObject, PHPickerViewControllerDelegate {
+    class Coordinator: NSObject, UINavigationControllerDelegate, UIImagePickerControllerDelegate {
         let parent: ImagePicker
 
         init(_ parent: ImagePicker) {
             self.parent = parent
         }
 
-        func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
-            picker.dismiss(animated: true)
-
-            guard let provider = results.first?.itemProvider else { return }
-
-            if provider.canLoadObject(ofClass: UIImage.self) {
-                provider.loadObject(ofClass: UIImage.self) { image, _ in
-                    self.parent.image = image as? UIImage
+        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
+            
+            if let selectedImage = info[.originalImage] as? UIImage {
+                if parent.selectionLimit == 1 {
+                    // Single image selection: replace the array
+                    parent.images = [selectedImage]
+                } else {
+                    // Multiple image selection: append to the array
+                    parent.images.append(selectedImage)
                 }
             }
+            picker.dismiss(animated: true)
         }
     }
 }

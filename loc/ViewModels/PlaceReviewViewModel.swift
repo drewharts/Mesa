@@ -16,6 +16,7 @@ class PlaceReviewViewModel: ObservableObject {
     @Published var ambienceRating: Double = 0
     @Published var favoriteDishes: [String] = []
     @Published var reviewText: String = ""
+    @Published var images: [UIImage] = []
 
     // You might track loading & error states for UI feedback:
     @Published var isLoading: Bool = false
