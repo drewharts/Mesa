@@ -13,6 +13,8 @@ struct PlaceReviewView: View {
     @Environment(\.presentationMode) var presentationMode: Binding<PresentationMode>
     @Binding var isPresented: Bool
     @EnvironmentObject var profile: ProfileViewModel
+    @State private var showButtonHighlight = false
+
     
     let place: GMSPlace
 
@@ -22,7 +24,7 @@ struct PlaceReviewView: View {
     @State private var showingImagePicker = false
     @State private var inputImages: [UIImage] = []
     
-    init(isPresented: Binding<Bool>, place: GMSPlace, userId: String, userName: String) {
+    init(isPresented: Binding<Bool>, place: GMSPlace, userId: String, userFirstName: String, userLastName: String) {
         self._isPresented = isPresented
         self.place = place
 
@@ -31,7 +33,8 @@ struct PlaceReviewView: View {
             wrappedValue: PlaceReviewViewModel(
                 place: place,
                 userId: userId,
-                userName: userName
+                userFirstName: userFirstName,
+                userLastName: userLastName
             )
         )
     }
@@ -82,15 +85,28 @@ struct PlaceReviewView: View {
                         .padding(.bottom, 15)
                         .padding(.horizontal, -10)
 
-                    PostReviewButtonView {
-                        // Pass the selected images to the ViewModel
+                    PostReviewButtonView(highlighted: $showButtonHighlight) {
+                        // 1. Immediately highlight the button
+                        showButtonHighlight = true
+                        
+                        // 2. Pass the selected images to the ViewModel
                         viewModel.images = inputImages
+                        
+                        // 3. Submit the review
                         viewModel.submitReview { success in
                             if success {
-                                isPresented = false
+                                // Optional: Wait briefly so user sees the highlight
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                    showButtonHighlight = false
+                                     presentationMode.wrappedValue.dismiss()
+                                }
+                            } else {
+                                // On failure, remove highlight
+                                showButtonHighlight = false
                             }
                         }
                     }
+
                 }
                 .padding(.horizontal, 40)
             }
