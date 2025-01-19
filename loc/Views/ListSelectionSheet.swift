@@ -15,66 +15,111 @@ struct ListSelectionSheet: View {
     @Binding var isPresented: Bool
     @State private var showNewListSheet = false
     @State private var newListName = ""
+    @State public var searchText = ""
+    @State private var selectedListIds: Set<UUID> = [] // Track multiple selected lists
 
     var body: some View {
-        VStack(spacing: 20) {
-            Text("Add to Collection")
-                .font(.headline)
-                .padding()
+        VStack(spacing: 10) {
+            HStack {
+                Spacer()
 
-            ScrollView {
-                VStack(spacing: 15) {
-                    // Button for creating a new collection
-                    Button(action: {
-                        showNewListSheet = true
-                    }) {
-                        HStack {
-                            Image(systemName: "plus.circle")
-                            Text("Create New Collection")
-                                .fontWeight(.bold)
-                        }
-                        .foregroundColor(.blue)
-                        .padding()
-                    }
-                    .sheet(isPresented: $showNewListSheet) {
-                        NewListView(isPresented: $showNewListSheet, onSave: { listName in
-                            profile.addNewPlaceList(named: listName, city: "", emoji: "", image: "")
-                        })
-                    }
+                Text("Save to list")
+                    .font(.headline)
+                    .padding(.leading, 20)
 
-                    // List of existing collections
-                    ForEach(profile.placeListViewModels, id: \.placeList.id) { listViewModel in
+                Spacer()
+
+                Button(action: {
+                    showNewListSheet = true
+                }) {
+                    Image(systemName: "plus")
+                        .imageScale(.small)
+                        .foregroundColor(.black)
+                        .padding(8)
+                        .background(Circle().fill(.white))
+                }
+                .sheet(isPresented: $showNewListSheet) {
+                    NewListView(isPresented: $showNewListSheet, onSave: { listName in
+                        profile.addNewPlaceList(named: listName, city: "", emoji: "", image: "")
+                    })
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 10)
+            
+            SkinnySearchBar()
+            
+            if !profile.placeListViewModels.isEmpty {
+                ScrollView {
+                    ForEach(profile.placeListViewModels) { listVM in
                         Button(action: {
-                            profile.getPlaceListViewModel(named: listViewModel.placeList.name)?.addPlace(place)
-                            isPresented = false
+                            if selectedListIds.contains(listVM.placeList.id) {
+                                // Deselect the list if already selected
+                                selectedListIds.remove(listVM.placeList.id)
+                                profile.getPlaceListViewModel(named: listVM.placeList.name)?.removePlace(place)
+                            } else {
+                                // Select the list and add the place
+                                selectedListIds.insert(listVM.placeList.id)
+                                profile.getPlaceListViewModel(named: listVM.placeList.name)?.addPlace(place)
+                            }
                         }) {
                             HStack {
-                                Text(listViewModel.placeList.name)
+                                // Display the list’s image if available:
+                                if let listImage = listVM.getImage() {
+                                    Image(uiImage: listImage)
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fill)
+                                        .frame(width: 75, height: 75)
+                                        .clipped()
+                                        .cornerRadius(4)
+                                } else {
+                                    // Fallback placeholder
+                                    Rectangle()
+                                        .frame(width: 75, height: 75)
+                                        .foregroundColor(.white)
+                                        .cornerRadius(4)
+                                }
+
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(listVM.placeList.name)
+                                        .font(.body)
+                                        .foregroundStyle(.white)
+
+                                    Text("\(listVM.placeList.places.count) Places")
+                                        .font(.caption)
+                                        .foregroundStyle(.white)
+                                }
+                                .padding(.horizontal, 15)
+                                
                                 Spacer()
-                                Image(systemName: "chevron.right")
-                                    .foregroundColor(.gray)
+                                
+                                // Circle to indicate selection
+                                ZStack {
+                                    Circle()
+                                        .stroke(Color.white)
+                                        .frame(width: 24, height: 24)
+                                    if selectedListIds.contains(listVM.placeList.id) {
+                                        Circle()
+                                            .fill(Color.white)
+                                            .frame(width: 18, height: 18)
+                                    }
+                                }
                             }
-                            .padding()
-                            .background(Color(.systemGray6))
-                            .cornerRadius(8)
+                            .padding(.top, 20)
+                            .padding(.horizontal, 15)
                         }
                     }
                 }
-                .padding(.horizontal)
+            } else {
+                Text("No lists available")
+                    .foregroundColor(.gray)
+                    .padding(.horizontal)
             }
 
             Spacer()
-
-            // Cancel button
-            Button("Cancel") {
-                isPresented = false
-            }
-            .foregroundColor(.red)
-            .padding()
         }
         .background(Color(.systemBackground))
         .cornerRadius(20)
         .padding()
     }
-
 }

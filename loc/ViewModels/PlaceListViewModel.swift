@@ -69,9 +69,19 @@ class PlaceListViewModel: ObservableObject, Identifiable {
         }
     }
 
-    func removePlace(byID placeID: String) {
-        placeList.places.removeAll { $0.id == placeID }
+    func removePlace(_ place: GMSPlace) {
+        if let placeID = place.placeID {
+            // Remove from local placeList
+            placeList.places.removeAll { $0.id == placeID }
+            
+            // Remove from Firestore
+            firestoreService.removePlaceFromList(userId: userId, listName: placeList.name, place: place)
+        } else {
+            // Handle cases where placeID is nil
+            print("Error: Cannot remove place. Invalid placeID.")
+        }
     }
+
 
     func fetchFullPlaces(completion: @escaping ([GMSPlace]) -> Void) {
         let placesClient = GMSPlacesClient.shared()

@@ -70,6 +70,7 @@
 		B00311FE2CDACD8B002AE03B /* Services */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Services; sourceTree = "<group>"; };
 		B00311FF2CDACE01002AE03B /* Managers */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Managers; sourceTree = "<group>"; };
 		B0384E7D2CE0334800FC72F7 /* Samples */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Samples; sourceTree = "<group>"; };
+		B0E659872D39D54300F8527E /* Extensions */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Extensions; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -137,6 +138,7 @@
 		B054DC5F2C42F5DA00C98088 /* loc */ = {
 			isa = PBXGroup;
 			children = (
+				B0E659872D39D54300F8527E /* Extensions */,
 				B0384E7D2CE0334800FC72F7 /* Samples */,
 				B00311FF2CDACE01002AE03B /* Managers */,
 				B00311FE2CDACD8B002AE03B /* Services */,
@@ -206,6 +208,7 @@
 				B00311FD2CDACD81002AE03B /* Views */,
 				B00311FE2CDACD8B002AE03B /* Services */,
 				B00311FF2CDACE01002AE03B /* Managers */,
+				B0E659872D39D54300F8527E /* Extensions */,
 			);
 			name = loc;
 			packageProductDependencies = (
