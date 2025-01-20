@@ -110,6 +110,9 @@ struct PlaceReviewView: View {
                 }
                 .padding(.horizontal, 40)
             }
+            .onTapGesture {
+                UIApplication.shared.endEditing()
+            }
             .background(Color(.white))
         }
         .navigationBarBackButtonHidden(true)
