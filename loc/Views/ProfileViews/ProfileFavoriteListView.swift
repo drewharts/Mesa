@@ -92,16 +92,14 @@ struct ProfileFavoriteListView: View {
             AddFavoritesView()
         }
         // 5) Present a detail sheet (or action sheet) for the selected place
-        .sheet(item: $selectedPlace) { place in
-            // This sheet is specifically for the selected place
-            // Build a detail view (or anything you want to show)
-            VStack {
-                Text("Details for \(place.name)")
-                    .font(.largeTitle)
-                // ... show more info about `place` here ...
-                Spacer()
-            }
-            .padding()
+        .fullScreenCover(item: $selectedPlace) { place in
+            // Present the MainView.
+            // Pass in the "preselected" place so we know which one to select on the map.
+            MainView(locationManager: LocationManager(),   // or pass in your existing one
+                     preselectedPlace: place)
+                // If needed, also pass along environment objects, etc.
+                .environmentObject(profile)
         }
+
     }
 }
