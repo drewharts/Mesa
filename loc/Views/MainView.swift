@@ -150,7 +150,6 @@ struct MainView: View {
             }
         }
         .navigationViewStyle(StackNavigationViewStyle())
-//        .environmentObject(userSession.profile!) // Pass the profile into the environment as before
     }
 
     // Handle the map tap to minimize the search bar
