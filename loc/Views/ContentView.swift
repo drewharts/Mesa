@@ -11,21 +11,21 @@ import FirebaseAuth
 
 struct ContentView: View {
     @EnvironmentObject var userSession: UserSession
-    @ObservedObject var locationManager = LocationManager()
+    // No need to observe LocationManager here anymore
 
     var body: some View {
         if userSession.isUserLoggedIn {
-            if let profileViewModel = userSession.profileViewModel {
-                // Once profileViewModel is available, inject it into the environment
-                MainView()
-                    .environmentObject(profileViewModel)
-                    .environmentObject(locationManager)
+            // Check if the profile data is loaded
+            if userSession.profileViewModel != nil {
+                // Pass userSession to MainView
+                MainView(userSession: userSession)
+                    .environmentObject(userSession)
             } else {
                 ProgressView("Loading profile...")
             }
         } else {
-            LoginView(viewModel: LoginViewModel(firestoreService: FirestoreService(),googleplacesService: userSession.googlePlacesService))
-                .environmentObject(userSession)        }
+            LoginView(viewModel: LoginViewModel(firestoreService: FirestoreService(), googleplacesService: userSession.googlePlacesService))
+                .environmentObject(userSession)
+        }
     }
 }
-

@@ -8,15 +8,15 @@
 import SwiftUI
 
 struct ProfileFavoriteListView: View {
-    @EnvironmentObject var profile: ProfileViewModel
+    @EnvironmentObject var userSession: UserSession // Use userSession
     @State private var showSearch = false
-    
+
     // Keep track of which place is currently selected
     @State private var selectedPlace: Place? = nil
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            
+
             // 1) "FAVORITES" button
             Button {
                 showSearch = true
@@ -34,14 +34,16 @@ struct ProfileFavoriteListView: View {
 
             
             // 2) Favorite places
-            if !profile.favoritePlaces.isEmpty {
+            // Access favoritePlaces through userSession
+            if let profileViewModel = userSession.profileViewModel, !profileViewModel.favoritePlaces.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) { // Horizontal scrolling enabled
                     HStack {
-                        ForEach(profile.favoritePlaces) { place in
+                        ForEach(profileViewModel.favoritePlaces) { place in
                             VStack { // Place image and name vertically
                                 ZStack {
                                     // If we have the photo for this place, use it
-                                    if let image = profile.favoritePlaceImages[place.id] {
+                                    // Access images through userSession
+                                    if let image = profileViewModel.favoritePlaceImages[place.id] {
                                         Image(uiImage: image)
                                             .resizable()
                                             .scaledToFill()
@@ -55,7 +57,8 @@ struct ProfileFavoriteListView: View {
                                             .frame(width: 85, height: 85)
                                             .cornerRadius(50)
                                             .onAppear {
-                                                profile.loadPhoto(for: place.id)
+                                                // Load the photo using the profileViewModel
+                                                profileViewModel.loadPhoto(for: place.id)
                                             }
                                     }
                                 }
@@ -89,7 +92,8 @@ struct ProfileFavoriteListView: View {
         }
         // 4) Present AddFavoritesView in a sheet
         .sheet(isPresented: $showSearch) {
-            AddFavoritesView()
+            // Make sure AddFavoritesView can access userSession
+            AddFavoritesView().environmentObject(userSession)
         }
         // 5) Present a detail sheet (or action sheet) for the selected place
         .sheet(item: $selectedPlace) { place in

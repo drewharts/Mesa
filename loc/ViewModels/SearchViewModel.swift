@@ -12,14 +12,14 @@ import Combine
 
 class SearchViewModel: ObservableObject {
     @Published var searchText = ""
-    @Published var searchResults: [GMSAutocompletePrediction] = [] // Use GMSAutocompletePrediction directly
-    @Published var selectedPlace: GMSPlace? // Use GMSPlace directly
+    @Published var searchResults: [GMSAutocompletePrediction] = []
+    @Published var selectedPlace: GMSPlace?
     @Published var userLocation: CLLocationCoordinate2D?
-    
+
     private var cancellables = Set<AnyCancellable>()
-    
+    private let placesClient = GMSPlacesClient.shared()
+
     init() {
-        // Observing searchText changes with debounce to limit API calls
         $searchText
             .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
             .sink { [weak self] text in
@@ -33,18 +33,17 @@ class SearchViewModel: ObservableObject {
             searchResults = []
             return
         }
-        
-        let placesClient = GMSPlacesClient.shared()
+
         let filter = GMSAutocompleteFilter()
-        filter.types = ["restaurant"] // Use a string array directly for types
-        
+        filter.types = ["restaurant"]
+
         if let location = userLocation {
             filter.locationBias = GMSPlaceRectangularLocationOption(
                 CLLocationCoordinate2D(latitude: location.latitude + 0.01, longitude: location.longitude + 0.01),
                 CLLocationCoordinate2D(latitude: location.latitude - 0.01, longitude: location.longitude - 0.01)
             )
         }
-        
+
         placesClient.findAutocompletePredictions(fromQuery: query, filter: filter, sessionToken: nil) { [weak self] results, error in
             if let error = error {
                 print("Error fetching autocomplete results: \(error)")
@@ -55,19 +54,21 @@ class SearchViewModel: ObservableObject {
             }
         }
     }
-    
-    func selectPlace(_ prediction: GMSAutocompletePrediction) {
-        let placesClient = GMSPlacesClient.shared()
 
-        let myProperties = [GMSPlaceProperty.all].map {$0.rawValue}
-        let placeRequest = GMSFetchPlaceRequest(placeID: prediction.placeID, placeProperties: myProperties, sessionToken: nil)
-        placesClient.fetchPlace(with: placeRequest, callback: {
-            (place: GMSPlace?, error: Error?) in
-            guard let place, error == nil else { return }
-            DispatchQueue.main.async {
-                self.selectedPlace = place
-                self.searchResults.removeAll() // Clear results after selecting a place
+    func selectPlace(_ prediction: GMSAutocompletePrediction) {
+        let placeProperties = [GMSPlaceProperty.all].map { $0.rawValue }
+        let placeRequest = GMSFetchPlaceRequest(placeID: prediction.placeID, placeProperties: placeProperties, sessionToken: nil)
+
+        placesClient.fetchPlace(with: placeRequest) { [weak self] place, error in
+            guard let place = place, error == nil else {
+                print("Error fetching place details: \(error!)")
+                return
             }
-        })
+            DispatchQueue.main.async {
+                // Update selectedPlace and clear searchResults only after place details are fetched
+                self?.selectedPlace = place
+                self?.searchResults = [] // Clear results after selecting a place
+            }
+        }
     }
 }

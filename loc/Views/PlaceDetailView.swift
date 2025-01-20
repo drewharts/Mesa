@@ -15,7 +15,7 @@ struct PlaceDetailView: View {
     
     @State private var selectedImage: UIImage?
 
-    @EnvironmentObject var profile: ProfileViewModel
+    @EnvironmentObject var userSession: UserSession
     @StateObject private var viewModel = PlaceDetailViewModel()
 
     var body: some View {
@@ -43,7 +43,7 @@ struct PlaceDetailView: View {
             }
             .sheet(isPresented: $viewModel.showListSelection) {
                 ListSelectionSheet(place: place, isPresented: $viewModel.showListSelection)
-                    .environmentObject(profile)
+                    .environmentObject(userSession.profileViewModel!)
             }
             .padding(.vertical)
             .frame(maxWidth: .infinity)

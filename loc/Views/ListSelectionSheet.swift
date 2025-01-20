@@ -9,8 +9,7 @@ import SwiftUI
 import GooglePlaces
 
 struct ListSelectionSheet: View {
-    @EnvironmentObject var profile: ProfileViewModel
-    @EnvironmentObject var lists: PlaceListViewModel
+    @EnvironmentObject var userSession: UserSession
     let place: GMSPlace
     @Binding var isPresented: Bool
     @State private var showNewListSheet = false
@@ -40,7 +39,7 @@ struct ListSelectionSheet: View {
                 }
                 .sheet(isPresented: $showNewListSheet) {
                     NewListView(isPresented: $showNewListSheet, onSave: { listName in
-                        profile.addNewPlaceList(named: listName, city: "", emoji: "", image: "")
+                        userSession.profileViewModel!.addNewPlaceList(named: listName, city: "", emoji: "", image: "")
                     })
                 }
             }
@@ -49,18 +48,18 @@ struct ListSelectionSheet: View {
             
             SkinnySearchBar()
             
-            if !profile.placeListViewModels.isEmpty {
+            if !(userSession.profileViewModel?.placeListViewModels.isEmpty)! {
                 ScrollView {
-                    ForEach(profile.placeListViewModels) { listVM in
+                    ForEach(userSession.profileViewModel!.placeListViewModels) { listVM in
                         Button(action: {
                             if selectedListIds.contains(listVM.placeList.id) {
                                 // Deselect the list if already selected
                                 selectedListIds.remove(listVM.placeList.id)
-                                profile.getPlaceListViewModel(named: listVM.placeList.name)?.removePlace(place)
+                                userSession.profileViewModel?.getPlaceListViewModel(named: listVM.placeList.name)?.removePlace(place)
                             } else {
                                 // Select the list and add the place
                                 selectedListIds.insert(listVM.placeList.id)
-                                profile.getPlaceListViewModel(named: listVM.placeList.name)?.addPlace(place)
+                                userSession.profileViewModel?.getPlaceListViewModel(named: listVM.placeList.name)?.addPlace(place)
                             }
                         }) {
                             HStack {

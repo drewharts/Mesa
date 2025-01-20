@@ -71,7 +71,7 @@ struct PlaceListCellView: View {
 }
 
 struct ProfileViewListsView: View {
-    @EnvironmentObject var profile: ProfileViewModel
+    @EnvironmentObject var userSession: UserSession
 
     // State for handling image picker
     @State private var showingImagePicker = false
@@ -83,10 +83,11 @@ struct ProfileViewListsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             ListHeaderView()
-
-            if !profile.placeListViewModels.isEmpty {
+            
+            
+            if !userSession.profileViewModel!.placeListViewModels.isEmpty {
                 ScrollView {
-                    ForEach(profile.placeListViewModels) { listVM in
+                    ForEach(userSession.profileViewModel!.placeListViewModels) { listVM in
                         PlaceListCellView(
                             listVM: listVM,
                             showingImagePicker: $showingImagePicker,

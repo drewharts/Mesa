@@ -9,7 +9,7 @@ import SwiftUI
 import GooglePlaces
 
 struct MinPlaceDetailView: View {
-    @EnvironmentObject var profile: ProfileViewModel
+    @EnvironmentObject var userSession: UserSession
     @ObservedObject var viewModel: PlaceDetailViewModel
     let place: GMSPlace
     
@@ -32,7 +32,7 @@ struct MinPlaceDetailView: View {
                     Spacer()
                     
                     HStack(spacing: 16) {
-                        NavigationLink(destination: PlaceReviewView(isPresented: .constant(false), place: place,userId: profile.getUserId(),userFirstName: profile.data.firstName,userLastName: profile.data.lastName)) {
+                        NavigationLink(destination: PlaceReviewView(isPresented: .constant(false), place: place,userId: (userSession.profileViewModel?.getUserId())!,userFirstName: (userSession.profileViewModel?.data.firstName)!,userLastName: (userSession.profileViewModel?.data.lastName)!)) {
                             Image(systemName: "plus")
                                 .font(.title3)
                         }

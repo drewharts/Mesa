@@ -1,10 +1,8 @@
-//
 //  MainView.swift
 //  loc
 //
 //  Created by Andrew Hartsfield II on 12/12/24.
 //
-
 
 import SwiftUI
 import GooglePlaces
@@ -12,8 +10,8 @@ import FirebaseAuth
 
 struct MainView: View {
     @EnvironmentObject var userSession: UserSession
-    @ObservedObject var locationManager: LocationManager
     @StateObject private var viewModel = SearchViewModel()
+    @StateObject private var mapViewModel: MapViewModel
 
     @FocusState private var searchIsFocused: Bool
     @State private var isSearchBarMinimized = true
@@ -23,38 +21,40 @@ struct MainView: View {
     @State private var showDetailSheet = false
     @State private var showProfileView = false
 
-    init(locationManager: LocationManager = LocationManager()) {
-        self.locationManager = locationManager
+    init(userSession: UserSession) {
+        let locationManager = LocationManager()
+        
+        // Initialize SearchViewModel
+        let searchVM = SearchViewModel()
+
+        // Initialize MapViewModel with searchVM
+        let mapVM = MapViewModel(locationManager: locationManager, userSession: userSession, searchViewModel: searchVM)
+        
+        _viewModel = StateObject(wrappedValue: searchVM)
+        _mapViewModel = StateObject(wrappedValue: mapVM)
     }
 
     var body: some View {
         NavigationView {
             ZStack(alignment: .top) {
                 // Map
-                MapView(
-                    searchResults: $viewModel.searchResults,
-                    selectedPlace: $viewModel.selectedPlace,
-                    locationManager: locationManager,
-                    onMapTap: handleMapTap
-                )
+                MapView(viewModel: mapViewModel, searchResults: $viewModel.searchResults) {
+                    handleMapTap()
+                }
                 .edgesIgnoringSafeArea(.all)
 
-                // Top Controls (Search Bar and Profile Button)
+                // Top Controls
                 VStack(spacing: 16) {
                     if isSearchBarMinimized {
                         HStack {
                             Spacer()
-
                             VStack(spacing: 10) {
                                 // Minimized Search Bar Button
                                 Button(action: {
                                     withAnimation {
-                                        // If the sheet is currently at max height, bring it back to the min height
                                         if sheetHeight == maxSheetHeight {
                                             sheetHeight = minSheetHeight
                                         }
-                                        
-                                        // Now handle showing the expanded search bar
                                         isSearchBarMinimized.toggle()
                                         searchIsFocused = true
                                     }
@@ -64,17 +64,14 @@ struct MainView: View {
                                         .frame(width: 60, height: 60)
                                         .background(Color.white)
                                         .clipShape(Circle())
-                                        .overlay(
-                                            Circle().stroke(Color.gray, lineWidth: 2)
-                                        )
+                                        .overlay(Circle().stroke(Color.gray, lineWidth: 2))
                                         .shadow(radius: 4)
                                 }
                                 .padding(.top, 10)
                                 .padding(.trailing, 20)
 
-
                                 // Profile Button
-                                NavigationLink(destination: ProfileView(), isActive: $showProfileView) {
+                                NavigationLink(destination: ProfileView().environmentObject(userSession), isActive: $showProfileView) {
                                     Button(action: {
                                         showProfileView = true
                                     }) {
@@ -83,9 +80,7 @@ struct MainView: View {
                                                 .resizable()
                                                 .frame(width: 60, height: 60)
                                                 .clipShape(Circle())
-                                                .overlay(
-                                                    Circle().stroke(Color.gray, lineWidth: 2)
-                                                )
+                                                .overlay(Circle().stroke(Color.gray, lineWidth: 2))
                                                 .shadow(radius: 4)
                                         } else {
                                             Image(systemName: "person.crop.circle")
@@ -94,9 +89,7 @@ struct MainView: View {
                                                 .frame(width: 60, height: 60)
                                                 .background(Color.white)
                                                 .clipShape(Circle())
-                                                .overlay(
-                                                    Circle().stroke(Color.gray, lineWidth: 2)
-                                                )
+                                                .overlay(Circle().stroke(Color.gray, lineWidth: 2))
                                                 .shadow(radius: 4)
                                         }
                                     }
@@ -114,6 +107,7 @@ struct MainView: View {
                         if !viewModel.searchResults.isEmpty {
                             SearchResultsView(results: viewModel.searchResults) { prediction in
                                 viewModel.selectPlace(prediction)
+                                //mapViewModel.selectedPlace = viewModel.selectedPlace
                                 withAnimation {
                                     isSearchBarMinimized = true
                                     searchIsFocused = false
@@ -129,7 +123,7 @@ struct MainView: View {
                 .transition(.move(edge: .top).combined(with: .opacity))
 
                 // Bottom Sheet
-                if showDetailSheet, let selectedPlace = viewModel.selectedPlace {
+                if showDetailSheet, let selectedPlace = mapViewModel.selectedPlace {
                     BottomSheetView(
                         isPresented: $showDetailSheet,
                         sheetHeight: $sheetHeight,
@@ -141,18 +135,14 @@ struct MainView: View {
                             minSheetHeight: minSheetHeight
                         )
                         .frame(maxWidth: .infinity)
-                        .id(selectedPlace.placeID) 
+                        .id(selectedPlace.placeID)
                     }
                 }
             }
-            .onAppear {
-                locationManager.requestLocationPermission()
-            }
+            .navigationViewStyle(StackNavigationViewStyle())
         }
-        .navigationViewStyle(StackNavigationViewStyle())
     }
 
-    // Handle the map tap to minimize the search bar
     private func handleMapTap() {
         withAnimation {
             searchIsFocused = false

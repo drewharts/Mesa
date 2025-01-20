@@ -12,18 +12,17 @@ import PhotosUI
 struct PlaceReviewView: View {
     @Environment(\.presentationMode) var presentationMode: Binding<PresentationMode>
     @Binding var isPresented: Bool
-    @EnvironmentObject var profile: ProfileViewModel
+    @EnvironmentObject var userSession: UserSession // Use userSession instead of profile
     @State private var showButtonHighlight = false
 
-    
     let place: GMSPlace
 
     @StateObject private var viewModel: PlaceReviewViewModel
-    
+
     // Image picker states
     @State private var showingImagePicker = false
     @State private var inputImages: [UIImage] = []
-    
+
     init(isPresented: Binding<Bool>, place: GMSPlace, userId: String, userFirstName: String, userLastName: String) {
         self._isPresented = isPresented
         self.place = place
@@ -38,14 +37,15 @@ struct PlaceReviewView: View {
             )
         )
     }
-    
-    var btnBack : some View { Button(action: {
-        self.presentationMode.wrappedValue.dismiss()
+
+    var btnBack : some View {
+        Button(action: {
+            self.presentationMode.wrappedValue.dismiss()
         }) {
             HStack {
-            Image(systemName: "chevron.left") // set image here
-                .aspectRatio(contentMode: .fit)
-                .foregroundColor(.black)
+                Image(systemName: "chevron.left") // set image here
+                    .aspectRatio(contentMode: .fit)
+                    .foregroundColor(.black)
             }
         }
     }
@@ -98,7 +98,7 @@ struct PlaceReviewView: View {
                                 // Optional: Wait briefly so user sees the highlight
                                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                                     showButtonHighlight = false
-                                     presentationMode.wrappedValue.dismiss()
+                                    presentationMode.wrappedValue.dismiss()
                                 }
                             } else {
                                 // On failure, remove highlight
@@ -120,6 +120,5 @@ struct PlaceReviewView: View {
         .sheet(isPresented: $showingImagePicker) {
             MultiImagePicker(images: $inputImages, selectionLimit: 0)
         }
-
     }
 }

@@ -13,13 +13,13 @@ import GooglePlaces
 
 struct PlaceListView: View {
     var placeList: PlaceList
-    @EnvironmentObject var profile: ProfileViewModel
+    @EnvironmentObject var userSession: UserSession
 
     var body: some View {
         List {
             ForEach(placeList.places, id: \.id) { place in
                 HStack(spacing: 16) {
-                    if let image = profile.favoritePlaceImages[place.id] {
+                    if let image = userSession.profileViewModel?.favoritePlaceImages[place.id] {
                         Image(uiImage: image)
                             .resizable()
                             .scaledToFill()
@@ -33,7 +33,7 @@ struct PlaceListView: View {
                             .frame(width: 80, height: 80)
                             .cornerRadius(8)
                             .onAppear {
-                                profile.loadPhoto(for: place.id)
+                                userSession.profileViewModel?.loadPhoto(for: place.id)
                             }
                     }
                     

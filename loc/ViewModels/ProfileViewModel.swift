@@ -63,11 +63,11 @@ class ProfileViewModel: ObservableObject {
         )
 
         // 3) Add the place to local + Firestore
-        addFavoritePlace(place: newPlace)
+        addFavoritePlaceFirestore(place: newPlace)
     }
 
     // Actually appends the place to local state and Firestore.
-    func addFavoritePlace(place: Place) {
+    func addFavoritePlaceFirestore(place: Place) {
         favoritePlaces.append(place)
         firestoreService.addProfileFavorite(userId: userId, place: place)
     }

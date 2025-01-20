@@ -10,15 +10,15 @@ import SwiftUI
 struct ProfileView: View {
     @Environment(\.presentationMode) var presentationMode: Binding<PresentationMode>
     @EnvironmentObject var userSession: UserSession
-    @EnvironmentObject var profile: ProfileViewModel
-    
-    var btnBack : some View { Button(action: {
-        self.presentationMode.wrappedValue.dismiss()
+
+    var btnBack : some View {
+        Button(action: {
+            self.presentationMode.wrappedValue.dismiss()
         }) {
             HStack {
-            Image(systemName: "chevron.left") // set image here
-                .aspectRatio(contentMode: .fit)
-                .foregroundColor(.black)
+                Image(systemName: "chevron.left") // set image here
+                    .aspectRatio(contentMode: .fit)
+                    .foregroundColor(.black)
             }
         }
     }
@@ -28,7 +28,7 @@ struct ProfileView: View {
             ScrollView {
                 VStack(spacing: 20) {
                     // Profile Picture
-                    if let profilePhoto = profile.profilePhoto {
+                    if let profilePhoto = userSession.profileViewModel?.profilePhoto {
                         profilePhoto
                             .resizable()
                             .frame(width: 120, height: 120)
@@ -43,20 +43,22 @@ struct ProfileView: View {
                     }
 
                     // Name
-                    let firstName = profile.data.firstName
-                    let lastName = profile.data.lastName
-                    Text("\(firstName) \(lastName)")
-                        .font(.title)
-                        .fontWeight(.bold)
-                        .foregroundStyle(.black)
-                    
+                    if let profileViewModel = userSession.profileViewModel {
+                        let firstName = profileViewModel.data.firstName
+                        let lastName = profileViewModel.data.lastName
+                        Text("\(firstName) \(lastName)")
+                            .font(.title)
+                            .fontWeight(.bold)
+                            .foregroundStyle(.black)
+                    }
+
                     Divider()
                         .padding(.top, 15)
                         .padding(.horizontal, 20)
-                    // Favorites & Lists
-                    ProfileFavoriteListView()
-                    ProfileViewListsView()
 
+                    // Favorites & Lists
+                    ProfileFavoriteListView().environmentObject(userSession)
+                    ProfileViewListsView().environmentObject(userSession)
 
                     // Logout Button
                     Button(action: {
