@@ -18,23 +18,28 @@ struct MapView: UIViewRepresentable {
     func makeUIView(context: Context) -> GMSMapView {
         let mapView = GMSMapView()
         mapView.isMyLocationEnabled = true
+        mapView.settings.setAllGesturesEnabled(true) // Enable gestures
         mapView.delegate = context.coordinator
-        
+
+        // Set the mapView in the viewModel
+        viewModel.mapView = mapView
+
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             if viewModel.shouldCenterOnUser {
                 viewModel.recenterUser()
             }
         }
-        
+
         return mapView
     }
 
     func updateUIView(_ uiView: GMSMapView, context: Context) {
         uiView.clear()
-        
+
         viewModel.markers.forEach { $0.map = uiView }
-        
-        uiView.animate(to: viewModel.cameraPosition)
+
+        // Remove uiView.animate(to:) from here
+        // uiView.animate(to: viewModel.cameraPosition)
 
         // Clear search results if the flag is set
         if viewModel.shouldClearSearchResults {
@@ -62,6 +67,12 @@ struct MapView: UIViewRepresentable {
                     self.parent.viewModel.onMapMoved()
                 }
             }
+        }
+
+        func mapView(_ mapView: GMSMapView, idleAt cameraPosition: GMSCameraPosition) {
+            // Called when the map movement stops
+            print("Map stopped at: \(cameraPosition)")
+            parent.viewModel.cameraPosition = cameraPosition
         }
     }
 }

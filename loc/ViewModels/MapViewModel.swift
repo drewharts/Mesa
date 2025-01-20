@@ -17,12 +17,15 @@ class MapViewModel: ObservableObject {
     @Published var selectedPlace: GMSPlace?
     @Published var shouldClearSearchResults: Bool = false
     @Published var shouldCenterOnUser: Bool = true
-    
+
     private let placesClient: GMSPlacesClient
     private let locationManager: LocationManager
     private var userSession: UserSession
     private var cancellables = Set<AnyCancellable>()
     private var selectedPlaceCancellable: AnyCancellable?
+
+    // Add a reference to the GMSMapView:
+    weak var mapView: GMSMapView?
 
     init(
         placesClient: GMSPlacesClient = .shared(),
@@ -42,31 +45,33 @@ class MapViewModel: ObservableObject {
         )
 
         setupSubscriptions()
-        
+
         // Subscribe to selectedPlacePublisher from SearchViewModel
-           if let searchViewModel = searchViewModel {
-               selectedPlaceCancellable = searchViewModel.$selectedPlace
-                   .compactMap { $0 }
-                   .receive(on: DispatchQueue.main)
-                   .sink { [weak self] place in
-                       self?.selectedPlace = place
-                       self?.cameraPosition = GMSCameraPosition.camera(
-                           withLatitude: place.coordinate.latitude,
-                           longitude: place.coordinate.longitude,
-                           zoom: 15.0
-                       )
-                       self?.addMarker(for: place)
-                   }
-           }
+        if let searchViewModel = searchViewModel {
+            selectedPlaceCancellable = searchViewModel.$selectedPlace
+                .compactMap { $0 }
+                .receive(on: DispatchQueue.main)
+                .sink { [weak self] place in
+                    self?.selectedPlace = place
+                    // Update camera position directly using animate:
+                    self?.mapView?.animate(to: GMSCameraPosition.camera(
+                        withLatitude: place.coordinate.latitude,
+                        longitude: place.coordinate.longitude,
+                        zoom: 15.0
+                    ))
+                    self?.addMarker(for: place)
+                }
+        }
     }
-    
+
     func recenterUser(){
         if let currentLocation = locationManager.currentLocation {
-            cameraPosition = GMSCameraPosition.camera(
+            // Update camera position directly using animate:
+            mapView?.animate(to: GMSCameraPosition.camera(
                 withLatitude: currentLocation.coordinate.latitude,
                 longitude: currentLocation.coordinate.longitude,
                 zoom: 15.0
-            )
+            ))
             shouldCenterOnUser = false
         }
     }
