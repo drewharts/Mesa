@@ -15,13 +15,15 @@ import FirebaseFirestore
 class LoginViewModel: ObservableObject {
     @Published var errorMessage: String?
     private let firestoreService: FirestoreService
+    private let googlePlacesService: GooglePlacesService
     
     // Instead of having isUserLoggedIn and profile here,
     // we'll rely on the UserSession environment object passed from the view.
     // That means your login view should pass `UserSession` as an environment object.
     
-    init(firestoreService: FirestoreService) {
+    init(firestoreService: FirestoreService, googleplacesService: GooglePlacesService) {
         self.firestoreService = firestoreService
+        self.googlePlacesService = googleplacesService
     }
 
     func signInWithGoogle(userSession: UserSession) {
@@ -86,7 +88,7 @@ class LoginViewModel: ObservableObject {
             placeLists: []
         )
 
-        let profileViewModel = ProfileViewModel(data: profileData, firestoreService: firestoreService.self, userId: uid)
+        let profileViewModel = ProfileViewModel(data: profileData, firestoreService: firestoreService.self,googlePlacesService: googlePlacesService.self, userId: uid)
 
         FirestoreService().saveUserProfile(uid: uid, profileData: profileViewModel.data) { [weak self] error in
             if let error = error {

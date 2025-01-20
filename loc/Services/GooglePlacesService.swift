@@ -10,37 +10,34 @@ import GooglePlaces
 import UIKit
 
 class GooglePlacesService {
-    private let placesClient = GMSPlacesClient.shared()
-    
-    /// Fetches a GMSPlace object based on the provided placeID.
-    ///
-    /// - Parameters:
-    ///   - placeID: The unique identifier of the place to fetch.
-    ///   - completion: A closure that returns a GMSPlace object or an Error.
+    private let placesClient: PlacesClientProtocol
+
+    init(placesClient: PlacesClientProtocol) {
+        self.placesClient = placesClient
+    }
+
     func fetchPlace(placeID: String, completion: @escaping (GMSPlace?, Error?) -> Void) {
-        // Define the fields to retrieve. Adjust based on your needs.
-        let fields: GMSPlaceField = [.name, .placeID, .coordinate, .formattedAddress, .phoneNumber, .website, .rating, .photos]
-        
-        // Fetch the place details
-        placesClient.fetchPlace(fromPlaceID: placeID, placeFields: fields, sessionToken: nil) { (place, error) in
+        // Request *all* fields (everything the SDK can return)
+        let fields: GMSPlaceField = .all
+
+        placesClient.fetchPlace(fromPlaceID: placeID, placeFields: fields, sessionToken: nil) { place, error in
             if let error = error {
                 print("Error fetching place: \(error.localizedDescription)")
                 completion(nil, error)
                 return
             }
-            
+
             guard let place = place else {
                 print("No place details found.")
                 completion(nil, nil)
                 return
             }
-            
-            // Successfully retrieved the place
+
+            // Successfully retrieved the place, with all fields that are available
             completion(place, nil)
         }
     }
-    
-    /// Example function to fetch a photo for a given placeID.
+
     func fetchPhoto(placeID: String, completion: @escaping (UIImage?) -> Void) {
         // 1) Fetch Photo Metadata
         placesClient.lookUpPhotos(forPlaceID: placeID) { [weak self] (photosMetadata, error) in
@@ -51,7 +48,7 @@ class GooglePlacesService {
                 completion(nil)
                 return
             }
-            
+
             // 2) Use the metadata to load the actual UIImage
             self?.placesClient.loadPlacePhoto(firstMeta) { (photo, error) in
                 guard let photo = photo, error == nil else {
@@ -63,4 +60,3 @@ class GooglePlacesService {
         }
     }
 }
-

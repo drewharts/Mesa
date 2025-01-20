@@ -19,13 +19,14 @@ class ProfileViewModel: ObservableObject {
     weak var delegate: ProfileDelegate?
     private let firestoreService: FirestoreService
     private let userId: String
-    private let googlePlacesService = GooglePlacesService()
+    private let googlePlacesService: GooglePlacesService
 
     @Published var showMaxFavoritesAlert: Bool = false
 
-    init(data: ProfileData, firestoreService: FirestoreService, userId: String) {
+    init(data: ProfileData, firestoreService: FirestoreService, googlePlacesService: GooglePlacesService, userId: String) {
         self.data = data
         self.firestoreService = firestoreService
+        self.googlePlacesService = googlePlacesService
         self.userId = userId
         loadPlaceLists()
         if let url = data.profilePhotoURL {

@@ -8,6 +8,7 @@
 import FirebaseAuth
 import GoogleSignIn
 import FirebaseFirestore
+import GooglePlaces
 import SwiftUI
 
 class UserSession: ObservableObject {
@@ -15,10 +16,13 @@ class UserSession: ObservableObject {
     @Published var profileViewModel: ProfileViewModel?
     @Published var locationManager: LocationManager
     private let firestoreService: FirestoreService
+    let googlePlacesService: GooglePlacesService
     
     init(firestoreService: FirestoreService) {
         self.locationManager = LocationManager()
         self.firestoreService = firestoreService
+        let placesClient = GMSPlacesClient.shared()
+        self.googlePlacesService = GooglePlacesService(placesClient: placesClient)
         // Check if a user is already signed in
         if let currentUser = Auth.auth().currentUser {
             self.isUserLoggedIn = true
@@ -63,8 +67,8 @@ class UserSession: ObservableObject {
                 let profileData = try document.data(as: ProfileData.self)
                 
                 // Create a ProfileViewModel from ProfileData
-                let profileViewModel = ProfileViewModel(data: profileData,firestoreService: self.firestoreService, userId: uid)
-                
+                let profileViewModel = ProfileViewModel(data: profileData, firestoreService: self.firestoreService, googlePlacesService: self.googlePlacesService, userId: uid)
+
                 // Assign it to our session
                 self.profileViewModel = profileViewModel
             } catch {

@@ -24,7 +24,7 @@ struct ContentView: View {
                 ProgressView("Loading profile...")
             }
         } else {
-            LoginView(viewModel: LoginViewModel(firestoreService: FirestoreService()))
+            LoginView(viewModel: LoginViewModel(firestoreService: FirestoreService(),googleplacesService: userSession.googlePlacesService))
                 .environmentObject(userSession)        }
     }
 }
