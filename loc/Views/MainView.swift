@@ -24,6 +24,7 @@ struct MainView: View {
     /// The custom `Place` you tapped in ProfileFavoriteListView,
     /// if any. Use this to fetch a `GMSPlace` on appear.
     let preselectedPlace: Place?
+    @State private var hasPreselectedPlaceBeenHandled = false
 
     // MARK: - Search UI States
     @FocusState private var searchIsFocused: Bool
@@ -139,6 +140,8 @@ struct MainView: View {
                                     isSearchBarMinimized = true
                                     searchIsFocused = false
                                     showDetailSheet = true
+                                    
+                                    hasPreselectedPlaceBeenHandled = false
                                 }
                             }
                             .frame(maxWidth: .infinity)
@@ -162,8 +165,12 @@ struct MainView: View {
                             minSheetHeight: minSheetHeight
                         )
                         .frame(maxWidth: .infinity)
-                        // Force SwiftUI to re-render if the place ID changes
                         .id(selectedPlace.placeID)
+                    }
+                    .onChange(of: showDetailSheet) { newValue in
+                        if !newValue {
+                            
+                        }
                     }
                 }
             }
@@ -172,7 +179,7 @@ struct MainView: View {
                 locationManager.requestLocationPermission()
                 
                 // If we arrived with a "favorite" place from the profile screen
-                if let favorite = preselectedPlace {
+                if let favorite = preselectedPlace, !hasPreselectedPlaceBeenHandled {
                     // Force the detail sheet open at max size
                     self.sheetHeight = maxSheetHeight
                     self.showDetailSheet = true
@@ -185,6 +192,7 @@ struct MainView: View {
                     fetchFullGMSPlace(by: favorite.id) { gmsPlace in
                         // Assign once retrieved
                         self.viewModel.selectedPlace = gmsPlace
+                        self.hasPreselectedPlaceBeenHandled = true
                     }
                 }
             }
@@ -198,6 +206,7 @@ struct MainView: View {
             searchIsFocused = false
             viewModel.searchResults = []
             isSearchBarMinimized = true
+            hasPreselectedPlaceBeenHandled = false
         }
     }
 

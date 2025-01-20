@@ -12,8 +12,8 @@ import Combine
 
 class SearchViewModel: ObservableObject {
     @Published var searchText = ""
-    @Published var searchResults: [GMSAutocompletePrediction] = [] // Use GMSAutocompletePrediction directly
-    @Published var selectedPlace: GMSPlace? // Use GMSPlace directly
+    @Published var searchResults: [GMSAutocompletePrediction] = []
+    @Published var selectedPlace: GMSPlace?
     @Published var userLocation: CLLocationCoordinate2D?
     
     private var cancellables = Set<AnyCancellable>()
