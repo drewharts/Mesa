@@ -14,9 +14,8 @@ struct AddFavoritesView: View {
     @StateObject private var viewModel = SearchViewModel()
     @FocusState private var searchBarFocus: Bool
     
-    @State private var lastTappedPlaceID: String?
-    @State private var showAlert: Bool = false // Add a state for the alert
-
+    @State private var showAlert: Bool = false // State for the alert
+    
     var body: some View {
         NavigationStack {
             VStack(spacing: 16) {
@@ -28,11 +27,16 @@ struct AddFavoritesView: View {
                     .padding(.top, 10)
                 
                 // Current Favorites
-                
-                CurrentFavoritesView()
+                if let profileViewModel = userSession.profileViewModel {
+                    CurrentFavoritesView(profileViewModel: profileViewModel)
+                } else {
+                    // Handle the case where profileViewModel is nil
+                    Text("No favorites available.")
+                        .foregroundColor(.gray)
+                }
                 
                 // SEARCH RESULTS
-                AddFavoritesSearchResultsView()
+                AddFavoritesSearchResultsView(viewModel: viewModel, showAlert: $showAlert)
             }
             .navigationTitle("Add to Favorites")
             .navigationBarTitleDisplayMode(.inline)

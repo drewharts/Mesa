@@ -10,11 +10,12 @@ import GooglePlaces
 
 struct AddFavoritesSearchResultsView: View {
     @EnvironmentObject var userSession: UserSession
-    @StateObject private var viewModel = SearchViewModel()
+    @ObservedObject var viewModel: SearchViewModel // Use @ObservedObject to observe the shared viewModel
+    
+    @Binding var showAlert: Bool // Use Binding to control the alert from parent view
     
     @State private var lastTappedPlaceID: String?
-    @State private var showAlert: Bool = false
-
+    
     var body: some View {
         if !viewModel.searchResults.isEmpty {
             List(viewModel.searchResults, id: \.self) { prediction in
@@ -27,9 +28,14 @@ struct AddFavoritesSearchResultsView: View {
             .alert("You can only add up to 4 favorites.", isPresented: $showAlert) {
                 Button("OK", role: .cancel) { }
             }
+        } else if !viewModel.searchText.isEmpty {
+            // Optionally, show a message when there are no results
+            Text("No results found.")
+                .foregroundColor(.gray)
+                .padding()
         }
     }
-
+    
     // Extracted the content of each row into a separate view
     private struct SearchResultRow: View {
         let prediction: GMSAutocompletePrediction
@@ -45,8 +51,8 @@ struct AddFavoritesSearchResultsView: View {
             .background(isHighlighted ? Color.blue.opacity(0.2) : Color.clear)
         }
     }
-
-    // Extracted the tap gesture logic into a separate function
+    
+    // Handle tap gesture by adding to favorites
     private func handleTapGesture(for prediction: GMSAutocompletePrediction) {
         guard let profileViewModel = userSession.profileViewModel else { return }
 
@@ -57,8 +63,8 @@ struct AddFavoritesSearchResultsView: View {
 
         addAndHighlightFavorite(prediction: prediction, profileViewModel: profileViewModel)
     }
-
-    // Extracted the logic for adding and highlighting the favorite
+    
+    // Add favorite and highlight the selected place
     private func addAndHighlightFavorite(prediction: GMSAutocompletePrediction, profileViewModel: ProfileViewModel) {
         profileViewModel.addFavoritePlace(prediction: prediction)
         lastTappedPlaceID = prediction.placeID

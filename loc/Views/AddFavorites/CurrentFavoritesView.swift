@@ -9,10 +9,10 @@ import SwiftUI
 import GooglePlaces
 
 struct CurrentFavoritesView: View {
-    @EnvironmentObject var userSession: UserSession
+    @ObservedObject var profileViewModel: ProfileViewModel
 
     var body: some View {
-        if let profileViewModel = userSession.profileViewModel, !profileViewModel.favoritePlaces.isEmpty {
+        if !profileViewModel.favoritePlaces.isEmpty {
             ScrollView(.horizontal) {
                 HStack(spacing: 16) {
                     ForEach(profileViewModel.favoritePlaces) { place in
