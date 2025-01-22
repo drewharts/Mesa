@@ -28,14 +28,30 @@ struct PlaceListCellView: View {
     var body: some View {
         NavigationLink(destination: PlaceListView(placeList: listVM.placeList)) {
             HStack {
-                // Display the list’s image if available:
-                if let listImage = listVM.image {
-                    Image(uiImage: listImage)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .frame(width: 90, height: 90)
-                        .clipped()
-                        .cornerRadius(4)
+                if let imageURLString = listVM.placeList.image,
+                   let imageURL = URL(string: imageURLString) {
+                    AsyncImage(url: imageURL) { phase in
+                        switch phase {
+                        case .empty:
+                            ProgressView()
+                                .frame(width: 90, height: 90)
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .frame(width: 90, height: 90)
+                                .clipped()
+                                .cornerRadius(4)
+                        case .failure:
+                            Image(systemName: "photo")
+                                .resizable()
+                                .frame(width: 90, height: 90)
+                                .foregroundColor(.gray)
+                                .cornerRadius(4)
+                        @unknown default:
+                            EmptyView()
+                        }
+                    }
                 } else {
                     // Fallback placeholder
                     Rectangle()
@@ -69,6 +85,7 @@ struct PlaceListCellView: View {
         }
     }
 }
+
 
 struct ProfileViewListsView: View {
     @EnvironmentObject var profile: ProfileViewModel

@@ -13,6 +13,6 @@ struct PlaceList: Codable, Identifiable {
     var places: [Place] = []
     var city: String
     var emoji: String
-    var image: String
+    var image: String?
 }
 
