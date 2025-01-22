@@ -93,18 +93,28 @@ class ProfileViewModel: ObservableObject {
     func loadPlaceLists() {
         // Fetch profile lists
         firestoreService.fetchLists(userId: userId) { [weak self] placeLists in
-            self?.data.placeLists = placeLists
-            self?.placeListViewModels = placeLists.map {
-                let viewModel = PlaceListViewModel(placeList: $0, firestoreService: self!.firestoreService, userId: self!.userId)
-
-                return viewModel
+            guard let self = self else { return }
+            DispatchQueue.main.async {
+                self.data.placeLists = placeLists
+                self.placeListViewModels = placeLists.map { placeList in
+                    PlaceListViewModel(
+                        placeList: placeList,
+                        firestoreService: self.firestoreService,
+                        userId: self.userId
+                    )
+                }
             }
         }
+        
         // Fetch profile favorites
         firestoreService.fetchProfileFavorites(userId: userId) { [weak self] fetchedPlaces in
-            self?.favoritePlaces = fetchedPlaces
+            guard let self = self else { return }
+            DispatchQueue.main.async {
+                self.favoritePlaces = fetchedPlaces
+            }
         }
     }
+
 
     private func loadImage(from url: URL) {
         URLSession.shared.dataTask(with: url) { [weak self] data, response, error in
