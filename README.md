@@ -8,6 +8,8 @@ Save, organize, and share places with friends
     <td><img src="https://github.com/drewharts/Loc/blob/main/RestaurantReviewPage.png?raw=true" width="300"></td>
     <td><img src="https://github.com/drewharts/Loc/blob/main/ProfilePage.png?raw=true" width="300"></td>
     <td><img src="https://github.com/drewharts/Loc/blob/main/ListPage.png?raw=true" width="300"></td>
+    <td><img src="https://github.com/drewharts/Loc/blob/main/SplashScreen.png?raw=true" width="300"></td>
+
   </tr>
 </table>
 
