@@ -17,7 +17,7 @@ struct SplashScreenView: View {
                 .transition(.opacity)
         } else {
             GeometryReader { geometry in
-                Image("IcelandWaterfall") // Replace with your image name
+                Image("SplashScreen") // Replace with your image name
                     .resizable()
                     .scaledToFill() // Scale to fill the entire screen, may crop edges
                     .frame(width: geometry.size.width, height: geometry.size.height) // Set to full screen size

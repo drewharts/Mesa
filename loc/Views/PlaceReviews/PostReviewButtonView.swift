@@ -9,6 +9,7 @@
 import SwiftUI
 
 struct PostReviewButtonView: View {
+    @Binding var highlighted: Bool
     let action: () -> Void
 
     var body: some View {
@@ -17,8 +18,9 @@ struct PostReviewButtonView: View {
                 .bold()
                 .frame(maxWidth: .infinity)
                 .padding()
-                .background(Color.gray.opacity(0.2))
-                .foregroundColor(.black)
+                // Change button background color if highlighted
+                .background(highlighted ? Color.green : Color.gray.opacity(0.2))
+                .foregroundColor(highlighted ? .white : .black)
                 .cornerRadius(20)
         }
         .padding(.horizontal, 40)

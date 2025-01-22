@@ -11,7 +11,8 @@ import Foundation
 struct Review: Codable {
     let id: String // UUID for the review
     let userId: String // ID of the user who wrote the review
-    let userName: String // Name of the user (optional)
+    let userFirstName: String
+    let userLastName: String
     let placeId: String // ID of the place being reviewed
     let placeName: String // Name of the place
     let foodRating: Double // Food rating (0-10)
@@ -20,5 +21,5 @@ struct Review: Codable {
     let favoriteDishes: [String] // List of favorite dishes
     let reviewText: String // User's text review
     let timestamp: Date // Time the review was created
-    let images: [String] // URLs for uploaded photos (optional)
+    var images: [String] // URLs for uploaded photos (optional)
 }

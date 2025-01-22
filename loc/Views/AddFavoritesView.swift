@@ -65,30 +65,39 @@ struct AddFavoritesView: View {
                 // SEARCH RESULTS
                 if !viewModel.searchResults.isEmpty {
                     List(viewModel.searchResults, id: \.self) { prediction in
-                        HStack {
-                            Text(prediction.attributedPrimaryText.string)
-                                .foregroundColor(.primary)
-                            Spacer()
-                        }
-                        .padding(.vertical, 6)
-                        .background(
-                            prediction.placeID == lastTappedPlaceID
-                                ? Color.blue.opacity(0.2)
-                                : Color.clear
-                        )
-                        .onTapGesture {
-                            // 1) Append to favorites (directly via ProfileViewModel)
-                            profile.addFavoritePlace(prediction: prediction)
-                            
-                            // 2) Highlight this row
-                            lastTappedPlaceID = prediction.placeID
-                            
-                            // 3) Clear highlight after 2 seconds
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                                withAnimation {
-                                    lastTappedPlaceID = nil
-                                }
+                        // Use a ZStack to layer the onTapGesture over the entire row
+                        ZStack {
+                            // Existing HStack for content display
+                            HStack {
+                                Text(prediction.attributedPrimaryText.string)
+                                    .foregroundColor(.primary)
+                                Spacer()
                             }
+                            .padding(.vertical, 6)
+                            .background(
+                                prediction.placeID == lastTappedPlaceID
+                                    ? Color.blue.opacity(0.2)
+                                    : Color.clear
+                            )
+
+                            // Transparent rectangle to capture taps over the entire row
+                            Rectangle()
+                                .fill(Color.clear) // Makes the rectangle transparent
+                                .contentShape(Rectangle()) // Makes the entire rectangle tappable, not just the area with content
+                                .onTapGesture {
+                                    // 1) Append to favorites (directly via ProfileViewModel)
+                                    profile.addFavoritePlace(prediction: prediction)
+
+                                    // 2) Highlight this row
+                                    lastTappedPlaceID = prediction.placeID
+
+                                    // 3) Clear highlight after 2 seconds
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                                        withAnimation {
+                                            lastTappedPlaceID = nil
+                                        }
+                                    }
+                                }
                         }
                     }
                     .listStyle(.plain)

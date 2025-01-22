@@ -13,12 +13,141 @@ import GooglePlaces
 class FirestoreService {
     private let db = Firestore.firestore()
     private let storage = Storage.storage() // Add a storage reference
+    
+    /// Saves a review and its associated images to Firestore/Storage in one go.
+    /// 1) Uploads all `UIImage`s to Firebase Storage under "reviews/{review.id}/"
+    /// 2) Collects download URLs
+    /// 3) Updates the `Review.images` array with those URLs
+    /// 4) Writes the updated Review to Firestore.
+    ///
+    /// - Parameters:
+    ///   - review: The Review object (can have an empty images array initially).
+    ///   - images: The UIImages to upload.
+    ///   - completion: Returns `.success` when the review + images are fully saved, or `.failure` on error.
+    func saveReviewWithImages(
+        review: Review,
+        images: [UIImage],
+        completion: @escaping (Result<Void, Error>) -> Void
+    ) {
+        // 1) Upload images first
+        uploadImagesForReview(review: review, images: images) { [weak self] result in
+            guard let self = self else { return }
+            
+            switch result {
+            case .success(let downloadURLs):
+                // 2) Update the review to include the new image URLs
+                var updatedReview = review
+                updatedReview.images = downloadURLs
+                
+                // 3) Save the updated review to Firestore
+                self.saveReview(updatedReview) { saveResult in
+                    switch saveResult {
+                    case .success:
+                        completion(.success(()))
+                    case .failure(let error):
+                        completion(.failure(error))
+                    }
+                }
+                
+            case .failure(let error):
+                // If image upload fails, return the error
+                completion(.failure(error))
+            }
+        }
+    }
+
 
     func saveReview(_ review: Review, completion: @escaping (Result<Void, Error>) -> Void) {
-        // Perform Firestore .addDocument or .setData logic here...
-        // For now, just call success:
-        completion(.success(()))
+        // 1. Build a reference: places/{placeId}/reviews/{reviewId}
+        let docRef = db.collection("places")
+                       .document(review.placeId)
+                       .collection("reviews")
+                       .document(review.id)
+        
+        // 2. Encode the `Review` directly via setData(from:)
+        do {
+            try docRef.setData(from: review) { error in
+                if let error = error {
+                    completion(.failure(error))
+                } else {
+                    completion(.success(()))
+                }
+            }
+        } catch {
+            completion(.failure(error))
+        }
     }
+    
+    func uploadImagesForReview(
+        review: Review,
+        images: [UIImage],
+        completion: @escaping (Result<[String], Error>) -> Void
+    ) {
+        // If there are no images, return immediately with an empty array
+        guard !images.isEmpty else {
+            completion(.success([]))
+            return
+        }
+        
+        var downloadURLs: [String] = []
+        var errors: [Error] = []
+
+        // A DispatchGroup to wait for all uploads
+        let dispatchGroup = DispatchGroup()
+        
+        for image in images {
+            dispatchGroup.enter()
+            
+            // 1. Generate a unique name for each image
+            let imageName = UUID().uuidString
+            
+            // 2. (Optional) Decide on a path for storing your review images
+            //    For example: "reviews/{reviewId}/{imageName}.jpg"
+            let storageRef = storage.reference()
+                .child("reviews/\(review.id)/\(imageName).jpg")
+            
+            // 3. Convert the UIImage to JPEG data
+            guard let imageData = image.jpegData(compressionQuality: 0.8) else {
+                errors.append(
+                    NSError(domain: "FirestoreService", code: 0, userInfo: [
+                        NSLocalizedDescriptionKey: "Could not convert image to data"
+                    ])
+                )
+                dispatchGroup.leave()
+                continue
+            }
+
+            // 4. Upload the image data
+            storageRef.putData(imageData, metadata: nil) { metadata, error in
+                if let error = error {
+                    errors.append(error)
+                    dispatchGroup.leave()
+                    return
+                }
+                
+                // 5. Once uploaded, fetch the download URL
+                storageRef.downloadURL { url, error in
+                    if let error = error {
+                        errors.append(error)
+                    } else if let downloadURL = url {
+                        downloadURLs.append(downloadURL.absoluteString)
+                    }
+                    dispatchGroup.leave()
+                }
+            }
+        }
+        
+        // 6. When all uploads finish, call completion
+        dispatchGroup.notify(queue: .main) {
+            if let firstError = errors.first {
+                completion(.failure(firstError))
+            } else {
+                completion(.success(downloadURLs))
+            }
+        }
+    }
+
+
 
 
     // Function to upload an image and update the PlaceList's image field

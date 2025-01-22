@@ -29,7 +29,7 @@ struct PlaceListCellView: View {
         NavigationLink(destination: PlaceListView(placeList: listVM.placeList)) {
             HStack {
                 // Display the list’s image if available:
-                if let listImage = listVM.getImage() {
+                if let listImage = listVM.image {
                     Image(uiImage: listImage)
                         .resizable()
                         .aspectRatio(contentMode: .fill)

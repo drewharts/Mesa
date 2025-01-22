@@ -9,36 +9,34 @@ import Foundation
 import GooglePlaces
 import UIKit
 import FirebaseStorage
+import Combine
 
 class PlaceListViewModel: ObservableObject, Identifiable {
     @Published var placeList: PlaceList
     private let firestoreService: FirestoreService
     private let userId: String
-    private var image: UIImage?
+    @Published var image: UIImage?
+    private var cancellables = Set<AnyCancellable>()
+
 
     init(placeList: PlaceList, firestoreService: FirestoreService, userId: String) {
         self.placeList = placeList
         self.firestoreService = firestoreService
         self.userId = userId
         loadPlaceLists()
+        loadImage()
     }
     
     func getImage() -> UIImage? {
         return image
     }
 
+    // Load the place lists from Firestore.
     func loadPlaceLists() {
         firestoreService.fetchList(userId: userId, listName: placeList.name) { [weak self] result in
             switch result {
             case .success(let fetchedPlaceList):
                 self?.placeList = fetchedPlaceList
-
-                // Fetch the image asynchronously if the URL is available
-                if let imageURLString = fetchedPlaceList.image as? String,
-                   let imageURL = URL(string: imageURLString) {
-                    self?.fetchImage(from: imageURL)
-                }
-
             case .failure(let error):
                 print("Failed to load place list: \(error.localizedDescription)")
             }
@@ -47,14 +45,29 @@ class PlaceListViewModel: ObservableObject, Identifiable {
 
 
     
-    private func fetchImage(from url: URL) {
-        URLSession.shared.dataTask(with: url) { [weak self] data, response, error in
+    func loadImage() {
+        guard let imageURLString = placeList.image as? String,
+              let imageURL = URL(string: imageURLString) else {
+            self.image = nil
+            return
+        }
+        
+        fetchImage(from: imageURL) { [weak self] fetchedImage in
+            self?.image = fetchedImage
+        }
+    }
+
+    private func fetchImage(from url: URL, completion: @escaping (UIImage?) -> Void) {
+        URLSession.shared.dataTask(with: url) { data, response, error in
             if let data = data, let image = UIImage(data: data) {
                 DispatchQueue.main.async {
-                    self?.image = image
+                    completion(image)
                 }
-            } else if let error = error {
-                print("Failed to fetch image: \(error.localizedDescription)")
+            } else {
+                print("Failed to fetch image: \(error?.localizedDescription ?? "Unknown error")")
+                DispatchQueue.main.async {
+                    completion(nil)
+                }
             }
         }.resume()
     }

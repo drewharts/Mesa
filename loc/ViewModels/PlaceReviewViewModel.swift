@@ -25,32 +25,33 @@ class PlaceReviewViewModel: ObservableObject {
     // MARK: - Private/Internal
     private let place: GMSPlace
     private let userId: String
-    private let userName: String
+    private let userFirstName: String
+    private let userLastName: String
     private let firestoreService: FirestoreService
 
     // MARK: - Init
     init(place: GMSPlace,
          userId: String,
-         userName: String,
+         userFirstName: String,
+         userLastName: String,
          firestoreService: FirestoreService = FirestoreService()) {
         self.place = place
         self.userId = userId
-        self.userName = userName
+        self.userFirstName = userFirstName
+        self.userLastName = userLastName
         self.firestoreService = firestoreService
     }
 
-    // MARK: - Public Methods
-    /// Creates a Review object and saves it via FirestoreReviewService
     func submitReview(completion: @escaping (Bool) -> Void) {
-        // Mark loading
         isLoading = true
         errorMessage = nil
-
-        // Construct your Review
-        let review = Review(
+        
+        // Create a Review object with an empty images array.
+        var newReview = Review(
             id: UUID().uuidString,
             userId: userId,
-            userName: userName,
+            userFirstName: userFirstName,
+            userLastName: userLastName,
             placeId: place.placeID ?? "unknown_place_id",
             placeName: place.name ?? "Unnamed Place",
             foodRating: foodRating,
@@ -59,11 +60,11 @@ class PlaceReviewViewModel: ObservableObject {
             favoriteDishes: favoriteDishes,
             reviewText: reviewText,
             timestamp: Date(),
-            images: []
+            images: [] // Will be updated after upload
         )
 
-        // Call your Firestore service
-        firestoreService.saveReview(review) { [weak self] result in
+        // Call the new FirestoreService function
+        firestoreService.saveReviewWithImages(review: newReview, images: images) { [weak self] result in
             DispatchQueue.main.async {
                 guard let self = self else { return }
                 self.isLoading = false
@@ -78,5 +79,6 @@ class PlaceReviewViewModel: ObservableObject {
             }
         }
     }
+
 }
 
