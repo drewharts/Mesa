@@ -1,5 +1,5 @@
 # MESA
-Save, organize, and share places with friends
+Save, organize, and share places with friends. A friend's recomendation is more valuable than any stranger.
 
 ## How does it look? 
 <table>
