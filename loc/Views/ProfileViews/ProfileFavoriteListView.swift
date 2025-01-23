@@ -34,7 +34,7 @@ struct ProfileFavoriteListView: View {
 
             
             // 2) Favorite places
-            if !profile.favoritePlaces.isEmpty {
+            if !profile.favoritePlaceViewModels.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) { // Horizontal scrolling enabled
                     HStack {
                         ForEach(profile.favoritePlaces) { place in

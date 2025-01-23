@@ -13,8 +13,10 @@ import Combine
 class SearchViewModel: ObservableObject {
     @Published var searchText = ""
     @Published var searchResults: [GMSAutocompletePrediction] = [] // Use GMSAutocompletePrediction directly
-    @Published var selectedPlace: GMSPlace? // Use GMSPlace directly
     @Published var userLocation: CLLocationCoordinate2D?
+    
+    weak var selectedPlaceVM: SelectedPlaceViewModel?
+
     
     private var cancellables = Set<AnyCancellable>()
     
@@ -65,8 +67,8 @@ class SearchViewModel: ObservableObject {
             (place: GMSPlace?, error: Error?) in
             guard let place, error == nil else { return }
             DispatchQueue.main.async {
-                self.selectedPlace = place
-                self.searchResults.removeAll() // Clear results after selecting a place
+                self.selectedPlaceVM?.selectedPlace = place
+                self.selectedPlaceVM?.isDetailSheetPresented = true
             }
         })
     }

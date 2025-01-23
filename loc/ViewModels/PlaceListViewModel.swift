@@ -13,6 +13,7 @@ import Combine
 
 class PlaceListViewModel: ObservableObject, Identifiable {
     @Published var placeList: PlaceList
+    @Published var placeViewModels: [PlaceViewModel] = []
     private let firestoreService: FirestoreService
     private let userId: String
     @Published var image: UIImage?
@@ -36,7 +37,12 @@ class PlaceListViewModel: ObservableObject, Identifiable {
         firestoreService.fetchList(userId: userId, listName: placeList.name) { [weak self] result in
             switch result {
             case .success(let fetchedPlaceList):
-                self?.placeList = fetchedPlaceList
+                DispatchQueue.main.async {
+                    self?.placeList = fetchedPlaceList
+                    self?.placeViewModels = fetchedPlaceList.places.map { place in
+                        PlaceViewModel(place: place)
+                    }
+                }
             case .failure(let error):
                 print("Failed to load place list: \(error.localizedDescription)")
             }
@@ -77,24 +83,34 @@ class PlaceListViewModel: ObservableObject, Identifiable {
 
     func addPlace(_ place: GMSPlace) {
         if let placeID = place.placeID {
-            placeList.places.append(Place(id: placeID, name: place.name ?? "", address: place.formattedAddress ?? ""))
-            firestoreService.addPlaceToList(userId: userId, listName: placeList.name, place: place)
+            let newPlace = Place(
+                id: placeID,
+                name: place.name ?? "",
+                address: place.formattedAddress ?? ""
+            )
+            placeViewModels.append(PlaceViewModel(place: newPlace))
+            placeList.places.append(newPlace)
+            firestoreService.addPlaceToList(userId: userId, listName: placeList.name, place: newPlace)
         }
     }
 
     func removePlace(_ place: GMSPlace) {
         if let placeID = place.placeID {
-            // Remove from local placeList
+            // Remove from local view models
+            if let index = placeViewModels.firstIndex(where: { $0.id == placeID }) {
+                placeViewModels.remove(at: index)
+            }
+            
+            // Remove from placeList.places
             placeList.places.removeAll { $0.id == placeID }
             
             // Remove from Firestore
-            firestoreService.removePlaceFromList(userId: userId, listName: placeList.name, place: place)
+            firestoreService.removePlaceFromList(userId: userId, listName: placeList.name, placeId: place.placeID!)
         } else {
             // Handle cases where placeID is nil
             print("Error: Cannot remove place. Invalid placeID.")
         }
     }
-
 
     func fetchFullPlaces(completion: @escaping ([GMSPlace]) -> Void) {
         let placesClient = GMSPlacesClient.shared()
