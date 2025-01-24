@@ -37,11 +37,10 @@ struct ProfileFavoriteListView: View {
             if !profile.favoritePlaceViewModels.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) { // Horizontal scrolling enabled
                     HStack {
-                        ForEach(profile.favoritePlaces) { place in
-                            VStack { // Place image and name vertically
+                        ForEach(profile.favoritePlaceViewModels) { favoritePlaceVM in
+                            VStack {
                                 ZStack {
-                                    // If we have the photo for this place, use it
-                                    if let image = profile.favoritePlaceImages[place.id] {
+                                    if let image = favoritePlaceVM.placeImage {
                                         Image(uiImage: image)
                                             .resizable()
                                             .scaledToFill()
@@ -49,30 +48,26 @@ struct ProfileFavoriteListView: View {
                                             .cornerRadius(50)
                                             .clipped()
                                     } else {
-                                        // Placeholder if we don't yet have the image
                                         Rectangle()
                                             .fill(Color.blue.opacity(0.3))
                                             .frame(width: 85, height: 85)
                                             .cornerRadius(50)
-                                            .onAppear {
-                                                profile.loadPhoto(for: place.id)
-                                            }
                                     }
                                 }
                                 
-                                Text(place.name.prefix(15)) // Limit to 15 characters
+                                Text(favoritePlaceVM.place.name.prefix(15))
                                     .foregroundColor(.black)
                                     .font(.footnote)
                                     .multilineTextAlignment(.center)
                                     .lineLimit(1)
-                                    .frame(width: 85) // Fixed width
+                                    .frame(width: 85)
                             }
-                            .padding(.trailing, 10) // Add padding between items
-                            // 3) Tapping a place sets `selectedPlace`
+                            .padding(.trailing, 10)
                             .onTapGesture {
-                                selectedPlace = place
+                                selectedPlace = favoritePlaceVM.place
                             }
                         }
+
                     }
                     .padding(.horizontal, 20)
                 }

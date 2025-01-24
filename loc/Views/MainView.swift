@@ -38,7 +38,7 @@ struct MainView: View {
                     locationManager: locationManager,
                     onMapTap: handleMapTap
                 )
-//                .edgesIgnoringSafeArea(.all)
+                .edgesIgnoringSafeArea(.all)
 
                 // Top Controls (Search Bar and Profile Button)
                 VStack(spacing: 16) {
@@ -132,7 +132,7 @@ struct MainView: View {
                 // Bottom Sheet
                 if selectedPlaceVM.isDetailSheetPresented, let selectedPlace = selectedPlaceVM.selectedPlace {
                     BottomSheetView(
-                        isPresented: selectedPlaceVM.isDetailSheetPresented,
+                        isPresented: $selectedPlaceVM.isDetailSheetPresented,
                         sheetHeight: $sheetHeight,
                         maxSheetHeight: maxSheetHeight
                     ) {
