@@ -19,7 +19,7 @@ class GooglePlacesService {
     ///   - completion: A closure that returns a GMSPlace object or an Error.
     func fetchPlace(placeID: String, completion: @escaping (GMSPlace?, Error?) -> Void) {
         // Define the fields to retrieve. Adjust based on your needs.
-        let fields: GMSPlaceField = [.name, .placeID, .coordinate, .formattedAddress, .phoneNumber, .website, .rating, .photos]
+        let fields: GMSPlaceField = [.all]
         
         // Fetch the place details
         placesClient.fetchPlace(fromPlaceID: placeID, placeFields: fields, sessionToken: nil) { (place, error) in

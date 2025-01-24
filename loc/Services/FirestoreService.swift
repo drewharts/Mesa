@@ -202,11 +202,11 @@ class FirestoreService {
     }
 
 
-    func addPlaceToList(userId: String, listName: String, place: GMSPlace) {
+    func addPlaceToList(userId: String, listName: String, place: Place) {
         let placeDict: [String: Any] = [
-            "id": place.placeID ?? "",
+            "id": place.id ?? "",
             "name": place.name ?? "",
-            "address": place.formattedAddress ?? ""
+            "address": place.address ?? ""
         ]
 
         db.collection("users").document(userId)
@@ -220,16 +220,10 @@ class FirestoreService {
             }
     }
     
-    func removePlaceFromList(userId: String, listName: String, place: GMSPlace) {
-        let placeDict: [String: Any] = [
-            "id": place.placeID ?? "",
-            "name": place.name ?? "",
-            "address": place.formattedAddress ?? ""
-        ]
-
+    func removePlaceFromList(userId: String, listName: String, placeId: String) {
         db.collection("users").document(userId)
             .collection("placeLists").document(listName)
-            .updateData(["places": FieldValue.arrayRemove([placeDict])]) { error in
+            .updateData(["places": FieldValue.arrayRemove([placeId])]) { error in
                 if let error = error {
                     print("Error removing place from list: \(error.localizedDescription)")
                 } else {
@@ -237,6 +231,7 @@ class FirestoreService {
                 }
             }
     }
+
 
 
     func createNewList(placeList: PlaceList,userID: String) {

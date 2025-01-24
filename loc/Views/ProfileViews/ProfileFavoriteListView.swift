@@ -9,14 +9,12 @@ import SwiftUI
 
 struct ProfileFavoriteListView: View {
     @EnvironmentObject var profile: ProfileViewModel
+    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
+    @Environment(\.presentationMode) var presentationMode // For dismissing the sheet
     @State private var showSearch = false
-    
-    // Keep track of which place is currently selected
-    @State private var selectedPlace: Place? = nil
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            
             // 1) "FAVORITES" button
             Button {
                 showSearch = true
@@ -26,22 +24,19 @@ struct ProfileFavoriteListView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.leading, 20)
                     .foregroundStyle(.black)
-                    .padding(.top,-10)
-
+                    .padding(.top, -10)
             }
             .buttonStyle(.plain)
             .padding(.horizontal, 10)
 
-            
             // 2) Favorite places
-            if !profile.favoritePlaces.isEmpty {
+            if !profile.favoritePlaceViewModels.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) { // Horizontal scrolling enabled
                     HStack {
-                        ForEach(profile.favoritePlaces) { place in
-                            VStack { // Place image and name vertically
+                        ForEach(profile.favoritePlaceViewModels) { favoritePlaceVM in
+                            VStack {
                                 ZStack {
-                                    // If we have the photo for this place, use it
-                                    if let image = profile.favoritePlaceImages[place.id] {
+                                    if let image = favoritePlaceVM.placeImage {
                                         Image(uiImage: image)
                                             .resizable()
                                             .scaledToFill()
@@ -49,59 +44,43 @@ struct ProfileFavoriteListView: View {
                                             .cornerRadius(50)
                                             .clipped()
                                     } else {
-                                        // Placeholder if we don't yet have the image
                                         Rectangle()
                                             .fill(Color.blue.opacity(0.3))
                                             .frame(width: 85, height: 85)
                                             .cornerRadius(50)
-                                            .onAppear {
-                                                profile.loadPhoto(for: place.id)
-                                            }
                                     }
                                 }
-                                
-                                Text(place.name.prefix(15)) // Limit to 15 characters
+                                Text(favoritePlaceVM.place.name.prefix(15))
                                     .foregroundColor(.black)
                                     .font(.footnote)
                                     .multilineTextAlignment(.center)
                                     .lineLimit(1)
-                                    .frame(width: 85) // Fixed width
+                                    .frame(width: 85)
                             }
-                            .padding(.trailing, 10) // Add padding between items
-                            // 3) Tapping a place sets `selectedPlace`
+                            .padding(.trailing, 10)
                             .onTapGesture {
-                                selectedPlace = place
+                                // Update the selected place in the view model and dismiss
+                                selectedPlaceVM.selectedPlace = favoritePlaceVM.gmsPlace
+                                selectedPlaceVM.isDetailSheetPresented = true
+                                presentationMode.wrappedValue.dismiss()
                             }
                         }
                     }
                     .padding(.horizontal, 20)
                 }
-                
             } else {
-                Text("No lists available")
+                Text("No favorites available")
                     .foregroundColor(.gray)
                     .padding(.horizontal)
             }
+
             Divider()
                 .padding(.top, 15)
                 .padding(.horizontal, 20)
-
         }
-        // 4) Present AddFavoritesView in a sheet
+        // Present AddFavoritesView in a sheet
         .sheet(isPresented: $showSearch) {
             AddFavoritesView()
-        }
-        // 5) Present a detail sheet (or action sheet) for the selected place
-        .sheet(item: $selectedPlace) { place in
-            // This sheet is specifically for the selected place
-            // Build a detail view (or anything you want to show)
-            VStack {
-                Text("Details for \(place.name)")
-                    .font(.largeTitle)
-                // ... show more info about `place` here ...
-                Spacer()
-            }
-            .padding()
         }
     }
 }

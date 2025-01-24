@@ -7,6 +7,7 @@
 
 import SwiftUI
 import PhotosUI
+import GooglePlaces
 
 struct ListHeaderView: View {
     var body: some View {
@@ -24,6 +25,9 @@ struct PlaceListCellView: View {
     let listVM: PlaceListViewModel
     @Binding var showingImagePicker: Bool
     @Binding var selectedList: PlaceListViewModel?
+    
+    var onPlaceSelected: ((GMSPlace) -> Void)?
+
 
     var body: some View {
         NavigationLink(destination: PlaceListView(placeList: listVM.placeList)) {
@@ -74,6 +78,11 @@ struct PlaceListCellView: View {
             }
             .padding(.vertical, 10)
             .padding(.horizontal, 30)
+            .onTapGesture {
+                if let firstPlace = listVM.placeViewModels.first!.gmsPlace {
+                    onPlaceSelected?(firstPlace)
+                }
+            }
         }
         .contextMenu {
             Button {
@@ -89,6 +98,8 @@ struct PlaceListCellView: View {
 
 struct ProfileViewListsView: View {
     @EnvironmentObject var profile: ProfileViewModel
+    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
+
 
     // State for handling image picker
     @State private var showingImagePicker = false
@@ -96,6 +107,7 @@ struct ProfileViewListsView: View {
 
     // State to remember which list was selected for adding a photo
     @State private var selectedList: PlaceListViewModel?
+    
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {

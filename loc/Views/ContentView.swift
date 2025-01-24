@@ -12,6 +12,7 @@ import FirebaseAuth
 struct ContentView: View {
     @EnvironmentObject var userSession: UserSession
     @ObservedObject var locationManager = LocationManager()
+    @StateObject private var selectedPlaceVM = SelectedPlaceViewModel()
 
     var body: some View {
         if userSession.isUserLoggedIn {
@@ -20,6 +21,7 @@ struct ContentView: View {
                 MainView()
                     .environmentObject(profileViewModel)
                     .environmentObject(locationManager)
+                    .environmentObject(selectedPlaceVM)
             } else {
                 ProgressView("Loading profile...")
             }

@@ -12,6 +12,7 @@ import FirebaseAuth
 
 struct MainView: View {
     @EnvironmentObject var userSession: UserSession
+    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @ObservedObject var locationManager: LocationManager
     @StateObject private var viewModel = SearchViewModel()
 
@@ -33,7 +34,7 @@ struct MainView: View {
                 // Map
                 MapView(
                     searchResults: $viewModel.searchResults,
-                    selectedPlace: $viewModel.selectedPlace,
+                    selectedPlace: $selectedPlaceVM.selectedPlace,
                     locationManager: locationManager,
                     onMapTap: handleMapTap
                 )
@@ -129,9 +130,9 @@ struct MainView: View {
                 .transition(.move(edge: .top).combined(with: .opacity))
 
                 // Bottom Sheet
-                if showDetailSheet, let selectedPlace = viewModel.selectedPlace {
+                if selectedPlaceVM.isDetailSheetPresented, let selectedPlace = selectedPlaceVM.selectedPlace {
                     BottomSheetView(
-                        isPresented: $showDetailSheet,
+                        isPresented: $selectedPlaceVM.isDetailSheetPresented,
                         sheetHeight: $sheetHeight,
                         maxSheetHeight: maxSheetHeight
                     ) {
@@ -147,10 +148,11 @@ struct MainView: View {
             }
             .onAppear {
                 locationManager.requestLocationPermission()
+                viewModel.selectedPlaceVM = selectedPlaceVM
+
             }
         }
         .navigationViewStyle(StackNavigationViewStyle())
-//        .environmentObject(userSession.profile!) // Pass the profile into the environment as before
     }
 
     // Handle the map tap to minimize the search bar
