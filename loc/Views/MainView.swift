@@ -148,6 +148,8 @@ struct MainView: View {
             }
             .onAppear {
                 locationManager.requestLocationPermission()
+                viewModel.selectedPlaceVM = selectedPlaceVM
+
             }
         }
         .navigationViewStyle(StackNavigationViewStyle())

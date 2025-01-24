@@ -16,11 +16,11 @@ class SearchViewModel: ObservableObject {
     @Published var userLocation: CLLocationCoordinate2D?
     
     weak var selectedPlaceVM: SelectedPlaceViewModel?
-
     
     private var cancellables = Set<AnyCancellable>()
     
     init() {
+
         // Observing searchText changes with debounce to limit API calls
         $searchText
             .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
