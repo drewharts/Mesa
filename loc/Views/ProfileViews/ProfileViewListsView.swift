@@ -108,8 +108,6 @@ struct ProfileViewListsView: View {
     // State to remember which list was selected for adding a photo
     @State private var selectedList: PlaceListViewModel?
     
-    @Environment(\.presentationMode) var presentationMode // For dismissing the sheet
-
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -121,13 +119,7 @@ struct ProfileViewListsView: View {
                         PlaceListCellView(
                             listVM: listVM,
                             showingImagePicker: $showingImagePicker,
-                            selectedList: $selectedList,
-                            onPlaceSelected: { place in
-                                selectedPlaceVM.selectedPlace = place
-                                selectedPlaceVM.isDetailSheetPresented = true
-                                
-                                presentationMode.wrappedValue.dismiss()
-                            }
+                            selectedList: $selectedList
                         )
                     }
                 }
