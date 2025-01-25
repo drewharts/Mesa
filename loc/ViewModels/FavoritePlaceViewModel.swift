@@ -45,6 +45,8 @@ class FavoritePlaceViewModel: ObservableObject, Identifiable {
                 self.fetchPlacePhoto()
             }
         }
+        print("Fetched place \(gmsPlace?.name ?? "?"): \(gmsPlace?.phoneNumber ?? "No phone")")
+
     }
 
     

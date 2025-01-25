@@ -14,18 +14,24 @@ class PlaceDetailViewModel: ObservableObject {
     @Published var showAlert = false
     @Published var alertMessage = ""
     @Published var showListSelection = false
+    @Published var phoneNumber = ""
 
     private var currentPlaceID: String?
 
     var placeName: String = "Unknown"
     var placeIconURL: URL?
     var openingHours: [String]?
+    
+    init(place: GMSPlace) {
+        loadData(for: place)
+    }
 
     func loadData(for place: GMSPlace) {
         placeName = place.name ?? "Restuarant"
         placeIconURL = place.iconImageURL
         openingHours = place.currentOpeningHours?.weekdayText
         fetchPhotos(for: place)
+        phoneNumber = place.phoneNumber ?? ""
     }
     
     func getRestaurantType(for place: GMSPlace) -> String? {

@@ -142,7 +142,7 @@ struct MainView: View {
                             minSheetHeight: minSheetHeight
                         )
                         .frame(maxWidth: .infinity)
-                        .id(selectedPlace.placeID) 
+//                        .id(selectedPlace.placeID) 
                     }
                 }
             }

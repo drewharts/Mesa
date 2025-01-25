@@ -16,22 +16,24 @@ struct PlaceDetailView: View {
     @State private var selectedImage: UIImage?
 
     @EnvironmentObject var profile: ProfileViewModel
-    @StateObject private var viewModel = PlaceDetailViewModel()
+    @StateObject private var viewModel: PlaceDetailViewModel
+
+    init(place: GMSPlace, sheetHeight: Binding<CGFloat>, minSheetHeight: CGFloat) {
+        self.place = place
+        self._sheetHeight = sheetHeight
+        self.minSheetHeight = minSheetHeight
+        _viewModel = StateObject(wrappedValue: PlaceDetailViewModel(place: place))
+    }
+
 
     var body: some View {
         ZStack {
             // 1) Main content (the sheet UI), blurred if an image is selected
             VStack(spacing: 16) {
-                if sheetHeight == minSheetHeight {
-                    MinPlaceDetailView(viewModel: viewModel,
+                //TODO: the minplacedetailview is being created before the viewmodel has any of the data we need
+                MinPlaceDetailView(viewModel: viewModel,
                                        place: place,
                                        selectedImage: $selectedImage)
-                } else {
-                    // Or MaxPlaceDetailView if you prefer for expanded state
-                    MinPlaceDetailView(viewModel: viewModel,
-                                       place: place,
-                                       selectedImage: $selectedImage)
-                }
             }
             .onAppear {
                 viewModel.loadData(for: place)

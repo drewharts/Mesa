@@ -50,7 +50,7 @@ struct MinPlaceDetailView: View {
                 
                 // MARK: - Row: Type / Status / Drive Time
                 HStack(spacing: 10) {
-                    Text(viewModel.getRestaurantType(for: place) ?? "Unknown")
+                    Text(viewModel.getRestaurantType(for: place) ?? "Restuarant")
                         .font(.subheadline)
                         .foregroundColor(.gray)
                     
@@ -172,6 +172,7 @@ struct MinPlaceDetailView: View {
                         .padding(.bottom, 15)
                     
                     // Example: embedding MaxPlaceDetailView
+                    //TODO: the viewmodel has no images when clicked to from the profile favs
                     MaxPlaceDetailView(
                         viewModel: viewModel,
                         place: place,
