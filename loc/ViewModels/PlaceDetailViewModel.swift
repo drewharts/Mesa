@@ -22,7 +22,7 @@ class PlaceDetailViewModel: ObservableObject {
     var openingHours: [String]?
 
     func loadData(for place: GMSPlace) {
-        placeName = place.name ?? "Unknown"
+        placeName = place.name ?? "Restuarant"
         placeIconURL = place.iconImageURL
         openingHours = place.currentOpeningHours?.weekdayText
         fetchPhotos(for: place)
