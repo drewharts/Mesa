@@ -27,11 +27,14 @@ class PlaceDetailViewModel: ObservableObject {
     }
 
     func loadData(for place: GMSPlace) {
-        placeName = place.name ?? "Restuarant"
-        placeIconURL = place.iconImageURL
-        openingHours = place.currentOpeningHours?.weekdayText
-        fetchPhotos(for: place)
-        phoneNumber = place.phoneNumber ?? ""
+        //dispatch
+        DispatchQueue.main.async {
+            self.placeName = place.name ?? "Restuarant"
+            self.placeIconURL = place.iconImageURL
+            self.openingHours = place.currentOpeningHours?.weekdayText
+            self.fetchPhotos(for: place)
+            self.phoneNumber = place.phoneNumber ?? ""
+        }
     }
     
     func getRestaurantType(for place: GMSPlace) -> String? {

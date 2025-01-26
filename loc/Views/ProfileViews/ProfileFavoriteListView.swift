@@ -9,6 +9,8 @@ import SwiftUI
 
 struct ProfileFavoriteListView: View {
     @EnvironmentObject var profile: ProfileViewModel
+    @StateObject private var viewModel = SearchViewModel()
+
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @Environment(\.presentationMode) var presentationMode // For dismissing the sheet
     @State private var showSearch = false
