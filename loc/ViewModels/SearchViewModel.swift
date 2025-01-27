@@ -14,6 +14,8 @@ class SearchViewModel: ObservableObject {
     @Published var searchText = ""
     @Published var searchResults: [GMSAutocompletePrediction] = [] // Use GMSAutocompletePrediction directly
     @Published var userLocation: CLLocationCoordinate2D?
+    private let googlePlacesService = GooglePlacesService()
+
     
     weak var selectedPlaceVM: SelectedPlaceViewModel?
     
@@ -59,17 +61,22 @@ class SearchViewModel: ObservableObject {
     }
     
     func selectPlace(_ prediction: GMSAutocompletePrediction) {
-        let placesClient = GMSPlacesClient.shared()
-
-        let myProperties = [GMSPlaceProperty.all].map {$0.rawValue}
-        let placeRequest = GMSFetchPlaceRequest(placeID: prediction.placeID, placeProperties: myProperties, sessionToken: nil)
-        placesClient.fetchPlace(with: placeRequest, callback: {
-            (place: GMSPlace?, error: Error?) in
-            guard let place, error == nil else { return }
-            DispatchQueue.main.async {
-                self.selectedPlaceVM?.selectedPlace = place
-                self.selectedPlaceVM?.isDetailSheetPresented = true
+        // Now we use our GooglePlacesService instead of GMSPlacesClient directly
+        googlePlacesService.fetchPlace(placeID: prediction.placeID) { [weak self] place, error in
+            if let error = error {
+                print("Error fetching place: \(error.localizedDescription)")
+                return
             }
-        })
+            
+            guard let place = place else {
+                print("No place details found.")
+                return
+            }
+            
+            DispatchQueue.main.async {
+                self?.selectedPlaceVM?.selectedPlace = place
+                self?.selectedPlaceVM?.isDetailSheetPresented = true
+            }
+        }
     }
 }

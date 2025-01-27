@@ -11,7 +11,9 @@ import GooglePlaces
 struct MinPlaceDetailView: View {
     @EnvironmentObject var profile: ProfileViewModel
     @ObservedObject var viewModel: PlaceDetailViewModel
-    let place: GMSPlace
+    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
+
+//    let place: GMSPlace
     
     @Binding var selectedImage: UIImage?
     
@@ -24,7 +26,7 @@ struct MinPlaceDetailView: View {
                 
                 // MARK: - Top Row: Title + Icons
                 HStack(alignment: .center) {
-                    Text(place.name ?? "Unnamed Place")
+                    Text(selectedPlaceVM.selectedPlace?.name ?? "Unnamed Place")
                         .font(.largeTitle)
                         .fontWeight(.bold)
                         .foregroundColor(.black)
@@ -32,7 +34,7 @@ struct MinPlaceDetailView: View {
                     Spacer()
                     
                     HStack(spacing: 16) {
-                        NavigationLink(destination: PlaceReviewView(isPresented: .constant(false), place: place,userId: profile.getUserId(),userFirstName: profile.data.firstName,userLastName: profile.data.lastName)) {
+                        NavigationLink(destination: PlaceReviewView(isPresented: .constant(false), place: selectedPlaceVM.selectedPlace!,userId: profile.getUserId(),userFirstName: profile.data.firstName,userLastName: profile.data.lastName)) {
                             Image(systemName: "plus")
                                 .font(.title3)
                         }
@@ -50,7 +52,7 @@ struct MinPlaceDetailView: View {
                 
                 // MARK: - Row: Type / Status / Drive Time
                 HStack(spacing: 10) {
-                    Text(viewModel.getRestaurantType(for: place) ?? "Restuarant")
+                    Text(viewModel.getRestaurantType(for:selectedPlaceVM.selectedPlace!) ?? "Restuarant")
                         .font(.subheadline)
                         .foregroundColor(.gray)
                     
@@ -101,7 +103,7 @@ struct MinPlaceDetailView: View {
                     }
                     
                     // Rating label (not a button)
-                    Text(String(format: "%.1f", place.rating))
+                    Text(String(format: "%.1f", selectedPlaceVM.selectedPlace!.rating))
                         .font(.caption)
                         .foregroundColor(.black)
                         .padding(.horizontal, 6)
@@ -162,7 +164,7 @@ struct MinPlaceDetailView: View {
                 switch selectedTab {
                 case .about:
                     // “About” content
-                    Text(place.editorialSummary ?? "No description available")
+                    Text(selectedPlaceVM.selectedPlace?.editorialSummary ?? "No description available")
                         .font(.footnote)
                         .foregroundColor(.black)
                         .fixedSize(horizontal: false, vertical: true)
@@ -175,7 +177,6 @@ struct MinPlaceDetailView: View {
                     //TODO: the viewmodel has no images when clicked to from the profile favs
                     MaxPlaceDetailView(
                         viewModel: viewModel,
-                        place: place,
                         selectedImage: $selectedImage
                     )
                     

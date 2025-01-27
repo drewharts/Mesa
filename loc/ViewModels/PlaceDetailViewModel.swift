@@ -15,85 +15,90 @@ class PlaceDetailViewModel: ObservableObject {
     @Published var alertMessage = ""
     @Published var showListSelection = false
     @Published var phoneNumber = ""
-
-    private var currentPlaceID: String?
-
-    var placeName: String = "Unknown"
-    var placeIconURL: URL?
-    var openingHours: [String]?
+    @Published var placeName: String = "Unknown"
+    @Published var openingHours: [String]?
     
-    init(place: GMSPlace) {
-        loadData(for: place)
+    var placeIconURL: URL?
+    
+    /// Keep track of which place we've loaded, so we don’t fetch again unnecessarily.
+    private(set) var currentPlaceID: String?
+
+    init() {
+        // Empty. We'll call loadData(for:) later.
     }
 
     func loadData(for place: GMSPlace) {
-        //dispatch
+        // If we already loaded this place, do nothing (optional).
+        if currentPlaceID == place.placeID { return }
+        
+        self.currentPlaceID = place.placeID
+        
         DispatchQueue.main.async {
-            self.placeName = place.name ?? "Restuarant"
+            self.placeName = place.name ?? "Restaurant"
             self.placeIconURL = place.iconImageURL
             self.openingHours = place.currentOpeningHours?.weekdayText
-            self.fetchPhotos(for: place)
             self.phoneNumber = place.phoneNumber ?? ""
+            self.fetchPhotos(for: place)
         }
     }
-    
-    func getRestaurantType(for place: GMSPlace) -> String? {
-        let recognizedTypes = ["American", "Japanese", "Korean", "Mexican", "Italian", "Chinese", "Greek", "Vietnamese"]
-        
-        // Get the types from the GMSPlace (e.g., ["japanese_restaurant", "sushi"]).
-        guard let placeTypes = place.types else {
-            return nil
-        }
-        
-        // Look for the first recognized type that appears in any of the place’s types.
-        //    We do a `.lowercased()` check so it’s case‐insensitive.
-        for recognizedType in recognizedTypes {
-            // If any string in `placeTypes` contains the recognizedType (e.g. “japanese” in “japanese_restaurant”)
-            if placeTypes.contains(where: { $0.lowercased().contains(recognizedType.lowercased()) }) {
-                return recognizedType
-            }
-        }
-        
-        // 4. If no match found, return nil
-        return nil
-    }
 
-
-    func fetchPhotos(for place: GMSPlace) {
+    private func fetchPhotos(for place: GMSPlace) {
         photos = []
+        
         guard let photosMetadata = place.photos, !photosMetadata.isEmpty else {
             print("No photos metadata found.")
             return
         }
 
-        currentPlaceID = place.placeID
-
         let placesClient = GMSPlacesClient.shared()
 
-        photosMetadata.forEach { photoMetadata in
-            let fetchPhotoRequest = GMSFetchPhotoRequest(photoMetadata: photoMetadata, maxSize: CGSize(width: 480, height: 480))
-            
-            placesClient.fetchPhoto(with: fetchPhotoRequest) { [weak self] photoImage, error in
+        photosMetadata.forEach { metadata in
+            let request = GMSFetchPhotoRequest(
+                photoMetadata: metadata,
+                maxSize: CGSize(width: 480, height: 480)
+            )
+
+            placesClient.fetchPhoto(with: request) { [weak self] image, error in
+                guard let self = self else { return }
                 if let error = error {
                     print("Error fetching photo: \(error.localizedDescription)")
-                } else if let photoImage = photoImage {
+                    return
+                }
+                if let image = image {
                     DispatchQueue.main.async {
-                        if self?.currentPlaceID == place.placeID {
-                            self?.photos.append(photoImage)
-                        } else {
-                            print("Discarding photo for outdated place.")
+                        // Double check the placeID to ensure we haven't switched
+                        if self.currentPlaceID == place.placeID {
+                            self.photos.append(image)
                         }
                     }
                 }
             }
         }
     }
-
+    
+    // Some convenience methods
     func handleAddButton() {
         showListSelection = true
     }
-
+    
     func showDirections() {
-        // Handle directions logic
+        // directions logic
+    }
+
+    func getRestaurantType(for place: GMSPlace) -> String? {
+        let recognizedTypes = [
+            "American", "Japanese", "Korean", "Mexican",
+            "Italian", "Chinese", "Greek", "Vietnamese"
+        ]
+        
+        guard let placeTypes = place.types else { return nil }
+        for recognizedType in recognizedTypes {
+            if placeTypes.contains(where: {
+                $0.lowercased().contains(recognizedType.lowercased())
+            }) {
+                return recognizedType
+            }
+        }
+        return nil
     }
 }

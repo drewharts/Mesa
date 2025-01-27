@@ -9,52 +9,66 @@ import SwiftUI
 import GooglePlaces
 
 struct PlaceDetailView: View {
-    let place: GMSPlace
     @Binding var sheetHeight: CGFloat
     let minSheetHeight: CGFloat
-    
+
     @State private var selectedImage: UIImage?
 
+    // Environment objects.
     @EnvironmentObject var profile: ProfileViewModel
-    @StateObject private var viewModel: PlaceDetailViewModel
+    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
+    
+    // ViewModel owned by SwiftUI
+    @StateObject private var viewModel = PlaceDetailViewModel()
 
-    init(place: GMSPlace, sheetHeight: Binding<CGFloat>, minSheetHeight: CGFloat) {
-        self.place = place
+    init(sheetHeight: Binding<CGFloat>, minSheetHeight: CGFloat) {
         self._sheetHeight = sheetHeight
         self.minSheetHeight = minSheetHeight
-        _viewModel = StateObject(wrappedValue: PlaceDetailViewModel(place: place))
     }
-
 
     var body: some View {
         ZStack {
-            // 1) Main content (the sheet UI), blurred if an image is selected
             VStack(spacing: 16) {
-                //TODO: the minplacedetailview is being created before the viewmodel has any of the data we need
-                MinPlaceDetailView(viewModel: viewModel,
-                                       place: place,
-                                       selectedImage: $selectedImage)
+                if viewModel.placeName == "Unknown" && viewModel.photos.isEmpty {
+                    ProgressView("Loading Place Details...")
+                } else {
+                    MinPlaceDetailView(viewModel: viewModel, selectedImage: $selectedImage)
+                }
             }
-            .onAppear {
-                viewModel.loadData(for: place)
-            }
+            .padding(.vertical)
+            .frame(maxWidth: .infinity)
+            .blur(radius: selectedImage != nil ? 10 : 0)
             .alert(isPresented: $viewModel.showAlert) {
                 Alert(title: Text("Success"),
                       message: Text(viewModel.alertMessage),
                       dismissButton: .default(Text("OK")))
             }
             .sheet(isPresented: $viewModel.showListSelection) {
-                ListSelectionSheet(place: place, isPresented: $viewModel.showListSelection)
+                if let selectedPlace = selectedPlaceVM.selectedPlace {
+                    ListSelectionSheet(
+                        place: selectedPlace,
+                        isPresented: $viewModel.showListSelection
+                    )
                     .environmentObject(profile)
+                } else {
+                    Text("No place selected")
+                }
             }
-            .padding(.vertical)
-            .frame(maxWidth: .infinity)
-            // Apply blur when we have a selected image
-            .blur(radius: selectedImage != nil ? 10 : 0)
+            .onAppear {
+                // Load the place on first appear if one exists.
+                if let place = selectedPlaceVM.selectedPlace {
+                    viewModel.loadData(for: place)
+                }
+            }
+            .onChange(of: selectedPlaceVM.selectedPlace) { newPlace in
+                // Whenever the selected place changes, load new data
+                if let place = newPlace {
+                    viewModel.loadData(for: place)
+                }
+            }
 
-            // 2) Overlay with the selected photo, centered
-            if let selectedImage = selectedImage {
-                // A fill container to detect taps outside the photo
+            // Overlay for the enlarged photo
+            if let selectedImage {
                 Color.clear
                     .contentShape(Rectangle())
                     .onTapGesture {
@@ -62,18 +76,15 @@ struct PlaceDetailView: View {
                     }
                     .ignoresSafeArea()
 
-                // Centered enlarged photo
                 VStack {
                     Image(uiImage: selectedImage)
                         .resizable()
                         .scaledToFit()
                         .padding()
                         .onTapGesture {
-                            // Tapping the photo also dismisses it
                             self.selectedImage = nil
                         }
                 }
-                // You can animate or transition if desired
                 .transition(.opacity)
                 .animation(.easeInOut, value: selectedImage)
             }

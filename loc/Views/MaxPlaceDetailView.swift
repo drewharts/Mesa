@@ -10,7 +10,9 @@ import GooglePlaces
 
 struct MaxPlaceDetailView: View {
     @ObservedObject var viewModel: PlaceDetailViewModel
-    let place: GMSPlace
+    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
+
+//    let place: GMSPlace
 
     // Accept the same binding
     @Binding var selectedImage: UIImage?
@@ -21,7 +23,7 @@ struct MaxPlaceDetailView: View {
             HStack(alignment: .center, spacing: 15) {
                 // CALL Bubble
                 Button(action: {
-                    if let phoneNumber = place.phoneNumber,
+                    if let phoneNumber = selectedPlaceVM.selectedPlace?.phoneNumber,
                        let url = URL(string: "tel://\(phoneNumber)") {
                         UIApplication.shared.open(url)
                     }

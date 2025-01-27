@@ -129,14 +129,13 @@ struct MainView: View {
                 .transition(.move(edge: .top).combined(with: .opacity))
 
                 // Bottom Sheet
-                if selectedPlaceVM.isDetailSheetPresented, let selectedPlace = selectedPlaceVM.selectedPlace {
+                if selectedPlaceVM.isDetailSheetPresented {
                     BottomSheetView(
                         isPresented: $selectedPlaceVM.isDetailSheetPresented,
                         sheetHeight: $sheetHeight,
                         maxSheetHeight: maxSheetHeight
                     ) {
                         PlaceDetailView(
-                            place: selectedPlace,
                             sheetHeight: $sheetHeight,
                             minSheetHeight: minSheetHeight
                         )
