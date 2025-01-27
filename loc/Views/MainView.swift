@@ -76,6 +76,7 @@ struct MainView: View {
                                 NavigationLink(destination: ProfileView(), isActive: $showProfileView) {
                                     Button(action: {
                                         showProfileView = true
+                                        selectedPlaceVM.isDetailSheetPresented = false
                                     }) {
                                         if let profilePhoto = userSession.profileViewModel?.profilePhoto {
                                             profilePhoto
