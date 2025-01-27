@@ -30,7 +30,7 @@ struct PlaceListCellView: View {
 
 
     var body: some View {
-        NavigationLink(destination: PlaceListView(placeList: listVM.placeList)) {
+        NavigationLink(destination: PlaceListView(placeLists: listVM.placeViewModels)) {
             HStack {
                 if let imageURLString = listVM.placeList.image,
                    let imageURL = URL(string: imageURLString) {
@@ -99,6 +99,7 @@ struct PlaceListCellView: View {
 struct ProfileViewListsView: View {
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
+    @Environment(\.presentationMode) private var presentationMode
 
 
     // State for handling image picker
@@ -140,6 +141,11 @@ struct ProfileViewListsView: View {
             
             inputImage = []
             selectedList = nil
+        }
+        .onChange(of: selectedPlaceVM.isDetailSheetPresented) { newValue in
+            if newValue == true {
+                presentationMode.wrappedValue.dismiss()
+            }
         }
     }
 }
