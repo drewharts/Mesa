@@ -33,7 +33,6 @@ struct MainView: View {
                 // Map
                 MapView(
                     searchResults: $viewModel.searchResults,
-                    selectedPlace: $selectedPlaceVM.selectedPlace,
                     locationManager: locationManager,
                     onMapTap: handleMapTap
                 )

@@ -11,7 +11,9 @@ import GooglePlaces
 
 struct MapView: UIViewRepresentable {
     @Binding var searchResults: [GMSAutocompletePrediction]
-    @Binding var selectedPlace: GMSPlace?
+//    @Binding var selectedPlace: GMSPlace?
+    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
+
     
     @ObservedObject var locationManager: LocationManager
     @EnvironmentObject var userSession: UserSession
@@ -86,7 +88,7 @@ struct MapView: UIViewRepresentable {
 
         // 3) If a place is selected from search/autocomplete,
         //    move the camera & add a special marker for it
-        if let place = selectedPlace {
+        if let place = selectedPlaceVM.selectedPlace {
             // Only animate if this is a new selection
             if context.coordinator.lastSelectedPlaceID != place.placeID {
                 let camera = GMSCameraPosition.camera(
