@@ -18,11 +18,19 @@ class GooglePlacesService {
     ///   - placeID: The unique identifier of the place to fetch.
     ///   - completion: A closure that returns a GMSPlace object or an Error.
     func fetchPlace(placeID: String, completion: @escaping (GMSPlace?, Error?) -> Void) {
-        // Define the fields to retrieve. Adjust based on your needs.
-        let fields: GMSPlaceField = [.all]
+        // Define the properties you need — here we request them all:
+        let requestedProperties = [GMSPlaceProperty.all].map { $0.rawValue }
         
-        // Fetch the place details
-        placesClient.fetchPlace(fromPlaceID: placeID, placeFields: fields, sessionToken: nil) { (place, error) in
+        // Create a fetch request using the new API
+        let placeRequest = GMSFetchPlaceRequest(
+            placeID: placeID,
+            placeProperties: requestedProperties,
+            sessionToken: nil
+        )
+        
+        // Perform the request
+        let placesClient = GMSPlacesClient.shared()
+        placesClient.fetchPlace(with: placeRequest) { (place, error) in
             if let error = error {
                 print("Error fetching place: \(error.localizedDescription)")
                 completion(nil, error)
@@ -39,6 +47,7 @@ class GooglePlacesService {
             completion(place, nil)
         }
     }
+
     
     /// Example function to fetch a photo for a given placeID.
     func fetchPhoto(placeID: String, completion: @escaping (UIImage?) -> Void) {

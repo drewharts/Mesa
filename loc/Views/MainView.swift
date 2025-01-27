@@ -21,7 +21,6 @@ struct MainView: View {
     @State private var sheetHeight: CGFloat = 200
     @State private var minSheetHeight: CGFloat = 250
     @State private var maxSheetHeight: CGFloat = UIScreen.main.bounds.height * 0.75
-    @State private var showDetailSheet = false
     @State private var showProfileView = false
 
     init(locationManager: LocationManager = LocationManager()) {
@@ -113,12 +112,12 @@ struct MainView: View {
                             .padding(.top, 10)
 
                         if !viewModel.searchResults.isEmpty {
+                            //this is where place is selected from search results
                             SearchResultsView(results: viewModel.searchResults) { prediction in
                                 viewModel.selectPlace(prediction)
                                 withAnimation {
                                     isSearchBarMinimized = true
                                     searchIsFocused = false
-                                    showDetailSheet = true
                                 }
                             }
                             .frame(maxWidth: .infinity)
@@ -130,19 +129,18 @@ struct MainView: View {
                 .transition(.move(edge: .top).combined(with: .opacity))
 
                 // Bottom Sheet
-                if selectedPlaceVM.isDetailSheetPresented, let selectedPlace = selectedPlaceVM.selectedPlace {
+                if selectedPlaceVM.isDetailSheetPresented {
                     BottomSheetView(
                         isPresented: $selectedPlaceVM.isDetailSheetPresented,
                         sheetHeight: $sheetHeight,
                         maxSheetHeight: maxSheetHeight
                     ) {
                         PlaceDetailView(
-                            place: selectedPlace,
                             sheetHeight: $sheetHeight,
                             minSheetHeight: minSheetHeight
                         )
                         .frame(maxWidth: .infinity)
-                        .id(selectedPlace.placeID) 
+//                        .id(selectedPlace.placeID) 
                     }
                 }
             }

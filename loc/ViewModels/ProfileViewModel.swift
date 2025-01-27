@@ -13,7 +13,7 @@ import GooglePlaces
 class ProfileViewModel: ObservableObject {
     @Published var data: ProfileData
     @Published var placeListViewModels: [PlaceListViewModel] = []
-    @Published var favoritePlaceViewModels: [FavoritePlaceViewModel] = []
+    @Published var favoritePlaceViewModels: [PlaceViewModel] = []
     @Published var favoritePlaceImages: [String: UIImage] = [:]
     @Published var profilePhoto: Image? = nil
     weak var delegate: ProfileDelegate?
@@ -66,7 +66,7 @@ class ProfileViewModel: ObservableObject {
 
     // Appends the place to local state and Firestore, and initializes FavoritePlaceViewModel
     func addFavoritePlace(place: Place) {
-        let favoritePlaceVM = FavoritePlaceViewModel(place: place)
+        let favoritePlaceVM = PlaceViewModel(place: place)
         favoritePlaceViewModels.append(favoritePlaceVM)
         firestoreService.addProfileFavorite(userId: userId, place: place)
     }
@@ -109,7 +109,7 @@ class ProfileViewModel: ObservableObject {
             DispatchQueue.main.async {
                 // Map fetched Places to FavoritePlaceViewModel
                 self.favoritePlaceViewModels = fetchedPlaces.map { place in
-                    FavoritePlaceViewModel(place: place)
+                    PlaceViewModel(place: place)
                 }
             }
         }
