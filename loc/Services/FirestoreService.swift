@@ -12,14 +12,14 @@ import GooglePlaces
 
 class FirestoreService {
     private let db = Firestore.firestore()
-    private let storage = Storage.storage() // Add a storage reference
-    
+    private let storage = Storage.storage()
+
     func searchUsers(query: String, completion: @escaping ([ProfileData]?, Error?) -> Void) {
         let usersRef = db.collection("users")
         
         // Perform a name search using Firestore's `whereField` with `>=` and `<=` for simple prefix matching
-        usersRef.whereField("firstName", isGreaterThanOrEqualTo: query)
-                .whereField("firstName", isLessThanOrEqualTo: query + "\u{f8ff}")
+        usersRef.whereField("fullName", isGreaterThanOrEqualTo: query)
+                .whereField("fullName", isLessThanOrEqualTo: query + "\u{f8ff}")
                 .getDocuments { snapshot, error in
                     if let error = error {
                         completion(nil, error)
