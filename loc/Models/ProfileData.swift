@@ -16,5 +16,8 @@ struct ProfileData: Codable, Identifiable {
     var email: String
     var profilePhotoURL: URL?
     var phoneNumber: String
-    var placeLists: [PlaceList]
+    
+    var fullName: String {
+        return "\(firstName) \(lastName)"
+    }
 }

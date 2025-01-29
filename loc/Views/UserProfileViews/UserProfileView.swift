@@ -15,25 +15,10 @@ struct UserProfileView: View {
         ScrollView {
             VStack(spacing: 20) {
                 // Profile Picture
-                if let profilePhotoURL = user.profilePhotoURL {
-                    AsyncImage(url: profilePhotoURL) { image in
-                        image.resizable()
-                            .scaledToFill()
-                            .frame(width: 100, height: 100)
-                            .clipShape(Circle())
-                            .shadow(radius: 4)
-                    } placeholder: {
-                        Image(systemName: "person.crop.circle.fill")
-                            .resizable()
-                            .frame(width: 100, height: 100)
-                            .clipShape(Circle())
-                            .shadow(radius: 4)
-                            .foregroundColor(.gray)
-                    }
-                }
+                UserProfileProfilePictureView(profilePhotoURL: user.profilePhotoURL)
 
                 // Name
-                Text("\(user.firstName) \(user.lastName)")
+                Text(user.fullName)
                     .font(.title)
                     .fontWeight(.bold)
                     .foregroundColor(.black)
@@ -56,7 +41,7 @@ struct UserProfileView: View {
                 }
 
                 // User's Place Lists
-                UserPlaceListsView(placeLists: user.placeLists)
+//                UserPlaceListsView(placeLists: user.placeLists)
 
                 Spacer()
             }
