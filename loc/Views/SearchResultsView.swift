@@ -16,7 +16,7 @@ struct SearchResultsView: View {
                 }
                 .padding(.top, 10)
             }
-            .frame(height: CGFloat((userResults.count + placeResults.count) * 70))
+            .frame(height: CGFloat((userResults.count + placeResults.count) * 120))
         }
     }
 }
@@ -80,14 +80,26 @@ struct UserResultsView: View {
                     Button(action: { onSelectUser(user) }) {
                         HStack {
                             // Profile Image Placeholder (Replace with actual image loading)
-                            Image(systemName: "person.crop.circle.fill")
-                                .resizable()
-                                .frame(width: 40, height: 40)
-                                .clipShape(Circle())
-                                .padding(.trailing, 10)
+                            AsyncImage(url: user.profilePhotoURL) { phase in
+                                if let image = phase.image {
+                                    image.resizable()
+                                        .frame(width: 40, height: 40)
+                                        .clipShape(Circle())
+                                } else if phase.error != nil {
+                                    Image(systemName: "person.crop.circle.fill")
+                                        .resizable()
+                                        .frame(width: 40, height: 40)
+                                        .clipShape(Circle())
+                                        .foregroundColor(.gray)
+                                } else {
+                                    ProgressView()
+                                        .frame(width: 40, height: 40)
+                                }
+                            }
+
                             
                             VStack(alignment: .leading) {
-                                Text("\(user.firstName) \(user.lastName)")                          
+                                Text(user.fullName)
                                     .foregroundColor(.black)
                             }
                             

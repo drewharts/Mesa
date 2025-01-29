@@ -11,21 +11,41 @@ struct UserProfileProfilePictureView: View {
     let profilePhotoURL: URL?
     
     var body: some View {
-        if let profilePhotoURL = profilePhotoURL {
-            AsyncImage(url: profilePhotoURL) { image in
-                image.resizable()
-                    .scaledToFill()
-                    .frame(width: 120, height: 120)
-                    .clipShape(Circle())
-                    .shadow(radius: 4)
-            } placeholder: {
+        // The main image or placeholder
+        let profileImage: some View = Group {
+            if let profilePhotoURL = profilePhotoURL {
+                AsyncImage(url: profilePhotoURL) { image in
+                    image.resizable()
+                        .scaledToFill()
+                } placeholder: {
+                    Image(systemName: "person.crop.circle.fill")
+                        .resizable()
+                        .foregroundColor(.gray)
+                }
+            } else {
                 Image(systemName: "person.crop.circle.fill")
                     .resizable()
-                    .frame(width: 100, height: 100)
-                    .clipShape(Circle())
-                    .shadow(radius: 4)
                     .foregroundColor(.gray)
             }
         }
+        
+        // Overlay the follow button at the top trailing corner
+        profileImage
+            .frame(width: 120, height: 120)
+            .clipShape(Circle())
+            .shadow(radius: 4)
+            .overlay(alignment: .topTrailing) {
+                Button(action: {
+                    // Follow action here
+                }) {
+                    Image(systemName: "person.fill.badge.plus")
+                        .padding(6)
+                        .background(Color.gray)
+                        .foregroundColor(.white)
+                        .clipShape(Circle())
+                }
+                .padding(4)
+            }
+            .padding(.top, 40)
     }
 }

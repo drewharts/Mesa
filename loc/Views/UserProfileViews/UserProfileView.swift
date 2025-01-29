@@ -26,20 +26,6 @@ struct UserProfileView: View {
                 Divider()
                     .padding(.horizontal, 20)
 
-                // Email (Optional)
-                if !user.email.isEmpty {
-                    Text(user.email)
-                        .font(.subheadline)
-                        .foregroundColor(.gray)
-                }
-
-                // Phone Number (Optional)
-                if !user.phoneNumber.isEmpty {
-                    Text(user.phoneNumber)
-                        .font(.subheadline)
-                        .foregroundColor(.gray)
-                }
-
                 // User's Place Lists
 //                UserPlaceListsView(placeLists: user.placeLists)
 
