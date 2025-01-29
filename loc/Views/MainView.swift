@@ -123,7 +123,7 @@ struct MainView: View {
                                     }
                                 },
                                 onSelectUser: { user in
-                                    print("Selected user: \(user.firstName) \(user.lastName)")
+                                    viewModel.selectUser(user)
                                     withAnimation {
                                         isSearchBarMinimized = true
                                         searchIsFocused = false
@@ -134,6 +134,11 @@ struct MainView: View {
                             .padding(.horizontal, 20)
                             .padding(.top, 10)
                         }
+                    }
+                }
+                .sheet(isPresented: $viewModel.isUserDetailPresented) {
+                    if let user = viewModel.selectedUser {
+                        UserProfileView(user: user)
                     }
                 }
                 .transition(.move(edge: .top).combined(with: .opacity))

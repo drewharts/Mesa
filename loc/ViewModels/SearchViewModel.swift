@@ -14,7 +14,8 @@ class SearchViewModel: ObservableObject {
     @Published var searchText = ""
     @Published var searchResults: [GMSAutocompletePrediction] = []
     @Published var userResults: [ProfileData] = []
-
+    @Published var selectedUser: ProfileData?
+    @Published var isUserDetailPresented = false
     @Published var userLocation: CLLocationCoordinate2D?
     private let googlePlacesService = GooglePlacesService()
     private let firestoreService = FirestoreService()
@@ -84,6 +85,13 @@ class SearchViewModel: ObservableObject {
                 self?.selectedPlaceVM?.selectedPlace = place
                 self?.selectedPlaceVM?.isDetailSheetPresented = true
             }
+        }
+    }
+    
+    func selectUser(_ user: ProfileData) {
+        DispatchQueue.main.async {
+            self.selectedUser = user
+            self.isUserDetailPresented = true
         }
     }
 }
