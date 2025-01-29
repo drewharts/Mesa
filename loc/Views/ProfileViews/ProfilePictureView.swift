@@ -11,17 +11,22 @@ struct ProfilePictureView: View {
     @EnvironmentObject var profile: ProfileViewModel
     
     var body: some View {
-        // The main image or placeholder
-        let profileImage: some View = Group {
+        Group {
             if let profilePhoto = profile.profilePhoto {
                 profilePhoto
                     .resizable()
+                    .scaledToFill()
                     .frame(width: 120, height: 120)
+                    .clipShape(Circle())
+                    .shadow(radius: 4)
             } else {
                 Image(systemName: "person.crop.circle.fill")
                     .resizable()
+                    .scaledToFit()
                     .foregroundColor(.blue)
                     .frame(width: 120, height: 120)
+                    .clipShape(Circle())
+                    .shadow(radius: 4)
             }
         }
     }

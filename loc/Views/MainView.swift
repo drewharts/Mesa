@@ -164,7 +164,7 @@ struct MainView: View {
             .onAppear {
                 locationManager.requestLocationPermission()
                 viewModel.selectedPlaceVM = selectedPlaceVM
-
+                viewModel.searchText = ""
             }
         }
         .navigationViewStyle(StackNavigationViewStyle())
@@ -176,6 +176,7 @@ struct MainView: View {
             searchIsFocused = false
             viewModel.searchResults = []
             isSearchBarMinimized = true
+            viewModel.searchText = ""
         }
     }
 }

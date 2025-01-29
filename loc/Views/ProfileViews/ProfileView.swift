@@ -50,7 +50,7 @@ struct ProfileView: View {
                 .padding(.horizontal, 40)
             }
             .padding(.bottom, 40)
-            .padding(.top, -30)
+            .padding(.top, 10)
         }
         .background(Color.white)
         .navigationBarBackButtonHidden(true)
