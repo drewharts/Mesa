@@ -12,46 +12,33 @@ import Combine
 
 class SearchViewModel: ObservableObject {
     @Published var searchText = ""
-    @Published var searchResults: [GMSAutocompletePrediction] = [] // Use GMSAutocompletePrediction directly
+    @Published var searchResults: [GMSAutocompletePrediction] = []
     @Published var userLocation: CLLocationCoordinate2D?
     private let googlePlacesService = GooglePlacesService()
 
-    
     weak var selectedPlaceVM: SelectedPlaceViewModel?
     
     private var cancellables = Set<AnyCancellable>()
     
     init() {
-
         // Observing searchText changes with debounce to limit API calls
         $searchText
             .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
             .sink { [weak self] text in
-                self?.performSearch(query: text)
+                self?.searchPlaces(query: text)
             }
             .store(in: &cancellables)
     }
 
-    private func performSearch(query: String) {
+    private func searchPlaces(query: String) {
         guard !query.isEmpty else {
             searchResults = []
             return
         }
         
-        let placesClient = GMSPlacesClient.shared()
-        let filter = GMSAutocompleteFilter()
-        filter.types = ["restaurant"] // Use a string array directly for types
-        
-        if let location = userLocation {
-            filter.locationBias = GMSPlaceRectangularLocationOption(
-                CLLocationCoordinate2D(latitude: location.latitude + 0.01, longitude: location.longitude + 0.01),
-                CLLocationCoordinate2D(latitude: location.latitude - 0.01, longitude: location.longitude - 0.01)
-            )
-        }
-        
-        placesClient.findAutocompletePredictions(fromQuery: query, filter: filter, sessionToken: nil) { [weak self] results, error in
+        googlePlacesService.performSearch(query: query, userLocation: userLocation) { [weak self] results, error in
             if let error = error {
-                print("Error fetching autocomplete results: \(error)")
+                print("Error fetching autocomplete results: \(error.localizedDescription)")
                 return
             }
             DispatchQueue.main.async {
@@ -61,7 +48,6 @@ class SearchViewModel: ObservableObject {
     }
     
     func selectPlace(_ prediction: GMSAutocompletePrediction) {
-        // Now we use our GooglePlacesService instead of GMSPlacesClient directly
         googlePlacesService.fetchPlace(placeID: prediction.placeID) { [weak self] place, error in
             if let error = error {
                 print("Error fetching place: \(error.localizedDescription)")
