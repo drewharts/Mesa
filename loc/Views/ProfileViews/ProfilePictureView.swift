@@ -24,23 +24,6 @@ struct ProfilePictureView: View {
                     .frame(width: 120, height: 120)
             }
         }
-        
-        // Overlay the button at the bottom trailing corner of the image
-        profileImage
-            .clipShape(Circle())
-            .overlay(alignment: .topTrailing) {
-                Button(action: {
-                    // follow action
-                }) {
-                    Image(systemName: "person.fill.badge.plus")
-                        .padding(6)
-                        .background(Color.gray)
-                        .foregroundColor(.white)
-                        .clipShape(Circle())
-                }
-                .padding(4)
-            }
-            .padding(.top, 40)
     }
 }
 
