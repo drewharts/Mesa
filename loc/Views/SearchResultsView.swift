@@ -2,43 +2,105 @@ import SwiftUI
 import GooglePlaces
 
 struct SearchResultsView: View {
-    let results: [GMSAutocompletePrediction]
-    let onSelect: (GMSAutocompletePrediction) -> Void
+    let placeResults: [GMSAutocompletePrediction]
+    let userResults: [ProfileData]
+    let onSelectPlace: (GMSAutocompletePrediction) -> Void
+    let onSelectUser: (ProfileData) -> Void
 
     var body: some View {
         GeometryReader { geometry in
             ScrollView {
-                VStack(spacing: 5) {
-                    ForEach(results, id: \.placeID) { prediction in
-                        Button(action: {
-                            onSelect(prediction)
-                        }) {
-                            VStack(alignment: .center) {
-                                Text(prediction.attributedPrimaryText.string)
-                                    .font(.headline)
-                                    .foregroundColor(.gray)
-                                    .frame(maxWidth: .infinity, alignment: .center)
-
-                                if let secondaryText = prediction.attributedSecondaryText?.string {
-                                    Text(secondaryText)
-                                        .font(.subheadline)
-                                        .foregroundColor(.gray)
-                                        .frame(maxWidth: .infinity, alignment: .center)
-                                }
-                            }
-                            .padding()
-                            .frame(width: geometry.size.width * 0.9, height: 60) // Fixed size for each box
-                            .background(Color.white)
-                            .cornerRadius(10)
-                            .shadow(color: .black.opacity(0.1), radius: 3, x: 0, y: 2)
-                        }
-                    }
+                VStack(spacing: 10) {
+                    UserResultsView(userResults: userResults, onSelectUser: onSelectUser)
+                    PlaceResultsView(placeResults: placeResults, onSelectPlace: onSelectPlace)
                 }
-                .padding(.horizontal, 20)
                 .padding(.top, 10)
             }
-            // Set the ScrollView height based on the number of items
-            .frame(height: CGFloat(results.count) * 70) // Adjust 70 to your item height + spacing
+            .frame(height: CGFloat((userResults.count + placeResults.count) * 70))
+        }
+    }
+}
+
+struct PlaceResultsView: View {
+    let placeResults: [GMSAutocompletePrediction]
+    let onSelectPlace: (GMSAutocompletePrediction) -> Void
+
+    var body: some View {
+        if !placeResults.isEmpty {
+            VStack(alignment: .leading, spacing: 5) {
+                Text("Places")
+                    .font(.headline)
+                    .foregroundColor(.gray)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 10)
+                
+                ForEach(placeResults, id: \.placeID) { prediction in
+                    Button(action: { onSelectPlace(prediction) }) {
+                        VStack(alignment: .center) {
+                            Text(prediction.attributedPrimaryText.string)
+                                .font(.headline)
+                                .foregroundColor(.black)
+                                .frame(maxWidth: .infinity, alignment: .center)
+
+                            if let secondaryText = prediction.attributedSecondaryText?.string {
+                                Text(secondaryText)
+                                    .font(.subheadline)
+                                    .foregroundColor(.gray)
+                                    .frame(maxWidth: .infinity, alignment: .center)
+                            }
+                        }
+                        .padding()
+                        .background(Color.white)
+                        .cornerRadius(10)
+                        .shadow(color: .black.opacity(0.1), radius: 3, x: 0, y: 2)
+                    }
+                    .padding(.horizontal, 20)
+                }
+            }
+        }
+    }
+}
+
+struct UserResultsView: View {
+    let userResults: [ProfileData]
+    let onSelectUser: (ProfileData) -> Void
+
+    var body: some View {
+        if !userResults.isEmpty {
+            VStack(alignment: .leading, spacing: 5) {
+                Text("Users")
+                    .font(.headline)
+                    .foregroundColor(.gray)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 10)
+                
+                ForEach(userResults) { user in
+                    Button(action: { onSelectUser(user) }) {
+                        HStack {
+                            // Profile Image Placeholder (Replace with actual image loading)
+                            Image(systemName: "person.crop.circle.fill")
+                                .resizable()
+                                .frame(width: 40, height: 40)
+                                .clipShape(Circle())
+                                .padding(.trailing, 10)
+                            
+                            VStack(alignment: .leading) {
+                                Text("\(user.firstName) \(user.lastName)")                          
+                                    .foregroundColor(.black)
+                            }
+                            
+                            Spacer()
+                        }
+                        .padding()
+                        .background(Color.white)
+                        .cornerRadius(10)
+                        .shadow(color: .black.opacity(0.1), radius: 3, x: 0, y: 2)
+                    }
+                    .padding(.horizontal, 20)
+                }
+            }
         }
     }
 }

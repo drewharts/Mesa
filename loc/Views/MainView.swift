@@ -111,15 +111,25 @@ struct MainView: View {
                             .padding(.horizontal, 20)
                             .padding(.top, 10)
 
-                        if !viewModel.searchResults.isEmpty {
-                            //this is where place is selected from search results
-                            SearchResultsView(results: viewModel.searchResults) { prediction in
-                                viewModel.selectPlace(prediction)
-                                withAnimation {
-                                    isSearchBarMinimized = true
-                                    searchIsFocused = false
+                        if !viewModel.searchResults.isEmpty || !viewModel.userResults.isEmpty {
+                            SearchResultsView(
+                                placeResults: viewModel.searchResults,
+                                userResults: viewModel.userResults,
+                                onSelectPlace: { prediction in
+                                    viewModel.selectPlace(prediction)
+                                    withAnimation {
+                                        isSearchBarMinimized = true
+                                        searchIsFocused = false
+                                    }
+                                },
+                                onSelectUser: { user in
+                                    print("Selected user: \(user.firstName) \(user.lastName)")
+                                    withAnimation {
+                                        isSearchBarMinimized = true
+                                        searchIsFocused = false
+                                    }
                                 }
-                            }
+                            )
                             .frame(maxWidth: .infinity)
                             .padding(.horizontal, 20)
                             .padding(.top, 10)
