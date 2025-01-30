@@ -8,17 +8,17 @@
 import SwiftUI
 
 struct UserProfileView: View {
-    let user: ProfileData
+    @ObservedObject var viewModel: UserProfileViewModel
     @Environment(\.presentationMode) var presentationMode
 
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
                 // Profile Picture
-                UserProfileProfilePictureView(profilePhotoURL: user.profilePhotoURL)
+                UserProfileProfilePictureView(profilePhotoURL: viewModel.selectedUser?.profilePhotoURL)
 
                 // Name
-                Text(user.fullName)
+                Text(viewModel.selectedUser!.fullName)
                     .font(.title)
                     .fontWeight(.bold)
                     .foregroundColor(.black)
@@ -27,7 +27,12 @@ struct UserProfileView: View {
                     .padding(.horizontal, 20)
 
                 // User's Place Lists
-//                UserPlaceListsView(placeLists: user.placeLists)
+                UserProfileFavoritesView(userFavorites: viewModel.userFavorites, placeImages: viewModel.placeImages)
+                
+                //favorites
+                
+                
+                //place lists
 
                 Spacer()
             }

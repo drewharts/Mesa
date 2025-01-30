@@ -87,11 +87,4 @@ class SearchViewModel: ObservableObject {
             }
         }
     }
-    
-    func selectUser(_ user: ProfileData) {
-        DispatchQueue.main.async {
-            self.selectedUser = user
-            self.isUserDetailPresented = true
-        }
-    }
 }

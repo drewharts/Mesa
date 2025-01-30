@@ -15,6 +15,7 @@ struct MainView: View {
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @ObservedObject var locationManager: LocationManager
     @StateObject private var viewModel = SearchViewModel()
+    @StateObject private var userProfileViewModel = UserProfileViewModel()
 
     @FocusState private var searchIsFocused: Bool
     @State private var isSearchBarMinimized = true
@@ -123,7 +124,8 @@ struct MainView: View {
                                     }
                                 },
                                 onSelectUser: { user in
-                                    viewModel.selectUser(user)
+                                    userProfileViewModel.selectUser(user)
+//                                    viewModel.selectUser(user)
                                     withAnimation {
                                         isSearchBarMinimized = true
                                         searchIsFocused = false
@@ -138,9 +140,9 @@ struct MainView: View {
                         }
                     }
                 }
-                .sheet(isPresented: $viewModel.isUserDetailPresented) {
-                    if let user = viewModel.selectedUser {
-                        UserProfileView(user: user)
+                .sheet(isPresented: $userProfileViewModel.isUserDetailPresented) {
+                    if let user = userProfileViewModel.selectedUser {
+                        UserProfileView(viewModel: userProfileViewModel)
                     }
                 }
                 .transition(.move(edge: .top).combined(with: .opacity))
