@@ -15,6 +15,7 @@ class UserProfileViewModel: ObservableObject {
     
     @Published var userFavorites: [GMSPlace] = []
     @Published var userLists: [PlaceList] = []
+    @Published var placeListGMSPlaces: [UUID: [GMSPlace]] = [:] // Store places per list
     @Published var placeImages: [String: UIImage] = [:] // Store images by placeID
 
     private let firestoreService = FirestoreService()
@@ -37,7 +38,9 @@ class UserProfileViewModel: ObservableObject {
                     print("No favorite places found.")
                     self.userFavorites = []
                 } else {
-                    self.fetchGMSPlaces(for: places)
+                    self.fetchGMSPlaces(for: places) { gmsPlaces in
+                        self.userFavorites = gmsPlaces
+                    }
                 }
             }
         }
@@ -47,11 +50,18 @@ class UserProfileViewModel: ObservableObject {
         firestoreService.fetchLists(userId: userId) { lists in
             DispatchQueue.main.async {
                 self.userLists = lists
+                
+                // Fetch GMSPlaces for each PlaceList
+                for list in lists {
+                    self.fetchGMSPlaces(for: list.places) { gmsPlaces in
+                        self.placeListGMSPlaces[list.id] = gmsPlaces
+                    }
+                }
             }
         }
     }
 
-    private func fetchGMSPlaces(for places: [Place]) {
+    private func fetchGMSPlaces(for places: [Place], completion: @escaping ([GMSPlace]) -> Void) {
         var fetchedPlaces: [GMSPlace] = []
         let dispatchGroup = DispatchGroup()
 
@@ -69,18 +79,20 @@ class UserProfileViewModel: ObservableObject {
         }
 
         dispatchGroup.notify(queue: .main) {
-            self.userFavorites = fetchedPlaces
+            DispatchQueue.main.async {
+                completion(fetchedPlaces)
+            }
         }
     }
     
     /// Fetches a photo for a given `GMSPlace` and stores it in `placeImages`
     private func fetchPhoto(for place: GMSPlace) {
-        let placeID = place.placeID
-        if placeImages[placeID!] != nil { return } // Avoid redundant fetching
+        guard let placeID = place.placeID else { return }
+        if placeImages[placeID] != nil { return } // Avoid redundant fetching
         
-        googlePlacesService.fetchPhoto(placeID: placeID!) { image in
+        googlePlacesService.fetchPhoto(placeID: placeID) { image in
             DispatchQueue.main.async {
-                self.placeImages[placeID!] = image
+                self.placeImages[placeID] = image
             }
         }
     }

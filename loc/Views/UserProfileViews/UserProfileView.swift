@@ -26,13 +26,12 @@ struct UserProfileView: View {
                 Divider()
                     .padding(.horizontal, 20)
 
-                // User's Place Lists
-                UserProfileFavoritesView(userFavorites: viewModel.userFavorites, placeImages: viewModel.placeImages)
-                
                 //favorites
-                
-                
+                UserProfileFavoritesView(userFavorites: viewModel.userFavorites, placeImages: viewModel.placeImages)
+                Divider()
+                    .padding(.horizontal, 20)
                 //place lists
+                UserProfileListsView(viewModel: viewModel, placeLists: viewModel.userLists)
 
                 Spacer()
             }
