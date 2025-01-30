@@ -17,19 +17,7 @@ struct ProfileView: View {
         ScrollView {
             VStack(spacing: 20) {
                 // Profile Picture
-                if let profilePhoto = profile.profilePhoto {
-                    profilePhoto
-                        .resizable()
-                        .frame(width: 120, height: 120)
-                        .clipShape(Circle())
-                        .padding(.top, 40)
-                } else {
-                    Image(systemName: "person.crop.circle.fill")
-                        .resizable()
-                        .frame(width: 120, height: 120)
-                        .foregroundColor(.blue)
-                        .padding(.top, 40)
-                }
+                ProfilePictureView()
 
                 // Name
                 let firstName = profile.data.firstName
@@ -62,7 +50,7 @@ struct ProfileView: View {
                 .padding(.horizontal, 40)
             }
             .padding(.bottom, 40)
-            .padding(.top, -30)
+            .padding(.top, 10)
         }
         .background(Color.white)
         .navigationBarBackButtonHidden(true)

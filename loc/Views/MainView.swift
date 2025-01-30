@@ -15,6 +15,7 @@ struct MainView: View {
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @ObservedObject var locationManager: LocationManager
     @StateObject private var viewModel = SearchViewModel()
+    @StateObject private var userProfileViewModel = UserProfileViewModel()
 
     @FocusState private var searchIsFocused: Bool
     @State private var isSearchBarMinimized = true
@@ -33,7 +34,6 @@ struct MainView: View {
                 // Map
                 MapView(
                     searchResults: $viewModel.searchResults,
-                    selectedPlace: $selectedPlaceVM.selectedPlace,
                     locationManager: locationManager,
                     onMapTap: handleMapTap
                 )
@@ -77,6 +77,7 @@ struct MainView: View {
                                 NavigationLink(destination: ProfileView(), isActive: $showProfileView) {
                                     Button(action: {
                                         showProfileView = true
+                                        selectedPlaceVM.isDetailSheetPresented = false
                                     }) {
                                         if let profilePhoto = userSession.profileViewModel?.profilePhoto {
                                             profilePhoto
@@ -111,19 +112,37 @@ struct MainView: View {
                             .padding(.horizontal, 20)
                             .padding(.top, 10)
 
-                        if !viewModel.searchResults.isEmpty {
-                            //this is where place is selected from search results
-                            SearchResultsView(results: viewModel.searchResults) { prediction in
-                                viewModel.selectPlace(prediction)
-                                withAnimation {
-                                    isSearchBarMinimized = true
-                                    searchIsFocused = false
+                        if !viewModel.searchResults.isEmpty || !viewModel.userResults.isEmpty {
+                            SearchResultsView(
+                                placeResults: viewModel.searchResults,
+                                userResults: viewModel.userResults,
+                                onSelectPlace: { prediction in
+                                    viewModel.selectPlace(prediction)
+                                    withAnimation {
+                                        isSearchBarMinimized = true
+                                        searchIsFocused = false
+                                    }
+                                },
+                                onSelectUser: { user in
+                                    userProfileViewModel.selectUser(user)
+//                                    viewModel.selectUser(user)
+                                    withAnimation {
+                                        isSearchBarMinimized = true
+                                        searchIsFocused = false
+                                    }
                                 }
-                            }
+                            )
                             .frame(maxWidth: .infinity)
                             .padding(.horizontal, 20)
                             .padding(.top, 10)
+                            .padding(.bottom, 50)
+
                         }
+                    }
+                }
+                .sheet(isPresented: $userProfileViewModel.isUserDetailPresented) {
+                    if let user = userProfileViewModel.selectedUser {
+                        UserProfileView(viewModel: userProfileViewModel)
                     }
                 }
                 .transition(.move(edge: .top).combined(with: .opacity))
@@ -147,7 +166,7 @@ struct MainView: View {
             .onAppear {
                 locationManager.requestLocationPermission()
                 viewModel.selectedPlaceVM = selectedPlaceVM
-
+                viewModel.searchText = ""
             }
         }
         .navigationViewStyle(StackNavigationViewStyle())
@@ -159,6 +178,7 @@ struct MainView: View {
             searchIsFocused = false
             viewModel.searchResults = []
             isSearchBarMinimized = true
+            viewModel.searchText = ""
         }
     }
 }

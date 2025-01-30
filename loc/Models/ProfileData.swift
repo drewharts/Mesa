@@ -9,12 +9,15 @@ import Foundation
 import SwiftUI
 import GooglePlaces
 
-struct ProfileData: Codable {
+struct ProfileData: Codable, Identifiable {
     let id: String
     var firstName: String
     var lastName: String
     var email: String
     var profilePhotoURL: URL?
     var phoneNumber: String
-    var placeLists: [PlaceList]
+    
+    var fullName: String {
+        return "\(firstName) \(lastName)"
+    }
 }

@@ -12,18 +12,33 @@ import GooglePlaces
 
 class FirestoreService {
     private let db = Firestore.firestore()
-    private let storage = Storage.storage() // Add a storage reference
+    private let storage = Storage.storage()
+
+    func searchUsers(query: String, completion: @escaping ([ProfileData]?, Error?) -> Void) {
+        let usersRef = db.collection("users")
+        
+        // Perform a name search using Firestore's `whereField` with `>=` and `<=` for simple prefix matching
+        usersRef.whereField("fullName", isGreaterThanOrEqualTo: query)
+                .whereField("fullName", isLessThanOrEqualTo: query + "\u{f8ff}")
+                .getDocuments { snapshot, error in
+                    if let error = error {
+                        completion(nil, error)
+                        return
+                    }
+
+                    guard let documents = snapshot?.documents else {
+                        completion([], nil)
+                        return
+                    }
+
+                    let users: [ProfileData] = documents.compactMap { doc in
+                        try? doc.data(as: ProfileData.self)
+                    }
+
+                    completion(users, nil)
+                }
+    }
     
-    /// Saves a review and its associated images to Firestore/Storage in one go.
-    /// 1) Uploads all `UIImage`s to Firebase Storage under "reviews/{review.id}/"
-    /// 2) Collects download URLs
-    /// 3) Updates the `Review.images` array with those URLs
-    /// 4) Writes the updated Review to Firestore.
-    ///
-    /// - Parameters:
-    ///   - review: The Review object (can have an empty images array initially).
-    ///   - images: The UIImages to upload.
-    ///   - completion: Returns `.success` when the review + images are fully saved, or `.failure` on error.
     func saveReviewWithImages(
         review: Review,
         images: [UIImage],
@@ -204,9 +219,9 @@ class FirestoreService {
 
     func addPlaceToList(userId: String, listName: String, place: Place) {
         let placeDict: [String: Any] = [
-            "id": place.id ?? "",
-            "name": place.name ?? "",
-            "address": place.address ?? ""
+            "id": place.id,
+            "name": place.name,
+            "address": place.address
         ]
 
         db.collection("users").document(userId)

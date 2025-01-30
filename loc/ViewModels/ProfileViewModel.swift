@@ -92,7 +92,6 @@ class ProfileViewModel: ObservableObject {
         firestoreService.fetchLists(userId: userId) { [weak self] placeLists in
             guard let self = self else { return }
             DispatchQueue.main.async {
-                self.data.placeLists = placeLists
                 self.placeListViewModels = placeLists.map { placeList in
                     PlaceListViewModel(
                         placeList: placeList,
@@ -130,7 +129,6 @@ class ProfileViewModel: ObservableObject {
         let placeListViewModel = PlaceListViewModel(placeList: newPlaceList, firestoreService: firestoreService, userId: userId)
 
         placeListViewModels.append(placeListViewModel)
-        data.placeLists.append(newPlaceList)
 
         firestoreService.createNewList(placeList: newPlaceList, userID: userId)
     }
@@ -140,6 +138,5 @@ class ProfileViewModel: ObservableObject {
         let placeListVM = placeListViewModels.remove(at: index)
         //TODO: Implement this remove list from firestore
 //        firestoreService.removeList(userId: userId, listName: placeListVM.placeList.name)
-        data.placeLists.removeAll { $0.id == placeListVM.placeList.id }
     }
 }

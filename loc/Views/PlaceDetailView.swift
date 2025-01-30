@@ -80,6 +80,11 @@ struct PlaceDetailView: View {
                     Image(uiImage: selectedImage)
                         .resizable()
                         .scaledToFit()
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(Color.gray, lineWidth: 1)
+                        )
                         .padding()
                         .onTapGesture {
                             self.selectedImage = nil

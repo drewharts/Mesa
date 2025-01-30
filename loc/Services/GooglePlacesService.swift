@@ -12,24 +12,30 @@ import UIKit
 class GooglePlacesService {
     private let placesClient = GMSPlacesClient.shared()
     
-    /// Fetches a GMSPlace object based on the provided placeID.
-    ///
-    /// - Parameters:
-    ///   - placeID: The unique identifier of the place to fetch.
-    ///   - completion: A closure that returns a GMSPlace object or an Error.
+    func performSearch(query: String, userLocation: CLLocationCoordinate2D?, completion: @escaping ([GMSAutocompletePrediction]?, Error?) -> Void) {
+        let filter = GMSAutocompleteFilter()
+        filter.types = ["restaurant"]
+
+        if let location = userLocation {
+            filter.locationBias = GMSPlaceRectangularLocationOption(
+                CLLocationCoordinate2D(latitude: location.latitude + 0.01, longitude: location.longitude + 0.01),
+                CLLocationCoordinate2D(latitude: location.latitude - 0.01, longitude: location.longitude - 0.01)
+            )
+        }
+
+        placesClient.findAutocompletePredictions(fromQuery: query, filter: filter, sessionToken: nil) { results, error in
+            completion(results, error)
+        }
+    }
+    
     func fetchPlace(placeID: String, completion: @escaping (GMSPlace?, Error?) -> Void) {
-        // Define the properties you need — here we request them all:
         let requestedProperties = [GMSPlaceProperty.all].map { $0.rawValue }
-        
-        // Create a fetch request using the new API
         let placeRequest = GMSFetchPlaceRequest(
             placeID: placeID,
             placeProperties: requestedProperties,
             sessionToken: nil
         )
-        
-        // Perform the request
-        let placesClient = GMSPlacesClient.shared()
+
         placesClient.fetchPlace(with: placeRequest) { (place, error) in
             if let error = error {
                 print("Error fetching place: \(error.localizedDescription)")
@@ -37,31 +43,17 @@ class GooglePlacesService {
                 return
             }
             
-            guard let place = place else {
-                print("No place details found.")
-                completion(nil, nil)
-                return
-            }
-            
-            // Successfully retrieved the place
             completion(place, nil)
         }
     }
-
     
-    /// Example function to fetch a photo for a given placeID.
     func fetchPhoto(placeID: String, completion: @escaping (UIImage?) -> Void) {
-        // 1) Fetch Photo Metadata
         placesClient.lookUpPhotos(forPlaceID: placeID) { [weak self] (photosMetadata, error) in
-            guard
-                error == nil,
-                let firstMeta = photosMetadata?.results.first
-            else {
+            guard let firstMeta = photosMetadata?.results.first, error == nil else {
                 completion(nil)
                 return
             }
-            
-            // 2) Use the metadata to load the actual UIImage
+
             self?.placesClient.loadPlacePhoto(firstMeta) { (photo, error) in
                 guard let photo = photo, error == nil else {
                     completion(nil)
@@ -72,4 +64,3 @@ class GooglePlacesService {
         }
     }
 }
-
