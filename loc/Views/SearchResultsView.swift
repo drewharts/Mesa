@@ -14,7 +14,6 @@ struct SearchResultsView: View {
                     UserResultsView(userResults: userResults, onSelectUser: onSelectUser)
                     PlaceResultsView(placeResults: placeResults, onSelectPlace: onSelectPlace)
                 }
-                .padding(.top, 10)
             }
             .frame(height: CGFloat((userResults.count + placeResults.count) * 120))
         }
