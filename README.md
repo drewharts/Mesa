@@ -13,3 +13,6 @@ Save, organize, and share places with friends. A friend's recomendation is more 
   </tr>
 </table>
 
+## Check my Progress
+<a href="https://www.notion.so/Mesa-Immediate-Tasks-178c5704890580549d27ebab1c85fa41?pvs=4"> Mesa's Notion <a/>
+
