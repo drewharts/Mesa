@@ -13,6 +13,8 @@ struct PlaceDetailView: View {
     let minSheetHeight: CGFloat
 
     @State private var selectedImage: UIImage?
+    @State private var showNoPhoneNumberAlert = false
+
 
     // Environment objects.
     @EnvironmentObject var profile: ProfileViewModel
@@ -32,7 +34,7 @@ struct PlaceDetailView: View {
                 if viewModel.placeName == "Unknown" && viewModel.photos.isEmpty {
                     ProgressView("Loading Place Details...")
                 } else {
-                    MinPlaceDetailView(viewModel: viewModel, selectedImage: $selectedImage)
+                    MinPlaceDetailView(viewModel: viewModel, showNoPhoneNumberAlert: $showNoPhoneNumberAlert, selectedImage: $selectedImage)
                 }
             }
             .padding(.vertical)
@@ -42,6 +44,13 @@ struct PlaceDetailView: View {
                 Alert(title: Text("Success"),
                       message: Text(viewModel.alertMessage),
                       dismissButton: .default(Text("OK")))
+            }
+            .alert(isPresented: $showNoPhoneNumberAlert) {
+                Alert(
+                    title: Text("Phone Number Not Available"),
+                    message: Text("No phone number is available for this place."),
+                    dismissButton: .default(Text("OK"))
+                )
             }
             .sheet(isPresented: $viewModel.showListSelection) {
                 if let selectedPlace = selectedPlaceVM.selectedPlace {
