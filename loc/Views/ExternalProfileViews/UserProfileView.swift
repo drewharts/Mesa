@@ -8,6 +8,7 @@
 import SwiftUI
 
 struct UserProfileView: View {
+    let userId: String
     @ObservedObject var viewModel: UserProfileViewModel
     @Environment(\.presentationMode) var presentationMode
 
@@ -15,7 +16,12 @@ struct UserProfileView: View {
         ScrollView {
             VStack(spacing: 20) {
                 // Profile Picture
-                UserProfileProfilePictureView(profilePhotoURL: viewModel.selectedUser?.profilePhotoURL)
+                UserProfileProfilePictureView(
+                    profilePhotoURL: viewModel.selectedUser?.profilePhotoURL,
+                    isFollowing: viewModel.isFollowing,
+                    onToggleFollow: { viewModel.toggleFollowUser(currentUserId: userId) }
+                )
+
 
                 // Name
                 Text(viewModel.selectedUser!.fullName)
@@ -36,6 +42,9 @@ struct UserProfileView: View {
                 Spacer()
             }
             .padding(.bottom, 40)
+        }
+        .onAppear {
+            viewModel.checkIfFollowing(currentUserId: userId)
         }
         .background(Color.white)
         .navigationBarBackButtonHidden(true)

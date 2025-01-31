@@ -14,7 +14,6 @@ struct SearchResultsView: View {
                     UserResultsView(userResults: userResults, onSelectUser: onSelectUser)
                     PlaceResultsView(placeResults: placeResults, onSelectPlace: onSelectPlace)
                 }
-                .padding(.top, 10)
             }
             .frame(height: CGFloat((userResults.count + placeResults.count) * 120))
         }
@@ -74,7 +73,6 @@ struct UserResultsView: View {
                     .foregroundColor(.gray)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 20)
-                    .padding(.top, 10)
                 
                 ForEach(userResults) { user in
                     Button(action: { onSelectUser(user) }) {

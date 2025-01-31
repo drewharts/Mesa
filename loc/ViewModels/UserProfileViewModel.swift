@@ -8,6 +8,7 @@
 import Foundation
 import GooglePlaces
 import UIKit
+import SwiftUICore
 
 class UserProfileViewModel: ObservableObject {
     @Published var selectedUser: ProfileData?
@@ -17,11 +18,13 @@ class UserProfileViewModel: ObservableObject {
     @Published var userLists: [PlaceList] = []
     @Published var placeListGMSPlaces: [UUID: [GMSPlace]] = [:] // Store places per list
     @Published var placeImages: [String: UIImage] = [:] // Store images by placeID
-
+    @Published var isFollowing: Bool = false  // ✅ Track follow state
+    
     private let firestoreService = FirestoreService()
     private let googlePlacesService = GooglePlacesService()
-
-    func selectUser(_ user: ProfileData) {
+    
+    
+    func selectUser(_ user: ProfileData, currentUserId: String) {
         DispatchQueue.main.async {
             self.selectedUser = user
             self.isUserDetailPresented = true
@@ -29,6 +32,53 @@ class UserProfileViewModel: ObservableObject {
         
         fetchProfileFavorites(userId: user.id)
         fetchLists(userId: user.id)
+        checkIfFollowing(currentUserId: currentUserId)
+    }
+    
+    func checkIfFollowing(currentUserId: String) {
+        let targetUserId = selectedUser?.id ?? ""
+        
+        
+        firestoreService.isFollowingUser(followerId: currentUserId, followingId: targetUserId) { isFollowing in
+            DispatchQueue.main.async {
+                self.isFollowing = isFollowing
+            }
+        }
+    }
+    
+    /// Follows or unfollows the selected user.
+    func toggleFollowUser(currentUserId: String) {
+              let targetUserId = selectedUser?.id ?? ""
+
+
+        if isFollowing {
+            firestoreService.unfollowUser(followerId: currentUserId, followingId: targetUserId) { success, error in
+                if success {
+                    DispatchQueue.main.async {
+                        self.isFollowing = false
+                    }
+                }
+            }
+        } else {
+            firestoreService.followUser(followerId: currentUserId, followingId: targetUserId) { success, error in
+                if success {
+                    DispatchQueue.main.async {
+                        self.isFollowing = true
+                    }
+                }
+            }
+        }
+    }
+    
+    func followUser(currentUserId: String, targetUserId: String) {
+        
+        firestoreService.followUser(followerId: currentUserId, followingId: targetUserId) { success, error in
+            if let error = error {
+                print("Error following user: \(error.localizedDescription)")
+            } else if success {
+                print("Successfully followed user \(targetUserId).")
+            }
+        }
     }
     
     private func fetchProfileFavorites(userId: String) {

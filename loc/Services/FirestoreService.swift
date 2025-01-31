@@ -13,6 +13,41 @@ import GooglePlaces
 class FirestoreService {
     private let db = Firestore.firestore()
     private let storage = Storage.storage()
+    
+    func followUser(followerId: String, followingId: String, completion: @escaping (Bool, Error?) -> Void) {
+        let follow = Follow(followerId: followerId, followingId: followingId, followedAt: Date())
+        let followRef = db.collection("follows").document(follow.followId)
+
+        do {
+            try followRef.setData(from: follow) { error in
+                completion(error == nil, error)
+            }
+        } catch let error {
+            completion(false, error)
+        }
+    }
+
+    func unfollowUser(followerId: String, followingId: String, completion: @escaping (Bool, Error?) -> Void) {
+        let followId = "\(followerId)_\(followingId)"
+        let followRef = db.collection("follows").document(followId)
+
+        followRef.delete { error in
+            completion(error == nil, error)
+        }
+    }
+
+    func isFollowingUser(followerId: String, followingId: String, completion: @escaping (Bool) -> Void) {
+        let followId = "\(followerId)_\(followingId)"
+        let followRef = db.collection("follows").document(followId)
+
+        followRef.getDocument { document, error in
+            if let document = document, document.exists {
+                completion(true) // User is following
+            } else {
+                completion(false) // User is not following
+            }
+        }
+    }
 
     func searchUsers(query: String, completion: @escaping ([ProfileData]?, Error?) -> Void) {
         let usersRef = db.collection("users")

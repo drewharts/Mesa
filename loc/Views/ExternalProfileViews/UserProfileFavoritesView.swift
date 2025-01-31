@@ -12,6 +12,8 @@ struct UserProfileFavoritesView: View {
     var userFavorites: [GMSPlace]
     var placeImages: [String: UIImage]
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
+    @Environment(\.presentationMode) var presentationMode // For dismissing the sheet
+
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -49,6 +51,7 @@ struct UserProfileFavoritesView: View {
                             .onTapGesture {
                                 selectedPlaceVM.selectedPlace = place
                                 selectedPlaceVM.isDetailSheetPresented = true
+                                presentationMode.wrappedValue.dismiss()
                             }
                         }
                     }

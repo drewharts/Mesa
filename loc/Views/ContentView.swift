@@ -27,7 +27,7 @@ struct ContentView: View {
             }
         } else {
             LoginView(viewModel: LoginViewModel(firestoreService: FirestoreService()))
-                .environmentObject(userSession)        }
+        }
     }
 }
 
