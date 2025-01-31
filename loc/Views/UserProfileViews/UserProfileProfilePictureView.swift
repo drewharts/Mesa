@@ -9,9 +9,10 @@ import SwiftUI
 
 struct UserProfileProfilePictureView: View {
     let profilePhotoURL: URL?
-    
+    let isFollowing: Bool
+    let onToggleFollow: () -> Void
+
     var body: some View {
-        // The main image or placeholder
         let profileImage: some View = Group {
             if let profilePhotoURL = profilePhotoURL {
                 AsyncImage(url: profilePhotoURL) { image in
@@ -28,19 +29,16 @@ struct UserProfileProfilePictureView: View {
                     .foregroundColor(.gray)
             }
         }
-        
-        // Overlay the follow button at the top trailing corner
+
         profileImage
             .frame(width: 120, height: 120)
             .clipShape(Circle())
             .shadow(radius: 4)
             .overlay(alignment: .topTrailing) {
-                Button(action: {
-                    // Follow action here
-                }) {
-                    Image(systemName: "person.fill.badge.plus")
+                Button(action: onToggleFollow) {
+                    Image(systemName: isFollowing ? "person.fill.checkmark" : "person.fill.badge.plus")
                         .padding(6)
-                        .background(Color.gray)
+                        .background(isFollowing ? Color.green : Color.gray)
                         .foregroundColor(.white)
                         .clipShape(Circle())
                 }

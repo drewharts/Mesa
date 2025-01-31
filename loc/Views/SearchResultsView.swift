@@ -73,7 +73,6 @@ struct UserResultsView: View {
                     .foregroundColor(.gray)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 20)
-                    .padding(.top, 10)
                 
                 ForEach(userResults) { user in
                     Button(action: { onSelectUser(user) }) {

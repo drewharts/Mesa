@@ -13,9 +13,11 @@ import FirebaseAuth
 struct MainView: View {
     @EnvironmentObject var userSession: UserSession
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
-    @ObservedObject var locationManager: LocationManager
+    @EnvironmentObject var profileViewModel: ProfileViewModel
     @StateObject private var viewModel = SearchViewModel()
     @StateObject private var userProfileViewModel = UserProfileViewModel()
+    @EnvironmentObject var locationManager: LocationManager
+
 
     @FocusState private var searchIsFocused: Bool
     @State private var isSearchBarMinimized = true
@@ -23,10 +25,6 @@ struct MainView: View {
     @State private var minSheetHeight: CGFloat = 250
     @State private var maxSheetHeight: CGFloat = UIScreen.main.bounds.height * 0.75
     @State private var showProfileView = false
-
-    init(locationManager: LocationManager = LocationManager()) {
-        self.locationManager = locationManager
-    }
 
     var body: some View {
         NavigationView {
@@ -111,6 +109,7 @@ struct MainView: View {
                             .focused($searchIsFocused)
                             .padding(.horizontal, 20)
                             .padding(.top, 10)
+                            .padding(.bottom, -10)
 
                         if !viewModel.searchResults.isEmpty || !viewModel.userResults.isEmpty {
                             SearchResultsView(
@@ -124,8 +123,7 @@ struct MainView: View {
                                     }
                                 },
                                 onSelectUser: { user in
-                                    userProfileViewModel.selectUser(user)
-//                                    viewModel.selectUser(user)
+                                    userProfileViewModel.selectUser(user, currentUserId: profileViewModel.userId)
                                     withAnimation {
                                         isSearchBarMinimized = true
                                         searchIsFocused = false
@@ -142,7 +140,7 @@ struct MainView: View {
                 }
                 .sheet(isPresented: $userProfileViewModel.isUserDetailPresented) {
                     if let user = userProfileViewModel.selectedUser {
-                        UserProfileView(viewModel: userProfileViewModel)
+                        UserProfileView(userId: profileViewModel.userId, viewModel: userProfileViewModel)
                     }
                 }
                 .transition(.move(edge: .top).combined(with: .opacity))

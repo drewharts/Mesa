@@ -18,7 +18,7 @@ class ProfileViewModel: ObservableObject {
     @Published var profilePhoto: Image? = nil
     weak var delegate: ProfileDelegate?
     private let firestoreService: FirestoreService
-    private let userId: String
+    public let userId: String
     private let googlePlacesService = GooglePlacesService()
 
     @Published var showMaxFavoritesAlert: Bool = false
