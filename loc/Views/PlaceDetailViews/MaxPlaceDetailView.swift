@@ -11,21 +11,25 @@ import GooglePlaces
 struct MaxPlaceDetailView: View {
     @ObservedObject var viewModel: PlaceDetailViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
-
-//    let place: GMSPlace
-
+    
     // Accept the same binding
     @Binding var selectedImage: UIImage?
-
+    
+    // 1) A state to track when we have no phone number
+    @Binding var showNoPhoneNumberAlert: Bool
+    
     var body: some View {
         VStack(spacing: 16) {
-            // Example header
             HStack(alignment: .center, spacing: 15) {
                 // CALL Bubble
                 Button(action: {
+                    // Check if phoneNumber is non-nil and not empty
                     if let phoneNumber = selectedPlaceVM.selectedPlace?.phoneNumber,
+                       !phoneNumber.isEmpty,
                        let url = URL(string: "tel://\(phoneNumber)") {
                         UIApplication.shared.open(url)
+                    } else {
+                        showNoPhoneNumberAlert = true
                     }
                 }) {
                     HStack(spacing: 8) {
@@ -41,6 +45,7 @@ struct MaxPlaceDetailView: View {
                     .background(Color.gray.opacity(0.2))
                     .clipShape(Capsule())
                 }
+
 
                 // MENU Bubble
                 HStack(spacing: 8) {

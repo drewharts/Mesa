@@ -5,7 +5,6 @@
 //  Created by Andrew Hartsfield II on 12/5/24.
 //
 
-
 import SwiftUI
 import GooglePlaces
 
@@ -17,6 +16,7 @@ class PlaceDetailViewModel: ObservableObject {
     @Published var phoneNumber = ""
     @Published var placeName: String = "Unknown"
     @Published var openingHours: [String]?
+    @Published var isOpen: Bool = false // New property to track open status
     
     var placeIconURL: URL?
     
@@ -39,9 +39,12 @@ class PlaceDetailViewModel: ObservableObject {
             self.openingHours = place.currentOpeningHours?.weekdayText
             self.phoneNumber = place.phoneNumber ?? ""
             self.fetchPhotos(for: place)
+            // Replace the deprecated call:
+            // place.isOpen()
+            self.checkOpenStatus(for: place)
         }
     }
-
+    
     private func fetchPhotos(for place: GMSPlace) {
         photos = []
         
@@ -71,6 +74,31 @@ class PlaceDetailViewModel: ObservableObject {
                             self.photos.append(image)
                         }
                     }
+                }
+            }
+        }
+    }
+    
+    // MARK: - Open Status Check
+    
+    /// Checks if the restaurant is open right now using the recommended isOpen API.
+    private func checkOpenStatus(for place: GMSPlace) {
+        GMSPlacesClient.shared().isOpen(with: place) { [weak self] openStatus, error in
+            DispatchQueue.main.async {
+                if let error = error {
+                    print("Error checking open status: \(error.localizedDescription)")
+                    self?.isOpen = false // In case of error, default to false.
+                    return
+                }
+                
+                // Translate GMSPlacesOpenStatus to a Bool value.
+                switch openStatus {
+                case .open:
+                    self?.isOpen = true
+                case .closed, .unknown:
+                    self?.isOpen = false
+                @unknown default:
+                    self?.isOpen = false
                 }
             }
         }

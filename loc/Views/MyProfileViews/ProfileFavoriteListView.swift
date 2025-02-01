@@ -31,43 +31,41 @@ struct ProfileFavoriteListView: View {
 
             // 2) Favorite places
             if !profile.favoritePlaceViewModels.isEmpty {
-                ScrollView(.horizontal, showsIndicators: false) { // Horizontal scrolling enabled
-                    HStack {
-                        ForEach(profile.favoritePlaceViewModels) { favoritePlaceVM in
-                            VStack {
-                                ZStack {
-                                    if let image = favoritePlaceVM.placeImage {
-                                        Image(uiImage: image)
-                                            .resizable()
-                                            .scaledToFill()
-                                            .frame(width: 85, height: 85)
-                                            .cornerRadius(50)
-                                            .clipped()
-                                    } else {
-                                        Rectangle()
-                                            .fill(Color.blue.opacity(0.3))
-                                            .frame(width: 85, height: 85)
-                                            .cornerRadius(50)
-                                    }
+                HStack {
+                    ForEach(profile.favoritePlaceViewModels) { favoritePlaceVM in
+                        VStack {
+                            ZStack {
+                                if let image = favoritePlaceVM.placeImage {
+                                    Image(uiImage: image)
+                                        .resizable()
+                                        .scaledToFill()
+                                        .frame(width: 85, height: 85)
+                                        .cornerRadius(50)
+                                        .clipped()
+                                } else {
+                                    Rectangle()
+                                        .fill(Color.blue.opacity(0.3))
+                                        .frame(width: 85, height: 85)
+                                        .cornerRadius(50)
                                 }
-                                Text(favoritePlaceVM.place.name.prefix(15))
-                                    .foregroundColor(.black)
-                                    .font(.footnote)
-                                    .multilineTextAlignment(.center)
-                                    .lineLimit(1)
-                                    .frame(width: 85)
                             }
-                            .padding(.trailing, 10)
-                            .onTapGesture {
-                                // Update the selected place in the view model and dismiss
-                                selectedPlaceVM.selectedPlace = favoritePlaceVM.gmsPlace
-                                selectedPlaceVM.isDetailSheetPresented = true
-                                presentationMode.wrappedValue.dismiss()
-                            }
+                            Text(favoritePlaceVM.place.name.prefix(15))
+                                .foregroundColor(.black)
+                                .font(.footnote)
+                                .multilineTextAlignment(.center)
+                                .lineLimit(1)
+                                .frame(width: 85)
+                        }
+                        .padding(.trailing, 10)
+                        .onTapGesture {
+                            // Update the selected place in the view model and dismiss
+                            selectedPlaceVM.selectedPlace = favoritePlaceVM.gmsPlace
+                            selectedPlaceVM.isDetailSheetPresented = true
+                            presentationMode.wrappedValue.dismiss()
                         }
                     }
-                    .padding(.horizontal, 20)
                 }
+                .padding(.horizontal, 20)
             } else {
                 Text("No favorites available")
                     .foregroundColor(.gray)

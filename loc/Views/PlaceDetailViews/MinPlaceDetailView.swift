@@ -12,7 +12,7 @@ struct MinPlaceDetailView: View {
     @EnvironmentObject var profile: ProfileViewModel
     @ObservedObject var viewModel: PlaceDetailViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
-
+    @Binding var showNoPhoneNumberAlert: Bool
 //    let place: GMSPlace
     
     @Binding var selectedImage: UIImage?
@@ -59,11 +59,11 @@ struct MinPlaceDetailView: View {
                     HStack(spacing: 4) {
                         Image(systemName: "circle.fill")
                             .font(.system(size: 8))
-                            .foregroundColor(.green)
+                            .foregroundColor(viewModel.isOpen ? .green : .red)
                         
-                        Text("Open")
+                        Text(viewModel.isOpen ? "Open" : "Closed")
                             .font(.subheadline)
-                            .foregroundColor(.green)
+                            .foregroundColor(viewModel.isOpen ? .green : .red)
                     }
                     
                     HStack(spacing: 4) {
@@ -177,7 +177,8 @@ struct MinPlaceDetailView: View {
                     //TODO: the viewmodel has no images when clicked to from the profile favs
                     MaxPlaceDetailView(
                         viewModel: viewModel,
-                        selectedImage: $selectedImage
+                        selectedImage: $selectedImage,
+                        showNoPhoneNumberAlert: $showNoPhoneNumberAlert
                     )
                     
                 case .reviews:
@@ -191,6 +192,13 @@ struct MinPlaceDetailView: View {
             .padding(.horizontal, 30)
         }
         .navigationBarTitleDisplayMode(.inline)
+        .alert(isPresented: $showNoPhoneNumberAlert) {
+            Alert(
+                title: Text("Phone Number Not Available"),
+                message: Text("No phone number is available for this place."),
+                dismissButton: .default(Text("OK"))
+            )
+        }
     }
 }
 

@@ -28,6 +28,40 @@ class GooglePlacesService {
         }
     }
     
+    func isRestaurantOpenNow(placeID: String, completion: @escaping (Bool, Error?) -> Void) {
+        // First, fetch the GMSPlace object
+        fetchPlace(placeID: placeID) { [weak self] place, error in
+            if let error = error {
+                completion(false, error)
+                return
+            }
+            
+            guard let place = place else {
+                // No place was returned, so we can’t check if it’s open
+                completion(false, nil)
+                return
+            }
+            
+            // Use the GMSPlacesClient isOpen API
+            self?.placesClient.isOpen(with: place) { openStatus, error in
+                if let error = error {
+                    completion(false, error)
+                    return
+                }
+                
+                // Translate GMSPlacesOpenStatus (.open, .closed, .unknown) to a Bool
+                switch openStatus {
+                case .open:
+                    completion(true, nil)
+                case .closed, .unknown:
+                    completion(false, nil)
+                @unknown default:
+                    completion(false, nil)
+                }
+            }
+        }
+    }
+    
     func fetchPlace(placeID: String, completion: @escaping (GMSPlace?, Error?) -> Void) {
         let requestedProperties = [GMSPlaceProperty.all].map { $0.rawValue }
         let placeRequest = GMSFetchPlaceRequest(
