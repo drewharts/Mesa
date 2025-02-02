@@ -78,11 +78,7 @@ struct PlaceListCellView: View {
             }
             .padding(.vertical, 10)
             .padding(.horizontal, 30)
-            .onTapGesture {
-                if let firstPlace = listVM.placeViewModels.first!.gmsPlace {
-                    onPlaceSelected?(firstPlace)
-                }
-            }
+            .contentShape(Rectangle())
         }
         .contextMenu {
             Button {
