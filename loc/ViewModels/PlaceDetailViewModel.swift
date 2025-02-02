@@ -108,7 +108,11 @@ class PlaceDetailViewModel: ObservableObject {
                     self?.travelTime = "N/A"
                 } else if let timeInterval = timeInterval {
                     let minutes = timeInterval / 60.0
-                    self?.travelTime = String(format: "%.0f min", minutes)
+                    if minutes > 60 {
+                        self?.travelTime = "60+ min"
+                    } else {
+                        self?.travelTime = String(format: "%.0f min", minutes)
+                    }
                 } else {
                     self?.travelTime = "N/A"
                 }
