@@ -13,6 +13,10 @@ import GooglePlaces
 class ProfileViewModel: ObservableObject {
     @Published var data: ProfileData
     @Published var placeListViewModels: [PlaceListViewModel] = []
+    
+    @Published var userFavorites: [GMSPlace] = []
+    @Published var placeImages: [String: UIImage] = [:] // Store images by placeID
+
     @Published var favoritePlaceViewModels: [PlaceViewModel] = []
     @Published var favoritePlaceImages: [String: UIImage] = [:]
     @Published var profilePhoto: Image? = nil
@@ -31,6 +35,8 @@ class ProfileViewModel: ObservableObject {
         if let url = data.profilePhotoURL {
             loadImage(from: url)
         }
+        fetchProfileFavorites(userId: userId)
+
     }
     
     func getUserId() -> String {
@@ -85,6 +91,56 @@ class ProfileViewModel: ObservableObject {
 
     func getPlaceListViewModel(named name: String) -> PlaceListViewModel? {
         return placeListViewModels.first { $0.placeList.name == name }
+    }
+    
+    private func fetchProfileFavorites(userId: String) {
+        firestoreService.fetchProfileFavorites(userId: userId) { places in
+            DispatchQueue.main.async {
+                if places.isEmpty {
+                    print("No favorite places found.")
+                    self.userFavorites = []
+                } else {
+                    self.fetchGMSPlaces(for: places) { gmsPlaces in
+                        self.userFavorites = gmsPlaces
+                    }
+                }
+            }
+        }
+    }
+    
+    private func fetchGMSPlaces(for places: [Place], completion: @escaping ([GMSPlace]) -> Void) {
+        var fetchedPlaces: [GMSPlace] = []
+        let dispatchGroup = DispatchGroup()
+
+        for place in places {
+            dispatchGroup.enter()
+            googlePlacesService.fetchPlace(placeID: place.id) { gmsPlace, error in
+                if let gmsPlace = gmsPlace {
+                    fetchedPlaces.append(gmsPlace)
+                    self.fetchPhoto(for: gmsPlace) // Fetch photo after getting GMSPlace
+                } else if let error = error {
+                    print("Error fetching GMSPlace: \(error.localizedDescription)")
+                }
+                dispatchGroup.leave()
+            }
+        }
+
+        dispatchGroup.notify(queue: .main) {
+            DispatchQueue.main.async {
+                completion(fetchedPlaces)
+            }
+        }
+    }
+    
+    private func fetchPhoto(for place: GMSPlace) {
+        guard let placeID = place.placeID else { return }
+        if placeImages[placeID] != nil { return } // Avoid redundant fetching
+        
+        googlePlacesService.fetchPhoto(placeID: placeID) { image in
+            DispatchQueue.main.async {
+                self.placeImages[placeID] = image
+            }
+        }
     }
 
     func loadPlaceLists() {
