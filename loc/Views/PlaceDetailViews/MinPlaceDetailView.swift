@@ -70,7 +70,7 @@ struct MinPlaceDetailView: View {
                         Image(systemName: "car.fill")
                             .foregroundColor(.gray)
                         
-                        Text("5 min")
+                        Text(viewModel.travelTime)
                             .font(.subheadline)
                             .foregroundColor(.gray)
                     }

@@ -19,7 +19,8 @@ struct PlaceDetailView: View {
     // Environment objects.
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
-    
+    @EnvironmentObject var locationManager: LocationManager
+
     // ViewModel owned by SwiftUI
     @StateObject private var viewModel = PlaceDetailViewModel()
 
@@ -64,15 +65,15 @@ struct PlaceDetailView: View {
                 }
             }
             .onAppear {
-                // Load the place on first appear if one exists.
-                if let place = selectedPlaceVM.selectedPlace {
-                    viewModel.loadData(for: place)
+                if let place = selectedPlaceVM.selectedPlace,
+                   let currentLocation = locationManager.currentLocation {
+                    viewModel.loadData(for: place, currentLocation: currentLocation.coordinate)
                 }
             }
             .onChange(of: selectedPlaceVM.selectedPlace) { newPlace in
-                // Whenever the selected place changes, load new data
-                if let place = newPlace {
-                    viewModel.loadData(for: place)
+                if let place = newPlace,
+                   let currentLocation = locationManager.currentLocation {
+                    viewModel.loadData(for: place, currentLocation: currentLocation.coordinate)
                 }
             }
 

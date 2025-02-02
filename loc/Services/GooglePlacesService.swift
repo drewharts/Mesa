@@ -14,7 +14,7 @@ class GooglePlacesService {
     
     func performSearch(query: String, userLocation: CLLocationCoordinate2D?, completion: @escaping ([GMSAutocompletePrediction]?, Error?) -> Void) {
         let filter = GMSAutocompleteFilter()
-        filter.types = ["restaurant"]
+        filter.types = ["establishment"]
 
         if let location = userLocation {
             filter.locationBias = GMSPlaceRectangularLocationOption(

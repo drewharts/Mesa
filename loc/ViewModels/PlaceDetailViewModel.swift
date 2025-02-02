@@ -16,7 +16,9 @@ class PlaceDetailViewModel: ObservableObject {
     @Published var phoneNumber = ""
     @Published var placeName: String = "Unknown"
     @Published var openingHours: [String]?
-    @Published var isOpen: Bool = false // New property to track open status
+    @Published var isOpen: Bool = false
+    @Published var travelTime: String = "Calculating..."
+
     
     var placeIconURL: URL?
     
@@ -27,7 +29,7 @@ class PlaceDetailViewModel: ObservableObject {
         // Empty. We'll call loadData(for:) later.
     }
 
-    func loadData(for place: GMSPlace) {
+    func loadData(for place: GMSPlace, currentLocation: CLLocationCoordinate2D) {
         // If we already loaded this place, do nothing (optional).
         if currentPlaceID == place.placeID { return }
         
@@ -42,6 +44,7 @@ class PlaceDetailViewModel: ObservableObject {
             // Replace the deprecated call:
             // place.isOpen()
             self.checkOpenStatus(for: place)
+            self.updateTravelTime(for: place, from: currentLocation)
         }
     }
     
@@ -79,7 +82,24 @@ class PlaceDetailViewModel: ObservableObject {
         }
     }
     
-    // MARK: - Open Status Check
+    func updateTravelTime(for place: GMSPlace, from userCoordinate: CLLocationCoordinate2D) {
+        let placeCoordinate = place.coordinate // Assuming GMSPlace has a `coordinate` property.
+        MapKitService.shared.calculateTravelTime(from: userCoordinate, to: placeCoordinate) { [weak self] timeInterval, error in
+            DispatchQueue.main.async {
+                if let error = error {
+                    print("Error calculating travel time: \(error.localizedDescription)")
+                    self?.travelTime = "N/A"
+                } else if let timeInterval = timeInterval {
+                    let minutes = timeInterval / 60.0
+                    self?.travelTime = String(format: "%.0f min", minutes)
+                } else {
+                    self?.travelTime = "N/A"
+                }
+            }
+        }
+    }
+    
+    
     
     /// Checks if the restaurant is open right now using the recommended isOpen API.
     private func checkOpenStatus(for place: GMSPlace) {
