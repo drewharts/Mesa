@@ -25,13 +25,12 @@ struct PlaceListCellView: View {
     let list: PlaceList
     @EnvironmentObject var profile: ProfileViewModel
     @Binding var showingImagePicker: Bool
-    @Binding var selectedList: PlaceListViewModel?
     
     var onPlaceSelected: ((GMSPlace) -> Void)?
 
 
     var body: some View {
-        NavigationLink(destination: EmptyView()/*destination: PlaceListView(placeLists: listVM.placeViewModels*/) {
+        NavigationLink(destination: PlaceListView(places: profile.placeListGMSPlaces[list.id] ?? [])) {
             HStack {
                 if let image = profile.listImages[list.id] {
                     Image(uiImage: image)
@@ -67,7 +66,6 @@ struct PlaceListCellView: View {
         }
         .contextMenu {
             Button {
-//                selectedList = listVM
                 showingImagePicker = true
             } label: {
                 Label("Add Photo", systemImage: "photo")
@@ -100,8 +98,7 @@ struct ProfileViewListsView: View {
                     ForEach(profile.userLists) { list in
                         PlaceListCellView(
                             list: list,
-                            showingImagePicker: $showingImagePicker,
-                            selectedList: $selectedList
+                            showingImagePicker: $showingImagePicker
                         )
                     }
                 }
@@ -118,10 +115,12 @@ struct ProfileViewListsView: View {
             ImagePicker(images: $inputImage, selectionLimit: 1)
         }
         .onChange(of: inputImage) {
-            selectedList?.addPhotoToList(image: inputImage.first!)
-            
+            guard let newImage = inputImage.first, let selectedList = selectedList else { return }
+            selectedList.addPhotoToList(image: newImage)
+            profile.listImages[selectedList.placeList.id] = newImage  // Replace or set the image
+
             inputImage = []
-            selectedList = nil
+            self.selectedList = nil
         }
         .onChange(of: selectedPlaceVM.isDetailSheetPresented) { newValue in
             if newValue == true {
