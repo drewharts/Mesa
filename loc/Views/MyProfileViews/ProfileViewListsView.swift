@@ -22,40 +22,24 @@ struct ListHeaderView: View {
 }
 
 struct PlaceListCellView: View {
-    let listVM: PlaceListViewModel
+    let list: PlaceList
+    @EnvironmentObject var profile: ProfileViewModel
     @Binding var showingImagePicker: Bool
-    @Binding var selectedList: PlaceListViewModel?
     
     var onPlaceSelected: ((GMSPlace) -> Void)?
 
 
     var body: some View {
-        NavigationLink(destination: PlaceListView(placeLists: listVM.placeViewModels)) {
+        NavigationLink(destination: PlaceListView(places: profile.placeListGMSPlaces[list.id] ?? [])) {
             HStack {
-                if let imageURLString = listVM.placeList.image,
-                   let imageURL = URL(string: imageURLString) {
-                    AsyncImage(url: imageURL) { phase in
-                        switch phase {
-                        case .empty:
-                            ProgressView()
-                                .frame(width: 90, height: 90)
-                        case .success(let image):
-                            image
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
-                                .frame(width: 90, height: 90)
-                                .clipped()
-                                .cornerRadius(4)
-                        case .failure:
-                            Image(systemName: "photo")
-                                .resizable()
-                                .frame(width: 90, height: 90)
-                                .foregroundColor(.gray)
-                                .cornerRadius(4)
-                        @unknown default:
-                            EmptyView()
-                        }
-                    }
+                if let image = profile.listImages[list.id] {
+                    Image(uiImage: image)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: 90, height: 90)
+                        .clipped()
+                        .cornerRadius(4)
+
                 } else {
                     // Fallback placeholder
                     Rectangle()
@@ -65,11 +49,11 @@ struct PlaceListCellView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(listVM.placeList.name)
+                    Text(list.name)
                         .font(.body)
                         .foregroundStyle(.black)
 
-                    Text("\(listVM.placeList.places.count) Places")
+                    Text("\(list.places.count) Places")
                         .font(.caption)
                         .foregroundStyle(.black)
                 }
@@ -78,15 +62,10 @@ struct PlaceListCellView: View {
             }
             .padding(.vertical, 10)
             .padding(.horizontal, 30)
-            .onTapGesture {
-                if let firstPlace = listVM.placeViewModels.first!.gmsPlace {
-                    onPlaceSelected?(firstPlace)
-                }
-            }
+            .contentShape(Rectangle())
         }
         .contextMenu {
             Button {
-                selectedList = listVM
                 showingImagePicker = true
             } label: {
                 Label("Add Photo", systemImage: "photo")
@@ -114,13 +93,12 @@ struct ProfileViewListsView: View {
         VStack(alignment: .leading, spacing: 16) {
             ListHeaderView()
 
-            if !profile.placeListViewModels.isEmpty {
+            if !profile.userLists.isEmpty {
                 ScrollView {
-                    ForEach(profile.placeListViewModels) { listVM in
+                    ForEach(profile.userLists) { list in
                         PlaceListCellView(
-                            listVM: listVM,
-                            showingImagePicker: $showingImagePicker,
-                            selectedList: $selectedList
+                            list: list,
+                            showingImagePicker: $showingImagePicker
                         )
                     }
                 }
@@ -137,10 +115,12 @@ struct ProfileViewListsView: View {
             ImagePicker(images: $inputImage, selectionLimit: 1)
         }
         .onChange(of: inputImage) {
-            selectedList?.addPhotoToList(image: inputImage.first!)
-            
+            guard let newImage = inputImage.first, let selectedList = selectedList else { return }
+            selectedList.addPhotoToList(image: newImage)
+            profile.listImages[selectedList.placeList.id] = newImage  // Replace or set the image
+
             inputImage = []
-            selectedList = nil
+            self.selectedList = nil
         }
         .onChange(of: selectedPlaceVM.isDetailSheetPresented) { newValue in
             if newValue == true {

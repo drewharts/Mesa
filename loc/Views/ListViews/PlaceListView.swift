@@ -50,22 +50,22 @@ struct WidePlaceView: View {
 }
 
 struct PlaceListView: View {
-    var placeLists: [PlaceViewModel]
+    var places: [GMSPlace]
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @Environment(\.presentationMode) var presentationMode // For dismissing the sheet
 
     var body: some View {
         List {
-            ForEach(placeLists) { place in
+            ForEach(places, id: \.placeID) { place in
                 // Wrap the row in a Button (or NavigationLink) so it’s tappable
                 Button(action: {
-                    selectedPlaceVM.selectedPlace = place.gmsPlace
+                    selectedPlaceVM.selectedPlace = place
                     selectedPlaceVM.isDetailSheetPresented = true
                     presentationMode.wrappedValue.dismiss()
                 }) {
                     // Existing row layout
-                    WidePlaceView(place: place.gmsPlace!)
+                    WidePlaceView(place: place)
                 }
                 // Use a plain button style if you don't want the default highlight
                 .buttonStyle(.plain)

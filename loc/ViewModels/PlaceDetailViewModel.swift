@@ -7,6 +7,7 @@
 
 import SwiftUI
 import GooglePlaces
+import MapKit
 
 class PlaceDetailViewModel: ObservableObject {
     @Published var photos: [UIImage] = []
@@ -46,6 +47,22 @@ class PlaceDetailViewModel: ObservableObject {
             self.checkOpenStatus(for: place)
             self.updateTravelTime(for: place, from: currentLocation)
         }
+    }
+    
+    func openNavigation(for place: GMSPlace, currentLocation: CLLocationCoordinate2D) {
+        let destinationCoordinate = place.coordinate // Assuming GMSPlace exposes a coordinate property.
+        let destinationPlacemark = MKPlacemark(coordinate: destinationCoordinate)
+        let destinationMapItem = MKMapItem(placemark: destinationPlacemark)
+        destinationMapItem.name = place.name
+        
+        // Create a map item for the current location.
+        let currentLocationMapItem = MKMapItem.forCurrentLocation()
+        
+        // Define launch options for driving directions.
+        let launchOptions = [MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeDriving]
+        
+        // Launch Apple Maps with the specified options.
+        MKMapItem.openMaps(with: [currentLocationMapItem, destinationMapItem], launchOptions: launchOptions)
     }
     
     private func fetchPhotos(for place: GMSPlace) {
@@ -91,7 +108,11 @@ class PlaceDetailViewModel: ObservableObject {
                     self?.travelTime = "N/A"
                 } else if let timeInterval = timeInterval {
                     let minutes = timeInterval / 60.0
-                    self?.travelTime = String(format: "%.0f min", minutes)
+                    if minutes > 60 {
+                        self?.travelTime = "60+ min"
+                    } else {
+                        self?.travelTime = String(format: "%.0f min", minutes)
+                    }
                 } else {
                     self?.travelTime = "N/A"
                 }

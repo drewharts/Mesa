@@ -30,12 +30,12 @@ struct ProfileFavoriteListView: View {
             .padding(.horizontal, 10)
 
             // 2) Favorite places
-            if !profile.favoritePlaceViewModels.isEmpty {
+            if !profile.userFavorites.isEmpty {
                 HStack {
-                    ForEach(profile.favoritePlaceViewModels) { favoritePlaceVM in
+                    ForEach(profile.userFavorites, id: \.placeID) { place in
                         VStack {
                             ZStack {
-                                if let image = favoritePlaceVM.placeImage {
+                                if let image = profile.placeImages[place.placeID!]{
                                     Image(uiImage: image)
                                         .resizable()
                                         .scaledToFill()
@@ -49,7 +49,7 @@ struct ProfileFavoriteListView: View {
                                         .cornerRadius(50)
                                 }
                             }
-                            Text(favoritePlaceVM.place.name.prefix(15))
+                            Text(place.name?.prefix(15) ?? "Unknown")
                                 .foregroundColor(.black)
                                 .font(.footnote)
                                 .multilineTextAlignment(.center)
@@ -59,7 +59,7 @@ struct ProfileFavoriteListView: View {
                         .padding(.trailing, 10)
                         .onTapGesture {
                             // Update the selected place in the view model and dismiss
-                            selectedPlaceVM.selectedPlace = favoritePlaceVM.gmsPlace
+                            selectedPlaceVM.selectedPlace = place
                             selectedPlaceVM.isDetailSheetPresented = true
                             presentationMode.wrappedValue.dismiss()
                         }

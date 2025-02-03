@@ -12,6 +12,8 @@ struct MinPlaceDetailView: View {
     @EnvironmentObject var profile: ProfileViewModel
     @ObservedObject var viewModel: PlaceDetailViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
+    @EnvironmentObject var locationManager: LocationManager
+
     @Binding var showNoPhoneNumberAlert: Bool
 //    let place: GMSPlace
     
@@ -34,7 +36,7 @@ struct MinPlaceDetailView: View {
                     Spacer()
                     
                     HStack(spacing: 16) {
-                        NavigationLink(destination: PlaceReviewView(isPresented: .constant(false), place: selectedPlaceVM.selectedPlace!,userId: profile.getUserId(),userFirstName: profile.data.firstName,userLastName: profile.data.lastName)) {
+                        NavigationLink(destination: PlaceReviewView(isPresented: .constant(false), place: selectedPlaceVM.selectedPlace!,userId: profile.userId,userFirstName: profile.data.firstName,userLastName: profile.data.lastName)) {
                             Image(systemName: "plus")
                                 .font(.title3)
                         }
@@ -73,6 +75,13 @@ struct MinPlaceDetailView: View {
                         Text(viewModel.travelTime)
                             .font(.subheadline)
                             .foregroundColor(.gray)
+                    }
+                    .onTapGesture {
+                        // Ensure you have a selected place and a valid current location.
+                        if let place = selectedPlaceVM.selectedPlace,
+                           let currentLocation = locationManager.currentLocation {
+                            viewModel.openNavigation(for: place, currentLocation: currentLocation.coordinate)
+                        }
                     }
                 }
                 .padding(.bottom, 10)
