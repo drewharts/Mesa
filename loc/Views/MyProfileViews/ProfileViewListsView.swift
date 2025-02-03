@@ -22,7 +22,8 @@ struct ListHeaderView: View {
 }
 
 struct PlaceListCellView: View {
-    let listVM: PlaceListViewModel
+    let list: PlaceList
+    @EnvironmentObject var profile: ProfileViewModel
     @Binding var showingImagePicker: Bool
     @Binding var selectedList: PlaceListViewModel?
     
@@ -30,32 +31,16 @@ struct PlaceListCellView: View {
 
 
     var body: some View {
-        NavigationLink(destination: PlaceListView(placeLists: listVM.placeViewModels)) {
+        NavigationLink(destination: EmptyView()/*destination: PlaceListView(placeLists: listVM.placeViewModels*/) {
             HStack {
-                if let imageURLString = listVM.placeList.image,
-                   let imageURL = URL(string: imageURLString) {
-                    AsyncImage(url: imageURL) { phase in
-                        switch phase {
-                        case .empty:
-                            ProgressView()
-                                .frame(width: 90, height: 90)
-                        case .success(let image):
-                            image
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
-                                .frame(width: 90, height: 90)
-                                .clipped()
-                                .cornerRadius(4)
-                        case .failure:
-                            Image(systemName: "photo")
-                                .resizable()
-                                .frame(width: 90, height: 90)
-                                .foregroundColor(.gray)
-                                .cornerRadius(4)
-                        @unknown default:
-                            EmptyView()
-                        }
-                    }
+                if let image = profile.listImages[list.id] {
+                    Image(uiImage: image)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: 90, height: 90)
+                        .clipped()
+                        .cornerRadius(4)
+
                 } else {
                     // Fallback placeholder
                     Rectangle()
@@ -65,11 +50,11 @@ struct PlaceListCellView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(listVM.placeList.name)
+                    Text(list.name)
                         .font(.body)
                         .foregroundStyle(.black)
 
-                    Text("\(listVM.placeList.places.count) Places")
+                    Text("\(list.places.count) Places")
                         .font(.caption)
                         .foregroundStyle(.black)
                 }
@@ -82,7 +67,7 @@ struct PlaceListCellView: View {
         }
         .contextMenu {
             Button {
-                selectedList = listVM
+//                selectedList = listVM
                 showingImagePicker = true
             } label: {
                 Label("Add Photo", systemImage: "photo")
@@ -110,11 +95,11 @@ struct ProfileViewListsView: View {
         VStack(alignment: .leading, spacing: 16) {
             ListHeaderView()
 
-            if !profile.placeListViewModels.isEmpty {
+            if !profile.userLists.isEmpty {
                 ScrollView {
-                    ForEach(profile.placeListViewModels) { listVM in
+                    ForEach(profile.userLists) { list in
                         PlaceListCellView(
-                            listVM: listVM,
+                            list: list,
                             showingImagePicker: $showingImagePicker,
                             selectedList: $selectedList
                         )

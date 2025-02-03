@@ -14,6 +14,11 @@ class ProfileViewModel: ObservableObject {
     @Published var data: ProfileData
     @Published var placeListViewModels: [PlaceListViewModel] = []
     
+    //lists new implementation
+    @Published var userLists: [PlaceList] = []
+    @Published var placeListGMSPlaces: [UUID: [GMSPlace]] = [:] // Store places per list
+    @Published var listImages: [UUID: UIImage] = [:]
+    
     @Published var userFavorites: [GMSPlace] = []
     @Published var placeImages: [String: UIImage] = [:] // Store images by placeID
 
@@ -36,11 +41,40 @@ class ProfileViewModel: ObservableObject {
             loadImage(from: url)
         }
         fetchProfileFavorites(userId: userId)
+        fetchLists(userId: userId)
 
     }
     
-    func getUserId() -> String {
-        return userId
+    private func fetchLists(userId: String) {
+        firestoreService.fetchLists(userId: userId) { lists in
+            DispatchQueue.main.async {
+                self.userLists = lists
+                
+                // For each list, fetch its image and any other related data
+                for list in lists {
+                    self.fetchListImage(for: list)
+                    self.fetchGMSPlaces(for: list.places) { gmsPlaces in
+                        self.placeListGMSPlaces[list.id] = gmsPlaces
+                    }
+                }
+            }
+        }
+    }
+    
+    private func fetchListImage(for list: PlaceList) {
+        // Ensure the list has an image URL
+        guard let imageUrlString = list.image, let url = URL(string: imageUrlString) else { return }
+        
+        // Check if the image is already cached
+        if listImages[list.id] != nil { return }
+        
+        // Fetch the image
+        URLSession.shared.dataTask(with: url) { [weak self] data, response, error in
+            guard let self = self, let data = data, let image = UIImage(data: data) else { return }
+            DispatchQueue.main.async {
+                self.listImages[list.id] = image
+            }
+        }.resume()
     }
 
     func loadPhoto(for placeID: String) {
