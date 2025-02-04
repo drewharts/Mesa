@@ -16,10 +16,12 @@ struct MapView: UIViewRepresentable {
 
     
     @ObservedObject var locationManager: LocationManager
-    @EnvironmentObject var userSession: UserSession
+//    @EnvironmentObject var userSession: UserSession
+    @EnvironmentObject var profile: ProfileViewModel
     
     var onMapTap: (() -> Void)? // Callback to notify when the map is tapped
     
+    let googlePlacesService = GooglePlacesService()
     let mapView = GMSMapView()
     
     func makeUIView(context: Context) -> GMSMapView {
@@ -56,55 +58,36 @@ struct MapView: UIViewRepresentable {
     }
     
     func updateUIView(_ uiView: GMSMapView, context: Context) {
-        // Clear all existing markers before adding new ones
+        // Clear existing markers
         uiView.clear()
-
-        // 1) Loop through each placeListViewModel in the user session
-        if let placeListVMs = userSession.profileViewModel?.placeListViewModels {
-            for listVM in placeListVMs {
-                // 2) Each list might have its own array of “places” with placeIDs
-                //    Replace this with your real data structure:
-                for place in listVM.placeList.places {
-                    // For each placeID, call fetchPlace to get the actual GMSPlace
-                    GMSPlacesClient.shared().fetchPlace(
-                        fromPlaceID: place.id, // e.g. "ChIJN1t_tDeuEmsRUsoyG83frY4"
-                        placeFields: [.coordinate, .name], // Request whatever fields you need
-                        sessionToken: nil
-                    ) { fetchedPlace, error in
-                        if let error = error {
-                            print("Error fetching place: \(error)")
-                            return
-                        }
-                        guard let fetchedPlace = fetchedPlace else { return }
-                        
-                        // Create a marker at the fetched coordinate
-                        let marker = GMSMarker(position: fetchedPlace.coordinate)
-                        marker.title = fetchedPlace.name
-                        marker.map = uiView
-                    }
-                }
+        
+        // Loop through the cached places from profile view model
+        for (_, places) in profile.placeListGMSPlaces {
+            for place in places {
+                let marker = GMSMarker(position: place.coordinate)
+                marker.title = place.name
+                marker.userData = place  // So that the marker delegate can use it
+                marker.map = uiView
             }
         }
-
-        // 3) If a place is selected from search/autocomplete,
-        //    move the camera & add a special marker for it
-        if let place = selectedPlaceVM.selectedPlace {
-            // Only animate if this is a new selection
-            if context.coordinator.lastSelectedPlaceID != place.placeID {
+        
+        // If a place is selected from search/autocomplete, move the camera & add a special marker for it
+        if let selectedPlace = selectedPlaceVM.selectedPlace {
+            if context.coordinator.lastSelectedPlaceID != selectedPlace.placeID {
                 let camera = GMSCameraPosition.camera(
-                    withLatitude: place.coordinate.latitude,
-                    longitude: place.coordinate.longitude,
+                    withLatitude: selectedPlace.coordinate.latitude,
+                    longitude: selectedPlace.coordinate.longitude,
                     zoom: 15.0
                 )
                 uiView.animate(to: camera)
                 
                 // Marker for the selected place
-                let marker = GMSMarker(position: place.coordinate)
-                marker.title = place.name
+                let marker = GMSMarker(position: selectedPlace.coordinate)
+                marker.title = selectedPlace.name
                 marker.map = uiView
                 
                 // Record that we’ve moved to this place
-                context.coordinator.lastSelectedPlaceID = place.placeID
+                context.coordinator.lastSelectedPlaceID = selectedPlace.placeID
             }
         }
     }
@@ -124,12 +107,24 @@ struct MapView: UIViewRepresentable {
 
         func mapView(_ mapView: GMSMapView, willMove gesture: Bool) {
             if gesture {
-                // If user manually pans the map, clear any search results & call onMapTap
                 DispatchQueue.main.async {
                     self.parent.searchResults = []
                     self.parent.onMapTap?()
                 }
             }
+        }
+        
+        func mapView(_ mapView: GMSMapView, didTap marker: GMSMarker) -> Bool {
+            // Retrieve the GMSPlace from the marker's userData
+            if let gmsPlace = marker.userData as? GMSPlace {
+                // Update the selectedPlaceViewModel
+                DispatchQueue.main.async {
+                    self.parent.selectedPlaceVM.selectedPlace = gmsPlace
+                    self.parent.selectedPlaceVM.isDetailSheetPresented = true
+                }
+            }
+            // Return false to allow the default behavior (like showing info windows)
+            return false
         }
     }
 }
