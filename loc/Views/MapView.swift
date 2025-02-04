@@ -70,6 +70,13 @@ struct MapView: UIViewRepresentable {
                 marker.map = uiView
             }
         }
+        // add user favorites as well to the map of pins 
+        for place in profile.userFavorites {
+            let marker = GMSMarker(position: place.coordinate)
+            marker.title = place.name
+            marker.userData = place
+            marker.map = uiView
+        }
         
         // If a place is selected from search/autocomplete, move the camera & add a special marker for it
         if let selectedPlace = selectedPlaceVM.selectedPlace {
