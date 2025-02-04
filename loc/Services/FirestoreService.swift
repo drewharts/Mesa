@@ -15,30 +15,64 @@ class FirestoreService {
     private let storage = Storage.storage()
     
     func followUser(followerId: String, followingId: String, completion: @escaping (Bool, Error?) -> Void) {
+        // Create the follow relationship
         let follow = Follow(followerId: followerId, followingId: followingId, followedAt: Date())
-        let followRef = db.collection("follows").document(follow.followId)
+        
+        // Generate document IDs for the two separate collections
+        let followingDocId = "\(followerId)_\(followingId)" // For the outgoing relationship
+        let followersDocId = "\(followingId)_\(followerId)" // For the incoming relationship
 
+        // References to the two collections
+        let followingRef = db.collection("following").document(followingDocId)
+        let followersRef = db.collection("followers").document(followersDocId)
+        
         do {
-            try followRef.setData(from: follow) { error in
-                completion(error == nil, error)
+            // First, add the document to the "following" collection
+            try followingRef.setData(from: follow) { error in
+                if let error = error {
+                    completion(false, error)
+                    return
+                }
+                
+                // Then, add the document to the "followers" collection
+                do {
+                    try followersRef.setData(from: follow) { error in
+                        completion(error == nil, error)
+                    }
+                } catch let error {
+                    completion(false, error)
+                }
             }
         } catch let error {
             completion(false, error)
         }
     }
-
+    
     func unfollowUser(followerId: String, followingId: String, completion: @escaping (Bool, Error?) -> Void) {
-        let followId = "\(followerId)_\(followingId)"
-        let followRef = db.collection("follows").document(followId)
-
-        followRef.delete { error in
-            completion(error == nil, error)
+        // Generate the same document IDs as when following
+        let followingDocId = "\(followerId)_\(followingId)"
+        let followersDocId = "\(followingId)_\(followerId)"
+        
+        // References to the two collections
+        let followingRef = db.collection("following").document(followingDocId)
+        let followersRef = db.collection("followers").document(followersDocId)
+        
+        // Delete from the "following" collection first
+        followingRef.delete { error in
+            if let error = error {
+                completion(false, error)
+                return
+            }
+            // Then delete from the "followers" collection
+            followersRef.delete { error in
+                completion(error == nil, error)
+            }
         }
     }
 
     func isFollowingUser(followerId: String, followingId: String, completion: @escaping (Bool) -> Void) {
         let followId = "\(followerId)_\(followingId)"
-        let followRef = db.collection("follows").document(followId)
+        let followRef = db.collection("following").document(followId)
 
         followRef.getDocument { document, error in
             if let document = document, document.exists {

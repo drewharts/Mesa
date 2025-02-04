@@ -28,20 +28,25 @@ class UserProfileViewModel: ObservableObject {
         DispatchQueue.main.async {
             self.selectedUser = user
             self.isUserDetailPresented = true
+            self.checkIfFollowing(currentUserId: currentUserId)
         }
         
         fetchProfileFavorites(userId: user.id)
         fetchLists(userId: user.id)
-        checkIfFollowing(currentUserId: currentUserId)
     }
     
     func checkIfFollowing(currentUserId: String) {
-        let targetUserId = selectedUser?.id ?? ""
+        // Ensure that selectedUser is set and has a valid id
+        guard let targetUserId = selectedUser?.id, !targetUserId.isEmpty else {
+            DispatchQueue.main.async { self.isFollowing = false }
+            return
+        }
         
-        
-        firestoreService.isFollowingUser(followerId: currentUserId, followingId: targetUserId) { isFollowing in
+        // Call the firestore service to check the following status.
+        firestoreService.isFollowingUser(followerId: currentUserId, followingId: targetUserId) { [weak self] isFollowing in
+            // Always update UI state on the main thread.
             DispatchQueue.main.async {
-                self.isFollowing = isFollowing
+                self?.isFollowing = isFollowing
             }
         }
     }

@@ -11,9 +11,8 @@ import GooglePlaces
 
 struct MapView: UIViewRepresentable {
     @Binding var searchResults: [GMSAutocompletePrediction]
-    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
-
     
+    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var locationManager: LocationManager
     @EnvironmentObject var profile: ProfileViewModel
     
