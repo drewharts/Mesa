@@ -32,7 +32,6 @@ struct MainView: View {
                 // Map
                 MapView(
                     searchResults: $viewModel.searchResults,
-                    locationManager: locationManager,
                     onMapTap: handleMapTap
                 )
                 .edgesIgnoringSafeArea(.all)

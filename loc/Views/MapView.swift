@@ -11,12 +11,9 @@ import GooglePlaces
 
 struct MapView: UIViewRepresentable {
     @Binding var searchResults: [GMSAutocompletePrediction]
-//    @Binding var selectedPlace: GMSPlace?
-    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
-
     
-    @ObservedObject var locationManager: LocationManager
-//    @EnvironmentObject var userSession: UserSession
+    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
+    @EnvironmentObject var locationManager: LocationManager
     @EnvironmentObject var profile: ProfileViewModel
     
     var onMapTap: (() -> Void)? // Callback to notify when the map is tapped
@@ -69,6 +66,13 @@ struct MapView: UIViewRepresentable {
                 marker.userData = place  // So that the marker delegate can use it
                 marker.map = uiView
             }
+        }
+        // add user favorites as well to the map of pins
+        for place in profile.userFavorites {
+            let marker = GMSMarker(position: place.coordinate)
+            marker.title = place.name
+            marker.userData = place
+            marker.map = uiView
         }
         
         // If a place is selected from search/autocomplete, move the camera & add a special marker for it
