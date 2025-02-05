@@ -300,6 +300,8 @@ class FirestoreService {
                     print("Error adding place to list: \(error.localizedDescription)")
                 } else {
                     print("Place successfully added to list: \(listName)")
+                    
+                    self.addOrUpdateMapPlace(for: userId, place: place, type: "list", listId: listName)
                 }
             }
     }
@@ -312,6 +314,14 @@ class FirestoreService {
                     print("Error removing place from list: \(error.localizedDescription)")
                 } else {
                     print("Place successfully removed from list: \(listName)")
+                    
+                    self.removeUserFromMapPlace(userId: userId, placeId: placeId) { success, error in
+                           if let error = error {
+                               print("Error removing user from mapPlace: \(error.localizedDescription)")
+                           } else {
+                               print("User successfully removed from mapPlace.")
+                           }
+                       }
                 }
             }
     }
@@ -331,6 +341,20 @@ class FirestoreService {
                 }
         } catch {
             print("Error encoding listData: \(error.localizedDescription)")
+        }
+    }
+    
+    func deleteList(userId: String, listName: String, completion: @escaping (Error?) -> Void) {
+        let listRef = db.collection("users").document(userId)
+                        .collection("placeLists").document(listName)
+        
+        listRef.delete { error in
+            if let error = error {
+                print("Error deleting list '\(listName)': \(error.localizedDescription)")
+            } else {
+                print("List successfully deleted: \(listName)")
+            }
+            completion(error)
         }
     }
     
@@ -392,25 +416,106 @@ class FirestoreService {
                         print("Place successfully added to favorites")
                     }
                 }
+            addOrUpdateMapPlace(for: userId, place: place, type: "favorite")
         } catch {
             print("Error encoding place: \(error.localizedDescription)")
         }
     }
     
+    func addOrUpdateMapPlace(for userId: String, place: Place, type: String, listId: String? = nil) {
+        // Create the MapPlaceUserInfo for the new entry.
+        let userInfo = MapPlaceUserInfo(
+            userId: userId,
+            type: type,
+            listId: listId,
+            addedAt: Date()
+        )
+        
+        // Prepare a reference to the mapPlaces collection. Assume we use place.id as the document ID.
+        let mapPlaceRef = db.collection("mapPlaces").document(place.id)
+        
+        // Attempt to get the existing document.
+        mapPlaceRef.getDocument { (document, error) in
+            if let document = document, document.exists {
+                // The place already exists. Update the 'addedBy' field.
+                do {
+                    // Decode the existing MapPlace.
+                    var existingMapPlace = try document.data(as: MapPlace.self)
+                    // Append the new user info.
+                    existingMapPlace.addedBy[userId] = userInfo
+                    // Save the updated document.
+                    try mapPlaceRef.setData(from: existingMapPlace) { error in
+                        if let error = error {
+                            print("Error updating map place: \(error.localizedDescription)")
+                        } else {
+                            print("Successfully updated map place with new user info.")
+                        }
+                    }
+                } catch {
+                    print("Error decoding existing MapPlace: \(error.localizedDescription)")
+                }
+            } else {
+                // The place does not exist yet. Create a new MapPlace document.
+                let newMapPlace = MapPlace(
+                    placeId: place.id,
+                    name: place.name,
+                    address: place.address,
+                    addedBy: [userId: userInfo]
+                ) 
+                do {
+                    try mapPlaceRef.setData(from: newMapPlace) { error in
+                        if let error = error {
+                            print("Error creating new map place: \(error.localizedDescription)")
+                        } else {
+                            print("Successfully created new map place.")
+                        }
+                    }
+                } catch {
+                    print("Error encoding new MapPlace: \(error.localizedDescription)")
+                }
+            }
+        }
+    }
+    
     func removeProfileFavorite(userId: String, placeId: String) {
-        // Reference to the user's favorites collection
-        let favoritesRef = Firestore.firestore()
-            .collection("users")
+        // Reference to the user's favorites collection.
+        let favoritesRef = db.collection("users")
             .document(userId)
             .collection("favorites")
             .document(placeId)
         
-        // Delete the document for the place
+        // Delete the document from the user's favorites collection.
         favoritesRef.delete { error in
             if let error = error {
-                print("Error removing favorite place: \(error.localizedDescription)")
+                print("Error removing favorite place from user's collection: \(error.localizedDescription)")
             } else {
-                print("Favorite place successfully removed!")
+                print("Favorite place successfully removed from user's collection.")
+                // Now remove the user's association from the aggregated mapPlaces document.
+                self.removeUserFromMapPlace(userId: userId, placeId: placeId) { success, error in
+                    if let error = error {
+                        print("Error removing user from mapPlace: \(error.localizedDescription)")
+                    } else {
+                        print("User successfully removed from mapPlace.")
+                    }
+                }
+            }
+        }
+    }
+    
+    func removeUserFromMapPlace(userId: String, placeId: String, completion: @escaping (Bool, Error?) -> Void) {
+        // Reference to the mapPlaces document for the given place.
+        let mapPlaceRef = db.collection("mapPlaces").document(placeId)
+        
+        // Update the document by removing the entry for the user from the addedBy dictionary.
+        mapPlaceRef.updateData([
+            "addedBy.\(userId)": FieldValue.delete()
+        ]) { error in
+            if let error = error {
+                print("Error removing user from mapPlace: \(error.localizedDescription)")
+                completion(false, error)
+            } else {
+                print("User successfully removed from mapPlace.")
+                completion(true, nil)
             }
         }
     }

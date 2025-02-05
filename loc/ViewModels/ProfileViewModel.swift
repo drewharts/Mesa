@@ -19,9 +19,10 @@ class ProfileViewModel: ObservableObject {
     @Published var placeListGMSPlaces: [UUID: [GMSPlace]] = [:] // Store places per list
     @Published var listImages: [UUID: UIImage] = [:]
     
+    //favorite places new implementation
     @Published var userFavorites: [GMSPlace] = []
     @Published var placeImages: [String: UIImage] = [:] // Store images by placeID
-
+    
     @Published var favoritePlaceViewModels: [PlaceViewModel] = []
     @Published var favoritePlaceImages: [String: UIImage] = [:]
     @Published var profilePhoto: Image? = nil
@@ -29,9 +30,9 @@ class ProfileViewModel: ObservableObject {
     private let firestoreService: FirestoreService
     public let userId: String
     private let googlePlacesService = GooglePlacesService()
-
+    
     @Published var showMaxFavoritesAlert: Bool = false
-
+    
     init(data: ProfileData, firestoreService: FirestoreService, userId: String) {
         self.data = data
         self.firestoreService = firestoreService
@@ -42,7 +43,7 @@ class ProfileViewModel: ObservableObject {
         }
         fetchProfileFavorites(userId: userId)
         fetchLists(userId: userId)
-
+        
     }
     
     private func fetchLists(userId: String) {
@@ -76,7 +77,7 @@ class ProfileViewModel: ObservableObject {
             }
         }.resume()
     }
-
+    
     func loadPhoto(for placeID: String) {
         googlePlacesService.fetchPhoto(placeID: placeID) { [weak self] image in
             DispatchQueue.main.async {
@@ -84,45 +85,58 @@ class ProfileViewModel: ObservableObject {
             }
         }
     }
-
-    // Adds a favorite place from a Google prediction
+    
     func addFavoritePlace(prediction: GMSAutocompletePrediction) {
         // 1) If 4 favorites exist, show alert
-        guard favoritePlaceViewModels.count < 4 else {
+        guard userFavorites.count < 4 else {
             showMaxFavoritesAlert = true
             return
         }
-
-        // 2) Convert the prediction into a Place with placeholder coordinates
-        let newPlace = Place(
-            id: prediction.placeID ?? UUID().uuidString,
-            name: prediction.attributedPrimaryText.string,
-            address: prediction.attributedSecondaryText?.string ?? "Unknown Address"
-        )
-
-        // 3) Add the place to local + Firestore
-        addFavoritePlace(place: newPlace)
-    }
-
-    // Appends the place to local state and Firestore, and initializes FavoritePlaceViewModel
-    func addFavoritePlace(place: Place) {
-        let favoritePlaceVM = PlaceViewModel(place: place)
-        favoritePlaceViewModels.append(favoritePlaceVM)
-        firestoreService.addProfileFavorite(userId: userId, place: place)
-    }
-
-    func removeFavoritePlace(place: Place) {
-        // Find the FavoritePlaceViewModel
-        if let index = favoritePlaceViewModels.firstIndex(where: { $0.id == place.id }) {
-            favoritePlaceViewModels.remove(at: index)
-            firestoreService.removeProfileFavorite(userId: userId, placeId: place.id)
+        
+        googlePlacesService.fetchPlace(placeID: prediction.placeID) { [weak self] gmsPlace, error in
+            guard let self = self else { return }
+            if let error = error {
+                print("Error fetching place: \(error.localizedDescription)")
+                return
+            }
+            guard let gmsPlace = gmsPlace else {
+                print("No GMSPlace found for the given prediction")
+                return
+            }
+            
+            // 4) Add the place to local state + Firestore.
+            self.addFavoritePlace(place: gmsPlace)
         }
     }
-
+    
+    // Appends the place to local state and Firestore, and initializes FavoritePlaceViewModel
+    func addFavoritePlace(place: GMSPlace) {
+        //        let favoritePlaceVM = PlaceViewModel(place: place)
+        //        favoritePlaceViewModels.append(favoritePlaceVM)
+        //        firestoreService.addProfileFavorite(userId: userId, place: place)
+        userFavorites.append(place)
+        let newPlace = Place(
+            id: place.placeID!, name: place.name!, address: place.formattedAddress!
+        )
+        firestoreService.addProfileFavorite(userId: userId, place: newPlace)
+    }
+    
+    func removeFavoritePlace(place: GMSPlace) {
+        // Find the FavoritePlaceViewModel
+        //        if let index = favoritePlaceViewModels.firstIndex(where: { $0.id == place.id }) {
+        //            favoritePlaceViewModels.remove(at: index)
+        //            firestoreService.removeProfileFavorite(userId: userId, placeId: place.id)
+        //        }
+        if let index = userFavorites.firstIndex(where: { $0.placeID == place.placeID }) {
+            userFavorites.remove(at: index)
+            firestoreService.removeProfileFavorite(userId: userId, placeId: place.placeID!)
+        }
+    }
+    
     func numberOfFavoritePlaces() -> Int {
         return favoritePlaceViewModels.count
     }
-
+    
     func getPlaceListViewModel(named name: String) -> PlaceListViewModel? {
         return placeListViewModels.first { $0.placeList.name == name }
     }
@@ -145,7 +159,7 @@ class ProfileViewModel: ObservableObject {
     private func fetchGMSPlaces(for places: [Place], completion: @escaping ([GMSPlace]) -> Void) {
         var fetchedPlaces: [GMSPlace] = []
         let dispatchGroup = DispatchGroup()
-
+        
         for place in places {
             dispatchGroup.enter()
             googlePlacesService.fetchPlace(placeID: place.id) { gmsPlace, error in
@@ -158,7 +172,7 @@ class ProfileViewModel: ObservableObject {
                 dispatchGroup.leave()
             }
         }
-
+        
         dispatchGroup.notify(queue: .main) {
             DispatchQueue.main.async {
                 completion(fetchedPlaces)
@@ -176,7 +190,7 @@ class ProfileViewModel: ObservableObject {
             }
         }
     }
-
+    
     func loadPlaceLists() {
         // Fetch profile lists
         firestoreService.fetchLists(userId: userId) { [weak self] placeLists in
@@ -203,8 +217,8 @@ class ProfileViewModel: ObservableObject {
             }
         }
     }
-
-
+    
+    
     private func loadImage(from url: URL) {
         URLSession.shared.dataTask(with: url) { [weak self] data, response, error in
             guard let data = data, let uiImage = UIImage(data: data) else { return }
@@ -213,20 +227,31 @@ class ProfileViewModel: ObservableObject {
             }
         }.resume()
     }
-
+    
     func addNewPlaceList(named name: String, city: String, emoji: String, image: String) {
         let newPlaceList = PlaceList(name: name, city: city, emoji: emoji, image: image)
-        let placeListViewModel = PlaceListViewModel(placeList: newPlaceList, firestoreService: firestoreService, userId: userId)
-
-        placeListViewModels.append(placeListViewModel)
-
+        //        let placeListViewModel = PlaceListViewModel(placeList: newPlaceList, firestoreService: firestoreService, userId: userId)
+        
+        //        placeListViewModels.append(placeListViewModel)
+        userLists.append(newPlaceList)
         firestoreService.createNewList(placeList: newPlaceList, userID: userId)
     }
-
-    func removePlaceList(at index: Int) {
-        guard placeListViewModels.indices.contains(index) else { return }
-        let placeListVM = placeListViewModels.remove(at: index)
-        //TODO: Implement this remove list from firestore
-//        firestoreService.removeList(userId: userId, listName: placeListVM.placeList.name)
+    
+    func removePlaceList(placeList: PlaceList) {
+        if let index = userLists.firstIndex(where: { $0.id == placeList.id }) {
+            // Remove from local array
+            userLists.remove(at: index)
+            firestoreService.deleteList(userId: self.userId, listName: placeList.name) { error in
+                if let error = error {
+                    // Handle the error (for example, show an alert to the user)
+                    print("Failed to delete list: \(error.localizedDescription)")
+                } else {
+                    // Successfully deleted list—update your local state if necessary.
+                    if let index = self.userLists.firstIndex(where: { $0.id == placeList.id }) {
+                        self.userLists.remove(at: index)
+                    }
+                }
+            }
+        }
     }
 }

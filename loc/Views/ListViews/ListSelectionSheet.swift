@@ -8,6 +8,103 @@
 import SwiftUI
 import GooglePlaces
 
+struct ListDescription: View {
+    @EnvironmentObject var profile: ProfileViewModel
+    let placeList: PlaceList
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(placeList.name)
+                .font(.body)
+                .foregroundStyle(.white)
+            
+            Text("\(profile.placeListGMSPlaces[placeList.id]?.count ?? 0) Places")                .font(.caption)
+                .foregroundStyle(.white)
+        }
+        .padding(.horizontal, 15)
+
+    }
+}
+struct ListsInSelectionSheet: View {
+    @EnvironmentObject var profile: ProfileViewModel
+    let place: GMSPlace
+    @State private var selectedListIds: Set<UUID> = [] // Track multiple selected lists
+
+    var body: some View {
+        ScrollView {
+            if !profile.userLists.isEmpty {
+                ForEach(profile.userLists) { list in
+                    Button(action: {
+                        // Determine whether the current list already contains the place.
+                        let isAdded = profile.placeListGMSPlaces[list.id]?.contains { $0.placeID == place.placeID } ?? false
+                        
+                        if isAdded {
+                            // Remove the place from the list.
+                            if var places = profile.placeListGMSPlaces[list.id] {
+                                places.removeAll { $0.placeID == place.placeID }
+                                profile.placeListGMSPlaces[list.id] = places
+                            }
+                            // Optionally update any local selection state, e.g.:
+                            selectedListIds.remove(list.id)
+                        } else {
+                            // Add the place to the list.
+                            if var places = profile.placeListGMSPlaces[list.id] {
+                                if !places.contains(where: { $0.placeID == place.placeID }) {
+                                    places.append(place)
+                                    profile.placeListGMSPlaces[list.id] = places
+                                }
+                            } else {
+                                profile.placeListGMSPlaces[list.id] = [place]
+                            }
+                            selectedListIds.insert(list.id)
+                        }
+                    }) {
+                        HStack {
+                            // Display the list’s image if available.
+                            if let listImage = profile.listImages[list.id] {
+                                Image(uiImage: listImage)
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .frame(width: 75, height: 75)
+                                    .clipped()
+                                    .cornerRadius(4)
+                            } else {
+                                // Fallback placeholder
+                                Rectangle()
+                                    .frame(width: 75, height: 75)
+                                    .foregroundColor(.white)
+                                    .cornerRadius(4)
+                            }
+                            
+                            ListDescription(placeList: list)
+                            
+                            Spacer()
+                            
+                            // Use the computed 'isAdded' flag to decide the bubble appearance.
+                            ZStack {
+                                if profile.placeListGMSPlaces[list.id]?.contains(where: { $0.placeID == place.placeID }) ?? false {
+                                    Circle()
+                                        .fill(Color.white)
+                                        .frame(width: 24, height: 24)
+                                } else {
+                                    Circle()
+                                        .stroke(Color.white)
+                                        .frame(width: 24, height: 24)
+                                }
+                            }
+                        }
+                        .padding(.top, 20)
+                        .padding(.horizontal, 15)
+                    }
+                }
+            } else {
+                Text("No lists available")
+                    .foregroundColor(.gray)
+                    .padding(.horizontal)
+            }
+        }
+    }
+}
+
 struct ListSelectionSheet: View {
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var lists: PlaceListViewModel
@@ -16,7 +113,6 @@ struct ListSelectionSheet: View {
     @State private var showNewListSheet = false
     @State private var newListName = ""
     @State public var searchText = ""
-    @State private var selectedListIds: Set<UUID> = [] // Track multiple selected lists
 
     var body: some View {
         VStack(spacing: 10) {
@@ -49,72 +145,7 @@ struct ListSelectionSheet: View {
             
             SkinnySearchBar()
             
-            if !profile.placeListViewModels.isEmpty {
-                ScrollView {
-                    ForEach(profile.placeListViewModels) { listVM in
-                        Button(action: {
-                            if selectedListIds.contains(listVM.placeList.id) {
-                                // Deselect the list if already selected
-                                selectedListIds.remove(listVM.placeList.id)
-                                profile.getPlaceListViewModel(named: listVM.placeList.name)?.removePlace(place)
-                            } else {
-                                // Select the list and add the place
-                                selectedListIds.insert(listVM.placeList.id)
-                                profile.getPlaceListViewModel(named: listVM.placeList.name)?.addPlace(place)
-                            }
-                        }) {
-                            HStack {
-                                // Display the list’s image if available:
-                                if let listImage = listVM.getImage() {
-                                    Image(uiImage: listImage)
-                                        .resizable()
-                                        .aspectRatio(contentMode: .fill)
-                                        .frame(width: 75, height: 75)
-                                        .clipped()
-                                        .cornerRadius(4)
-                                } else {
-                                    // Fallback placeholder
-                                    Rectangle()
-                                        .frame(width: 75, height: 75)
-                                        .foregroundColor(.white)
-                                        .cornerRadius(4)
-                                }
-
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(listVM.placeList.name)
-                                        .font(.body)
-                                        .foregroundStyle(.white)
-
-                                    Text("\(listVM.placeList.places.count) Places")
-                                        .font(.caption)
-                                        .foregroundStyle(.white)
-                                }
-                                .padding(.horizontal, 15)
-                                
-                                Spacer()
-                                
-                                // Circle to indicate selection
-                                ZStack {
-                                    Circle()
-                                        .stroke(Color.white)
-                                        .frame(width: 24, height: 24)
-                                    if selectedListIds.contains(listVM.placeList.id) {
-                                        Circle()
-                                            .fill(Color.white)
-                                            .frame(width: 18, height: 18)
-                                    }
-                                }
-                            }
-                            .padding(.top, 20)
-                            .padding(.horizontal, 15)
-                        }
-                    }
-                }
-            } else {
-                Text("No lists available")
-                    .foregroundColor(.gray)
-                    .padding(.horizontal)
-            }
+            ListsInSelectionSheet(place: place)
 
             Spacer()
         }

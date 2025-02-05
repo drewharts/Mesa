@@ -53,7 +53,7 @@ struct PlaceListCellView: View {
                         .font(.body)
                         .foregroundStyle(.black)
 
-                    Text("\(list.places.count) Places")
+                    Text("\(profile.placeListGMSPlaces[list.id]?.count ?? 0) Places")
                         .font(.caption)
                         .foregroundStyle(.black)
                 }
@@ -71,6 +71,13 @@ struct PlaceListCellView: View {
                 Label("Add Photo", systemImage: "photo")
             }
         }
+        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+            Button(role: .destructive) {
+                profile.removePlaceList(placeList: list)
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+        }
     }
 }
 
@@ -80,7 +87,6 @@ struct ProfileViewListsView: View {
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @Environment(\.presentationMode) private var presentationMode
 
-
     // State for handling image picker
     @State private var showingImagePicker = false
     @State private var inputImage: [UIImage] = []
@@ -88,7 +94,6 @@ struct ProfileViewListsView: View {
     // State to remember which list was selected for adding a photo
     @State private var selectedList: PlaceListViewModel?
     
-
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             ListHeaderView()
@@ -109,7 +114,6 @@ struct ProfileViewListsView: View {
             }
         }
         .padding(.vertical)
-
         // Present the image picker as a sheet
         .sheet(isPresented: $showingImagePicker) {
             ImagePicker(images: $inputImage, selectionLimit: 1)
