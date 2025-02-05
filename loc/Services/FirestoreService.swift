@@ -344,6 +344,20 @@ class FirestoreService {
         }
     }
     
+    func deleteList(userId: String, listName: String, completion: @escaping (Error?) -> Void) {
+        let listRef = db.collection("users").document(userId)
+                        .collection("placeLists").document(listName)
+        
+        listRef.delete { error in
+            if let error = error {
+                print("Error deleting list '\(listName)': \(error.localizedDescription)")
+            } else {
+                print("List successfully deleted: \(listName)")
+            }
+            completion(error)
+        }
+    }
+    
     
     func fetchList(userId: String, listName: String, completion: @escaping (Result<PlaceList, Error>) -> Void) {
         db.collection("users").document(userId)
