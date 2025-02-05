@@ -19,6 +19,7 @@ class ProfileViewModel: ObservableObject {
     @Published var placeListGMSPlaces: [UUID: [GMSPlace]] = [:] // Store places per list
     @Published var listImages: [UUID: UIImage] = [:]
     
+    //favorite places new implementation
     @Published var userFavorites: [GMSPlace] = []
     @Published var placeImages: [String: UIImage] = [:] // Store images by placeID
 
@@ -229,10 +230,10 @@ class ProfileViewModel: ObservableObject {
 
     func addNewPlaceList(named name: String, city: String, emoji: String, image: String) {
         let newPlaceList = PlaceList(name: name, city: city, emoji: emoji, image: image)
-        let placeListViewModel = PlaceListViewModel(placeList: newPlaceList, firestoreService: firestoreService, userId: userId)
+//        let placeListViewModel = PlaceListViewModel(placeList: newPlaceList, firestoreService: firestoreService, userId: userId)
 
-        placeListViewModels.append(placeListViewModel)
-
+//        placeListViewModels.append(placeListViewModel)
+        userLists.append(newPlaceList)
         firestoreService.createNewList(placeList: newPlaceList, userID: userId)
     }
 

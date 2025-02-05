@@ -300,6 +300,8 @@ class FirestoreService {
                     print("Error adding place to list: \(error.localizedDescription)")
                 } else {
                     print("Place successfully added to list: \(listName)")
+                    
+                    self.addOrUpdateMapPlace(for: userId, place: place, type: "list", listId: listName)
                 }
             }
     }
@@ -312,6 +314,14 @@ class FirestoreService {
                     print("Error removing place from list: \(error.localizedDescription)")
                 } else {
                     print("Place successfully removed from list: \(listName)")
+                    
+                    self.removeUserFromMapPlace(userId: userId, placeId: placeId) { success, error in
+                           if let error = error {
+                               print("Error removing user from mapPlace: \(error.localizedDescription)")
+                           } else {
+                               print("User successfully removed from mapPlace.")
+                           }
+                       }
                 }
             }
     }

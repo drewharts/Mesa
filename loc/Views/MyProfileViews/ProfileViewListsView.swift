@@ -53,7 +53,7 @@ struct PlaceListCellView: View {
                         .font(.body)
                         .foregroundStyle(.black)
 
-                    Text("\(list.places.count) Places")
+                    Text("\(profile.placeListGMSPlaces[list.id]?.count ?? 0) Places")
                         .font(.caption)
                         .foregroundStyle(.black)
                 }
