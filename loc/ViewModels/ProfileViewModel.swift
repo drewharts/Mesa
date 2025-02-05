@@ -85,37 +85,50 @@ class ProfileViewModel: ObservableObject {
         }
     }
 
-    // Adds a favorite place from a Google prediction
     func addFavoritePlace(prediction: GMSAutocompletePrediction) {
         // 1) If 4 favorites exist, show alert
-        guard favoritePlaceViewModels.count < 4 else {
+        guard userFavorites.count < 4 else {
             showMaxFavoritesAlert = true
             return
         }
-
-        // 2) Convert the prediction into a Place with placeholder coordinates
-        let newPlace = Place(
-            id: prediction.placeID ?? UUID().uuidString,
-            name: prediction.attributedPrimaryText.string,
-            address: prediction.attributedSecondaryText?.string ?? "Unknown Address"
-        )
-
-        // 3) Add the place to local + Firestore
-        addFavoritePlace(place: newPlace)
+        
+        googlePlacesService.fetchPlace(placeID: prediction.placeID) { [weak self] gmsPlace, error in
+            guard let self = self else { return }
+            if let error = error {
+                print("Error fetching place: \(error.localizedDescription)")
+                return
+            }
+            guard let gmsPlace = gmsPlace else {
+                print("No GMSPlace found for the given prediction")
+                return
+            }
+            
+            // 4) Add the place to local state + Firestore.
+            self.addFavoritePlace(place: gmsPlace)
+        }
     }
 
     // Appends the place to local state and Firestore, and initializes FavoritePlaceViewModel
-    func addFavoritePlace(place: Place) {
-        let favoritePlaceVM = PlaceViewModel(place: place)
-        favoritePlaceViewModels.append(favoritePlaceVM)
-        firestoreService.addProfileFavorite(userId: userId, place: place)
+    func addFavoritePlace(place: GMSPlace) {
+//        let favoritePlaceVM = PlaceViewModel(place: place)
+//        favoritePlaceViewModels.append(favoritePlaceVM)
+//        firestoreService.addProfileFavorite(userId: userId, place: place)
+        userFavorites.append(place)
+        let newPlace = Place(
+            id: place.placeID!, name: place.name!, address: place.formattedAddress!
+        )
+        firestoreService.addProfileFavorite(userId: userId, place: newPlace)
     }
 
-    func removeFavoritePlace(place: Place) {
+    func removeFavoritePlace(place: GMSPlace) {
         // Find the FavoritePlaceViewModel
-        if let index = favoritePlaceViewModels.firstIndex(where: { $0.id == place.id }) {
-            favoritePlaceViewModels.remove(at: index)
-            firestoreService.removeProfileFavorite(userId: userId, placeId: place.id)
+//        if let index = favoritePlaceViewModels.firstIndex(where: { $0.id == place.id }) {
+//            favoritePlaceViewModels.remove(at: index)
+//            firestoreService.removeProfileFavorite(userId: userId, placeId: place.id)
+//        }
+        if let index = userFavorites.firstIndex(where: { $0.placeID == place.placeID }) {
+            userFavorites.remove(at: index)
+            firestoreService.removeProfileFavorite(userId: userId, placeId: place.placeID!)
         }
     }
 

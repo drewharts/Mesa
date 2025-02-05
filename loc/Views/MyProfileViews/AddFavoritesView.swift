@@ -8,6 +8,45 @@
 import SwiftUI
 import GooglePlaces
 
+struct AddFavoritesCurrentFavoritesView: View {
+    @EnvironmentObject var profile: ProfileViewModel
+    var body: some View {
+        if !profile.userFavorites.isEmpty {
+            ScrollView(.horizontal) {
+                HStack(spacing: 16) {
+                    ForEach(profile.userFavorites, id: \.placeID) { place in
+                        // Blue box with the restaurant name and "X" icon
+                        HStack {
+                            // Restaurant name
+                            Text(place.name!)
+                                .foregroundColor(.white)
+                                .font(.headline)
+                                .padding(.leading, 8) // Add leading padding for text
+                            
+                            Spacer()
+                            
+                            // "X" icon
+                            Button(action: {
+                                // Remove the selected favorite
+                                profile.removeFavoritePlace(place: place)
+                            }) {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundColor(.white)
+                                    .font(.headline) // Match font size for better proportions
+                            }
+                            .padding(.trailing, 8) // Add trailing padding for the icon
+                        }
+                        .padding(.vertical, 8) // Vertical padding inside the blue box
+                        .background(Color.blue)
+                        .cornerRadius(8)
+                    }
+                }
+                .padding(.horizontal, 20)
+            }
+        }
+    }
+}
+
 struct AddFavoritesView: View {
     @EnvironmentObject var userSession: UserSession
     @EnvironmentObject var profile: ProfileViewModel  // Using the ProfileViewModel directly
@@ -28,39 +67,7 @@ struct AddFavoritesView: View {
                     .padding(.top, 10)
                 
                 // Current Favorites
-                if !profile.favoritePlaceViewModels.isEmpty {
-                    ScrollView(.horizontal) {
-                        HStack(spacing: 16) {
-                            ForEach(profile.favoritePlaceViewModels) { favoritePlaceVM in
-                                // Blue box with the restaurant name and "X" icon
-                                HStack {
-                                    // Restaurant name
-                                    Text(favoritePlaceVM.place.name)
-                                        .foregroundColor(.white)
-                                        .font(.headline)
-                                        .padding(.leading, 8) // Add leading padding for text
-                                    
-                                    Spacer()
-                                    
-                                    // "X" icon
-                                    Button(action: {
-                                        // Remove the selected favorite
-                                        profile.removeFavoritePlace(place: favoritePlaceVM.place)
-                                    }) {
-                                        Image(systemName: "xmark.circle.fill")
-                                            .foregroundColor(.white)
-                                            .font(.headline) // Match font size for better proportions
-                                    }
-                                    .padding(.trailing, 8) // Add trailing padding for the icon
-                                }
-                                .padding(.vertical, 8) // Vertical padding inside the blue box
-                                .background(Color.blue)
-                                .cornerRadius(8)
-                            }
-                        }
-                        .padding(.horizontal, 20)
-                    }
-                }
+                AddFavoritesCurrentFavoritesView()
                 
                 // SEARCH RESULTS
                 if !viewModel.searchResults.isEmpty {
