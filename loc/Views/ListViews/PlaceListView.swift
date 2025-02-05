@@ -73,6 +73,13 @@ struct PlaceListView: View {
                 .listRowSeparator(.hidden)
             }
         }
+//        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+//            Button(role: .destructive) {
+//                profile.removePlaceFromList(place: place)
+//            } label: {
+//                Label("Delete", systemImage: "trash")
+//            }
+//        }
         // Use .plain style to remove extra insets
         .listStyle(.plain)
         // Hide default scroll content background so our custom background can show through

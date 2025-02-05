@@ -27,7 +27,6 @@ struct ListDescription: View {
 struct ListsInSelectionSheet: View {
     @EnvironmentObject var profile: ProfileViewModel
     let place: GMSPlace
-    @State private var selectedListIds: Set<UUID> = [] // Track multiple selected lists
 
     var body: some View {
         ScrollView {
@@ -35,27 +34,14 @@ struct ListsInSelectionSheet: View {
                 ForEach(profile.userLists) { list in
                     Button(action: {
                         // Determine whether the current list already contains the place.
-                        let isAdded = profile.placeListGMSPlaces[list.id]?.contains { $0.placeID == place.placeID } ?? false
+                        let isAdded = profile.isPlaceInList(listId: list.id, placeId: place.placeID!)
                         
                         if isAdded {
                             // Remove the place from the list.
-                            if var places = profile.placeListGMSPlaces[list.id] {
-                                places.removeAll { $0.placeID == place.placeID }
-                                profile.placeListGMSPlaces[list.id] = places
-                            }
-                            // Optionally update any local selection state, e.g.:
-                            selectedListIds.remove(list.id)
+                            profile.removePlaceFromList(listId: list.id, place: place)
                         } else {
                             // Add the place to the list.
-                            if var places = profile.placeListGMSPlaces[list.id] {
-                                if !places.contains(where: { $0.placeID == place.placeID }) {
-                                    places.append(place)
-                                    profile.placeListGMSPlaces[list.id] = places
-                                }
-                            } else {
-                                profile.placeListGMSPlaces[list.id] = [place]
-                            }
-                            selectedListIds.insert(list.id)
+                            profile.addPlaceToList(listId: list.id, place: place)
                         }
                     }) {
                         HStack {

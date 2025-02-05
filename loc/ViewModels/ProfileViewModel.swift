@@ -45,6 +45,26 @@ class ProfileViewModel: ObservableObject {
         fetchLists(userId: userId)
         
     }
+    func isPlaceInList(listId: UUID, placeId: String) -> Bool {
+        guard let places = placeListGMSPlaces[listId] else {
+            return false
+        }
+        return places.contains { $0.placeID == placeId }
+    }
+    
+    func addPlaceToList(listId: UUID, place: GMSPlace ) {
+        placeListGMSPlaces[listId, default: []].append(place)
+    }
+    
+    func removePlaceFromList(listId: UUID, place: GMSPlace) {
+        if var places = placeListGMSPlaces[listId] {
+            places.removeAll {
+                $0.placeID == place.placeID
+            }
+                    
+            placeListGMSPlaces[listId] = places
+        }
+    }
     
     private func fetchLists(userId: String) {
         firestoreService.fetchLists(userId: userId) { lists in
