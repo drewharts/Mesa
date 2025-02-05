@@ -9,6 +9,7 @@
 import SwiftUI
 import GooglePlaces
 import FirebaseAuth
+import MapboxMaps
 
 struct MainView: View {
     @EnvironmentObject var userSession: UserSession
@@ -30,10 +31,13 @@ struct MainView: View {
         NavigationView {
             ZStack(alignment: .top) {
                 // Map
-                MapView(
-                    searchResults: $viewModel.searchResults,
-                    onMapTap: handleMapTap
-                )
+//                MapView(
+//                    searchResults: $viewModel.searchResults,
+//                    onMapTap: handleMapTap
+//                )
+                let center = CLLocationCoordinate2D(latitude: 39.5, longitude: -98.0)
+                Map(initialViewport: .camera(center: center, zoom: 2, bearing: 0, pitch: 0))
+                    .ignoresSafeArea()
                 .edgesIgnoringSafeArea(.all)
 
                 // Top Controls (Search Bar and Profile Button)
