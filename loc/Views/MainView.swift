@@ -10,6 +10,7 @@ import SwiftUI
 import GooglePlaces
 import FirebaseAuth
 import MapboxMaps
+import MapboxSearch
 
 struct MainView: View {
     @EnvironmentObject var userSession: UserSession
@@ -119,7 +120,7 @@ struct MainView: View {
                                 placeResults: viewModel.searchResults,
                                 userResults: viewModel.userResults,
                                 onSelectPlace: { prediction in
-                                    viewModel.selectPlace(prediction)
+                                    viewModel.selectSuggestion(prediction as! SearchSuggestion)
                                     withAnimation {
                                         isSearchBarMinimized = true
                                         searchIsFocused = false

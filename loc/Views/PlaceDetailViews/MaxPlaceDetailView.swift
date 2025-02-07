@@ -24,7 +24,7 @@ struct MaxPlaceDetailView: View {
                 // CALL Bubble
                 Button(action: {
                     // Check if phoneNumber is non-nil and not empty
-                    if let phoneNumber = selectedPlaceVM.selectedPlace?.phoneNumber,
+                    if let phoneNumber = selectedPlaceVM.selectedPlace?.metadata?.phone,
                        !phoneNumber.isEmpty,
                        let url = URL(string: "tel://\(phoneNumber)") {
                         UIApplication.shared.open(url)

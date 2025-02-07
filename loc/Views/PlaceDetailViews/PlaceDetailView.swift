@@ -70,12 +70,12 @@ struct PlaceDetailView: View {
                     viewModel.loadData(for: place, currentLocation: currentLocation.coordinate)
                 }
             }
-            .onChange(of: selectedPlaceVM.selectedPlace) { newPlace in
-                if let place = newPlace,
-                   let currentLocation = locationManager.currentLocation {
-                    viewModel.loadData(for: place, currentLocation: currentLocation.coordinate)
-                }
-            }
+//            .onChange(of: selectedPlaceVM.selectedPlace) { newPlace in
+//                if let place = newPlace,
+//                   let currentLocation = locationManager.currentLocation {
+//                    viewModel.loadData(for: place, currentLocation: currentLocation.coordinate)
+//                }
+//            }
 
             // Overlay for the enlarged photo
             if let selectedImage {

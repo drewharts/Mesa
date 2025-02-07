@@ -12,7 +12,7 @@ import FirebaseAuth
 struct ContentView: View {
     @EnvironmentObject var userSession: UserSession
     @ObservedObject var locationManager = LocationManager()
-    @StateObject private var selectedPlaceVM = SelectedPlaceViewModel()
+    @StateObject private var selectedPlaceVM = SelectedPlaceViewModel(locationManager:  LocationManager())
 
     var body: some View {
         if userSession.isUserLoggedIn {

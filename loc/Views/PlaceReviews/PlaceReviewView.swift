@@ -8,6 +8,7 @@
 import SwiftUI
 import GooglePlaces
 import PhotosUI
+import MapboxSearch
 
 struct PlaceReviewView: View {
     @Environment(\.presentationMode) var presentationMode: Binding<PresentationMode>
@@ -16,7 +17,7 @@ struct PlaceReviewView: View {
     @State private var showButtonHighlight = false
 
     
-    let place: GMSPlace
+    let place: SearchResult
 
     @StateObject private var viewModel: PlaceReviewViewModel
     
@@ -24,7 +25,7 @@ struct PlaceReviewView: View {
     @State private var showingImagePicker = false
     @State private var inputImages: [UIImage] = []
     
-    init(isPresented: Binding<Bool>, place: GMSPlace, userId: String, userFirstName: String, userLastName: String) {
+    init(isPresented: Binding<Bool>, place: SearchResult, userId: String, userFirstName: String, userLastName: String) {
         self._isPresented = isPresented
         self.place = place
 

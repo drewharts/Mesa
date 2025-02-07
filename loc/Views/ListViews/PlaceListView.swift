@@ -10,14 +10,15 @@
 
 import SwiftUI
 import GooglePlaces
+import MapboxSearch
 
 struct WidePlaceView: View {
     @EnvironmentObject var profile: ProfileViewModel
-    let place: GMSPlace
+    let place: SearchResult
     
     var body: some View {
         HStack(spacing: 16) {
-            if let image = profile.favoritePlaceImages[place.placeID!] {
+            if let image = profile.favoritePlaceImages[place.id] {
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFill()
@@ -30,16 +31,16 @@ struct WidePlaceView: View {
                     .fill(Color.blue.opacity(0.3))
                     .frame(width: 80, height: 80)
                     .cornerRadius(8)
-                    .onAppear {
-                        profile.loadPhoto(for: place.placeID!)
-                    }
+//                    .onAppear {
+//                        profile.loadPhoto(for: place.id)
+//                    }
             }
             
             VStack(alignment: .leading, spacing: 4) {
-                Text(place.name!)
+                Text(place.name)
                     .font(.body)
                     .foregroundStyle(.black)
-                Text(place.formattedAddress!)
+                Text(place.address!.formattedAddress(style: .medium)!)
                     .font(.caption)
                     .foregroundColor(.gray)
             }
@@ -50,14 +51,14 @@ struct WidePlaceView: View {
 }
 
 struct PlaceListView: View {
-    var places: [GMSPlace]
+    var places: [SearchResult]
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @Environment(\.presentationMode) var presentationMode // For dismissing the sheet
 
     var body: some View {
         List {
-            ForEach(places, id: \.placeID) { place in
+            ForEach(places, id: \.id) { place in
                 // Wrap the row in a Button (or NavigationLink) so it’s tappable
                 Button(action: {
                     selectedPlaceVM.selectedPlace = place

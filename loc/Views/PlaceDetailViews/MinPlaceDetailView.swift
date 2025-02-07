@@ -112,7 +112,7 @@ struct MinPlaceDetailView: View {
                     }
                     
                     // Rating label (not a button)
-                    Text(String(format: "%.1f", selectedPlaceVM.selectedPlace!.rating))
+                    Text(String(format: "%.1f", (selectedPlaceVM.selectedPlace!.metadata?.rating)!))
                         .font(.caption)
                         .foregroundColor(.black)
                         .padding(.horizontal, 6)
@@ -173,7 +173,7 @@ struct MinPlaceDetailView: View {
                 switch selectedTab {
                 case .about:
                     // “About” content
-                    Text(selectedPlaceVM.selectedPlace?.editorialSummary ?? "No description available")
+                    Text(selectedPlaceVM.selectedPlace?.metadata?.detailedDescription ?? "No description available")
                         .font(.footnote)
                         .foregroundColor(.black)
                         .fixedSize(horizontal: false, vertical: true)
