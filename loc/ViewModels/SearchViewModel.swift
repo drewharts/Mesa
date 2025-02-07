@@ -53,10 +53,14 @@ class SearchViewModel: ObservableObject {
     }
     
     func selectSuggestion(_ suggestion: SearchSuggestion) {
+        print("🔍 User selected suggestion: \(suggestion.id) - \(suggestion.name)")
+
         mapboxSearchService.selectSuggestion(
             suggestion,
             onResultResolved: { [weak self] result in
                 DispatchQueue.main.async {
+                    print("✅ Resolved result: \(result.id) - \(result.name)")
+
                     self?.selectedPlaceVM?.selectedPlace = result
                     self?.selectedPlaceVM?.isDetailSheetPresented = true
                 }

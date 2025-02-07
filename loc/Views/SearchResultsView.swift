@@ -5,7 +5,7 @@ import GooglePlaces
 struct SearchResultsView: View {
     let placeResults: [SearchSuggestion]
     let userResults: [ProfileData]
-    let onSelectPlace: (SearchResult) -> Void
+    let onSelectPlace: (SearchSuggestion) -> Void
     let onSelectUser: (ProfileData) -> Void
 
     var body: some View {
@@ -23,7 +23,7 @@ struct SearchResultsView: View {
 
 struct PlaceResultsView: View {
     let placeResults: [SearchSuggestion]
-    let onSelectPlace: (SearchResult) -> Void
+    let onSelectPlace: (SearchSuggestion) -> Void
 
     var body: some View {
         if !placeResults.isEmpty {
@@ -36,7 +36,7 @@ struct PlaceResultsView: View {
                     .padding(.top, 10)
                 
                 ForEach(placeResults, id: \.id) { prediction in
-                    Button(action: {}/*action: { onSelectPlace(prediction) }*/) {
+                    Button(action: { onSelectPlace(prediction) }) {
                         VStack(alignment: .center) {
                             Text(prediction.name)
                                 .font(.headline)
@@ -76,7 +76,7 @@ struct UserResultsView: View {
                     .padding(.horizontal, 20)
                 
                 ForEach(userResults) { user in
-                    Button(action: {}/*action: { onSelectUser(user) }*/) {
+                    Button(action: { onSelectUser(user) }) {
                         HStack {
                             // Profile Image Placeholder (Replace with actual image loading)
                             AsyncImage(url: user.profilePhotoURL) { phase in

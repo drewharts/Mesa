@@ -120,7 +120,7 @@ struct MainView: View {
                                 placeResults: viewModel.searchResults,
                                 userResults: viewModel.userResults,
                                 onSelectPlace: { prediction in
-                                    viewModel.selectSuggestion(prediction as! SearchSuggestion)
+                                    viewModel.selectSuggestion(prediction)
                                     withAnimation {
                                         isSearchBarMinimized = true
                                         searchIsFocused = false
