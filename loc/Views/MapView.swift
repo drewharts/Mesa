@@ -6,8 +6,26 @@
 //
 
 import SwiftUI
-import GoogleMaps
-import GooglePlaces
+import MapboxMaps
+
+struct MapView: View {
+
+    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
+    @EnvironmentObject var locationManager: LocationManager
+    @EnvironmentObject var profile: ProfileViewModel
+
+    var onMapTap: (() -> Void)? // Callback to notify when the map is tapped
+
+    var body: some View {
+        let center = CLLocationCoordinate2D(latitude: 39.5, longitude: -98.0)
+        let currentCords = locationManager.currentLocation?.coordinate ?? center
+        Map(initialViewport: .camera(center: currentCords, zoom: 13, bearing: 0, pitch: 0)) {
+            Puck2D()
+            Puck2D(bearing: .heading)
+        }
+    }
+
+}
 
 //struct MapView: UIViewRepresentable {
 //    @Binding var searchResults: [GMSAutocompletePrediction]
