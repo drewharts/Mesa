@@ -37,6 +37,12 @@ class PlaceDetailViewModel: ObservableObject {
         
         self.currentPlaceID = place.id
         
+        self.placeName = place.name ?? "Restaurant"
+//        self.placeIconURL = place.metadata?.primaryImage
+//        self.openingHours = place.metadata?.openHours
+//        self.phoneNumber = place.metadata.phone
+
+        
 //        DispatchQueue.main.async {
 //            self.placeName = place.name ?? "Restaurant"
 //            self.placeIconURL = place.metadata?.primaryImage

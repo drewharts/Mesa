@@ -32,7 +32,7 @@ struct PlaceDetailView: View {
     var body: some View {
         ZStack {
             VStack(spacing: 16) {
-                if viewModel.placeName == "Unknown" && viewModel.photos.isEmpty {
+                if viewModel.placeName == "Unknown" /*&& viewModel.photos.isEmpty*/ {
                     ProgressView("Loading Place Details...")
                 } else {
                     MinPlaceDetailView(viewModel: viewModel, showNoPhoneNumberAlert: $showNoPhoneNumberAlert, selectedImage: $selectedImage)

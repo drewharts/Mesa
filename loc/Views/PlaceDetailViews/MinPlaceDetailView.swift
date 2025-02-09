@@ -111,8 +111,8 @@ struct MinPlaceDetailView: View {
                             )
                     }
                     
-                    // Rating label (not a button)
-                    Text(String(format: "%.1f", (selectedPlaceVM.selectedPlace!.metadata?.rating)!))
+                    // Updated Rating label (adapted for Mapsbox)
+                    Text(String(format: "%.1f", selectedPlaceVM.selectedPlace?.metadata?.rating ?? 0.0))
                         .font(.caption)
                         .foregroundColor(.black)
                         .padding(.horizontal, 6)
@@ -172,7 +172,7 @@ struct MinPlaceDetailView: View {
                 // MARK: - Tab-Specific Content
                 switch selectedTab {
                 case .about:
-                    // “About” content
+                    // "About" content
                     Text(selectedPlaceVM.selectedPlace?.metadata?.detailedDescription ?? "No description available")
                         .font(.footnote)
                         .foregroundColor(.black)
@@ -191,7 +191,7 @@ struct MinPlaceDetailView: View {
                     )
                     
                 case .reviews:
-                    // “Reviews” content
+                    // "Reviews" content
                     Text("Reviews content here...")
                         .font(.footnote)
                         .foregroundColor(.black)
