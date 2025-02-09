@@ -54,7 +54,6 @@ class SearchViewModel: ObservableObject {
     
     func selectSuggestion(_ suggestion: SearchSuggestion) {
         print("🔍 User selected suggestion: \(suggestion.id) - \(suggestion.name)")
-
         mapboxSearchService.selectSuggestion(
             suggestion,
             onResultResolved: { [weak self] result in

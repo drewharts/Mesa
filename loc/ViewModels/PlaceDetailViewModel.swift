@@ -50,7 +50,7 @@ class PlaceDetailViewModel: ObservableObject {
 //            self.phoneNumber = place.metadata.phone
 ////            self.fetchPhotos(for: place)
 ////            self.checkOpenStatus(for: place)
-//            self.updateTravelTime(for: place, from: currentLocation)
+            self.updateTravelTime(for: place, from: currentLocation)
 //        }
     }
     
@@ -105,7 +105,7 @@ class PlaceDetailViewModel: ObservableObject {
 //    }
     
     func updateTravelTime(for place: SearchResult, from userCoordinate: CLLocationCoordinate2D) {
-        let placeCoordinate = place.coordinate // Assuming GMSPlace has a `coordinate` property.
+        let placeCoordinate = place.coordinate
         MapKitService.shared.calculateTravelTime(from: userCoordinate, to: placeCoordinate) { [weak self] timeInterval, error in
             DispatchQueue.main.async {
                 if let error = error {
