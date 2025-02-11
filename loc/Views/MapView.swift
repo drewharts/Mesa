@@ -23,6 +23,9 @@ struct MapView: View {
             Puck2D()
             Puck2D(bearing: .heading)
         }
+        .onTapGesture {
+            self.onMapTap?()
+        }
     }
 
 }

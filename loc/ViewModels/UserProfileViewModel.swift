@@ -109,8 +109,8 @@ class UserProfileViewModel: ObservableObject {
                 
                 // Fetch GMSPlaces for each PlaceList
                 for list in lists {
-                    self.fetchMapboxPlaces(for: list.places) { gmsPlaces in
-                        self.placeListMapboxPlaces[list.id] = gmsPlaces
+                    self.fetchMapboxPlaces(for: list.places) { place in
+                        self.placeListMapboxPlaces[list.id] = place
                     }
                 }
             }

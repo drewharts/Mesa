@@ -44,7 +44,7 @@ class ProfileViewModel: ObservableObject {
             loadImage(from: url)
         }
 //        fetchProfileFavorites(userId: userId)
-//        fetchLists(userId: userId)
+        fetchLists(userId: userId)
         
     }
     func isPlaceInList(listId: UUID, placeId: String) -> Bool {
@@ -54,9 +54,25 @@ class ProfileViewModel: ObservableObject {
         return places.contains { $0.id == placeId }
     }
     
-    func addPlaceToList(listId: UUID, place: SearchResult ) {
+    func addPlaceToList(listId: UUID, place: SearchResult) {
+        let newPlace = Place(
+            name: place.name,
+            address: place.address?.formattedAddress(style: .medium) ?? ""
+        )
+        
         placeListGMSPlaces[listId, default: []].append(place)
-    }
+        
+        firestoreService.addPlaceToList(userId: userId, listName: listId.uuidString, place: newPlace)
+        
+        let detailPlace = DetailPlace(place: newPlace)
+        
+        firestoreService.addToAllPlaces(detailPlace: detailPlace) { error in
+            if let error = error {
+                print("Error adding place: \(error.localizedDescription)")
+            } else {
+                print("Place added successfully!")
+            }
+        }
     
     func removePlaceFromList(listId: UUID, place: SearchResult) {
         if var places = placeListGMSPlaces[listId] {
@@ -66,23 +82,25 @@ class ProfileViewModel: ObservableObject {
                     
             placeListGMSPlaces[listId] = places
         }
+        
+        firestoreService.removePlaceFromList(userId: userId, listName: listId.uuidString, placeId: place.id)
     }
     
-//    private func fetchLists(userId: String) {
-//        firestoreService.fetchLists(userId: userId) { lists in
-//            DispatchQueue.main.async {
-//                self.userLists = lists
-//                
-//                // For each list, fetch its image and any other related data
-//                for list in lists {
-//                    self.fetchListImage(for: list)
-//                    self.fetchGMSPlaces(for: list.places) { gmsPlaces in
-//                        self.placeListGMSPlaces[list.id] = gmsPlaces
-//                    }
-//                }
-//            }
-//        }
-//    }
+    private func fetchLists(userId: String) {
+        firestoreService.fetchLists(userId: userId) { lists in
+            DispatchQueue.main.async {
+                self.userLists = lists
+                
+                // For each list, fetch its image and any other related data
+                for list in lists {
+                    self.fetchListImage(for: list)
+                    self.fetchMapboxPlaces(for: list.places) { gmsPlaces in
+                        self.placeListGMSPlaces[list.id] = gmsPlaces
+                    }
+                }
+            }
+        }
+    }
     
     private func fetchListImage(for list: PlaceList) {
         // Ensure the list has an image URL
@@ -189,7 +207,7 @@ class ProfileViewModel: ObservableObject {
             mapboxSearchService.searchPlaces(query: place.name,
                 onResultsUpdated: { results in
                     if let firstResult = results.first {
-                        fetchedPlaces.append(firstResult as! SearchResult)
+                        fetchedPlaces.append(firstResult)
                     }
                     dispatchGroup.leave()
                 },

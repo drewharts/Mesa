@@ -31,7 +31,9 @@ struct MainView: View {
     var body: some View {
         NavigationView {
             ZStack(alignment: .top) {
-                MapView()
+                MapView(onMapTap: {
+                    searchIsFocused = false
+                })
                 .ignoresSafeArea()
                 .edgesIgnoringSafeArea(.all)
 

@@ -6,9 +6,11 @@
 //
 
 import Foundation
+import FirebaseFirestore
 
 struct Place: Codable,Identifiable {
-    let id: String
+    var id: UUID = UUID()
     let name: String
     let address: String
+
 }

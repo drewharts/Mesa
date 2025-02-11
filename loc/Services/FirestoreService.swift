@@ -287,23 +287,13 @@ class FirestoreService {
 
 
     func addPlaceToList(userId: String, listName: String, place: Place) {
-        let placeDict: [String: Any] = [
-            "id": place.id,
-            "name": place.name,
-            "address": place.address
-        ]
-
-        db.collection("users").document(userId)
-            .collection("placeLists").document(listName)
-            .setData(["places": FieldValue.arrayUnion([placeDict])], merge: true) { error in
-                if let error = error {
-                    print("Error adding place to list: \(error.localizedDescription)")
-                } else {
-                    print("Place successfully added to list: \(listName)")
-                    
-                    self.addOrUpdateMapPlace(for: userId, place: place, type: "list", listId: listName)
-                }
-            }
+        do {
+            try db.collection("users").document(userId)
+                .collection("placeLists").document(listName)
+                .updateData(["places": FieldValue.arrayUnion([try Firestore.Encoder().encode(place)])])
+        } catch {
+            print("Error encoding place: \(error.localizedDescription)")
+        }
     }
     
     func removePlaceFromList(userId: String, listName: String, placeId: String) {
@@ -330,8 +320,10 @@ class FirestoreService {
 
     func createNewList(placeList: PlaceList,userID: String) {
         do {
+            let listIdString = placeList.id.uuidString // Convert UUID to String
+
             try db.collection("users").document(userID)
-                .collection("placeLists").document(placeList.name)
+                .collection("placeLists").document(listIdString)
                 .setData(from: placeList) { error in
                     if let error = error {
                         print("Error creating new list: \(error.localizedDescription)")
@@ -539,6 +531,19 @@ class FirestoreService {
                     completion(places)
                 }
             }
+    }
+    
+    func addToAllPlaces(detailPlace: DetailPlace, completion: @escaping (Error?) -> Void) {
+        let detailPlaceId = detailPlace.id.uuidString // Convert UUID to String
+        let placeRef = db.collection("places").document(detailPlaceId)
+        
+        do {
+            try placeRef.setData(from: detailPlace) { error in
+                completion(error)
+            }
+        } catch {
+            completion(error)
+        }
     }
 
 
