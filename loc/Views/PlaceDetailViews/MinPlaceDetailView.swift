@@ -15,7 +15,6 @@ struct MinPlaceDetailView: View {
     @EnvironmentObject var locationManager: LocationManager
 
     @Binding var showNoPhoneNumberAlert: Bool
-//    let place: GMSPlace
     
     @Binding var selectedImage: UIImage?
     
@@ -112,7 +111,7 @@ struct MinPlaceDetailView: View {
                     }
                     
                     // Updated Rating label (adapted for Mapsbox)
-                    Text(String(format: "%.1f", selectedPlaceVM.selectedPlace?.metadata?.rating ?? 0.0))
+                    Text(String(format: "%.1f", selectedPlaceVM.selectedPlace?.rating ?? 0.0))
                         .font(.caption)
                         .foregroundColor(.black)
                         .padding(.horizontal, 6)
@@ -173,7 +172,7 @@ struct MinPlaceDetailView: View {
                 switch selectedTab {
                 case .about:
                     // "About" content
-                    Text(selectedPlaceVM.selectedPlace?.metadata?.detailedDescription ?? "No description available")
+                    Text(selectedPlaceVM.selectedPlace?.description ?? "No description available")
                         .font(.footnote)
                         .foregroundColor(.black)
                         .fixedSize(horizontal: false, vertical: true)

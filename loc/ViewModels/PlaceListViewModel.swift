@@ -81,58 +81,58 @@ class PlaceListViewModel: ObservableObject, Identifiable {
 
 
 
-    func addPlace(_ place: GMSPlace) {
-        if let placeID = place.placeID {
-            let newPlace = Place(
-                id: placeID,
-                name: place.name ?? "",
-                address: place.formattedAddress ?? ""
-            )
-            placeViewModels.append(PlaceViewModel(place: newPlace))
-            placeList.places.append(newPlace)
-            firestoreService.addPlaceToList(userId: userId, listName: placeList.name, place: newPlace)
-        }
-    }
+//    func addPlace(_ place: GMSPlace) {
+//        if let placeID = place.placeID {
+//            let newPlace = Place(
+//                id: placeID,
+//                name: place.name ?? "",
+//                address: place.formattedAddress ?? ""
+//            )
+//            placeViewModels.append(PlaceViewModel(place: newPlace))
+//            placeList.places.append(newPlace)
+//            firestoreService.addPlaceToList(userId: userId, listName: placeList.name, place: newPlace)
+//        }
+//    }
 
-    func removePlace(_ place: GMSPlace) {
-        if let placeID = place.placeID {
-            // Remove from local view models
-            if let index = placeViewModels.firstIndex(where: { $0.id == placeID }) {
-                placeViewModels.remove(at: index)
-            }
-            
-            // Remove from placeList.places
-            placeList.places.removeAll { $0.id == placeID }
-            
-            // Remove from Firestore
-            firestoreService.removePlaceFromList(userId: userId, listName: placeList.name, placeId: place.placeID!)
-        } else {
-            // Handle cases where placeID is nil
-            print("Error: Cannot remove place. Invalid placeID.")
-        }
-    }
-
-    func fetchFullPlaces(completion: @escaping ([GMSPlace]) -> Void) {
-        let placesClient = GMSPlacesClient.shared()
-        var fullPlaces: [GMSPlace] = []
-        let dispatchGroup = DispatchGroup()
-
-        for simplifiedPlace in placeList.places {
-            dispatchGroup.enter()
-            placesClient.lookUpPlaceID(simplifiedPlace.id) { place, error in
-                if let place = place {
-                    fullPlaces.append(place)
-                } else if let error = error {
-                    print("Error fetching place: \(error.localizedDescription)")
-                }
-                dispatchGroup.leave()
-            }
-        }
-
-        dispatchGroup.notify(queue: .main) {
-            completion(fullPlaces)
-        }
-    }
+//    func removePlace(_ place: GMSPlace) {
+//        if let placeID = place.placeID {
+//            // Remove from local view models
+//            if let index = placeViewModels.firstIndex(where: { $0.id == placeID }) {
+//                placeViewModels.remove(at: index)
+//            }
+//            
+//            // Remove from placeList.places
+//            placeList.places.removeAll { $0.id == placeID }
+//            
+//            // Remove from Firestore
+//            firestoreService.removePlaceFromList(userId: userId, listName: placeList.name, placeId: place.placeID!)
+//        } else {
+//            // Handle cases where placeID is nil
+//            print("Error: Cannot remove place. Invalid placeID.")
+//        }
+//    }
+//
+//    func fetchFullPlaces(completion: @escaping ([GMSPlace]) -> Void) {
+//        let placesClient = GMSPlacesClient.shared()
+//        var fullPlaces: [GMSPlace] = []
+//        let dispatchGroup = DispatchGroup()
+//
+//        for simplifiedPlace in placeList.places {
+//            dispatchGroup.enter()
+//            placesClient.lookUpPlaceID(simplifiedPlace.id) { place, error in
+//                if let place = place {
+//                    fullPlaces.append(place)
+//                } else if let error = error {
+//                    print("Error fetching place: \(error.localizedDescription)")
+//                }
+//                dispatchGroup.leave()
+//            }
+//        }
+//
+//        dispatchGroup.notify(queue: .main) {
+//            completion(fullPlaces)
+//        }
+//    }
 
     func addPhotoToList(image: UIImage) {
         self.image = image // Set the image in the view model

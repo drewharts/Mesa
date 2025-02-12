@@ -14,11 +14,11 @@ import MapboxSearch
 
 struct WidePlaceView: View {
     @EnvironmentObject var profile: ProfileViewModel
-    let place: SearchResult
+    let place: DetailPlace
     
     var body: some View {
         HStack(spacing: 16) {
-            if let image = profile.favoritePlaceImages[place.id] {
+            if let image = profile.favoritePlaceImages[place.id.uuidString] {
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFill()
@@ -40,7 +40,7 @@ struct WidePlaceView: View {
                 Text(place.name)
                     .font(.body)
                     .foregroundStyle(.black)
-                Text(place.address!.formattedAddress(style: .medium)!)
+                Text(place.address!)
                     .font(.caption)
                     .foregroundColor(.gray)
             }
@@ -51,7 +51,7 @@ struct WidePlaceView: View {
 }
 
 struct PlaceListView: View {
-    var places: [SearchResult]
+    var places: [DetailPlace]
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @Environment(\.presentationMode) var presentationMode // For dismissing the sheet

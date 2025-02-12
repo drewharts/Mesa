@@ -9,6 +9,7 @@ import SwiftUI
 import Combine
 import MapboxSearch
 import CoreLocation
+import FirebaseFirestore
 
 class SearchViewModel: ObservableObject {
     @Published var searchText = ""  // User's search input
@@ -52,6 +53,32 @@ class SearchViewModel: ObservableObject {
         )
     }
     
+    private func searchResultToDetailPlace(place: SearchResult) -> DetailPlace {
+        let uuid = UUID(uuidString: place.id) ?? UUID()
+
+        var detailPlace = DetailPlace(id: uuid, name: place.name,address: place.address?.formattedAddress(style: .medium) ?? "")
+        
+        detailPlace.mapboxId = place.id
+        detailPlace.coordinate = GeoPoint(
+            latitude: Double(place.coordinate.latitude),
+            longitude: Double(place.coordinate.longitude)
+        )
+        detailPlace.categories = place.categories
+        detailPlace.phone = place.metadata?.phone
+        detailPlace.rating = place.metadata?.rating ?? 0
+        detailPlace.description = place.metadata?.description ?? ""
+        detailPlace.priceLevel = place.metadata?.priceLevel
+        detailPlace.reservable = place.metadata?.reservable ?? false
+        detailPlace.servesBreakfast = place.metadata?.servesBreakfast ?? false
+        detailPlace.serversLunch = place.metadata?.servesLunch ?? false
+        detailPlace.serversDinner = place.metadata?.servesDinner ?? false
+        detailPlace.Instagram = place.metadata?.instagram
+        detailPlace.X = place.metadata?.twitter
+        
+        return detailPlace
+        
+    }
+    
     func selectSuggestion(_ suggestion: SearchSuggestion) {
         print("🔍 User selected suggestion: \(suggestion.id) - \(suggestion.name)")
         mapboxSearchService.selectSuggestion(
@@ -60,7 +87,7 @@ class SearchViewModel: ObservableObject {
                 DispatchQueue.main.async {
                     print("✅ Resolved result: \(result.id) - \(result.name)")
 
-                    self?.selectedPlaceVM?.selectedPlace = result
+                    self?.selectedPlaceVM?.selectedPlace = self!.searchResultToDetailPlace(place: result)
                     self?.selectedPlaceVM?.isDetailSheetPresented = true
                 }
             }

@@ -15,9 +15,9 @@ class UserProfileViewModel: ObservableObject {
     @Published var selectedUser: ProfileData?
     @Published var isUserDetailPresented = false
     
-    @Published var userFavorites: [SearchResult] = []
+    @Published var userFavorites: [DetailPlace] = []
     @Published var userLists: [PlaceList] = []
-    @Published var placeListMapboxPlaces: [UUID: [SearchResult]] = [:] // Store places per list
+    @Published var placeListMapboxPlaces: [UUID: [DetailPlace]] = [:] // Store places per list
     @Published var placeImages: [String: UIImage] = [:] // Store images by placeID
     @Published var isFollowing: Bool = false  // ✅ Track follow state
     
@@ -94,7 +94,7 @@ class UserProfileViewModel: ObservableObject {
                     print("No favorite places found.")
                     self.userFavorites = []
                 } else {
-                    self.fetchMapboxPlaces(for: places) { gmsPlaces in
+                    self.fetchFirestorePlaces(for: places) { gmsPlaces in
                         self.userFavorites = gmsPlaces
                     }
                 }
@@ -109,7 +109,7 @@ class UserProfileViewModel: ObservableObject {
                 
                 // Fetch GMSPlaces for each PlaceList
                 for list in lists {
-                    self.fetchMapboxPlaces(for: list.places) { place in
+                    self.fetchFirestorePlaces(for: list.places) { place in
                         self.placeListMapboxPlaces[list.id] = place
                     }
                 }
@@ -117,28 +117,27 @@ class UserProfileViewModel: ObservableObject {
         }
     }
 
-    private func fetchMapboxPlaces(for places: [Place], completion: @escaping ([SearchResult]) -> Void) {
-        var fetchedPlaces: [SearchResult] = []
+    func fetchFirestorePlaces(for places: [Place], completion: @escaping ([DetailPlace]) -> Void) {
+        var fetchedPlaces: [DetailPlace] = []
         let dispatchGroup = DispatchGroup()
-
+        
         for place in places {
             dispatchGroup.enter()
             
-            // Perform search using place name or other identifiers
-            mapboxSearchService.searchPlaces(query: place.name,
-                onResultsUpdated: { results in
-                    if let firstResult = results.first {
-                        fetchedPlaces.append(firstResult as! SearchResult)
-                    }
-                    dispatchGroup.leave()
-                },
-                onError: { error in
-                    print("Error fetching place from Mapbox: \(error)")
-                    dispatchGroup.leave()
+            // Convert the UUID to a String since Firestore expects document IDs as Strings.
+            let documentId = place.id.uuidString
+            
+            firestoreService.fetchPlace(withId: documentId) { result in
+                switch result {
+                case .success(let detailPlace):
+                    fetchedPlaces.append(detailPlace)
+                case .failure(let error):
+                    print("Error fetching place from Firestore: \(error.localizedDescription)")
                 }
-            )
+                dispatchGroup.leave()
+            }
         }
-
+        
         dispatchGroup.notify(queue: .main) {
             DispatchQueue.main.async {
                 completion(fetchedPlaces)

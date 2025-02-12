@@ -31,7 +31,7 @@ struct ListDescription: View {
 struct ListSelectionRowView: View {
     @EnvironmentObject var profile: ProfileViewModel
     let list: PlaceList
-    let place: SearchResult
+    let place: DetailPlace
 
     var body: some View {
         Button(action: {
@@ -74,7 +74,7 @@ struct ListSelectionRowView: View {
     }
 
     private func togglePlaceInList() {
-        let isAdded = profile.isPlaceInList(listId: list.id, placeId: place.id)
+        let isAdded = profile.isPlaceInList(listId: list.id, placeId: place.id.uuidString)
         if isAdded {
             profile.removePlaceFromList(listId: list.id, place: place)
         } else {
@@ -86,7 +86,7 @@ struct ListSelectionRowView: View {
 // MARK: - ListsInSelectionSheet
 struct ListsInSelectionSheet: View {
     @EnvironmentObject var profile: ProfileViewModel
-    let place: SearchResult
+    let place: DetailPlace
 
     var body: some View {
         ScrollView {
@@ -107,7 +107,7 @@ struct ListsInSelectionSheet: View {
 struct ListSelectionSheet: View {
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var lists: PlaceListViewModel
-    let place: SearchResult
+    let place: DetailPlace
     @Binding var isPresented: Bool
     @State private var showNewListSheet = false
     @State private var newListName = ""

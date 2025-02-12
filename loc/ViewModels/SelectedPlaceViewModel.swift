@@ -11,7 +11,7 @@ import MapboxSearch
 import CoreLocation
 
 class SelectedPlaceViewModel: ObservableObject {
-    @Published var selectedPlace: (any SearchResult)? {
+    @Published var selectedPlace: ( DetailPlace)? {
         didSet {
             if let place = selectedPlace,
                let currentLocation = locationManager.currentLocation {
@@ -29,7 +29,7 @@ class SelectedPlaceViewModel: ObservableObject {
         self.locationManager = locationManager
     }
     
-    private func loadData(for place: any SearchResult, currentLocation: CLLocationCoordinate2D) {
+    private func loadData(for place: DetailPlace, currentLocation: CLLocationCoordinate2D) {
         print("Loading data for \(place.name) at location \(currentLocation)")
         isDetailSheetPresented = true
     }

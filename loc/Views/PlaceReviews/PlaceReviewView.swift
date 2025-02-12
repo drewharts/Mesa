@@ -17,7 +17,7 @@ struct PlaceReviewView: View {
     @State private var showButtonHighlight = false
 
     
-    let place: SearchResult
+    let place: DetailPlace
 
     @StateObject private var viewModel: PlaceReviewViewModel
     
@@ -25,7 +25,7 @@ struct PlaceReviewView: View {
     @State private var showingImagePicker = false
     @State private var inputImages: [UIImage] = []
     
-    init(isPresented: Binding<Bool>, place: SearchResult, userId: String, userFirstName: String, userLastName: String) {
+    init(isPresented: Binding<Bool>, place: DetailPlace, userId: String, userFirstName: String, userLastName: String) {
         self._isPresented = isPresented
         self.place = place
 

@@ -31,21 +31,43 @@ struct DetailPlace: Codable, Identifiable {
         self.X = nil
         
     }
+    
+    init(id: UUID, name: String, address: String?) {
+        self.id = id
+        self.name = name
+        self.address = address
+        
+        // Set all other optional properties to nil
+        self.mapboxId = nil
+        self.coordinate = nil
+        self.categories = nil
+        self.phone = nil
+        self.rating = nil
+        self.OpenHours = nil
+        self.description = nil
+        self.priceLevel = nil
+        self.reservable = nil
+        self.servesBreakfast = nil
+        self.serversLunch = nil
+        self.serversDinner = nil
+        self.Instagram = nil
+        self.X = nil
+    }
     var id: UUID = UUID()
-    let name: String
-    let address: String?
-    let mapboxId: String?
-    let coordinate: GeoPoint?
-    let categories: [String]?
-    let phone: String?
-    let rating: Double?
-    let OpenHours: [String]?
-    let description: String?
-    let priceLevel: String?
-    let reservable: Bool?
-    let servesBreakfast: Bool?
-    let serversLunch: Bool?
-    let serversDinner: Bool?
-    let Instagram: String?
-    let X: String?
+    var name: String
+    var address: String?
+    var mapboxId: String?
+    var coordinate: GeoPoint?
+    var categories: [String]?
+    var phone: String?
+    var rating: Double?
+    var OpenHours: [String]?
+    var description: String?
+    var priceLevel: String?
+    var reservable: Bool?
+    var servesBreakfast: Bool?
+    var serversLunch: Bool?
+    var serversDinner: Bool?
+    var Instagram: String?
+    var X: String?
 }

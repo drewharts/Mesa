@@ -9,6 +9,9 @@ import SwiftUI
 import Combine
 import GooglePlaces
 import MapboxSearch
+import Foundation
+import FirebaseFirestore
+
 
 class ProfileViewModel: ObservableObject {
     @Published var data: ProfileData
@@ -16,11 +19,11 @@ class ProfileViewModel: ObservableObject {
     
     // Lists new implementation
     @Published var userLists: [PlaceList] = []
-    @Published var placeListGMSPlaces: [UUID: [SearchResult]] = [:] // Store places per list
+    @Published var placeListGMSPlaces: [UUID: [DetailPlace]] = [:] // Store places per list
     @Published var listImages: [UUID: UIImage] = [:]
     
     // Favorite places new implementation
-    @Published var userFavorites: [SearchResult] = []
+    @Published var userFavorites: [DetailPlace] = []
     @Published var placeImages: [String: UIImage] = [:] // Store images by placeID
     @Published var favoritePlaceViewModels: [PlaceViewModel] = []
     @Published var favoritePlaceImages: [String: UIImage] = [:]
@@ -54,22 +57,21 @@ class ProfileViewModel: ObservableObject {
         guard let places = placeListGMSPlaces[listId] else {
             return false
         }
-        return places.contains { $0.id == placeId }
+        return places.contains { $0.id.uuidString == placeId }
     }
     
-    func addPlaceToList(listId: UUID, place: SearchResult) {
+    func addPlaceToList(listId: UUID, place: DetailPlace) {
         let newPlace = Place(
             name: place.name,
-            address: place.address?.formattedAddress(style: .medium) ?? ""
+            address: place.address!
         )
+//        var detailPlace = searchResultToDetailPlace(place: place)
         
         placeListGMSPlaces[listId, default: []].append(place)
         
         firestoreService.addPlaceToList(userId: userId, listName: listId.uuidString, place: newPlace)
-        
-        let detailPlace = DetailPlace(place: newPlace)
-        
-        firestoreService.addToAllPlaces(detailPlace: detailPlace) { error in
+                
+        firestoreService.addToAllPlaces(detailPlace: place) { error in
             if let error = error {
                 print("Error adding place: \(error.localizedDescription)")
             } else {
@@ -78,12 +80,38 @@ class ProfileViewModel: ObservableObject {
         }
     }
     
-    func removePlaceFromList(listId: UUID, place: SearchResult) {
+    private func searchResultToDetailPlace(place: SearchResult) -> DetailPlace {
+        let uuid = UUID(uuidString: place.id) ?? UUID()
+
+        var detailPlace = DetailPlace(id: uuid, name: place.name,address: place.address?.formattedAddress(style: .medium) ?? "")
+        
+        detailPlace.mapboxId = place.id
+        detailPlace.coordinate = GeoPoint(
+            latitude: Double(place.coordinate.latitude),
+            longitude: Double(place.coordinate.longitude)
+        )
+        detailPlace.categories = place.categories
+        detailPlace.phone = place.metadata?.phone
+        detailPlace.rating = place.metadata?.rating ?? 0
+        detailPlace.description = place.metadata?.description ?? ""
+        detailPlace.priceLevel = place.metadata?.priceLevel
+        detailPlace.reservable = place.metadata?.reservable ?? false
+        detailPlace.servesBreakfast = place.metadata?.servesBreakfast ?? false
+        detailPlace.serversLunch = place.metadata?.servesLunch ?? false
+        detailPlace.serversDinner = place.metadata?.servesDinner ?? false
+        detailPlace.Instagram = place.metadata?.instagram
+        detailPlace.X = place.metadata?.twitter
+        
+        return detailPlace
+        
+    }
+    
+    func removePlaceFromList(listId: UUID, place: DetailPlace) {
         if var places = placeListGMSPlaces[listId] {
-            places.removeAll { $0.id == place.id }
+            places.removeAll { $0.id.uuidString == place.id.uuidString }
             placeListGMSPlaces[listId] = places
         }
-        firestoreService.removePlaceFromList(userId: userId, listName: listId.uuidString, placeId: place.id)
+        firestoreService.removePlaceFromList(userId: userId, listName: listId.uuidString, placeId: place.id.uuidString)
     }
     
     private func fetchLists(userId: String) {
@@ -94,7 +122,7 @@ class ProfileViewModel: ObservableObject {
                 // For each list, fetch its image and any other related data
                 for list in lists {
                     self.fetchListImage(for: list)
-                    self.fetchMapboxPlaces(for: list.places) { gmsPlaces in
+                    self.fetchFirestorePlaces(for: list.places) { gmsPlaces in
                         self.placeListGMSPlaces[list.id] = gmsPlaces
                     }
                 }
@@ -120,21 +148,27 @@ class ProfileViewModel: ObservableObject {
     
     // MARK: - Favorite Places Management
     
-    func addFavoritePlace(place: SearchResult) {
+    func addFavoritePlace(place: DetailPlace) {
         // Append the place to local state and add to Firestore
         userFavorites.append(place)
+        
+        guard let uuid = UUID(uuidString: place.id.uuidString) else {
+            print("Invalid UUID string: \(place.id)")
+            return
+        }
+        
         let newPlace = Place(
-            id: place.id,
+            id: uuid,
             name: place.name,
-            address: place.address!.formattedAddress(style: .medium)!
+            address: place.address!
         )
         firestoreService.addProfileFavorite(userId: userId, place: newPlace)
     }
     
-    func removeFavoritePlace(place: SearchResult) {
-        if let index = userFavorites.firstIndex(where: { $0.id == place.id }) {
+    func removeFavoritePlace(place: DetailPlace) {
+        if let index = userFavorites.firstIndex(where: { $0.id.uuidString == place.id.uuidString }) {
             userFavorites.remove(at: index)
-            firestoreService.removeProfileFavorite(userId: userId, placeId: place.id)
+            firestoreService.removeProfileFavorite(userId: userId, placeId: place.id.uuidString)
         }
     }
     
@@ -148,24 +182,25 @@ class ProfileViewModel: ObservableObject {
     
     // MARK: - Mapbox Search
     
-    func fetchMapboxPlaces(for places: [Place], completion: @escaping ([SearchResult]) -> Void) {
-        var fetchedPlaces: [SearchResult] = []
+    func fetchFirestorePlaces(for places: [Place], completion: @escaping ([DetailPlace]) -> Void) {
+        var fetchedPlaces: [DetailPlace] = []
         let dispatchGroup = DispatchGroup()
         
         for place in places {
             dispatchGroup.enter()
             
-            mapboxSearchService.searchPlaces(query: place.name,
-                                             onResultsUpdated: { results in
-                if let firstResult = results.first {
-                    fetchedPlaces.append(firstResult)
+            // Convert the UUID to a String since Firestore expects document IDs as Strings.
+            let documentId = place.id.uuidString
+            
+            firestoreService.fetchPlace(withId: documentId) { result in
+                switch result {
+                case .success(let detailPlace):
+                    fetchedPlaces.append(detailPlace)
+                case .failure(let error):
+                    print("Error fetching place from Firestore: \(error.localizedDescription)")
                 }
                 dispatchGroup.leave()
-            },
-                                             onError: { error in
-                print("Error fetching place from Mapbox: \(error)")
-                dispatchGroup.leave()
-            })
+            }
         }
         
         dispatchGroup.notify(queue: .main) {

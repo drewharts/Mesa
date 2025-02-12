@@ -10,7 +10,7 @@ import GooglePlaces
 import MapboxSearch
 
 struct UserProfileFavoritesView: View {
-    var userFavorites: [SearchResult]
+    var userFavorites: [DetailPlace]
     var placeImages: [String: UIImage]
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @Environment(\.presentationMode) var presentationMode // For dismissing the sheet
@@ -28,7 +28,7 @@ struct UserProfileFavoritesView: View {
                 HStack {
                     ForEach(userFavorites, id: \.id) { place in
                         VStack {
-                            if let image = placeImages[place.id] {
+                            if let image = placeImages[place.id.uuidString] {
                                 Image(uiImage: image)
                                     .resizable()
                                     .scaledToFill()

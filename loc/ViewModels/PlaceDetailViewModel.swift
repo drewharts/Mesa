@@ -31,11 +31,11 @@ class PlaceDetailViewModel: ObservableObject {
         // Empty. We'll call loadData(for:) later.
     }
 
-    func loadData(for place: SearchResult, currentLocation: CLLocationCoordinate2D) {
+    func loadData(for place: DetailPlace, currentLocation: CLLocationCoordinate2D) {
         // If we already loaded this place, do nothing (optional).
-        if currentPlaceID == place.id { return }
+        if currentPlaceID == place.id.uuidString { return }
         
-        self.currentPlaceID = place.id
+        self.currentPlaceID = place.id.uuidString
         
         self.placeName = place.name ?? "Restaurant"
 //        self.placeIconURL = place.metadata?.primaryImage
@@ -54,8 +54,19 @@ class PlaceDetailViewModel: ObservableObject {
 //        }
     }
     
-    func openNavigation(for place: SearchResult, currentLocation: CLLocationCoordinate2D) {
-        let destinationCoordinate = place.coordinate 
+    func openNavigation(for place: DetailPlace, currentLocation: CLLocationCoordinate2D) {
+        // Unwrap the GeoPoint from place.coordinate
+        guard let geoPoint = place.coordinate else {
+            print("No coordinate available for this place.")
+            return
+        }
+        
+        // Convert GeoPoint to CLLocationCoordinate2D.
+        let destinationCoordinate = CLLocationCoordinate2D(
+            latitude: geoPoint.latitude,
+            longitude: geoPoint.longitude
+        )
+        
         let destinationPlacemark = MKPlacemark(coordinate: destinationCoordinate)
         let destinationMapItem = MKMapItem(placemark: destinationPlacemark)
         destinationMapItem.name = place.name
@@ -104,8 +115,18 @@ class PlaceDetailViewModel: ObservableObject {
 //        }
 //    }
     
-    func updateTravelTime(for place: SearchResult, from userCoordinate: CLLocationCoordinate2D) {
-        let placeCoordinate = place.coordinate
+    func updateTravelTime(for place: DetailPlace, from userCoordinate: CLLocationCoordinate2D) {
+        // Unwrap the GeoPoint; if it's nil, set travelTime to "N/A" and return.
+        guard let geoPoint = place.coordinate else {
+            DispatchQueue.main.async { [weak self] in
+                self?.travelTime = "N/A"
+            }
+            return
+        }
+        
+        // Convert GeoPoint to CLLocationCoordinate2D.
+        let placeCoordinate = CLLocationCoordinate2D(latitude: geoPoint.latitude, longitude: geoPoint.longitude)
+        
         MapKitService.shared.calculateTravelTime(from: userCoordinate, to: placeCoordinate) { [weak self] timeInterval, error in
             DispatchQueue.main.async {
                 if let error = error {
@@ -113,18 +134,13 @@ class PlaceDetailViewModel: ObservableObject {
                     self?.travelTime = "N/A"
                 } else if let timeInterval = timeInterval {
                     let minutes = timeInterval / 60.0
-                    if minutes > 60 {
-                        self?.travelTime = "60+ min"
-                    } else {
-                        self?.travelTime = String(format: "%.0f min", minutes)
-                    }
+                    self?.travelTime = minutes > 60 ? "60+ min" : String(format: "%.0f min", minutes)
                 } else {
                     self?.travelTime = "N/A"
                 }
             }
         }
     }
-    
     
     
     /// Checks if the restaurant is open right now using the recommended isOpen API.
@@ -151,7 +167,7 @@ class PlaceDetailViewModel: ObservableObject {
         // directions logic
     }
 
-    func getRestaurantType(for place: SearchResult) -> String? {
+    func getRestaurantType(for place: DetailPlace) -> String? {
         let recognizedTypes = [
             "American", "Japanese", "Korean", "Mexican",
             "Italian", "Chinese", "Greek", "Vietnamese"

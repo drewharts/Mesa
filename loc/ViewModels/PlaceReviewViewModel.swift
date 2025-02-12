@@ -24,14 +24,14 @@ class PlaceReviewViewModel: ObservableObject {
     @Published var errorMessage: String?
 
     // MARK: - Private/Internal
-    private let place: SearchResult
+    private let place: DetailPlace
     private let userId: String
     private let userFirstName: String
     private let userLastName: String
     private let firestoreService: FirestoreService
 
     // MARK: - Init
-    init(place: SearchResult,
+    init(place: DetailPlace,
          userId: String,
          userFirstName: String,
          userLastName: String,
@@ -53,7 +53,7 @@ class PlaceReviewViewModel: ObservableObject {
             userId: userId,
             userFirstName: userFirstName,
             userLastName: userLastName,
-            placeId: place.id ?? "unknown_place_id",
+            placeId: place.id.uuidString ?? "unknown_place_id",
             placeName: place.name ?? "Unnamed Place",
             foodRating: foodRating,
             serviceRating: serviceRating,
