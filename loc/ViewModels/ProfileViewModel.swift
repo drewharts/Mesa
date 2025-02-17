@@ -62,6 +62,7 @@ class ProfileViewModel: ObservableObject {
     
     func addPlaceToList(listId: UUID, place: DetailPlace) {
         let newPlace = Place(
+            id: place.id,
             name: place.name,
             address: place.address!
         )
