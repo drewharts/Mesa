@@ -78,7 +78,7 @@ struct ProfileFavoriteListView: View {
         }
         // Present AddFavoritesView in a sheet
         .sheet(isPresented: $showSearch) {
-//            AddFavoritesView()
+            AddFavoritesView()
         }
     }
 }

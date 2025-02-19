@@ -173,6 +173,25 @@ class ProfileViewModel: ObservableObject {
         }
     }
     
+    func addFavoriteFromSuggestion(_ suggestion: SearchSuggestion) {
+        print("🔍 User selected suggestion: \(suggestion.id) - \(suggestion.name)")
+        
+        // Resolve the suggestion to a SearchResult using your Mapbox search service.
+        mapboxSearchService.selectSuggestion(suggestion) { [weak self] result in
+            guard let self = self else { return }
+            
+            DispatchQueue.main.async {
+                print("✅ Resolved result: \(result.id) - \(result.name)")
+                
+                // Convert the SearchResult into a DetailPlace.
+                let detailPlace = self.searchResultToDetailPlace(place: result)
+                
+                // Add the DetailPlace to the favorites.
+                self.addFavoritePlace(place: detailPlace)
+            }
+        }
+    }
+    
     func numberOfFavoritePlaces() -> Int {
         return favoritePlaceViewModels.count
     }

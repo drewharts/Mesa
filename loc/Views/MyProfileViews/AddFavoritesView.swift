@@ -7,6 +7,7 @@
 
 import SwiftUI
 import GooglePlaces
+import MapboxSearch
 
 struct AddFavoritesCurrentFavoritesView: View {
     @EnvironmentObject var profile: ProfileViewModel
@@ -47,83 +48,95 @@ struct AddFavoritesCurrentFavoritesView: View {
     }
 }
 
-//struct AddFavoritesView: View {
-//    @EnvironmentObject var userSession: UserSession
-//    @EnvironmentObject var profile: ProfileViewModel  // Using the ProfileViewModel directly
-//    
-//    @StateObject private var viewModel = SearchViewModel()
-//    @FocusState private var searchBarFocus: Bool
-//    
-//    @State private var lastTappedPlaceID: String?
-//
-//    var body: some View {
-//        NavigationStack {
-//            VStack(spacing: 16) {
-//                
-//                // SEARCH BAR
-//                SearchBar(text: $viewModel.searchText)
-//                    .focused($searchBarFocus)
-//                    .padding(.horizontal, 20)
-//                    .padding(.top, 10)
-//                
-//                // Current Favorites
-//                AddFavoritesCurrentFavoritesView()
-//                
-//                // SEARCH RESULTS
-//                if !viewModel.searchResults.isEmpty {
-//                    List(viewModel.searchResults, id: \.self) { prediction in
-//                        // Use a ZStack to layer the onTapGesture over the entire row
-//                        ZStack {
-//                            // Existing HStack for content display
-//                            HStack {
-//                                Text(prediction.attributedPrimaryText.string)
-//                                    .foregroundColor(.primary)
-//                                Spacer()
-//                            }
-//                            .padding(.vertical, 6)
-//                            .background(
-//                                prediction.placeID == lastTappedPlaceID
-//                                    ? Color.blue.opacity(0.2)
-//                                    : Color.clear
-//                            )
-//
-//                            // Transparent rectangle to capture taps over the entire row
-//                            Rectangle()
-//                                .fill(Color.clear) // Makes the rectangle transparent
-//                                .contentShape(Rectangle()) // Makes the entire rectangle tappable, not just the area with content
-//                                .onTapGesture {
-//                                    // 1) Append to favorites (directly via ProfileViewModel)
-//                                    profile.addFavoritePlace(prediction: prediction)
-//
-//                                    // 2) Highlight this row
-//                                    lastTappedPlaceID = prediction.placeID
-//
-//                                    // 3) Clear highlight after 2 seconds
-//                                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-//                                        withAnimation {
-//                                            lastTappedPlaceID = nil
-//                                        }
-//                                    }
-//                                }
-//                        }
-//                    }
-//                    .listStyle(.plain)
-//                }
-//            }
-//            .navigationTitle("Add to Favorites")
-//            .navigationBarTitleDisplayMode(.inline)
-//            .onAppear {
-//                // Auto-focus the search bar
-//                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-//                    self.searchBarFocus = true
-//                }
-//            }
-//        }
-//        // Alert to notify user if they’ve hit the 4-favorite limit
-//        .alert("Max Favorites Reached", isPresented: $profile.showMaxFavoritesAlert) {
-//            Button("OK", role: .cancel) { }
-//        } message: {
-//            Text("You already have 4 favorites. Remove one before adding a new one.")
-//        }
-//    }
-//}
+struct FavoritesContentDisplay: View {
+    @EnvironmentObject var profile: ProfileViewModel
+    var prediction: SearchSuggestion
+    @State private var lastTappedPlaceID: String?
+
+    var body: some View {
+        ZStack {
+            // Existing HStack for content display
+            HStack {
+                Text(prediction.name)
+                    .foregroundColor(.primary)
+                Spacer()
+            }
+            .padding(.vertical, 6)
+            .background(
+                prediction.id == lastTappedPlaceID
+                    ? Color.blue.opacity(0.2)
+                    : Color.clear
+            )
+
+            // Transparent rectangle to capture taps over the entire row
+            Rectangle()
+                .fill(Color.clear) // Makes the rectangle transparent
+                .contentShape(Rectangle()) // Makes the entire rectangle tappable, not just the area with content
+                .onTapGesture {
+                    // 1) Append to favorites (directly via ProfileViewModel)
+                    profile.addFavoriteFromSuggestion(prediction)
+
+                    // 2) Highlight this row
+                    lastTappedPlaceID = prediction.id
+
+                    // 3) Clear highlight after 2 seconds
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                        withAnimation {
+                            lastTappedPlaceID = nil
+                        }
+                    }
+                }
+        }
+    }
+}
+
+struct AddFavoritesView: View {
+    @EnvironmentObject var userSession: UserSession
+    @EnvironmentObject var profile: ProfileViewModel
+    
+    @StateObject private var viewModel = SearchViewModel()
+    @FocusState private var searchBarFocus: Bool
+    
+    @State private var lastTappedPlaceID: String?
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 16) {
+                
+                // SEARCH BAR
+                SearchBar(text: $viewModel.searchText)
+                    .focused($searchBarFocus)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 10)
+                
+                // Current Favorites
+                AddFavoritesCurrentFavoritesView()
+                
+                // SEARCH RESULTS
+                if !viewModel.searchResults.isEmpty {
+                    List(viewModel.searchResults, id: \.id) { prediction in
+                        // Use a ZStack to layer the onTapGesture over the entire row
+                        FavoritesContentDisplay(prediction: prediction)
+                    }
+                    .listStyle(.plain)
+                }
+            }
+            .navigationTitle("Add to Favorites")
+            .navigationBarTitleDisplayMode(.inline)
+            .onAppear {
+                // Auto-focus the search bar
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    self.searchBarFocus = true
+                }
+            }
+        }
+        // Alert to notify user if they’ve hit the 4-favorite limit
+        .alert("Max Favorites Reached", isPresented: $profile.showMaxFavoritesAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("You already have 4 favorites. Remove one before adding a new one.")
+        }
+    }
+}
+
+
