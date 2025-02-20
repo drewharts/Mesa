@@ -32,7 +32,7 @@ class UserProfileViewModel: ObservableObject {
             self.checkIfFollowing(currentUserId: currentUserId)
         }
         
-        fetchProfileFavorites(userId: user.id)
+//        fetchProfileFavorites(userId: user.id)
         fetchLists(userId: user.id)
     }
     
@@ -94,9 +94,7 @@ class UserProfileViewModel: ObservableObject {
                     print("No favorite places found.")
                     self.userFavorites = []
                 } else {
-                    self.fetchFirestorePlaces(for: places) { gmsPlaces in
-                        self.userFavorites = gmsPlaces
-                    }
+                    self.userFavorites = places
                 }
             }
         }

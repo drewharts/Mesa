@@ -47,8 +47,8 @@ class ProfileViewModel: ObservableObject {
         if let url = data.profilePhotoURL {
             loadImage(from: url)
         }
-        // Uncomment if needed: fetchProfileFavorites(userId: userId)
         fetchLists(userId: userId)
+        fetchFavorites(userId: userId)
     }
     
     // MARK: - Place List Management
@@ -131,6 +131,17 @@ class ProfileViewModel: ObservableObject {
         }
     }
     
+    private func fetchFavorites(userId: String) {
+        firestoreService.fetchProfileFavorites(userId: userId) { [weak self] favorites in
+            guard let self = self else { return }
+            
+            DispatchQueue.main.async {
+                // Update the userFavorites array with the fetched favorites
+                self.userFavorites = favorites
+            }
+        }
+    }
+    
     private func fetchListImage(for list: PlaceList) {
         // Ensure the list has an image URL
         guard let imageUrlString = list.image, let url = URL(string: imageUrlString) else { return }
@@ -149,22 +160,22 @@ class ProfileViewModel: ObservableObject {
     
     // MARK: - Favorite Places Management
     
-    func addFavoritePlace(place: DetailPlace) {
-        // Append the place to local state and add to Firestore
-        userFavorites.append(place)
-        
-        guard let uuid = UUID(uuidString: place.id.uuidString) else {
-            print("Invalid UUID string: \(place.id)")
-            return
-        }
-        
-        let newPlace = Place(
-            id: uuid,
-            name: place.name,
-            address: place.address!
-        )
-        firestoreService.addProfileFavorite(userId: userId, place: newPlace)
-    }
+//    func addFavoritePlace(place: DetailPlace) {
+//        // Append the place to local state and add to Firestore
+//        userFavorites.append(place)
+//        
+//        guard let uuid = UUID(uuidString: place.id.uuidString) else {
+//            print("Invalid UUID string: \(place.id)")
+//            return
+//        }
+//        
+//        let newPlace = Place(
+//            id: uuid,
+//            name: place.name,
+//            address: place.address!
+//        )
+//        firestoreService.addProfileFavorite(userId: userId, place: newPlace)
+//    }
     
     func removeFavoritePlace(place: DetailPlace) {
         if let index = userFavorites.firstIndex(where: { $0.id.uuidString == place.id.uuidString }) {
@@ -187,7 +198,10 @@ class ProfileViewModel: ObservableObject {
                 let detailPlace = self.searchResultToDetailPlace(place: result)
                 
                 // Add the DetailPlace to the favorites.
-                self.addFavoritePlace(place: detailPlace)
+                self.userFavorites.append(detailPlace)
+
+                self.firestoreService.addProfileFavorite(userId: self.userId, place: detailPlace)
+
             }
         }
     }
@@ -248,14 +262,14 @@ class ProfileViewModel: ObservableObject {
         }
         
         // Fetch profile favorites
-        firestoreService.fetchProfileFavorites(userId: userId) { [weak self] fetchedPlaces in
-            guard let self = self else { return }
-            DispatchQueue.main.async {
-                self.favoritePlaceViewModels = fetchedPlaces.map { place in
-                    PlaceViewModel(place: place)
-                }
-            }
-        }
+//        firestoreService.fetchProfileFavorites(userId: userId) { [weak self] fetchedPlaces in
+//            guard let self = self else { return }
+//            DispatchQueue.main.async {
+//                self.favoritePlaceViewModels = fetchedPlaces.map { place in
+//                    PlaceViewModel(place: place)
+//                }
+//            }
+//        }
     }
     
     func loadImage(from url: URL) {

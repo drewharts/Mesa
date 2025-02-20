@@ -423,7 +423,7 @@ class FirestoreService {
             }
     }
     
-    func addProfileFavorite(userId: String, place: Place) {
+    func addProfileFavorite(userId: String, place: DetailPlace) {
         
         do {
             try db.collection("users")
@@ -443,7 +443,7 @@ class FirestoreService {
         }
     }
     
-    func addOrUpdateMapPlace(for userId: String, place: Place, type: String, listId: String? = nil) {
+    func addOrUpdateMapPlace(for userId: String, place: DetailPlace, type: String, listId: String? = nil) {
         // Create the MapPlaceUserInfo for the new entry.
         let userInfo = MapPlaceUserInfo(
             userId: userId,
@@ -542,7 +542,7 @@ class FirestoreService {
     }
 
     
-    func fetchProfileFavorites(userId: String, completion: @escaping ([Place]) -> Void) {
+    func fetchProfileFavorites(userId: String, completion: @escaping ([DetailPlace]) -> Void) {
         db.collection("users")
             .document(userId)
             .collection("favorites")
@@ -552,12 +552,12 @@ class FirestoreService {
                     print("Error fetching favorites: \(error.localizedDescription)")
                     completion([])
                 } else {
-                    // Attempt to decode each document into a Place
-                    let places = snapshot?.documents.compactMap {
-                        try? $0.data(as: Place.self)
+                    // Attempt to decode each document into a DetailPlace
+                    let detailPlaces = snapshot?.documents.compactMap {
+                        try? $0.data(as: DetailPlace.self)
                     } ?? []
                     
-                    completion(places)
+                    completion(detailPlaces)
                 }
             }
     }
