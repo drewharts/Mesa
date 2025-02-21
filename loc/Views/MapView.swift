@@ -9,25 +9,34 @@ import SwiftUI
 import MapboxMaps
 
 struct MapView: View {
-
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var locationManager: LocationManager
     @EnvironmentObject var profile: ProfileViewModel
 
     var onMapTap: (() -> Void)? // Callback to notify when the map is tapped
 
+    // Use a default center if no current location is available.
+    var defaultCenter = CLLocationCoordinate2D(latitude: 39.5, longitude: -98.0)
+    
     var body: some View {
-        let center = CLLocationCoordinate2D(latitude: 39.5, longitude: -98.0)
-        let currentCords = locationManager.currentLocation?.coordinate ?? center
-        Map(initialViewport: .camera(center: currentCords, zoom: 13, bearing: 0, pitch: 0)) {
+        // Use the selected place’s coordinate if available, otherwise fall back to the current location (or default)
+        let currentCoords = locationManager.currentLocation?.coordinate ?? defaultCenter
+
+        Map(initialViewport: .camera(center: currentCoords, zoom: 13, bearing: 0, pitch: 0)) {
+            // Display the user's location pucks
             Puck2D()
             Puck2D(bearing: .heading)
+            
+            // If a place is selected, add an annotation (pin)
+            if let selectedPlace = selectedPlaceVM.selectedPlace {
+                let currentPlaceLocation = CLLocationCoordinate2D(latitude: (selectedPlaceVM.selectedPlace?.coordinate!.latitude)!, longitude: (selectedPlaceVM.selectedPlace?.coordinate!.longitude)!)
+                PointAnnotation(coordinate: currentPlaceLocation)
+            }
         }
         .onTapGesture {
             self.onMapTap?()
         }
     }
-
 }
 
 //struct MapView: UIViewRepresentable {
