@@ -29,8 +29,13 @@ struct MapView: View {
             
             // If a place is selected, add an annotation (pin)
             if let selectedPlace = selectedPlaceVM.selectedPlace {
-                let currentPlaceLocation = CLLocationCoordinate2D(latitude: (selectedPlaceVM.selectedPlace?.coordinate!.latitude)!, longitude: (selectedPlaceVM.selectedPlace?.coordinate!.longitude)!)
+                let currentPlaceLocation = CLLocationCoordinate2D(
+                    latitude: selectedPlace.coordinate!.latitude,
+                    longitude: selectedPlace.coordinate!.longitude
+                )
                 PointAnnotation(coordinate: currentPlaceLocation)
+                  .image(.init(image: UIImage(named: "LocLogo")!, name: "dest-pin"))
+
             }
         }
         .onTapGesture {
