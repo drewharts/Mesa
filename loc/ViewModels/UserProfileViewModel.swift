@@ -32,7 +32,7 @@ class UserProfileViewModel: ObservableObject {
             self.checkIfFollowing(currentUserId: currentUserId)
         }
         
-//        fetchProfileFavorites(userId: user.id)
+        fetchProfileFavorites(userId: user.id)
         fetchLists(userId: user.id)
     }
     
