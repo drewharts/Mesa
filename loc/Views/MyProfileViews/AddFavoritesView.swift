@@ -7,6 +7,7 @@
 
 import SwiftUI
 import GooglePlaces
+import MapboxSearch
 
 struct AddFavoritesCurrentFavoritesView: View {
     @EnvironmentObject var profile: ProfileViewModel
@@ -14,11 +15,11 @@ struct AddFavoritesCurrentFavoritesView: View {
         if !profile.userFavorites.isEmpty {
             ScrollView(.horizontal) {
                 HStack(spacing: 16) {
-                    ForEach(profile.userFavorites, id: \.placeID) { place in
+                    ForEach(profile.userFavorites, id: \.id) { place in
                         // Blue box with the restaurant name and "X" icon
                         HStack {
                             // Restaurant name
-                            Text(place.name!)
+                            Text(place.name)
                                 .foregroundColor(.white)
                                 .font(.headline)
                                 .padding(.leading, 8) // Add leading padding for text
@@ -47,9 +48,51 @@ struct AddFavoritesCurrentFavoritesView: View {
     }
 }
 
+struct FavoritesContentDisplay: View {
+    @EnvironmentObject var profile: ProfileViewModel
+    var prediction: SearchSuggestion
+    @State private var lastTappedPlaceID: String?
+
+    var body: some View {
+        ZStack {
+            // Existing HStack for content display
+            HStack {
+                Text(prediction.name)
+                    .foregroundColor(.primary)
+                Spacer()
+            }
+            .padding(.vertical, 6)
+            .background(
+                prediction.id == lastTappedPlaceID
+                    ? Color.blue.opacity(0.2)
+                    : Color.clear
+            )
+
+            // Transparent rectangle to capture taps over the entire row
+            Rectangle()
+                .fill(Color.clear) // Makes the rectangle transparent
+                .contentShape(Rectangle()) // Makes the entire rectangle tappable, not just the area with content
+                .onTapGesture {
+                    // 1) Append to favorites (directly via ProfileViewModel)
+                    profile.addFavoriteFromSuggestion(prediction)
+
+                    // 2) Highlight this row
+                    lastTappedPlaceID = prediction.id
+
+                    // 3) Clear highlight after 2 seconds
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                        withAnimation {
+                            lastTappedPlaceID = nil
+                        }
+                    }
+                }
+        }
+    }
+}
+
 struct AddFavoritesView: View {
     @EnvironmentObject var userSession: UserSession
-    @EnvironmentObject var profile: ProfileViewModel  // Using the ProfileViewModel directly
+    @EnvironmentObject var profile: ProfileViewModel
     
     @StateObject private var viewModel = SearchViewModel()
     @FocusState private var searchBarFocus: Bool
@@ -71,41 +114,9 @@ struct AddFavoritesView: View {
                 
                 // SEARCH RESULTS
                 if !viewModel.searchResults.isEmpty {
-                    List(viewModel.searchResults, id: \.self) { prediction in
+                    List(viewModel.searchResults, id: \.id) { prediction in
                         // Use a ZStack to layer the onTapGesture over the entire row
-                        ZStack {
-                            // Existing HStack for content display
-                            HStack {
-                                Text(prediction.attributedPrimaryText.string)
-                                    .foregroundColor(.primary)
-                                Spacer()
-                            }
-                            .padding(.vertical, 6)
-                            .background(
-                                prediction.placeID == lastTappedPlaceID
-                                    ? Color.blue.opacity(0.2)
-                                    : Color.clear
-                            )
-
-                            // Transparent rectangle to capture taps over the entire row
-                            Rectangle()
-                                .fill(Color.clear) // Makes the rectangle transparent
-                                .contentShape(Rectangle()) // Makes the entire rectangle tappable, not just the area with content
-                                .onTapGesture {
-                                    // 1) Append to favorites (directly via ProfileViewModel)
-                                    profile.addFavoritePlace(prediction: prediction)
-
-                                    // 2) Highlight this row
-                                    lastTappedPlaceID = prediction.placeID
-
-                                    // 3) Clear highlight after 2 seconds
-                                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                                        withAnimation {
-                                            lastTappedPlaceID = nil
-                                        }
-                                    }
-                                }
-                        }
+                        FavoritesContentDisplay(prediction: prediction)
                     }
                     .listStyle(.plain)
                 }
@@ -127,3 +138,5 @@ struct AddFavoritesView: View {
         }
     }
 }
+
+

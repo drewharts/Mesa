@@ -1,10 +1,11 @@
 import SwiftUI
+import MapboxSearch
 import GooglePlaces
 
 struct SearchResultsView: View {
-    let placeResults: [GMSAutocompletePrediction]
+    let placeResults: [SearchSuggestion]
     let userResults: [ProfileData]
-    let onSelectPlace: (GMSAutocompletePrediction) -> Void
+    let onSelectPlace: (SearchSuggestion) -> Void
     let onSelectUser: (ProfileData) -> Void
 
     var body: some View {
@@ -21,8 +22,8 @@ struct SearchResultsView: View {
 }
 
 struct PlaceResultsView: View {
-    let placeResults: [GMSAutocompletePrediction]
-    let onSelectPlace: (GMSAutocompletePrediction) -> Void
+    let placeResults: [SearchSuggestion]
+    let onSelectPlace: (SearchSuggestion) -> Void
 
     var body: some View {
         if !placeResults.isEmpty {
@@ -34,15 +35,15 @@ struct PlaceResultsView: View {
                     .padding(.horizontal, 20)
                     .padding(.top, 10)
                 
-                ForEach(placeResults, id: \.placeID) { prediction in
+                ForEach(placeResults, id: \.id) { prediction in
                     Button(action: { onSelectPlace(prediction) }) {
                         VStack(alignment: .center) {
-                            Text(prediction.attributedPrimaryText.string)
+                            Text(prediction.name)
                                 .font(.headline)
                                 .foregroundColor(.black)
                                 .frame(maxWidth: .infinity, alignment: .center)
 
-                            if let secondaryText = prediction.attributedSecondaryText?.string {
+                            if let secondaryText = prediction.address?.formattedAddress(style: .medium) {
                                 Text(secondaryText)
                                     .font(.subheadline)
                                     .foregroundColor(.gray)

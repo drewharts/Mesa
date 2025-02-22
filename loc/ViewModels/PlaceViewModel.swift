@@ -27,32 +27,32 @@ class PlaceViewModel: ObservableObject, Identifiable {
 
     init(place: Place) {
         self.place = place
-        self.id = place.id
-        fetchGMSPlace()
+        self.id = place.id.uuidString
+//        fetchGMSPlace()
     }
 
-    private func fetchGMSPlace() {
-        googlePlacesService.fetchPlace(placeID: place.id) { [weak self] gmsPlace, error in
-            if let error = error {
-                print("Error fetching GMSPlace: \(error.localizedDescription)")
-                DispatchQueue.main.async {
-                    self?.hasError = true
-                    self?.errorMessage = error.localizedDescription
-                }
-                return
-            }
-
-            guard let self = self, let gmsPlace = gmsPlace else {
-                print("GMSPlace is nil.")
-                return
-            }
-
-            DispatchQueue.main.async {
-                self.gmsPlace = gmsPlace
-                self.fetchPlacePhoto()
-            }
-        }
-    }
+//    private func fetchGMSPlace() {
+//        googlePlacesService.fetchPlace(placeID: place.id) { [weak self] gmsPlace, error in
+//            if let error = error {
+//                print("Error fetching GMSPlace: \(error.localizedDescription)")
+//                DispatchQueue.main.async {
+//                    self?.hasError = true
+//                    self?.errorMessage = error.localizedDescription
+//                }
+//                return
+//            }
+//
+//            guard let self = self, let gmsPlace = gmsPlace else {
+//                print("GMSPlace is nil.")
+//                return
+//            }
+//
+//            DispatchQueue.main.async {
+//                self.gmsPlace = gmsPlace
+//                self.fetchPlacePhoto()
+//            }
+//        }
+//    }
 
     private func fetchPlacePhoto() {
         guard let gmsPlace = gmsPlace,

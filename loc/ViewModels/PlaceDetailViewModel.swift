@@ -8,6 +8,7 @@
 import SwiftUI
 import GooglePlaces
 import MapKit
+import MapboxSearch
 
 class PlaceDetailViewModel: ObservableObject {
     @Published var photos: [UIImage] = []
@@ -30,27 +31,42 @@ class PlaceDetailViewModel: ObservableObject {
         // Empty. We'll call loadData(for:) later.
     }
 
-    func loadData(for place: GMSPlace, currentLocation: CLLocationCoordinate2D) {
+    func loadData(for place: DetailPlace, currentLocation: CLLocationCoordinate2D) {
         // If we already loaded this place, do nothing (optional).
-        if currentPlaceID == place.placeID { return }
+        if currentPlaceID == place.id.uuidString { return }
         
-        self.currentPlaceID = place.placeID
+        self.currentPlaceID = place.id.uuidString
         
-        DispatchQueue.main.async {
-            self.placeName = place.name ?? "Restaurant"
-            self.placeIconURL = place.iconImageURL
-            self.openingHours = place.currentOpeningHours?.weekdayText
-            self.phoneNumber = place.phoneNumber ?? ""
-            self.fetchPhotos(for: place)
-            // Replace the deprecated call:
-            // place.isOpen()
-            self.checkOpenStatus(for: place)
+        self.placeName = place.name ?? "Restaurant"
+//        self.placeIconURL = place.metadata?.primaryImage
+//        self.openingHours = place.metadata?.openHours
+//        self.phoneNumber = place.metadata.phone
+
+        
+//        DispatchQueue.main.async {
+//            self.placeName = place.name ?? "Restaurant"
+//            self.placeIconURL = place.metadata?.primaryImage
+//            self.openingHours = place.metadata?.openHours
+//            self.phoneNumber = place.metadata.phone
+////            self.fetchPhotos(for: place)
+////            self.checkOpenStatus(for: place)
             self.updateTravelTime(for: place, from: currentLocation)
-        }
+//        }
     }
     
-    func openNavigation(for place: GMSPlace, currentLocation: CLLocationCoordinate2D) {
-        let destinationCoordinate = place.coordinate // Assuming GMSPlace exposes a coordinate property.
+    func openNavigation(for place: DetailPlace, currentLocation: CLLocationCoordinate2D) {
+        // Unwrap the GeoPoint from place.coordinate
+        guard let geoPoint = place.coordinate else {
+            print("No coordinate available for this place.")
+            return
+        }
+        
+        // Convert GeoPoint to CLLocationCoordinate2D.
+        let destinationCoordinate = CLLocationCoordinate2D(
+            latitude: geoPoint.latitude,
+            longitude: geoPoint.longitude
+        )
+        
         let destinationPlacemark = MKPlacemark(coordinate: destinationCoordinate)
         let destinationMapItem = MKMapItem(placemark: destinationPlacemark)
         destinationMapItem.name = place.name
@@ -65,42 +81,52 @@ class PlaceDetailViewModel: ObservableObject {
         MKMapItem.openMaps(with: [currentLocationMapItem, destinationMapItem], launchOptions: launchOptions)
     }
     
-    private func fetchPhotos(for place: GMSPlace) {
-        photos = []
-        
-        guard let photosMetadata = place.photos, !photosMetadata.isEmpty else {
-            print("No photos metadata found.")
+//    private func fetchPhotos(for place: GMSPlace) {
+//        photos = []
+//        
+//        guard let photosMetadata = place.photos, !photosMetadata.isEmpty else {
+//            print("No photos metadata found.")
+//            return
+//        }
+//
+//        let placesClient = GMSPlacesClient.shared()
+//
+//        photosMetadata.forEach { metadata in
+//            let request = GMSFetchPhotoRequest(
+//                photoMetadata: metadata,
+//                maxSize: CGSize(width: 480, height: 480)
+//            )
+//
+//            placesClient.fetchPhoto(with: request) { [weak self] image, error in
+//                guard let self = self else { return }
+//                if let error = error {
+//                    print("Error fetching photo: \(error.localizedDescription)")
+//                    return
+//                }
+//                if let image = image {
+//                    DispatchQueue.main.async {
+//                        // Double check the placeID to ensure we haven't switched
+//                        if self.currentPlaceID == place.placeID {
+//                            self.photos.append(image)
+//                        }
+//                    }
+//                }
+//            }
+//        }
+//    }
+    
+    func updateTravelTime(for place: DetailPlace, from userCoordinate: CLLocationCoordinate2D) {
+        // Unwrap the GeoPoint; if it's nil, set travelTime to "N/A" and return.
+        guard let geoPoint = place.coordinate else {
+            DispatchQueue.main.async { [weak self] in
+                self?.travelTime = "N/A"
+            }
             return
         }
-
-        let placesClient = GMSPlacesClient.shared()
-
-        photosMetadata.forEach { metadata in
-            let request = GMSFetchPhotoRequest(
-                photoMetadata: metadata,
-                maxSize: CGSize(width: 480, height: 480)
-            )
-
-            placesClient.fetchPhoto(with: request) { [weak self] image, error in
-                guard let self = self else { return }
-                if let error = error {
-                    print("Error fetching photo: \(error.localizedDescription)")
-                    return
-                }
-                if let image = image {
-                    DispatchQueue.main.async {
-                        // Double check the placeID to ensure we haven't switched
-                        if self.currentPlaceID == place.placeID {
-                            self.photos.append(image)
-                        }
-                    }
-                }
-            }
-        }
-    }
-    
-    func updateTravelTime(for place: GMSPlace, from userCoordinate: CLLocationCoordinate2D) {
-        let placeCoordinate = place.coordinate // Assuming GMSPlace has a `coordinate` property.
+        
+        // Convert GeoPoint to CLLocationCoordinate2D.
+        let placeCoordinate = CLLocationCoordinate2D(latitude: geoPoint.latitude, longitude: geoPoint.longitude)
+        
         MapKitService.shared.calculateTravelTime(from: userCoordinate, to: placeCoordinate) { [weak self] timeInterval, error in
             DispatchQueue.main.async {
                 if let error = error {
@@ -108,11 +134,7 @@ class PlaceDetailViewModel: ObservableObject {
                     self?.travelTime = "N/A"
                 } else if let timeInterval = timeInterval {
                     let minutes = timeInterval / 60.0
-                    if minutes > 60 {
-                        self?.travelTime = "60+ min"
-                    } else {
-                        self?.travelTime = String(format: "%.0f min", minutes)
-                    }
+                    self?.travelTime = minutes > 60 ? "60+ min" : String(format: "%.0f min", minutes)
                 } else {
                     self?.travelTime = "N/A"
                 }
@@ -121,21 +143,20 @@ class PlaceDetailViewModel: ObservableObject {
     }
     
     
-    
     /// Checks if the restaurant is open right now using the recommended isOpen API.
-    private func checkOpenStatus(for place: GMSPlace) {
-        googleplacesService.isRestaurantOpenNow(placeID: place.placeID!) { [weak self] isOpen, error in
-            DispatchQueue.main.async {
-                guard let self = self else { return }
-                if let error = error {
-                    print("Error checking open status: \(error.localizedDescription)")
-                    self.isOpen = false
-                } else {
-                    self.isOpen = isOpen
-                }
-            }
-        }
-    }
+//    private func checkOpenStatus(for place: GMSPlace) {
+//        googleplacesService.isRestaurantOpenNow(placeID: place.placeID!) { [weak self] isOpen, error in
+//            DispatchQueue.main.async {
+//                guard let self = self else { return }
+//                if let error = error {
+//                    print("Error checking open status: \(error.localizedDescription)")
+//                    self.isOpen = false
+//                } else {
+//                    self.isOpen = isOpen
+//                }
+//            }
+//        }
+//    }
     
     // Some convenience methods
     func handleAddButton() {
@@ -146,13 +167,13 @@ class PlaceDetailViewModel: ObservableObject {
         // directions logic
     }
 
-    func getRestaurantType(for place: GMSPlace) -> String? {
+    func getRestaurantType(for place: DetailPlace) -> String? {
         let recognizedTypes = [
             "American", "Japanese", "Korean", "Mexican",
             "Italian", "Chinese", "Greek", "Vietnamese"
         ]
-        
-        guard let placeTypes = place.types else { return nil }
+        //TODO: this may need some revision at a later date
+        guard let placeTypes = place.categories else { return nil }
         for recognizedType in recognizedTypes {
             if placeTypes.contains(where: {
                 $0.lowercased().contains(recognizedType.lowercased())

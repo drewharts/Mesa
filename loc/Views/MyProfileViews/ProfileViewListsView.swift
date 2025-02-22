@@ -8,6 +8,7 @@
 import SwiftUI
 import PhotosUI
 import GooglePlaces
+import MapboxSearch
 
 struct ListHeaderView: View {
     var body: some View {
@@ -26,7 +27,7 @@ struct PlaceListCellView: View {
     @EnvironmentObject var profile: ProfileViewModel
     @Binding var showingImagePicker: Bool
     
-    var onPlaceSelected: ((GMSPlace) -> Void)?
+    var onPlaceSelected: ((SearchResult) -> Void)?
 
 
     var body: some View {

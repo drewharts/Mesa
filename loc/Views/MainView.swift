@@ -9,6 +9,8 @@
 import SwiftUI
 import GooglePlaces
 import FirebaseAuth
+import MapboxMaps
+import MapboxSearch
 
 struct MainView: View {
     @EnvironmentObject var userSession: UserSession
@@ -29,11 +31,10 @@ struct MainView: View {
     var body: some View {
         NavigationView {
             ZStack(alignment: .top) {
-                // Map
-                MapView(
-                    searchResults: $viewModel.searchResults,
-                    onMapTap: handleMapTap
-                )
+                MapView(onMapTap: {
+                    searchIsFocused = false
+                })
+                .ignoresSafeArea()
                 .edgesIgnoringSafeArea(.all)
 
                 // Top Controls (Search Bar and Profile Button)
@@ -115,7 +116,7 @@ struct MainView: View {
                                 placeResults: viewModel.searchResults,
                                 userResults: viewModel.userResults,
                                 onSelectPlace: { prediction in
-                                    viewModel.selectPlace(prediction)
+                                    viewModel.selectSuggestion(prediction)
                                     withAnimation {
                                         isSearchBarMinimized = true
                                         searchIsFocused = false

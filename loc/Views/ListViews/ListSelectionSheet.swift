@@ -6,95 +6,93 @@
 //
 
 import SwiftUI
-import GooglePlaces
+import MapboxSearch
 
+// MARK: - ListDescription
 struct ListDescription: View {
     @EnvironmentObject var profile: ProfileViewModel
     let placeList: PlaceList
+
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(placeList.name)
                 .font(.body)
                 .foregroundStyle(.white)
             
-            Text("\(profile.placeListGMSPlaces[placeList.id]?.count ?? 0) Places")                .font(.caption)
+            Text("\(profile.placeListGMSPlaces[placeList.id]?.count ?? 0) Places")
+                .font(.caption)
                 .foregroundStyle(.white)
         }
         .padding(.horizontal, 15)
-
     }
 }
+
+// MARK: - ListSelectionRowView
+struct ListSelectionRowView: View {
+    @EnvironmentObject var profile: ProfileViewModel
+    let list: PlaceList
+    let place: DetailPlace
+
+    var body: some View {
+        Button(action: {
+            togglePlaceInList()
+        }) {
+            HStack {
+                if let listImage = profile.listImages[list.id] {
+                    Image(uiImage: listImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: 75, height: 75)
+                        .clipped()
+                        .cornerRadius(4)
+                } else {
+                    Rectangle()
+                        .frame(width: 75, height: 75)
+                        .foregroundColor(.white)
+                        .cornerRadius(4)
+                }
+
+                ListDescription(placeList: list)
+
+                Spacer()
+
+                ZStack {
+                    if profile.placeListGMSPlaces[list.id]?.contains(where: { $0.id == place.id }) ?? false {
+                        Circle()
+                            .fill(Color.white)
+                            .frame(width: 24, height: 24)
+                    } else {
+                        Circle()
+                            .stroke(Color.white)
+                            .frame(width: 24, height: 24)
+                    }
+                }
+            }
+            .padding(.top, 20)
+            .padding(.horizontal, 15)
+        }
+    }
+
+    private func togglePlaceInList() {
+        let isAdded = profile.isPlaceInList(listId: list.id, placeId: place.id.uuidString)
+        if isAdded {
+            profile.removePlaceFromList(listId: list.id, place: place)
+        } else {
+            profile.addPlaceToList(listId: list.id, place: place)
+        }
+    }
+}
+
+// MARK: - ListsInSelectionSheet
 struct ListsInSelectionSheet: View {
     @EnvironmentObject var profile: ProfileViewModel
-    let place: GMSPlace
-    @State private var selectedListIds: Set<UUID> = [] // Track multiple selected lists
+    let place: DetailPlace
 
     var body: some View {
         ScrollView {
             if !profile.userLists.isEmpty {
                 ForEach(profile.userLists) { list in
-                    Button(action: {
-                        // Determine whether the current list already contains the place.
-                        let isAdded = profile.placeListGMSPlaces[list.id]?.contains { $0.placeID == place.placeID } ?? false
-                        
-                        if isAdded {
-                            // Remove the place from the list.
-                            if var places = profile.placeListGMSPlaces[list.id] {
-                                places.removeAll { $0.placeID == place.placeID }
-                                profile.placeListGMSPlaces[list.id] = places
-                            }
-                            // Optionally update any local selection state, e.g.:
-                            selectedListIds.remove(list.id)
-                        } else {
-                            // Add the place to the list.
-                            if var places = profile.placeListGMSPlaces[list.id] {
-                                if !places.contains(where: { $0.placeID == place.placeID }) {
-                                    places.append(place)
-                                    profile.placeListGMSPlaces[list.id] = places
-                                }
-                            } else {
-                                profile.placeListGMSPlaces[list.id] = [place]
-                            }
-                            selectedListIds.insert(list.id)
-                        }
-                    }) {
-                        HStack {
-                            // Display the list’s image if available.
-                            if let listImage = profile.listImages[list.id] {
-                                Image(uiImage: listImage)
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fill)
-                                    .frame(width: 75, height: 75)
-                                    .clipped()
-                                    .cornerRadius(4)
-                            } else {
-                                // Fallback placeholder
-                                Rectangle()
-                                    .frame(width: 75, height: 75)
-                                    .foregroundColor(.white)
-                                    .cornerRadius(4)
-                            }
-                            
-                            ListDescription(placeList: list)
-                            
-                            Spacer()
-                            
-                            // Use the computed 'isAdded' flag to decide the bubble appearance.
-                            ZStack {
-                                if profile.placeListGMSPlaces[list.id]?.contains(where: { $0.placeID == place.placeID }) ?? false {
-                                    Circle()
-                                        .fill(Color.white)
-                                        .frame(width: 24, height: 24)
-                                } else {
-                                    Circle()
-                                        .stroke(Color.white)
-                                        .frame(width: 24, height: 24)
-                                }
-                            }
-                        }
-                        .padding(.top, 20)
-                        .padding(.horizontal, 15)
-                    }
+                    ListSelectionRowView(list: list, place: place)
                 }
             } else {
                 Text("No lists available")
@@ -105,10 +103,11 @@ struct ListsInSelectionSheet: View {
     }
 }
 
+// MARK: - ListSelectionSheet
 struct ListSelectionSheet: View {
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var lists: PlaceListViewModel
-    let place: GMSPlace
+    let place: DetailPlace
     @Binding var isPresented: Bool
     @State private var showNewListSheet = false
     @State private var newListName = ""
@@ -142,9 +141,9 @@ struct ListSelectionSheet: View {
             }
             .padding(.horizontal, 20)
             .padding(.top, 10)
-            
+
             SkinnySearchBar()
-            
+
             ListsInSelectionSheet(place: place)
 
             Spacer()

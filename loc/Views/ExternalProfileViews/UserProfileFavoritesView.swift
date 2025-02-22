@@ -7,9 +7,10 @@
 
 import SwiftUI
 import GooglePlaces
+import MapboxSearch
 
 struct UserProfileFavoritesView: View {
-    var userFavorites: [GMSPlace]
+    var userFavorites: [DetailPlace]
     var placeImages: [String: UIImage]
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @Environment(\.presentationMode) var presentationMode // For dismissing the sheet
@@ -25,9 +26,9 @@ struct UserProfileFavoritesView: View {
 
             if !userFavorites.isEmpty {
                 HStack {
-                    ForEach(userFavorites, id: \.placeID) { place in
+                    ForEach(userFavorites, id: \.id) { place in
                         VStack {
-                            if let image = placeImages[place.placeID!] {
+                            if let image = placeImages[place.id.uuidString] {
                                 Image(uiImage: image)
                                     .resizable()
                                     .scaledToFill()
@@ -39,7 +40,7 @@ struct UserProfileFavoritesView: View {
                                     .frame(width: 85, height: 85)
                             }
 
-                            Text(place.name?.prefix(15) ?? "Unknown")
+                            Text(place.name.prefix(15) ?? "Unknown")
                                 .foregroundColor(.black)
                                 .font(.footnote)
                                 .multilineTextAlignment(.center)

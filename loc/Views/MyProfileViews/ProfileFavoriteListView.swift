@@ -32,10 +32,10 @@ struct ProfileFavoriteListView: View {
             // 2) Favorite places
             if !profile.userFavorites.isEmpty {
                 HStack {
-                    ForEach(profile.userFavorites, id: \.placeID) { place in
+                    ForEach(profile.userFavorites, id: \.id) { place in
                         VStack {
                             ZStack {
-                                if let image = profile.placeImages[place.placeID!]{
+                                if let image = profile.placeImages[place.id.uuidString]{
                                     Image(uiImage: image)
                                         .resizable()
                                         .scaledToFill()
@@ -49,7 +49,7 @@ struct ProfileFavoriteListView: View {
                                         .cornerRadius(50)
                                 }
                             }
-                            Text(place.name?.prefix(15) ?? "Unknown")
+                            Text(place.name.prefix(15) ?? "Unknown")
                                 .foregroundColor(.black)
                                 .font(.footnote)
                                 .multilineTextAlignment(.center)
