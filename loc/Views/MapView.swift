@@ -21,11 +21,31 @@ struct MapView: View {
     
     var body: some View {
         let currentCoords = locationManager.currentLocation?.coordinate ?? defaultCenter
-        
+
         Map(viewport: $viewport) {
             Puck2D()
             Puck2D(bearing: .heading)
             
+            ForEvery(profile.userFavorites) { favorite in
+                var tempPlaceLocation = CLLocationCoordinate2D(
+                    latitude: favorite.coordinate!.latitude,
+                    longitude: favorite.coordinate!.longitude
+                )
+                PointAnnotation(coordinate: tempPlaceLocation)
+                    .image(.init(image: UIImage(named: "DestPin")!, name: "dest-pin"))
+            }
+            
+            ForEvery(profile.userLists) { list in
+                if let places = profile.placeListGMSPlaces[list.id] {
+                    ForEvery(places) { place in
+                        PointAnnotation(coordinate: CLLocationCoordinate2D(
+                            latitude: place.coordinate!.latitude,
+                            longitude: place.coordinate!.longitude
+                        ))
+                        .image(.init(image: UIImage(named: "DestPin") ?? UIImage(), name: "dest-pin"))
+                    }
+                }
+            }
             if let selectedPlace = selectedPlaceVM.selectedPlace {
                 let currentPlaceLocation = CLLocationCoordinate2D(
                     latitude: selectedPlace.coordinate!.latitude,
