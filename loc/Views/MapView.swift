@@ -12,37 +12,56 @@ struct MapView: View {
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var locationManager: LocationManager
     @EnvironmentObject var profile: ProfileViewModel
-
-    var onMapTap: (() -> Void)? // Callback to notify when the map is tapped
-
-    // Use a default center if no current location is available.
-    var defaultCenter = CLLocationCoordinate2D(latitude: 39.5, longitude: -98.0)
+    
+    private let defaultCenter = CLLocationCoordinate2D(latitude: 39.5, longitude: -98.0)
+    @State var viewport: Viewport = .camera(center: CLLocationCoordinate2D(latitude: 39.5, longitude: -98.0), zoom: 10)
+    @State private var hasInitialized = false
+    
+    var onMapTap: (() -> Void)?
     
     var body: some View {
-        // Use the selected place’s coordinate if available, otherwise fall back to the current location (or default)
         let currentCoords = locationManager.currentLocation?.coordinate ?? defaultCenter
-
-        Map(initialViewport: .camera(center: currentCoords, zoom: 13, bearing: 0, pitch: 0)) {
-            // Display the user's location pucks
+        
+        Map(viewport: $viewport) {
             Puck2D()
             Puck2D(bearing: .heading)
             
-            // If a place is selected, add an annotation (pin)
             if let selectedPlace = selectedPlaceVM.selectedPlace {
                 let currentPlaceLocation = CLLocationCoordinate2D(
                     latitude: selectedPlace.coordinate!.latitude,
                     longitude: selectedPlace.coordinate!.longitude
                 )
                 PointAnnotation(coordinate: currentPlaceLocation)
-                  .image(.init(image: UIImage(named: "LocLogo")!, name: "dest-pin"))
-
+                    .image(.init(image: UIImage(named: "DestPin")!, name: "dest-pin"))
             }
         }
         .onTapGesture {
             self.onMapTap?()
         }
+        .onAppear {
+            if !hasInitialized {
+                print("Initial setup with coords: \(currentCoords)")
+                viewport = .camera(center: currentCoords, zoom: 13)
+                hasInitialized = true
+            }
+        }
+        .onChange(of: selectedPlaceVM.selectedPlace) { newPlace in
+            guard let place = newPlace, let coordinate = place.coordinate else {
+                print("No valid place or coordinate")
+                return
+            }
+            let newCenter = CLLocationCoordinate2D(
+                latitude: coordinate.latitude,
+                longitude: coordinate.longitude
+            )
+            print("Updating camera to: \(newCenter)")
+            withViewportAnimation(.easeOut(duration: 5.0)) {
+                viewport = .camera(center: newCenter, zoom: 14)
+            }
+        }
     }
 }
+
 
 //struct MapView: UIViewRepresentable {
 //    @Binding var searchResults: [GMSAutocompletePrediction]

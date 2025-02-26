@@ -8,7 +8,7 @@
 import Foundation
 import FirebaseFirestore
 
-struct DetailPlace: Codable, Identifiable {
+struct DetailPlace: Codable, Identifiable,Equatable {
     
     init(place: Place) {
         self.id = place.id
