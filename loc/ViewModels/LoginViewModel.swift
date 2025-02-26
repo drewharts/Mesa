@@ -87,7 +87,7 @@ class LoginViewModel: ObservableObject {
 
         let profileViewModel = ProfileViewModel(data: profileData, firestoreService: firestoreService.self, userId: uid)
 
-        FirestoreService().saveUserProfile(uid: uid, profileData: profileViewModel.data) { [weak self] error in
+        FirestoreService().saveUserProfile(uid: uid, profileData: profileData) { [weak self] error in
             if let error = error {
                 self?.errorMessage = "Error saving profile: \(error.localizedDescription)"
             } else {

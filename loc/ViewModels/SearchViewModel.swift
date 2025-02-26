@@ -33,6 +33,7 @@ class SearchViewModel: ObservableObject {
             .removeDuplicates() // Avoid duplicate searches
             .sink { [weak self] text in
                 self?.searchPlaces(query: text)
+                self?.searchUsers(query: text)
             }
             .store(in: &cancellables)
     }

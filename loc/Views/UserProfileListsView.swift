@@ -8,6 +8,39 @@
 import SwiftUI
 import GooglePlaces
 
+struct UserProfileListViewJustListsPlaces: View {
+    @ObservedObject var viewModel: UserProfileViewModel
+    var places: [DetailPlace]
+    var body: some View {
+        HStack {
+            ForEach(places, id: \.id) { place in
+                VStack {
+                    if let image = viewModel.placeImages[place.id.uuidString ?? ""] {
+                        Image(uiImage: image)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 85, height: 85)
+                            .cornerRadius(50)
+                            .clipped()
+                    } else {
+                        ProgressView()
+                            .frame(width: 85, height: 85)
+                    }
+
+                    Text(place.name ?? "Unknown")
+                        .font(.footnote)
+                        .foregroundColor(.black)
+                        .multilineTextAlignment(.center)
+                        .lineLimit(1)
+                        .frame(width: 85)
+                }
+                .padding(.trailing, 10)
+            }
+        }
+        .padding(.horizontal, 20)
+    }
+}
+
 struct UserProfileListViewJustLists: View {
     @ObservedObject var viewModel: UserProfileViewModel
     var placeLists: [PlaceList]
@@ -21,40 +54,15 @@ struct UserProfileListViewJustLists: View {
                         .foregroundColor(.black)
                         .padding(.leading, 20)
 
-//                    if let places = viewModel.placeListMapboxPlaces[list.id] {
-//                        ScrollView(.horizontal, showsIndicators: false) {
-//                            HStack {
-//                                ForEach(places, id: \.placeID) { place in
-//                                    VStack {
-//                                        if let image = viewModel.placeImages[place.placeID ?? ""] {
-//                                            Image(uiImage: image)
-//                                                .resizable()
-//                                                .scaledToFill()
-//                                                .frame(width: 85, height: 85)
-//                                                .cornerRadius(50)
-//                                                .clipped()
-//                                        } else {
-//                                            ProgressView()
-//                                                .frame(width: 85, height: 85)
-//                                        }
-//
-//                                        Text(place.name ?? "Unknown")
-//                                            .font(.footnote)
-//                                            .foregroundColor(.black)
-//                                            .multilineTextAlignment(.center)
-//                                            .lineLimit(1)
-//                                            .frame(width: 85)
-//                                    }
-//                                    .padding(.trailing, 10)
-//                                }
-//                            }
-//                            .padding(.horizontal, 20)
-//                        }
-//                    } else {
-//                        Text("Loading places...")
-//                            .foregroundColor(.gray)
-//                            .padding(.leading, 20)
-//                    }
+                    if let places = viewModel.placeListMapboxPlaces[list.id] {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            UserProfileListViewJustListsPlaces(viewModel: viewModel, places: places)
+                        }
+                    } else {
+                        Text("Loading places...")
+                            .foregroundColor(.gray)
+                            .padding(.leading, 20)
+                    }
                 }
             }
         }
