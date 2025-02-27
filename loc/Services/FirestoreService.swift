@@ -14,6 +14,26 @@ class FirestoreService {
     private let db = Firestore.firestore()
     private let storage = Storage.storage()
     
+    func getNumberFollowers(forUserId userId: String, completion: @escaping (Int, Error?) -> Void) {
+        db.collection("followers")
+            .whereField("followingId", isEqualTo: userId)
+            .getDocuments { snapshot, error in
+                if let error = error {
+                    completion(0, error) // Return 0 followers and the error
+                    return
+                }
+                
+                // If no error, count the documents in the snapshot
+                guard let snapshot = snapshot else {
+                    completion(0, nil) // No documents, no error
+                    return
+                }
+                
+                let followerCount = snapshot.documents.count
+                completion(followerCount, nil) // Return the count and no error
+            }
+    }
+    
     func followUser(followerId: String, followingId: String, completion: @escaping (Bool, Error?) -> Void) {
         // Create the follow relationship
         let follow = Follow(followerId: followerId, followingId: followingId, followedAt: Date())

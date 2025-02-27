@@ -29,6 +29,9 @@ class ProfileViewModel: ObservableObject {
     @Published var favoritePlaceImages: [String: UIImage] = [:]
     @Published var profilePhoto: SwiftUI.Image? = nil
     
+    //followers and following
+    @Published var followers: Int = 0
+    
     weak var delegate: ProfileDelegate?
     private let firestoreService: FirestoreService
     public let userId: String
@@ -49,10 +52,19 @@ class ProfileViewModel: ObservableObject {
         }
         fetchLists(userId: userId)
         fetchFavorites(userId: userId)
+        fetchFollowers(userId: userId)
     }
     
     // MARK: - Place List Management
-    
+    func fetchFollowers(userId: String) {
+        firestoreService.getNumberFollowers(forUserId: userId) { (count, error) in
+            if let error = error {
+                print("Error fetching followers: \(error.localizedDescription)")
+                return
+            }
+            self.followers = count
+        }
+    }
     func isPlaceInList(listId: UUID, placeId: String) -> Bool {
         guard let places = placeListGMSPlaces[listId] else {
             return false

@@ -26,6 +26,9 @@ struct ProfileView: View {
                     .font(.title)
                     .fontWeight(.bold)
                     .foregroundColor(.black)
+                Text("\(profile.followers) followers")
+                    .foregroundStyle(.black)
+
                 
                 Divider()
                     .padding(.top, 15)
