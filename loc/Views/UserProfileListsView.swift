@@ -23,8 +23,9 @@ struct UserProfileListViewJustListsPlaces: View {
                             .cornerRadius(50)
                             .clipped()
                     } else {
-                        ProgressView()
+                        Circle()
                             .frame(width: 85, height: 85)
+                            .foregroundColor(.gray)
                     }
 
                     Text(place.name ?? "Unknown")

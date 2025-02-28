@@ -36,11 +36,12 @@ struct UserProfileFavoritesView: View {
                                     .cornerRadius(50)
                                     .clipped()
                             } else {
-                                ProgressView()
+                                Circle()
                                     .frame(width: 85, height: 85)
+                                    .foregroundColor(.gray)
                             }
 
-                            Text(place.name.prefix(15) ?? "Unknown")
+                            Text(place.name.prefix(16) ?? "Unknown")
                                 .foregroundColor(.black)
                                 .font(.footnote)
                                 .multilineTextAlignment(.center)
@@ -54,6 +55,7 @@ struct UserProfileFavoritesView: View {
                             presentationMode.wrappedValue.dismiss()
                         }
                     }
+                    Spacer() // Pushes everything to the left
                 }
                 .padding(.horizontal, 20)
             } else {
