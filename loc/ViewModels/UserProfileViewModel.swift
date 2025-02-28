@@ -20,7 +20,7 @@ class UserProfileViewModel: ObservableObject {
     @Published var placeListMapboxPlaces: [UUID: [DetailPlace]] = [:] // Store places per list
     @Published var placeImages: [String: UIImage] = [:] // Store images by placeID
     @Published var isFollowing: Bool = false  // ✅ Track follow state
-    
+    @Published var followers: Int = 0
     private let firestoreService = FirestoreService()
     private let mapboxSearchService = MapboxSearchService()
     
@@ -34,8 +34,17 @@ class UserProfileViewModel: ObservableObject {
         
         fetchProfileFavorites(userId: user.id)
         fetchLists(userId: user.id)
+        fetchFollowers(userId: user.id)
     }
-    
+    func fetchFollowers(userId: String) {
+        firestoreService.getNumberFollowers(forUserId: userId) { (count, error) in
+            if let error = error {
+                print("Error fetching followers: \(error.localizedDescription)")
+                return
+            }
+            self.followers = count
+        }
+    }
     func checkIfFollowing(currentUserId: String) {
         // Ensure that selectedUser is set and has a valid id
         guard let targetUserId = selectedUser?.id, !targetUserId.isEmpty else {
@@ -90,11 +99,11 @@ class UserProfileViewModel: ObservableObject {
     private func fetchProfileFavorites(userId: String) {
         firestoreService.fetchProfileFavorites(userId: userId) { places in
             DispatchQueue.main.async {
-                if places.isEmpty {
+                if ((places?.isEmpty) != nil) {
                     print("No favorite places found.")
                     self.userFavorites = []
                 } else {
-                    self.userFavorites = places
+                    self.userFavorites = places ?? []
                 }
             }
         }

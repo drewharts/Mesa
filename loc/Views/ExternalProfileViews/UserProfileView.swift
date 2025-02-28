@@ -28,7 +28,9 @@ struct UserProfileView: View {
                     .font(.title)
                     .fontWeight(.bold)
                     .foregroundColor(.black)
-                
+                Text("\(viewModel.followers) followers")
+                    .foregroundColor(.black)
+
                 Divider()
                     .padding(.horizontal, 20)
 

@@ -29,6 +29,12 @@ class ProfileViewModel: ObservableObject {
     @Published var favoritePlaceImages: [String: UIImage] = [:]
     @Published var profilePhoto: SwiftUI.Image? = nil
     
+    //friends places
+    @Published var friends: [User] = []
+    @Published var friendPlaces: [String: [DetailPlace]] = [:]
+    //followers and following
+    @Published var followers: Int = 0
+    
     weak var delegate: ProfileDelegate?
     private let firestoreService: FirestoreService
     public let userId: String
@@ -49,10 +55,47 @@ class ProfileViewModel: ObservableObject {
         }
         fetchLists(userId: userId)
         fetchFavorites(userId: userId)
+        fetchFollowers(userId: userId)
+        fetchFriends(userId: userId)
+    }
+    func fetchFriends(userId: String) {
+        firestoreService.fetchFollowingProfiles(for: userId) { [weak self] profiles, error in
+            guard let self = self else { return }
+            self.friends = profiles ?? []
+            let friendIds = self.friends.map { $0.id } // Assuming User has an id: String property
+            self.fetchFriendPlaces(userIds: friendIds)
+        }
+    }
+    func fetchFriendPlaces(userIds: [String]) {
+        let dispatchGroup = DispatchGroup()
+        var tempFriendPlaces: [String: [DetailPlace]] = [:]
+
+        for userId in userIds {
+            dispatchGroup.enter()
+            firestoreService.fetchProfileFavorites(userId: userId) { [weak self] places in
+                guard let self = self else { return }
+                if let places = places {
+                    tempFriendPlaces[userId] = places
+                }
+                dispatchGroup.leave()
+            }
+        }
+
+        dispatchGroup.notify(queue: .main) {
+            self.friendPlaces = tempFriendPlaces
+        }
     }
     
     // MARK: - Place List Management
-    
+    func fetchFollowers(userId: String) {
+        firestoreService.getNumberFollowers(forUserId: userId) { (count, error) in
+            if let error = error {
+                print("Error fetching followers: \(error.localizedDescription)")
+                return
+            }
+            self.followers = count
+        }
+    }
     func isPlaceInList(listId: UUID, placeId: String) -> Bool {
         guard let places = placeListGMSPlaces[listId] else {
             return false
@@ -137,7 +180,7 @@ class ProfileViewModel: ObservableObject {
             
             DispatchQueue.main.async {
                 // Update the userFavorites array with the fetched favorites
-                self.userFavorites = favorites
+                self.userFavorites = favorites ?? []
             }
         }
     }
