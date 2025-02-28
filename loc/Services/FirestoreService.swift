@@ -13,7 +13,78 @@ import GooglePlaces
 class FirestoreService {
     private let db = Firestore.firestore()
     private let storage = Storage.storage()
+
+    func fetchFriends(userId: String, completion: @escaping ([String]?, Error?) -> Void) {
+        db.collection("following")
+            .whereField("followerId", isEqualTo: userId)
+            .getDocuments { snapshot, error in
+                if let error = error {
+                    completion(nil, error)
+                    return
+                }
+                
+                guard let snapshot = snapshot else {
+                    completion([], nil)
+                    return
+                }
+                
+                let followingIds = snapshot.documents.compactMap { document in
+                    document.get("followingId") as? String
+                }
+                
+                completion(followingIds, nil)
+            }
+    }
     
+    func fetchProfiles(for userIds: [String], completion: @escaping ([User]?, Error?) -> Void) {
+        var profiles: [User] = []
+        let dispatchGroup = DispatchGroup()
+        
+        for userId in userIds {
+            dispatchGroup.enter()
+            db.collection("users").document(userId).getDocument { document, error in
+                if let error = error {
+                    print("Error fetching user \(userId): \(error.localizedDescription)")
+                    dispatchGroup.leave()
+                    return
+                }
+                
+                guard let document = document, document.exists else {
+                    print("User \(userId) not found")
+                    dispatchGroup.leave()
+                    return
+                }
+                
+                do {
+                    let user = try document.data(as: User.self)
+                    profiles.append(user)
+                } catch {
+                    print("Error decoding user \(userId): \(error.localizedDescription)")
+                }
+                dispatchGroup.leave()
+            }
+        }
+        
+        dispatchGroup.notify(queue: .main) {
+            completion(profiles, nil)
+        }
+    }
+    
+    func fetchFollowingProfiles(for userId: String, completion: @escaping ([User]?, Error?) -> Void) {
+        fetchFriends(userId: userId) { followingIds, error in
+            if let error = error {
+                completion(nil, error)
+                return
+            }
+            
+            guard let followingIds = followingIds, !followingIds.isEmpty else {
+                completion([], nil)
+                return
+            }
+            
+            self.fetchProfiles(for: followingIds, completion: completion)
+        }
+    }
     func getNumberFollowers(forUserId userId: String, completion: @escaping (Int, Error?) -> Void) {
         db.collection("followers")
             .whereField("followingId", isEqualTo: userId)

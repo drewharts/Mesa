@@ -29,6 +29,10 @@ class ProfileViewModel: ObservableObject {
     @Published var favoritePlaceImages: [String: UIImage] = [:]
     @Published var profilePhoto: SwiftUI.Image? = nil
     
+    //friends places
+    @Published var friends: [User] = []
+    @Published var friendPlaces: [UUID: [DetailPlace]] = [:]
+    
     //followers and following
     @Published var followers: Int = 0
     
@@ -53,7 +57,17 @@ class ProfileViewModel: ObservableObject {
         fetchLists(userId: userId)
         fetchFavorites(userId: userId)
         fetchFollowers(userId: userId)
+        fetchFriends(userId: userId)
+//        fetchFriendPlaces(userId: userId)
     }
+    func fetchFriends(userId: String) {
+        firestoreService.fetchFollowingProfiles(for: userId) { profiles, error in
+            self.friends = profiles ?? []
+        }
+    }
+//    func fetchFriendPlaces(userId: String) {
+//        firestoreService.fetchFriendPlaces(userId: userId) {
+//    }
     
     // MARK: - Place List Management
     func fetchFollowers(userId: String) {
