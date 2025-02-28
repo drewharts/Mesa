@@ -99,11 +99,11 @@ class UserProfileViewModel: ObservableObject {
     private func fetchProfileFavorites(userId: String) {
         firestoreService.fetchProfileFavorites(userId: userId) { places in
             DispatchQueue.main.async {
-                if places.isEmpty {
+                if ((places?.isEmpty) != nil) {
                     print("No favorite places found.")
                     self.userFavorites = []
                 } else {
-                    self.userFavorites = places
+                    self.userFavorites = places ?? []
                 }
             }
         }

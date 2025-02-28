@@ -46,6 +46,17 @@ struct MapView: View {
                     }
                 }
             }
+            
+            ForEvery(profile.friends) { friend in
+                if let places = profile.friendPlaces[friend.id] {
+                    ForEvery(places) { place in
+                        PointAnnotation(coordinate: CLLocationCoordinate2D(
+                            latitude: place.coordinate!.latitude, longitude: place.coordinate!.longitude
+                        ))
+                        .image(.init(image: UIImage(named: "DestPin") ?? UIImage(), name: "dest-pin"))
+                    }
+                }
+            }
             if let selectedPlace = selectedPlaceVM.selectedPlace {
                 let currentPlaceLocation = CLLocationCoordinate2D(
                     latitude: selectedPlace.coordinate!.latitude,

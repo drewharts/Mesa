@@ -31,8 +31,7 @@ class ProfileViewModel: ObservableObject {
     
     //friends places
     @Published var friends: [User] = []
-    @Published var friendPlaces: [UUID: [DetailPlace]] = [:]
-    
+    @Published var friendPlaces: [String: [DetailPlace]] = [:]
     //followers and following
     @Published var followers: Int = 0
     
@@ -58,16 +57,34 @@ class ProfileViewModel: ObservableObject {
         fetchFavorites(userId: userId)
         fetchFollowers(userId: userId)
         fetchFriends(userId: userId)
-//        fetchFriendPlaces(userId: userId)
     }
     func fetchFriends(userId: String) {
-        firestoreService.fetchFollowingProfiles(for: userId) { profiles, error in
+        firestoreService.fetchFollowingProfiles(for: userId) { [weak self] profiles, error in
+            guard let self = self else { return }
             self.friends = profiles ?? []
+            let friendIds = self.friends.map { $0.id } // Assuming User has an id: String property
+            self.fetchFriendPlaces(userIds: friendIds)
         }
     }
-//    func fetchFriendPlaces(userId: String) {
-//        firestoreService.fetchFriendPlaces(userId: userId) {
-//    }
+    func fetchFriendPlaces(userIds: [String]) {
+        let dispatchGroup = DispatchGroup()
+        var tempFriendPlaces: [String: [DetailPlace]] = [:]
+
+        for userId in userIds {
+            dispatchGroup.enter()
+            firestoreService.fetchProfileFavorites(userId: userId) { [weak self] places in
+                guard let self = self else { return }
+                if let places = places {
+                    tempFriendPlaces[userId] = places
+                }
+                dispatchGroup.leave()
+            }
+        }
+
+        dispatchGroup.notify(queue: .main) {
+            self.friendPlaces = tempFriendPlaces
+        }
+    }
     
     // MARK: - Place List Management
     func fetchFollowers(userId: String) {
@@ -163,7 +180,7 @@ class ProfileViewModel: ObservableObject {
             
             DispatchQueue.main.async {
                 // Update the userFavorites array with the fetched favorites
-                self.userFavorites = favorites
+                self.userFavorites = favorites ?? []
             }
         }
     }

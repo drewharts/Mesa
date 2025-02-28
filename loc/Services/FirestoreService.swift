@@ -633,7 +633,7 @@ class FirestoreService {
     }
 
     
-    func fetchProfileFavorites(userId: String, completion: @escaping ([DetailPlace]) -> Void) {
+    func fetchProfileFavorites(userId: String, completion: @escaping ([DetailPlace]?) -> Void) {
         db.collection("users")
             .document(userId)
             .collection("favorites")
