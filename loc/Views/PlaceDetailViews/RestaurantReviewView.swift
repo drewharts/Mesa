@@ -41,40 +41,38 @@ struct RestaurantReviewView: View {
     var body: some View {
         VStack(spacing: 16) {
             // Header: Profile Picture, Name, and Timestamp
-            HStack(spacing: 12) {
-                // Placeholder for profile image (you might want to fetch this dynamically or use a default image)
-                Image(systemName: "person.circle.fill") // Default profile icon
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: 50, height: 50)
-                    .clipShape(Circle())
-                    .overlay(Circle().stroke(Color.blue, lineWidth: 2))
-                
+            Image(systemName: "person.circle.fill")
+                .resizable()
+                .scaledToFill()
+                .frame(width: 50, height: 50)
+                .clipShape(Circle())
+            HStack(alignment: .center) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("\(review.userFirstName) \(review.userLastName)")
                         .font(.headline)
                     Text(timestampFormatter.string(from: review.timestamp))
-                        .font(.subheadline)
+                        .font(.footnote)
                         .foregroundColor(.gray)
                 }
-                Spacer()
             }
             .padding(.horizontal)
-            
+            .padding(.bottom,15)
+
             // Ratings (Food, Ambience, Service)
-            HStack(spacing: 20) {
+            HStack(spacing: 35) {
                 RatingView(title: "Food", score: review.foodRating, color: .green)
                 RatingView(title: "Ambience", score: review.ambienceRating, color: .green)
                 RatingView(title: "Service", score: review.serviceRating, color: .yellow)
             }
             .padding(.horizontal)
+            .padding(.bottom,15)
             
-            // Must Order Section (Using favoriteDishes from the model)
-            VStack(alignment: .leading, spacing: 8) {
+            // Must Order Section - Moved to far left
+            VStack(alignment: .leading, spacing: 15) {
                 Text("Must Order")
-                    .font(.headline)
+                    .font(.subheadline)
                 
-                HStack(spacing: 8) {
+                HStack(spacing: 20) {
                     ForEach(review.favoriteDishes, id: \.self) { dish in
                         Button(action: {
                             // Action for the dish (e.g., show details)
@@ -86,9 +84,10 @@ struct RestaurantReviewView: View {
                                 .cornerRadius(10)
                         }
                     }
+                    Spacer() // Ensures content stays left-aligned
                 }
             }
-            .padding(.horizontal)
+            .padding(.horizontal,10) // Only pad the right side, keeping left flush
             
             // Review Text
             Text(review.reviewText)
@@ -96,7 +95,7 @@ struct RestaurantReviewView: View {
                 .padding(.horizontal)
                 .multilineTextAlignment(.center)
             
-            // Images (Using URLs from the images array)
+            // Images
             if !review.images.isEmpty {
                 HStack(spacing: 16) {
                     ForEach(review.images.prefix(2), id: \.self) { imageURL in
@@ -112,7 +111,7 @@ struct RestaurantReviewView: View {
                                     .frame(width: 150, height: 150)
                                     .clipShape(RoundedRectangle(cornerRadius: 10))
                             case .failure:
-                                Image(systemName: "photo") // Fallback for failed image load
+                                Image(systemName: "photo")
                                     .resizable()
                                     .scaledToFill()
                                     .frame(width: 150, height: 150)
@@ -130,7 +129,6 @@ struct RestaurantReviewView: View {
         .padding(.vertical)
     }
     
-    // Formatter for timestamp
     private var timestampFormatter: DateFormatter {
         let formatter = DateFormatter()
         formatter.dateStyle = .medium
@@ -157,5 +155,44 @@ struct RatingView: View {
                 .clipShape(Circle())
         }
     }
+}
+
+#Preview {
+    // Sample review data
+    let sampleReviews = [
+        Review(
+            id: "1", // String ID for the review
+            userId: "user1", // String ID for the user
+            userFirstName: "John",
+            userLastName: "Doe",
+            placeId: "place1", // String ID for the place
+            placeName: "Italian Bistro",
+            foodRating: 4.5,
+            serviceRating: 3.8,
+            ambienceRating: 4.0,
+            favoriteDishes: ["Pizza", "Pasta"],
+            reviewText: "Great food and vibe, but service could be faster!",
+            timestamp: Date(),
+            images: ["https://example.com/image1.jpg", "https://example.com/image2.jpg"]
+        ),
+        Review(
+            id: "2",
+            userId: "user2",
+            userFirstName: "Jane",
+            userLastName: "Smith",
+            placeId: "place2",
+            placeName: "Cafe Verde",
+            foodRating: 3.0,
+            serviceRating: 4.0,
+            ambienceRating: 4.5,
+            favoriteDishes: ["Salad"],
+            reviewText: "Loved the ambience, food was okay.",
+            timestamp: Date().addingTimeInterval(-86400), // Yesterday
+            images: []
+        )
+    ]
+    
+    // Return the view with sample data
+    PlaceReviewsView(reviews: sampleReviews)
 }
 
