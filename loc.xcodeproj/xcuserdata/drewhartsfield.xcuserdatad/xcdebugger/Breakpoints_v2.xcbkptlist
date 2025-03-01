@@ -882,36 +882,6 @@
             endingLineNumber = "75"
             landmarkName = "fetchFriendPlaces(userIds:)"
             landmarkType = "7">
-            <Locations>
-               <Location
-                  uuid = "9A978687-875C-417B-B468-E1D6529BC7FC - 94e4f455fc92f2a6"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "loc.ProfileViewModel.fetchFriendPlaces(userIds: Swift.Array&lt;Swift.String&gt;) -&gt; ()"
-                  moduleName = "loc.debug.dylib"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/drewhartsfield/Desktop/Repos/Loc/loc/ViewModels/ProfileViewModel.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "75"
-                  endingLineNumber = "75">
-               </Location>
-               <Location
-                  uuid = "9A978687-875C-417B-B468-E1D6529BC7FC - 3ae6c56a9cd1ca5a"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "closure #1 (Swift.Optional&lt;Swift.Array&lt;loc.DetailPlace&gt;&gt;) -&gt; () in loc.ProfileViewModel.fetchFriendPlaces(userIds: Swift.Array&lt;Swift.String&gt;) -&gt; ()"
-                  moduleName = "loc.debug.dylib"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/drewhartsfield/Desktop/Repos/Loc/loc/ViewModels/ProfileViewModel.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "75"
-                  endingLineNumber = "75">
-               </Location>
-            </Locations>
          </BreakpointContent>
       </BreakpointProxy>
       <BreakpointProxy

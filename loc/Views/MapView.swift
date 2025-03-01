@@ -33,6 +33,10 @@ struct MapView: View {
                 )
                 PointAnnotation(coordinate: tempPlaceLocation)
                     .image(.init(image: UIImage(named: "DestPin")!, name: "dest-pin"))
+                    .onTapGesture {
+                        selectedPlaceVM.selectedPlace = favorite
+                        selectedPlaceVM.isDetailSheetPresented = true
+                    }
             }
             
             ForEvery(profile.userLists) { list in
@@ -43,6 +47,10 @@ struct MapView: View {
                             longitude: place.coordinate!.longitude
                         ))
                         .image(.init(image: UIImage(named: "DestPin") ?? UIImage(), name: "dest-pin"))
+                        .onTapGesture {
+                            selectedPlaceVM.selectedPlace = place
+                            selectedPlaceVM.isDetailSheetPresented = true
+                        }
                     }
                 }
             }
@@ -54,6 +62,10 @@ struct MapView: View {
                             latitude: place.coordinate!.latitude, longitude: place.coordinate!.longitude
                         ))
                         .image(.init(image: UIImage(named: "DestPin") ?? UIImage(), name: "dest-pin"))
+                        .onTapGesture {
+                            selectedPlaceVM.selectedPlace = place
+                            selectedPlaceVM.isDetailSheetPresented = true
+                        }
                     }
                 }
             }
