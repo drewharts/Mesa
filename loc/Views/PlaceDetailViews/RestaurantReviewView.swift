@@ -19,7 +19,6 @@ struct PlaceReviewsView: View {
                         .padding(.vertical, 8)
                         .background(Color(.systemBackground))
                         .cornerRadius(10)
-                        .shadow(radius: 2)
                 }
                 
                 if reviews.isEmpty {
@@ -30,10 +29,68 @@ struct PlaceReviewsView: View {
                 }
             }
         }
+        .padding(.horizontal,-50)
         .navigationTitle("Reviews")
+        .background(Color.white)
+    }
+}
+struct RestaruantReviewViewProfileInformation: View {
+    let review: Review
+    
+    var body: some View {
+        Image(systemName: "person.circle.fill")
+            .resizable()
+            .scaledToFill()
+            .frame(width: 50, height: 50)
+            .clipShape(Circle())
+        HStack(alignment: .center) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("\(review.userFirstName) \(review.userLastName)")
+                    .font(.headline)
+                Text(timestampFormatter.string(from: review.timestamp))
+                    .font(.footnote)
+                    .foregroundColor(.gray)
+            }
+        }
+        .padding(.horizontal)
+        .padding(.bottom,15)
+    }
+    private var timestampFormatter: DateFormatter {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .none
+        return formatter
     }
 }
 
+struct RestuarantReviewViewMustOrder: View {
+    let review: Review
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 15) {
+            Text("Must Order")
+                .font(.subheadline)
+            
+            HStack(spacing: 20) {
+                ForEach(review.favoriteDishes, id: \.self) { dish in
+                    Button(action: {
+                        // Action for the dish (e.g., show details)
+                    }) {
+                        Text(dish)
+                            .padding(.vertical, 4)
+                            .padding(.horizontal, 16)
+                            .background(Capsule().fill(Color.gray.opacity(0.2)))
+                            .foregroundStyle(.black)
+                            .font(.footnote)
+                    }
+                }
+                Spacer() // Ensures content stays left-aligned
+            }
+        }
+        .padding(.horizontal,20) // Only pad the right side, keeping left flush
+        .padding(.bottom, 15)
+    }
+}
 // Individual Review View (Renamed for clarity, but unchanged internally)
 struct RestaurantReviewView: View {
     let review: Review
@@ -41,22 +98,7 @@ struct RestaurantReviewView: View {
     var body: some View {
         VStack(spacing: 16) {
             // Header: Profile Picture, Name, and Timestamp
-            Image(systemName: "person.circle.fill")
-                .resizable()
-                .scaledToFill()
-                .frame(width: 50, height: 50)
-                .clipShape(Circle())
-            HStack(alignment: .center) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("\(review.userFirstName) \(review.userLastName)")
-                        .font(.headline)
-                    Text(timestampFormatter.string(from: review.timestamp))
-                        .font(.footnote)
-                        .foregroundColor(.gray)
-                }
-            }
-            .padding(.horizontal)
-            .padding(.bottom,15)
+            RestaruantReviewViewProfileInformation(review: review)
 
             // Ratings (Food, Ambience, Service)
             HStack(spacing: 35) {
@@ -67,33 +109,15 @@ struct RestaurantReviewView: View {
             .padding(.horizontal)
             .padding(.bottom,15)
             
-            // Must Order Section - Moved to far left
-            VStack(alignment: .leading, spacing: 15) {
-                Text("Must Order")
-                    .font(.subheadline)
-                
-                HStack(spacing: 20) {
-                    ForEach(review.favoriteDishes, id: \.self) { dish in
-                        Button(action: {
-                            // Action for the dish (e.g., show details)
-                        }) {
-                            Text(dish)
-                                .padding(.vertical, 6)
-                                .padding(.horizontal, 12)
-                                .background(Color.gray.opacity(0.2))
-                                .cornerRadius(10)
-                        }
-                    }
-                    Spacer() // Ensures content stays left-aligned
-                }
-            }
-            .padding(.horizontal,10) // Only pad the right side, keeping left flush
+            // Must Order Section
+            RestuarantReviewViewMustOrder(review: review)
             
             // Review Text
             Text(review.reviewText)
                 .font(.body)
                 .padding(.horizontal)
-                .multilineTextAlignment(.center)
+                .multilineTextAlignment(.leading)
+                .padding(.bottom,15)
             
             // Images
             if !review.images.isEmpty {
@@ -128,13 +152,6 @@ struct RestaurantReviewView: View {
         }
         .padding(.vertical)
     }
-    
-    private var timestampFormatter: DateFormatter {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .none
-        return formatter
-    }
 }
 
 // Reusable Rating View (Unchanged)
@@ -146,7 +163,7 @@ struct RatingView: View {
     var body: some View {
         VStack(spacing: 4) {
             Text(title)
-                .font(.subheadline)
+                .font(.footnote)
             Text(String(format: "%.1f", score))
                 .font(.title3)
                 .foregroundColor(.white)
