@@ -191,10 +191,7 @@ struct MinPlaceDetailView: View {
                     
                 case .reviews:
                     // "Reviews" content
-                    Text("Reviews content here...")
-                        .font(.footnote)
-                        .foregroundColor(.black)
-                        .fixedSize(horizontal: false, vertical: true)
+                    PlaceReviewsView(reviews: selectedPlaceVM.reviews)
                 }
             }
             .padding(.horizontal, 30)
