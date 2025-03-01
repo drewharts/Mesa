@@ -13,6 +13,35 @@ import GooglePlaces
 class FirestoreService {
     private let db = Firestore.firestore()
     private let storage = Storage.storage()
+    
+    func fetchReviews(placeId: String, completion: @escaping ([Review]?, Error?) -> Void) {
+        // Reference to the reviews subcollection under the place document
+        let reviewsRef = db.collection("places")
+                          .document(placeId)
+                          .collection("reviews")
+        
+        // Fetch all documents in the reviews collection
+        reviewsRef.getDocuments { snapshot, error in
+            if let error = error {
+                print("Error fetching reviews for place \(placeId): \(error.localizedDescription)")
+                completion(nil, error)
+                return
+            }
+            
+            guard let snapshot = snapshot else {
+                print("No snapshot returned for reviews of place \(placeId)")
+                completion([], nil)
+                return
+            }
+            
+            // Decode each document into a Review object
+            let reviews: [Review] = snapshot.documents.compactMap { document in
+                try? document.data(as: Review.self)
+            }
+            
+            completion(reviews, nil)
+        }
+    }
 
     func fetchFriends(userId: String, completion: @escaping ([String]?, Error?) -> Void) {
         db.collection("following")
