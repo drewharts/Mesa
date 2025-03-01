@@ -49,7 +49,7 @@ class PlaceReviewViewModel: ObservableObject {
         
         // Create a Review object with an empty images array.
         var newReview = Review(
-            id: UUID().uuidString,
+            id: place.id.uuidString,
             userId: userId,
             userFirstName: userFirstName,
             userLastName: userLastName,

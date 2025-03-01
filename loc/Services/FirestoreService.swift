@@ -665,8 +665,4 @@ class FirestoreService {
             completion(error)
         }
     }
-
-
-
-
 }
