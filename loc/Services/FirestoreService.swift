@@ -14,6 +14,49 @@ class FirestoreService {
     private let db = Firestore.firestore()
     private let storage = Storage.storage()
     
+    func fetchPhotosFromStorage(placeId: String, completion: @escaping ([UIImage]?, Error?) -> Void) {
+        let storageRef = storage.reference().child("reviews/\(placeId)")
+        
+        storageRef.listAll { [weak self] (result, error) in
+            guard let self = self else { return }
+            
+            if let error = error {
+                print("Error listing files in storage for place \(placeId): \(error.localizedDescription)")
+                completion(nil, error)
+                return
+            }
+            
+            guard let result = result else {
+                print("No result returned for storage path reviews/\(placeId)")
+                completion([], nil)
+                return
+            }
+            
+            var images: [UIImage] = []
+            let dispatchGroup = DispatchGroup()
+            
+            for item in result.items.prefix(9) { // Limit to max 9 items
+                dispatchGroup.enter()
+                
+                item.getData(maxSize: 10 * 1024 * 1024) { data, error in
+                    defer { dispatchGroup.leave() }
+                    
+                    if let error = error {
+                        print("Error downloading image \(item.name): \(error.localizedDescription)")
+                        return
+                    }
+                    
+                    if let data = data, let image = UIImage(data: data) {
+                        images.append(image)
+                    }
+                }
+            }
+            
+            dispatchGroup.notify(queue: .main) {
+                completion(images, nil)
+            }
+        }
+    }
     func findPlace(mapboxId: String, completion: @escaping (DetailPlace?, Error?) -> Void) {
         // Reference to the Firestore collection where places are stored ("places")
         let db = Firestore.firestore()

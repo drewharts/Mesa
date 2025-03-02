@@ -46,7 +46,6 @@ struct MaxPlaceDetailView: View {
                     .clipShape(Capsule())
                 }
 
-
                 // MENU Bubble
                 HStack(spacing: 8) {
                     Image(systemName: "fork.knife.circle")
@@ -74,11 +73,10 @@ struct MaxPlaceDetailView: View {
                 .padding(.bottom, 5)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-            
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    if !viewModel.photos.isEmpty {
-                        GridView(images: viewModel.photos,
+                    if let place = selectedPlaceVM.selectedPlace, !selectedPlaceVM.photos(for: place).isEmpty {
+                        GridView(images: selectedPlaceVM.photos(for: place),
                                  selectedImage: $selectedImage)
                     } else {
                         ProgressView("Loading Photos...")
