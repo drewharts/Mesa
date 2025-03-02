@@ -125,30 +125,57 @@ class ProfileViewModel: ObservableObject {
         }
     }
     
-    private func searchResultToDetailPlace(place: SearchResult) -> DetailPlace {
-        let uuid = UUID(uuidString: place.id) ?? UUID()
-
-        var detailPlace = DetailPlace(id: uuid, name: place.name,address: place.address?.formattedAddress(style: .medium) ?? "")
-        
-        detailPlace.mapboxId = place.id
-        detailPlace.coordinate = GeoPoint(
-            latitude: Double(place.coordinate.latitude),
-            longitude: Double(place.coordinate.longitude)
-        )
-        detailPlace.categories = place.categories
-        detailPlace.phone = place.metadata?.phone
-        detailPlace.rating = place.metadata?.rating ?? 0
-        detailPlace.description = place.metadata?.description ?? ""
-        detailPlace.priceLevel = place.metadata?.priceLevel
-        detailPlace.reservable = place.metadata?.reservable ?? false
-        detailPlace.servesBreakfast = place.metadata?.servesBreakfast ?? false
-        detailPlace.serversLunch = place.metadata?.servesLunch ?? false
-        detailPlace.serversDinner = place.metadata?.servesDinner ?? false
-        detailPlace.Instagram = place.metadata?.instagram
-        detailPlace.X = place.metadata?.twitter
-        
-        return detailPlace
-        
+    //TODO: this needs to be changed
+    private func searchResultToDetailPlace(place: SearchResult, completion: @escaping (DetailPlace) -> Void) {
+        // First, check if the DetailPlace exists in Firestore using mapboxId
+        firestoreService.findPlace(mapboxId: place.mapboxId!) { [weak self] existingDetailPlace, error in
+            if let error = error {
+                print("Error checking for existing place: \(error.localizedDescription)")
+                // If there's an error, proceed to create a new DetailPlace (or handle differently)
+            }
+            
+            if let existingDetailPlace = existingDetailPlace {
+                // If the place exists, return it immediately
+                completion(existingDetailPlace)
+                return
+            }
+            
+            // If no existing place is found, create a new DetailPlace
+            let uuid = UUID(uuidString: place.id) ?? UUID()
+            
+            var detailPlace = DetailPlace(
+                id: uuid,
+                name: place.name,
+                address: place.address?.formattedAddress(style: .medium) ?? ""
+            )
+            
+            detailPlace.mapboxId = place.mapboxId
+            detailPlace.coordinate = GeoPoint(
+                latitude: Double(place.coordinate.latitude),
+                longitude: Double(place.coordinate.longitude)
+            )
+            detailPlace.categories = place.categories
+            detailPlace.phone = place.metadata?.phone
+            detailPlace.rating = place.metadata?.rating ?? 0
+            detailPlace.description = place.metadata?.description ?? ""
+            detailPlace.priceLevel = place.metadata?.priceLevel
+            detailPlace.reservable = place.metadata?.reservable ?? false
+            detailPlace.servesBreakfast = place.metadata?.servesBreakfast ?? false
+            detailPlace.serversLunch = place.metadata?.servesLunch ?? false
+            detailPlace.serversDinner = place.metadata?.servesDinner ?? false
+            detailPlace.Instagram = place.metadata?.instagram
+            detailPlace.X = place.metadata?.twitter
+            
+            // Optionally, save the new DetailPlace to Firestore if it doesn’t exist
+            self?.firestoreService.addToAllPlaces(detailPlace: detailPlace) { error in
+                if let error = error {
+                    print("Error saving new place to Firestore: \(error.localizedDescription)")
+                }
+            }
+            
+            // Return the newly created DetailPlace
+            completion(detailPlace)
+        }
     }
     
     func removePlaceFromList(listId: UUID, place: DetailPlace) {
@@ -239,12 +266,11 @@ class ProfileViewModel: ObservableObject {
                 print("✅ Resolved result: \(result.id) - \(result.name)")
                 
                 // Convert the SearchResult into a DetailPlace.
-                let detailPlace = self.searchResultToDetailPlace(place: result)
-                
-                // Add the DetailPlace to the favorites.
-                self.userFavorites.append(detailPlace)
+                self.searchResultToDetailPlace(place: result) { [weak self] place in
+                    self!.userFavorites.append(place)
 
-                self.firestoreService.addProfileFavorite(userId: self.userId, place: detailPlace)
+                    self!.firestoreService.addProfileFavorite(userId: self!.userId, place: place)
+                }
 
             }
         }
