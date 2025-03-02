@@ -53,4 +53,8 @@ class SelectedPlaceViewModel: ObservableObject {
             }
         }
     }
+    
+    private func getPlacePhotos(for place: DetailPlace) {
+        
+    }
 }
