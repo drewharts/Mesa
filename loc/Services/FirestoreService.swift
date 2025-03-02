@@ -14,6 +14,39 @@ class FirestoreService {
     private let db = Firestore.firestore()
     private let storage = Storage.storage()
     
+    func findPlace(mapboxId: String, completion: @escaping (DetailPlace?, Error?) -> Void) {
+        // Reference to the Firestore collection where places are stored ("places")
+        let db = Firestore.firestore()
+        let placesCollection = db.collection("places")
+        
+        // Query where "mapboxId" matches the input
+        placesCollection
+            .whereField("mapboxId", isEqualTo: mapboxId)
+            .limit(to: 1) // Assuming mapboxId is unique
+            .getDocuments { (snapshot, error) in
+                if let error = error {
+                    // Return nil for DetailPlace and the error if the query fails
+                    completion(nil, error)
+                    return
+                }
+                
+                guard let document = snapshot?.documents.first else {
+                    // No matching document found
+                    completion(nil, nil)
+                    return
+                }
+                
+                // Decode the document directly into DetailPlace
+                do {
+                    let detailPlace = try document.data(as: DetailPlace.self)
+                    completion(detailPlace, nil)
+                } catch {
+                    // Return nil for DetailPlace and the decoding error
+                    completion(nil, error)
+                }
+            }
+    }
+    
     func fetchReviews(placeId: String, completion: @escaping ([Review]?, Error?) -> Void) {
         // Reference to the reviews subcollection under the place document
         let reviewsRef = db.collection("places")

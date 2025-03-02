@@ -114,7 +114,8 @@ class ProfileViewModel: ObservableObject {
         placeListGMSPlaces[listId, default: []].append(place)
         
         firestoreService.addPlaceToList(userId: userId, listName: listId.uuidString, place: newPlace)
-                
+        
+        //TODO: Check if place is already added to list
         firestoreService.addToAllPlaces(detailPlace: place) { error in
             if let error = error {
                 print("Error adding place: \(error.localizedDescription)")
