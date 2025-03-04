@@ -59,6 +59,8 @@ struct FavoritesContentDisplay: View {
             HStack {
                 Text(prediction.name)
                     .foregroundColor(.primary)
+                Text((prediction.address?.place) ?? "")
+                    .foregroundColor(.secondary)
                 Spacer()
             }
             .padding(.vertical, 6)

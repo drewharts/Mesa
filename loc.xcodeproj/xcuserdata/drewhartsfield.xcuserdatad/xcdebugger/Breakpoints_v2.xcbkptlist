@@ -979,36 +979,6 @@
             endingLineNumber = "269"
             landmarkName = "addFavoriteFromSuggestion(_:)"
             landmarkType = "7">
-            <Locations>
-               <Location
-                  uuid = "073DF0C8-3A5D-41FC-A3C1-1420B9420235 - 57c85f90d8a74ed6"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "closure #1 @Swift.MainActor () -&gt; () in closure #1 (MapboxSearch.SearchResult) -&gt; () in loc.ProfileViewModel.addFavoriteFromSuggestion(MapboxSearch.SearchSuggestion) -&gt; ()"
-                  moduleName = "loc.debug.dylib"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/drewhartsfield/Desktop/Repos/Loc/loc/ViewModels/ProfileViewModel.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "269"
-                  endingLineNumber = "269">
-               </Location>
-               <Location
-                  uuid = "073DF0C8-3A5D-41FC-A3C1-1420B9420235 - 9dca24f0cc6914b9"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "closure #1 (loc.DetailPlace) -&gt; () in closure #1 @Swift.MainActor () -&gt; () in closure #1 (MapboxSearch.SearchResult) -&gt; () in loc.ProfileViewModel.addFavoriteFromSuggestion(MapboxSearch.SearchSuggestion) -&gt; ()"
-                  moduleName = "loc.debug.dylib"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/drewhartsfield/Desktop/Repos/Loc/loc/ViewModels/ProfileViewModel.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "269"
-                  endingLineNumber = "269">
-               </Location>
-            </Locations>
          </BreakpointContent>
       </BreakpointProxy>
    </Breakpoints>
