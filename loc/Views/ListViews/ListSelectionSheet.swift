@@ -17,11 +17,11 @@ struct ListDescription: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(placeList.name)
                 .font(.body)
-                .foregroundStyle(.primary) // Adapts to light/dark mode
-            
+                .foregroundStyle(Color.primary.opacity(1.0)) // Ensures black in light mode, white in dark mode
+
             Text("\(profile.placeListGMSPlaces[placeList.id]?.count ?? 0) Places")
                 .font(.caption)
-                .foregroundStyle(.secondary) // Slightly lighter for hierarchy
+                .foregroundStyle(Color.secondary.opacity(1.0)) // Slightly lighter, adapts to mode
         }
         .padding(.horizontal, 15)
     }
@@ -59,7 +59,7 @@ struct ListSelectionRowView: View {
                 ZStack {
                     if profile.placeListGMSPlaces[list.id]?.contains(where: { $0.id == place.id }) ?? false {
                         Circle()
-                            .fill(Color.accentColor) // Use accent color for visibility
+                            .fill(Color.primary) // Use accent color for visibility
                             .frame(width: 24, height: 24)
                     } else {
                         Circle()
