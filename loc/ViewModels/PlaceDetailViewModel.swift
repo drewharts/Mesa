@@ -38,20 +38,7 @@ class PlaceDetailViewModel: ObservableObject {
         self.currentPlaceID = place.id.uuidString
         
         self.placeName = place.name ?? "Restaurant"
-//        self.placeIconURL = place.metadata?.primaryImage
-//        self.openingHours = place.metadata?.openHours
-//        self.phoneNumber = place.metadata.phone
-
-        
-//        DispatchQueue.main.async {
-//            self.placeName = place.name ?? "Restaurant"
-//            self.placeIconURL = place.metadata?.primaryImage
-//            self.openingHours = place.metadata?.openHours
-//            self.phoneNumber = place.metadata.phone
-////            self.fetchPhotos(for: place)
-////            self.checkOpenStatus(for: place)
-            self.updateTravelTime(for: place, from: currentLocation)
-//        }
+        self.updateTravelTime(for: place, from: currentLocation)
     }
     
     func openNavigation(for place: DetailPlace, currentLocation: CLLocationCoordinate2D) {

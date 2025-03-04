@@ -11,6 +11,7 @@ import Foundation
 struct Review: Codable {
     let id: String // UUID for the review
     let userId: String // ID of the user who wrote the review
+    let profilePhotoUrl: String
     let userFirstName: String
     let userLastName: String
     let placeId: String // ID of the place being reviewed

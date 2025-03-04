@@ -38,9 +38,8 @@ struct RestaruantReviewViewProfileInformation: View {
     let review: Review
     
     var body: some View {
-        Image(systemName: "person.circle.fill")
-            .resizable()
-            .scaledToFill()
+        //TODO: need a different way to display profile photo
+        AsyncImage(url: URL(string: review.profilePhotoUrl))
             .frame(width: 50, height: 50)
             .clipShape(Circle())
         HStack(alignment: .center) {
@@ -182,7 +181,8 @@ struct RatingView: View {
     let sampleReviews = [
         Review(
             id: "1", // String ID for the review
-            userId: "user1", // String ID for the user
+            userId: "user1",
+            profilePhotoUrl: "",
             userFirstName: "John",
             userLastName: "Doe",
             placeId: "place1", // String ID for the place
@@ -198,6 +198,7 @@ struct RatingView: View {
         Review(
             id: "2",
             userId: "user2",
+            profilePhotoUrl: "",
             userFirstName: "Jane",
             userLastName: "Smith",
             placeId: "place2",
