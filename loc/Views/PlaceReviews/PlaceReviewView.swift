@@ -25,7 +25,7 @@ struct PlaceReviewView: View {
     @State private var showingImagePicker = false
     @State private var inputImages: [UIImage] = []
     
-    init(isPresented: Binding<Bool>, place: DetailPlace, userId: String, userFirstName: String, userLastName: String) {
+    init(isPresented: Binding<Bool>, place: DetailPlace, userId: String, profilePhotoUrl: String, userFirstName: String, userLastName: String) {
         self._isPresented = isPresented
         self.place = place
 
@@ -35,7 +35,8 @@ struct PlaceReviewView: View {
                 place: place,
                 userId: userId,
                 userFirstName: userFirstName,
-                userLastName: userLastName
+                userLastName: userLastName,
+                profilePhotoUrl: profilePhotoUrl
             )
         )
     }

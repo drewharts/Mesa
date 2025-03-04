@@ -58,6 +58,20 @@ class ProfileViewModel: ObservableObject {
         fetchFollowers(userId: userId)
         fetchFriends(userId: userId)
     }
+    func fetchFavoritePlaceImages() {
+        for place in userFavorites {
+            firestoreService.fetchPhotosFromStorage(placeId: place.id.uuidString, returnFirstImageOnly: true) { [weak self] (images, error) in
+                guard let self = self else { return }
+                
+                if let error = error {
+                    print("Error fetching image for place \(place.id.uuidString): \(error.localizedDescription)")
+                    return
+                }
+                
+                self.favoritePlaceImages[place.id.uuidString] = images?.first
+            }
+        }
+    }
     func fetchFriends(userId: String) {
         firestoreService.fetchFollowingProfiles(for: userId) { [weak self] profiles, error in
             guard let self = self else { return }
@@ -114,7 +128,8 @@ class ProfileViewModel: ObservableObject {
         placeListGMSPlaces[listId, default: []].append(place)
         
         firestoreService.addPlaceToList(userId: userId, listName: listId.uuidString, place: newPlace)
-                
+        
+        //TODO: Check if place is already added to list
         firestoreService.addToAllPlaces(detailPlace: place) { error in
             if let error = error {
                 print("Error adding place: \(error.localizedDescription)")
@@ -124,30 +139,57 @@ class ProfileViewModel: ObservableObject {
         }
     }
     
-    private func searchResultToDetailPlace(place: SearchResult) -> DetailPlace {
-        let uuid = UUID(uuidString: place.id) ?? UUID()
-
-        var detailPlace = DetailPlace(id: uuid, name: place.name,address: place.address?.formattedAddress(style: .medium) ?? "")
-        
-        detailPlace.mapboxId = place.id
-        detailPlace.coordinate = GeoPoint(
-            latitude: Double(place.coordinate.latitude),
-            longitude: Double(place.coordinate.longitude)
-        )
-        detailPlace.categories = place.categories
-        detailPlace.phone = place.metadata?.phone
-        detailPlace.rating = place.metadata?.rating ?? 0
-        detailPlace.description = place.metadata?.description ?? ""
-        detailPlace.priceLevel = place.metadata?.priceLevel
-        detailPlace.reservable = place.metadata?.reservable ?? false
-        detailPlace.servesBreakfast = place.metadata?.servesBreakfast ?? false
-        detailPlace.serversLunch = place.metadata?.servesLunch ?? false
-        detailPlace.serversDinner = place.metadata?.servesDinner ?? false
-        detailPlace.Instagram = place.metadata?.instagram
-        detailPlace.X = place.metadata?.twitter
-        
-        return detailPlace
-        
+    //TODO: this needs to be changed
+    private func searchResultToDetailPlace(place: SearchResult, completion: @escaping (DetailPlace) -> Void) {
+        // First, check if the DetailPlace exists in Firestore using mapboxId
+        firestoreService.findPlace(mapboxId: place.mapboxId!) { [weak self] existingDetailPlace, error in
+            if let error = error {
+                print("Error checking for existing place: \(error.localizedDescription)")
+                // If there's an error, proceed to create a new DetailPlace (or handle differently)
+            }
+            
+            if let existingDetailPlace = existingDetailPlace {
+                // If the place exists, return it immediately
+                completion(existingDetailPlace)
+                return
+            }
+            
+            // If no existing place is found, create a new DetailPlace
+            let uuid = UUID(uuidString: place.id) ?? UUID()
+            
+            var detailPlace = DetailPlace(
+                id: uuid,
+                name: place.name,
+                address: place.address?.formattedAddress(style: .medium) ?? ""
+            )
+            
+            detailPlace.mapboxId = place.mapboxId
+            detailPlace.coordinate = GeoPoint(
+                latitude: Double(place.coordinate.latitude),
+                longitude: Double(place.coordinate.longitude)
+            )
+            detailPlace.categories = place.categories
+            detailPlace.phone = place.metadata?.phone
+            detailPlace.rating = place.metadata?.rating ?? 0
+            detailPlace.description = place.metadata?.description ?? ""
+            detailPlace.priceLevel = place.metadata?.priceLevel
+            detailPlace.reservable = place.metadata?.reservable ?? false
+            detailPlace.servesBreakfast = place.metadata?.servesBreakfast ?? false
+            detailPlace.serversLunch = place.metadata?.servesLunch ?? false
+            detailPlace.serversDinner = place.metadata?.servesDinner ?? false
+            detailPlace.Instagram = place.metadata?.instagram
+            detailPlace.X = place.metadata?.twitter
+            
+            // Optionally, save the new DetailPlace to Firestore if it doesn’t exist
+            self?.firestoreService.addToAllPlaces(detailPlace: detailPlace) { error in
+                if let error = error {
+                    print("Error saving new place to Firestore: \(error.localizedDescription)")
+                }
+            }
+            
+            // Return the newly created DetailPlace
+            completion(detailPlace)
+        }
     }
     
     func removePlaceFromList(listId: UUID, place: DetailPlace) {
@@ -181,6 +223,7 @@ class ProfileViewModel: ObservableObject {
             DispatchQueue.main.async {
                 // Update the userFavorites array with the fetched favorites
                 self.userFavorites = favorites ?? []
+                self.fetchFavoritePlaceImages()
             }
         }
     }
@@ -238,12 +281,11 @@ class ProfileViewModel: ObservableObject {
                 print("✅ Resolved result: \(result.id) - \(result.name)")
                 
                 // Convert the SearchResult into a DetailPlace.
-                let detailPlace = self.searchResultToDetailPlace(place: result)
-                
-                // Add the DetailPlace to the favorites.
-                self.userFavorites.append(detailPlace)
+                self.searchResultToDetailPlace(place: result) { [weak self] place in
+                    self!.userFavorites.append(place)
 
-                self.firestoreService.addProfileFavorite(userId: self.userId, place: detailPlace)
+                    self!.firestoreService.addProfileFavorite(userId: self!.userId, place: place)
+                }
 
             }
         }

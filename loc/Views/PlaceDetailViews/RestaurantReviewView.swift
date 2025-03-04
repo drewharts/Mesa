@@ -38,13 +38,12 @@ struct RestaruantReviewViewProfileInformation: View {
     let review: Review
     
     var body: some View {
-        Image(systemName: "person.circle.fill")
-            .resizable()
-            .scaledToFill()
+        //TODO: need a different way to display profile photo
+        AsyncImage(url: URL(string: review.profilePhotoUrl))
             .frame(width: 50, height: 50)
             .clipShape(Circle())
         HStack(alignment: .center) {
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .center, spacing: 4) {
                 Text("\(review.userFirstName) \(review.userLastName)")
                     .font(.headline)
                 Text(timestampFormatter.string(from: review.timestamp))
@@ -69,7 +68,7 @@ struct RestuarantReviewViewMustOrder: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 15) {
             Text("Must Order")
-                .font(.subheadline)
+                .font(.caption)
             
             HStack(spacing: 20) {
                 ForEach(review.favoriteDishes, id: \.self) { dish in
@@ -81,13 +80,13 @@ struct RestuarantReviewViewMustOrder: View {
                             .padding(.horizontal, 16)
                             .background(Capsule().fill(Color.gray.opacity(0.2)))
                             .foregroundStyle(.black)
-                            .font(.footnote)
+                            .font(.caption2)
                     }
                 }
                 Spacer() // Ensures content stays left-aligned
             }
         }
-        .padding(.horizontal,20) // Only pad the right side, keeping left flush
+        .padding(.horizontal,30) // Only pad the right side, keeping left flush
         .padding(.bottom, 15)
     }
 }
@@ -101,53 +100,56 @@ struct RestaurantReviewView: View {
             RestaruantReviewViewProfileInformation(review: review)
 
             // Ratings (Food, Ambience, Service)
-            HStack(spacing: 35) {
+            HStack(spacing: 45) {
                 RatingView(title: "Food", score: review.foodRating, color: .green)
                 RatingView(title: "Ambience", score: review.ambienceRating, color: .green)
                 RatingView(title: "Service", score: review.serviceRating, color: .yellow)
             }
             .padding(.horizontal)
-            .padding(.bottom,15)
+            .padding(.bottom, 15)
             
             // Must Order Section
             RestuarantReviewViewMustOrder(review: review)
             
             // Review Text
             Text(review.reviewText)
-                .font(.body)
+                .font(.footnote)
+                .foregroundColor(.gray)
                 .padding(.horizontal)
                 .multilineTextAlignment(.leading)
-                .padding(.bottom,15)
+                .padding(.bottom, 15)
             
-            // Images
+            // Images (Horizontal Scrolling)
             if !review.images.isEmpty {
-                HStack(spacing: 16) {
-                    ForEach(review.images.prefix(2), id: \.self) { imageURL in
-                        AsyncImage(url: URL(string: imageURL)) { phase in
-                            switch phase {
-                            case .empty:
-                                ProgressView()
-                                    .frame(width: 150, height: 150)
-                            case .success(let image):
-                                image
-                                    .resizable()
-                                    .scaledToFill()
-                                    .frame(width: 150, height: 150)
-                                    .clipShape(RoundedRectangle(cornerRadius: 10))
-                            case .failure:
-                                Image(systemName: "photo")
-                                    .resizable()
-                                    .scaledToFill()
-                                    .frame(width: 150, height: 150)
-                                    .clipShape(RoundedRectangle(cornerRadius: 10))
-                                    .foregroundColor(.gray)
-                            @unknown default:
-                                EmptyView()
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 16) {
+                        ForEach(review.images, id: \.self) { imageURL in
+                            AsyncImage(url: URL(string: imageURL)) { phase in
+                                switch phase {
+                                case .empty:
+                                    ProgressView()
+                                        .frame(width: 150, height: 150)
+                                case .success(let image):
+                                    image
+                                        .resizable()
+                                        .scaledToFill()
+                                        .frame(width: 150, height: 150)
+                                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                                case .failure:
+                                    Image(systemName: "photo")
+                                        .resizable()
+                                        .scaledToFill()
+                                        .frame(width: 150, height: 150)
+                                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                                        .foregroundColor(.gray)
+                                @unknown default:
+                                    EmptyView()
+                                }
                             }
                         }
                     }
+                    .padding(.horizontal)
                 }
-                .padding(.horizontal)
             }
         }
         .padding(.vertical)
@@ -161,13 +163,13 @@ struct RatingView: View {
     let color: Color
     
     var body: some View {
-        VStack(spacing: 4) {
+        VStack(spacing: 15) {
             Text(title)
-                .font(.footnote)
+                .font(.caption)
             Text(String(format: "%.1f", score))
                 .font(.title3)
                 .foregroundColor(.white)
-                .frame(width: 50, height: 50)
+                .frame(width: 45, height: 45)
                 .background(color)
                 .clipShape(Circle())
         }
@@ -179,7 +181,8 @@ struct RatingView: View {
     let sampleReviews = [
         Review(
             id: "1", // String ID for the review
-            userId: "user1", // String ID for the user
+            userId: "user1",
+            profilePhotoUrl: "",
             userFirstName: "John",
             userLastName: "Doe",
             placeId: "place1", // String ID for the place
@@ -195,6 +198,7 @@ struct RatingView: View {
         Review(
             id: "2",
             userId: "user2",
+            profilePhotoUrl: "",
             userFirstName: "Jane",
             userLastName: "Smith",
             placeId: "place2",

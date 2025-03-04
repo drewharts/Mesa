@@ -36,7 +36,7 @@ struct MinPlaceDetailView: View {
                     Spacer()
                     
                     HStack(spacing: 16) {
-                        NavigationLink(destination: PlaceReviewView(isPresented: .constant(false), place: selectedPlaceVM.selectedPlace!,userId: profile.userId,userFirstName: profile.data.firstName,userLastName: profile.data.lastName)) {
+                        NavigationLink(destination: PlaceReviewView(isPresented: .constant(false), place: selectedPlaceVM.selectedPlace!,userId: profile.userId, profilePhotoUrl: profile.data.profilePhotoURL?.absoluteString ?? "",userFirstName: profile.data.firstName,userLastName: profile.data.lastName)) {
                             Image(systemName: "plus")
                                 .font(.title3)
                         }
@@ -112,7 +112,7 @@ struct MinPlaceDetailView: View {
                     }
                     
                     // Updated Rating label (adapted for Mapsbox)
-                    Text(String(format: "%.1f", selectedPlaceVM.selectedPlace?.rating ?? 0.0))
+                    Text(String(format: "%.1f", selectedPlaceVM.placeRating ?? 0.0))
                         .font(.caption)
                         .foregroundColor(.black)
                         .padding(.horizontal, 6)
@@ -250,6 +250,7 @@ struct MinPlaceDetailView_Previews: PreviewProvider {
             Review(
                 id: "review1",
                 userId: "user123",
+                profilePhotoUrl: "",
                 userFirstName: "Mada",
                 userLastName: "Graviet",
                 placeId: "place123",

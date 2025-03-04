@@ -28,6 +28,7 @@ class PlaceReviewViewModel: ObservableObject {
     private let userId: String
     private let userFirstName: String
     private let userLastName: String
+    private let profilePhotoUrl: String
     private let firestoreService: FirestoreService
 
     // MARK: - Init
@@ -35,11 +36,13 @@ class PlaceReviewViewModel: ObservableObject {
          userId: String,
          userFirstName: String,
          userLastName: String,
+         profilePhotoUrl: String,
          firestoreService: FirestoreService = FirestoreService()) {
         self.place = place
         self.userId = userId
         self.userFirstName = userFirstName
         self.userLastName = userLastName
+        self.profilePhotoUrl = profilePhotoUrl
         self.firestoreService = firestoreService
     }
 
@@ -51,6 +54,7 @@ class PlaceReviewViewModel: ObservableObject {
         var newReview = Review(
             id: place.id.uuidString,
             userId: userId,
+            profilePhotoUrl: profilePhotoUrl,
             userFirstName: userFirstName,
             userLastName: userLastName,
             placeId: place.id.uuidString ?? "unknown_place_id",

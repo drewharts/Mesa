@@ -54,30 +54,56 @@ class SearchViewModel: ObservableObject {
         )
     }
     
-    private func searchResultToDetailPlace(place: SearchResult) -> DetailPlace {
-        let uuid = UUID(uuidString: place.id) ?? UUID()
-
-        var detailPlace = DetailPlace(id: uuid, name: place.name,address: place.address?.formattedAddress(style: .medium) ?? "")
-        
-        detailPlace.mapboxId = place.id
-        detailPlace.coordinate = GeoPoint(
-            latitude: Double(place.coordinate.latitude),
-            longitude: Double(place.coordinate.longitude)
-        )
-        detailPlace.categories = place.categories
-        detailPlace.phone = place.metadata?.phone
-        detailPlace.rating = place.metadata?.rating ?? 0
-        detailPlace.description = place.metadata?.description ?? ""
-        detailPlace.priceLevel = place.metadata?.priceLevel
-        detailPlace.reservable = place.metadata?.reservable ?? false
-        detailPlace.servesBreakfast = place.metadata?.servesBreakfast ?? false
-        detailPlace.serversLunch = place.metadata?.servesLunch ?? false
-        detailPlace.serversDinner = place.metadata?.servesDinner ?? false
-        detailPlace.Instagram = place.metadata?.instagram
-        detailPlace.X = place.metadata?.twitter
-        
-        return detailPlace
-        
+    private func searchResultToDetailPlace(place: SearchResult, completion: @escaping (DetailPlace) -> Void) {
+        // First, check if the DetailPlace exists in Firestore using mapboxId
+        firestoreService.findPlace(mapboxId: place.mapboxId!) { [weak self] existingDetailPlace, error in
+            if let error = error {
+                print("Error checking for existing place: \(error.localizedDescription)")
+                // If there's an error, proceed to create a new DetailPlace (or handle differently)
+            }
+            
+            if let existingDetailPlace = existingDetailPlace {
+                // If the place exists, return it immediately
+                completion(existingDetailPlace)
+                return
+            }
+            
+            // If no existing place is found, create a new DetailPlace
+            let uuid = UUID(uuidString: place.id) ?? UUID()
+            
+            var detailPlace = DetailPlace(
+                id: uuid,
+                name: place.name,
+                address: place.address?.formattedAddress(style: .medium) ?? ""
+            )
+            
+            detailPlace.mapboxId = place.mapboxId
+            detailPlace.coordinate = GeoPoint(
+                latitude: Double(place.coordinate.latitude),
+                longitude: Double(place.coordinate.longitude)
+            )
+            detailPlace.categories = place.categories
+            detailPlace.phone = place.metadata?.phone
+            detailPlace.rating = place.metadata?.rating ?? 0
+            detailPlace.description = place.metadata?.description ?? ""
+            detailPlace.priceLevel = place.metadata?.priceLevel
+            detailPlace.reservable = place.metadata?.reservable ?? false
+            detailPlace.servesBreakfast = place.metadata?.servesBreakfast ?? false
+            detailPlace.serversLunch = place.metadata?.servesLunch ?? false
+            detailPlace.serversDinner = place.metadata?.servesDinner ?? false
+            detailPlace.Instagram = place.metadata?.instagram
+            detailPlace.X = place.metadata?.twitter
+            
+            // Optionally, save the new DetailPlace to Firestore if it doesn’t exist
+            self?.firestoreService.addToAllPlaces(detailPlace: detailPlace) { error in
+                if let error = error {
+                    print("Error saving new place to Firestore: \(error.localizedDescription)")
+                }
+            }
+            
+            // Return the newly created DetailPlace
+            completion(detailPlace)
+        }
     }
     
     func selectSuggestion(_ suggestion: SearchSuggestion) {
@@ -88,8 +114,12 @@ class SearchViewModel: ObservableObject {
                 DispatchQueue.main.async {
                     print("✅ Resolved result: \(result.id) - \(result.name)")
 
-                    self?.selectedPlaceVM?.selectedPlace = self!.searchResultToDetailPlace(place: result)
-                    self?.selectedPlaceVM?.isDetailSheetPresented = true
+                    // Use the asynchronous searchResultToDetailPlace with a completion handler
+                    self?.searchResultToDetailPlace(place: result) { [weak self] detailPlace in
+                        guard let self = self else { return }
+                        self.selectedPlaceVM?.selectedPlace = detailPlace
+                        self.selectedPlaceVM?.isDetailSheetPresented = true
+                    }
                 }
             }
         )

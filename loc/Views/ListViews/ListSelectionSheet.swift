@@ -8,7 +8,7 @@
 import SwiftUI
 import MapboxSearch
 
-// MARK: - ListDescription
+// ListDescription
 struct ListDescription: View {
     @EnvironmentObject var profile: ProfileViewModel
     let placeList: PlaceList
@@ -17,17 +17,17 @@ struct ListDescription: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(placeList.name)
                 .font(.body)
-                .foregroundStyle(.white)
-            
+                .foregroundStyle(Color.primary.opacity(1.0)) // Ensures black in light mode, white in dark mode
+
             Text("\(profile.placeListGMSPlaces[placeList.id]?.count ?? 0) Places")
                 .font(.caption)
-                .foregroundStyle(.white)
+                .foregroundStyle(Color.secondary.opacity(1.0)) // Slightly lighter, adapts to mode
         }
         .padding(.horizontal, 15)
     }
 }
 
-// MARK: - ListSelectionRowView
+// ListSelectionRowView
 struct ListSelectionRowView: View {
     @EnvironmentObject var profile: ProfileViewModel
     let list: PlaceList
@@ -48,7 +48,7 @@ struct ListSelectionRowView: View {
                 } else {
                     Rectangle()
                         .frame(width: 75, height: 75)
-                        .foregroundColor(.white)
+                        .foregroundColor(.gray.opacity(0.2)) // Light gray placeholder
                         .cornerRadius(4)
                 }
 
@@ -59,11 +59,11 @@ struct ListSelectionRowView: View {
                 ZStack {
                     if profile.placeListGMSPlaces[list.id]?.contains(where: { $0.id == place.id }) ?? false {
                         Circle()
-                            .fill(Color.white)
+                            .fill(Color.primary) // Use accent color for visibility
                             .frame(width: 24, height: 24)
                     } else {
                         Circle()
-                            .stroke(Color.white)
+                            .stroke(Color.primary, lineWidth: 2) // Adaptive outline
                             .frame(width: 24, height: 24)
                     }
                 }
@@ -148,7 +148,6 @@ struct ListSelectionSheet: View {
 
             Spacer()
         }
-        .background(Color(.systemBackground))
         .cornerRadius(20)
         .padding()
     }
