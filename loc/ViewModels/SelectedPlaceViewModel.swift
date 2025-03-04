@@ -26,7 +26,7 @@ class SelectedPlaceViewModel: ObservableObject {
     
     @Published var isDetailSheetPresented: Bool = false
     @Published private var placePhotos: [String: [UIImage]] = [:] // Store photos by placeId
-    
+    @Published var placeRating: Double = 0
     private let locationManager: LocationManager
     
     // ✅ Inject LocationManager via initializer
@@ -53,8 +53,21 @@ class SelectedPlaceViewModel: ObservableObject {
             // Update the reviews on the main thread
             DispatchQueue.main.async {
                 self.reviews = reviews ?? []
+                self.placeRating = self.calculateAvgRating()
             }
         }
+    }
+    
+    private func calculateAvgRating() -> Double {
+        var runningTotal: Double = 0
+        for review in reviews {
+            runningTotal += review.foodRating
+        }
+        
+        if runningTotal == 0 {
+            return 0
+        }
+        return runningTotal/Double(reviews.count)
     }
     
     private func getPlacePhotos(for place: DetailPlace) {

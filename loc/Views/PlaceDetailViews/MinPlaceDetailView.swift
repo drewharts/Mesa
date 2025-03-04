@@ -112,7 +112,7 @@ struct MinPlaceDetailView: View {
                     }
                     
                     // Updated Rating label (adapted for Mapsbox)
-                    Text(String(format: "%.1f", selectedPlaceVM.selectedPlace?.rating ?? 0.0))
+                    Text(String(format: "%.1f", selectedPlaceVM.placeRating ?? 0.0))
                         .font(.caption)
                         .foregroundColor(.black)
                         .padding(.horizontal, 6)
