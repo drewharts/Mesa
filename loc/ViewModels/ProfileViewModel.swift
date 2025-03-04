@@ -58,6 +58,20 @@ class ProfileViewModel: ObservableObject {
         fetchFollowers(userId: userId)
         fetchFriends(userId: userId)
     }
+    func fetchFavoritePlaceImages() {
+        for place in userFavorites {
+            firestoreService.fetchPhotosFromStorage(placeId: place.id.uuidString, returnFirstImageOnly: true) { [weak self] (images, error) in
+                guard let self = self else { return }
+                
+                if let error = error {
+                    print("Error fetching image for place \(place.id.uuidString): \(error.localizedDescription)")
+                    return
+                }
+                
+                self.favoritePlaceImages[place.id.uuidString] = images?.first
+            }
+        }
+    }
     func fetchFriends(userId: String) {
         firestoreService.fetchFollowingProfiles(for: userId) { [weak self] profiles, error in
             guard let self = self else { return }
@@ -209,6 +223,7 @@ class ProfileViewModel: ObservableObject {
             DispatchQueue.main.async {
                 // Update the userFavorites array with the fetched favorites
                 self.userFavorites = favorites ?? []
+                self.fetchFavoritePlaceImages()
             }
         }
     }

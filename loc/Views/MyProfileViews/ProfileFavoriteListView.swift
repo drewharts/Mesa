@@ -35,7 +35,7 @@ struct ProfileFavoriteListView: View {
                     ForEach(profile.userFavorites, id: \.id) { place in
                         VStack {
                             ZStack {
-                                if let image = profile.placeImages[place.id.uuidString]{
+                                if let image = profile.favoritePlaceImages[place.id.uuidString]{
                                     Image(uiImage: image)
                                         .resizable()
                                         .scaledToFill()

@@ -14,7 +14,7 @@ class FirestoreService {
     private let db = Firestore.firestore()
     private let storage = Storage.storage()
     
-    func fetchPhotosFromStorage(placeId: String, completion: @escaping ([UIImage]?, Error?) -> Void) {
+    func fetchPhotosFromStorage(placeId: String, returnFirstImageOnly: Bool = false, completion: @escaping ([UIImage]?, Error?) -> Void) {
         let storageRef = storage.reference().child("reviews/\(placeId)")
         
         storageRef.listAll { [weak self] (result, error) in
@@ -35,7 +35,9 @@ class FirestoreService {
             var images: [UIImage] = []
             let dispatchGroup = DispatchGroup()
             
-            for item in result.items.prefix(9) { // Limit to max 9 items
+            let itemsToProcess = returnFirstImageOnly ? result.items.prefix(1) : result.items.prefix(9)
+            
+            for item in itemsToProcess { // Limit to 1 if returnFirstImageOnly, otherwise max 9
                 dispatchGroup.enter()
                 
                 item.getData(maxSize: 10 * 1024 * 1024) { data, error in
