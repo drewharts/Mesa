@@ -309,7 +309,7 @@ class FirestoreService {
     func saveReviewWithImages(
         review: Review,
         images: [UIImage],
-        completion: @escaping (Result<Void, Error>) -> Void
+        completion: @escaping (Result<Review, Error>) -> Void
     ) {
         // 1) Upload images first
         uploadImagesForReview(review: review, images: images) { [weak self] result in
@@ -325,7 +325,8 @@ class FirestoreService {
                 self.saveReview(updatedReview) { saveResult in
                     switch saveResult {
                     case .success:
-                        completion(.success(()))
+                        // Return the updated review instead of Void
+                        completion(.success(updatedReview))
                     case .failure(let error):
                         completion(.failure(error))
                     }

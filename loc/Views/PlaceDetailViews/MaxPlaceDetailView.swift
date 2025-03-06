@@ -75,9 +75,16 @@ struct MaxPlaceDetailView: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    if let place = selectedPlaceVM.selectedPlace, !selectedPlaceVM.photos(for: place).isEmpty {
-                        GridView(images: selectedPlaceVM.photos(for: place),
-                                 selectedImage: $selectedImage)
+                    if let place = selectedPlaceVM.selectedPlace {
+                        let photos = selectedPlaceVM.photos(for: place)
+                        if !photos.isEmpty {
+                            GridView(images: photos,
+                                     selectedImage: $selectedImage)
+                        } else {
+                            Text("No Photos")
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                        }
                     } else {
                         ProgressView("Loading Photos...")
                             .frame(maxWidth: .infinity)
