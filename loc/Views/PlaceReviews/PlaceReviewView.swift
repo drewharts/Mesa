@@ -14,6 +14,7 @@ struct PlaceReviewView: View {
     @Environment(\.presentationMode) var presentationMode: Binding<PresentationMode>
     @Binding var isPresented: Bool
     @EnvironmentObject var profile: ProfileViewModel
+    @EnvironmentObject var selectedPlace: SelectedPlaceViewModel
     @State private var showButtonHighlight = false
 
     
@@ -95,16 +96,24 @@ struct PlaceReviewView: View {
                         viewModel.images = inputImages
                         
                         // 3. Submit the review
-                        viewModel.submitReview { success in
-                            if success {
+                        viewModel.submitReview { result in
+                            // TODO: Show loading screen while it posts (e.g., use viewModel.isLoading)
+                            switch result {
+                            case .success(let savedReview):
+                                // Append the saved review to selectedPlace.reviews
+                                selectedPlace.reviews.append(savedReview)
+                                
                                 // Optional: Wait briefly so user sees the highlight
                                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                                     showButtonHighlight = false
-                                     presentationMode.wrappedValue.dismiss()
+                                    presentationMode.wrappedValue.dismiss()
                                 }
-                            } else {
+                                
+                            case .failure(let error):
                                 // On failure, remove highlight
                                 showButtonHighlight = false
+                                // TODO: Add signal that review wasn't processed (e.g., show an alert)
+                                print("Review submission failed: \(error.localizedDescription)")
                             }
                         }
                     }

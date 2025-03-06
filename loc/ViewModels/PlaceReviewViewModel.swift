@@ -46,44 +46,44 @@ class PlaceReviewViewModel: ObservableObject {
         self.firestoreService = firestoreService
     }
 
-    func submitReview(completion: @escaping (Bool) -> Void) {
-        isLoading = true
-        errorMessage = nil
-        
-        // Create a Review object with an empty images array.
-        var newReview = Review(
-            id: place.id.uuidString,
-            userId: userId,
-            profilePhotoUrl: profilePhotoUrl,
-            userFirstName: userFirstName,
-            userLastName: userLastName,
-            placeId: place.id.uuidString ?? "unknown_place_id",
-            placeName: place.name ?? "Unnamed Place",
-            foodRating: foodRating,
-            serviceRating: serviceRating,
-            ambienceRating: ambienceRating,
-            favoriteDishes: favoriteDishes,
-            reviewText: reviewText,
-            timestamp: Date(),
-            images: [] // Will be updated after upload
-        )
+    func submitReview(completion: @escaping (Result<Review, Error>) -> Void) {
+            isLoading = true
+            errorMessage = nil
+            
+            var newReview = Review(
+                id: UUID().uuidString, // Temporary ID, may be overridden by Firestore
+                userId: userId,
+                profilePhotoUrl: profilePhotoUrl,
+                userFirstName: userFirstName,
+                userLastName: userLastName,
+                placeId: place.id.uuidString ?? "unknown_place_id",
+                placeName: place.name ?? "Unnamed Place",
+                foodRating: foodRating,
+                serviceRating: serviceRating,
+                ambienceRating: ambienceRating,
+                favoriteDishes: favoriteDishes,
+                reviewText: reviewText,
+                timestamp: Date(),
+                images: [] // Will be updated after upload
+            )
 
-        // Call the new FirestoreService function
-        firestoreService.saveReviewWithImages(review: newReview, images: images) { [weak self] result in
-            DispatchQueue.main.async {
-                guard let self = self else { return }
-                self.isLoading = false
+            // Call FirestoreService and pass the result
+            firestoreService.saveReviewWithImages(review: newReview, images: images) { [weak self] result in
+                DispatchQueue.main.async {
+                    guard let self = self else { return }
+                    self.isLoading = false
 
-                switch result {
-                case .success:
-                    completion(true)
-                case .failure(let error):
-                    self.errorMessage = error.localizedDescription
-                    completion(false)
+                    switch result {
+                    case .success(let savedReview):
+                        // Return the saved review (with Firestore ID, image URLs, etc.)
+                        completion(.success(savedReview))
+                    case .failure(let error):
+                        self.errorMessage = error.localizedDescription
+                        completion(.failure(error))
+                    }
                 }
             }
         }
-    }
 
 }
 
