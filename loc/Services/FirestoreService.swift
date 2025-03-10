@@ -15,50 +15,56 @@ class FirestoreService {
     private let storage = Storage.storage()
     
     func fetchPhotosFromStorage(placeId: String, returnFirstImageOnly: Bool = false, completion: @escaping ([UIImage]?, Error?) -> Void) {
-        let storageRef = storage.reference().child("reviews/\(placeId)")
-        
-        storageRef.listAll { [weak self] (result, error) in
-            guard let self = self else { return }
+            let storageRef = storage.reference().child("reviews/\(placeId)")
             
-            if let error = error {
-                print("Error listing files in storage for place \(placeId): \(error.localizedDescription)")
-                completion(nil, error)
-                return
-            }
-            
-            guard let result = result else {
-                print("No result returned for storage path reviews/\(placeId)")
-                completion([], nil)
-                return
-            }
-            
-            var images: [UIImage] = []
-            let dispatchGroup = DispatchGroup()
-            
-            let itemsToProcess = returnFirstImageOnly ? result.items.prefix(1) : result.items.prefix(9)
-            
-            for item in itemsToProcess { // Limit to 1 if returnFirstImageOnly, otherwise max 9
-                dispatchGroup.enter()
+            storageRef.listAll { [weak self] (result, error) in
+                guard let self = self else { return }
                 
-                item.getData(maxSize: 10 * 1024 * 1024) { data, error in
-                    defer { dispatchGroup.leave() }
-                    
-                    if let error = error {
-                        print("Error downloading image \(item.name): \(error.localizedDescription)")
+                if let error = error {
+                    print("Error listing files in storage for place \(placeId): \(error.localizedDescription)")
+                    completion(nil, error)
+                    return
+                }
+                
+                guard let result = result else {
+                    print("No result returned for storage path reviews/\(placeId)")
+                    completion([], nil)
+                    return
+                }
+                
+                let itemsToProcess = returnFirstImageOnly ? result.items.prefix(1) : result.items.prefix(9)
+                let itemsArray = Array(itemsToProcess) // Convert to array for indexing
+                var images: [UIImage] = []
+                var lastError: Error? = nil
+                
+                // Recursive function to fetch images one by one
+                func fetchNextImage(index: Int) {
+                    // Base case: all items processed
+                    if index >= itemsArray.count {
+                        DispatchQueue.main.async {
+                            completion(images.isEmpty && lastError == nil ? [] : images, lastError)
+                        }
                         return
                     }
                     
-                    if let data = data, let image = UIImage(data: data) {
-                        images.append(image)
+                    let item = itemsArray[index]
+                    item.getData(maxSize: 5 * 1024 * 1024) { data, error in
+                        if let error = error {
+                            print("Error downloading image \(item.name): \(error.localizedDescription)")
+                            lastError = error
+                        } else if let data = data, let image = UIImage(data: data) {
+                            images.append(image)
+                        }
+                        
+                        // Fetch the next image
+                        fetchNextImage(index: index + 1)
                     }
                 }
-            }
-            
-            dispatchGroup.notify(queue: .main) {
-                completion(images, nil)
+                
+                // Start fetching from the first item
+                fetchNextImage(index: 0)
             }
         }
-    }
     func findPlace(mapboxId: String, completion: @escaping (DetailPlace?, Error?) -> Void) {
         // Reference to the Firestore collection where places are stored ("places")
         let db = Firestore.firestore()
@@ -390,7 +396,7 @@ class FirestoreService {
                 .child("reviews/\(review.id)/\(imageName).jpg")
             
             // 3. Convert the UIImage to JPEG data
-            guard let imageData = image.jpegData(compressionQuality: 0.8) else {
+            guard let imageData = image.jpegData(compressionQuality: 0.5) else {
                 errors.append(
                     NSError(domain: "FirestoreService", code: 0, userInfo: [
                         NSLocalizedDescriptionKey: "Could not convert image to data"
