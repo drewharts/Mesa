@@ -101,7 +101,7 @@ struct PlaceReviewView: View {
                             switch result {
                             case .success(let savedReview):
                                 // Append the saved review to selectedPlace.reviews
-                                selectedPlace.reviews.append(savedReview)
+                                selectedPlace.addReview(savedReview)
                                 
                                 // Optional: Wait briefly so user sees the highlight
                                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {

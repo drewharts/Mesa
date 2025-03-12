@@ -192,7 +192,7 @@ struct MinPlaceDetailView: View {
                     
                 case .reviews:
                     // "Reviews" content
-                    PlaceReviewsView(reviews: selectedPlaceVM.reviews)
+                    PlaceReviewsView(reviews: selectedPlaceVM.reviews,selectedImage: $selectedImage)
                 }
             }
             .padding(.horizontal, 30)
@@ -217,65 +217,65 @@ enum DetailTab {
 
 // MARK: - Preview Provider
 // MARK: - Preview Provider
-struct MinPlaceDetailView_Previews: PreviewProvider {
-    static var previews: some View {
-        // Create mock instances for dependencies
-        let mockLocationManager = LocationManager()
-        let mockFirestoreService = FirestoreService()
-        let mockProfileData = ProfileData(
-            id: "", firstName: "drew", lastName: "hartsfield", email: "drew", profilePhotoURL: URL(string: ""), phoneNumber: "801"
-        )
-        let mockUserId = "user123"
-        
-        // Create mock ProfileViewModel with required parameters
-        let mockProfile = ProfileViewModel(
-            data: mockProfileData,
-            firestoreService: mockFirestoreService,
-            userId: mockUserId
-        )
-        
-        let mockPlaceDetailVM = PlaceDetailViewModel()
-        let mockSelectedPlaceVM = SelectedPlaceViewModel(
-            locationManager: mockLocationManager,
-            firestoreService: mockFirestoreService
-        )
-        
-        // Set up mock data for selectedPlaceVM
-        mockSelectedPlaceVM.selectedPlace = DetailPlace()
-        
-        // Set up mock data for profile (already set in mockProfileData)
-        
-        // Set up mock reviews for selectedPlaceVM (optional, for the Reviews tab)
-        mockSelectedPlaceVM.reviews = [
-            Review(
-                id: "review1",
-                userId: "user123",
-                profilePhotoUrl: "",
-                userFirstName: "Mada",
-                userLastName: "Graviet",
-                placeId: "place123",
-                placeName: "Sample Restaurant",
-                foodRating: 7.8,
-                serviceRating: 4.3,
-                ambienceRating: 8.1,
-                favoriteDishes: ["roasted chicken", "grilled salmon"],
-                reviewText: "\"This is definitely a new favorite. Service was really slow but food made up for it.\"",
-                timestamp: Date().addingTimeInterval(-172800), // 2 days ago
-                images: ["https://example.com/restaurant.jpg", "https://example.com/food.jpg"]
-            )
-        ]
-        
-        // Configure PlaceDetailViewModel with mock data
-        mockPlaceDetailVM.isOpen = true
-        mockPlaceDetailVM.travelTime = "15 min"
-        
-        return MinPlaceDetailView(
-            viewModel: mockPlaceDetailVM,
-            showNoPhoneNumberAlert: .constant(false),
-            selectedImage: .constant(nil)
-        )
-        .environmentObject(mockProfile)
-        .environmentObject(mockSelectedPlaceVM)
-        .environmentObject(mockLocationManager)
-    }
-}
+//struct MinPlaceDetailView_Previews: PreviewProvider {
+//    static var previews: some View {
+//        // Create mock instances for dependencies
+//        let mockLocationManager = LocationManager()
+//        let mockFirestoreService = FirestoreService()
+//        let mockProfileData = ProfileData(
+//            id: "", firstName: "drew", lastName: "hartsfield", email: "drew", profilePhotoURL: URL(string: ""), phoneNumber: "801"
+//        )
+//        let mockUserId = "user123"
+//        
+//        // Create mock ProfileViewModel with required parameters
+//        let mockProfile = ProfileViewModel(
+//            data: mockProfileData,
+//            firestoreService: mockFirestoreService,
+//            userId: mockUserId
+//        )
+//        
+//        let mockPlaceDetailVM = PlaceDetailViewModel()
+//        let mockSelectedPlaceVM = SelectedPlaceViewModel(
+//            locationManager: mockLocationManager,
+//            firestoreService: mockFirestoreService
+//        )
+//        
+//        // Set up mock data for selectedPlaceVM
+//        mockSelectedPlaceVM.selectedPlace = DetailPlace()
+//        
+//        // Set up mock data for profile (already set in mockProfileData)
+//        
+//        // Set up mock reviews for selectedPlaceVM (optional, for the Reviews tab)
+//        mockSelectedPlaceVM.reviews = [
+//            Review(
+//                id: "review1",
+//                userId: "user123",
+//                profilePhotoUrl: "",
+//                userFirstName: "Mada",
+//                userLastName: "Graviet",
+//                placeId: "place123",
+//                placeName: "Sample Restaurant",
+//                foodRating: 7.8,
+//                serviceRating: 4.3,
+//                ambienceRating: 8.1,
+//                favoriteDishes: ["roasted chicken", "grilled salmon"],
+//                reviewText: "\"This is definitely a new favorite. Service was really slow but food made up for it.\"",
+//                timestamp: Date().addingTimeInterval(-172800), // 2 days ago
+//                images: ["https://example.com/restaurant.jpg", "https://example.com/food.jpg"]
+//            )
+//        ]
+//        
+//        // Configure PlaceDetailViewModel with mock data
+//        mockPlaceDetailVM.isOpen = true
+//        mockPlaceDetailVM.travelTime = "15 min"
+//        
+//        return MinPlaceDetailView(
+//            viewModel: mockPlaceDetailVM,
+//            showNoPhoneNumberAlert: .constant(false),
+//            selectedImage: .constant(nil)
+//        )
+//        .environmentObject(mockProfile)
+//        .environmentObject(mockSelectedPlaceVM)
+//        .environmentObject(mockLocationManager)
+//    }
+//}
