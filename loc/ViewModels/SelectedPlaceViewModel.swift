@@ -12,24 +12,32 @@ import CoreLocation
 
 class SelectedPlaceViewModel: ObservableObject {
     private let firestoreService: FirestoreService
-    var reviews: [Review] = []
+    private let locationManager: LocationManager
+    
     @Published var selectedPlace: DetailPlace? {
         didSet {
             if let place = selectedPlace,
                let currentLocation = locationManager.currentLocation {
                 loadData(for: place, currentLocation: currentLocation.coordinate)
                 loadReviews(for: place)
-                getPlacePhotos(for: place) // Fetch photos when a place is selected
+                getPlacePhotos(for: place)
             }
         }
     }
     
     @Published var isDetailSheetPresented: Bool = false
-    @Published private var placePhotos: [String: [UIImage]] = [:] // Store photos by placeId
-    @Published var placeRating: Double = 0
-    private let locationManager: LocationManager
+    @Published private var placePhotos: [String: [UIImage]] = [:] // Cache photos by placeId
+    @Published private var placeReviews: [String: [Review]] = [:] // Cache reviews by placeId
+    @Published var placeRating: Double = 0 // Current rating for selectedPlace
+    @Published private var photoLoadingStates: [String: LoadingState] = [:] // Track loading state per placeId
+
+    enum LoadingState {
+        case idle
+        case loading
+        case loaded
+        case error(Error)
+    }
     
-    // ✅ Inject LocationManager via initializer
     init(locationManager: LocationManager, firestoreService: FirestoreService) {
         self.locationManager = locationManager
         self.firestoreService = firestoreService
@@ -40,9 +48,9 @@ class SelectedPlaceViewModel: ObservableObject {
         isDetailSheetPresented = true
     }
     
-    //get reviews here
     private func loadReviews(for place: DetailPlace) {
-        firestoreService.fetchReviews(placeId: place.id.uuidString) { [weak self] reviews, error in
+        let placeId = place.id.uuidString
+        firestoreService.fetchReviews(placeId: placeId) { [weak self] reviews, error in
             guard let self = self else { return }
             
             if let error = error {
@@ -50,53 +58,71 @@ class SelectedPlaceViewModel: ObservableObject {
                 return
             }
             
-            // Update the reviews on the main thread
             DispatchQueue.main.async {
-                self.reviews = reviews ?? []
-                self.placeRating = self.calculateAvgRating()
+                self.placeReviews[placeId] = reviews ?? []
+                if self.selectedPlace?.id.uuidString == placeId {
+                    self.placeRating = self.calculateAvgRating(for: placeId)
+                }
             }
         }
     }
     
-    private func calculateAvgRating() -> Double {
-        var runningTotal: Double = 0
-        for review in reviews {
-            runningTotal += review.foodRating
-        }
-        
-        if runningTotal == 0 {
-            return 0
-        }
-        return runningTotal/Double(reviews.count)
+    private func calculateAvgRating(for placeId: String) -> Double {
+        guard let reviews = placeReviews[placeId], !reviews.isEmpty else { return 0 }
+        let total = reviews.reduce(0.0) { $0 + $1.foodRating }
+        return total / Double(reviews.count)
     }
     
     private func getPlacePhotos(for place: DetailPlace) {
-        firestoreService.fetchPhotosFromStorage(placeId: place.id.uuidString) { [weak self] images, error in
+        let placeId = place.id.uuidString
+        // Set to loading when starting the fetch
+        DispatchQueue.main.async {
+            self.photoLoadingStates[placeId] = .loading
+        }
+        
+        firestoreService.fetchPhotosFromStorage(placeId: placeId) { [weak self] images, error in
             guard let self = self else { return }
             
-            if let error = error {
-                print("Error fetching photos for place \(place.id.uuidString): \(error.localizedDescription)")
-                return
-            }
-            
-            if let images = images {
-                print("Fetched \(images.count) photos for place \(place.name)")
-                // Store the photos in the placePhotos dictionary using the placeId as the key
-                DispatchQueue.main.async {
-                    self.placePhotos[place.id.uuidString] = images
-                }
-            } else {
-                print("No photos found for place \(place.name)")
-                // Optionally, clear the photos for this placeId if none are found
-                DispatchQueue.main.async {
-                    self.placePhotos[place.id.uuidString] = []
+            DispatchQueue.main.async {
+                if let error = error {
+                    print("Error fetching photos for place \(placeId): \(error.localizedDescription)")
+                    self.photoLoadingStates[placeId] = .error(error)
+                    self.placePhotos[placeId] = []
+                } else {
+                    let fetchedImages = images ?? []
+                    self.placePhotos[placeId] = fetchedImages
+                    self.photoLoadingStates[placeId] = .loaded // Transition to loaded
                 }
             }
         }
     }
-
-    // Helper method to access photos for a specific place
-    func photos(for place: DetailPlace) -> [UIImage] {
-        return placePhotos[place.id.uuidString] ?? []
+    
+    func addReview(_ review: Review) {
+        guard let placeId = selectedPlace?.id.uuidString else { return }
+        
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            var currentReviews = self.placeReviews[placeId] ?? []
+            currentReviews.append(review)
+            self.placeReviews[placeId] = currentReviews
+            self.placeRating = self.calculateAvgRating(for: placeId)
+        }
+    }
+    
+    // Helper to access reviews for the currently selected place
+    var reviews: [Review] {
+        guard let placeId = selectedPlace?.id.uuidString else { return [] }
+        return placeReviews[placeId] ?? []
+    }
+    
+    var photoLoadingState: LoadingState {
+        guard let placeId = selectedPlace?.id.uuidString else { return .idle }
+        return photoLoadingStates[placeId] ?? .idle
+    }
+    
+    // Helper to access photos for the currently selected place
+    var photos: [UIImage] {
+        guard let placeId = selectedPlace?.id.uuidString else { return [] }
+        return placePhotos[placeId] ?? []
     }
 }

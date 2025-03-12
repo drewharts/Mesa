@@ -75,18 +75,31 @@ struct MaxPlaceDetailView: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    if let place = selectedPlaceVM.selectedPlace {
-                        let photos = selectedPlaceVM.photos(for: place)
-                        if !photos.isEmpty {
-                            GridView(images: photos,
-                                     selectedImage: $selectedImage)
-                        } else {
-                            Text("No Photos")
+                    if let _ = selectedPlaceVM.selectedPlace {
+                        switch selectedPlaceVM.photoLoadingState {
+                        case .idle, .loading:
+                            ProgressView("Loading Photos...")
                                 .frame(maxWidth: .infinity)
                                 .padding()
+                            
+                        case .loaded:
+                            let photos = selectedPlaceVM.photos
+                            if !photos.isEmpty {
+                                GridView(images: photos, selectedImage: $selectedImage)
+                            } else {
+                                Text("No Photos")
+                                    .frame(maxWidth: .infinity)
+                                    .padding()
+                            }
+                            
+                        case .error(let error):
+                            Text("Failed to load photos: \(error.localizedDescription)")
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .foregroundColor(.red)
                         }
                     } else {
-                        ProgressView("Loading Photos...")
+                        Text("No Place Selected")
                             .frame(maxWidth: .infinity)
                             .padding()
                     }
