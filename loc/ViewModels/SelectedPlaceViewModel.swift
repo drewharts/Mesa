@@ -29,6 +29,14 @@ class SelectedPlaceViewModel: ObservableObject {
     @Published private var placePhotos: [String: [UIImage]] = [:] // Cache photos by placeId
     @Published private var placeReviews: [String: [Review]] = [:] // Cache reviews by placeId
     @Published var placeRating: Double = 0 // Current rating for selectedPlace
+    @Published private var photoLoadingStates: [String: LoadingState] = [:] // Track loading state per placeId
+
+    enum LoadingState {
+        case idle
+        case loading
+        case loaded
+        case error(Error)
+    }
     
     init(locationManager: LocationManager, firestoreService: FirestoreService) {
         self.locationManager = locationManager
@@ -67,16 +75,24 @@ class SelectedPlaceViewModel: ObservableObject {
     
     private func getPlacePhotos(for place: DetailPlace) {
         let placeId = place.id.uuidString
+        // Set to loading when starting the fetch
+        DispatchQueue.main.async {
+            self.photoLoadingStates[placeId] = .loading
+        }
+        
         firestoreService.fetchPhotosFromStorage(placeId: placeId) { [weak self] images, error in
             guard let self = self else { return }
             
-            if let error = error {
-                print("Error fetching photos for place \(placeId): \(error.localizedDescription)")
-                return
-            }
-            
             DispatchQueue.main.async {
-                self.placePhotos[placeId] = images ?? []
+                if let error = error {
+                    print("Error fetching photos for place \(placeId): \(error.localizedDescription)")
+                    self.photoLoadingStates[placeId] = .error(error)
+                    self.placePhotos[placeId] = []
+                } else {
+                    let fetchedImages = images ?? []
+                    self.placePhotos[placeId] = fetchedImages
+                    self.photoLoadingStates[placeId] = .loaded // Transition to loaded
+                }
             }
         }
     }
@@ -89,8 +105,6 @@ class SelectedPlaceViewModel: ObservableObject {
             var currentReviews = self.placeReviews[placeId] ?? []
             currentReviews.append(review)
             self.placeReviews[placeId] = currentReviews
-            
-            // Update the rating since we added a new review
             self.placeRating = self.calculateAvgRating(for: placeId)
         }
     }
@@ -99,6 +113,11 @@ class SelectedPlaceViewModel: ObservableObject {
     var reviews: [Review] {
         guard let placeId = selectedPlace?.id.uuidString else { return [] }
         return placeReviews[placeId] ?? []
+    }
+    
+    var photoLoadingState: LoadingState {
+        guard let placeId = selectedPlace?.id.uuidString else { return .idle }
+        return photoLoadingStates[placeId] ?? .idle
     }
     
     // Helper to access photos for the currently selected place
