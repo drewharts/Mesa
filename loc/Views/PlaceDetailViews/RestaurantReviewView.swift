@@ -18,7 +18,7 @@ struct PlaceReviewsView: View {
                     RestaurantReviewView(review: review, selectedImage: $selectedImage)
                         .padding(.horizontal)
                         .padding(.vertical, 8)
-                        .background(Color(.systemBackground))
+                        .background(Color.white) // Explicitly white for each review card
                         .cornerRadius(10)
                 }
                 
@@ -29,10 +29,13 @@ struct PlaceReviewsView: View {
                         .padding()
                 }
             }
+            .frame(maxWidth: .infinity) // Ensure VStack fills the width
+            .background(Color.white) // Ensure content area is white
         }
-        .padding(.horizontal,-50)
+        .background(Color.white) // Ensure ScrollView background is white
+        .padding(.horizontal, -50)
         .navigationTitle("Reviews")
-        .background(Color.white)
+        .ignoresSafeArea(.all, edges: .all) // Optional: Extend white to edges if needed
     }
 }
 struct RestaruantReviewViewProfileInformation: View {
@@ -47,6 +50,8 @@ struct RestaruantReviewViewProfileInformation: View {
             VStack(alignment: .center, spacing: 4) {
                 Text("\(review.userFirstName) \(review.userLastName)")
                     .font(.headline)
+                    .foregroundColor(.black)
+
                 Text(timestampFormatter.string(from: review.timestamp))
                     .font(.footnote)
                     .foregroundColor(.gray)
@@ -70,7 +75,8 @@ struct RestuarantReviewViewMustOrder: View {
         VStack(alignment: .leading, spacing: 15) {
             Text("Must Order")
                 .font(.caption)
-            
+                .foregroundColor(.black)
+
             HStack(spacing: 20) {
                 ForEach(review.favoriteDishes, id: \.self) { dish in
                     Button(action: {
@@ -155,6 +161,8 @@ struct RatingView: View {
         VStack(spacing: 15) {
             Text(title)
                 .font(.caption)
+                .foregroundColor(.black)
+
             Text(String(format: "%.1f", score))
                 .font(.title3)
                 .foregroundColor(.white)
