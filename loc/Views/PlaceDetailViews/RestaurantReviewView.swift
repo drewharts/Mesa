@@ -18,7 +18,7 @@ struct PlaceReviewsView: View {
                     RestaurantReviewView(review: review, selectedImage: $selectedImage)
                         .padding(.horizontal)
                         .padding(.vertical, 8)
-                        .background(Color.white) // Explicitly white for each review card
+                        .background(Color.white)
                         .cornerRadius(10)
                 }
                 
@@ -29,37 +29,69 @@ struct PlaceReviewsView: View {
                         .padding()
                 }
             }
-            .frame(maxWidth: .infinity) // Ensure VStack fills the width
-            .background(Color.white) // Ensure content area is white
+            .frame(maxWidth: .infinity)
+            .background(Color.white)
         }
-        .background(Color.white) // Ensure ScrollView background is white
+        .background(Color.white)
         .padding(.horizontal, -50)
         .navigationTitle("Reviews")
-        .ignoresSafeArea(.all, edges: .all) // Optional: Extend white to edges if needed
+        .ignoresSafeArea(.all, edges: .all)
     }
 }
+
 struct RestaruantReviewViewProfileInformation: View {
     let review: Review
-    
+    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
+
     var body: some View {
-        //TODO: need a different way to display profile photo
-        AsyncImage(url: URL(string: review.profilePhotoUrl))
-            .frame(width: 50, height: 50)
-            .clipShape(Circle())
-        HStack(alignment: .center) {
-            VStack(alignment: .center, spacing: 4) {
+        HStack(alignment: .center, spacing: 16) { // Increased spacing between photo and text
+            // Profile Photo from Cache
+            if let profilePhoto = selectedPlaceVM.profilePhoto(forUserId: review.userId) {
+                Image(uiImage: profilePhoto)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 50, height: 50)
+                    .clipShape(Circle())
+            } else if selectedPlaceVM.profilePhotoLoadingState(forUserId: review.userId) == .loading {
+                ProgressView()
+                    .frame(width: 50, height: 50)
+            } else {
+                Image(systemName: "person.circle")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 50, height: 50)
+                    .foregroundColor(.gray)
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
                 Text("\(review.userFirstName) \(review.userLastName)")
                     .font(.headline)
                     .foregroundColor(.black)
 
-                Text(timestampFormatter.string(from: review.timestamp))
+                Text(formattedTimestamp(review.timestamp))
                     .font(.footnote)
                     .foregroundColor(.gray)
             }
+            Spacer()
         }
         .padding(.horizontal)
-        .padding(.bottom,15)
+        .padding(.bottom, 15)
     }
+
+    // Helper function to format timestamp
+    private func formattedTimestamp(_ date: Date) -> String {
+        let now = Date()
+        let calendar = Calendar.current
+        let daysSince = calendar.dateComponents([.day], from: date, to: now).day ?? 0
+        
+        // If within 30 days, show number of days
+        if daysSince < 30 {
+            return daysSince == 0 ? "Today" : "\(daysSince) day\(daysSince == 1 ? "" : "s") ago"
+        } else {
+            return timestampFormatter.string(from: date)
+        }
+    }
+
     private var timestampFormatter: DateFormatter {
         let formatter = DateFormatter()
         formatter.dateStyle = .medium
@@ -79,9 +111,7 @@ struct RestuarantReviewViewMustOrder: View {
 
             HStack(spacing: 20) {
                 ForEach(review.favoriteDishes, id: \.self) { dish in
-                    Button(action: {
-                        // Action for the dish (e.g., show details)
-                    }) {
+                    Button(action: {}) {
                         Text(dish)
                             .padding(.vertical, 4)
                             .padding(.horizontal, 16)
@@ -90,14 +120,14 @@ struct RestuarantReviewViewMustOrder: View {
                             .font(.caption2)
                     }
                 }
-                Spacer() // Ensures content stays left-aligned
+                Spacer()
             }
         }
-        .padding(.horizontal,30) // Only pad the right side, keeping left flush
+        .padding(.horizontal, 30)
         .padding(.bottom, 15)
     }
 }
-// Individual Review View (Renamed for clarity, but unchanged internally)
+
 struct RestaurantReviewView: View {
     let review: Review
     @Binding var selectedImage: UIImage?
@@ -152,7 +182,6 @@ struct RestaurantReviewView: View {
     }
 }
 
-// Reusable Rating View (Unchanged)
 struct RatingView: View {
     let title: String
     let score: Double

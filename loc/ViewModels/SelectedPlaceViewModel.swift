@@ -29,15 +29,34 @@ class SelectedPlaceViewModel: ObservableObject {
     @Published private var placePhotos: [String: [UIImage]] = [:] // Cache place-level photos
     @Published private var placeReviews: [String: [Review]] = [:] // Cache reviews by placeId
     @Published private var reviewPhotos: [String: [UIImage]] = [:] // Cache photos by reviewId
+    @Published private var userProfilePhotos: [String: UIImage] = [:] // Cache profile photos by userId
     @Published var placeRating: Double = 0
     @Published private var photoLoadingStates: [String: LoadingState] = [:] // For place photos
     @Published private var reviewPhotoLoadingStates: [String: LoadingState] = [:] // For review photos
+    @Published private var profilePhotoLoadingStates: [String: LoadingState] = [:] // For profile photos
 
-    enum LoadingState {
+    enum LoadingState: Equatable {
         case idle
         case loading
         case loaded
         case error(Error)
+
+        // Implement Equatable conformance
+        static func == (lhs: LoadingState, rhs: LoadingState) -> Bool {
+            switch (lhs, rhs) {
+            case (.idle, .idle):
+                return true
+            case (.loading, .loading):
+                return true
+            case (.loaded, .loaded):
+                return true
+            case (.error, .error):
+                // Treat all errors as equal for simplicity
+                return true
+            default:
+                return false
+            }
+        }
     }
     
     init(locationManager: LocationManager, firestoreService: FirestoreService) {
@@ -69,6 +88,7 @@ class SelectedPlaceViewModel: ObservableObject {
                 // Load photos for each review
                 fetchedReviews.forEach { review in
                     self.loadReviewPhotos(for: review)
+                    self.loadProfilePhoto(for: review) // Load profile photo
                 }
             }
         }
@@ -132,6 +152,54 @@ class SelectedPlaceViewModel: ObservableObject {
         }
     }
     
+    private func loadProfilePhoto(for review: Review) {
+        let userId = review.userId // Non-optional
+        let photoUrlString = review.profilePhotoUrl // Non-optional
+        
+        // If URL is empty or already cached, skip loading
+        guard !photoUrlString.isEmpty else {
+            DispatchQueue.main.async {
+                self.profilePhotoLoadingStates[userId] = .loaded
+                self.userProfilePhotos[userId] = nil
+            }
+            return
+        }
+        
+        if userProfilePhotos[userId] != nil {
+            return
+        }
+        
+        DispatchQueue.main.async {
+            self.profilePhotoLoadingStates[userId] = .loading
+        }
+        
+        guard let url = URL(string: photoUrlString) else {
+            DispatchQueue.main.async {
+                self.profilePhotoLoadingStates[userId] = .error(NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid profile photo URL"]))
+                self.userProfilePhotos[userId] = nil
+            }
+            return
+        }
+        
+        URLSession.shared.dataTask(with: url) { [weak self] data, response, error in
+            guard let self = self else { return }
+            
+            DispatchQueue.main.async {
+                if let error = error {
+                    print("Error fetching profile photo for user \(userId): \(error.localizedDescription)")
+                    self.profilePhotoLoadingStates[userId] = .error(error)
+                    self.userProfilePhotos[userId] = nil
+                } else if let data = data, let image = UIImage(data: data) {
+                    self.userProfilePhotos[userId] = image
+                    self.profilePhotoLoadingStates[userId] = .loaded
+                } else {
+                    self.profilePhotoLoadingStates[userId] = .error(NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to decode profile photo"]))
+                    self.userProfilePhotos[userId] = nil
+                }
+            }
+        }.resume()
+    }
+    
     func addReview(_ review: Review) {
         guard let placeId = selectedPlace?.id.uuidString else { return }
         
@@ -141,7 +209,8 @@ class SelectedPlaceViewModel: ObservableObject {
             currentReviews.append(review)
             self.placeReviews[placeId] = currentReviews
             self.placeRating = self.calculateAvgRating(for: placeId)
-            self.loadReviewPhotos(for: review) // Load photos for the new review
+            self.loadReviewPhotos(for: review) // Load review photos
+            self.loadProfilePhoto(for: review) // Load profile photo for new review
         }
     }
     
@@ -167,5 +236,14 @@ class SelectedPlaceViewModel: ObservableObject {
     
     func photoLoadingState(for review: Review) -> LoadingState {
         return reviewPhotoLoadingStates[review.id] ?? .idle
+    }
+    
+    // Helper to access profile photo for a specific user
+    func profilePhoto(forUserId userId: String) -> UIImage? {
+        return userProfilePhotos[userId]
+    }
+    
+    func profilePhotoLoadingState(forUserId userId: String) -> LoadingState {
+        return profilePhotoLoadingStates[userId] ?? .idle
     }
 }
