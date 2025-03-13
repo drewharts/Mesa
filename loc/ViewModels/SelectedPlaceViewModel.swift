@@ -24,71 +24,75 @@ class SelectedPlaceViewModel: ObservableObject {
             }
         }
     }
-    
     @Published var isDetailSheetPresented: Bool = false
-    @Published private var placePhotos: [String: [UIImage]] = [:] // Cache place-level photos
-    @Published private var placeReviews: [String: [Review]] = [:] // Cache reviews by placeId
-    @Published private var reviewPhotos: [String: [UIImage]] = [:] // Cache photos by reviewId
-    @Published private var userProfilePhotos: [String: UIImage] = [:] // Cache profile photos by userId
+    @Published private var placePhotos: [String: [UIImage]] = [:] // Cache for place-level photos by placeId
+    @Published private var placeReviews: [String: [Review]] = [:] // Cache for reviews by placeId
+    @Published private var reviewPhotos: [String: [UIImage]] = [:] // Cache for review photos by reviewId
+    @Published private var userProfilePhotos: [String: UIImage] = [:] // Cache for profile photos by userId
     @Published var placeRating: Double = 0
-    @Published private var photoLoadingStates: [String: LoadingState] = [:] // For place photos
-    @Published private var reviewPhotoLoadingStates: [String: LoadingState] = [:] // For review photos
-    @Published private var profilePhotoLoadingStates: [String: LoadingState] = [:] // For profile photos
+    @Published private var photoLoadingStates: [String: LoadingState] = [:] // Loading states for place photos
+    @Published private var reviewPhotoLoadingStates: [String: LoadingState] = [:] // Loading states for review photos
+    @Published private var profilePhotoLoadingStates: [String: LoadingState] = [:] // Loading states for profile photos
+    @Published private var reviewLoadingStates: [String: LoadingState] = [:] // Loading states for reviews
 
+    // MARK: - Loading State Enum
     enum LoadingState: Equatable {
         case idle
         case loading
         case loaded
         case error(Error)
 
-        // Implement Equatable conformance
         static func == (lhs: LoadingState, rhs: LoadingState) -> Bool {
             switch (lhs, rhs) {
-            case (.idle, .idle):
-                return true
-            case (.loading, .loading):
-                return true
-            case (.loaded, .loaded):
+            case (.idle, .idle), (.loading, .loading), (.loaded, .loaded):
                 return true
             case (.error, .error):
-                // Treat all errors as equal for simplicity
-                return true
+                return true // All errors considered equal for simplicity
             default:
                 return false
             }
         }
     }
     
+    // MARK: - Initialization
     init(locationManager: LocationManager, firestoreService: FirestoreService) {
         self.locationManager = locationManager
         self.firestoreService = firestoreService
     }
     
+    // MARK: - Private Methods
     private func loadData(for place: DetailPlace, currentLocation: CLLocationCoordinate2D) {
         print("Loading data for \(place.name) at location \(currentLocation)")
-        isDetailSheetPresented = true
+        DispatchQueue.main.async {
+            self.isDetailSheetPresented = true
+        }
     }
     
     private func loadReviews(for place: DetailPlace) {
         let placeId = place.id.uuidString
+        DispatchQueue.main.async {
+            self.reviewLoadingStates[placeId] = .loading
+        }
+        
         firestoreService.fetchReviews(placeId: placeId) { [weak self] reviews, error in
             guard let self = self else { return }
             
-            if let error = error {
-                print("Error fetching reviews for place \(place.name): \(error.localizedDescription)")
-                return
-            }
-            
             DispatchQueue.main.async {
-                let fetchedReviews = reviews ?? []
-                self.placeReviews[placeId] = fetchedReviews
-                if self.selectedPlace?.id.uuidString == placeId {
-                    self.placeRating = self.calculateAvgRating(for: placeId)
-                }
-                // Load photos for each review
-                fetchedReviews.forEach { review in
-                    self.loadReviewPhotos(for: review)
-                    self.loadProfilePhoto(for: review) // Load profile photo
+                if let error = error {
+                    print("Error fetching reviews for place \(place.name): \(error.localizedDescription)")
+                    self.reviewLoadingStates[placeId] = .error(error)
+                    self.placeReviews[placeId] = []
+                } else {
+                    let fetchedReviews = reviews ?? []
+                    self.placeReviews[placeId] = fetchedReviews
+                    if self.selectedPlace?.id.uuidString == placeId {
+                        self.placeRating = self.calculateAvgRating(for: placeId)
+                    }
+                    fetchedReviews.forEach { review in
+                        self.loadReviewPhotos(for: review)
+                        self.loadProfilePhoto(for: review)
+                    }
+                    self.reviewLoadingStates[placeId] = .loaded
                 }
             }
         }
@@ -153,10 +157,9 @@ class SelectedPlaceViewModel: ObservableObject {
     }
     
     private func loadProfilePhoto(for review: Review) {
-        let userId = review.userId // Non-optional
-        let photoUrlString = review.profilePhotoUrl // Non-optional
+        let userId = review.userId
+        let photoUrlString = review.profilePhotoUrl
         
-        // If URL is empty or already cached, skip loading
         guard !photoUrlString.isEmpty else {
             DispatchQueue.main.async {
                 self.profilePhotoLoadingStates[userId] = .loaded
@@ -200,6 +203,7 @@ class SelectedPlaceViewModel: ObservableObject {
         }.resume()
     }
     
+    // MARK: - Public Methods
     func addReview(_ review: Review) {
         guard let placeId = selectedPlace?.id.uuidString else { return }
         
@@ -209,11 +213,27 @@ class SelectedPlaceViewModel: ObservableObject {
             currentReviews.append(review)
             self.placeReviews[placeId] = currentReviews
             self.placeRating = self.calculateAvgRating(for: placeId)
-            self.loadReviewPhotos(for: review) // Load review photos
-            self.loadProfilePhoto(for: review) // Load profile photo for new review
+            self.loadReviewPhotos(for: review)
+            self.loadProfilePhoto(for: review)
         }
     }
     
+    func formattedTimestamp(for review: Review) -> String {
+        let now = Date()
+        let calendar = Calendar.current
+        let daysSince = calendar.dateComponents([.day], from: review.timestamp, to: now).day ?? 0
+        
+        if daysSince < 30 {
+            return daysSince == 0 ? "Today" : "\(daysSince) day\(daysSince == 1 ? "" : "s") ago"
+        } else {
+            let formatter = DateFormatter()
+            formatter.dateStyle = .medium
+            formatter.timeStyle = .none
+            return formatter.string(from: review.timestamp)
+        }
+    }
+    
+    // MARK: - Public Accessors
     var reviews: [Review] {
         guard let placeId = selectedPlace?.id.uuidString else { return [] }
         return placeReviews[placeId] ?? []
@@ -229,7 +249,6 @@ class SelectedPlaceViewModel: ObservableObject {
         return placePhotos[placeId] ?? []
     }
     
-    // Helper to access photos for a specific review
     func photos(for review: Review) -> [UIImage] {
         return reviewPhotos[review.id] ?? []
     }
@@ -238,12 +257,15 @@ class SelectedPlaceViewModel: ObservableObject {
         return reviewPhotoLoadingStates[review.id] ?? .idle
     }
     
-    // Helper to access profile photo for a specific user
     func profilePhoto(forUserId userId: String) -> UIImage? {
         return userProfilePhotos[userId]
     }
     
     func profilePhotoLoadingState(forUserId userId: String) -> LoadingState {
         return profilePhotoLoadingStates[userId] ?? .idle
+    }
+    
+    func reviewLoadingState(forPlaceId placeId: String) -> LoadingState {
+        return reviewLoadingStates[placeId] ?? .idle
     }
 }

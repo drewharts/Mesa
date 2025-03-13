@@ -186,7 +186,7 @@ struct MinPlaceDetailView: View {
                     )
                 case .reviews:
                     // "Reviews" content
-                    PlaceReviewsView(reviews: selectedPlaceVM.reviews, selectedImage: $selectedImage)
+                    PlaceReviewsView(selectedImage: $selectedImage)
                 }
             }
             .padding(.horizontal, 30)

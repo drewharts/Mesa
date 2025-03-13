@@ -8,22 +8,52 @@
 import SwiftUI
 
 struct PlaceReviewsView: View {
-    let reviews: [Review]
     @Binding var selectedImage: UIImage?
+    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
 
     var body: some View {
         ScrollView {
             VStack(spacing: 24) {
-                ForEach(reviews, id: \.id) { review in
-                    RestaurantReviewView(review: review, selectedImage: $selectedImage)
-                        .padding(.horizontal)
-                        .padding(.vertical, 8)
-                        .background(Color.white)
-                        .cornerRadius(10)
-                }
-                
-                if reviews.isEmpty {
-                    Text("No reviews yet.")
+                if let placeId = selectedPlaceVM.selectedPlace?.id.uuidString {
+                    let loadingState = selectedPlaceVM.reviewLoadingState(forPlaceId: placeId)
+                    let reviews = selectedPlaceVM.reviews // Use view model's reviews
+                    
+                    switch loadingState {
+                    case .loading:
+                        ProgressView()
+                            .padding()
+                            .frame(maxWidth: .infinity)
+                        
+                    case .loaded:
+                        if reviews.isEmpty {
+                            Text("No reviews yet.")
+                                .font(.subheadline)
+                                .foregroundColor(.gray)
+                                .padding()
+                        } else {
+                            ForEach(reviews, id: \.id) { review in
+                                RestaurantReviewView(review: review, selectedImage: $selectedImage)
+                                    .padding(.horizontal)
+                                    .padding(.vertical, 8)
+                                    .background(Color.white)
+                                    .cornerRadius(10)
+                            }
+                        }
+                        
+                    case .error(let error):
+                        Text("Failed to load reviews: \(error.localizedDescription)")
+                            .font(.subheadline)
+                            .foregroundColor(.red)
+                            .padding()
+                        
+                    case .idle:
+                        Text("Reviews not yet loaded")
+                            .font(.subheadline)
+                            .foregroundColor(.gray)
+                            .padding()
+                    }
+                } else {
+                    Text("No place selected")
                         .font(.subheadline)
                         .foregroundColor(.gray)
                         .padding()
