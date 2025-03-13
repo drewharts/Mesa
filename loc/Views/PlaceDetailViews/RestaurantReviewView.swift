@@ -129,10 +129,11 @@ struct RestaurantReviewView: View {
                 .padding(.bottom, 15)
             
             // Images (Horizontal Scrolling)
-            if !selectedPlaceVM.photos.isEmpty {
+            let reviewPhotos = selectedPlaceVM.photos(for: review)
+            if !reviewPhotos.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 16) {
-                        ForEach(selectedPlaceVM.photos, id: \.self) { photo in
+                        ForEach(reviewPhotos, id: \.self) { photo in
                             Image(uiImage: photo)
                                 .resizable()
                                 .scaledToFill()
