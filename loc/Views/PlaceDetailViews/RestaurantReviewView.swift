@@ -158,24 +158,51 @@ struct RestaurantReviewView: View {
                 .multilineTextAlignment(.leading)
                 .padding(.bottom, 15)
             
-            // Images (Horizontal Scrolling)
+            // Images (Horizontal Scrolling) with Loading State
             let reviewPhotos = selectedPlaceVM.photos(for: review)
-            if !reviewPhotos.isEmpty {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 16) {
-                        ForEach(reviewPhotos, id: \.self) { photo in
-                            Image(uiImage: photo)
-                                .resizable()
-                                .scaledToFill()
-                                .frame(width: 150, height: 150)
-                                .clipShape(RoundedRectangle(cornerRadius: 10))
-                                .onTapGesture {
-                                    selectedImage = photo
-                                }
-                        }
-                    }
+            let loadingState = selectedPlaceVM.photoLoadingState(for: review)
+            
+            switch loadingState {
+            case .loading:
+                ProgressView()
                     .padding(.horizontal)
+                    .frame(height: 150) // Match photo height for consistency
+                
+            case .loaded:
+                if !reviewPhotos.isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 16) {
+                            ForEach(reviewPhotos, id: \.self) { photo in
+                                Image(uiImage: photo)
+                                    .resizable()
+                                    .scaledToFill()
+                                    .frame(width: 150, height: 150)
+                                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                                    .onTapGesture {
+                                        selectedImage = photo
+                                    }
+                            }
+                        }
+                        .padding(.horizontal)
+                    }
+                } else {
+                    Text("No photos available")
+                        .font(.footnote)
+                        .foregroundColor(.gray)
+                        .padding(.horizontal)
                 }
+                
+            case .error(let error):
+                Text("Failed to load photos: \(error.localizedDescription)")
+                    .font(.footnote)
+                    .foregroundColor(.red)
+                    .padding(.horizontal)
+                
+            case .idle:
+                Text("Photos not yet loaded")
+                    .font(.footnote)
+                    .foregroundColor(.gray)
+                    .padding(.horizontal)
             }
         }
         .padding(.vertical)
