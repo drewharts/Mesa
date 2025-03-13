@@ -16,11 +16,10 @@ struct MinPlaceDetailView: View {
     @EnvironmentObject var locationManager: LocationManager
 
     @Binding var showNoPhoneNumberAlert: Bool
-    
     @Binding var selectedImage: UIImage?
     
     // Tracks which tab is selected: ABOUT or REVIEWS
-    @State private var selectedTab: DetailTab = .about
+    @State private var selectedTab: DetailTab = .reviews
     
     var body: some View {
         ScrollView {
@@ -36,13 +35,12 @@ struct MinPlaceDetailView: View {
                     Spacer()
                     
                     HStack(spacing: 16) {
-                        NavigationLink(destination: PlaceReviewView(isPresented: .constant(false), place: selectedPlaceVM.selectedPlace!,userId: profile.userId, profilePhotoUrl: profile.data.profilePhotoURL?.absoluteString ?? "",userFirstName: profile.data.firstName,userLastName: profile.data.lastName)) {
+                        NavigationLink(destination: PlaceReviewView(isPresented: .constant(false), place: selectedPlaceVM.selectedPlace!, userId: profile.userId, profilePhotoUrl: profile.data.profilePhotoURL?.absoluteString ?? "", userFirstName: profile.data.firstName, userLastName: profile.data.lastName)) {
                             Image(systemName: "plus")
                                 .font(.title3)
                         }
                         
                         Button(action: {
-                            // 1) Present the ListSelectionSheet to add this place to a list
                             viewModel.showListSelection = true
                         }) {
                             Image(systemName: "bookmark")
@@ -54,7 +52,7 @@ struct MinPlaceDetailView: View {
                 
                 // MARK: - Row: Type / Status / Drive Time
                 HStack(spacing: 10) {
-                    Text(viewModel.getRestaurantType(for:selectedPlaceVM.selectedPlace!) ?? "Restuarant")
+                    Text(viewModel.getRestaurantType(for: selectedPlaceVM.selectedPlace!) ?? "Restaurant")
                         .font(.subheadline)
                         .foregroundColor(.gray)
                     
@@ -77,7 +75,6 @@ struct MinPlaceDetailView: View {
                             .foregroundColor(.gray)
                     }
                     .onTapGesture {
-                        // Ensure you have a selected place and a valid current location.
                         if let place = selectedPlaceVM.selectedPlace,
                            let currentLocation = locationManager.currentLocation {
                             viewModel.openNavigation(for: place, currentLocation: currentLocation.coordinate)
@@ -86,41 +83,10 @@ struct MinPlaceDetailView: View {
                 }
                 .padding(.bottom, 10)
                 
-                // MARK: - Row: ABOUT / Rating / REVIEWS / Avatars
+                // MARK: - Row: REVIEWS / Rating / ABOUT / Avatars
                 HStack(spacing: 12) {
                     
-                    // ABOUT button
-                    Button(action: {
-                        selectedTab = .about
-                    }) {
-                        Text("ABOUT")
-                            .font(.subheadline)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.black)
-                            .padding(.bottom, 5)
-                            .overlay(
-                                Group {
-                                    if selectedTab == .about {
-                                        Rectangle()
-                                            .fill(Color.blue)
-                                            .frame(height: 3)
-                                            .offset(y: 6)
-                                    }
-                                },
-                                alignment: .bottom
-                            )
-                    }
-                    
-                    // Updated Rating label (adapted for Mapsbox)
-                    Text(String(format: "%.1f", selectedPlaceVM.placeRating ?? 0.0))
-                        .font(.caption)
-                        .foregroundColor(.black)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 4)
-                        .background(Color.yellow)
-                        .cornerRadius(10)
-                    
-                    // REVIEWS button
+                    // REVIEWS button (moved first)
                     Button(action: {
                         selectedTab = .reviews
                     }) {
@@ -132,6 +98,37 @@ struct MinPlaceDetailView: View {
                             .overlay(
                                 Group {
                                     if selectedTab == .reviews {
+                                        Rectangle()
+                                            .fill(Color.blue)
+                                            .frame(height: 3)
+                                            .offset(y: 6)
+                                    }
+                                },
+                                alignment: .bottom
+                            )
+                    }
+                    
+                    // Updated Rating label (adapted for Mapbox)
+                    Text(String(format: "%.1f", selectedPlaceVM.placeRating ?? 0.0))
+                        .font(.caption)
+                        .foregroundColor(.black)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 4)
+                        .background(Color.yellow)
+                        .cornerRadius(10)
+                    
+                    // ABOUT button (moved after rating)
+                    Button(action: {
+                        selectedTab = .about
+                    }) {
+                        Text("ABOUT")
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.black)
+                            .padding(.bottom, 5)
+                            .overlay(
+                                Group {
+                                    if selectedTab == .about {
                                         Rectangle()
                                             .fill(Color.blue)
                                             .frame(height: 3)
@@ -182,17 +179,14 @@ struct MinPlaceDetailView: View {
                         .padding(.top, 15)
                         .padding(.bottom, 15)
                     
-                    // Example: embedding MaxPlaceDetailView
-                    //TODO: the viewmodel has no images when clicked to from the profile favs
                     MaxPlaceDetailView(
                         viewModel: viewModel,
                         selectedImage: $selectedImage,
                         showNoPhoneNumberAlert: $showNoPhoneNumberAlert
                     )
-                    
                 case .reviews:
                     // "Reviews" content
-                    PlaceReviewsView(reviews: selectedPlaceVM.reviews,selectedImage: $selectedImage)
+                    PlaceReviewsView(reviews: selectedPlaceVM.reviews, selectedImage: $selectedImage)
                 }
             }
             .padding(.horizontal, 30)
