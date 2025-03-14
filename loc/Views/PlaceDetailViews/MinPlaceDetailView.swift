@@ -14,17 +14,16 @@ struct MinPlaceDetailView: View {
     @ObservedObject var viewModel: PlaceDetailViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var locationManager: LocationManager
+    @Environment(\.isScrollingEnabled) var isScrollingEnabled // Access scroll state
 
     @Binding var showNoPhoneNumberAlert: Bool
     @Binding var selectedImage: UIImage?
     
-    // Tracks which tab is selected: ABOUT or REVIEWS
     @State private var selectedTab: DetailTab = .reviews
     
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 5) {
-                
                 // MARK: - Top Row: Title + Icons
                 HStack(alignment: .center) {
                     Text(selectedPlaceVM.selectedPlace?.name ?? "Unnamed Place")
@@ -85,8 +84,6 @@ struct MinPlaceDetailView: View {
                 
                 // MARK: - Row: REVIEWS / Rating / ABOUT / Avatars
                 HStack(spacing: 12) {
-                    
-                    // REVIEWS button (moved first)
                     Button(action: {
                         selectedTab = .reviews
                     }) {
@@ -108,7 +105,6 @@ struct MinPlaceDetailView: View {
                             )
                     }
                     
-                    // Updated Rating label (adapted for Mapbox)
                     Text(String(format: "%.1f", selectedPlaceVM.placeRating ?? 0.0))
                         .font(.caption)
                         .foregroundColor(.black)
@@ -117,7 +113,6 @@ struct MinPlaceDetailView: View {
                         .background(Color.yellow)
                         .cornerRadius(10)
                     
-                    // ABOUT button (moved after rating)
                     Button(action: {
                         selectedTab = .about
                     }) {
@@ -139,7 +134,6 @@ struct MinPlaceDetailView: View {
                             )
                     }
                     
-                    // Example avatar stack
                     HStack(spacing: -10) {
                         ForEach(0..<3) { _ in
                             Circle()
@@ -169,7 +163,6 @@ struct MinPlaceDetailView: View {
                 // MARK: - Tab-Specific Content
                 switch selectedTab {
                 case .about:
-                    // "About" content
                     Text(selectedPlaceVM.selectedPlace?.description ?? "No description available")
                         .font(.footnote)
                         .foregroundColor(.black)
@@ -185,12 +178,12 @@ struct MinPlaceDetailView: View {
                         showNoPhoneNumberAlert: $showNoPhoneNumberAlert
                     )
                 case .reviews:
-                    // "Reviews" content
                     PlaceReviewsView(selectedImage: $selectedImage)
                 }
             }
             .padding(.horizontal, 30)
         }
+        .scrollDisabled(!isScrollingEnabled) // Disable scrolling based on sheet height
         .navigationBarTitleDisplayMode(.inline)
         .alert(isPresented: $showNoPhoneNumberAlert) {
             Alert(
@@ -203,7 +196,6 @@ struct MinPlaceDetailView: View {
 }
 
 // MARK: - Sub-Types
-
 enum DetailTab {
     case about
     case reviews

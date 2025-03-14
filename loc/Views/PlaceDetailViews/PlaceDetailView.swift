@@ -15,13 +15,11 @@ struct PlaceDetailView: View {
     @State private var selectedImage: UIImage?
     @State private var showNoPhoneNumberAlert = false
 
-
-    // Environment objects.
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var locationManager: LocationManager
+    @Environment(\.isScrollingEnabled) var isScrollingEnabled // Access scroll state
 
-    // ViewModel owned by SwiftUI
     @StateObject private var viewModel = PlaceDetailViewModel()
 
     init(sheetHeight: Binding<CGFloat>, minSheetHeight: CGFloat) {
@@ -32,10 +30,15 @@ struct PlaceDetailView: View {
     var body: some View {
         ZStack {
             VStack(spacing: 16) {
-                if viewModel.placeName == "Unknown" /*&& viewModel.photos.isEmpty*/ {
+                if viewModel.placeName == "Unknown" {
                     ProgressView("Loading Place Details...")
                 } else {
-                    MinPlaceDetailView(viewModel: viewModel, showNoPhoneNumberAlert: $showNoPhoneNumberAlert, selectedImage: $selectedImage)
+                    MinPlaceDetailView(
+                        viewModel: viewModel,
+                        showNoPhoneNumberAlert: $showNoPhoneNumberAlert,
+                        selectedImage: $selectedImage
+                    )
+                    .scrollDisabled(!isScrollingEnabled) // Disable scrolling based on sheet height
                 }
             }
             .padding(.vertical)
@@ -70,14 +73,8 @@ struct PlaceDetailView: View {
                     viewModel.loadData(for: place, currentLocation: currentLocation.coordinate)
                 }
             }
-//            .onChange(of: selectedPlaceVM.selectedPlace) { newPlace in
-//                if let place = newPlace,
-//                   let currentLocation = locationManager.currentLocation {
-//                    viewModel.loadData(for: place, currentLocation: currentLocation.coordinate)
-//                }
-//            }
 
-            // Overlay for the enlarged photo
+            // Overlay for enlarged photo
             if let selectedImage {
                 Color.clear
                     .contentShape(Rectangle())
