@@ -11,9 +11,9 @@ import UIKit
 struct BottomSheetView<Content: View>: View {
     @Binding var sheetHeight: CGFloat
     @Binding var isPresented: Bool
-    let minSheetHeight: CGFloat = 200 // <-- Ensure minimum height is set
+    let minSheetHeight: CGFloat = 200
     let maxSheetHeight: CGFloat
-    @GestureState private var dragTranslation: CGFloat = 0 // <-- Use dragTranslation instead of dragOffset
+    @GestureState private var dragTranslation: CGFloat = 0
     let content: Content
 
     init(
@@ -28,22 +28,27 @@ struct BottomSheetView<Content: View>: View {
         self.content = content()
     }
 
+    // Computed property to determine if scrolling should be enabled
+    private var isScrollingEnabled: Bool {
+        sheetHeight == maxSheetHeight
+    }
+
     var body: some View {
         VStack {
             Spacer()
             VStack(spacing: 0) {
-                // Drag Handle
                 Capsule()
                     .fill(Color.gray.opacity(0.5))
                     .frame(width: 40, height: 6)
                     .padding(.top, 8)
-                // Content
-                content
+                
+                // Pass isScrollingEnabled to content
+                content.environment(\.isScrollingEnabled, isScrollingEnabled)
                     .padding(.top, 8)
                     .frame(maxWidth: .infinity)
                     .frame(maxHeight: .infinity, alignment: .top)
             }
-            .frame(height: sheetHeight) // <-- Use sheetHeight directly
+            .frame(height: sheetHeight)
             .frame(maxWidth: .infinity)
             .background(Color.white)
             .cornerRadius(16, corners: [.topLeft, .topRight])
@@ -51,16 +56,15 @@ struct BottomSheetView<Content: View>: View {
             .gesture(
                 DragGesture()
                     .updating($dragTranslation) { value, state, _ in
-                        state = value.translation.height // <-- Track drag translation
+                        state = value.translation.height
                     }
                     .onEnded { value in
                         let newHeight = sheetHeight - value.translation.height
-                        let dismissalThreshold: CGFloat = 100 //desired threshold for dismissing
+                        let dismissalThreshold: CGFloat = 100
                         withAnimation {
                             if value.translation.height > dismissalThreshold {
                                 isPresented = false
-                            }
-                            else if newHeight > (maxSheetHeight + minSheetHeight) / 2 {
+                            } else if newHeight > (maxSheetHeight + minSheetHeight) / 2 {
                                 sheetHeight = maxSheetHeight
                             } else {
                                 sheetHeight = minSheetHeight
@@ -69,9 +73,9 @@ struct BottomSheetView<Content: View>: View {
                     }
             )
             .onChange(of: dragTranslation) { value in
-                let newHeight = sheetHeight - value // <-- Calculate new height
+                let newHeight = sheetHeight - value
                 if newHeight <= maxSheetHeight && newHeight >= minSheetHeight {
-                    sheetHeight = newHeight // <-- Update sheetHeight directly
+                    sheetHeight = newHeight
                 } else if newHeight > maxSheetHeight {
                     sheetHeight = maxSheetHeight
                 } else if newHeight < minSheetHeight {
@@ -83,7 +87,19 @@ struct BottomSheetView<Content: View>: View {
     }
 }
 
-// Extension to round specific corners remains the same
+// Custom Environment Key for passing scroll state
+private struct IsScrollingEnabledKey: EnvironmentKey {
+    static let defaultValue: Bool = true
+}
+
+extension EnvironmentValues {
+    var isScrollingEnabled: Bool {
+        get { self[IsScrollingEnabledKey.self] }
+        set { self[IsScrollingEnabledKey.self] = newValue }
+    }
+}
+
+// RoundedCorner and cornerRadius extension (unchanged)
 struct RoundedCorner: Shape {
     var radius: CGFloat = 0.0
     var corners: UIRectCorner = .allCorners
@@ -100,6 +116,6 @@ struct RoundedCorner: Shape {
 
 extension View {
     func cornerRadius(_ radius: CGFloat, corners: UIRectCorner) -> some View {
-        clipShape( RoundedCorner(radius: radius, corners: corners) )
+        clipShape(RoundedCorner(radius: radius, corners: corners))
     }
 }

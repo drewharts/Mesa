@@ -93,6 +93,7 @@ struct PlaceReviewView: View {
                         showButtonHighlight = true
                         
                         // 2. Pass the selected images to the ViewModel
+                        viewModel.images = []
                         viewModel.images = inputImages
                         
                         // 3. Submit the review

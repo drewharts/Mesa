@@ -14,6 +14,46 @@ class FirestoreService {
     private let db = Firestore.firestore()
     private let storage = Storage.storage()
     
+    func fetchPhotosFromStorage(urls: [String], completion: @escaping ([UIImage]?, Error?) -> Void) {
+        var images: [UIImage] = []
+        let group = DispatchGroup()
+        var fetchError: Error?
+        
+        // If no URLs provided, return empty array immediately
+        guard !urls.isEmpty else {
+            DispatchQueue.main.async {
+                completion([], nil)
+            }
+            return
+        }
+        
+        for urlString in urls {
+            guard let url = URL(string: urlString) else {
+                print("Invalid URL: \(urlString)")
+                continue
+            }
+            
+            group.enter()
+            URLSession.shared.dataTask(with: url) { data, response, error in
+                if let error = error {
+                    print("Error downloading image from \(urlString): \(error.localizedDescription)")
+                    fetchError = error
+                } else if let data = data, let image = UIImage(data: data) {
+                    images.append(image)
+                }
+                group.leave()
+            }.resume()
+        }
+        
+        group.notify(queue: .main) {
+            if let error = fetchError {
+                completion(nil, error)
+            } else {
+                completion(images, nil)
+            }
+        }
+    }
+    
     func fetchPhotosFromStorage(placeId: String, returnFirstImageOnly: Bool = false, completion: @escaping ([UIImage]?, Error?) -> Void) {
             let storageRef = storage.reference().child("reviews/\(placeId)")
             
