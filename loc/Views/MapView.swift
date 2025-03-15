@@ -32,7 +32,7 @@ struct MapView: View {
                     longitude: favorite.coordinate!.longitude
                 )
                 PointAnnotation(coordinate: tempPlaceLocation)
-                    .image(.init(image: UIImage(named: "DestPin")!, name: "dest-pin"))
+                    .image(.init(image: circularImage(from: profile.profilePhotoImage!), name: "profile"))
                     .onTapGesture {
                         selectedPlaceVM.selectedPlace = favorite
                         selectedPlaceVM.isDetailSheetPresented = true
@@ -46,7 +46,7 @@ struct MapView: View {
                             latitude: place.coordinate!.latitude,
                             longitude: place.coordinate!.longitude
                         ))
-                        .image(.init(image: UIImage(named: "DestPin") ?? UIImage(), name: "dest-pin"))
+                        .image(.init(image: circularImage(from: profile.profilePhotoImage!), name: "profile"))
                         .onTapGesture {
                             selectedPlaceVM.selectedPlace = place
                             selectedPlaceVM.isDetailSheetPresented = true
@@ -74,8 +74,8 @@ struct MapView: View {
                     latitude: selectedPlace.coordinate!.latitude,
                     longitude: selectedPlace.coordinate!.longitude
                 )
-                PointAnnotation(coordinate: currentPlaceLocation)
-                    .image(.init(image: UIImage(named: "DestPin")!, name: "dest-pin"))
+//                PointAnnotation(coordinate: currentPlaceLocation)
+//                    .image(.init(image: UIImage(named: "DestPin")!, name: "dest-pin"))
             }
         }
         .onTapGesture {
@@ -103,4 +103,30 @@ struct MapView: View {
             }
         }
     }
+    
+    private func circularImage(from image: UIImage?) -> UIImage {
+            guard let image = image else {
+                // Return a default image or placeholder if nil
+                return UIImage(named: "defaultProfile") ?? UIImage()
+            }
+            
+            let size = CGSize(width: 40, height: 40) // Adjust size as needed
+            let renderer = UIGraphicsImageRenderer(size: size)
+            
+            return renderer.image { context in
+                let rect = CGRect(origin: .zero, size: size)
+                
+                // Create circular clipping path
+                let circlePath = UIBezierPath(ovalIn: rect)
+                circlePath.addClip()
+                
+                // Draw the image scaled to fit the circular bounds
+                image.draw(in: rect)
+                
+                // Add thin white border
+                context.cgContext.setStrokeColor(UIColor.white.cgColor)
+                context.cgContext.setLineWidth(1.0) // Thin border, adjust as needed
+                context.cgContext.strokeEllipse(in: rect.insetBy(dx: 0.5, dy: 0.5)) // Slightly inset to fit within bounds
+            }
+        }
 }

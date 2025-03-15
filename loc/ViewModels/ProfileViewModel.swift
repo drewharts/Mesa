@@ -29,6 +29,7 @@ class ProfileViewModel: ObservableObject {
     @Published var favoritePlaceViewModels: [PlaceViewModel] = []
     @Published var favoritePlaceImages: [String: UIImage] = [:]
     @Published var profilePhoto: SwiftUI.Image? = nil
+    @Published var profilePhotoImage: UIImage? = nil // New UIImage attribute
     
     //friends places
     @Published var friends: [User] = []
@@ -397,13 +398,14 @@ class ProfileViewModel: ObservableObject {
     }
     
     func loadImage(from url: URL) {
-        URLSession.shared.dataTask(with: url) { [weak self] data, response, error in
-            guard let data = data, let uiImage = UIImage(data: data) else { return }
-            DispatchQueue.main.async {
-                self?.profilePhoto = Image(uiImage: uiImage)
-            }
-        }.resume()
-    }
+            URLSession.shared.dataTask(with: url) { [weak self] data, response, error in
+                guard let data = data, let uiImage = UIImage(data: data) else { return }
+                DispatchQueue.main.async {
+                    self?.profilePhoto = Image(uiImage: uiImage)  // Update SwiftUI Image
+                    self?.profilePhotoImage = uiImage             // Update UIImage
+                }
+            }.resume()
+        }
     
     // MARK: - Place List Creation / Deletion
     
