@@ -30,12 +30,17 @@ class ProfileViewModel: ObservableObject {
     @Published var favoritePlaceImages: [String: UIImage] = [:]
     @Published var profilePhoto: SwiftUI.Image? = nil
     @Published var profilePhotoImage: UIImage? = nil // New UIImage attribute
-    
+    @Published private var userProfilePhotos: [String: UIImage] = [:] // Cache for profile photos by userId
+
     //friends places
     @Published var friends: [User] = []
     @Published var friendPlaces: [String: [DetailPlace]] = [:]
     //followers and following
     @Published var followers: Int = 0
+    
+    //mapPlaces
+    @Published var placeSavers: [String: [User]] = [:]
+    @Published var placeLookup: [String: DetailPlace] = [:]
     
     weak var delegate: ProfileDelegate?
     private let firestoreService: FirestoreService
@@ -114,11 +119,58 @@ class ProfileViewModel: ObservableObject {
     func fetchFriends(userId: String) {
         firestoreService.fetchFollowingProfiles(for: userId) { [weak self] profiles, error in
             guard let self = self else { return }
+            if let error = error {
+                print("Error fetching friends: \(error.localizedDescription)")
+                return
+            }
+            
             self.friends = profiles ?? []
-            let friendIds = self.friends.map { $0.id } // Assuming User has an id: String property
+            let friendIds = self.friends.map { $0.id }
+            
+            // Fetch profile photos for each friend
+            for friend in self.friends {
+                if let photoURL = friend.profilePhotoURL { // Directly use URL? property
+                    self.loadUserProfilePhoto(from: photoURL, forUserId: friend.id)
+                } else {
+                    // If no profile photo URL, set a default or nil
+                    self.userProfilePhotos[friend.id] = nil
+                }
+            }
+            
+            // Fetch friend places after friends are loaded
             self.fetchFriendPlaces(userIds: friendIds)
         }
     }
+    
+    private func loadUserProfilePhoto(from url: URL, forUserId userId: String) {
+            if userProfilePhotos[userId] != nil { return }
+            
+            URLSession.shared.dataTask(with: url) { [weak self] data, response, error in
+                guard let self = self else { return }
+                if let error = error {
+                    print("Error loading profile photo for user \(userId): \(error.localizedDescription)")
+                    DispatchQueue.main.async {
+                        self.userProfilePhotos[userId] = nil
+                    }
+                    return
+                }
+                
+                if let data = data, let uiImage = UIImage(data: data) {
+                    DispatchQueue.main.async {
+                        self.userProfilePhotos[userId] = uiImage
+                    }
+                } else {
+                    DispatchQueue.main.async {
+                        self.userProfilePhotos[userId] = nil
+                    }
+                }
+            }.resume()
+        }
+
+        func profilePhoto(forUserId userId: String) -> UIImage? {
+            return userProfilePhotos[userId] ?? UIImage(named: "defaultProfile")
+        }
+    
     func fetchFriendPlaces(userIds: [String]) {
         let dispatchGroup = DispatchGroup()
         var tempFriendPlaces: [String: [DetailPlace]] = [:]

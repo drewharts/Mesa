@@ -61,7 +61,7 @@ struct MapView: View {
                         PointAnnotation(coordinate: CLLocationCoordinate2D(
                             latitude: place.coordinate!.latitude, longitude: place.coordinate!.longitude
                         ))
-                        .image(.init(image: UIImage(named: "DestPin") ?? UIImage(), name: "dest-pin"))
+                        .image(.init(image: circularImage(from: profile.profilePhoto(forUserId: friend.id) ?? UIImage(named: "DestPin")), name: "dest-pin"))
                         .onTapGesture {
                             selectedPlaceVM.selectedPlace = place
                             selectedPlaceVM.isDetailSheetPresented = true
