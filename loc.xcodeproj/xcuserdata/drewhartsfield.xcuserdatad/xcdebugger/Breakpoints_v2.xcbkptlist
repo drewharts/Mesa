@@ -831,8 +831,8 @@
             filePath = "loc/Views/PlaceReviews/PlaceReviewView.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "36"
-            endingLineNumber = "36"
+            startingLineNumber = "37"
+            endingLineNumber = "37"
             landmarkName = "init(isPresented:place:userId:profilePhotoUrl:userFirstName:userLastName:)"
             landmarkType = "7">
          </BreakpointContent>

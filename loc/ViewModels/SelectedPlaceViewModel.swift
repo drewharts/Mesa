@@ -29,7 +29,9 @@ class SelectedPlaceViewModel: ObservableObject {
     @Published private var placeReviews: [String: [Review]] = [:] // Cache for reviews by placeId
     @Published private var reviewPhotos: [String: [UIImage]] = [:] // Cache for review photos by reviewId
     @Published private var userProfilePhotos: [String: UIImage] = [:] // Cache for profile photos by userId
+    
     @Published var placeRating: Double = 0
+    
     @Published private var photoLoadingStates: [String: LoadingState] = [:] // Loading states for place photos
     @Published private var reviewPhotoLoadingStates: [String: LoadingState] = [:] // Loading states for review photos
     @Published private var profilePhotoLoadingStates: [String: LoadingState] = [:] // Loading states for profile photos
