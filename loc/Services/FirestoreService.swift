@@ -138,14 +138,19 @@ class FirestoreService {
             }
     }
     
-    func fetchReviews(placeId: String, completion: @escaping ([Review]?, Error?) -> Void) {
+    func fetchReviews(placeId: String, latestOnly: Bool = false, completion: @escaping ([Review]?, Error?) -> Void) {
         // Reference to the reviews subcollection under the place document
         let reviewsRef = db.collection("places")
-                          .document(placeId)
-                          .collection("reviews")
+                         .document(placeId)
+                         .collection("reviews")
         
-        // Fetch all documents in the reviews collection
-        reviewsRef.getDocuments { snapshot, error in
+        // Create the query based on the latestOnly flag
+        let query = latestOnly ?
+            reviewsRef.order(by: "timestamp", descending: true).limit(to: 1) : // Latest review only
+            reviewsRef.order(by: "timestamp", descending: false)              // All reviews
+        
+        // Fetch documents based on the query
+        query.getDocuments { snapshot, error in
             if let error = error {
                 print("Error fetching reviews for place \(placeId): \(error.localizedDescription)")
                 completion(nil, error)

@@ -11,6 +11,7 @@ import GooglePlaces
 import MapboxSearch
 import Foundation
 import FirebaseFirestore
+import UIKit
 
 
 class ProfileViewModel: ObservableObject {
@@ -58,17 +59,54 @@ class ProfileViewModel: ObservableObject {
         fetchFollowers(userId: userId)
         fetchFriends(userId: userId)
     }
+    
+
     func fetchFavoritePlaceImages() {
         for place in userFavorites {
-            firestoreService.fetchPhotosFromStorage(placeId: place.id.uuidString, returnFirstImageOnly: true) { [weak self] (images, error) in
+            let placeId = place.id.uuidString
+            
+            // Fetch the first review
+            firestoreService.fetchReviews(placeId: placeId, latestOnly: true) { [weak self] (reviews, error) in
                 guard let self = self else { return }
                 
                 if let error = error {
-                    print("Error fetching image for place \(place.id.uuidString): \(error.localizedDescription)")
+                    print("Error fetching reviews for place \(placeId): \(error.localizedDescription)")
+                    self.favoritePlaceImages[placeId] = nil
                     return
                 }
                 
-                self.favoritePlaceImages[place.id.uuidString] = images?.first
+                if let firstReview = reviews?.first {
+                    // Assuming photoURLs is an array of full Firebase Storage URLs
+                    if let firstPhotoURLString = firstReview.images.first,
+                       let url = URL(string: firstPhotoURLString) {
+                        // Load image directly from the URL
+                        URLSession.shared.dataTask(with: url) { data, response, error in
+                            if let error = error {
+                                print("Error loading image for place \(placeId): \(error.localizedDescription)")
+                                DispatchQueue.main.async {
+                                    self.favoritePlaceImages[placeId] = nil
+                                }
+                                return
+                            }
+                            
+                            if let data = data, let image = UIImage(data: data) {
+                                DispatchQueue.main.async {
+                                    self.favoritePlaceImages[placeId] = image
+                                }
+                            } else {
+                                DispatchQueue.main.async {
+                                    self.favoritePlaceImages[placeId] = nil
+                                }
+                            }
+                        }.resume()
+                    } else {
+                        // No valid photo URL in the review
+                        self.favoritePlaceImages[placeId] = nil
+                    }
+                } else {
+                    // No reviews found
+                    self.favoritePlaceImages[placeId] = nil
+                }
             }
         }
     }
@@ -285,6 +323,7 @@ class ProfileViewModel: ObservableObject {
                     self!.userFavorites.append(place)
 
                     self!.firestoreService.addProfileFavorite(userId: self!.userId, place: place)
+                    self?.fetchFavoritePlaceImages()
                 }
 
             }
