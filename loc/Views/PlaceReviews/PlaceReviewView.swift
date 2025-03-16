@@ -16,7 +16,8 @@ struct PlaceReviewView: View {
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var selectedPlace: SelectedPlaceViewModel
     @State private var showButtonHighlight = false
-
+    @State private var showAlert = false
+    @State private var alertMessage = ""
     
     let place: DetailPlace
 
@@ -98,13 +99,12 @@ struct PlaceReviewView: View {
                         
                         // 3. Submit the review
                         viewModel.submitReview { result in
-                            // TODO: Show loading screen while it posts (e.g., use viewModel.isLoading)
                             switch result {
                             case .success(let savedReview):
                                 // Append the saved review to selectedPlace.reviews
                                 selectedPlace.addReview(savedReview)
                                 
-                                // Optional: Wait briefly so user sees the highlight
+                                // Wait briefly so user sees the highlight
                                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                                     showButtonHighlight = false
                                     presentationMode.wrappedValue.dismiss()
@@ -113,12 +113,22 @@ struct PlaceReviewView: View {
                             case .failure(let error):
                                 // On failure, remove highlight
                                 showButtonHighlight = false
-                                // TODO: Add signal that review wasn't processed (e.g., show an alert)
+                                
+                                // Show alert with error message
+                                alertMessage = error.localizedDescription
+                                showAlert = true
+                                
                                 print("Review submission failed: \(error.localizedDescription)")
                             }
                         }
                     }
-
+                    .alert(isPresented: $showAlert) {
+                        Alert(
+                            title: Text("Review Submission Failed"),
+                            message: Text(alertMessage),
+                            dismissButton: .default(Text("OK"))
+                        )
+                    }
                 }
                 .padding(.horizontal, 40)
             }

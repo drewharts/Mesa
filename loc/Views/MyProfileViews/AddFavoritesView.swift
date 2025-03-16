@@ -77,7 +77,6 @@ struct FavoritesContentDisplay: View {
                 .onTapGesture {
                     // 1) Append to favorites (directly via ProfileViewModel)
                     profile.addFavoriteFromSuggestion(prediction)
-
                     // 2) Highlight this row
                     lastTappedPlaceID = prediction.id
 
