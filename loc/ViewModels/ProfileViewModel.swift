@@ -53,8 +53,11 @@ class ProfileViewModel: ObservableObject {
         let dispatchGroup = DispatchGroup()
         
         dispatchGroup.enter()
-        fetchCurrentUser {
-            dispatchGroup.leave()
+        fetchCurrentUser { [weak self] in
+            guard let self = self else { return }
+            self.fetchFavorites(user: self.currentUser!) {
+                dispatchGroup.leave()
+            }
         }
         
         loadPlaceLists()
@@ -62,7 +65,11 @@ class ProfileViewModel: ObservableObject {
             loadImage(from: url)
         }
         
-        fetchLists(userId: userId)
+        dispatchGroup.enter()
+        fetchLists(userId: userId) {
+            dispatchGroup.leave()
+        }
+        
         fetchFollowers(userId: userId)
         
         dispatchGroup.enter()
@@ -87,17 +94,12 @@ class ProfileViewModel: ObservableObject {
                     completion()
                 } else if let user = user {
                     self.currentUser = user
-                    let userDispatchGroup = DispatchGroup()
                     if let photoURL = user.profilePhotoURL {
-                        userDispatchGroup.enter()
                         self.loadUserProfilePhoto(from: photoURL, forUserId: user.id) {
-                            userDispatchGroup.leave()
-                        }
-                    }
-                    userDispatchGroup.notify(queue: .main) {
-                        self.fetchFavorites(user: user) {
                             completion()
                         }
+                    } else {
+                        completion()
                     }
                 } else {
                     print("No user found for ID: \(self.userId)")
@@ -155,24 +157,32 @@ class ProfileViewModel: ObservableObject {
             }
             
             self.friends = profiles ?? []
-            let friendDispatchGroup = DispatchGroup()
+            guard !self.friends.isEmpty else {
+                completion()
+                return
+            }
+            
+            var pendingTasks = friends.count
             for friend in self.friends {
                 if let photoURL = friend.profilePhotoURL {
-                    friendDispatchGroup.enter()
-                    self.loadUserProfilePhoto(from: photoURL, forUserId: friend.id) {
-                        friendDispatchGroup.leave()
+                    self.loadUserProfilePhoto(from: photoURL, forUserId: friend.id) { [weak self] in
+                        guard let self = self else { return }
+                        self.fetchFriendFavPlaces(friend: friend) {
+                            pendingTasks -= 1
+                            if pendingTasks == 0 {
+                                completion()
+                            }
+                        }
                     }
                 } else {
                     self.userProfilePhotos[friend.id] = nil
+                    self.fetchFriendFavPlaces(friend: friend) {
+                        pendingTasks -= 1
+                        if pendingTasks == 0 {
+                            completion()
+                        }
+                    }
                 }
-                friendDispatchGroup.enter()
-                self.fetchFriendFavPlaces(friend: friend) {
-                    friendDispatchGroup.leave()
-                }
-            }
-            
-            friendDispatchGroup.notify(queue: .main) {
-                completion()
             }
         }
     }
@@ -368,6 +378,22 @@ class ProfileViewModel: ObservableObject {
                 print("Place added successfully!")
             }
         }
+        // Update dictionaries for the new list place
+        let placeId = place.id.uuidString
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self, let user = self.currentUser else { return }
+            if self.placeSavers[placeId] != nil {
+                if !self.placeSavers[placeId]!.contains(where: { $0.id == user.id }) {
+                    self.placeSavers[placeId]!.append(user)
+                }
+            } else {
+                self.placeSavers[placeId] = [user]
+            }
+            self.placeLookup[placeId] = place
+            let (image1, image2, image3) = self.getFirstThreeProfileImages(forKey: placeId)
+            self.placeAnnotationImages[placeId] = self.combinedCircularImage(image1: image1, image2: image2, image3: image3)
+            print("Added list place \(placeId) to placeSavers, placeLookup, and placeAnnotationImages")
+        }
     }
     
     private func searchResultToDetailPlace(place: SearchResult, completion: @escaping (DetailPlace) -> Void) {
@@ -409,16 +435,57 @@ class ProfileViewModel: ObservableObject {
             placeListGMSPlaces[listId] = places
         }
         firestoreService.removePlaceFromList(userId: userId, listName: listId.uuidString, placeId: place.id.uuidString)
+        // Update dictionaries if the place is no longer associated with the user
+        let placeId = place.id.uuidString
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self, let currentUser = self.currentUser else { return }
+            if let users = self.placeSavers[placeId], users.count == 1, users.first?.id == currentUser.id {
+                self.placeSavers[placeId] = nil
+                self.placeLookup[placeId] = nil
+                self.placeAnnotationImages[placeId] = nil
+            } else if var users = self.placeSavers[placeId] {
+                users.removeAll { $0.id == currentUser.id }
+                self.placeSavers[placeId] = users
+                let (image1, image2, image3) = self.getFirstThreeProfileImages(forKey: placeId)
+                self.placeAnnotationImages[placeId] = self.combinedCircularImage(image1: image1, image2: image2, image3: image3)
+            }
+        }
     }
     
-    private func fetchLists(userId: String) {
-        firestoreService.fetchLists(userId: userId) { lists in
+    private func fetchLists(userId: String, completion: @escaping () -> Void = {}) {
+        firestoreService.fetchLists(userId: userId) { [weak self] lists in
+            guard let self = self else { completion(); return }
             DispatchQueue.main.async {
                 self.userLists = lists
+                guard !lists.isEmpty else {
+                    completion()
+                    return
+                }
+                
+                var pendingFetches = lists.count
                 for list in lists {
                     self.fetchListImage(for: list)
-                    self.fetchFirestorePlaces(for: list.places) { gmsPlaces in
+                    self.fetchFirestorePlaces(for: list.places) { [weak self] gmsPlaces in
+                        guard let self = self, let currentUser = self.currentUser else { return }
                         self.placeListGMSPlaces[list.id] = gmsPlaces
+                        for place in gmsPlaces {
+                            let placeId = place.id.uuidString
+                            if self.placeSavers[placeId] != nil {
+                                if !self.placeSavers[placeId]!.contains(where: { $0.id == currentUser.id }) {
+                                    self.placeSavers[placeId]!.append(currentUser)
+                                }
+                            } else {
+                                self.placeSavers[placeId] = [currentUser]
+                            }
+                            self.placeLookup[placeId] = place
+                            let (image1, image2, image3) = self.getFirstThreeProfileImages(forKey: placeId)
+                            self.placeAnnotationImages[placeId] = self.combinedCircularImage(image1: image1, image2: image2, image3: image3)
+                            print("Added list place \(placeId) to placeSavers, placeLookup, and placeAnnotationImages from list \(list.id)")
+                        }
+                        pendingFetches -= 1
+                        if pendingFetches == 0 {
+                            completion()
+                        }
                     }
                 }
             }
