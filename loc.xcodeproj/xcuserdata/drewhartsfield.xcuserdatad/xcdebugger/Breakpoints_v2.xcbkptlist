@@ -14,8 +14,8 @@
             filePath = "loc/Services/FirestoreService.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "661"
-            endingLineNumber = "661"
+            startingLineNumber = "682"
+            endingLineNumber = "682"
             landmarkName = "fetchLists(userId:completion:)"
             landmarkType = "7">
          </BreakpointContent>
@@ -30,8 +30,8 @@
             filePath = "loc/Services/FirestoreService.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "664"
-            endingLineNumber = "664"
+            startingLineNumber = "685"
+            endingLineNumber = "685"
             landmarkName = "fetchLists(userId:completion:)"
             landmarkType = "7">
          </BreakpointContent>
@@ -46,8 +46,8 @@
             filePath = "loc/Services/FirestoreService.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "667"
-            endingLineNumber = "667"
+            startingLineNumber = "688"
+            endingLineNumber = "688"
             landmarkName = "fetchLists(userId:completion:)"
             landmarkType = "7">
          </BreakpointContent>
@@ -62,8 +62,8 @@
             filePath = "loc/Services/FirestoreService.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "692"
-            endingLineNumber = "692"
+            startingLineNumber = "713"
+            endingLineNumber = "713"
             landmarkName = "addProfileFavorite(userId:place:)"
             landmarkType = "7">
          </BreakpointContent>
@@ -398,8 +398,8 @@
             filePath = "loc/Services/FirestoreService.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "356"
-            endingLineNumber = "356"
+            startingLineNumber = "377"
+            endingLineNumber = "377"
             landmarkName = "searchUsers(query:completion:)"
             landmarkType = "7">
          </BreakpointContent>
@@ -542,8 +542,8 @@
             filePath = "loc/Services/FirestoreService.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "519"
-            endingLineNumber = "519"
+            startingLineNumber = "540"
+            endingLineNumber = "540"
             landmarkName = "uploadImageAndUpdatePlaceList(userId:placeList:image:completion:)"
             landmarkType = "7">
          </BreakpointContent>
@@ -558,8 +558,8 @@
             filePath = "loc/Services/FirestoreService.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "490"
-            endingLineNumber = "490"
+            startingLineNumber = "511"
+            endingLineNumber = "511"
             landmarkName = "uploadImageAndUpdatePlaceList(userId:placeList:image:completion:)"
             landmarkType = "7">
          </BreakpointContent>
@@ -574,8 +574,8 @@
             filePath = "loc/Services/FirestoreService.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "679"
-            endingLineNumber = "679"
+            startingLineNumber = "700"
+            endingLineNumber = "700"
             landmarkName = "addProfileFavorite(userId:place:)"
             landmarkType = "7">
          </BreakpointContent>
@@ -638,8 +638,8 @@
             filePath = "loc/Services/FirestoreService.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "671"
-            endingLineNumber = "671"
+            startingLineNumber = "692"
+            endingLineNumber = "692"
             landmarkName = "fetchLists(userId:completion:)"
             landmarkType = "7">
          </BreakpointContent>
@@ -719,8 +719,8 @@
             filePath = "loc/Services/FirestoreService.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "806"
-            endingLineNumber = "806"
+            startingLineNumber = "827"
+            endingLineNumber = "827"
             landmarkName = "fetchProfileFavorites(userId:completion:)"
             landmarkType = "7">
          </BreakpointContent>
@@ -735,8 +735,8 @@
             filePath = "loc/Services/FirestoreService.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "810"
-            endingLineNumber = "810"
+            startingLineNumber = "831"
+            endingLineNumber = "831"
             landmarkName = "fetchProfileFavorites(userId:completion:)"
             landmarkType = "7">
          </BreakpointContent>
@@ -767,8 +767,8 @@
             filePath = "loc/Services/FirestoreService.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "397"
-            endingLineNumber = "397"
+            startingLineNumber = "418"
+            endingLineNumber = "418"
             landmarkName = "saveReview(_:completion:)"
             landmarkType = "7">
          </BreakpointContent>
@@ -835,6 +835,22 @@
             endingLineNumber = "100"
             landmarkName = "fetchProfileFavorites(userId:)"
             landmarkType = "7">
+         </BreakpointContent>
+      </BreakpointProxy>
+      <BreakpointProxy
+         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
+         <BreakpointContent
+            uuid = "FE152EC4-E426-431C-BE3B-B997F1D6BC82"
+            shouldBeEnabled = "No"
+            ignoreCount = "0"
+            continueAfterRunningActions = "No"
+            filePath = "loc/Views/MainView.swift"
+            startingColumnNumber = "9223372036854775807"
+            endingColumnNumber = "9223372036854775807"
+            startingLineNumber = "34"
+            endingLineNumber = "34"
+            landmarkName = "body"
+            landmarkType = "24">
          </BreakpointContent>
       </BreakpointProxy>
    </Breakpoints>

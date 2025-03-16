@@ -14,6 +14,27 @@ class FirestoreService {
     private let db = Firestore.firestore()
     private let storage = Storage.storage()
     
+    func fetchCurrentUser(userId: String, completion: @escaping (User?, Error?) -> Void) {
+        db.collection("users").document(userId).getDocument { document, error in
+            if let error = error {
+                completion(nil, error)
+                return
+            }
+            
+            guard let document = document, document.exists else {
+                completion(nil, nil) // User not found, no error
+                return
+            }
+            
+            do {
+                let user = try document.data(as: User.self)
+                completion(user, nil)
+            } catch {
+                completion(nil, error)
+            }
+        }
+    }
+    
     func fetchPhotosFromStorage(urls: [String], completion: @escaping ([UIImage]?, Error?) -> Void) {
         var images: [UIImage] = []
         let group = DispatchGroup()
