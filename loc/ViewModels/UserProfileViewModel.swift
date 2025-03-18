@@ -16,6 +16,8 @@ class UserProfileViewModel: ObservableObject {
     @Published var isUserDetailPresented = false
     
     @Published var userFavorites: [DetailPlace] = []
+    @Published var favoritePlaceImages: [String: UIImage] = [:]
+
     @Published var userLists: [PlaceList] = []
     @Published var placeListMapboxPlaces: [UUID: [DetailPlace]] = [:] // Store places per list
     @Published var placeImages: [String: UIImage] = [:] // Store images by placeID
@@ -35,6 +37,7 @@ class UserProfileViewModel: ObservableObject {
         fetchProfileFavorites(userId: user.id)
         fetchLists(userId: user.id)
         fetchFollowers(userId: user.id)
+        fetchFavoritePlaceImages()
     }
     func fetchFollowers(userId: String) {
         firestoreService.getNumberFollowers(forUserId: userId) { (count, error) in
@@ -97,13 +100,63 @@ class UserProfileViewModel: ObservableObject {
     }
     
     private func fetchProfileFavorites(userId: String) {
-        firestoreService.fetchProfileFavorites(userId: userId) { places in
-            DispatchQueue.main.async {
-                if ((places?.isEmpty) != nil) {
-                    print("No favorite places found.")
-                    self.userFavorites = []
+            print("Fetching favorites for userId: \(userId)")
+            firestoreService.fetchProfileFavorites(userId: userId) { [weak self] favorites in
+                guard let self = self else { return }
+                DispatchQueue.main.async {
+                    if favorites == nil {
+                        print("Favorites fetch returned nil - possible error or no data")
+                        self.userFavorites = []
+                    } else if favorites!.isEmpty {
+                        print("No favorites found for userId: \(userId)")
+                        self.userFavorites = []
+                    } else {
+                        print("Fetched \(favorites!.count) favorites for userId: \(userId)")
+                        self.userFavorites = favorites!
+                    }
+                }
+            }
+        }
+    
+    func fetchFavoritePlaceImages() {
+        print("Starting fetchFavoritePlaceImages for \(userFavorites.count) favorites")
+        for place in userFavorites {
+            let placeId = place.id.uuidString
+            firestoreService.fetchReviews(placeId: placeId, latestOnly: true) { [weak self] (reviews, error) in
+                guard let self = self else { return }
+                if let error = error {
+                    print("Error fetching reviews for place \(placeId): \(error.localizedDescription)")
+                    self.favoritePlaceImages[placeId] = nil
+                    return
+                }
+                print("Fetched \(reviews?.count ?? 0) reviews for place \(placeId)")
+                if let firstReview = reviews?.first,
+                   let firstPhotoURLString = firstReview.images.first,
+                   let url = URL(string: firstPhotoURLString) {
+                    print("Fetching image from URL: \(firstPhotoURLString)")
+                    URLSession.shared.dataTask(with: url) { data, response, error in
+                        if let error = error {
+                            print("Error loading image for place \(placeId): \(error.localizedDescription)")
+                            DispatchQueue.main.async {
+                                self.favoritePlaceImages[placeId] = nil
+                            }
+                            return
+                        }
+                        if let data = data, let image = UIImage(data: data) {
+                            DispatchQueue.main.async {
+                                self.favoritePlaceImages[placeId] = image
+                                print("Loaded image for place \(placeId)")
+                            }
+                        } else {
+                            DispatchQueue.main.async {
+                                self.favoritePlaceImages[placeId] = nil
+                                print("No image data for place \(placeId)")
+                            }
+                        }
+                    }.resume()
                 } else {
-                    self.userFavorites = places ?? []
+                    print("No valid review or image URL for place \(placeId)")
+                    self.favoritePlaceImages[placeId] = nil
                 }
             }
         }

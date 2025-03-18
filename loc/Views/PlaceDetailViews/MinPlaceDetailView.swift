@@ -134,8 +134,10 @@ struct MinPlaceDetailView: View {
                             )
                     }
                     
+
+                    
                     HStack(spacing: -10) {
-                        ForEach(0..<3) { _ in
+                        ForEach(0..<2) { _ in
                             Circle()
                                 .fill(Color.gray)
                                 .frame(width: 30, height: 30)
@@ -179,6 +181,7 @@ struct MinPlaceDetailView: View {
                     )
                 case .reviews:
                     PlaceReviewsView(selectedImage: $selectedImage)
+                    
                 }
             }
             .padding(.horizontal, 30)

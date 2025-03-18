@@ -82,7 +82,8 @@ class LoginViewModel: ObservableObject {
             lastName: user.profile?.familyName ?? "",
             email: user.profile?.email ?? "",
             profilePhotoURL: user.profile?.imageURL(withDimension: 200),
-            phoneNumber: ""
+            phoneNumber: "",
+            fullName: "\(user.profile?.givenName ?? "") \(user.profile?.familyName ?? "")"
         )
 
         let profileViewModel = ProfileViewModel(data: profileData, firestoreService: firestoreService.self, userId: uid)

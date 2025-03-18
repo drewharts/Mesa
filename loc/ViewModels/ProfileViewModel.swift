@@ -162,12 +162,20 @@ class ProfileViewModel: ObservableObject {
                 return
             }
             
-            var pendingTasks = friends.count
+            var pendingTasks = self.friends.count * 2 // Two tasks per friend: favorites and lists
+            
             for friend in self.friends {
                 if let photoURL = friend.profilePhotoURL {
-                    self.loadUserProfilePhoto(from: photoURL, forUserId: friend.id) { [weak self] in
-                        guard let self = self else { return }
+                    self.loadUserProfilePhoto(from: photoURL, forUserId: friend.id) {
+                        // Fetch favorite places
                         self.fetchFriendFavPlaces(friend: friend) {
+                            pendingTasks -= 1
+                            if pendingTasks == 0 {
+                                completion()
+                            }
+                        }
+                        // Fetch and process lists
+                        self.fetchAndProcessFriendLists(friend: friend) {
                             pendingTasks -= 1
                             if pendingTasks == 0 {
                                 completion()
@@ -176,7 +184,15 @@ class ProfileViewModel: ObservableObject {
                     }
                 } else {
                     self.userProfilePhotos[friend.id] = nil
+                    // Fetch favorite places
                     self.fetchFriendFavPlaces(friend: friend) {
+                        pendingTasks -= 1
+                        if pendingTasks == 0 {
+                            completion()
+                        }
+                    }
+                    // Fetch and process lists
+                    self.fetchAndProcessFriendLists(friend: friend) {
                         pendingTasks -= 1
                         if pendingTasks == 0 {
                             completion()
@@ -448,6 +464,43 @@ class ProfileViewModel: ObservableObject {
                 self.placeSavers[placeId] = users
                 let (image1, image2, image3) = self.getFirstThreeProfileImages(forKey: placeId)
                 self.placeAnnotationImages[placeId] = self.combinedCircularImage(image1: image1, image2: image2, image3: image3)
+            }
+        }
+    }
+    
+    private func fetchAndProcessFriendLists(friend: User, completion: @escaping () -> Void) {
+        firestoreService.fetchLists(userId: friend.id) { [weak self] lists in
+            guard let self = self else { completion(); return }
+            guard !lists.isEmpty else {
+                completion()
+                return
+            }
+            
+            var pendingFetches = lists.count
+            for list in lists {
+                self.fetchFirestorePlaces(for: list.places) { gmsPlaces in
+                    for place in gmsPlaces {
+                        let placeId = place.id.uuidString
+                        // Update placeSavers
+                        if self.placeSavers[placeId] != nil {
+                            if !self.placeSavers[placeId]!.contains(where: { $0.id == friend.id }) {
+                                self.placeSavers[placeId]!.append(friend)
+                            }
+                        } else {
+                            self.placeSavers[placeId] = [friend]
+                        }
+                        // Update placeLookup
+                        self.placeLookup[placeId] = place
+                        // Update placeAnnotationImages
+                        let (image1, image2, image3) = self.getFirstThreeProfileImages(forKey: placeId)
+                        self.placeAnnotationImages[placeId] = self.combinedCircularImage(image1: image1, image2: image2, image3: image3)
+                        print("Added friend's list place \(placeId) to placeSavers, placeLookup, and placeAnnotationImages")
+                    }
+                    pendingFetches -= 1
+                    if pendingFetches == 0 {
+                        completion()
+                    }
+                }
             }
         }
     }
