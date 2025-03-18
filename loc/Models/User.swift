@@ -15,7 +15,5 @@ struct User: Codable, Identifiable {
     let email: String
     let profilePhotoURL: URL?
     
-    var fullName: String {
-        return "\(firstName) \(lastName)"
-    }
+    let fullName: String
 }
