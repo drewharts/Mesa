@@ -114,27 +114,6 @@ struct MinPlaceDetailView: View {
                         .cornerRadius(10)
                     
                     Button(action: {
-                        selectedTab = .comments
-                    }) {
-                        Text("COMMENTS")
-                            .font(.subheadline)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.black)
-                            .padding(.bottom, 5)
-                            .overlay(
-                                Group {
-                                    if selectedTab == .comments {
-                                        Rectangle()
-                                            .fill(Color.blue)
-                                            .frame(height: 3)
-                                            .offset(y: 6)
-                                    }
-                                },
-                                alignment: .bottom
-                            )
-                    }
-                    
-                    Button(action: {
                         selectedTab = .about
                     }) {
                         Text("ABOUT")
@@ -203,8 +182,6 @@ struct MinPlaceDetailView: View {
                 case .reviews:
                     PlaceReviewsView(selectedImage: $selectedImage)
                     
-                case .comments:
-                    CommentsView()
                 }
             }
             .padding(.horizontal, 30)
@@ -225,7 +202,6 @@ struct MinPlaceDetailView: View {
 enum DetailTab {
     case about
     case reviews
-    case comments
 }
 
 // MARK: - Preview Provider
