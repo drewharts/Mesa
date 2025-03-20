@@ -47,8 +47,8 @@ struct MapView: View {
                     )
                 }
             }
-            .onTapGesture {
-                self.onMapTap?()
+            .onMapTapGesture { _ in
+                onMapTap?()
             }
             .onAppear {
                 if !hasInitialized {

@@ -33,6 +33,7 @@ struct MainView: View {
             ZStack(alignment: .top) {
                 MapView(onMapTap: {
                     searchIsFocused = false
+                    isSearchBarMinimized = true
                 })
                 .ignoresSafeArea()
                 .edgesIgnoringSafeArea(.all)
