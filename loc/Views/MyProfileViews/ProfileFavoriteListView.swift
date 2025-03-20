@@ -29,48 +29,62 @@ struct ProfileFavoriteListView: View {
             .buttonStyle(.plain)
             .padding(.horizontal, 10)
 
-            // 2) Favorite places
-            if !profile.userFavorites.isEmpty {
-                HStack {
-                    ForEach(profile.userFavorites, id: \.id) { place in
+            // 2) Favorite places or placeholders
+            HStack(spacing: 10) {
+                // Display existing favorites
+                ForEach(profile.userFavorites, id: \.id) { place in
+                    VStack {
+                        ZStack {
+                            if let image = profile.favoritePlaceImages[place.id.uuidString] {
+                                Image(uiImage: image)
+                                    .resizable()
+                                    .scaledToFill()
+                                    .frame(width: 85, height: 85)
+                                    .cornerRadius(50)
+                                    .clipped()
+                            } else {
+                                Rectangle()
+                                    .fill(Color.blue.opacity(0.3))
+                                    .frame(width: 85, height: 85)
+                                    .cornerRadius(50)
+                            }
+                        }
+                        Text(place.name.prefix(15) ?? "Unknown")
+                            .foregroundColor(.black)
+                            .font(.footnote)
+                            .multilineTextAlignment(.center)
+                            .lineLimit(1)
+                            .frame(width: 85)
+                    }
+                    .onTapGesture {
+                        selectedPlaceVM.selectedPlace = place
+                        selectedPlaceVM.isDetailSheetPresented = true
+                        presentationMode.wrappedValue.dismiss()
+                    }
+                }
+
+                // Add placeholder circles if fewer than 4 favorites
+                if profile.userFavorites.count < 4 {
+                    ForEach(profile.userFavorites.count..<4, id: \.self) { _ in
                         VStack {
                             ZStack {
-                                if let image = profile.favoritePlaceImages[place.id.uuidString]{
-                                    Image(uiImage: image)
-                                        .resizable()
-                                        .scaledToFill()
-                                        .frame(width: 85, height: 85)
-                                        .cornerRadius(50)
-                                        .clipped()
-                                } else {
-                                    Rectangle()
-                                        .fill(Color.blue.opacity(0.3))
-                                        .frame(width: 85, height: 85)
-                                        .cornerRadius(50)
-                                }
+                                Circle()
+                                    .fill(Color.gray.opacity(0.2))
+                                    .frame(width: 85, height: 85)
+                                Image(systemName: "plus")
+                                    .font(.system(size: 20))
+                                    .foregroundColor(.gray)
                             }
-                            Text(place.name.prefix(15) ?? "Unknown")
-                                .foregroundColor(.black)
-                                .font(.footnote)
-                                .multilineTextAlignment(.center)
-                                .lineLimit(1)
-                                .frame(width: 85)
+                            .padding(.bottom, 20)
                         }
-                        .padding(.trailing, 10)
                         .onTapGesture {
-                            // Update the selected place in the view model and dismiss
-                            selectedPlaceVM.selectedPlace = place
-                            selectedPlaceVM.isDetailSheetPresented = true
-                            presentationMode.wrappedValue.dismiss()
+                            showSearch = true
                         }
                     }
                 }
-                .padding(.horizontal, 20)
-            } else {
-                Text("No favorites available")
-                    .foregroundColor(.gray)
-                    .padding(.horizontal)
             }
+            .frame(maxWidth: .infinity, alignment: .center) // Center the content
+            .padding(.horizontal, 20)
 
             Divider()
                 .padding(.top, 15)

@@ -82,6 +82,41 @@ struct PlaceListCellView: View {
     }
 }
 
+struct MyProfileHorizontalListPlaces: View {
+    @EnvironmentObject var viewModel: ProfileViewModel
+    var places: [DetailPlace]
+    
+    var body: some View {
+        HStack {
+            ForEach(places, id: \.id) { place in
+                VStack {
+                    if let image = viewModel.placeImages[place.id.uuidString ?? ""] {
+                        Image(uiImage: image)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 85, height: 85)
+                            .cornerRadius(50)
+                            .clipped()
+                    } else {
+                        Circle()
+                            .frame(width: 85, height: 85)
+                            .foregroundColor(.gray)
+                    }
+
+                    Text(place.name ?? "Unknown")
+                        .font(.footnote)
+                        .foregroundColor(.black)
+                        .multilineTextAlignment(.center)
+                        .lineLimit(1)
+                        .frame(width: 85)
+                }
+                .padding(.trailing, 10)
+            }
+        }
+        .padding(.horizontal, 20)
+    }
+}
+
 
 struct ProfileViewListsView: View {
     @EnvironmentObject var profile: ProfileViewModel
@@ -100,12 +135,22 @@ struct ProfileViewListsView: View {
             ListHeaderView()
 
             if !profile.userLists.isEmpty {
-                ScrollView {
-                    ForEach(profile.userLists) { list in
-                        PlaceListCellView(
-                            list: list,
-                            showingImagePicker: $showingImagePicker
-                        )
+                ForEach(profile.userLists) { list in
+                    VStack(alignment: .leading) {
+                        Text(list.name)
+                            .font(.headline)
+                            .foregroundColor(.black)
+                            .padding(.leading, 20)
+
+                        if let places = profile.placeListGMSPlaces[list.id] {
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                MyProfileHorizontalListPlaces(places: places)
+                            }
+                        } else {
+                            Text("Loading places...")
+                                .foregroundColor(.gray)
+                                .padding(.leading, 20)
+                        }
                     }
                 }
             } else {
