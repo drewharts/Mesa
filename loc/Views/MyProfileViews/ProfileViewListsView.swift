@@ -84,33 +84,42 @@ struct PlaceListCellView: View {
 
 struct MyProfileHorizontalListPlaces: View {
     @EnvironmentObject var viewModel: ProfileViewModel
+    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
+    @Environment(\.presentationMode) var presentationMode // For dismissing the sheet
+    
     var places: [DetailPlace]
     
     var body: some View {
         HStack {
             ForEach(places, id: \.id) { place in
-                VStack {
-                    if let image = viewModel.placeImages[place.id.uuidString ?? ""] {
-                        Image(uiImage: image)
-                            .resizable()
-                            .scaledToFill()
-                            .frame(width: 85, height: 85)
-                            .cornerRadius(50)
-                            .clipped()
-                    } else {
-                        Circle()
-                            .frame(width: 85, height: 85)
-                            .foregroundColor(.gray)
+                Button(action: {
+                    selectedPlaceVM.selectedPlace = place
+                    selectedPlaceVM.isDetailSheetPresented = true
+                    presentationMode.wrappedValue.dismiss()
+                }) {
+                    VStack {
+                        if let image = viewModel.placeImages[place.id.uuidString ?? ""] {
+                            Image(uiImage: image)
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 85, height: 85)
+                                .cornerRadius(50)
+                                .clipped()
+                        } else {
+                            Circle()
+                                .frame(width: 85, height: 85)
+                                .foregroundColor(.gray)
+                        }
+                        
+                        Text(place.name ?? "Unknown")
+                            .font(.footnote)
+                            .foregroundColor(.black)
+                            .multilineTextAlignment(.center)
+                            .lineLimit(1)
+                            .frame(width: 85)
                     }
-
-                    Text(place.name ?? "Unknown")
-                        .font(.footnote)
-                        .foregroundColor(.black)
-                        .multilineTextAlignment(.center)
-                        .lineLimit(1)
-                        .frame(width: 85)
+                    .padding(.trailing, 10)
                 }
-                .padding(.trailing, 10)
             }
         }
         .padding(.horizontal, 20)
