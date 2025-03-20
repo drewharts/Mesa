@@ -314,6 +314,7 @@ class ProfileViewModel: ObservableObject {
                         if let data = data, let image = UIImage(data: data) {
                             DispatchQueue.main.async {
                                 self.favoritePlaceImages[placeId] = image
+                                self.placeImages[placeId] = image
                                 print("Loaded image for place \(placeId)")
                             }
                         } else {
