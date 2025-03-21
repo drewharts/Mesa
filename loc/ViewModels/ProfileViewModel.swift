@@ -67,6 +67,7 @@ class ProfileViewModel: ObservableObject {
         
         dispatchGroup.enter()
         fetchLists(userId: userId) {
+            self.fetchAllPlaceImages()
             dispatchGroup.leave()
         }
         
@@ -287,51 +288,218 @@ class ProfileViewModel: ObservableObject {
         }
     }
     
-    func fetchFavoritePlaceImages() {
-        print("Starting fetchFavoritePlaceImages for \(userFavorites.count) favorites")
-        for place in userFavorites {
+    func fetchAllPlaceImages() {
+        print("Starting fetchAllPlaceImages for all places")
+        
+        // Get all unique places from placeLookup
+        let allPlaces = Array(placeLookup.values)
+        print("Processing \(allPlaces.count) total places")
+        
+        for place in allPlaces {
             let placeId = place.id.uuidString
-            firestoreService.fetchReviews(placeId: placeId, latestOnly: true) { [weak self] (reviews, error) in
+            
+            // Skip if image already exists
+            if placeImages[placeId] != nil {
+                print("Image already exists for place \(placeId), skipping fetch")
+                continue
+            }
+            
+            // First try the latest review
+            firestoreService.fetchReviews(placeId: placeId, latestOnly: true) { [weak self] (latestReviews, error) in
                 guard let self = self else { return }
+                
                 if let error = error {
-                    print("Error fetching reviews for place \(placeId): \(error.localizedDescription)")
-                    self.favoritePlaceImages[placeId] = nil
+                    print("Error fetching latest review for place \(placeId): \(error.localizedDescription)")
+                    DispatchQueue.main.async {
+                        self.placeImages[placeId] = nil
+                    }
                     return
                 }
-                print("Fetched \(reviews?.count ?? 0) reviews for place \(placeId)")
-                if let firstReview = reviews?.first,
+                
+                // Check if latest review has an image
+                if let firstReview = latestReviews?.first,
                    let firstPhotoURLString = firstReview.images.first,
                    let url = URL(string: firstPhotoURLString) {
-                    print("Fetching image from URL: \(firstPhotoURLString)")
-                    URLSession.shared.dataTask(with: url) { data, response, error in
+                    
+                    self.fetchImage(from: url, for: placeId)
+                } else {
+                    // If no image in latest review, fetch all reviews
+                    self.firestoreService.fetchReviews(placeId: placeId, latestOnly: false) { (allReviews, error) in
                         if let error = error {
-                            print("Error loading image for place \(placeId): \(error.localizedDescription)")
+                            print("Error fetching all reviews for place \(placeId): \(error.localizedDescription)")
                             DispatchQueue.main.async {
-                                self.favoritePlaceImages[placeId] = nil
+                                self.placeImages[placeId] = nil
                             }
                             return
                         }
-                        if let data = data, let image = UIImage(data: data) {
+                        
+                        // Look through all reviews for the first available image
+                        if let reviews = allReviews {
+                            print("Checking \(reviews.count) reviews for place \(placeId)")
+                            for review in reviews {
+                                if let photoURLString = review.images.first,
+                                   let url = URL(string: photoURLString) {
+                                    self.fetchImage(from: url, for: placeId)
+                                    return // Exit after finding the first image
+                                }
+                            }
+                            // If no images found in any review
                             DispatchQueue.main.async {
-                                self.favoritePlaceImages[placeId] = image
-                                self.placeImages[placeId] = image
-                                print("Loaded image for place \(placeId)")
+                                self.placeImages[placeId] = nil
+                                print("No images found in any reviews for place \(placeId)")
                             }
                         } else {
                             DispatchQueue.main.async {
-                                self.favoritePlaceImages[placeId] = nil
-                                print("No image data for place \(placeId)")
+                                self.placeImages[placeId] = nil
+                                print("No reviews available for place \(placeId)")
                             }
                         }
-                    }.resume()
-                } else {
-                    print("No valid review or image URL for place \(placeId)")
-                    self.favoritePlaceImages[placeId] = nil
+                    }
                 }
             }
         }
     }
+
+    // Helper function to fetch and store the image
+    private func fetchImage(from url: URL, for placeId: String) {
+        print("Fetching image from URL: \(url.absoluteString) for place \(placeId)")
+        URLSession.shared.dataTask(with: url) { [weak self] data, response, error in
+            guard let self = self else { return }
+            
+            if let error = error {
+                print("Error loading image for place \(placeId): \(error.localizedDescription)")
+                DispatchQueue.main.async {
+                    self.placeImages[placeId] = nil
+                }
+                return
+            }
+            
+            if let data = data, let image = UIImage(data: data) {
+                DispatchQueue.main.async {
+                    // Only store if no image exists yet
+                    if self.placeImages[placeId] == nil {
+                        self.placeImages[placeId] = image
+                        print("Loaded and stored image for place \(placeId) into placeImages")
+                    } else {
+                        print("Image already stored for \(placeId), skipping update")
+                    }
+                }
+            } else {
+                DispatchQueue.main.async {
+                    self.placeImages[placeId] = nil
+                    print("No image data for place \(placeId)")
+                }
+            }
+        }.resume()
+    }
     
+    func fetchFavoritePlaceImages() {
+        print("Starting fetchFavoritePlaceImages for \(userFavorites.count) favorites")
+        
+        for place in userFavorites {
+            let placeId = place.id.uuidString
+            
+            // Skip if image already exists in favoritePlaceImages
+            if favoritePlaceImages[placeId] != nil {
+                print("Image already exists for favorite place \(placeId), skipping fetch")
+                continue
+            }
+            
+            // First try the latest review
+            firestoreService.fetchReviews(placeId: placeId, latestOnly: true) { [weak self] (latestReviews, error) in
+                guard let self = self else { return }
+                
+                if let error = error {
+                    print("Error fetching latest review for place \(placeId): \(error.localizedDescription)")
+                    DispatchQueue.main.async {
+                        self.favoritePlaceImages[placeId] = nil
+                        self.placeImages[placeId] = nil
+                    }
+                    return
+                }
+                
+                // Check if latest review has an image
+                if let firstReview = latestReviews?.first,
+                   let firstPhotoURLString = firstReview.images.first,
+                   let url = URL(string: firstPhotoURLString) {
+                    
+                    self.fetchFavoriteImage(from: url, for: placeId)
+                } else {
+                    // If no image in latest review, fetch all reviews
+                    self.firestoreService.fetchReviews(placeId: placeId, latestOnly: false) { (allReviews, error) in
+                        if let error = error {
+                            print("Error fetching all reviews for place \(placeId): \(error.localizedDescription)")
+                            DispatchQueue.main.async {
+                                self.favoritePlaceImages[placeId] = nil
+                                self.placeImages[placeId] = nil
+                            }
+                            return
+                        }
+                        
+                        // Look through all reviews for the first available image
+                        if let reviews = allReviews {
+                            print("Checking \(reviews.count) reviews for place \(placeId)")
+                            for review in reviews {
+                                if let photoURLString = review.images.first,
+                                   let url = URL(string: photoURLString) {
+                                    self.fetchFavoriteImage(from: url, for: placeId)
+                                    return // Exit after finding the first image
+                                }
+                            }
+                            // If no images found in any review
+                            DispatchQueue.main.async {
+                                self.favoritePlaceImages[placeId] = nil
+                                self.placeImages[placeId] = nil
+                                print("No images found in any reviews for favorite place \(placeId)")
+                            }
+                        } else {
+                            DispatchQueue.main.async {
+                                self.favoritePlaceImages[placeId] = nil
+                                self.placeImages[placeId] = nil
+                                print("No reviews available for favorite place \(placeId)")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Helper function to fetch and store the favorite place image
+    private func fetchFavoriteImage(from url: URL, for placeId: String) {
+        print("Fetching image from URL: \(url.absoluteString) for favorite place \(placeId)")
+        URLSession.shared.dataTask(with: url) { [weak self] data, response, error in
+            guard let self = self else { return }
+            
+            if let error = error {
+                print("Error loading image for place \(placeId): \(error.localizedDescription)")
+                DispatchQueue.main.async {
+                    self.favoritePlaceImages[placeId] = nil
+                    self.placeImages[placeId] = nil
+                }
+                return
+            }
+            
+            if let data = data, let image = UIImage(data: data) {
+                DispatchQueue.main.async {
+                    // Only store if no image exists yet
+                    if self.favoritePlaceImages[placeId] == nil {
+                        self.favoritePlaceImages[placeId] = image
+                        self.placeImages[placeId] = image
+                        print("Loaded and stored image for favorite place \(placeId)")
+                    } else {
+                        print("Image already stored for favorite place \(placeId), skipping update")
+                    }
+                }
+            } else {
+                DispatchQueue.main.async {
+                    self.favoritePlaceImages[placeId] = nil
+                    self.placeImages[placeId] = nil
+                    print("No image data for favorite place \(placeId)")
+                }
+            }
+        }.resume()
+    }
     private func loadUserProfilePhoto(from url: URL, forUserId userId: String, completion: (() -> Void)? = nil) {
         if userProfilePhotos[userId] != nil {
             completion?()
@@ -394,6 +562,7 @@ class ProfileViewModel: ObservableObject {
             } else {
                 print("Place added successfully!")
             }
+            self.fetchAllPlaceImages() // Add this to fetch image for the new place
         }
         // Update dictionaries for the new list place
         let placeId = place.id.uuidString
