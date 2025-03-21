@@ -85,6 +85,95 @@ class ProfileViewModel: ObservableObject {
         }
     }
     
+    func toggleFollowUser(userId: String) {
+        // Check if the user is already in the friends list
+        if let friendIndex = friends.firstIndex(where: { $0.id == userId }) {
+            // User is currently followed, so unfollow them
+            let friendToRemove = friends[friendIndex]
+            friends.remove(at: friendIndex)
+            
+            // Immediately remove friend's places from the map
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                self.removeFriendPlaces(friendId: userId)
+                print("Immediately removed places for unfollowed user \(userId) from map")
+                
+                // Update followers count asynchronously
+                self.fetchFollowers(userId: self.userId)
+                print("Successfully unfollowed user \(userId)")
+            }
+        } else {
+            // User is not followed, so follow them
+            firestoreService.fetchCurrentUser(userId: userId) { [weak self] user, error in
+                guard let self = self else { return }
+                if let error = error {
+                    print("Error fetching user to follow \(userId): \(error.localizedDescription)")
+                    return
+                }
+                guard let userToFollow = user else {
+                    print("No user found with ID: \(userId)")
+                    return
+                }
+                
+                DispatchQueue.main.async { [weak self] in
+                    guard let self = self else { return }
+                    // Add to local friends list
+                    self.friends.append(userToFollow)
+                    print("Successfully followed user \(userId)")
+                    
+                    // Load profile photo if available and fetch friend's data
+                    if let photoURL = userToFollow.profilePhotoURL {
+                        self.loadUserProfilePhoto(from: photoURL, forUserId: userId) {
+                            // Immediately fetch and add friend's favorite places to the map
+                            self.fetchFriendFavPlaces(friend: userToFollow) {
+                                print("Finished fetching new friend's favorite places and added to map")
+                            }
+                            // Immediately fetch and add friend's lists to the map
+                            self.fetchAndProcessFriendLists(friend: userToFollow) {
+                                print("Finished fetching new friend's lists and added to map")
+                            }
+                        }
+                    } else {
+                        self.userProfilePhotos[userId] = nil
+                        // Immediately fetch and add friend's data without waiting for photo
+                        self.fetchFriendFavPlaces(friend: userToFollow) {
+                            print("Finished fetching new friend's favorite places and added to map")
+                        }
+                        self.fetchAndProcessFriendLists(friend: userToFollow) {
+                            print("Finished fetching new friend's lists and added to map")
+                        }
+                    }
+                    
+                    // Update followers count asynchronously
+                    self.fetchFollowers(userId: self.userId)
+                }
+            }
+        }
+    }
+
+    // Helper function to clean up friend's places when unfollowing
+    private func removeFriendPlaces(friendId: String) {
+        // Update placeSavers and placeAnnotationImages
+        for (placeId, users) in placeSavers {
+            if let index = users.firstIndex(where: { $0.id == friendId }) {
+                var updatedUsers = users
+                updatedUsers.remove(at: index)
+                
+                if updatedUsers.isEmpty {
+                    // If no users left, remove the place entirely
+                    placeSavers[placeId] = nil
+                    placeLookup[placeId] = nil
+                    placeAnnotationImages[placeId] = nil
+                } else {
+                    // Update with remaining users
+                    placeSavers[placeId] = updatedUsers
+                    let (image1, image2, image3) = getFirstThreeProfileImages(forKey: placeId)
+                    placeAnnotationImages[placeId] = combinedCircularImage(image1: image1, image2: image2, image3: image3)
+                }
+            }
+        }
+    }
+    
     private func fetchCurrentUser(completion: @escaping () -> Void) {
         firestoreService.fetchCurrentUser(userId: userId) { [weak self] user, error in
             guard let self = self else { completion(); return }

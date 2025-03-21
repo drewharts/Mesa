@@ -10,6 +10,7 @@ import SwiftUI
 struct UserProfileView: View {
     let userId: String
     @ObservedObject var viewModel: UserProfileViewModel
+    @EnvironmentObject var profile: ProfileViewModel
     @Environment(\.presentationMode) var presentationMode
 
     var body: some View {
@@ -19,7 +20,10 @@ struct UserProfileView: View {
                 UserProfileProfilePictureView(
                     profilePhotoURL: viewModel.selectedUser?.profilePhotoURL,
                     isFollowing: viewModel.isFollowing,
-                    onToggleFollow: { viewModel.toggleFollowUser(currentUserId: userId) }
+                    onToggleFollow: {
+                        viewModel.toggleFollowUser(currentUserId: userId)
+                        profile.toggleFollowUser(userId: viewModel.selectedUser!.id)
+                    }
                 )
 
 
