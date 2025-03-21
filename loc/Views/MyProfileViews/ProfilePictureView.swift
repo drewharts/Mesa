@@ -16,7 +16,7 @@ struct ProfilePictureView: View {
                 profilePhoto
                     .resizable()
                     .scaledToFill()
-                    .frame(width: 120, height: 120)
+                    .frame(width: 100, height: 100)
                     .clipShape(Circle())
                     .shadow(radius: 4)
             } else {
@@ -24,7 +24,7 @@ struct ProfilePictureView: View {
                     .resizable()
                     .scaledToFit()
                     .foregroundColor(.blue)
-                    .frame(width: 120, height: 120)
+                    .frame(width: 100, height: 100)
                     .clipShape(Circle())
                     .shadow(radius: 4)
             }

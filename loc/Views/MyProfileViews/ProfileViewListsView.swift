@@ -13,7 +13,8 @@ import MapboxSearch
 struct ListHeaderView: View {
     var body: some View {
         Text("LISTS")
-            .font(.headline)
+            .font(.subheadline)
+            .fontWeight(.medium)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.leading, 20)
             .foregroundStyle(.black)

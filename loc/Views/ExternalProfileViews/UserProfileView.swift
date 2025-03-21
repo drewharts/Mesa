@@ -32,8 +32,14 @@ struct UserProfileView: View {
                     .font(.title)
                     .fontWeight(.bold)
                     .foregroundColor(.black)
-                Text("\(viewModel.followers) followers")
-                    .foregroundColor(.black)
+                VStack {
+                    Text("\(viewModel.followers)")
+                        .foregroundStyle(.black)
+                    Text("Followers")
+                        .foregroundStyle(.black)
+                        .font(.footnote)
+                        .fontWeight(.light)
+                }
 
                 Divider()
                     .padding(.horizontal, 20)
@@ -47,7 +53,7 @@ struct UserProfileView: View {
 
                 Spacer()
             }
-            .padding(.bottom, 40)
+            .padding(.bottom, 20)
         }
         .onAppear {
             viewModel.checkIfFollowing(currentUserId: userId)
