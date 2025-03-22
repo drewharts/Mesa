@@ -13,7 +13,8 @@ import MapboxSearch
 struct ListHeaderView: View {
     var body: some View {
         Text("LISTS")
-            .font(.headline)
+            .font(.subheadline)
+            .fontWeight(.medium)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.leading, 20)
             .foregroundStyle(.black)
@@ -146,10 +147,17 @@ struct ProfileViewListsView: View {
             if !profile.userLists.isEmpty {
                 ForEach(profile.userLists) { list in
                     VStack(alignment: .leading) {
-                        Text(list.name)
-                            .font(.headline)
-                            .foregroundColor(.black)
-                            .padding(.leading, 20)
+                        HStack {
+                            Text(list.name)
+                                .font(.callout)
+                                .fontWeight(.medium)
+                                .foregroundColor(.black)
+                                .padding(.leading, 20)
+//                            Text(list.places.count)
+//                                .font(.caption)
+//                                .foregroundStyle(.black)
+                        }
+
 
                         if let places = profile.placeListGMSPlaces[list.id] {
                             ScrollView(.horizontal, showsIndicators: false) {

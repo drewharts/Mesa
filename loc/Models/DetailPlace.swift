@@ -53,11 +53,11 @@ struct DetailPlace: Codable, Identifiable,Equatable {
         
     }
     
-    init(id: UUID, name: String, address: String?) {
+    init(id: UUID, name: String, address: String?, city: String?) {
         self.id = id
         self.name = name
         self.address = address
-        
+        self.city = city
         // Set all other optional properties to nil
         self.mapboxId = nil
         self.coordinate = nil
@@ -77,6 +77,7 @@ struct DetailPlace: Codable, Identifiable,Equatable {
     var id: UUID = UUID()
     var name: String
     var address: String?
+    var city: String?
     var mapboxId: String?
     var coordinate: GeoPoint?
     var categories: [String]?

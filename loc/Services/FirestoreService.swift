@@ -14,6 +14,30 @@ class FirestoreService {
     private let db = Firestore.firestore()
     private let storage = Storage.storage()
     
+    func addFieldToAllPlaces(fieldName: String, fieldValue: Any) {
+        let db = Firestore.firestore()
+
+        db.collection("places").getDocuments { (querySnapshot, err) in
+            if let err = err {
+                print("Error getting documents: \(err)")
+            } else {
+                for document in querySnapshot!.documents {
+                    // Update each document with the new field
+                    db.collection("places").document(document.documentID).updateData([
+                        fieldName: fieldValue
+                    ]) { err in
+                        if let err = err {
+                            print("Error updating document: \(err)")
+                        } else {
+                            print("Document updated!")
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    
     func fetchCurrentUser(userId: String, completion: @escaping (User?, Error?) -> Void) {
         db.collection("users").document(userId).getDocument { document, error in
             if let error = error {
@@ -281,6 +305,25 @@ class FirestoreService {
                 
                 let followerCount = snapshot.documents.count
                 completion(followerCount, nil) // Return the count and no error
+            }
+    }
+    func getNumberFollowing(forUserId userId: String, completion: @escaping (Int, Error?) -> Void) {
+        db.collection("following")
+            .whereField("followerId", isEqualTo: userId)
+            .getDocuments { snapshot, error in
+                if let error = error {
+                    completion(0, error) // Return 0 followers and the error
+                    return
+                }
+                
+                // If no error, count the documents in the snapshot
+                guard let snapshot = snapshot else {
+                    completion(0, nil) // No documents, no error
+                    return
+                }
+                
+                let followingCount = snapshot.documents.count
+                completion(followingCount, nil) // Return the count and no error
             }
     }
     

@@ -74,7 +74,7 @@ class SearchViewModel: ObservableObject {
             var detailPlace = DetailPlace(
                 id: uuid,
                 name: place.name,
-                address: place.address?.formattedAddress(style: .medium) ?? ""
+                address: place.address?.formattedAddress(style: .medium) ?? "", city: place.address?.place ?? ""
             )
             
             detailPlace.mapboxId = place.mapboxId

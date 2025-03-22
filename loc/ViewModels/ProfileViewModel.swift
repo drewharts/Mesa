@@ -32,6 +32,7 @@ class ProfileViewModel: ObservableObject {
     @Published var friends: [User] = []
     @Published var friendPlaces: [String: [DetailPlace]] = [:]
     @Published var followers: Int = 0
+    @Published var following: Int = 0
     
     @Published var placeSavers: [String: [User]] = [:]
     @Published var placeLookup: [String: DetailPlace] = [:]
@@ -46,6 +47,8 @@ class ProfileViewModel: ObservableObject {
     @Published var isLoading: Bool = true
     
     init(data: ProfileData, firestoreService: FirestoreService, userId: String) {
+        firestoreService.addFieldToAllPlaces(fieldName: "city", fieldValue: "")
+
         self.data = data
         self.firestoreService = firestoreService
         self.userId = userId
@@ -72,6 +75,7 @@ class ProfileViewModel: ObservableObject {
         }
         
         fetchFollowers(userId: userId)
+        fetchFollowing(userId: userId)
         
         dispatchGroup.enter()
         fetchFriends(userId: userId) {
@@ -633,6 +637,15 @@ class ProfileViewModel: ObservableObject {
             self.followers = count
         }
     }
+    func fetchFollowing(userId: String) {
+        firestoreService.getNumberFollowing(forUserId: userId) { (count, error) in
+            if let error = error {
+                print("Error fetching followers: \(error.localizedDescription)")
+                return
+            }
+            self.following = count
+        }
+    }
     
     func isPlaceInList(listId: UUID, placeId: String) -> Bool {
         guard let places = placeListGMSPlaces[listId] else {
@@ -681,7 +694,7 @@ class ProfileViewModel: ObservableObject {
                 return
             }
             let uuid = UUID(uuidString: place.id) ?? UUID()
-            var detailPlace = DetailPlace(id: uuid, name: place.name, address: place.address?.formattedAddress(style: .medium) ?? "")
+            var detailPlace = DetailPlace(id: uuid, name: place.name, address: place.address?.formattedAddress(style: .medium) ?? "",city: place.address?.place ?? "")
             detailPlace.mapboxId = place.mapboxId
             detailPlace.coordinate = GeoPoint(latitude: Double(place.coordinate.latitude), longitude: Double(place.coordinate.longitude))
             detailPlace.categories = place.categories

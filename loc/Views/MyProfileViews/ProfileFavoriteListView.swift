@@ -20,7 +20,8 @@ struct ProfileFavoriteListView: View {
                 showSearch = true
             } label: {
                 Text("FAVORITES")
-                    .font(.headline)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.leading, 20)
                     .foregroundStyle(.black)
@@ -51,7 +52,15 @@ struct ProfileFavoriteListView: View {
                         }
                         Text(place.name.prefix(15) ?? "Unknown")
                             .foregroundColor(.black)
+                            .fontWeight(.semibold)
                             .font(.footnote)
+                            .multilineTextAlignment(.center)
+                            .lineLimit(1)
+                            .frame(width: 85)
+                        Text(place.city?.prefix(15) ?? "")
+                            .foregroundColor(.black)
+                            .font(.caption)
+                            .fontWeight(.light)
                             .multilineTextAlignment(.center)
                             .lineLimit(1)
                             .frame(width: 85)
@@ -87,7 +96,6 @@ struct ProfileFavoriteListView: View {
             .padding(.horizontal, 20)
 
             Divider()
-                .padding(.top, 15)
                 .padding(.horizontal, 20)
         }
         // Present AddFavoritesView in a sheet
