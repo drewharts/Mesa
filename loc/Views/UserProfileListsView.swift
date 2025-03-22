@@ -74,18 +74,15 @@ struct UserProfileListsView: View {
     @ObservedObject var viewModel: UserProfileViewModel
     var placeLists: [PlaceList]
 
-    //slider that will show more and less lists based on distance from you
-    //long press restaurants for more info
-    //bring instagram photos to here
     var body: some View {
-        VStack(alignment: .leading) {
+        VStack(alignment: .leading, spacing: 20) {
             Text("LISTS")
-                .font(.headline)
+                .font(.subheadline)
+                .fontWeight(.medium)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.leading, 20)
+                .padding(.leading, 20) // Match Favorites
                 .foregroundStyle(.black)
-                .padding(.horizontal, 10)
-            
+
             if placeLists.isEmpty {
                 Text("No lists available")
                     .font(.subheadline)
