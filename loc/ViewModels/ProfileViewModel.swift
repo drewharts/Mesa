@@ -47,7 +47,6 @@ class ProfileViewModel: ObservableObject {
     @Published var isLoading: Bool = true
     
     init(data: ProfileData, firestoreService: FirestoreService, userId: String) {
-        firestoreService.addFieldToAllPlaces(fieldName: "city", fieldValue: "")
 
         self.data = data
         self.firestoreService = firestoreService

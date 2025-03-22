@@ -89,6 +89,8 @@ struct MyProfileHorizontalListPlaces: View {
     @Environment(\.presentationMode) var presentationMode // For dismissing the sheet
     
     var places: [DetailPlace]
+    // Dictionary to store a color for each place ID
+    @State private var placeColors: [UUID: Color] = [:]
     
     var body: some View {
         HStack {
@@ -109,7 +111,7 @@ struct MyProfileHorizontalListPlaces: View {
                         } else {
                             Circle()
                                 .frame(width: 85, height: 85)
-                                .foregroundColor(.gray)
+                                .foregroundColor(colorForPlace(place)) // Use consistent color
                         }
                         
                         Text(place.name ?? "Unknown")
@@ -124,6 +126,45 @@ struct MyProfileHorizontalListPlaces: View {
             }
         }
         .padding(.horizontal, 20)
+        .onAppear {
+            // Generate colors for all places when the view appears
+            for place in places {
+                if placeColors[place.id] == nil {
+                    placeColors[place.id] = randomColor()
+                }
+            }
+        }
+    }
+    
+    // Helper function to generate a random color
+    private func randomColor() -> Color {
+        Color(
+            red: Double.random(in: 0...1),
+            green: Double.random(in: 0...1),
+            blue: Double.random(in: 0...1)
+        )
+    }
+    
+    // Helper function to get the color for a place
+    private func colorForPlace(_ place: DetailPlace) -> Color {
+        placeColors[place.id] ?? .gray // Fallback to gray if something goes wrong
+    }
+}
+
+struct ProfileListDescription: View {
+    @State var list: PlaceList
+    
+    var body: some View {
+        HStack {
+            Text(list.name)
+                .font(.callout)
+                .fontWeight(.medium)
+                .foregroundColor(.black)
+                .padding(.leading, 20)
+            Text("\(list.places.count) \(list.places.count == 1 ? "place" : "places")")
+                .font(.caption)
+                .foregroundStyle(.black)
+        }
     }
 }
 
@@ -147,18 +188,8 @@ struct ProfileViewListsView: View {
             if !profile.userLists.isEmpty {
                 ForEach(profile.userLists) { list in
                     VStack(alignment: .leading) {
-                        HStack {
-                            Text(list.name)
-                                .font(.callout)
-                                .fontWeight(.medium)
-                                .foregroundColor(.black)
-                                .padding(.leading, 20)
-//                            Text(list.places.count)
-//                                .font(.caption)
-//                                .foregroundStyle(.black)
-                        }
-
-
+                        ProfileListDescription(list: list)
+                        
                         if let places = profile.placeListGMSPlaces[list.id] {
                             ScrollView(.horizontal, showsIndicators: false) {
                                 MyProfileHorizontalListPlaces(places: places)

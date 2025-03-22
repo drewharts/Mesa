@@ -77,36 +77,3 @@ struct UserProfileView: View {
         }
     }
 }
-
-// A simple view for displaying the user's place lists
-struct UserPlaceListsView: View {
-    let placeLists: [PlaceList]
-
-    var body: some View {
-        VStack(alignment: .leading) {
-            Text("Place Lists")
-                .font(.headline)
-                .padding(.leading, 20)
-            
-            if placeLists.isEmpty {
-                Text("No lists available")
-                    .font(.subheadline)
-                    .foregroundColor(.gray)
-                    .padding(.leading, 20)
-            } else {
-                ForEach(placeLists, id: \.name) { list in
-                    HStack {
-                        Text(list.name)
-                            .foregroundColor(.blue)
-                            .padding()
-                        Spacer()
-                    }
-                    .background(Color.white)
-                    .cornerRadius(10)
-                    .shadow(color: .black.opacity(0.1), radius: 3, x: 0, y: 2)
-                    .padding(.horizontal, 20)
-                }
-            }
-        }
-    }
-}

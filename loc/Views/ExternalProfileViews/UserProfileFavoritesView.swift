@@ -13,16 +13,16 @@ struct UserProfileFavoritesView: View {
     var userFavorites: [DetailPlace]
     var placeImages: [String: UIImage]
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
-    @Environment(\.presentationMode) var presentationMode // For dismissing the sheet
-
+    @Environment(\.presentationMode) var presentationMode
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             Text("FAVORITES")
-                .font(.headline)
-                .padding(.leading, 20)
+                .font(.subheadline)
+                .fontWeight(.medium)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.leading, 20) // Keep this consistent
                 .foregroundStyle(.black)
-
 
             if !userFavorites.isEmpty {
                 HStack {
@@ -41,9 +41,17 @@ struct UserProfileFavoritesView: View {
                                     .foregroundColor(.gray)
                             }
 
-                            Text(place.name.prefix(16) ?? "Unknown")
+                            Text(place.name.prefix(15) ?? "Unknown")
                                 .foregroundColor(.black)
+                                .fontWeight(.semibold)
                                 .font(.footnote)
+                                .multilineTextAlignment(.center)
+                                .lineLimit(1)
+                                .frame(width: 85)
+                            Text(place.city?.prefix(15) ?? "")
+                                .foregroundColor(.black)
+                                .font(.caption)
+                                .fontWeight(.light)
                                 .multilineTextAlignment(.center)
                                 .lineLimit(1)
                                 .frame(width: 85)
@@ -55,7 +63,7 @@ struct UserProfileFavoritesView: View {
                             presentationMode.wrappedValue.dismiss()
                         }
                     }
-                    Spacer() // Pushes everything to the left
+                    Spacer()
                 }
                 .padding(.horizontal, 20)
             } else {
