@@ -11,15 +11,16 @@ import MapboxSearch
 
 struct AddFavoritesCurrentFavoritesView: View {
     @EnvironmentObject var profile: ProfileViewModel
+    @EnvironmentObject var places: DetailPlaceViewModel
     var body: some View {
         if !profile.userFavorites.isEmpty {
             ScrollView(.horizontal) {
                 HStack(spacing: 16) {
-                    ForEach(profile.userFavorites, id: \.id) { place in
+                    ForEach(profile.userFavorites, id: \.self) { place in
                         // Blue box with the restaurant name and "X" icon
                         HStack {
                             // Restaurant name
-                            Text(place.name)
+                            Text(places.places[place]?.name ?? "")
                                 .foregroundColor(.white)
                                 .font(.headline)
                                 .padding(.leading, 8) // Add leading padding for text
@@ -29,7 +30,7 @@ struct AddFavoritesCurrentFavoritesView: View {
                             // "X" icon
                             Button(action: {
                                 // Remove the selected favorite
-                                profile.removeFavoritePlace(place: place)
+                                profile.removeFavoritePlace(place: places.places[place]!)
                             }) {
                                 Image(systemName: "xmark.circle.fill")
                                     .foregroundColor(.white)

@@ -26,13 +26,13 @@ struct ListHeaderView: View {
 struct PlaceListCellView: View {
     let list: PlaceList
     @EnvironmentObject var profile: ProfileViewModel
+    @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel // Add this
     @Binding var showingImagePicker: Bool
     
     var onPlaceSelected: ((SearchResult) -> Void)?
 
-
     var body: some View {
-        NavigationLink(destination: PlaceListView(places: profile.placeListGMSPlaces[list.id] ?? [])) {
+        NavigationLink(destination: PlaceListView(places: getPlacesForList())) {
             HStack {
                 if let image = profile.listImages[list.id] {
                     Image(uiImage: image)
@@ -41,9 +41,7 @@ struct PlaceListCellView: View {
                         .frame(width: 90, height: 90)
                         .clipped()
                         .cornerRadius(4)
-
                 } else {
-                    // Fallback placeholder
                     Rectangle()
                         .frame(width: 90, height: 90)
                         .foregroundColor(.gray)
@@ -55,7 +53,7 @@ struct PlaceListCellView: View {
                         .font(.body)
                         .foregroundStyle(.black)
 
-                    Text("\(profile.placeListGMSPlaces[list.id]?.count ?? 0) Places")
+                    Text("\(profile.placeListMBPlaces[list.id]?.count ?? 0) Places")
                         .font(.caption)
                         .foregroundStyle(.black)
                 }
@@ -81,15 +79,21 @@ struct PlaceListCellView: View {
             }
         }
     }
+    
+    // Helper to convert place IDs to DetailPlace objects
+    private func getPlacesForList() -> [DetailPlace] {
+        let placeIds = profile.placeListMBPlaces[list.id] ?? []
+        return placeIds.compactMap { detailPlaceViewModel.places[$0] }
+    }
 }
 
 struct MyProfileHorizontalListPlaces: View {
     @EnvironmentObject var viewModel: ProfileViewModel
+    @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel // Add this
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
-    @Environment(\.presentationMode) var presentationMode // For dismissing the sheet
+    @Environment(\.presentationMode) var presentationMode
     
-    var places: [DetailPlace]
-    // Dictionary to store a color for each place ID
+    let places: [DetailPlace] // Keep as [DetailPlace]
     @State private var placeColors: [UUID: Color] = [:]
     
     var body: some View {
@@ -101,7 +105,7 @@ struct MyProfileHorizontalListPlaces: View {
                     presentationMode.wrappedValue.dismiss()
                 }) {
                     VStack {
-                        if let image = viewModel.placeImages[place.id.uuidString ?? ""] {
+                        if let image = detailPlaceViewModel.placeImages[place.id.uuidString] { // Use DetailPlaceViewModel
                             Image(uiImage: image)
                                 .resizable()
                                 .scaledToFill()
@@ -111,7 +115,10 @@ struct MyProfileHorizontalListPlaces: View {
                         } else {
                             Circle()
                                 .frame(width: 85, height: 85)
-                                .foregroundColor(colorForPlace(place)) // Use consistent color
+                                .foregroundColor(colorForPlace(place))
+                                .onAppear {
+                                    detailPlaceViewModel.fetchPlaceImage(for: place.id.uuidString)
+                                }
                         }
                         
                         Text(place.name ?? "Unknown")
@@ -127,7 +134,6 @@ struct MyProfileHorizontalListPlaces: View {
         }
         .padding(.horizontal, 20)
         .onAppear {
-            // Generate colors for all places when the view appears
             for place in places {
                 if placeColors[place.id] == nil {
                     placeColors[place.id] = randomColor()
@@ -136,7 +142,6 @@ struct MyProfileHorizontalListPlaces: View {
         }
     }
     
-    // Helper function to generate a random color
     private func randomColor() -> Color {
         Color(
             red: Double.random(in: 0...1),
@@ -145,9 +150,8 @@ struct MyProfileHorizontalListPlaces: View {
         )
     }
     
-    // Helper function to get the color for a place
     private func colorForPlace(_ place: DetailPlace) -> Color {
-        placeColors[place.id] ?? .gray // Fallback to gray if something goes wrong
+        placeColors[place.id] ?? .gray
     }
 }
 
@@ -172,13 +176,11 @@ struct ProfileListDescription: View {
 struct ProfileViewListsView: View {
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
+    @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel // Add this
     @Environment(\.presentationMode) private var presentationMode
 
-    // State for handling image picker
     @State private var showingImagePicker = false
     @State private var inputImage: [UIImage] = []
-
-    // State to remember which list was selected for adding a photo
     @State private var selectedList: PlaceListViewModel?
     
     var body: some View {
@@ -186,13 +188,13 @@ struct ProfileViewListsView: View {
             ListHeaderView()
 
             if !profile.userLists.isEmpty {
-                ForEach(profile.userLists) { list in
+                ForEach(profile.userLists, id: \.id) { list in // Explicitly use id
                     VStack(alignment: .leading) {
                         ProfileListDescription(list: list)
                         
-                        if let places = profile.placeListGMSPlaces[list.id] {
+                        if let placeIds = profile.placeListMBPlaces[list.id] {
                             ScrollView(.horizontal, showsIndicators: false) {
-                                MyProfileHorizontalListPlaces(places: places)
+                                MyProfileHorizontalListPlaces(places: placeIds.compactMap { detailPlaceViewModel.places[$0] })
                             }
                         } else {
                             Text("Loading places...")
@@ -208,15 +210,13 @@ struct ProfileViewListsView: View {
             }
         }
         .padding(.vertical)
-        // Present the image picker as a sheet
         .sheet(isPresented: $showingImagePicker) {
             ImagePicker(images: $inputImage, selectionLimit: 1)
         }
-        .onChange(of: inputImage) {
+        .onChange(of: inputImage) { _ in
             guard let newImage = inputImage.first, let selectedList = selectedList else { return }
             selectedList.addPhotoToList(image: newImage)
-            profile.listImages[selectedList.placeList.id] = newImage  // Replace or set the image
-
+            profile.listImages[selectedList.placeList.id] = newImage
             inputImage = []
             self.selectedList = nil
         }

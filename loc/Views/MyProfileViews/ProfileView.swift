@@ -11,7 +11,7 @@ struct ProfileView: View {
     @EnvironmentObject var userSession: UserSession
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var profile: ProfileViewModel
-
+    @EnvironmentObject var placeVM: DetailPlaceViewModel
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
@@ -89,44 +89,45 @@ struct ProfileView: View {
     }
 }
 
-#if DEBUG
-struct ProfileView_Previews: PreviewProvider {
-    static var previews: some View {
-        // Mock dependencies
-        let mockLocationManager = LocationManager()
-        let mockFirestoreService = FirestoreService()
-        // Mock ProfileData
-        let profileData = ProfileData(
-            id: "kKEEK3Snx4Yirp7jIi9FMyzEUWF2",
-            firstName: "Drew",
-            lastName: "Hartsfield",
-            email: "drewharts8@gmail.com",
-            profilePhotoURL: URL(string: "https://lh3.googleusercontent.com/a/ACg8ocIRjc_nBuuY7tyQTXTDfuvvkhLNjKHnWiyyjRR0jMUxdjeLeTIJ=s200"),
-            phoneNumber: "123-456-7890",
-            fullName: "Drew Hartsfield"  // Computed or manually set
-        )
-        
-        // Mock ProfileViewModel
-        let profileVM = ProfileViewModel(
-            data: profileData,
-            firestoreService: mockFirestoreService,
-            userId: "kKEEK3Snx4Yirp7jIi9FMyzEUWF2"
-        )
-//        profileVM.followers = 42
-        
-        // Mock UserSession
-        let userSession = UserSession(firestoreService: mockFirestoreService)
-        
-        // Mock SelectedPlaceViewModel
-        let selectedPlaceVM = SelectedPlaceViewModel(locationManager: mockLocationManager, firestoreService: mockFirestoreService)
-
-        // Wrap in NavigationView for toolbar to work
-        NavigationView {
-            ProfileView()
-                .environmentObject(userSession)
-                .environmentObject(selectedPlaceVM)
-                .environmentObject(profileVM)
-        }
-    }
-}
-#endif
+//#if DEBUG
+//struct ProfileView_Previews: PreviewProvider {
+//    static var previews: some View {
+//        // Mock dependencies
+//        let mockLocationManager = LocationManager()
+//        let mockFirestoreService = FirestoreService()
+//        // Mock ProfileData
+//        let profileData = ProfileData(
+//            id: "kKEEK3Snx4Yirp7jIi9FMyzEUWF2",
+//            firstName: "Drew",
+//            lastName: "Hartsfield",
+//            email: "drewharts8@gmail.com",
+//            profilePhotoURL: URL(string: "https://lh3.googleusercontent.com/a/ACg8ocIRjc_nBuuY7tyQTXTDfuvvkhLNjKHnWiyyjRR0jMUxdjeLeTIJ=s200"),
+//            phoneNumber: "123-456-7890",
+//            fullName: "Drew Hartsfield"  // Computed or manually set
+//        )
+//        let detailPlaceVM = DetailPlaceViewModel(firestoreService: mockFirestoreService)
+//        // Mock ProfileViewModel
+//        let profileVM = ProfileViewModel(
+//            data: profileData,
+//            firestoreService: mockFirestoreService,
+//            detailPlaceViewModel: detailPlaceVM,
+//            userId: "kKEEK3Snx4Yirp7jIi9FMyzEUWF2"
+//        )
+////        profileVM.followers = 42
+//        
+//        // Mock UserSession
+//        let userSession = UserSession(firestoreService: mockFirestoreService)
+//        
+//        // Mock SelectedPlaceViewModel
+//        let selectedPlaceVM = SelectedPlaceViewModel(locationManager: mockLocationManager, firestoreService: mockFirestoreService)
+//
+//        // Wrap in NavigationView for toolbar to work
+//        NavigationView {
+//            ProfileView()
+//                .environmentObject(userSession)
+//                .environmentObject(selectedPlaceVM)
+//                .environmentObject(profileVM)
+//        }
+//    }
+//}
+//#endif

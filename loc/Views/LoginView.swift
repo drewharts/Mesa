@@ -8,12 +8,8 @@ import SwiftUI
 import GoogleSignInSwift
 
 struct LoginView: View {
+    @ObservedObject var viewModel: LoginViewModel
     @EnvironmentObject var userSession: UserSession
-    @StateObject var viewModel: LoginViewModel
-
-    init(viewModel: LoginViewModel) {
-        _viewModel = StateObject(wrappedValue: viewModel)
-    }
 
     var body: some View {
         ZStack {

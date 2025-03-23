@@ -10,7 +10,7 @@ import FirebaseFirestore
 import FirebaseStorage
 import GooglePlaces
 
-class FirestoreService {
+class FirestoreService: ObservableObject {
     private let db = Firestore.firestore()
     private let storage = Storage.storage()
     
