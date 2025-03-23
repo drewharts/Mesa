@@ -43,10 +43,9 @@ class DetailPlaceViewModel: ObservableObject {
         }
     }
 
-    // Fetch image for a place (similar to ProfileViewModel's fetchImage)
     func fetchPlaceImage(for placeId: String) {
         guard placeImages[placeId] == nil else { return }
-        firestoreService.fetchReviews(placeId: placeId, latestOnly: true) { [weak self] (reviews, error) in
+        firestoreService.fetchReviews(placeId: placeId, latestOnly: false) { [weak self] (reviews, error) in
             guard let self = self else { return }
             if let error = error {
                 print("Error fetching reviews for place \(placeId): \(error.localizedDescription)")
@@ -55,24 +54,44 @@ class DetailPlaceViewModel: ObservableObject {
                 }
                 return
             }
-            if let review = reviews?.first, let urlString = review.images.first, let url = URL(string: urlString) {
-                URLSession.shared.dataTask(with: url) { data, _, error in
-                    if let data = data, let image = UIImage(data: data) {
-                        DispatchQueue.main.async {
-                            self.placeImages[placeId] = image
-                        }
-                    } else {
-                        DispatchQueue.main.async {
-                            self.placeImages[placeId] = nil
+            if let reviews = reviews {
+                var imageURLs: [URL] = []
+                for review in reviews {
+                    for urlString in review.images {
+                        if let url = URL(string: urlString) {
+                            imageURLs.append(url)
                         }
                     }
-                }.resume()
+                }
+                self.downloadFirstSuccessfulImage(from: imageURLs, for: placeId)
             } else {
                 DispatchQueue.main.async {
                     self.placeImages[placeId] = nil
                 }
             }
         }
+    }
+
+    private func downloadFirstSuccessfulImage(from urls: [URL], for placeId: String) {
+        guard !urls.isEmpty else {
+            DispatchQueue.main.async {
+                self.placeImages[placeId] = nil
+            }
+            return
+        }
+        let url = urls[0]
+        URLSession.shared.dataTask(with: url) { [weak self] data, _, error in
+            guard let self = self else { return }
+            if let data = data, let image = UIImage(data: data) {
+                DispatchQueue.main.async {
+                    self.placeImages[placeId] = image
+                }
+            } else {
+                // Try the next URL if this one fails
+                let remainingURLs = Array(urls.dropFirst())
+                self.downloadFirstSuccessfulImage(from: remainingURLs, for: placeId)
+            }
+        }.resume()
     }
 
     // Update placeSavers when a user saves a place
