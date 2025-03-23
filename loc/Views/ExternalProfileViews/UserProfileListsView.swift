@@ -59,10 +59,16 @@ struct UserProfileListViewJustLists: View {
         ScrollView {
             ForEach(placeLists) { list in
                 VStack(alignment: .leading) {
-                    Text(list.name)
-                        .font(.headline)
-                        .foregroundColor(.black)
-                        .padding(.leading, 20)
+                    HStack {
+                        Text(list.name)
+                            .font(.callout)
+                            .fontWeight(.medium)
+                            .foregroundColor(.black)
+                            .padding(.leading, 20)
+                        Text("\(list.places.count) \(list.places.count == 1 ? "place" : "places")")
+                            .font(.caption)
+                            .foregroundStyle(.black)
+                    }
 
                     if let places = viewModel.placeListMapboxPlaces[list.id] {
                         ScrollView(.horizontal, showsIndicators: false) {
