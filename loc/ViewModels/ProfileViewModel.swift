@@ -224,6 +224,9 @@ class ProfileViewModel: ObservableObject {
                 let circlePath = UIBezierPath(ovalIn: rect)
                 circlePath.addClip()
                 image.draw(in: rect)
+                context.cgContext.setStrokeColor(UIColor.white.cgColor)
+                context.cgContext.setLineWidth(1.0)
+                context.cgContext.strokeEllipse(in: rect.insetBy(dx: 0.5, dy: 0.5))
                 context.cgContext.restoreGState()
             }
             
