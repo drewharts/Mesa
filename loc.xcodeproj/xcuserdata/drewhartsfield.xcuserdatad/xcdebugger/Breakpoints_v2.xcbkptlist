@@ -338,50 +338,6 @@
             endingLineNumber = "616"
             landmarkName = "uploadImageAndUpdatePlaceList(userId:placeList:image:completion:)"
             landmarkType = "7">
-            <Locations>
-               <Location
-                  uuid = "69BF4134-AAA2-44F7-9FC3-F36B3F802B19 - b663b94449dc5217"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "loc.FirestoreService.fetchPlace(withId: Swift.String, completion: (Swift.Result&lt;loc.DetailPlace, Swift.Error&gt;) -&gt; ()) -&gt; ()"
-                  moduleName = "loc.debug.dylib"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/drewhartsfield/Desktop/Repos/Loc/loc/Services/FirestoreService.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "616"
-                  endingLineNumber = "616">
-               </Location>
-               <Location
-                  uuid = "69BF4134-AAA2-44F7-9FC3-F36B3F802B19 - ca1de7f2a72eab56"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "closure #1 (Swift.Optional&lt;__C.FIRDocumentSnapshot&gt;, Swift.Optional&lt;Swift.Error&gt;) -&gt; () in loc.FirestoreService.fetchPlace(withId: Swift.String, completion: (Swift.Result&lt;loc.DetailPlace, Swift.Error&gt;) -&gt; ()) -&gt; ()"
-                  moduleName = "loc.debug.dylib"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/drewhartsfield/Desktop/Repos/Loc/loc/Services/FirestoreService.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "616"
-                  endingLineNumber = "616">
-               </Location>
-               <Location
-                  uuid = "69BF4134-AAA2-44F7-9FC3-F36B3F802B19 - 2bb6268f00843cfc"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "closure #1 (Swift.Optional&lt;Foundation.URL&gt;, Swift.Optional&lt;Swift.Error&gt;) -&gt; () in closure #1 (Swift.Optional&lt;FirebaseStorage.StorageMetadata&gt;, Swift.Optional&lt;Swift.Error&gt;) -&gt; () in loc.FirestoreService.uploadImageAndUpdatePlaceList(userId: Swift.String, placeList: loc.PlaceList, image: __C.UIImage, completion: (Swift.Optional&lt;Swift.Error&gt;) -&gt; ()) -&gt; ()"
-                  moduleName = "loc.debug.dylib"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/drewhartsfield/Desktop/Repos/Loc/loc/Services/FirestoreService.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "616"
-                  endingLineNumber = "616">
-               </Location>
-            </Locations>
          </BreakpointContent>
       </BreakpointProxy>
       <BreakpointProxy
@@ -398,36 +354,6 @@
             endingLineNumber = "587"
             landmarkName = "uploadImageAndUpdatePlaceList(userId:placeList:image:completion:)"
             landmarkType = "7">
-            <Locations>
-               <Location
-                  uuid = "1D8AEA6E-CE4E-4445-BEA0-902BBBF26823 - f5deb77f2687b35a"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "closure #1 (Swift.Optional&lt;Swift.Error&gt;) -&gt; () in closure #1 (Swift.Optional&lt;Foundation.URL&gt;, Swift.Optional&lt;Swift.Error&gt;) -&gt; () in closure #1 (Swift.Optional&lt;FirebaseStorage.StorageMetadata&gt;, Swift.Optional&lt;Swift.Error&gt;) -&gt; () in loc.FirestoreService.uploadImageAndUpdatePlaceList(userId: Swift.String, placeList: loc.PlaceList, image: __C.UIImage, completion: (Swift.Optional&lt;Swift.Error&gt;) -&gt; ()) -&gt; ()"
-                  moduleName = "loc.debug.dylib"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/drewhartsfield/Desktop/Repos/Loc/loc/Services/FirestoreService.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "587"
-                  endingLineNumber = "587">
-               </Location>
-               <Location
-                  uuid = "1D8AEA6E-CE4E-4445-BEA0-902BBBF26823 - 6d3d88121e8392d0"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "loc.FirestoreService.uploadImageAndUpdatePlaceList(userId: Swift.String, placeList: loc.PlaceList, image: __C.UIImage, completion: (Swift.Optional&lt;Swift.Error&gt;) -&gt; ()) -&gt; ()"
-                  moduleName = "loc.debug.dylib"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/drewhartsfield/Desktop/Repos/Loc/loc/Services/FirestoreService.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "587"
-                  endingLineNumber = "587">
-               </Location>
-            </Locations>
          </BreakpointContent>
       </BreakpointProxy>
       <BreakpointProxy

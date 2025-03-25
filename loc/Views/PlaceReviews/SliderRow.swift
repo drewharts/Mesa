@@ -44,7 +44,7 @@ struct SliderRow: View {
                             .frame(width: 30, height: 30)
                             .foregroundColor(.black)
                         
-                        Text(String(format: "%.00f", value)) // Display the value
+                        Text(String(format: "%.1f", value)) // Display the value
                             .font(.caption)
                             .foregroundColor(.white)
                     }
