@@ -73,6 +73,7 @@
 		B00311FE2CDACD8B002AE03B /* Services */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Services; sourceTree = "<group>"; };
 		B00311FF2CDACE01002AE03B /* Managers */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Managers; sourceTree = "<group>"; };
 		B0E659872D39D54300F8527E /* Extensions */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Extensions; sourceTree = "<group>"; };
+		B0EBD65F2D921E0D00E846D8 /* Migrations */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Migrations; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -143,6 +144,7 @@
 		B054DC5F2C42F5DA00C98088 /* loc */ = {
 			isa = PBXGroup;
 			children = (
+				B0EBD65F2D921E0D00E846D8 /* Migrations */,
 				B0E659872D39D54300F8527E /* Extensions */,
 				B00311FF2CDACE01002AE03B /* Managers */,
 				B00311FE2CDACD8B002AE03B /* Services */,
@@ -213,6 +215,7 @@
 				B00311FE2CDACD8B002AE03B /* Services */,
 				B00311FF2CDACE01002AE03B /* Managers */,
 				B0E659872D39D54300F8527E /* Extensions */,
+				B0EBD65F2D921E0D00E846D8 /* Migrations */,
 			);
 			name = loc;
 			packageProductDependencies = (
@@ -527,6 +530,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = loc/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Mesa;
 				INFOPLIST_KEY_NSLocationAlwaysUsageDescription = "Access your location in the background";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Show your location on the map";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -564,6 +568,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = loc/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Mesa;
 				INFOPLIST_KEY_NSLocationAlwaysUsageDescription = "Access your location in the background";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Show your location on the map";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;

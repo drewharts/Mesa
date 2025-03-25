@@ -1,11 +1,3 @@
-//
-//  locApp.swift
-//  loc
-//
-//  Created by Andrew Hartsfield II on 7/13/24.
-//
-
-
 import SwiftUI
 import GoogleMaps
 import GooglePlaces
@@ -18,7 +10,6 @@ import GoogleSignIn
 struct locApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     
-    // Declare @StateObject properties without initializers
     @StateObject private var firestoreService: FirestoreService
     @StateObject private var locationManager: LocationManager
     @StateObject private var detailPlaceVM: DetailPlaceViewModel
@@ -26,23 +17,19 @@ struct locApp: App {
     @StateObject private var userSession: UserSession
 
     init() {
-        // Configure Firebase and App Check
         FirebaseApp.configure()
         let providerFactory = AppAttestProviderFactory()
         AppCheck.setAppCheckProviderFactory(providerFactory)
 
-        // Initialize Google Maps and Places API keys
         GMSServices.provideAPIKey("AIzaSyD0E96aor4slzQTgo24aflktGJzbjgQkB4")
         GMSPlacesClient.provideAPIKey("AIzaSyD0E96aor4slzQTgo24aflktGJzbjgQkB4")
 
-        // Create shared instances with proper dependencies
         let firestore = FirestoreService()
         let location = LocationManager()
         let detailVM = DetailPlaceViewModel(firestoreService: firestore)
         let selectedVM = SelectedPlaceViewModel(locationManager: location, firestoreService: firestore)
         let userSess = UserSession(firestoreService: firestore, locationManager: location, detailPlaceVM: detailVM)
 
-        // Assign to @StateObject properties
         self._firestoreService = StateObject(wrappedValue: firestore)
         self._locationManager = StateObject(wrappedValue: location)
         self._detailPlaceVM = StateObject(wrappedValue: detailVM)
@@ -68,7 +55,6 @@ struct locApp: App {
     }
 }
 
-// AppDelegate and AppAttestProviderFactory remain unchanged
 class AppDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {

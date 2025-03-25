@@ -58,11 +58,11 @@ struct MinPlaceDetailView: View {
                     HStack(spacing: 4) {
                         Image(systemName: "circle.fill")
                             .font(.system(size: 8))
-                            .foregroundColor(viewModel.isOpen ? .green : .red)
+                            .foregroundColor(selectedPlaceVM.isRestaurantOpen ? .green : .red)
                         
-                        Text(viewModel.isOpen ? "Open" : "Closed")
+                        Text(selectedPlaceVM.isRestaurantOpen ? "Open" : "Closed")
                             .font(.subheadline)
-                            .foregroundColor(viewModel.isOpen ? .green : .red)
+                            .foregroundColor(selectedPlaceVM.isRestaurantOpen ? .green : .red)
                     }
                     
                     HStack(spacing: 4) {

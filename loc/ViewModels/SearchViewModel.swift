@@ -68,32 +68,8 @@ class SearchViewModel: ObservableObject {
                 return
             }
             
-            // If no existing place is found, create a new DetailPlace
-            let uuid = UUID(uuidString: place.id) ?? UUID()
-            
-            var detailPlace = DetailPlace(
-                id: uuid,
-                name: place.name,
-                address: place.address?.formattedAddress(style: .medium) ?? "", 
-                city: place.address?.place ?? ""
-            )
-            
-            detailPlace.mapboxId = place.mapboxId
-            detailPlace.coordinate = GeoPoint(
-                latitude: Double(place.coordinate.latitude),
-                longitude: Double(place.coordinate.longitude)
-            )
-            detailPlace.categories = place.categories
-            detailPlace.phone = place.metadata?.phone
-            detailPlace.rating = place.metadata?.rating ?? 0
-            detailPlace.description = place.metadata?.description ?? ""
-            detailPlace.priceLevel = place.metadata?.priceLevel
-            detailPlace.reservable = place.metadata?.reservable ?? false
-            detailPlace.servesBreakfast = place.metadata?.servesBreakfast ?? false
-            detailPlace.serversLunch = place.metadata?.servesLunch ?? false
-            detailPlace.serversDinner = place.metadata?.servesDinner ?? false
-            detailPlace.Instagram = place.metadata?.instagram
-            detailPlace.X = place.metadata?.twitter
+            // If no existing place is found, create a new DetailPlace using the initializer
+            var detailPlace = DetailPlace(from: place)
             
             // Optionally, save the new DetailPlace to Firestore if it doesn’t exist
             self?.firestoreService.addToAllPlaces(detailPlace: detailPlace) { error in
