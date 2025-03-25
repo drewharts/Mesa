@@ -107,34 +107,36 @@ class DetailPlaceViewModel: ObservableObject {
 
     // Convert SearchResult to DetailPlace and save it
     func searchResultToDetailPlace(place: SearchResult, completion: @escaping (DetailPlace) -> Void) {
-        firestoreService.findPlace(mapboxId: place.mapboxId!) { [weak self] existingDetailPlace, error in
+        // Safely unwrap mapboxId to avoid force-unwrap crash
+        guard let mapboxId = place.mapboxId else {
+            print("SearchResult has no mapboxId")
+            return
+        }
+        
+        firestoreService.findPlace(mapboxId: mapboxId) { [weak self] existingDetailPlace, error in
             guard let self = self else { return }
+            
+            // Log any errors from Firestore lookup
             if let error = error {
                 print("Error checking for existing place: \(error.localizedDescription)")
             }
+            
+            // If place exists, return it
             if let existingDetailPlace = existingDetailPlace {
                 completion(existingDetailPlace)
                 return
             }
-            let uuid = UUID(uuidString: place.id) ?? UUID()
-            var detailPlace = DetailPlace(id: uuid, name: place.name, address: place.address?.formattedAddress(style: .medium) ?? "", city: place.address?.place ?? "")
-            detailPlace.mapboxId = place.mapboxId
-            detailPlace.coordinate = GeoPoint(latitude: Double(place.coordinate.latitude), longitude: Double(place.coordinate.longitude))
-            detailPlace.categories = place.categories
-            detailPlace.phone = place.metadata?.phone
-            detailPlace.rating = place.metadata?.rating ?? 0
-            detailPlace.description = place.metadata?.description ?? ""
-            detailPlace.priceLevel = place.metadata?.priceLevel
-            detailPlace.reservable = place.metadata?.reservable ?? false
-            detailPlace.servesBreakfast = place.metadata?.servesBreakfast ?? false
-            detailPlace.serversLunch = place.metadata?.servesLunch ?? false
-            detailPlace.serversDinner = place.metadata?.servesDinner ?? false
-            detailPlace.Instagram = place.metadata?.instagram
-            detailPlace.X = place.metadata?.twitter
+            
+            // Create new DetailPlace using the new constructor
+            let detailPlace = DetailPlace(from: place)
+            
+            // Save to Firestore
             self.firestoreService.addToAllPlaces(detailPlace: detailPlace) { error in
                 if let error = error {
                     print("Error saving new place to Firestore: \(error.localizedDescription)")
                 }
+                
+                // Update local state and fetch image on main thread
                 DispatchQueue.main.async {
                     self.places[detailPlace.id.uuidString] = detailPlace
                     self.fetchPlaceImage(for: detailPlace.id.uuidString)
@@ -142,5 +144,4 @@ class DetailPlaceViewModel: ObservableObject {
                 }
             }
         }
-    }
-}
+    }}
