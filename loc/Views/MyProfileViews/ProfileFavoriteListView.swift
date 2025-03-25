@@ -9,6 +9,7 @@ import SwiftUI
 
 struct ProfileFavoriteListView: View {
     @EnvironmentObject var profile: ProfileViewModel
+    @EnvironmentObject var places: DetailPlaceViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @Environment(\.presentationMode) var presentationMode // For dismissing the sheet
     @State private var showSearch = false
@@ -33,10 +34,11 @@ struct ProfileFavoriteListView: View {
             // 2) Favorite places or placeholders
             HStack(spacing: 10) {
                 // Display existing favorites
-                ForEach(profile.userFavorites, id: \.id) { place in
+                ForEach(profile.userFavorites, id: \.self) { place in
+                    let detailPlace = places.places[place]
                     VStack {
                         ZStack {
-                            if let image = profile.favoritePlaceImages[place.id.uuidString] {
+                            if let image = places.placeImages[place] {
                                 Image(uiImage: image)
                                     .resizable()
                                     .scaledToFill()
@@ -50,14 +52,14 @@ struct ProfileFavoriteListView: View {
                                     .cornerRadius(50)
                             }
                         }
-                        Text(place.name.prefix(15) ?? "Unknown")
+                        Text(detailPlace?.name.prefix(15) ?? "Unknown")
                             .foregroundColor(.black)
                             .fontWeight(.semibold)
                             .font(.footnote)
                             .multilineTextAlignment(.center)
                             .lineLimit(1)
                             .frame(width: 85)
-                        Text(place.city?.prefix(15) ?? "")
+                        Text(detailPlace?.city?.prefix(15) ?? "")
                             .foregroundColor(.black)
                             .font(.caption)
                             .fontWeight(.light)
@@ -66,7 +68,7 @@ struct ProfileFavoriteListView: View {
                             .frame(width: 85)
                     }
                     .onTapGesture {
-                        selectedPlaceVM.selectedPlace = place
+                        selectedPlaceVM.selectedPlace = detailPlace
                         selectedPlaceVM.isDetailSheetPresented = true
                         presentationMode.wrappedValue.dismiss()
                     }

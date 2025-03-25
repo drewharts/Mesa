@@ -13,13 +13,14 @@ import SwiftUI
 class UserSession: ObservableObject {
     @Published var isUserLoggedIn: Bool = false
     @Published var profileViewModel: ProfileViewModel?
-    @Published var locationManager: LocationManager
     private let firestoreService: FirestoreService
+    private let locationManager: LocationManager
+    private let detailPlaceVM: DetailPlaceViewModel
     
-    init(firestoreService: FirestoreService) {
-        self.locationManager = LocationManager()
+    init(firestoreService: FirestoreService, locationManager: LocationManager, detailPlaceVM: DetailPlaceViewModel) {
         self.firestoreService = firestoreService
-        // Check if a user is already signed in
+        self.locationManager = locationManager
+        self.detailPlaceVM = detailPlaceVM
         if let currentUser = Auth.auth().currentUser {
             self.isUserLoggedIn = true
             fetchProfile(for: currentUser.uid)
@@ -31,11 +32,8 @@ class UserSession: ObservableObject {
 
     func logout() {
         do {
-            // Sign out from Firebase
             try Auth.auth().signOut()
             GIDSignIn.sharedInstance.signOut()
-            
-            // Update login state
             isUserLoggedIn = false
             profileViewModel = nil
         } catch let signOutError as NSError {
@@ -47,25 +45,22 @@ class UserSession: ObservableObject {
         let docRef = Firestore.firestore().collection("users").document(uid)
         docRef.getDocument { [weak self] (document, error) in
             guard let self = self else { return }
-
             if let error = error {
                 print("Error fetching profile: \(error.localizedDescription)")
                 return
             }
-
             guard let document = document, document.exists else {
                 print("No profile found for user \(uid)")
                 return
             }
-
             do {
-                // Decode the firestore data into ProfileData
                 let profileData = try document.data(as: ProfileData.self)
-                
-                // Create a ProfileViewModel from ProfileData
-                let profileViewModel = ProfileViewModel(data: profileData,firestoreService: self.firestoreService, userId: uid)
-                
-                // Assign it to our session
+                let profileViewModel = ProfileViewModel(
+                    data: profileData,
+                    firestoreService: self.firestoreService,
+                    detailPlaceViewModel: self.detailPlaceVM,
+                    userId: uid
+                )
                 self.profileViewModel = profileViewModel
             } catch {
                 print("Error decoding profile data: \(error)")
@@ -83,8 +78,6 @@ class UserSession: ObservableObject {
                 print("Firebase sign-in error: \(error.localizedDescription)")
                 return
             }
-            
-            // Sign-in successful
             self.isUserLoggedIn = true
             if let currentUser = Auth.auth().currentUser {
                 self.fetchProfile(for: currentUser.uid)

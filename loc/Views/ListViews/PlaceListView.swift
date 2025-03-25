@@ -14,11 +14,12 @@ import MapboxSearch
 
 struct WidePlaceView: View {
     @EnvironmentObject var profile: ProfileViewModel
+    @EnvironmentObject var places: DetailPlaceViewModel
     let place: DetailPlace
     
     var body: some View {
         HStack(spacing: 16) {
-            if let image = profile.favoritePlaceImages[place.id.uuidString] {
+            if let image = places.placeImages[place.id.uuidString] {
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFill()

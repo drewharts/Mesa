@@ -19,7 +19,7 @@ struct ListDescription: View {
                 .font(.body)
                 .foregroundStyle(Color.primary.opacity(1.0)) // Ensures black in light mode, white in dark mode
 
-            Text("\(profile.placeListGMSPlaces[placeList.id]?.count ?? 0) Places")
+            Text("\(profile.placeListMBPlaces[placeList.id]?.count ?? 0) Places")
                 .font(.caption)
                 .foregroundStyle(Color.secondary.opacity(1.0)) // Slightly lighter, adapts to mode
         }
@@ -48,7 +48,7 @@ struct ListSelectionRowView: View {
                 } else {
                     Rectangle()
                         .frame(width: 75, height: 75)
-                        .foregroundColor(.gray.opacity(0.2)) // Light gray placeholder
+                        .foregroundColor(.gray.opacity(0.2))
                         .cornerRadius(4)
                 }
 
@@ -57,13 +57,13 @@ struct ListSelectionRowView: View {
                 Spacer()
 
                 ZStack {
-                    if profile.placeListGMSPlaces[list.id]?.contains(where: { $0.id == place.id }) ?? false {
+                    if profile.placeListMBPlaces[list.id]?.contains(place.id.uuidString) ?? false {
                         Circle()
-                            .fill(Color.primary) // Use accent color for visibility
+                            .fill(Color.primary)
                             .frame(width: 24, height: 24)
                     } else {
                         Circle()
-                            .stroke(Color.primary, lineWidth: 2) // Adaptive outline
+                            .stroke(Color.primary, lineWidth: 2)
                             .frame(width: 24, height: 24)
                     }
                 }

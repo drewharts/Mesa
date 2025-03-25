@@ -11,22 +11,24 @@ import FirebaseAuth
 
 struct ContentView: View {
     @EnvironmentObject var userSession: UserSession
-    @ObservedObject var locationManager = LocationManager()
-    @StateObject private var selectedPlaceVM = SelectedPlaceViewModel(locationManager:  LocationManager(), firestoreService: FirestoreService())
+    @EnvironmentObject var locationManager: LocationManager
+    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
+    @EnvironmentObject var detailPlaceVM: DetailPlaceViewModel
+    @EnvironmentObject var firestoreService: FirestoreService
 
     var body: some View {
         if userSession.isUserLoggedIn {
             if let profileViewModel = userSession.profileViewModel {
-                // Once profileViewModel is available, inject it into the environment
                 MainView()
                     .environmentObject(profileViewModel)
                     .environmentObject(locationManager)
                     .environmentObject(selectedPlaceVM)
+                    .environmentObject(detailPlaceVM)
             } else {
                 ProgressView("Loading profile...")
             }
         } else {
-            LoginView(viewModel: LoginViewModel(firestoreService: FirestoreService()))
+            LoginView(viewModel: LoginViewModel(firestoreService: firestoreService))
         }
     }
 }
