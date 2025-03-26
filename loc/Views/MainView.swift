@@ -20,13 +20,13 @@ struct MainView: View {
     @StateObject private var userProfileViewModel = UserProfileViewModel()
     @EnvironmentObject var locationManager: LocationManager
 
-
     @FocusState private var searchIsFocused: Bool
     @State private var isSearchBarMinimized = true
     @State private var sheetHeight: CGFloat = 200
     @State private var minSheetHeight: CGFloat = 250
     @State private var maxSheetHeight: CGFloat = UIScreen.main.bounds.height * 0.85
     @State private var showProfileView = false
+    @State private var triggerFocus = false
 
     var body: some View {
         NavigationView {
@@ -38,23 +38,20 @@ struct MainView: View {
                 .ignoresSafeArea()
                 .edgesIgnoringSafeArea(.all)
 
-                // Top Controls (Search Bar and Profile Button)
                 VStack(spacing: 16) {
                     if isSearchBarMinimized {
                         HStack {
                             Spacer()
-
                             VStack(spacing: 10) {
-                                // Minimized Search Bar Button
                                 Button(action: {
                                     withAnimation {
-                                        // If the sheet is currently at max height, bring it back to the min height
                                         if sheetHeight == maxSheetHeight {
                                             sheetHeight = minSheetHeight
                                         }
-                                        
-                                        // Now handle showing the expanded search bar
                                         isSearchBarMinimized.toggle()
+                                    }
+                                    // Delay focus to ensure TextField is rendered
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                                         searchIsFocused = true
                                     }
                                 }) {
@@ -71,8 +68,7 @@ struct MainView: View {
                                 .padding(.top, 10)
                                 .padding(.trailing, 20)
 
-
-                                // Profile Button
+                                // Profile Button (unchanged)
                                 NavigationLink(destination: ProfileView(), isActive: $showProfileView) {
                                     Button(action: {
                                         showProfileView = true
@@ -105,8 +101,14 @@ struct MainView: View {
                             }
                         }
                     } else {
-                        // Expanded Search Bar
-                        SearchBar(text: $viewModel.searchText)
+                        TextField("Search here...", text: $viewModel.searchText)
+                            .padding()
+                            .background(Color.white)
+                            .cornerRadius(20)
+                            .shadow(color: .black.opacity(0.2), radius: 5, x: 0, y: 3)
+                            .padding(.horizontal, 20)
+                            .padding(.top, 20)
+                            .foregroundStyle(Color.gray)
                             .focused($searchIsFocused)
                             .padding(.horizontal, 20)
                             .padding(.top, 10)
@@ -135,7 +137,6 @@ struct MainView: View {
                             .padding(.horizontal, 20)
                             .padding(.top, 10)
                             .padding(.bottom, 50)
-
                         }
                     }
                 }
@@ -146,7 +147,6 @@ struct MainView: View {
                 }
                 .transition(.move(edge: .top).combined(with: .opacity))
 
-                // Bottom Sheet
                 if selectedPlaceVM.isDetailSheetPresented {
                     BottomSheetView(
                         isPresented: $selectedPlaceVM.isDetailSheetPresented,
@@ -158,7 +158,6 @@ struct MainView: View {
                             minSheetHeight: minSheetHeight
                         )
                         .frame(maxWidth: .infinity)
-//                        .id(selectedPlace.placeID) 
                     }
                 }
             }
@@ -171,7 +170,6 @@ struct MainView: View {
         .navigationViewStyle(StackNavigationViewStyle())
     }
 
-    // Handle the map tap to minimize the search bar
     private func handleMapTap() {
         withAnimation {
             searchIsFocused = false
