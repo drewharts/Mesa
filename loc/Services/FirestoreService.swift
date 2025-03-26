@@ -957,4 +957,23 @@ class FirestoreService: ObservableObject {
             completion(hasField, missingField, nil)
         }
     }
+
+    func updatePlace(detailPlace: DetailPlace, completion: @escaping (Error?) -> Void) {
+        let placeRef = db.collection("places").document(detailPlace.id.uuidString)
+        
+        do {
+            // Update the document with merge: true to only update specified fields
+            try placeRef.setData(from: detailPlace, merge: true) { error in
+                if let error = error {
+                    print("Error updating place: \(error.localizedDescription)")
+                } else {
+                    print("Successfully updated place with ID: \(detailPlace.id.uuidString)")
+                }
+                completion(error)
+            }
+        } catch {
+            print("Error encoding place data: \(error.localizedDescription)")
+            completion(error)
+        }
+    }
 }
