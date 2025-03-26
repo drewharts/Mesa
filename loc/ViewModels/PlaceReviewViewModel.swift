@@ -64,7 +64,8 @@ class PlaceReviewViewModel: ObservableObject {
                 favoriteDishes: favoriteDishes,
                 reviewText: reviewText,
                 timestamp: Date(),
-                images: [] // Will be updated after upload
+                images: [],
+                likes: 0
             )
 
             // Call FirestoreService and pass the result

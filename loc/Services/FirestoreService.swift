@@ -921,4 +921,40 @@ class FirestoreService: ObservableObject {
             completion(error)
         }
     }
+
+    func verifyOpenHoursField(completion: @escaping (Int, Int, Error?) -> Void) {
+        db.collection("places").getDocuments { snapshot, error in
+            if let error = error {
+                completion(0, 0, error)
+                return
+            }
+            
+            guard let documents = snapshot?.documents else {
+                completion(0, 0, nil)
+                return
+            }
+            
+            var hasField = 0
+            var missingField = 0
+            
+            for document in documents {
+                let data = document.data()
+                if data["OpenHours"] != nil {
+                    hasField += 1
+                } else {
+                    missingField += 1
+                    print("⚠️ Place missing OpenHours: \(document.documentID)")
+                }
+            }
+            
+            print("""
+                📊 OpenHours Field Verification:
+                - Places with OpenHours: \(hasField)
+                - Places missing OpenHours: \(missingField)
+                - Total places: \(hasField + missingField)
+                """)
+            
+            completion(hasField, missingField, nil)
+        }
+    }
 }
