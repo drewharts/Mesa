@@ -72,6 +72,7 @@ struct PlaceReviewsView: View {
 struct RestaruantReviewViewProfileInformation: View {
     let review: Review
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
+    @EnvironmentObject var profile: ProfileViewModel
 
     var body: some View {
         HStack(alignment: .center, spacing: 16) { // Increased spacing between photo and text
@@ -101,6 +102,22 @@ struct RestaruantReviewViewProfileInformation: View {
                 Text(formattedTimestamp(review.timestamp))
                     .font(.footnote)
                     .foregroundColor(.gray)
+                
+                // Add likes button and count
+                HStack(spacing: 4) {
+                    Button(action: {
+                        selectedPlaceVM.likeReview(review, userId: profile.userId)
+                    }) {
+                        Image(systemName: selectedPlaceVM.isReviewLiked(review.id) ? "heart.fill" : "heart")
+                            .foregroundColor(review.userId == profile.userId ? .gray : (selectedPlaceVM.isReviewLiked(review.id) ? .red : .gray))
+                            .opacity(review.userId == profile.userId ? 0.3 : 0.7)
+                    }
+                    .disabled(review.userId == profile.userId)
+                    
+                    Text("\(review.likes)")
+                        .font(.footnote)
+                        .foregroundColor(.gray)
+                }
             }
             Spacer()
         }

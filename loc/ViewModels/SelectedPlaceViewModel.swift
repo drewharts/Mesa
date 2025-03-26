@@ -38,6 +38,9 @@ class SelectedPlaceViewModel: ObservableObject {
     @Published private var profilePhotoLoadingStates: [String: LoadingState] = [:] // Loading states for profile photos
     @Published private var reviewLoadingStates: [String: LoadingState] = [:] // Loading states for reviews
 
+    // Add new property to track liked reviews
+    @Published private var likedReviews: Set<String> = []
+
     // MARK: - Loading State Enum
     enum LoadingState: Equatable {
         case idle
@@ -318,5 +321,72 @@ class SelectedPlaceViewModel: ObservableObject {
     
     func reviewLoadingState(forPlaceId placeId: String) -> LoadingState {
         return reviewLoadingStates[placeId] ?? .idle
+    }
+    
+    func likeReview(_ review: Review, userId: String) {
+        guard let placeId = selectedPlace?.id.uuidString else { return }
+        
+        // Prevent liking your own review
+        if review.userId == userId {
+            print("Cannot like your own review")
+            return
+        }
+        
+        firestoreService.hasUserLikedReview(userId: userId, reviewId: review.id) { [weak self] isLiked in
+            guard let self = self else { return }
+            
+            if isLiked {
+                // Unlike the review
+                self.firestoreService.unlikeReview(userId: userId, placeId: placeId, reviewId: review.id) { [weak self] result in
+                    guard let self = self else { return }
+                    
+                    switch result {
+                    case .success:
+                        DispatchQueue.main.async {
+                            if var currentReviews = self.placeReviews[placeId] {
+                                if let index = currentReviews.firstIndex(where: { $0.id == review.id }) {
+                                    // Create a new Review instance with updated likes count
+                                    var updatedReview = currentReviews[index]
+                                    updatedReview.likes = max(0, updatedReview.likes - 1)
+                                    currentReviews[index] = updatedReview
+                                    self.placeReviews[placeId] = currentReviews
+                                    self.likedReviews.remove(review.id)
+                                }
+                            }
+                        }
+                    case .failure(let error):
+                        print("Error unliking review: \(error.localizedDescription)")
+                    }
+                }
+            } else {
+                // Like the review
+                self.firestoreService.likeReview(userId: userId, placeId: placeId, reviewId: review.id) { [weak self] result in
+                    guard let self = self else { return }
+                    
+                    switch result {
+                    case .success:
+                        DispatchQueue.main.async {
+                            if var currentReviews = self.placeReviews[placeId] {
+                                if let index = currentReviews.firstIndex(where: { $0.id == review.id }) {
+                                    // Create a new Review instance with updated likes count
+                                    var updatedReview = currentReviews[index]
+                                    updatedReview.likes += 1
+                                    currentReviews[index] = updatedReview
+                                    self.placeReviews[placeId] = currentReviews
+                                    self.likedReviews.insert(review.id)
+                                }
+                            }
+                        }
+                    case .failure(let error):
+                        print("Error liking review: \(error.localizedDescription)")
+                    }
+                }
+            }
+        }
+    }
+
+    // Add helper method to check if a review is liked
+    func isReviewLiked(_ reviewId: String) -> Bool {
+        return likedReviews.contains(reviewId)
     }
 }

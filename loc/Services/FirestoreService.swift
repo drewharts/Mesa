@@ -976,4 +976,130 @@ class FirestoreService: ObservableObject {
             completion(error)
         }
     }
+
+    func likeReview(userId: String, placeId: String, reviewId: String, completion: @escaping (Result<Void, Error>) -> Void) {
+        let reviewRef = db.collection("places").document(placeId).collection("reviews").document(reviewId)
+        let likeRef = db.collection("reviewLikes").document("\(userId)_\(reviewId)")
+        
+        // Use a transaction to handle both the like count and the like record
+        db.runTransaction({ (transaction, errorPointer) -> Any? in
+            // First check if user has already liked
+            let likeDocument: DocumentSnapshot
+            do {
+                try likeDocument = transaction.getDocument(likeRef)
+                if likeDocument.exists {
+                    let error = NSError(domain: "AppErrorDomain", code: -1, userInfo: [
+                        NSLocalizedDescriptionKey: "User has already liked this review"
+                    ])
+                    errorPointer?.pointee = error
+                    return nil
+                }
+            } catch let fetchError as NSError {
+                errorPointer?.pointee = fetchError
+                return nil
+            }
+            
+            // Then get the review and increment likes
+            let reviewDocument: DocumentSnapshot
+            do {
+                try reviewDocument = transaction.getDocument(reviewRef)
+            } catch let fetchError as NSError {
+                errorPointer?.pointee = fetchError
+                return nil
+            }
+            
+            guard let oldLikes = reviewDocument.data()?["likes"] as? Int else {
+                let error = NSError(domain: "AppErrorDomain", code: -1, userInfo: [
+                    NSLocalizedDescriptionKey: "Unable to retrieve likes count"
+                ])
+                errorPointer?.pointee = error
+                return nil
+            }
+            
+            // Create the like record
+            let likeData: [String: Any] = [
+                "userId": userId,
+                "reviewId": reviewId,
+                "placeId": placeId,
+                "timestamp": FieldValue.serverTimestamp()
+            ]
+            
+            // Update both documents in the transaction
+            transaction.setData(likeData, forDocument: likeRef)
+            transaction.updateData(["likes": oldLikes + 1], forDocument: reviewRef)
+            
+            return nil
+        }) { (_, error) in
+            if let error = error {
+                completion(.failure(error))
+            } else {
+                completion(.success(()))
+            }
+        }
+    }
+
+    func unlikeReview(userId: String, placeId: String, reviewId: String, completion: @escaping (Result<Void, Error>) -> Void) {
+        let reviewRef = db.collection("places").document(placeId).collection("reviews").document(reviewId)
+        let likeRef = db.collection("reviewLikes").document("\(userId)_\(reviewId)")
+        
+        db.runTransaction({ (transaction, errorPointer) -> Any? in
+            // First verify the like exists
+            let likeDocument: DocumentSnapshot
+            do {
+                try likeDocument = transaction.getDocument(likeRef)
+                if !likeDocument.exists {
+                    let error = NSError(domain: "AppErrorDomain", code: -1, userInfo: [
+                        NSLocalizedDescriptionKey: "User has not liked this review"
+                    ])
+                    errorPointer?.pointee = error
+                    return nil
+                }
+            } catch let fetchError as NSError {
+                errorPointer?.pointee = fetchError
+                return nil
+            }
+            
+            // Then get the review and decrement likes
+            let reviewDocument: DocumentSnapshot
+            do {
+                try reviewDocument = transaction.getDocument(reviewRef)
+            } catch let fetchError as NSError {
+                errorPointer?.pointee = fetchError
+                return nil
+            }
+            
+            guard let oldLikes = reviewDocument.data()?["likes"] as? Int else {
+                let error = NSError(domain: "AppErrorDomain", code: -1, userInfo: [
+                    NSLocalizedDescriptionKey: "Unable to retrieve likes count"
+                ])
+                errorPointer?.pointee = error
+                return nil
+            }
+            
+            // Delete the like record and decrement the count
+            transaction.deleteDocument(likeRef)
+            transaction.updateData(["likes": max(0, oldLikes - 1)], forDocument: reviewRef)
+            
+            return nil
+        }) { (_, error) in
+            if let error = error {
+                completion(.failure(error))
+            } else {
+                completion(.success(()))
+            }
+        }
+    }
+
+    func hasUserLikedReview(userId: String, reviewId: String, completion: @escaping (Bool) -> Void) {
+        let likeRef = db.collection("reviewLikes").document("\(userId)_\(reviewId)")
+        
+        likeRef.getDocument { document, error in
+            if let error = error {
+                print("Error checking like status: \(error.localizedDescription)")
+                completion(false)
+                return
+            }
+            completion(document?.exists ?? false)
+        }
+    }
 }
