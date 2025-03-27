@@ -7,8 +7,3 @@
 
 
 import Foundation
-import GooglePlaces
-
-protocol ProfileDelegate: AnyObject {
-    func didAddPlace(toList listName: String, place: GMSPlace)
-}

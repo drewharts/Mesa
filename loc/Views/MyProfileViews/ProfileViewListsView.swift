@@ -7,7 +7,6 @@
 
 import SwiftUI
 import PhotosUI
-import GooglePlaces
 import MapboxSearch
 
 struct ListHeaderView: View {

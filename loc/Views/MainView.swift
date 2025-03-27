@@ -7,7 +7,6 @@
 
 
 import SwiftUI
-import GooglePlaces
 import FirebaseAuth
 import MapboxMaps
 import MapboxSearch

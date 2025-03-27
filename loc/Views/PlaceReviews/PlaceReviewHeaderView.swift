@@ -7,7 +7,6 @@
 
 
 import SwiftUI
-import GooglePlaces
 
 struct PlaceReviewHeaderView: View {
     let placeName: String
