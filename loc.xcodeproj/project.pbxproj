@@ -64,6 +64,7 @@
 		B061F1E22C581A3A00042CB0 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		B0821C672C641B9100BA126E /* CoreLocationUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreLocationUI.framework; path = System/Library/Frameworks/CoreLocationUI.framework; sourceTree = SDKROOT; };
 		B0A819142CEA5F2A0041416F /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
+		B0C31A862D94CB6400E481F4 /* .gitignore */ = {isa = PBXFileReference; lastKnownFileType = text; path = .gitignore; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -121,6 +122,7 @@
 		B054DC542C42F5DA00C98088 = {
 			isa = PBXGroup;
 			children = (
+				B0C31A862D94CB6400E481F4 /* .gitignore */,
 				B054DC5F2C42F5DA00C98088 /* loc */,
 				B054DC702C42F5DB00C98088 /* locTests */,
 				B054DC7A2C42F5DB00C98088 /* locUITests */,

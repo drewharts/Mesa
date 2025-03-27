@@ -23,4 +23,5 @@ struct Review: Codable {
     let reviewText: String // User's text review
     let timestamp: Date // Time the review was created
     var images: [String] // URLs for uploaded photos (optional)
+    var likes: Int // Changed from let to var
 }

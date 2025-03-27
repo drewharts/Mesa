@@ -13,6 +13,7 @@ import SwiftUI
 class UserSession: ObservableObject {
     @Published var isUserLoggedIn: Bool = false
     @Published var profileViewModel: ProfileViewModel?
+    @Published var currentUserId: String?
     private let firestoreService: FirestoreService
     private let locationManager: LocationManager
     private let detailPlaceVM: DetailPlaceViewModel
@@ -80,6 +81,7 @@ class UserSession: ObservableObject {
             }
             self.isUserLoggedIn = true
             if let currentUser = Auth.auth().currentUser {
+                self.currentUserId = currentUser.uid
                 self.fetchProfile(for: currentUser.uid)
             }
         }

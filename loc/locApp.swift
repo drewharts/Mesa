@@ -21,6 +21,15 @@ struct locApp: App {
         let providerFactory = AppAttestProviderFactory()
         AppCheck.setAppCheckProviderFactory(providerFactory)
 
+        // Run migrations right after Firebase configuration
+//        MigrationManager.shared.runMigrations { error in
+//            if let error = error {
+//                print("Migration failed: \(error.localizedDescription)")
+//            } else {
+//                print("Migrations completed successfully")
+//            }
+//        }
+
         GMSServices.provideAPIKey("AIzaSyD0E96aor4slzQTgo24aflktGJzbjgQkB4")
         GMSPlacesClient.provideAPIKey("AIzaSyD0E96aor4slzQTgo24aflktGJzbjgQkB4")
 

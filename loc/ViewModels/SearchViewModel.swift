@@ -62,16 +62,28 @@ class SearchViewModel: ObservableObject {
                 // If there's an error, proceed to create a new DetailPlace (or handle differently)
             }
             
-            if let existingDetailPlace = existingDetailPlace {
-                // If the place exists, return it immediately
-                completion(existingDetailPlace)
+            if var existingDetailPlace = existingDetailPlace {
+                // Update the OpenHours for the existing place
+                if let openHours = place.metadata?.openHours as? OpenHours {
+                    existingDetailPlace.OpenHours = DetailPlace.serializeOpenHours(openHours)
+                    
+                    // Update the place in Firestore
+                    self?.firestoreService.updatePlace(detailPlace: existingDetailPlace) { error in
+                        if let error = error {
+                            print("Error updating place hours in Firestore: \(error.localizedDescription)")
+                        }
+                        completion(existingDetailPlace)
+                    }
+                } else {
+                    completion(existingDetailPlace)
+                }
                 return
             }
             
             // If no existing place is found, create a new DetailPlace using the initializer
             var detailPlace = DetailPlace(from: place)
             
-            // Optionally, save the new DetailPlace to Firestore if it doesn’t exist
+            // Save the new DetailPlace to Firestore if it doesn't exist
             self?.firestoreService.addToAllPlaces(detailPlace: detailPlace) { error in
                 if let error = error {
                     print("Error saving new place to Firestore: \(error.localizedDescription)")
