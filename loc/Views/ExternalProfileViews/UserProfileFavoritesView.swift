@@ -13,6 +13,7 @@ struct UserProfileFavoritesView: View {
     var placeImages: [String: UIImage]
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @Environment(\.presentationMode) var presentationMode
+    @State private var placeColors: [UUID: Color] = [:]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -37,7 +38,7 @@ struct UserProfileFavoritesView: View {
                             } else {
                                 Circle()
                                     .frame(width: 85, height: 85)
-                                    .foregroundColor(.gray)
+                                    .foregroundColor(placeColors[place.id] ?? .gray)
                             }
 
                             Text(place.name.prefix(15) ?? "Unknown")
@@ -71,5 +72,20 @@ struct UserProfileFavoritesView: View {
                     .padding(.horizontal)
             }
         }
+        .onAppear {
+            for place in userFavorites {
+                if placeColors[place.id] == nil {
+                    placeColors[place.id] = randomColor()
+                }
+            }
+        }
+    }
+
+    private func randomColor() -> Color {
+        Color(
+            red: Double.random(in: 0...1),
+            green: Double.random(in: 0...1),
+            blue: Double.random(in: 0...1)
+        )
     }
 }
