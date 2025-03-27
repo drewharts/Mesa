@@ -21,6 +21,9 @@ class SelectedPlaceViewModel: ObservableObject {
                 loadData(for: place, currentLocation: currentLocation.coordinate)
                 loadReviews(for: place)
                 getPlacePhotos(for: place)
+                
+                // Clear previous likes when loading a new place
+                likedReviews.removeAll()
             }
         }
     }
@@ -142,6 +145,7 @@ class SelectedPlaceViewModel: ObservableObject {
                     if self.selectedPlace?.id.uuidString == placeId {
                         self.placeRating = self.calculateAvgRating(for: placeId)
                     }
+                    
                     fetchedReviews.forEach { review in
                         self.loadReviewPhotos(for: review)
                         self.loadProfilePhoto(for: review)
@@ -255,6 +259,25 @@ class SelectedPlaceViewModel: ObservableObject {
                 }
             }
         }.resume()
+    }
+    
+    // Update the method to take userId as parameter
+    func checkLikeStatuses(userId: String) {
+        guard let placeId = selectedPlace?.id.uuidString,
+              let reviews = placeReviews[placeId] else { return }
+        
+        // Clear previous likes before checking
+        likedReviews.removeAll()
+        
+        reviews.forEach { review in
+            firestoreService.hasUserLikedReview(userId: userId, reviewId: review.id) { [weak self] isLiked in
+                DispatchQueue.main.async {
+                    if isLiked {
+                        self?.likedReviews.insert(review.id)
+                    }
+                }
+            }
+        }
     }
     
     // MARK: - Public Methods
