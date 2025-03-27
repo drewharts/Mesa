@@ -6,7 +6,6 @@
 //
 
 import SwiftUI
-import GooglePlaces
 
 struct UpvoteFavDishesView: View {
     @Binding var favoriteDishes: [String]

@@ -6,9 +6,9 @@
 //
 
 import Foundation
-import GooglePlaces
 import MapboxSearch
 import CoreLocation
+import UIKit
 
 class SelectedPlaceViewModel: ObservableObject {
     private let firestoreService: FirestoreService

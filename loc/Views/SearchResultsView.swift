@@ -1,6 +1,5 @@
 import SwiftUI
 import MapboxSearch
-import GooglePlaces
 
 struct SearchResultsView: View {
     let placeResults: [SearchSuggestion]

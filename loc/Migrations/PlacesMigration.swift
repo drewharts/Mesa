@@ -2,7 +2,6 @@ import FirebaseFirestore
 import MapboxSearch
 import Foundation
 import FirebaseStorage
-import GooglePlaces
 
 class PlacesMigration: SearchEngineDelegate {
     func suggestionsUpdated(suggestions: [any MapboxSearch.SearchSuggestion], searchEngine: MapboxSearch.SearchEngine) {

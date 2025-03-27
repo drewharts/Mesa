@@ -1,6 +1,4 @@
 import SwiftUI
-import GoogleMaps
-import GooglePlaces
 import Firebase
 import FirebaseAuth
 import FirebaseAppCheck
@@ -29,10 +27,6 @@ struct locApp: App {
 //                print("Migrations completed successfully")
 //            }
 //        }
-
-        GMSServices.provideAPIKey("AIzaSyD0E96aor4slzQTgo24aflktGJzbjgQkB4")
-        GMSPlacesClient.provideAPIKey("AIzaSyD0E96aor4slzQTgo24aflktGJzbjgQkB4")
-
         let firestore = FirestoreService()
         let location = LocationManager()
         let detailVM = DetailPlaceViewModel(firestoreService: firestore)
