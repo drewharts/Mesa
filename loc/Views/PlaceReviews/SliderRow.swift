@@ -6,7 +6,6 @@
 //
 
 import SwiftUI
-import GooglePlaces
 
 struct SliderRow: View {
     let title: String

@@ -6,7 +6,6 @@
 //
 
 import SwiftUI
-import GooglePlaces
 
 struct UserProfileListViewJustListsPlaces: View {
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel

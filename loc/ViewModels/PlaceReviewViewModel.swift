@@ -7,7 +7,6 @@
 
 import SwiftUI
 import Combine
-import GooglePlaces
 import MapboxSearch
 
 class PlaceReviewViewModel: ObservableObject {

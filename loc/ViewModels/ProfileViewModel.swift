@@ -6,7 +6,6 @@
 
 import SwiftUI
 import Combine
-import GooglePlaces
 import MapboxSearch
 import Foundation
 import FirebaseFirestore
@@ -33,7 +32,6 @@ class ProfileViewModel: ObservableObject {
     
     @Published var placeAnnotationImages: [String: UIImage] = [:] // Still here for now
     
-    weak var delegate: ProfileDelegate?
     private let firestoreService: FirestoreService
     private let detailPlaceViewModel: DetailPlaceViewModel
     public let userId: String

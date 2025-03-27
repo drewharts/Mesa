@@ -9,7 +9,6 @@
 // PlaceListView.swift
 
 import SwiftUI
-import GooglePlaces
 import MapboxSearch
 
 struct WidePlaceView: View {

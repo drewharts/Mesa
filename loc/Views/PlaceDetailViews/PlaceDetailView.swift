@@ -6,7 +6,6 @@
 //
 
 import SwiftUI
-import GooglePlaces
 
 struct PlaceDetailView: View {
     @Binding var sheetHeight: CGFloat

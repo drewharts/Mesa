@@ -7,7 +7,6 @@
 
 import Foundation
 import SwiftUI
-import GooglePlaces
 
 struct ProfileData: Codable, Identifiable {
     let id: String

@@ -6,7 +6,6 @@
 //
 
 import SwiftUI
-import GooglePlaces
 import MapboxSearch
 
 struct UserProfileFavoritesView: View {

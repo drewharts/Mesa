@@ -6,7 +6,6 @@
 //
 
 import SwiftUI
-import GooglePlaces
 
 struct MaxPlaceDetailView: View {
     @ObservedObject var viewModel: PlaceDetailViewModel

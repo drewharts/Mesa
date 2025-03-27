@@ -6,7 +6,6 @@
 //
 
 import SwiftUI
-import GooglePlaces
 import MapKit
 import MapboxSearch
 
@@ -23,7 +22,6 @@ class PlaceDetailViewModel: ObservableObject {
 
     
     var placeIconURL: URL?
-    let googleplacesService = GooglePlacesService()
     /// Keep track of which place we've loaded, so we don’t fetch again unnecessarily.
     private(set) var currentPlaceID: String?
 
@@ -128,22 +126,6 @@ class PlaceDetailViewModel: ObservableObject {
             }
         }
     }
-    
-    
-    /// Checks if the restaurant is open right now using the recommended isOpen API.
-//    private func checkOpenStatus(for place: GMSPlace) {
-//        googleplacesService.isRestaurantOpenNow(placeID: place.placeID!) { [weak self] isOpen, error in
-//            DispatchQueue.main.async {
-//                guard let self = self else { return }
-//                if let error = error {
-//                    print("Error checking open status: \(error.localizedDescription)")
-//                    self.isOpen = false
-//                } else {
-//                    self.isOpen = isOpen
-//                }
-//            }
-//        }
-//    }
     
     // Some convenience methods
     func handleAddButton() {
