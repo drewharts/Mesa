@@ -70,8 +70,11 @@ class ProfileViewModel: ObservableObject {
         fetchFollowing(userId: userId)
         
         dispatchGroup.enter()
-        fetchFriends(userId: userId) {
-            dispatchGroup.leave()
+        fetchFriends(userId: userId) { [weak self] in
+            guard let self = self else { return }
+            self.fetchUserReviewedPlaces {
+                dispatchGroup.leave()
+            }
         }
         
         dispatchGroup.notify(queue: .main) {
@@ -457,6 +460,67 @@ class ProfileViewModel: ObservableObject {
     func fetchFollowing(userId: String) {
         firestoreService.getNumberFollowing(forUserId: userId) { [weak self] (count, _) in
             self?.following = count
+        }
+    }
+    
+    func fetchUserReviewedPlaces(completion: @escaping () -> Void = {}) {
+        guard let currentUser = currentUser else { 
+            completion()
+            return 
+        }
+        
+        // First fetch current user's reviews
+        firestoreService.fetchUserReviewPlaces(userId: userId, user: currentUser) { [weak self] places, error in
+            guard let self = self else { completion(); return }
+            
+            DispatchQueue.main.async {
+                if let places = places {
+                    for place in places {
+                        let placeId = place.id.uuidString
+                        self.detailPlaceViewModel.places[placeId] = place
+                        self.detailPlaceViewModel.updatePlaceSavers(placeId: placeId, user: currentUser)
+                        self.detailPlaceViewModel.fetchPlaceImage(for: placeId)
+                        let (image1, image2, image3) = self.getFirstThreeProfileImages(forKey: placeId)
+                        self.placeAnnotationImages[placeId] = self.combinedCircularImage(image1: image1, image2: image2, image3: image3)
+                    }
+                }
+                
+                // Then fetch reviews for each friend
+                var pendingTasks = self.friends.count
+                for friend in self.friends {
+                    self.fetchFriendReviewedPlaces(friend: friend) {
+                        pendingTasks -= 1
+                        if pendingTasks == 0 {
+                            completion()
+                        }
+                    }
+                }
+                
+                // If no friends, complete immediately
+                if self.friends.isEmpty {
+                    completion()
+                }
+            }
+        }
+    }
+    
+    private func fetchFriendReviewedPlaces(friend: User, completion: @escaping () -> Void) {
+        firestoreService.fetchUserReviewPlaces(userId: friend.id, user: friend) { [weak self] places, error in
+            guard let self = self else { completion(); return }
+            
+            DispatchQueue.main.async {
+                if let places = places {
+                    for place in places {
+                        let placeId = place.id.uuidString
+                        self.detailPlaceViewModel.places[placeId] = place
+                        self.detailPlaceViewModel.updatePlaceSavers(placeId: placeId, user: friend)
+                        self.detailPlaceViewModel.fetchPlaceImage(for: placeId)
+                        let (image1, image2, image3) = self.getFirstThreeProfileImages(forKey: placeId)
+                        self.placeAnnotationImages[placeId] = self.combinedCircularImage(image1: image1, image2: image2, image3: image3)
+                    }
+                }
+                completion()
+            }
         }
     }
 }

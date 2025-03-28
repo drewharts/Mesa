@@ -488,15 +488,27 @@ class FirestoreService: ObservableObject {
 
 
     func saveReview(_ review: Review, completion: @escaping (Result<Void, Error>) -> Void) {
-        // 1. Build a reference: places/{placeId}/reviews/{reviewId}
-        let docRef = db.collection("places")
-                       .document(review.placeId)
-                       .collection("reviews")
-                       .document(review.id)
+        // 1. Build references for both locations
+        let placeReviewRef = db.collection("places")
+                              .document(review.placeId)
+                              .collection("reviews")
+                              .document(review.id)
         
-        // 2. Encode the `Review` directly via setData(from:)
+        let userReviewRef = db.collection("users")
+                             .document(review.userId)
+                             .collection("reviews")
+                             .document(review.id)
+        
+        // 2. Encode the Review
         do {
-            try docRef.setData(from: review) { error in
+            let reviewData = try Firestore.Encoder().encode(review)
+            
+            // 3. Use a batch write to save to both locations atomically
+            let batch = db.batch()
+            batch.setData(reviewData, forDocument: placeReviewRef)
+            batch.setData(reviewData, forDocument: userReviewRef)
+            
+            batch.commit { error in
                 if let error = error {
                     completion(.failure(error))
                 } else {
@@ -1099,6 +1111,100 @@ class FirestoreService: ObservableObject {
                 return
             }
             completion(document?.exists ?? false)
+        }
+    }
+
+    func fetchUserReviews(userId: String, completion: @escaping ([Review]?, Error?) -> Void) {
+        // Reference to the user's reviews collection
+        let reviewsRef = db.collection("users")
+                          .document(userId)
+                          .collection("reviews")
+        
+        // Query the reviews, ordered by timestamp descending (most recent first)
+        reviewsRef.order(by: "timestamp", descending: true)
+                 .getDocuments { snapshot, error in
+            if let error = error {
+                print("Error fetching reviews for user \(userId): \(error.localizedDescription)")
+                completion(nil, error)
+                return
+            }
+            
+            guard let snapshot = snapshot else {
+                print("No snapshot returned for reviews of user \(userId)")
+                completion([], nil)
+                return
+            }
+            
+            // Decode each document into a Review object
+            let reviews: [Review] = snapshot.documents.compactMap { document in
+                try? document.data(as: Review.self)
+            }
+            
+            completion(reviews, nil)
+        }
+    }
+
+    func fetchUserReviewPlaces(userId: String, user: User, completion: @escaping ([DetailPlace]?, Error?) -> Void) {
+        // Reference to the user's reviews collection
+        let reviewsRef = db.collection("users")
+                          .document(userId)
+                          .collection("reviews")
+        
+        reviewsRef.getDocuments { [weak self] snapshot, error in
+            guard let self = self else { return }
+            
+            if let error = error {
+                print("Error fetching reviews for user \(userId): \(error.localizedDescription)")
+                completion(nil, error)
+                return
+            }
+            
+            guard let snapshot = snapshot else {
+                print("No reviews found for user \(userId)")
+                completion([], nil)
+                return
+            }
+            
+            // Get all reviews and their placeIds
+            let reviews = snapshot.documents.compactMap { document in
+                try? document.data(as: Review.self)
+            }
+            
+            let placeIds = Set(reviews.map { $0.placeId })
+            
+            // If no places found in reviews
+            if placeIds.isEmpty {
+                completion([], nil)
+                return
+            }
+            
+            var places: [DetailPlace] = []
+            let dispatchGroup = DispatchGroup()
+            var fetchError: Error?
+            
+            // Fetch each unique place
+            for placeId in placeIds {
+                dispatchGroup.enter()
+                
+                self.fetchPlace(withId: placeId) { result in
+                    switch result {
+                    case .success(let place):
+                        places.append(place)
+                    case .failure(let error):
+                        print("Error fetching place \(placeId): \(error.localizedDescription)")
+                        fetchError = error
+                    }
+                    dispatchGroup.leave()
+                }
+            }
+            
+            dispatchGroup.notify(queue: .main) {
+                if let error = fetchError {
+                    completion(nil, error)
+                } else {
+                    completion(places, nil)
+                }
+            }
         }
     }
 }

@@ -22,6 +22,8 @@
 		B054DC722C42F5DB00C98088 /* locTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B054DC712C42F5DB00C98088 /* locTests.swift */; };
 		B054DC7C2C42F5DB00C98088 /* locUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B054DC7B2C42F5DB00C98088 /* locUITests.swift */; };
 		B054DC7E2C42F5DB00C98088 /* locUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B054DC7D2C42F5DB00C98088 /* locUITestsLaunchTests.swift */; };
+		B054DC902C4301FB00C98088 /* GoogleMaps in Frameworks */ = {isa = PBXBuildFile; productRef = B054DC8F2C4301FB00C98088 /* GoogleMaps */; };
+		B061F1DE2C5815FA00042CB0 /* GooglePlaces in Frameworks */ = {isa = PBXBuildFile; productRef = B061F1DD2C5815FA00042CB0 /* GooglePlaces */; };
 		B0821C682C641B9100BA126E /* CoreLocationUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B0821C672C641B9100BA126E /* CoreLocationUI.framework */; settings = {ATTRIBUTES = (Required, ); }; };
 		B0A819152CEA5F2A0041416F /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = B0A819142CEA5F2A0041416F /* GoogleService-Info.plist */; };
 		B0A819182CEA5F970041416F /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = B0A819172CEA5F970041416F /* GoogleSignIn */; };
@@ -85,6 +87,7 @@
 				B0EDE3F22CF7985900F33939 /* FirebaseFirestore in Frameworks */,
 				B03AE5C52D5478A000B986B1 /* MapboxMaps in Frameworks */,
 				B0384E872CE2D19A00FC72F7 /* FirebaseAnalyticsWithoutAdIdSupport in Frameworks */,
+				B054DC902C4301FB00C98088 /* GoogleMaps in Frameworks */,
 				B0384E852CE2D19A00FC72F7 /* FirebaseAnalyticsOnDeviceConversion in Frameworks */,
 				B0384E8F2CE2D54200FC72F7 /* FirebaseAuth in Frameworks */,
 				B0EDE3F02CF7980100F33939 /* FirebaseFirestore in Frameworks */,
@@ -92,6 +95,7 @@
 				B03AE5C22D54785B00B986B1 /* MapboxSearchUI in Frameworks */,
 				B0384E892CE2D19A00FC72F7 /* FirebaseAppCheck in Frameworks */,
 				B0384E832CE2D19A00FC72F7 /* FirebaseAnalytics in Frameworks */,
+				B061F1DE2C5815FA00042CB0 /* GooglePlaces in Frameworks */,
 				B0E659862D37436000F8527E /* FirebaseStorage in Frameworks */,
 				B0384E8B2CE2D19A00FC72F7 /* FirebaseAppDistribution-Beta in Frameworks */,
 				B0A8191A2CEA5F970041416F /* GoogleSignInSwift in Frameworks */,
@@ -217,6 +221,8 @@
 			);
 			name = loc;
 			packageProductDependencies = (
+				B054DC8F2C4301FB00C98088 /* GoogleMaps */,
+				B061F1DD2C5815FA00042CB0 /* GooglePlaces */,
 				B0384E822CE2D19A00FC72F7 /* FirebaseAnalytics */,
 				B0384E842CE2D19A00FC72F7 /* FirebaseAnalyticsOnDeviceConversion */,
 				B0384E862CE2D19A00FC72F7 /* FirebaseAnalyticsWithoutAdIdSupport */,
@@ -305,6 +311,8 @@
 			);
 			mainGroup = B054DC542C42F5DA00C98088;
 			packageReferences = (
+				B054DC8A2C42F95A00C98088 /* XCRemoteSwiftPackageReference "ios-maps-sdk" */,
+				B061F1DC2C5290EF00042CB0 /* XCRemoteSwiftPackageReference "ios-places-sdk" */,
 				B0384E812CE2D19A00FC72F7 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
 				B0A819162CEA5F970041416F /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
 				B03AE5BE2D54785B00B986B1 /* XCRemoteSwiftPackageReference "search-ios" */,
@@ -725,6 +733,22 @@
 				version = "11.10.0-rc.1";
 			};
 		};
+		B054DC8A2C42F95A00C98088 /* XCRemoteSwiftPackageReference "ios-maps-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/googlemaps/ios-maps-sdk";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 9.0.0;
+			};
+		};
+		B061F1DC2C5290EF00042CB0 /* XCRemoteSwiftPackageReference "ios-places-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/googlemaps/ios-places-sdk";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 9.0.0;
+			};
+		};
 		B0A819162CEA5F970041416F /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/google/GoogleSignIn-iOS";
@@ -780,6 +804,16 @@
 			isa = XCSwiftPackageProductDependency;
 			package = B03AE5C32D5478A000B986B1 /* XCRemoteSwiftPackageReference "mapbox-maps-ios" */;
 			productName = MapboxMaps;
+		};
+		B054DC8F2C4301FB00C98088 /* GoogleMaps */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B054DC8A2C42F95A00C98088 /* XCRemoteSwiftPackageReference "ios-maps-sdk" */;
+			productName = GoogleMaps;
+		};
+		B061F1DD2C5815FA00042CB0 /* GooglePlaces */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B061F1DC2C5290EF00042CB0 /* XCRemoteSwiftPackageReference "ios-places-sdk" */;
+			productName = GooglePlaces;
 		};
 		B0A819172CEA5F970041416F /* GoogleSignIn */ = {
 			isa = XCSwiftPackageProductDependency;

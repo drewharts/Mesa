@@ -10,6 +10,7 @@ import SwiftUI
 struct UserProfileListViewJustListsPlaces: View {
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @Environment(\.presentationMode) var presentationMode
+    @State private var placeColors: [UUID: Color] = [:]
 
     @ObservedObject var viewModel: UserProfileViewModel
     var places: [DetailPlace]
@@ -32,7 +33,7 @@ struct UserProfileListViewJustListsPlaces: View {
                         } else {
                             Circle()
                                 .frame(width: 85, height: 85)
-                                .foregroundColor(.gray)
+                                .foregroundColor(placeColors[place.id] ?? .gray)
                         }
                         
                         Text(place.name ?? "Unknown")
@@ -47,6 +48,21 @@ struct UserProfileListViewJustListsPlaces: View {
             }
         }
         .padding(.horizontal, 20)
+        .onAppear {
+            for place in places {
+                if placeColors[place.id] == nil {
+                    placeColors[place.id] = randomColor()
+                }
+            }
+        }
+    }
+    
+    private func randomColor() -> Color {
+        Color(
+            red: Double.random(in: 0...1),
+            green: Double.random(in: 0...1),
+            blue: Double.random(in: 0...1)
+        )
     }
 }
 

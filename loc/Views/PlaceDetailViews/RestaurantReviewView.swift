@@ -10,6 +10,7 @@ import SwiftUI
 struct PlaceReviewsView: View {
     @Binding var selectedImage: UIImage?
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
+    @EnvironmentObject var profile: ProfileViewModel
 
     var body: some View {
         ScrollView {
@@ -66,6 +67,10 @@ struct PlaceReviewsView: View {
         .padding(.horizontal, -50)
         .navigationTitle("Reviews")
         .ignoresSafeArea(.all, edges: .all)
+        .onAppear {
+            // Check like statuses when view appears
+            selectedPlaceVM.checkLikeStatuses(userId: profile.userId)
+        }
     }
 }
 
@@ -147,7 +152,7 @@ struct RestaruantReviewViewProfileInformation: View {
     }
 }
 
-struct RestuarantReviewViewMustOrder: View {
+struct RestaruantReviewViewMustOrder: View {
     let review: Review
     
     var body: some View {
@@ -181,6 +186,7 @@ struct RestaurantReviewView: View {
     let review: Review
     @Binding var selectedImage: UIImage?
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
+    @EnvironmentObject var profile: ProfileViewModel
 
     var body: some View {
         VStack(spacing: 16) {
@@ -197,7 +203,7 @@ struct RestaurantReviewView: View {
             .padding(.bottom, 15)
             
             // Must Order Section
-            RestuarantReviewViewMustOrder(review: review)
+            RestaruantReviewViewMustOrder(review: review)
             
             // Review Text
             Text(review.reviewText)
@@ -255,6 +261,10 @@ struct RestaurantReviewView: View {
             }
         }
         .padding(.vertical)
+        .onAppear {
+            // Check like statuses using the proper userId from profile
+            selectedPlaceVM.checkLikeStatuses(userId: profile.userId)
+        }
     }
 }
 
