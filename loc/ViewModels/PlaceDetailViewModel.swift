@@ -139,7 +139,8 @@ class PlaceDetailViewModel: ObservableObject {
     func getRestaurantType(for place: DetailPlace) -> String? {
         let recognizedTypes = [
             "American", "Japanese", "Korean", "Mexican",
-            "Italian", "Chinese", "Greek", "Vietnamese"
+            "Italian", "Chinese", "Greek", "Vietnamese",
+            "Barbecue", "Indian"
         ]
         //TODO: this may need some revision at a later date
         guard let placeTypes = place.categories else { return nil }
