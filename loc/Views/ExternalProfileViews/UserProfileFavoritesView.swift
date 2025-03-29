@@ -93,7 +93,7 @@ struct UserProfileFavoritesView: View {
                 }
                 .padding(.horizontal, 20)
             }
-            .frame(height: 120)
+            .frame(height: userFavorites.isEmpty ? 85 : 120)
         }
         .onAppear {
             for place in userFavorites {
