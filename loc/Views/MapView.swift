@@ -21,7 +21,7 @@ struct MapView: View {
     var body: some View {
         let currentCoords = locationManager.currentLocation?.coordinate ?? defaultCenter
         
-        if profile.isLoading {
+        if profile.isLoading || profile.profilePhoto == nil {
             ProgressView("Loading places…")
         } else {
             Map(viewport: $viewport) {

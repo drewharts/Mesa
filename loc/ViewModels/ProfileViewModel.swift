@@ -33,6 +33,7 @@ class ProfileViewModel: ObservableObject {
     @Published var placeAnnotationImages: [String: UIImage] = [:] // Still here for now
     
     private let firestoreService: FirestoreService
+    private let profileFirestoreService = ProfileFirestoreService()
     private let detailPlaceViewModel: DetailPlaceViewModel
     public let userId: String
     private let mapboxSearchService = MapboxSearchService()
@@ -82,6 +83,58 @@ class ProfileViewModel: ObservableObject {
         }
     }
     
+    func changeProfilePhoto(_ newImage: UIImage) async {
+        // Crop the image to a square
+        let squareImage = cropToSquare(newImage)
+        
+        do {
+            let newPhotoURL = try await firestoreService.updateProfilePhoto(userId: userId, image: squareImage)
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                self.profilePhotoImage = squareImage
+                self.profilePhoto = Image(uiImage: squareImage)
+                self.data.profilePhotoURL = newPhotoURL
+                
+                // Update profile picture across all reviews
+                self.firestoreService.updateProfilePictureAcrossAllReviews(userId: self.userId, newProfilePictureURL: newPhotoURL.absoluteString) { error in
+                    if let error = error {
+                        print("Error updating profile pictures in reviews: \(error.localizedDescription)")
+                        // You might want to show an alert to the user here
+                    } else {
+                        print("Successfully updated profile pictures across all reviews")
+                    }
+                }
+            }
+        } catch {
+            print("Error updating profile photo: \(error)")
+            // You might want to handle the error here, perhaps show an alert to the user
+        }
+    }
+    
+    private func cropToSquare(_ image: UIImage) -> UIImage {
+        let cgImage = image.cgImage!
+        let contextImage = UIImage(cgImage: cgImage)
+        let contextSize = contextImage.size
+        
+        // Get the size of the square
+        let size = min(contextSize.width, contextSize.height)
+        
+        // Calculate the crop rect
+        let x = (contextSize.width - size) / 2
+        let y = (contextSize.height - size) / 2
+        let cropRect = CGRect(x: x * image.scale,
+                            y: y * image.scale,
+                            width: size * image.scale,
+                            height: size * image.scale)
+        
+        // Create the cropped image
+        if let croppedCGImage = cgImage.cropping(to: cropRect) {
+            return UIImage(cgImage: croppedCGImage, scale: image.scale, orientation: image.imageOrientation)
+        }
+        
+        return image
+    }
+    
     func toggleFollowUser(userId: String) {
         if let friendIndex = friends.firstIndex(where: { $0.id == userId }) {
             let friendToRemove = friends[friendIndex]
@@ -101,12 +154,12 @@ class ProfileViewModel: ObservableObject {
                         guard let self = self else { return }
                         self.friends.append(userToFollow)
                         if let photoURL = userToFollow.profilePhotoURL {
-                            self.loadUserProfilePhoto(from: photoURL, forUserId: userId) {
+                            self.loadUserProfilePhoto(from: photoURL, forUserId: userToFollow.id) {
                                 self.fetchFriendFavPlaces(friend: userToFollow) {}
                                 self.fetchAndProcessFriendLists(friend: userToFollow) {}
                             }
                         } else {
-                            self.userProfilePhotos[userId] = nil
+                            self.userProfilePhotos[userToFollow.id] = nil
                             self.fetchFriendFavPlaces(friend: userToFollow) {}
                             self.fetchAndProcessFriendLists(friend: userToFollow) {}
                         }
@@ -140,15 +193,38 @@ class ProfileViewModel: ObservableObject {
             DispatchQueue.main.async {
                 let favoriteIds = favorites?.map { $0.id.uuidString } ?? []
                 self.userFavorites = favoriteIds
+                
+                // Create a dispatch group to track all profile photo loads
+                let group = DispatchGroup()
+                
                 for place in favorites ?? [] {
                     let placeId = place.id.uuidString
                     self.detailPlaceViewModel.places[placeId] = place
                     self.detailPlaceViewModel.updatePlaceSavers(placeId: placeId, user: user)
                     self.detailPlaceViewModel.fetchPlaceImage(for: placeId)
-                    let (image1, image2, image3) = self.getFirstThreeProfileImages(forKey: placeId)
-                    self.placeAnnotationImages[placeId] = self.combinedCircularImage(image1: image1, image2: image2, image3: image3)
+                    
+                    // Load profile photos for all users who saved this place
+                    if let users = self.detailPlaceViewModel.placeSavers[placeId] {
+                        for user in users {
+                            if let photoURL = user.profilePhotoURL {
+                                group.enter()
+                                self.loadUserProfilePhoto(from: photoURL, forUserId: user.id) {
+                                    group.leave()
+                                }
+                            }
+                        }
+                    }
                 }
-                completion()
+                
+                // Once all profile photos are loaded, update the annotation images
+                group.notify(queue: .main) {
+                    for place in favorites ?? [] {
+                        let placeId = place.id.uuidString
+                        let (image1, image2, image3) = self.getFirstThreeProfileImages(forKey: placeId)
+                        self.placeAnnotationImages[placeId] = self.combinedCircularImage(image1: image1, image2: image2, image3: image3)
+                    }
+                    completion()
+                }
             }
         }
     }
@@ -200,11 +276,21 @@ class ProfileViewModel: ObservableObject {
     
     public func getFirstThreeProfileImages(forKey key: String) -> (UIImage?, UIImage?, UIImage?) {
         guard let users = detailPlaceViewModel.placeSavers[key] else {
-            print("No users found for place ID: \(key)")
-            return (nil, nil, nil)
+            // Create default profile images when no users are found
+            let config = UIImage.SymbolConfiguration(pointSize: 40)
+            let defaultImage = UIImage(systemName: "person.circle.fill", withConfiguration: config)?.withTintColor(.gray, renderingMode: .alwaysOriginal)
+            return (defaultImage, defaultImage, defaultImage)
         }
         let firstThreeUsers = users.prefix(3)
-        let images = firstThreeUsers.map { self.userProfilePhotos[$0.id] ?? UIImage(named: "defaultProfile") }
+        let images = firstThreeUsers.map { user in
+            if let photo = self.userProfilePhotos[user.id] {
+                return photo
+            } else {
+                // Use system image as fallback
+                let config = UIImage.SymbolConfiguration(pointSize: 40)
+                return (UIImage(systemName: "person.circle.fill", withConfiguration: config)?.withTintColor(.gray, renderingMode: .alwaysOriginal))!
+            }
+        }
         let paddedImages = (images + [nil, nil, nil]).prefix(3)
         return (paddedImages[0], paddedImages[1], paddedImages[2])
     }
@@ -436,13 +522,13 @@ class ProfileViewModel: ObservableObject {
     }
     
     // Helpers
-    private func loadUserProfilePhoto(from url: URL, forUserId userId: String, completion: (() -> Void)? = nil) {
-        if userProfilePhotos[userId] != nil { completion?(); return }
+    private func loadUserProfilePhoto(from url: URL, forUserId userId: String, completion: @escaping () -> Void) {
+        if userProfilePhotos[userId] != nil { completion(); return }
         URLSession.shared.dataTask(with: url) { [weak self] data, _, error in
-            guard let self = self else { completion?(); return }
+            guard let self = self else { completion(); return }
             DispatchQueue.main.async {
                 self.userProfilePhotos[userId] = data.flatMap { UIImage(data: $0) }
-                completion?()
+                completion()
             }
         }.resume()
     }
@@ -522,5 +608,41 @@ class ProfileViewModel: ObservableObject {
                 completion()
             }
         }
+    }
+    
+    private func loadUserProfilePhoto(from urlString: String, forUserId userId: String, completion: @escaping () -> Void) {
+        guard let url = URL(string: urlString) else {
+            self.userProfilePhotos[userId] = nil
+            completion()
+            return
+        }
+        
+        URLSession.shared.dataTask(with: url) { [weak self] data, response, error in
+            guard let self = self else { return }
+            
+            DispatchQueue.main.async {
+                if let error = error {
+                    print("Error loading profile photo: \(error)")
+                    self.userProfilePhotos[userId] = nil
+                    completion()
+                    return
+                }
+                
+                if let data = data, let image = UIImage(data: data) {
+                    // Crop the image to a square before storing
+                    let squareImage = self.cropToSquare(image)
+                    self.userProfilePhotos[userId] = squareImage
+                    
+                    // If this is the current user's profile photo, update the main profile photo
+                    if userId == self.userId {
+                        self.profilePhotoImage = squareImage
+                        self.profilePhoto = Image(uiImage: squareImage)
+                    }
+                } else {
+                    self.userProfilePhotos[userId] = nil
+                }
+                completion()
+            }
+        }.resume()
     }
 }
