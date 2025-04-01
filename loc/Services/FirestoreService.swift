@@ -527,10 +527,11 @@ class FirestoreService: ObservableObject {
 
     func searchUsers(query: String, completion: @escaping ([ProfileData]?, Error?) -> Void) {
         let usersRef = db.collection("users")
+        let queryLower = query.lowercased()
         
         // Perform a name search using Firestore's `whereField` with `>=` and `<=` for simple prefix matching
-        usersRef.whereField("fullName", isGreaterThanOrEqualTo: query)
-                .whereField("fullName", isLessThanOrEqualTo: query + "\u{f8ff}")
+        usersRef.whereField("fullNameLower", isGreaterThanOrEqualTo: queryLower)
+                .whereField("fullNameLower", isLessThanOrEqualTo: queryLower + "\u{f8ff}")
                 .getDocuments { snapshot, error in
                     if let error = error {
                         completion(nil, error)

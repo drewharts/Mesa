@@ -83,6 +83,7 @@ class LoginViewModel: ObservableObject {
             email: user.profile?.email ?? "",
             profilePhotoURL: user.profile?.imageURL(withDimension: 200),
             phoneNumber: "",
+            fullNameLower: "\(user.profile?.givenName ?? "").lowercased() \(user.profile?.familyName ?? "").lowercased()",
             fullName: "\(user.profile?.givenName ?? "") \(user.profile?.familyName ?? "")"
         )
         let detailPlaceVM = DetailPlaceViewModel(firestoreService: firestoreService.self)
