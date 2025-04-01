@@ -202,29 +202,10 @@ class ProfileViewModel: ObservableObject {
                     self.detailPlaceViewModel.places[placeId] = place
                     self.detailPlaceViewModel.updatePlaceSavers(placeId: placeId, user: user)
                     self.detailPlaceViewModel.fetchPlaceImage(for: placeId)
-                    
-                    // Load profile photos for all users who saved this place
-                    if let users = self.detailPlaceViewModel.placeSavers[placeId] {
-                        for user in users {
-                            if let photoURL = user.profilePhotoURL {
-                                group.enter()
-                                self.loadUserProfilePhoto(from: photoURL, forUserId: user.id) {
-                                    group.leave()
-                                }
-                            }
-                        }
-                    }
+                    self.updatePlaceAnnotationImages(for: placeId)
                 }
                 
-                // Once all profile photos are loaded, update the annotation images
-                group.notify(queue: .main) {
-                    for place in favorites ?? [] {
-                        let placeId = place.id.uuidString
-                        let (image1, image2, image3) = self.getFirstThreeProfileImages(forKey: placeId)
-                        self.placeAnnotationImages[placeId] = self.combinedCircularImage(image1: image1, image2: image2, image3: image3)
-                    }
-                    completion()
-                }
+                completion()
             }
         }
     }
@@ -262,8 +243,7 @@ class ProfileViewModel: ObservableObject {
                     self.detailPlaceViewModel.places[placeId] = place
                     self.detailPlaceViewModel.updatePlaceSavers(placeId: placeId, user: friend)
                     self.detailPlaceViewModel.fetchPlaceImage(for: placeId)
-                    let (image1, image2, image3) = self.getFirstThreeProfileImages(forKey: placeId)
-                    self.placeAnnotationImages[placeId] = self.combinedCircularImage(image1: image1, image2: image2, image3: image3)
+                    self.updatePlaceAnnotationImages(for: placeId)
                 }
                 completion()
             }
@@ -276,23 +256,60 @@ class ProfileViewModel: ObservableObject {
     
     public func getFirstThreeProfileImages(forKey key: String) -> (UIImage?, UIImage?, UIImage?) {
         guard let users = detailPlaceViewModel.placeSavers[key] else {
-            // Create default profile images when no users are found
+            print("CREATING DEFAULT PROFILE IMAGES BC NO USERS FOUND")
             let config = UIImage.SymbolConfiguration(pointSize: 40)
             let defaultImage = UIImage(systemName: "person.circle.fill", withConfiguration: config)?.withTintColor(.gray, renderingMode: .alwaysOriginal)
             return (defaultImage, defaultImage, defaultImage)
         }
+        
         let firstThreeUsers = users.prefix(3)
-        let images = firstThreeUsers.map { user in
+        let images = firstThreeUsers.map { user -> UIImage? in
             if let photo = self.userProfilePhotos[user.id] {
                 return photo
             } else {
-                // Use system image as fallback
-                let config = UIImage.SymbolConfiguration(pointSize: 40)
-                return (UIImage(systemName: "person.circle.fill", withConfiguration: config)?.withTintColor(.gray, renderingMode: .alwaysOriginal))!
+                // Instead of immediately falling back, return nil to indicate loading
+                return nil
             }
         }
+        
+        // If all images are nil (still loading), return nil for all three
+        if images.allSatisfy({ $0 == nil }) {
+            return (nil, nil, nil)
+        }
+        
         let paddedImages = (images + [nil, nil, nil]).prefix(3)
         return (paddedImages[0], paddedImages[1], paddedImages[2])
+    }
+    
+    private func ensureProfilePhotosLoaded(for users: [User], completion: @escaping () -> Void) {
+        let dispatchGroup = DispatchGroup()
+        var loadedCount = 0
+        
+        for user in users {
+            if userProfilePhotos[user.id] == nil, let photoURL = user.profilePhotoURL {
+                dispatchGroup.enter()
+                loadUserProfilePhoto(from: photoURL, forUserId: user.id) {
+                    loadedCount += 1
+                    dispatchGroup.leave()
+                }
+            } else {
+                loadedCount += 1
+            }
+        }
+        
+        dispatchGroup.notify(queue: .main) {
+            completion()
+        }
+    }
+    
+    private func updatePlaceAnnotationImages(for placeId: String) {
+        guard let users = detailPlaceViewModel.placeSavers[placeId] else { return }
+        
+        ensureProfilePhotosLoaded(for: Array(users)) { [weak self] in
+            guard let self = self else { return }
+            let (image1, image2, image3) = self.getFirstThreeProfileImages(forKey: placeId)
+            self.placeAnnotationImages[placeId] = self.combinedCircularImage(image1: image1, image2: image2, image3: image3)
+        }
     }
     
     private func combinedCircularImage(image1: UIImage?, image2: UIImage? = nil, image3: UIImage? = nil) -> UIImage {
@@ -319,7 +336,7 @@ class ProfileViewModel: ObservableObject {
             
             if image3 != nil { drawCircularImage(image3, in: thirdRect) }
             if image2 != nil { drawCircularImage(image2, in: secondRect) }
-            drawCircularImage(image1 ?? UIImage(named: "DestPin")!, in: firstRect)
+            if image1 != nil { drawCircularImage(image1, in: firstRect) }
         }
     }
     
@@ -341,8 +358,7 @@ class ProfileViewModel: ObservableObject {
                     self.detailPlaceViewModel.updatePlaceSavers(placeId: placeId, user: user)
                 }
                 self.detailPlaceViewModel.fetchPlaceImage(for: placeId)
-                let (image1, image2, image3) = self.getFirstThreeProfileImages(forKey: placeId)
-                self.placeAnnotationImages[placeId] = self.combinedCircularImage(image1: image1, image2: image2, image3: image3)
+                self.updatePlaceAnnotationImages(for: placeId)
             }
         }
     }
@@ -358,9 +374,7 @@ class ProfileViewModel: ObservableObject {
             placeListMBPlaces[listId] = placeIds
         }
         firestoreService.removePlaceFromList(userId: userId, listName: listId.uuidString, placeId: placeId)
-        // No need to update placeSavers here; DetailPlaceViewModel handles it if needed
-        let (image1, image2, image3) = getFirstThreeProfileImages(forKey: placeId)
-        placeAnnotationImages[placeId] = combinedCircularImage(image1: image1, image2: image2, image3: image3)
+        self.updatePlaceAnnotationImages(for: placeId)
     }
     
     private func fetchAndProcessFriendLists(friend: User, completion: @escaping () -> Void) {
@@ -376,8 +390,7 @@ class ProfileViewModel: ObservableObject {
                         self.detailPlaceViewModel.places[placeId] = place
                         self.detailPlaceViewModel.updatePlaceSavers(placeId: placeId, user: friend)
                         self.detailPlaceViewModel.fetchPlaceImage(for: placeId)
-                        let (image1, image2, image3) = self.getFirstThreeProfileImages(forKey: placeId)
-                        self.placeAnnotationImages[placeId] = self.combinedCircularImage(image1: image1, image2: image2, image3: image3)
+                        self.updatePlaceAnnotationImages(for: placeId)
                     }
                     pendingFetches -= 1
                     if pendingFetches == 0 { completion() }
@@ -405,8 +418,7 @@ class ProfileViewModel: ObservableObject {
                                 self.detailPlaceViewModel.places[placeId] = place
                                 self.detailPlaceViewModel.updatePlaceSavers(placeId: placeId, user: currentUser)
                                 self.detailPlaceViewModel.fetchPlaceImage(for: placeId)
-                                let (image1, image2, image3) = self.getFirstThreeProfileImages(forKey: placeId)
-                                self.placeAnnotationImages[placeId] = self.combinedCircularImage(image1: image1, image2: image2, image3: image3)
+                                self.updatePlaceAnnotationImages(for: placeId)
                             }
                         }
                         pendingFetches -= 1
@@ -448,8 +460,7 @@ class ProfileViewModel: ObservableObject {
                         self.detailPlaceViewModel.updatePlaceSavers(placeId: placeId, user: user)
                     }
                     self.detailPlaceViewModel.fetchPlaceImage(for: placeId)
-                    let (image1, image2, image3) = self.getFirstThreeProfileImages(forKey: placeId)
-                    self.placeAnnotationImages[placeId] = self.combinedCircularImage(image1: image1, image2: image2, image3: image3)
+                    self.updatePlaceAnnotationImages(for: placeId)
                 }
             }
         }
@@ -566,8 +577,7 @@ class ProfileViewModel: ObservableObject {
                         self.detailPlaceViewModel.places[placeId] = place
                         self.detailPlaceViewModel.updatePlaceSavers(placeId: placeId, user: currentUser)
                         self.detailPlaceViewModel.fetchPlaceImage(for: placeId)
-                        let (image1, image2, image3) = self.getFirstThreeProfileImages(forKey: placeId)
-                        self.placeAnnotationImages[placeId] = self.combinedCircularImage(image1: image1, image2: image2, image3: image3)
+                        self.updatePlaceAnnotationImages(for: placeId)
                     }
                 }
                 
@@ -601,8 +611,7 @@ class ProfileViewModel: ObservableObject {
                         self.detailPlaceViewModel.places[placeId] = place
                         self.detailPlaceViewModel.updatePlaceSavers(placeId: placeId, user: friend)
                         self.detailPlaceViewModel.fetchPlaceImage(for: placeId)
-                        let (image1, image2, image3) = self.getFirstThreeProfileImages(forKey: placeId)
-                        self.placeAnnotationImages[placeId] = self.combinedCircularImage(image1: image1, image2: image2, image3: image3)
+                        self.updatePlaceAnnotationImages(for: placeId)
                     }
                 }
                 completion()
