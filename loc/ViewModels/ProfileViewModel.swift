@@ -29,10 +29,12 @@ class ProfileViewModel: ObservableObject {
     @Published var friends: [User] = []
     @Published var followers: Int = 0
     @Published var following: Int = 0
+    @Published var placeSaversByPlace: [String: [User]] = [:] // Maps place IDs to users who saved them
     
     @Published var placeAnnotationImages: [String: UIImage] = [:] // Still here for now
     
     private let firestoreService: FirestoreService
+    private let profileFirestoreService = ProfileFirestoreService()
     private let detailPlaceViewModel: DetailPlaceViewModel
     public let userId: String
     private let mapboxSearchService = MapboxSearchService()
@@ -70,7 +72,7 @@ class ProfileViewModel: ObservableObject {
         fetchFollowing(userId: userId)
         
         dispatchGroup.enter()
-        fetchFriends(userId: userId) { [weak self] in
+        processFollowedUsersAndPlaces { [weak self] in
             guard let self = self else { return }
             self.fetchUserReviewedPlaces {
                 dispatchGroup.leave()
@@ -80,6 +82,58 @@ class ProfileViewModel: ObservableObject {
         dispatchGroup.notify(queue: .main) {
             self.isLoading = false
         }
+    }
+    
+    func changeProfilePhoto(_ newImage: UIImage) async {
+        // Crop the image to a square
+        let squareImage = cropToSquare(newImage)
+        
+        do {
+            let newPhotoURL = try await firestoreService.updateProfilePhoto(userId: userId, image: squareImage)
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                self.profilePhotoImage = squareImage
+                self.profilePhoto = Image(uiImage: squareImage)
+                self.data.profilePhotoURL = newPhotoURL
+                
+                // Update profile picture across all reviews
+                self.firestoreService.updateProfilePictureAcrossAllReviews(userId: self.userId, newProfilePictureURL: newPhotoURL.absoluteString) { error in
+                    if let error = error {
+                        print("Error updating profile pictures in reviews: \(error.localizedDescription)")
+                        // You might want to show an alert to the user here
+                    } else {
+                        print("Successfully updated profile pictures across all reviews")
+                    }
+                }
+            }
+        } catch {
+            print("Error updating profile photo: \(error)")
+            // You might want to handle the error here, perhaps show an alert to the user
+        }
+    }
+    
+    private func cropToSquare(_ image: UIImage) -> UIImage {
+        let cgImage = image.cgImage!
+        let contextImage = UIImage(cgImage: cgImage)
+        let contextSize = contextImage.size
+        
+        // Get the size of the square
+        let size = min(contextSize.width, contextSize.height)
+        
+        // Calculate the crop rect
+        let x = (contextSize.width - size) / 2
+        let y = (contextSize.height - size) / 2
+        let cropRect = CGRect(x: x * image.scale,
+                            y: y * image.scale,
+                            width: size * image.scale,
+                            height: size * image.scale)
+        
+        // Create the cropped image
+        if let croppedCGImage = cgImage.cropping(to: cropRect) {
+            return UIImage(cgImage: croppedCGImage, scale: image.scale, orientation: image.imageOrientation)
+        }
+        
+        return image
     }
     
     func toggleFollowUser(userId: String) {
@@ -101,12 +155,12 @@ class ProfileViewModel: ObservableObject {
                         guard let self = self else { return }
                         self.friends.append(userToFollow)
                         if let photoURL = userToFollow.profilePhotoURL {
-                            self.loadUserProfilePhoto(from: photoURL, forUserId: userId) {
+                            self.loadUserProfilePhoto(from: photoURL, forUserId: userToFollow.id) {
                                 self.fetchFriendFavPlaces(friend: userToFollow) {}
                                 self.fetchAndProcessFriendLists(friend: userToFollow) {}
                             }
                         } else {
-                            self.userProfilePhotos[userId] = nil
+                            self.userProfilePhotos[userToFollow.id] = nil
                             self.fetchFriendFavPlaces(friend: userToFollow) {}
                             self.fetchAndProcessFriendLists(friend: userToFollow) {}
                         }
@@ -140,14 +194,17 @@ class ProfileViewModel: ObservableObject {
             DispatchQueue.main.async {
                 let favoriteIds = favorites?.map { $0.id.uuidString } ?? []
                 self.userFavorites = favoriteIds
+                
                 for place in favorites ?? [] {
                     let placeId = place.id.uuidString
                     self.detailPlaceViewModel.places[placeId] = place
                     self.detailPlaceViewModel.updatePlaceSavers(placeId: placeId, user: user)
+                    // Add to our placeSaversByPlace dictionary
+                    self.placeSaversByPlace[placeId, default: []].append(user)
                     self.detailPlaceViewModel.fetchPlaceImage(for: placeId)
-                    let (image1, image2, image3) = self.getFirstThreeProfileImages(forKey: placeId)
-                    self.placeAnnotationImages[placeId] = self.combinedCircularImage(image1: image1, image2: image2, image3: image3)
+                    self.updatePlaceAnnotationImages(for: placeId)
                 }
+                
                 completion()
             }
         }
@@ -160,17 +217,25 @@ class ProfileViewModel: ObservableObject {
                 self.friends = profiles ?? []
                 guard !self.friends.isEmpty else { completion(); return }
                 
-                var pendingTasks = self.friends.count * 2
+                var pendingTasks = self.friends.count
                 for friend in self.friends {
                     if let photoURL = friend.profilePhotoURL {
                         self.loadUserProfilePhoto(from: photoURL, forUserId: friend.id) {
-                            self.fetchFriendFavPlaces(friend: friend) { pendingTasks -= 1; if pendingTasks == 0 { completion() } }
-                            self.fetchAndProcessFriendLists(friend: friend) { pendingTasks -= 1; if pendingTasks == 0 { completion() } }
+                            self.fetchFriendFavPlaces(friend: friend) { 
+                                self.fetchAndProcessFriendLists(friend: friend) {
+                                    pendingTasks -= 1
+                                    if pendingTasks == 0 { completion() }
+                                }
+                            }
                         }
                     } else {
                         self.userProfilePhotos[friend.id] = nil
-                        self.fetchFriendFavPlaces(friend: friend) { pendingTasks -= 1; if pendingTasks == 0 { completion() } }
-                        self.fetchAndProcessFriendLists(friend: friend) { pendingTasks -= 1; if pendingTasks == 0 { completion() } }
+                        self.fetchFriendFavPlaces(friend: friend) { 
+                            self.fetchAndProcessFriendLists(friend: friend) {
+                                pendingTasks -= 1
+                                if pendingTasks == 0 { completion() }
+                            }
+                        }
                     }
                 }
             }
@@ -186,8 +251,7 @@ class ProfileViewModel: ObservableObject {
                     self.detailPlaceViewModel.places[placeId] = place
                     self.detailPlaceViewModel.updatePlaceSavers(placeId: placeId, user: friend)
                     self.detailPlaceViewModel.fetchPlaceImage(for: placeId)
-                    let (image1, image2, image3) = self.getFirstThreeProfileImages(forKey: placeId)
-                    self.placeAnnotationImages[placeId] = self.combinedCircularImage(image1: image1, image2: image2, image3: image3)
+                    self.updatePlaceAnnotationImages(for: placeId)
                 }
                 completion()
             }
@@ -199,14 +263,67 @@ class ProfileViewModel: ObservableObject {
     }
     
     public func getFirstThreeProfileImages(forKey key: String) -> (UIImage?, UIImage?, UIImage?) {
-        guard let users = detailPlaceViewModel.placeSavers[key] else {
-            print("No users found for place ID: \(key)")
-            return (nil, nil, nil)
+        guard let users = detailPlaceViewModel.placeSavers[key], !users.isEmpty else {
+            print("CREATING DEFAULT PROFILE IMAGES BC NO USERS FOUND")
+            let defaultImage = UIImage(named: "defaultProfile")
+            return (defaultImage, nil, nil)
         }
+        
         let firstThreeUsers = users.prefix(3)
-        let images = firstThreeUsers.map { self.userProfilePhotos[$0.id] ?? UIImage(named: "defaultProfile") }
+        let images = firstThreeUsers.map { user -> UIImage? in
+            if let photo = self.userProfilePhotos[user.id] {
+                return photo
+            } else {
+                // Return default image since we should have loaded all photos by now
+                return UIImage(named: "defaultProfile")
+            }
+        }
+        
         let paddedImages = (images + [nil, nil, nil]).prefix(3)
         return (paddedImages[0], paddedImages[1], paddedImages[2])
+    }
+    
+    private func ensureProfilePhotosLoaded(for users: [User], completion: @escaping () -> Void) {
+        if users.isEmpty {
+            completion()
+            return
+        }
+
+        let dispatchGroup = DispatchGroup()
+        
+        for user in users {
+            dispatchGroup.enter()
+            if userProfilePhotos[user.id] == nil {
+                if let photoURL = user.profilePhotoURL {
+                    loadUserProfilePhoto(from: photoURL, forUserId: user.id) {
+                        dispatchGroup.leave()
+                    }
+                } else {
+                    // No photo URL, set a default image
+                    DispatchQueue.main.async {
+                        self.userProfilePhotos[user.id] = UIImage(named: "defaultProfile")
+                        dispatchGroup.leave()
+                    }
+                }
+            } else {
+                // Already loaded
+                dispatchGroup.leave()
+            }
+        }
+        
+        dispatchGroup.notify(queue: .main) {
+            completion()
+        }
+    }
+    
+    private func updatePlaceAnnotationImages(for placeId: String) {
+        guard let users = detailPlaceViewModel.placeSavers[placeId] else { return }
+        
+        ensureProfilePhotosLoaded(for: Array(users)) { [weak self] in
+            guard let self = self else { return }
+            let (image1, image2, image3) = self.getFirstThreeProfileImages(forKey: placeId)
+            self.placeAnnotationImages[placeId] = self.combinedCircularImage(image1: image1, image2: image2, image3: image3)
+        }
     }
     
     private func combinedCircularImage(image1: UIImage?, image2: UIImage? = nil, image3: UIImage? = nil) -> UIImage {
@@ -233,7 +350,7 @@ class ProfileViewModel: ObservableObject {
             
             if image3 != nil { drawCircularImage(image3, in: thirdRect) }
             if image2 != nil { drawCircularImage(image2, in: secondRect) }
-            drawCircularImage(image1 ?? UIImage(named: "DestPin")!, in: firstRect)
+            if image1 != nil { drawCircularImage(image1, in: firstRect) }
         }
     }
     
@@ -253,10 +370,11 @@ class ProfileViewModel: ObservableObject {
                 self.detailPlaceViewModel.places[placeId] = place
                 if let user = self.currentUser {
                     self.detailPlaceViewModel.updatePlaceSavers(placeId: placeId, user: user)
+                    // Add to placeSaversByPlace dictionary
+                    self.placeSaversByPlace[placeId, default: []].append(user)
                 }
                 self.detailPlaceViewModel.fetchPlaceImage(for: placeId)
-                let (image1, image2, image3) = self.getFirstThreeProfileImages(forKey: placeId)
-                self.placeAnnotationImages[placeId] = self.combinedCircularImage(image1: image1, image2: image2, image3: image3)
+                self.updatePlaceAnnotationImages(for: placeId)
             }
         }
     }
@@ -272,9 +390,7 @@ class ProfileViewModel: ObservableObject {
             placeListMBPlaces[listId] = placeIds
         }
         firestoreService.removePlaceFromList(userId: userId, listName: listId.uuidString, placeId: placeId)
-        // No need to update placeSavers here; DetailPlaceViewModel handles it if needed
-        let (image1, image2, image3) = getFirstThreeProfileImages(forKey: placeId)
-        placeAnnotationImages[placeId] = combinedCircularImage(image1: image1, image2: image2, image3: image3)
+        self.updatePlaceAnnotationImages(for: placeId)
     }
     
     private func fetchAndProcessFriendLists(friend: User, completion: @escaping () -> Void) {
@@ -290,8 +406,7 @@ class ProfileViewModel: ObservableObject {
                         self.detailPlaceViewModel.places[placeId] = place
                         self.detailPlaceViewModel.updatePlaceSavers(placeId: placeId, user: friend)
                         self.detailPlaceViewModel.fetchPlaceImage(for: placeId)
-                        let (image1, image2, image3) = self.getFirstThreeProfileImages(forKey: placeId)
-                        self.placeAnnotationImages[placeId] = self.combinedCircularImage(image1: image1, image2: image2, image3: image3)
+                        self.updatePlaceAnnotationImages(for: placeId)
                     }
                     pendingFetches -= 1
                     if pendingFetches == 0 { completion() }
@@ -318,9 +433,10 @@ class ProfileViewModel: ObservableObject {
                                 let placeId = place.id.uuidString
                                 self.detailPlaceViewModel.places[placeId] = place
                                 self.detailPlaceViewModel.updatePlaceSavers(placeId: placeId, user: currentUser)
+                                // Add to our placeSaversByPlace dictionary
+                                self.placeSaversByPlace[placeId, default: []].append(currentUser)
                                 self.detailPlaceViewModel.fetchPlaceImage(for: placeId)
-                                let (image1, image2, image3) = self.getFirstThreeProfileImages(forKey: placeId)
-                                self.placeAnnotationImages[placeId] = self.combinedCircularImage(image1: image1, image2: image2, image3: image3)
+                                self.updatePlaceAnnotationImages(for: placeId)
                             }
                         }
                         pendingFetches -= 1
@@ -362,8 +478,7 @@ class ProfileViewModel: ObservableObject {
                         self.detailPlaceViewModel.updatePlaceSavers(placeId: placeId, user: user)
                     }
                     self.detailPlaceViewModel.fetchPlaceImage(for: placeId)
-                    let (image1, image2, image3) = self.getFirstThreeProfileImages(forKey: placeId)
-                    self.placeAnnotationImages[placeId] = self.combinedCircularImage(image1: image1, image2: image2, image3: image3)
+                    self.updatePlaceAnnotationImages(for: placeId)
                 }
             }
         }
@@ -436,13 +551,13 @@ class ProfileViewModel: ObservableObject {
     }
     
     // Helpers
-    private func loadUserProfilePhoto(from url: URL, forUserId userId: String, completion: (() -> Void)? = nil) {
-        if userProfilePhotos[userId] != nil { completion?(); return }
+    private func loadUserProfilePhoto(from url: URL, forUserId userId: String, completion: @escaping () -> Void) {
+        if userProfilePhotos[userId] != nil { completion(); return }
         URLSession.shared.dataTask(with: url) { [weak self] data, _, error in
-            guard let self = self else { completion?(); return }
+            guard let self = self else { completion(); return }
             DispatchQueue.main.async {
                 self.userProfilePhotos[userId] = data.flatMap { UIImage(data: $0) }
-                completion?()
+                completion()
             }
         }.resume()
     }
@@ -479,9 +594,10 @@ class ProfileViewModel: ObservableObject {
                         let placeId = place.id.uuidString
                         self.detailPlaceViewModel.places[placeId] = place
                         self.detailPlaceViewModel.updatePlaceSavers(placeId: placeId, user: currentUser)
+                        // Add to placeSaversByPlace dictionary
+                        self.placeSaversByPlace[placeId, default: []].append(currentUser)
                         self.detailPlaceViewModel.fetchPlaceImage(for: placeId)
-                        let (image1, image2, image3) = self.getFirstThreeProfileImages(forKey: placeId)
-                        self.placeAnnotationImages[placeId] = self.combinedCircularImage(image1: image1, image2: image2, image3: image3)
+                        self.updatePlaceAnnotationImages(for: placeId)
                     }
                 }
                 
@@ -514,12 +630,193 @@ class ProfileViewModel: ObservableObject {
                         let placeId = place.id.uuidString
                         self.detailPlaceViewModel.places[placeId] = place
                         self.detailPlaceViewModel.updatePlaceSavers(placeId: placeId, user: friend)
+                        // Add to placeSaversByPlace dictionary
+                        self.placeSaversByPlace[placeId, default: []].append(friend)
                         self.detailPlaceViewModel.fetchPlaceImage(for: placeId)
-                        let (image1, image2, image3) = self.getFirstThreeProfileImages(forKey: placeId)
-                        self.placeAnnotationImages[placeId] = self.combinedCircularImage(image1: image1, image2: image2, image3: image3)
+                        self.updatePlaceAnnotationImages(for: placeId)
                     }
                 }
                 completion()
+            }
+        }
+    }
+    
+    private func loadUserProfilePhoto(from urlString: String, forUserId userId: String, completion: @escaping () -> Void) {
+        guard let url = URL(string: urlString) else {
+            self.userProfilePhotos[userId] = nil
+            completion()
+            return
+        }
+        
+        URLSession.shared.dataTask(with: url) { [weak self] data, response, error in
+            guard let self = self else { return }
+            
+            DispatchQueue.main.async {
+                if let error = error {
+                    print("Error loading profile photo: \(error)")
+                    self.userProfilePhotos[userId] = nil
+                    completion()
+                    return
+                }
+                
+                if let data = data, let image = UIImage(data: data) {
+                    // Crop the image to a square before storing
+                    let squareImage = self.cropToSquare(image)
+                    self.userProfilePhotos[userId] = squareImage
+                    
+                    // If this is the current user's profile photo, update the main profile photo
+                    if userId == self.userId {
+                        self.profilePhotoImage = squareImage
+                        self.profilePhoto = Image(uiImage: squareImage)
+                    }
+                } else {
+                    self.userProfilePhotos[userId] = nil
+                }
+                completion()
+            }
+        }.resume()
+    }
+    
+    
+    // New function to process all followed users and their places
+    func processFollowedUsersAndPlaces(completion: @escaping () -> Void) {
+        firestoreService.fetchFollowingProfiles(for: userId) { [weak self] profiles, error in
+            guard let self = self else { completion(); return }
+            
+            DispatchQueue.main.async {
+                self.friends = profiles ?? []
+                
+                // First make sure current user profile photo is loaded
+                let initialPhotoDispatchGroup = DispatchGroup()
+                if let currentUser = self.currentUser {
+                    initialPhotoDispatchGroup.enter()
+                    if let photoURL = currentUser.profilePhotoURL {
+                        self.loadUserProfilePhoto(from: photoURL, forUserId: currentUser.id) {
+                            initialPhotoDispatchGroup.leave()
+                        }
+                    } else {
+                        DispatchQueue.main.async {
+                            self.userProfilePhotos[currentUser.id] = UIImage(named: "defaultProfile")
+                            initialPhotoDispatchGroup.leave()
+                        }
+                    }
+                }
+                
+                // Load profile photos for all friends first
+                for friend in self.friends {
+                    initialPhotoDispatchGroup.enter()
+                    if let photoURL = friend.profilePhotoURL {
+                        self.loadUserProfilePhoto(from: photoURL, forUserId: friend.id) {
+                            initialPhotoDispatchGroup.leave()
+                        }
+                    } else {
+                        DispatchQueue.main.async {
+                            self.userProfilePhotos[friend.id] = UIImage(named: "defaultProfile")
+                            initialPhotoDispatchGroup.leave()
+                        }
+                    }
+                }
+                
+                // After all profile photos are pre-loaded, proceed with fetching places
+                initialPhotoDispatchGroup.notify(queue: .main) {
+                    // If no friends, complete directly
+                    guard !self.friends.isEmpty else { completion(); return }
+                    
+                    let dispatchGroup = DispatchGroup()
+                    var processedPlaces = Set<String>()
+                    
+                    // Process each friend
+                    for friend in self.friends {
+                        // Load favorite places
+                        dispatchGroup.enter()
+                        self.firestoreService.fetchProfileFavorites(userId: friend.id) { [weak self] places in
+                            guard let self = self else { dispatchGroup.leave(); return }
+                            
+                            DispatchQueue.main.async {
+                                for place in places ?? [] {
+                                    let placeId = place.id.uuidString
+                                    processedPlaces.insert(placeId)
+                                    // Store the place in the DetailPlaceViewModel
+                                    self.detailPlaceViewModel.places[placeId] = place
+                                    // Add user to place savers map
+                                    self.placeSaversByPlace[placeId, default: []].append(friend)
+                                    // Update in DetailPlaceViewModel for consistency
+                                    self.detailPlaceViewModel.updatePlaceSavers(placeId: placeId, user: friend)
+                                    // Fetch the place image
+                                    self.detailPlaceViewModel.fetchPlaceImage(for: placeId)
+                                }
+                                dispatchGroup.leave()
+                            }
+                        }
+                        
+                        // Load placelists and their places
+                        dispatchGroup.enter()
+                        self.firestoreService.fetchLists(userId: friend.id) { [weak self] lists in
+                            guard let self = self else { dispatchGroup.leave(); return }
+                            
+                            let listDispatchGroup = DispatchGroup()
+                            guard !lists.isEmpty else { dispatchGroup.leave(); return }
+                            
+                            for list in lists {
+                                listDispatchGroup.enter()
+                                self.fetchFirestorePlaces(for: list.places) { detailPlaces in
+                                    DispatchQueue.main.async {
+                                        for place in detailPlaces {
+                                            let placeId = place.id.uuidString
+                                            processedPlaces.insert(placeId)
+                                            // Store the place
+                                            self.detailPlaceViewModel.places[placeId] = place
+                                            // Add user to place savers map
+                                            self.placeSaversByPlace[placeId, default: []].append(friend)
+                                            // Update in DetailPlaceViewModel
+                                            self.detailPlaceViewModel.updatePlaceSavers(placeId: placeId, user: friend)
+                                            // Fetch the place image
+                                            self.detailPlaceViewModel.fetchPlaceImage(for: placeId)
+                                        }
+                                        listDispatchGroup.leave()
+                                    }
+                                }
+                            }
+                            
+                            listDispatchGroup.notify(queue: .main) {
+                                dispatchGroup.leave()
+                            }
+                        }
+                    }
+                    
+                    // First notify to collect all places
+                    dispatchGroup.notify(queue: .main) {
+                        // After all places are fetched, process annotation images
+                        let finalProcessDispatchGroup = DispatchGroup()
+                        
+                        if processedPlaces.isEmpty {
+                            // No places, just finish
+                            completion()
+                            return
+                        }
+                        
+                        // Process annotation images for all collected places
+                        for placeId in processedPlaces {
+                            finalProcessDispatchGroup.enter()
+                            // Generate the annotation image (profile photos are already loaded)
+                            if let users = self.detailPlaceViewModel.placeSavers[placeId], !users.isEmpty {
+                                let (image1, image2, image3) = self.getFirstThreeProfileImages(forKey: placeId)
+                                self.placeAnnotationImages[placeId] = self.combinedCircularImage(image1: image1, image2: image2, image3: image3)
+                            } else {
+                                // No users have saved this place, create a default annotation
+                                let defaultImage = self.combinedCircularImage(image1: UIImage(named: "defaultProfile"))
+                                self.placeAnnotationImages[placeId] = defaultImage
+                            }
+                            finalProcessDispatchGroup.leave()
+                        }
+                        
+                        // After all annotation images are processed, call the completion handler
+                        finalProcessDispatchGroup.notify(queue: .main) {
+                            print("All place annotation images processed: \(self.placeAnnotationImages.count)")
+                            completion()
+                        }
+                    }
+                }
             }
         }
     }

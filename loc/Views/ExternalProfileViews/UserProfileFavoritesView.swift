@@ -14,6 +14,7 @@ struct UserProfileFavoritesView: View {
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @Environment(\.presentationMode) var presentationMode
     @State private var placeColors: [UUID: Color] = [:]
+    @State private var emptyCircleColors: [Int: Color] = [:]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -24,58 +25,87 @@ struct UserProfileFavoritesView: View {
                 .padding(.leading, 20) // Keep this consistent
                 .foregroundStyle(.black)
 
-            if !userFavorites.isEmpty {
-                HStack {
-                    ForEach(userFavorites, id: \.id) { place in
-                        VStack {
-                            if let image = placeImages[place.id.uuidString] {
-                                Image(uiImage: image)
-                                    .resizable()
-                                    .scaledToFill()
-                                    .frame(width: 85, height: 85)
-                                    .cornerRadius(50)
-                                    .clipped()
-                            } else {
+            GeometryReader { geometry in
+                HStack(spacing: 0) {
+                    ForEach(0..<4) { index in
+                        if index < userFavorites.count {
+                            VStack(spacing: 4) {
+                                if let image = placeImages[userFavorites[index].id.uuidString] {
+                                    Image(uiImage: image)
+                                        .resizable()
+                                        .scaledToFill()
+                                        .frame(width: 85, height: 85)
+                                        .cornerRadius(50)
+                                        .clipped()
+                                } else {
+                                    Circle()
+                                        .frame(width: 85, height: 85)
+                                        .foregroundColor(placeColors[userFavorites[index].id] ?? .green)
+                                }
+
+                                Text(userFavorites[index].name.prefix(15) ?? "Unknown")
+                                    .foregroundColor(.black)
+                                    .fontWeight(.semibold)
+                                    .font(.footnote)
+                                    .multilineTextAlignment(.center)
+                                    .lineLimit(1)
+                                    .frame(width: 85)
+                                Text(userFavorites[index].city?.prefix(15) ?? "")
+                                    .foregroundColor(.black)
+                                    .font(.caption)
+                                    .fontWeight(.light)
+                                    .multilineTextAlignment(.center)
+                                    .lineLimit(1)
+                                    .frame(width: 85)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .onTapGesture {
+                                selectedPlaceVM.selectedPlace = userFavorites[index]
+                                selectedPlaceVM.isDetailSheetPresented = true
+                                presentationMode.wrappedValue.dismiss()
+                            }
+                        } else {
+                            VStack(spacing: 4) {
                                 Circle()
                                     .frame(width: 85, height: 85)
-                                    .foregroundColor(placeColors[place.id] ?? .gray)
+                                    .foregroundColor(emptyCircleColors[index] ?? randomColor())
+                                
+                                if !userFavorites.isEmpty {
+                                    Text("")
+                                        .foregroundColor(.black)
+                                        .fontWeight(.semibold)
+                                        .font(.footnote)
+                                        .multilineTextAlignment(.center)
+                                        .lineLimit(1)
+                                        .frame(width: 85)
+                                    Text("")
+                                        .foregroundColor(.black)
+                                        .font(.caption)
+                                        .fontWeight(.light)
+                                        .multilineTextAlignment(.center)
+                                        .lineLimit(1)
+                                        .frame(width: 85)
+                                }
                             }
-
-                            Text(place.name.prefix(15) ?? "Unknown")
-                                .foregroundColor(.black)
-                                .fontWeight(.semibold)
-                                .font(.footnote)
-                                .multilineTextAlignment(.center)
-                                .lineLimit(1)
-                                .frame(width: 85)
-                            Text(place.city?.prefix(15) ?? "")
-                                .foregroundColor(.black)
-                                .font(.caption)
-                                .fontWeight(.light)
-                                .multilineTextAlignment(.center)
-                                .lineLimit(1)
-                                .frame(width: 85)
-                        }
-                        .padding(.trailing, 10)
-                        .onTapGesture {
-                            selectedPlaceVM.selectedPlace = place
-                            selectedPlaceVM.isDetailSheetPresented = true
-                            presentationMode.wrappedValue.dismiss()
+                            .frame(maxWidth: .infinity)
                         }
                     }
-                    Spacer()
                 }
                 .padding(.horizontal, 20)
-            } else {
-                Text("No favorites available")
-                    .foregroundColor(.gray)
-                    .padding(.horizontal)
             }
+            .frame(height: userFavorites.isEmpty ? 85 : 120)
         }
         .onAppear {
             for place in userFavorites {
                 if placeColors[place.id] == nil {
                     placeColors[place.id] = randomColor()
+                }
+            }
+            
+            // Set random colors for empty circles
+            for index in 0..<4 {
+                if index >= userFavorites.count {
+                    emptyCircleColors[index] = randomColor()
                 }
             }
         }

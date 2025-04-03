@@ -21,7 +21,7 @@ struct MapView: View {
     var body: some View {
         let currentCoords = locationManager.currentLocation?.coordinate ?? defaultCenter
         
-        if profile.isLoading {
+        if profile.isLoading || profile.profilePhoto == nil {
             ProgressView("Loading places…")
         } else {
             Map(viewport: $viewport) {
@@ -30,13 +30,15 @@ struct MapView: View {
                 
                 ForEvery(profile.getAllDetailPlaces()) { place in
                     let placeId = place.id.uuidString
-                    PointAnnotation(coordinate: CLLocationCoordinate2D(
-                        latitude: place.coordinate!.latitude, longitude: place.coordinate!.longitude
-                    ))
-                    .image(.init(image: profile.placeAnnotationImages[placeId] ?? UIImage(named: "DestPin")!, name: "dest-pin-\(placeId)"))
-                    .onTapGesture {
-                        selectedPlaceVM.selectedPlace = place
-                        selectedPlaceVM.isDetailSheetPresented = true
+                    if let annotationImage = profile.placeAnnotationImages[placeId] {
+                        PointAnnotation(coordinate: CLLocationCoordinate2D(
+                            latitude: place.coordinate!.latitude, longitude: place.coordinate!.longitude
+                        ))
+                        .image(.init(image: annotationImage, name: "dest-pin-\(placeId)"))
+                        .onTapGesture {
+                            selectedPlaceVM.selectedPlace = place
+                            selectedPlaceVM.isDetailSheetPresented = true
+                        }
                     }
                 }
                 

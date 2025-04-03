@@ -28,6 +28,7 @@ struct locApp: App {
 //            }
 //        }
         let firestore = FirestoreService()
+        let profileFirestore = ProfileFirestoreService()
         let location = LocationManager()
         let detailVM = DetailPlaceViewModel(firestoreService: firestore)
         let selectedVM = SelectedPlaceViewModel(locationManager: location, firestoreService: firestore)

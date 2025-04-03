@@ -13,6 +13,103 @@ class FirestoreService: ObservableObject {
     private let db = Firestore.firestore()
     private let storage = Storage.storage()
     
+    func updateProfilePhoto(userId: String, image: UIImage, completion: @escaping (Result<URL, Error>) -> Void) {
+        // Convert UIImage to Data
+        guard let imageData = image.jpegData(compressionQuality: 0.5) else {
+            let error = NSError(domain: "ProfileFirestoreService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to convert image to data"])
+            completion(.failure(error))
+            return
+        }
+        
+        // Create a unique filename
+        let filename = "profile_photos/\(userId)_\(Date().timeIntervalSince1970).jpg"
+        let storageRef = storage.reference().child(filename)
+        
+        // Upload the image data
+        let metadata = StorageMetadata()
+        metadata.contentType = "image/jpeg"
+        
+        // First, check if user has an existing profile photo
+        let userRef = db.collection("users").document(userId)
+        userRef.getDocument { [weak self] document, error in
+            guard let self = self else { return }
+            
+            if let error = error {
+                print("Error checking existing profile photo: \(error.localizedDescription)")
+                // Continue with upload even if we can't check existing photo
+            }
+            
+            // Try to delete existing photo if it exists
+            if let existingPhotoURL = document?.data()?["profilePhotoURL"] as? String {
+                // Extract the filename from the URL
+                if let existingPhotoPath = existingPhotoURL.components(separatedBy: "/").last {
+                    let existingRef = self.storage.reference().child("profile_photos/\(existingPhotoPath)")
+                    existingRef.delete { error in
+                        if let error = error {
+                            // Only log the error if it's not a "not found" error
+                            if (error as NSError).domain != "com.google.HTTPStatus" || (error as NSError).code != 404 {
+                                print("Error deleting existing profile photo: \(error.localizedDescription)")
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Now upload the new photo
+            storageRef.putData(imageData, metadata: metadata) { metadata, error in
+                if let error = error {
+                    print("Error uploading profile photo: \(error.localizedDescription)")
+                    completion(.failure(error))
+                    return
+                }
+                
+                // Wait a brief moment to ensure the upload is fully processed
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    storageRef.downloadURL { url, error in
+                        if let error = error {
+                            print("Error getting download URL: \(error.localizedDescription)")
+                            completion(.failure(error))
+                            return
+                        }
+                        
+                        guard let downloadURL = url else {
+                            let error = NSError(domain: "ProfileFirestoreService", code: -2, userInfo: [NSLocalizedDescriptionKey: "Download URL was nil"])
+                            completion(.failure(error))
+                            return
+                        }
+                        
+                        // Update the user's profile document with the new URL
+                        userRef.updateData([
+                            "profilePhotoURL": downloadURL.absoluteString
+                        ]) { error in
+                            if let error = error {
+                                print("Error updating user profile: \(error.localizedDescription)")
+                                completion(.failure(error))
+                            } else {
+                                print("Successfully updated profile photo URL")
+                                completion(.success(downloadURL))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // Add async version of updateProfilePhoto
+    func updateProfilePhoto(userId: String, image: UIImage) async throws -> URL {
+        return try await withCheckedThrowingContinuation { continuation in
+            updateProfilePhoto(userId: userId, image: image) { result in
+                switch result {
+                case .success(let url):
+                    continuation.resume(returning: url)
+                case .failure(let error):
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+    
     // Fetch all places from Firestore
         func fetchAllPlaces(completion: @escaping ([DetailPlace]?, Error?) -> Void) {
             print("Fetching all places from Firestore...")
@@ -430,10 +527,11 @@ class FirestoreService: ObservableObject {
 
     func searchUsers(query: String, completion: @escaping ([ProfileData]?, Error?) -> Void) {
         let usersRef = db.collection("users")
+        let queryLower = query.lowercased()
         
         // Perform a name search using Firestore's `whereField` with `>=` and `<=` for simple prefix matching
-        usersRef.whereField("fullName", isGreaterThanOrEqualTo: query)
-                .whereField("fullName", isLessThanOrEqualTo: query + "\u{f8ff}")
+        usersRef.whereField("fullNameLower", isGreaterThanOrEqualTo: queryLower)
+                .whereField("fullNameLower", isLessThanOrEqualTo: queryLower + "\u{f8ff}")
                 .getDocuments { snapshot, error in
                     if let error = error {
                         completion(nil, error)
@@ -1205,6 +1303,172 @@ class FirestoreService: ObservableObject {
                     completion(places, nil)
                 }
             }
+        }
+    }
+
+    func updateProfilePictureInUserReviews(userId: String, newProfilePictureURL: String, completion: @escaping (Error?) -> Void) {
+        // Reference to the user's reviews collection
+        let reviewsRef = db.collection("users")
+                          .document(userId)
+                          .collection("reviews")
+        
+        // Get all reviews for the user
+        reviewsRef.getDocuments { [weak self] snapshot, error in
+            guard let self = self else { return }
+            
+            if let error = error {
+                print("Error fetching user reviews: \(error.localizedDescription)")
+                completion(error)
+                return
+            }
+            
+            guard let documents = snapshot?.documents else {
+                print("No reviews found for user")
+                completion(nil)
+                return
+            }
+            
+            let batch = self.db.batch()
+            var batchCount = 0
+            let maxBatchSize = 500 // Firestore batch limit
+            
+            for document in documents {
+                let reviewRef = reviewsRef.document(document.documentID)
+                batch.updateData(["profilePhotoUrl": newProfilePictureURL], forDocument: reviewRef)
+                batchCount += 1
+                
+                // Commit batch when it reaches the limit
+                if batchCount >= maxBatchSize {
+                    batch.commit { error in
+                        if let error = error {
+                            print("Error updating batch of reviews: \(error.localizedDescription)")
+                        }
+                    }
+                    batchCount = 0
+                }
+            }
+            
+            // Commit any remaining updates
+            if batchCount > 0 {
+                batch.commit { error in
+                    if let error = error {
+                        print("Error updating final batch of reviews: \(error.localizedDescription)")
+                    }
+                    completion(error)
+                }
+            } else {
+                completion(nil)
+            }
+        }
+    }
+    
+    func updateProfilePictureInPlaceReviews(userId: String, newProfilePictureURL: String, completion: @escaping (Error?) -> Void) {
+        // First, get all reviews from the user's collection
+        let userReviewsRef = db.collection("users")
+                              .document(userId)
+                              .collection("reviews")
+        
+        userReviewsRef.getDocuments { [weak self] snapshot, error in
+            guard let self = self else { return }
+            
+            if let error = error {
+                print("Error fetching user reviews: \(error.localizedDescription)")
+                completion(error)
+                return
+            }
+            
+            guard let documents = snapshot?.documents else {
+                print("No reviews found for user")
+                completion(nil)
+                return
+            }
+            
+            let dispatchGroup = DispatchGroup()
+            var updateError: Error?
+            
+            // Process reviews in batches
+            let batchSize = 500
+            var currentBatch = self.db.batch()
+            var batchCount = 0
+            
+            for document in documents {
+                guard let review = try? document.data(as: Review.self) else { continue }
+                
+                // Get reference to the review in the place's collection
+                let placeReviewRef = self.db.collection("places")
+                                          .document(review.placeId)
+                                          .collection("reviews")
+                                          .document(review.id)
+                
+                // Update the review with new profile picture URL
+                currentBatch.updateData([
+                    "profilePhotoUrl": newProfilePictureURL,
+                    "userFirstName": review.userFirstName,
+                    "userLastName": review.userLastName
+                ], forDocument: placeReviewRef)
+                
+                batchCount += 1
+                
+                // Commit batch when it reaches the limit
+                if batchCount >= batchSize {
+                    dispatchGroup.enter()
+                    currentBatch.commit { error in
+                        if let error = error {
+                            print("Error updating batch of reviews: \(error.localizedDescription)")
+                            updateError = error
+                        }
+                        dispatchGroup.leave()
+                    }
+                    currentBatch = self.db.batch()
+                    batchCount = 0
+                }
+            }
+            
+            // Commit any remaining updates
+            if batchCount > 0 {
+                dispatchGroup.enter()
+                currentBatch.commit { error in
+                    if let error = error {
+                        print("Error updating final batch of reviews: \(error.localizedDescription)")
+                        updateError = error
+                    }
+                    dispatchGroup.leave()
+                }
+            }
+            
+            dispatchGroup.notify(queue: .main) {
+                completion(updateError)
+            }
+        }
+    }
+    
+    // Function to update profile picture across all reviews
+    func updateProfilePictureAcrossAllReviews(userId: String, newProfilePictureURL: String, completion: @escaping (Error?) -> Void) {
+        let dispatchGroup = DispatchGroup()
+        var updateError: Error?
+        
+        // Update user's reviews
+        dispatchGroup.enter()
+        updateProfilePictureInUserReviews(userId: userId, newProfilePictureURL: newProfilePictureURL) { error in
+            if let error = error {
+                print("Error updating user reviews: \(error.localizedDescription)")
+                updateError = error
+            }
+            dispatchGroup.leave()
+        }
+        
+        // Update place reviews
+        dispatchGroup.enter()
+        updateProfilePictureInPlaceReviews(userId: userId, newProfilePictureURL: newProfilePictureURL) { error in
+            if let error = error {
+                print("Error updating place reviews: \(error.localizedDescription)")
+                updateError = error
+            }
+            dispatchGroup.leave()
+        }
+        
+        dispatchGroup.notify(queue: .main) {
+            completion(updateError)
         }
     }
 }

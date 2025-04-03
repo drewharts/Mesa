@@ -15,6 +15,6 @@ struct ProfileData: Codable, Identifiable {
     var email: String
     var profilePhotoURL: URL?
     var phoneNumber: String
-    
+    var fullNameLower: String
     var fullName: String
 }
