@@ -7,6 +7,7 @@
 
 import SwiftUI
 import FirebaseFirestore
+import UIKit
 
 struct MinPlaceDetailView: View {
     @EnvironmentObject var profile: ProfileViewModel
@@ -29,6 +30,28 @@ struct MinPlaceDetailView: View {
                         .font(.largeTitle)
                         .fontWeight(.bold)
                         .foregroundColor(.black)
+                    
+                    Button(action: {
+                        if let place = selectedPlaceVM.selectedPlace {
+                            let name = place.name ?? "Unknown Place"
+                            // If we have an address, include it for more accurate search
+                            if let address = place.address {
+                                viewModel.openGoogleMapsWithPlace(query: "\(name), \(address)")
+                            } else if let latitude = place.coordinate?.latitude,
+                                      let longitude = place.coordinate?.longitude {
+                                // If no address, use name with coordinates
+                                viewModel.openGoogleMapsWithPlace(query: "\(name) @\(latitude),\(longitude)")
+                            } else {
+                                // Fallback to just using the name
+                                viewModel.openGoogleMapsWithPlace(query: name)
+                            }
+                        }
+                    }) {
+                        Image(systemName: "map.fill")
+                            .font(.subheadline)
+                            .foregroundColor(Color.green.opacity(0.8))
+                    }
+                    .padding(.leading, 5)
                     
                     Spacer()
                     
