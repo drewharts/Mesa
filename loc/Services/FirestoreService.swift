@@ -1471,4 +1471,314 @@ class FirestoreService: ObservableObject {
             completion(updateError)
         }
     }
+    
+        // MARK: - Comment Methods
+        
+        func addComment(placeId: String, reviewId: String, comment: Comment, images: [UIImage], completion: @escaping (Result<Comment, Error>) -> Void) {
+            // 1) Upload images first if any
+            uploadImagesForComment(comment: comment, images: images) { [weak self] result in
+                guard let self = self else { return }
+                
+                switch result {
+                case .success(let downloadURLs):
+                    // 2) Update the comment to include the new image URLs
+                    var updatedComment = comment
+                    updatedComment.images = downloadURLs
+                    
+                    // 3) Save the updated comment to Firestore
+                    self.saveComment(placeId: placeId, reviewId: reviewId, comment: updatedComment) { saveResult in
+                        switch saveResult {
+                        case .success:
+                            // Return the updated comment
+                            completion(.success(updatedComment))
+                        case .failure(let error):
+                            completion(.failure(error))
+                        }
+                    }
+                    
+                case .failure(let error):
+                    // If image upload fails, return the error
+                    completion(.failure(error))
+                }
+            }
+        }
+        
+        private func saveComment(placeId: String, reviewId: String, comment: Comment, completion: @escaping (Result<Void, Error>) -> Void) {
+            // Reference to the comment document
+            let commentRef = db.collection("places")
+                              .document(placeId)
+                              .collection("reviews")
+                              .document(reviewId)
+                              .collection("comments")
+                              .document(comment.id)
+            
+            // Add comment to the review's comments subcollection
+            do {
+                try commentRef.setData(from: comment) { error in
+                    if let error = error {
+                        print("Error saving comment: \(error.localizedDescription)")
+                        completion(.failure(error))
+                    } else {
+                        // Also save to user's comments collection for easier querying
+                        let userCommentRef = self.db.collection("users")
+                                                .document(comment.userId)
+                                                .collection("comments")
+                                                .document(comment.id)
+                        
+                        do {
+                            try userCommentRef.setData(from: comment) { error in
+                                if let error = error {
+                                    print("Error saving user's comment reference: \(error.localizedDescription)")
+                                    completion(.failure(error))
+                                } else {
+                                    completion(.success(()))
+                                }
+                            }
+                        } catch {
+                            print("Error encoding comment data for user reference: \(error.localizedDescription)")
+                            completion(.failure(error))
+                        }
+                    }
+                }
+            } catch {
+                print("Error encoding comment data: \(error.localizedDescription)")
+                completion(.failure(error))
+            }
+        }
+        
+        private func uploadImagesForComment(comment: Comment, images: [UIImage], completion: @escaping (Result<[String], Error>) -> Void) {
+            // If there are no images, return immediately with an empty array
+            guard !images.isEmpty else {
+                completion(.success([]))
+                return
+            }
+            
+            var downloadURLs: [String] = []
+            var errors: [Error] = []
+
+            // A DispatchGroup to wait for all uploads
+            let dispatchGroup = DispatchGroup()
+            
+            for image in images {
+                dispatchGroup.enter()
+                
+                // 1. Generate a unique name for each image
+                let imageName = UUID().uuidString
+                
+                // 2. Store comment images in a separate folder
+                let storageRef = storage.reference()
+                    .child("comments/\(comment.id)/\(imageName).jpg")
+                
+                // 3. Convert the UIImage to JPEG data
+                guard let imageData = image.jpegData(compressionQuality: 0.5) else {
+                    errors.append(
+                        NSError(domain: "FirestoreService", code: 0, userInfo: [
+                            NSLocalizedDescriptionKey: "Could not convert image to data"
+                        ])
+                    )
+                    dispatchGroup.leave()
+                    continue
+                }
+
+                // 4. Upload the image data
+                storageRef.putData(imageData, metadata: nil) { metadata, error in
+                    if let error = error {
+                        errors.append(error)
+                        dispatchGroup.leave()
+                        return
+                    }
+                    
+                    // 5. Once uploaded, fetch the download URL
+                    storageRef.downloadURL { url, error in
+                        if let error = error {
+                            errors.append(error)
+                        } else if let downloadURL = url {
+                            downloadURLs.append(downloadURL.absoluteString)
+                        }
+                        dispatchGroup.leave()
+                    }
+                }
+            }
+            
+            // 6. When all uploads finish, call completion
+            dispatchGroup.notify(queue: .main) {
+                if let firstError = errors.first {
+                    completion(.failure(firstError))
+                } else {
+                    completion(.success(downloadURLs))
+                }
+            }
+        }
+        
+        func fetchComments(placeId: String, reviewId: String, completion: @escaping ([Comment]?, Error?) -> Void) {
+            let commentsRef = db.collection("places")
+                              .document(placeId)
+                              .collection("reviews")
+                              .document(reviewId)
+                              .collection("comments")
+            
+            // Get all comments, ordered by timestamp
+            commentsRef.order(by: "timestamp", descending: true)
+                     .getDocuments { snapshot, error in
+                if let error = error {
+                    print("Error fetching comments: \(error.localizedDescription)")
+                    completion(nil, error)
+                    return
+                }
+                
+                guard let snapshot = snapshot else {
+                    print("No snapshot returned for comments")
+                    completion([], nil)
+                    return
+                }
+                
+                // Decode each document into a Comment object
+                let comments: [Comment] = snapshot.documents.compactMap { document in
+                    try? document.data(as: Comment.self)
+                }
+                
+                completion(comments, nil)
+            }
+        }
+        
+        func likeComment(userId: String, placeId: String, reviewId: String, commentId: String, completion: @escaping (Result<Void, Error>) -> Void) {
+            let commentRef = db.collection("places")
+                               .document(placeId)
+                               .collection("reviews")
+                               .document(reviewId)
+                               .collection("comments")
+                               .document(commentId)
+            
+            let likeRef = db.collection("commentLikes").document("\(userId)_\(commentId)")
+            
+            // Use a transaction to handle both the like count and the like record
+            db.runTransaction({ (transaction, errorPointer) -> Any? in
+                // First check if user has already liked
+                let likeDocument: DocumentSnapshot
+                do {
+                    try likeDocument = transaction.getDocument(likeRef)
+                    if likeDocument.exists {
+                        let error = NSError(domain: "AppErrorDomain", code: -1, userInfo: [
+                            NSLocalizedDescriptionKey: "User has already liked this comment"
+                        ])
+                        errorPointer?.pointee = error
+                        return nil
+                    }
+                } catch let fetchError as NSError {
+                    errorPointer?.pointee = fetchError
+                    return nil
+                }
+                
+                // Then get the comment and increment likes
+                let commentDocument: DocumentSnapshot
+                do {
+                    try commentDocument = transaction.getDocument(commentRef)
+                } catch let fetchError as NSError {
+                    errorPointer?.pointee = fetchError
+                    return nil
+                }
+                
+                guard let oldLikes = commentDocument.data()?["likes"] as? Int else {
+                    let error = NSError(domain: "AppErrorDomain", code: -1, userInfo: [
+                        NSLocalizedDescriptionKey: "Unable to retrieve likes count"
+                    ])
+                    errorPointer?.pointee = error
+                    return nil
+                }
+                
+                // Create the like record
+                let likeData: [String: Any] = [
+                    "userId": userId,
+                    "commentId": commentId,
+                    "reviewId": reviewId,
+                    "placeId": placeId,
+                    "timestamp": FieldValue.serverTimestamp()
+                ]
+                
+                // Update both documents in the transaction
+                transaction.setData(likeData, forDocument: likeRef)
+                transaction.updateData(["likes": oldLikes + 1], forDocument: commentRef)
+                
+                return nil
+            }) { (_, error) in
+                if let error = error {
+                    completion(.failure(error))
+                } else {
+                    completion(.success(()))
+                }
+            }
+        }
+        
+        func unlikeComment(userId: String, placeId: String, reviewId: String, commentId: String, completion: @escaping (Result<Void, Error>) -> Void) {
+            let commentRef = db.collection("places")
+                               .document(placeId)
+                               .collection("reviews")
+                               .document(reviewId)
+                               .collection("comments")
+                               .document(commentId)
+            
+            let likeRef = db.collection("commentLikes").document("\(userId)_\(commentId)")
+            
+            db.runTransaction({ (transaction, errorPointer) -> Any? in
+                // First verify the like exists
+                let likeDocument: DocumentSnapshot
+                do {
+                    try likeDocument = transaction.getDocument(likeRef)
+                    if !likeDocument.exists {
+                        let error = NSError(domain: "AppErrorDomain", code: -1, userInfo: [
+                            NSLocalizedDescriptionKey: "User has not liked this comment"
+                        ])
+                        errorPointer?.pointee = error
+                        return nil
+                    }
+                } catch let fetchError as NSError {
+                    errorPointer?.pointee = fetchError
+                    return nil
+                }
+                
+                // Then get the comment and decrement likes
+                let commentDocument: DocumentSnapshot
+                do {
+                    try commentDocument = transaction.getDocument(commentRef)
+                } catch let fetchError as NSError {
+                    errorPointer?.pointee = fetchError
+                    return nil
+                }
+                
+                guard let oldLikes = commentDocument.data()?["likes"] as? Int else {
+                    let error = NSError(domain: "AppErrorDomain", code: -1, userInfo: [
+                        NSLocalizedDescriptionKey: "Unable to retrieve likes count"
+                    ])
+                    errorPointer?.pointee = error
+                    return nil
+                }
+                
+                // Delete the like record and decrement the count
+                transaction.deleteDocument(likeRef)
+                transaction.updateData(["likes": max(0, oldLikes - 1)], forDocument: commentRef)
+                
+                return nil
+            }) { (_, error) in
+                if let error = error {
+                    completion(.failure(error))
+                } else {
+                    completion(.success(()))
+                }
+            }
+        }
+        
+        func hasUserLikedComment(userId: String, commentId: String, completion: @escaping (Bool) -> Void) {
+            let likeRef = db.collection("commentLikes").document("\(userId)_\(commentId)")
+            
+            likeRef.getDocument { document, error in
+                if let error = error {
+                    print("Error checking comment like status: \(error.localizedDescription)")
+                    completion(false)
+                    return
+                }
+                completion(document?.exists ?? false)
+            }
+        }
+
+    // ... existing code ...
 }

@@ -187,6 +187,7 @@ struct RestaurantReviewView: View {
     @Binding var selectedImage: UIImage?
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var profile: ProfileViewModel
+    @State private var showComments = false
 
     var body: some View {
         VStack(spacing: 16) {
@@ -259,12 +260,336 @@ struct RestaurantReviewView: View {
                     .foregroundColor(.gray)
                     .padding(.horizontal)
             }
+            
+            // Add Comment and Like buttons
+            HStack(spacing: 20) {
+                
+                // Comment button
+                Button(action: {
+                    // Load comments if needed before showing
+                    if !showComments {
+                        selectedPlaceVM.loadCommentsForReview(reviewId: review.id)
+                        selectedPlaceVM.checkCommentLikeStatuses(userId: profile.userId, reviewId: review.id)
+                    }
+                    withAnimation {
+                        showComments.toggle()
+                    }
+                }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: showComments ? "bubble.left.fill" : "bubble.left")
+                            .foregroundColor(.gray)
+                            .opacity(0.7)
+                        
+                        Text("Comments")
+                            .font(.footnote)
+                            .foregroundColor(.gray)
+                    }
+                }
+            }
+            .padding(.horizontal)
+            .padding(.bottom, 10)
+            
+            // Comments section (expandable/collapsible)
+            if showComments {
+                VStack(alignment: .leading, spacing: 10) {
+                    // Comments title
+                    HStack {
+                        Text("Comments")
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.black)
+                        Spacer()
+                    }
+                    .padding(.horizontal)
+                    .padding(.top, 5)
+                    
+                    // Embedded comments view
+                    InlineCommentsView(reviewId: review.id)
+                        .padding(.leading, 15) // Indentation for comments
+                }
+                .padding(8)
+                .background(Color.gray.opacity(0.1))
+                .cornerRadius(8)
+                .padding(.horizontal)
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
         }
         .padding(.vertical)
         .onAppear {
             // Check like statuses using the proper userId from profile
             selectedPlaceVM.checkLikeStatuses(userId: profile.userId)
         }
+    }
+}
+
+// Create an inline version of the comments view to embed within the review
+struct InlineCommentsView: View {
+    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
+    @EnvironmentObject var profile: ProfileViewModel
+    @State private var commentText = ""
+    @State private var selectedImages: [UIImage] = []
+    @State private var isPickerPresented = false
+    
+    let reviewId: String
+    
+    var body: some View {
+        VStack(spacing: 12) {
+            // Comments list
+            let comments = selectedPlaceVM.comments(for: reviewId)
+            let loadingState = selectedPlaceVM.commentLoadingState(for: reviewId)
+            
+            switch loadingState {
+            case .loading:
+                ProgressView()
+                    .padding()
+                    .frame(maxWidth: .infinity)
+                
+            case .loaded:
+                if comments.isEmpty {
+                    Text("No comments yet. Be the first to comment!")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                        .padding(.vertical, 5)
+                } else {
+                    // Comments thread with connection line
+                    VStack(spacing: 6) {
+                        ForEach(comments) { comment in
+                            HStack(alignment: .top, spacing: 0) {
+                                // Curved connection line
+                                ConnectionLine()
+                                    .stroke(Color.gray.opacity(0.5), lineWidth: 1.5)
+                                    .frame(width: 20, height: 30)
+                                    .padding(.top, 12)
+                                
+                                // Actual comment
+                                InlineCommentView(comment: comment)
+                            }
+                        }
+                    }
+                    .padding(.leading, 8)
+                }
+                
+            case .error(let error):
+                Text("Failed to load comments: \(error.localizedDescription)")
+                    .font(.caption)
+                    .foregroundColor(.red)
+                    .padding(.vertical, 5)
+                
+            case .idle:
+                Text("Loading comments...")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+                    .padding(.vertical, 5)
+            }
+            
+            // Add comment input
+            HStack(spacing: 10) {
+                // Comment text field
+                TextField("Add a comment...", text: $commentText)
+                    .font(.footnote)
+                    .padding(8)
+                    .background(Color(.systemBackground))
+                    .cornerRadius(15)
+                    .foregroundColor(.primary) // Use .primary for proper dark/light mode colors
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 15)
+                            .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+                    )
+                
+                // Submit button
+                Button(action: {
+                    submitComment()
+                }) {
+                    Image(systemName: "paperplane.fill")
+                        .foregroundColor(commentText.isEmpty ? .gray : .blue)
+                        .font(.footnote)
+                }
+                .disabled(commentText.isEmpty)
+                
+                // Photo button
+                Button(action: {
+                    isPickerPresented = true
+                }) {
+                    Image(systemName: "photo")
+                        .foregroundColor(.gray)
+                        .font(.footnote)
+                }
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+        }
+        .sheet(isPresented: $isPickerPresented) {
+            MultiImagePicker(images: $selectedImages, selectionLimit: 5)
+        }
+    }
+    
+    private func submitComment() {
+        guard !commentText.isEmpty else { return }
+        
+        selectedPlaceVM.addComment(
+            reviewId: reviewId,
+            text: commentText,
+            images: selectedImages,
+            userId: profile.userId,
+            userFirstName: profile.currentUser?.firstName ?? "unknown",
+            userLastName: profile.currentUser?.lastName ?? "unknown",
+            profilePhotoUrl: profile.currentUser?.profilePhotoURL?.absoluteString ?? ""
+        )
+        
+        // Clear form
+        commentText = ""
+        selectedImages = []
+    }
+}
+
+// Simplified inline comment view
+struct InlineCommentView: View {
+    let comment: loc.Comment
+    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
+    @EnvironmentObject var profile: ProfileViewModel
+    @State private var showFullText = false
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            // User info and comment text
+            HStack(alignment: .top, spacing: 8) {
+                // Profile photo (smaller size)
+                if let url = URL(string: comment.profilePhotoUrl) {
+                    AsyncImage(url: url) { phase in
+                        switch phase {
+                        case .empty:
+                            Image(systemName: "person.circle")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 24, height: 24)
+                                .foregroundColor(.gray)
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 24, height: 24)
+                                .clipShape(Circle())
+                        case .failure:
+                            Image(systemName: "person.circle")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 24, height: 24)
+                                .foregroundColor(.gray)
+                        @unknown default:
+                            EmptyView()
+                        }
+                    }
+                } else {
+                    Image(systemName: "person.circle")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 24, height: 24)
+                        .foregroundColor(.gray)
+                }
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack {
+                        Text("\(comment.userFirstName) \(comment.userLastName)")
+                            .font(.caption)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.primary) // Use .primary for dark mode support
+                        
+                        Text(formattedTimestamp(comment.timestamp))
+                            .font(.caption2)
+                            .foregroundColor(.gray)
+                        
+                        Spacer()
+                        
+                        // Like button (smaller)
+                        Button(action: {
+                            selectedPlaceVM.likeComment(comment: comment, userId: profile.userId)
+                        }) {
+                            HStack(spacing: 2) {
+                                Image(systemName: selectedPlaceVM.isCommentLiked(comment.id) ? "heart.fill" : "heart")
+                                    .foregroundColor(selectedPlaceVM.isCommentLiked(comment.id) ? .red : .gray)
+                                    .font(.caption2)
+                                
+                                Text("\(comment.likes)")
+                                    .font(.caption2)
+                                    .foregroundColor(.gray)
+                            }
+                        }
+                        .disabled(comment.userId == profile.userId)
+                        .opacity(comment.userId == profile.userId ? 0.5 : 1)
+                    }
+                    
+                    // Comment text
+                    Text(comment.commentText)
+                        .font(.caption)
+                        .foregroundColor(.primary) // Use .primary for dark mode support
+                        .lineLimit(showFullText ? nil : 3)
+                        .onTapGesture {
+                            withAnimation {
+                                showFullText.toggle()
+                            }
+                        }
+                }
+            }
+            
+            // Show photos if any (smaller)
+            let photos = selectedPlaceVM.commentPhotos(for: comment)
+            if !photos.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 5) {
+                        ForEach(0..<photos.count, id: \.self) { index in
+                            Image(uiImage: photos[index])
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 60, height: 60)
+                                .clipShape(RoundedRectangle(cornerRadius: 6))
+                        }
+                    }
+                }
+                .frame(height: 60)
+                .padding(.leading, 32) // Aligns with the text
+            }
+        }
+        .padding(8)
+        .background(Color(.secondarySystemBackground)) // Better dark/light mode support
+        .cornerRadius(8)
+    }
+    
+    // Helper function to format timestamp
+    private func formattedTimestamp(_ date: Date) -> String {
+        let now = Date()
+        let calendar = Calendar.current
+        let components = calendar.dateComponents([.minute, .hour, .day], from: date, to: now)
+        
+        if let minutes = components.minute, minutes < 60 {
+            return minutes == 0 ? "Just now" : "\(minutes)m"
+        } else if let hours = components.hour, hours < 24 {
+            return "\(hours)h"
+        } else if let days = components.day, days < 7 {
+            return "\(days)d"
+        } else {
+            let formatter = DateFormatter()
+            formatter.dateStyle = .short
+            formatter.timeStyle = .none
+            return formatter.string(from: date)
+        }
+    }
+}
+
+// Custom shape for the curved connection line
+struct ConnectionLine: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        
+        // Start at top center
+        path.move(to: CGPoint(x: rect.midX, y: 0))
+        
+        // Draw curved line to right side
+        path.addQuadCurve(
+            to: CGPoint(x: rect.maxX, y: rect.midY),
+            control: CGPoint(x: rect.midX, y: rect.midY - 5)
+        )
+        
+        return path
     }
 }
 

@@ -44,6 +44,12 @@ class SelectedPlaceViewModel: ObservableObject {
     // Add new property to track liked reviews
     @Published private var likedReviews: Set<String> = []
 
+    // MARK: - Comment Management Properties
+    private var placeReviewComments: [String: [Comment]] = [:] // reviewId -> comments
+    private var likedComments: Set<String> = [] // commentIds that are liked by the current user
+    private var commentLoadingStates: [String: LoadingState] = [:] // reviewId -> loading state
+    private var commentPhotos: [String: [UIImage]] = [:] // commentId -> photos
+
     // MARK: - Loading State Enum
     enum LoadingState: Equatable {
         case idle
@@ -280,6 +286,191 @@ class SelectedPlaceViewModel: ObservableObject {
         }
     }
     
+    // MARK: - Comment Methods
+    
+    func loadCommentsForReview(reviewId: String) {
+        guard let placeId = selectedPlace?.id.uuidString else { return }
+        
+        // Set loading state
+        commentLoadingStates[reviewId] = .loading
+        
+        firestoreService.fetchComments(placeId: placeId, reviewId: reviewId) { [weak self] comments, error in
+            guard let self = self else { return }
+            
+            DispatchQueue.main.async {
+                if let error = error {
+                    self.commentLoadingStates[reviewId] = .error(error)
+                } else if let comments = comments {
+                    // Store comments for this review
+                    self.placeReviewComments[reviewId] = comments
+                    self.commentLoadingStates[reviewId] = .loaded
+                    
+                    // Load photos for each comment
+                    for comment in comments {
+                        self.loadCommentPhotos(for: comment)
+                    }
+                }
+            }
+        }
+    }
+    
+    func addComment(reviewId: String, text: String, images: [UIImage], userId: String, userFirstName: String, userLastName: String, profilePhotoUrl: String) {
+        guard let placeId = selectedPlace?.id.uuidString else { return }
+        
+        let commentId = UUID().uuidString
+        
+        let comment = Comment(
+            id: commentId,
+            reviewId: reviewId,
+            userId: userId,
+            profilePhotoUrl: profilePhotoUrl,
+            userFirstName: userFirstName,
+            userLastName: userLastName,
+            commentText: text,
+            timestamp: Date(),
+            images: [],
+            likes: 0
+        )
+        
+        firestoreService.addComment(placeId: placeId, reviewId: reviewId, comment: comment, images: images) { [weak self] result in
+            guard let self = self else { return }
+            
+            DispatchQueue.main.async {
+                switch result {
+                case .success(let savedComment):
+                    // Add the comment to our local collection
+                    var currentComments = self.placeReviewComments[reviewId] ?? []
+                    currentComments.insert(savedComment, at: 0) // Add at the top
+                    self.placeReviewComments[reviewId] = currentComments
+                    
+                    // Load comment photos if any
+                    if !savedComment.images.isEmpty {
+                        self.loadCommentPhotos(for: savedComment)
+                    }
+                    
+                case .failure(let error):
+                    print("Error adding comment: \(error.localizedDescription)")
+                }
+            }
+        }
+    }
+    
+    private func loadCommentPhotos(for comment: Comment) {
+        // Skip if there are no images or if already loaded
+        if comment.images.isEmpty || commentPhotos[comment.id] != nil {
+            return
+        }
+        
+        firestoreService.fetchPhotosFromStorage(urls: comment.images) { [weak self] images, error in
+            guard let self = self else { return }
+            
+            DispatchQueue.main.async {
+                if let error = error {
+                    print("Error loading comment photos: \(error.localizedDescription)")
+                } else if let images = images {
+                    self.commentPhotos[comment.id] = images
+                }
+            }
+        }
+    }
+    
+    func likeComment(comment: Comment, userId: String) {
+        guard let placeId = selectedPlace?.id.uuidString else { return }
+        
+        // Prevent liking your own comment
+        if comment.userId == userId {
+            print("Cannot like your own comment")
+            return
+        }
+        
+        firestoreService.hasUserLikedComment(userId: userId, commentId: comment.id) { [weak self] isLiked in
+            guard let self = self else { return }
+            
+            if isLiked {
+                // Unlike the comment
+                self.firestoreService.unlikeComment(userId: userId, placeId: placeId, reviewId: comment.reviewId, commentId: comment.id) { [weak self] result in
+                    guard let self = self else { return }
+                    
+                    switch result {
+                    case .success:
+                        DispatchQueue.main.async {
+                            if var currentComments = self.placeReviewComments[comment.reviewId] {
+                                if let index = currentComments.firstIndex(where: { $0.id == comment.id }) {
+                                    // Create a new Comment instance with updated likes count
+                                    var updatedComment = currentComments[index]
+                                    updatedComment.likes = max(0, updatedComment.likes - 1)
+                                    currentComments[index] = updatedComment
+                                    self.placeReviewComments[comment.reviewId] = currentComments
+                                    self.likedComments.remove(comment.id)
+                                }
+                            }
+                        }
+                    case .failure(let error):
+                        print("Error unliking comment: \(error.localizedDescription)")
+                    }
+                }
+            } else {
+                // Like the comment
+                self.firestoreService.likeComment(userId: userId, placeId: placeId, reviewId: comment.reviewId, commentId: comment.id) { [weak self] result in
+                    guard let self = self else { return }
+                    
+                    switch result {
+                    case .success:
+                        DispatchQueue.main.async {
+                            if var currentComments = self.placeReviewComments[comment.reviewId] {
+                                if let index = currentComments.firstIndex(where: { $0.id == comment.id }) {
+                                    // Create a new Comment instance with updated likes count
+                                    var updatedComment = currentComments[index]
+                                    updatedComment.likes += 1
+                                    currentComments[index] = updatedComment
+                                    self.placeReviewComments[comment.reviewId] = currentComments
+                                    self.likedComments.insert(comment.id)
+                                }
+                            }
+                        }
+                    case .failure(let error):
+                        print("Error liking comment: \(error.localizedDescription)")
+                    }
+                }
+            }
+        }
+    }
+    
+    func checkCommentLikeStatuses(userId: String, reviewId: String) {
+        guard let comments = placeReviewComments[reviewId] else { return }
+        
+        // Clear previous comment likes before checking
+        likedComments.removeAll()
+        
+        comments.forEach { comment in
+            firestoreService.hasUserLikedComment(userId: userId, commentId: comment.id) { [weak self] isLiked in
+                DispatchQueue.main.async {
+                    if isLiked {
+                        self?.likedComments.insert(comment.id)
+                    }
+                }
+            }
+        }
+    }
+    
+    // MARK: - Comment Public Accessors
+    
+    func comments(for reviewId: String) -> [Comment] {
+        return placeReviewComments[reviewId] ?? []
+    }
+    
+    func commentLoadingState(for reviewId: String) -> LoadingState {
+        return commentLoadingStates[reviewId] ?? .idle
+    }
+    
+    func commentPhotos(for comment: Comment) -> [UIImage] {
+        return commentPhotos[comment.id] ?? []
+    }
+    
+    func isCommentLiked(_ commentId: String) -> Bool {
+        return likedComments.contains(commentId)
+    }
+
     // MARK: - Public Methods
     func addReview(_ review: Review) {
         guard let placeId = selectedPlace?.id.uuidString else { return }
