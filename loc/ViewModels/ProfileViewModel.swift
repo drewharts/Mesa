@@ -841,6 +841,29 @@ class ProfileViewModel: ObservableObject {
         return uniqueUsers
     }
     
+    // Returns unique users who saved a place, excluding the current logged-in user
+    func getUniquePlaceSaversExcludingCurrentUser(forPlaceId placeId: String) -> [User] {
+        guard let users = placeSaversByPlace[placeId] else { return [] }
+        
+        var uniqueUsers: [User] = []
+        var seenIds = Set<String>()
+        
+        for user in users {
+            // Skip the current logged-in user
+            if user.id == userId {
+                continue
+            }
+            
+            // Add other unique users
+            if !seenIds.contains(user.id) {
+                uniqueUsers.append(user)
+                seenIds.insert(user.id)
+            }
+        }
+        
+        return uniqueUsers
+    }
+    
     // Updates placeSaversByPlace dictionary, preventing duplicates
     func updatePlaceSavers(placeId: String, user: User) {
         if placeSaversByPlace[placeId] != nil {

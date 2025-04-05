@@ -210,14 +210,15 @@ struct ProfileCirclesView: View {
     var body: some View {
         Group {
             if let placeId = placeId {
-                // Get unique users who saved this place
-                let uniqueUsers = profile.getUniquePlaceSavers(forPlaceId: placeId)
+                // Get unique users who saved this place, excluding current user
+                let uniqueUsers = profile.getUniquePlaceSaversExcludingCurrentUser(forPlaceId: placeId)
                 
-                // Only show the profile circles if we actually have unique users
+                // Only show the profile circles if we actually have other unique users
                 if !uniqueUsers.isEmpty {
                     HStack(spacing: -10) {
-                        // Get profile images for this place
-                        let (image1, image2, image3) = profile.getFirstThreeProfileImages(forKey: placeId)
+                        // Get profile images for this place (we'll still use getFirstThreeProfileImages since
+                        // it pulls from DetailPlaceViewModel.placeSavers which has the correct filtering)
+                        let (image1, image2, image3) = getProfileImagesForDisplayedUsers(users: uniqueUsers, placeId: placeId)
                         
                         // First profile image
                         if let image1 = image1 {
@@ -243,6 +244,19 @@ struct ProfileCirclesView: View {
                 EmptyView()
             }
         }
+    }
+    
+    // Helper method to get profile images for displayed users
+    private func getProfileImagesForDisplayedUsers(users: [User], placeId: String) -> (UIImage?, UIImage?, UIImage?) {
+        guard !users.isEmpty else { return (nil, nil, nil) }
+        
+        let firstThreeUsers = users.prefix(3)
+        let images = firstThreeUsers.map { user -> UIImage? in
+            profile.profilePhoto(forUserId: user.id)
+        }
+        
+        let paddedImages = (images + [nil, nil, nil]).prefix(3)
+        return (paddedImages[0], paddedImages[1], paddedImages[2])
     }
     
     // Helper view for profile image circle
