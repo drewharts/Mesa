@@ -156,31 +156,7 @@ struct MinPlaceDetailView: View {
                             )
                     }
                     
-
-                    
-                    HStack(spacing: -10) {
-                        ForEach(0..<2) { _ in
-                            Circle()
-                                .fill(Color.gray)
-                                .frame(width: 30, height: 30)
-                                .overlay(
-                                    Circle().stroke(Color.white, lineWidth: 2)
-                                )
-                        }
-                        
-                        ZStack {
-                            Circle()
-                                .fill(Color.gray)
-                                .frame(width: 30, height: 30)
-                                .overlay(
-                                    Circle().stroke(Color.white, lineWidth: 2)
-                                )
-                            
-                            Text("+5")
-                                .font(.caption)
-                                .foregroundColor(.white)
-                        }
-                    }
+                    ProfileCirclesView(placeId: selectedPlaceVM.selectedPlace?.id.uuidString)
                 }
                 .padding(.bottom, 10)
                 
@@ -226,67 +202,74 @@ enum DetailTab {
     case reviews
 }
 
-// MARK: - Preview Provider
-// MARK: - Preview Provider
-//struct MinPlaceDetailView_Previews: PreviewProvider {
-//    static var previews: some View {
-//        // Create mock instances for dependencies
-//        let mockLocationManager = LocationManager()
-//        let mockFirestoreService = FirestoreService()
-//        let mockProfileData = ProfileData(
-//            id: "", firstName: "drew", lastName: "hartsfield", email: "drew", profilePhotoURL: URL(string: ""), phoneNumber: "801"
-//        )
-//        let mockUserId = "user123"
-//        
-//        // Create mock ProfileViewModel with required parameters
-//        let mockProfile = ProfileViewModel(
-//            data: mockProfileData,
-//            firestoreService: mockFirestoreService,
-//            userId: mockUserId
-//        )
-//        
-//        let mockPlaceDetailVM = PlaceDetailViewModel()
-//        let mockSelectedPlaceVM = SelectedPlaceViewModel(
-//            locationManager: mockLocationManager,
-//            firestoreService: mockFirestoreService
-//        )
-//        
-//        // Set up mock data for selectedPlaceVM
-//        mockSelectedPlaceVM.selectedPlace = DetailPlace()
-//        
-//        // Set up mock data for profile (already set in mockProfileData)
-//        
-//        // Set up mock reviews for selectedPlaceVM (optional, for the Reviews tab)
-//        mockSelectedPlaceVM.reviews = [
-//            Review(
-//                id: "review1",
-//                userId: "user123",
-//                profilePhotoUrl: "",
-//                userFirstName: "Mada",
-//                userLastName: "Graviet",
-//                placeId: "place123",
-//                placeName: "Sample Restaurant",
-//                foodRating: 7.8,
-//                serviceRating: 4.3,
-//                ambienceRating: 8.1,
-//                favoriteDishes: ["roasted chicken", "grilled salmon"],
-//                reviewText: "\"This is definitely a new favorite. Service was really slow but food made up for it.\"",
-//                timestamp: Date().addingTimeInterval(-172800), // 2 days ago
-//                images: ["https://example.com/restaurant.jpg", "https://example.com/food.jpg"]
-//            )
-//        ]
-//        
-//        // Configure PlaceDetailViewModel with mock data
-//        mockPlaceDetailVM.isOpen = true
-//        mockPlaceDetailVM.travelTime = "15 min"
-//        
-//        return MinPlaceDetailView(
-//            viewModel: mockPlaceDetailVM,
-//            showNoPhoneNumberAlert: .constant(false),
-//            selectedImage: .constant(nil)
-//        )
-//        .environmentObject(mockProfile)
-//        .environmentObject(mockSelectedPlaceVM)
-//        .environmentObject(mockLocationManager)
-//    }
-//}
+// MARK: - Profile Circles View
+struct ProfileCirclesView: View {
+    @EnvironmentObject var profile: ProfileViewModel
+    let placeId: String?
+    
+    var body: some View {
+        Group {
+            if let placeId = placeId {
+                // Get unique users who saved this place
+                let uniqueUsers = profile.getUniquePlaceSavers(forPlaceId: placeId)
+                
+                // Only show the profile circles if we actually have unique users
+                if !uniqueUsers.isEmpty {
+                    HStack(spacing: -10) {
+                        // Get profile images for this place
+                        let (image1, image2, image3) = profile.getFirstThreeProfileImages(forKey: placeId)
+                        
+                        // First profile image
+                        if let image1 = image1 {
+                            profileCircleImage(image: image1)
+                        }
+                        
+                        // Second profile image
+                        if let image2 = image2 {
+                            profileCircleImage(image: image2)
+                        }
+                        
+                        // Third or +more indicator
+                        if let image3 = image3 {
+                            profileCircleImage(image: image3)
+                        } else if uniqueUsers.count > 2 {
+                            // Show +X if there are more than shown
+                            plusCircle(count: uniqueUsers.count - 2)
+                        }
+                    }
+                }
+            } else {
+                // If no users have saved this place, display nothing
+                EmptyView()
+            }
+        }
+    }
+    
+    // Helper view for profile image circle
+    private func profileCircleImage(image: UIImage) -> some View {
+        Image(uiImage: image)
+            .resizable()
+            .scaledToFill()
+            .frame(width: 30, height: 30)
+            .clipShape(Circle())
+            .overlay(
+                Circle().stroke(Color.white, lineWidth: 2)
+            )
+    }
+    
+    // Helper view for the +X circle
+    private func plusCircle(count: Int) -> some View {
+        ZStack {
+            Circle()
+                .fill(Color.gray)
+                .frame(width: 30, height: 30)
+                .overlay(
+                    Circle().stroke(Color.white, lineWidth: 2)
+                )
+            
+            Text("+\(count)")
+                .font(.caption)
+                .foregroundColor(.white)
+        }
+    }
+}

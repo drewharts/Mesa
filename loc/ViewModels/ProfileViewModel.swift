@@ -200,7 +200,7 @@ class ProfileViewModel: ObservableObject {
                     self.detailPlaceViewModel.places[placeId] = place
                     self.detailPlaceViewModel.updatePlaceSavers(placeId: placeId, user: user)
                     // Add to our placeSaversByPlace dictionary
-                    self.placeSaversByPlace[placeId, default: []].append(user)
+                    self.updatePlaceSavers(placeId: placeId, user: user)
                     self.detailPlaceViewModel.fetchPlaceImage(for: placeId)
                     self.updatePlaceAnnotationImages(for: placeId)
                 }
@@ -250,6 +250,7 @@ class ProfileViewModel: ObservableObject {
                     let placeId = place.id.uuidString
                     self.detailPlaceViewModel.places[placeId] = place
                     self.detailPlaceViewModel.updatePlaceSavers(placeId: placeId, user: friend)
+                    self.updatePlaceSavers(placeId: placeId, user: friend)
                     self.detailPlaceViewModel.fetchPlaceImage(for: placeId)
                     self.updatePlaceAnnotationImages(for: placeId)
                 }
@@ -371,7 +372,7 @@ class ProfileViewModel: ObservableObject {
                 if let user = self.currentUser {
                     self.detailPlaceViewModel.updatePlaceSavers(placeId: placeId, user: user)
                     // Add to placeSaversByPlace dictionary
-                    self.placeSaversByPlace[placeId, default: []].append(user)
+                    self.updatePlaceSavers(placeId: placeId, user: user)
                 }
                 self.detailPlaceViewModel.fetchPlaceImage(for: placeId)
                 self.updatePlaceAnnotationImages(for: placeId)
@@ -434,7 +435,7 @@ class ProfileViewModel: ObservableObject {
                                 self.detailPlaceViewModel.places[placeId] = place
                                 self.detailPlaceViewModel.updatePlaceSavers(placeId: placeId, user: currentUser)
                                 // Add to our placeSaversByPlace dictionary
-                                self.placeSaversByPlace[placeId, default: []].append(currentUser)
+                                self.updatePlaceSavers(placeId: placeId, user: currentUser)
                                 self.detailPlaceViewModel.fetchPlaceImage(for: placeId)
                                 self.updatePlaceAnnotationImages(for: placeId)
                             }
@@ -595,7 +596,7 @@ class ProfileViewModel: ObservableObject {
                         self.detailPlaceViewModel.places[placeId] = place
                         self.detailPlaceViewModel.updatePlaceSavers(placeId: placeId, user: currentUser)
                         // Add to placeSaversByPlace dictionary
-                        self.placeSaversByPlace[placeId, default: []].append(currentUser)
+                        self.updatePlaceSavers(placeId: placeId, user: currentUser)
                         self.detailPlaceViewModel.fetchPlaceImage(for: placeId)
                         self.updatePlaceAnnotationImages(for: placeId)
                     }
@@ -631,7 +632,7 @@ class ProfileViewModel: ObservableObject {
                         self.detailPlaceViewModel.places[placeId] = place
                         self.detailPlaceViewModel.updatePlaceSavers(placeId: placeId, user: friend)
                         // Add to placeSaversByPlace dictionary
-                        self.placeSaversByPlace[placeId, default: []].append(friend)
+                        self.updatePlaceSavers(placeId: placeId, user: friend)
                         self.detailPlaceViewModel.fetchPlaceImage(for: placeId)
                         self.updatePlaceAnnotationImages(for: placeId)
                     }
@@ -739,7 +740,7 @@ class ProfileViewModel: ObservableObject {
                                     // Store the place in the DetailPlaceViewModel
                                     self.detailPlaceViewModel.places[placeId] = place
                                     // Add user to place savers map
-                                    self.placeSaversByPlace[placeId, default: []].append(friend)
+                                    self.updatePlaceSavers(placeId: placeId, user: friend)
                                     // Update in DetailPlaceViewModel for consistency
                                     self.detailPlaceViewModel.updatePlaceSavers(placeId: placeId, user: friend)
                                     // Fetch the place image
@@ -767,7 +768,7 @@ class ProfileViewModel: ObservableObject {
                                             // Store the place
                                             self.detailPlaceViewModel.places[placeId] = place
                                             // Add user to place savers map
-                                            self.placeSaversByPlace[placeId, default: []].append(friend)
+                                            self.updatePlaceSavers(placeId: placeId, user: friend)
                                             // Update in DetailPlaceViewModel
                                             self.detailPlaceViewModel.updatePlaceSavers(placeId: placeId, user: friend)
                                             // Fetch the place image
@@ -818,6 +819,37 @@ class ProfileViewModel: ObservableObject {
                     }
                 }
             }
+        }
+    }
+    
+    // MARK: - User Management Methods
+    
+    // Returns unique users who saved a place, removing duplicates by ID
+    func getUniquePlaceSavers(forPlaceId placeId: String) -> [User] {
+        guard let users = placeSaversByPlace[placeId] else { return [] }
+        
+        var uniqueUsers: [User] = []
+        var seenIds = Set<String>()
+        
+        for user in users {
+            if !seenIds.contains(user.id) {
+                uniqueUsers.append(user)
+                seenIds.insert(user.id)
+            }
+        }
+        
+        return uniqueUsers
+    }
+    
+    // Updates placeSaversByPlace dictionary, preventing duplicates
+    func updatePlaceSavers(placeId: String, user: User) {
+        if placeSaversByPlace[placeId] != nil {
+            // Only add if user not already in the array
+            if !placeSaversByPlace[placeId]!.contains(where: { $0.id == user.id }) {
+                placeSaversByPlace[placeId]!.append(user)
+            }
+        } else {
+            placeSaversByPlace[placeId] = [user]
         }
     }
 }
