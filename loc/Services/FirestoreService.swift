@@ -1698,15 +1698,16 @@ class FirestoreService: ObservableObject {
             }
         }
         
-        func fetchComments(placeId: String, reviewId: String, completion: @escaping ([Comment]?, Error?) -> Void) {
+        func fetchComments(placeId: String, reviewId: String, limit: Int = 20, completion: @escaping ([Comment]?, Error?) -> Void) {
             let commentsRef = db.collection("places")
                               .document(placeId)
                               .collection("reviews")
                               .document(reviewId)
                               .collection("comments")
             
-            // Get all comments, ordered by timestamp
+            // Get comments, ordered by timestamp with a limit
             commentsRef.order(by: "timestamp", descending: true)
+                     .limit(to: limit)
                      .getDocuments { snapshot, error in
                 if let error = error {
                     print("Error fetching comments: \(error.localizedDescription)")

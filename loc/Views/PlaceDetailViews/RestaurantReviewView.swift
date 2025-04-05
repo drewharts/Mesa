@@ -135,13 +135,19 @@ struct RestaruantReviewViewProfileInformation: View {
     private func formattedTimestamp(_ date: Date) -> String {
         let now = Date()
         let calendar = Calendar.current
-        let daysSince = calendar.dateComponents([.day], from: date, to: now).day ?? 0
+        let components = calendar.dateComponents([.minute, .hour, .day], from: date, to: now)
         
-        // If within 30 days, show number of days
-        if daysSince < 30 {
-            return daysSince == 0 ? "Today" : "\(daysSince) day\(daysSince == 1 ? "" : "s") ago"
+        if let minutes = components.minute, minutes < 60 && (components.hour ?? 0) == 0 && (components.day ?? 0) == 0 {
+            return minutes == 0 ? "Just now" : "\(minutes)m"
+        } else if let hours = components.hour, hours < 24 && (components.day ?? 0) == 0 {
+            return "\(hours)h"
+        } else if let days = components.day {
+            return "\(days)d"
         } else {
-            return timestampFormatter.string(from: date)
+            let formatter = DateFormatter()
+            formatter.dateStyle = .short
+            formatter.timeStyle = .none
+            return formatter.string(from: date)
         }
     }
 
@@ -358,6 +364,7 @@ struct InlineCommentsView: View {
     @State private var selectedImages: [UIImage] = []
     @State private var isPickerPresented = false
     @State private var showingReplyField = false
+    @State private var loadedCommentLimit = 5
     @FocusState private var isTextFieldFocused: Bool
     
     let reviewId: String
@@ -366,6 +373,7 @@ struct InlineCommentsView: View {
         VStack(spacing: 12) {
             // Comments list
             let comments = selectedPlaceVM.comments(for: reviewId)
+            let totalCommentCount = selectedPlaceVM.commentCount(for: reviewId)
             let loadingState = selectedPlaceVM.commentLoadingState(for: reviewId)
             
             switch loadingState {
@@ -456,6 +464,25 @@ struct InlineCommentsView: View {
                                 InlineCommentView(comment: comment)
                             }
                         }
+                        
+                        // Load more comments button if there are more to load
+                        if comments.count < totalCommentCount {
+                            Button(action: {
+                                loadMoreComments()
+                            }) {
+                                HStack {
+                                    Text("Load more comments")
+                                        .font(.caption)
+                                        .foregroundColor(.blue)
+                                    
+                                    Image(systemName: "arrow.down.circle")
+                                        .font(.caption)
+                                        .foregroundColor(.blue)
+                                }
+                                .padding(.vertical, 8)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .center)
+                        }
                     }
                     .padding(.leading, 8)
                     
@@ -536,6 +563,14 @@ struct InlineCommentsView: View {
         .sheet(isPresented: $isPickerPresented) {
             MultiImagePicker(images: $selectedImages, selectionLimit: 5)
         }
+    }
+     
+    private func loadMoreComments() {
+        // Increase the limit and reload comments
+        loadedCommentLimit += 5
+        
+        guard let placeId = selectedPlaceVM.selectedPlace?.id.uuidString else { return }
+        selectedPlaceVM.loadMoreComments(placeId: placeId, reviewId: reviewId, limit: loadedCommentLimit)
     }
     
     private func submitComment() {
@@ -672,11 +707,11 @@ struct InlineCommentView: View {
         let calendar = Calendar.current
         let components = calendar.dateComponents([.minute, .hour, .day], from: date, to: now)
         
-        if let minutes = components.minute, minutes < 60 {
+        if let minutes = components.minute, minutes < 60 && (components.hour ?? 0) == 0 && (components.day ?? 0) == 0 {
             return minutes == 0 ? "Just now" : "\(minutes)m"
-        } else if let hours = components.hour, hours < 24 {
+        } else if let hours = components.hour, hours < 24 && (components.day ?? 0) == 0 {
             return "\(hours)h"
-        } else if let days = components.day, days < 7 {
+        } else if let days = components.day {
             return "\(days)d"
         } else {
             let formatter = DateFormatter()
