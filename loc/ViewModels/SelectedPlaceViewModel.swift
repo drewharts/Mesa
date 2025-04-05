@@ -20,7 +20,7 @@ class SelectedPlaceViewModel: ObservableObject {
                let currentLocation = locationManager.currentLocation {
                 loadData(for: place, currentLocation: currentLocation.coordinate)
                 loadReviews(for: place)
-                getPlacePhotos(for: place)
+//                getPlacePhotos(for: place)
                 
                 // Clear previous likes when loading a new place
                 likedReviews.removeAll()
@@ -218,6 +218,11 @@ class SelectedPlaceViewModel: ObservableObject {
                 }
             }
         }
+    }
+    
+    // Public method to reload review photos
+    func reloadReviewPhotos(for review: Review) {
+        self.loadReviewPhotos(for: review)
     }
     
     private func loadProfilePhoto(for review: Review) {

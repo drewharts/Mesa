@@ -220,20 +220,35 @@ struct RestaurantReviewView: View {
             
             switch loadingState {
             case .loading:
-                ProgressView()
-                    .padding(.horizontal)
-                    .frame(height: 150) // Match photo height for consistency
+                ZStack {
+                    VStack {
+                        ProgressView()
+                            .scaleEffect(1.2)
+                        
+                        Text("Loading photos...")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                            .padding(.top, 8)
+                    }
+                }
+                .frame(height: 150)
+                .padding(.horizontal)
                 
             case .loaded:
                 if !reviewPhotos.isEmpty {
                     ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 16) {
+                        LazyHStack(spacing: 16) {
                             ForEach(reviewPhotos, id: \.self) { photo in
                                 Image(uiImage: photo)
                                     .resizable()
                                     .scaledToFill()
                                     .frame(width: 150, height: 150)
                                     .clipShape(RoundedRectangle(cornerRadius: 10))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 10)
+                                            .stroke(Color.gray.opacity(0.3), lineWidth: 0.5)
+                                    )
+                                    .shadow(radius: 2)
                                     .onTapGesture {
                                         selectedImage = photo
                                     }
@@ -249,10 +264,32 @@ struct RestaurantReviewView: View {
                 }
                 
             case .error(let error):
-                Text("Failed to load photos: \(error.localizedDescription)")
-                    .font(.footnote)
-                    .foregroundColor(.red)
+                VStack(spacing: 8) {
+                    HStack {
+                        Image(systemName: "exclamationmark.triangle")
+                            .foregroundColor(.orange)
+                        
+                        Text("Failed to load photos: \(error.localizedDescription)")
+                            .font(.footnote)
+                            .foregroundColor(.red)
+                    }
                     .padding(.horizontal)
+                    
+                    Button(action: {
+                        // Trigger reload of photos
+                        selectedPlaceVM.reloadReviewPhotos(for: review)
+                    }) {
+                        Text("Retry")
+                            .font(.footnote)
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(Color.blue)
+                            .cornerRadius(8)
+                    }
+                }
+                .padding(.vertical, 8)
+                .padding(.horizontal)
                 
             case .idle:
                 Text("Photos not yet loaded")

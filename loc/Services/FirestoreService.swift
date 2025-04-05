@@ -8,6 +8,7 @@
 
 import FirebaseFirestore
 import FirebaseStorage
+import UIKit
 
 class FirestoreService: ObservableObject {
     private let db = Firestore.firestore()
@@ -189,11 +190,7 @@ class FirestoreService: ObservableObject {
     }
     
     func fetchPhotosFromStorage(urls: [String], completion: @escaping ([UIImage]?, Error?) -> Void) {
-        var images: [UIImage] = []
-        let group = DispatchGroup()
-        var fetchError: Error?
-        
-        // If no URLs provided, return empty array immediately
+        // Early exit for empty URLs
         guard !urls.isEmpty else {
             DispatchQueue.main.async {
                 completion([], nil)
@@ -201,31 +198,122 @@ class FirestoreService: ObservableObject {
             return
         }
         
+        var images: [UIImage] = []
+        let group = DispatchGroup()
+        var lastError: Error?
+        
+        // Use OperationQueue to limit concurrent downloads
+        let downloadQueue = OperationQueue()
+        downloadQueue.maxConcurrentOperationCount = 3 // Limit concurrent downloads
+        
         for urlString in urls {
+            // Skip invalid URLs
             guard let url = URL(string: urlString) else {
                 print("Invalid URL: \(urlString)")
                 continue
             }
             
+            // Check cache first
+            if let cachedImage = ImageCacheService.shared.getImage(for: url) {
+                images.append(cachedImage)
+                continue
+            }
+            
             group.enter()
-            URLSession.shared.dataTask(with: url) { data, response, error in
-                if let error = error {
-                    print("Error downloading image from \(urlString): \(error.localizedDescription)")
-                    fetchError = error
-                } else if let data = data, let image = UIImage(data: data) {
-                    images.append(image)
+            
+            // Create download operation
+            let operation = BlockOperation {
+                // Create a semaphore to handle the async task within the operation
+                let semaphore = DispatchSemaphore(value: 0)
+                
+                var retryCount = 0
+                let maxRetries = 2
+                
+                func attemptDownload() {
+                    // Configure the URLRequest with timeout
+                    var request = URLRequest(url: url)
+                    request.timeoutInterval = 15 // 15 seconds timeout
+                    
+                    URLSession.shared.dataTask(with: request) { data, response, error in
+                        // Handle error with retry logic
+                        if let error = error {
+                            if retryCount < maxRetries {
+                                retryCount += 1
+                                print("Retry \(retryCount) for URL: \(urlString)")
+                                attemptDownload() // Recursive retry
+                                return
+                            }
+                            
+                            print("Error downloading image after \(maxRetries) retries from \(urlString): \(error.localizedDescription)")
+                            lastError = error
+                            semaphore.signal()
+                            group.leave()
+                            return
+                        }
+                        
+                        // Process image data
+                        if let data = data {
+                            // Check for image data size and possibly downsample for large images
+                            if data.count > 1024 * 1024 { // If larger than 1MB
+                                if let downsampledImage = self.downsampleImage(data: data, to: CGSize(width: 1000, height: 1000)) {
+                                    images.append(downsampledImage)
+                                    ImageCacheService.shared.storeImage(downsampledImage, for: url)
+                                } else if let image = UIImage(data: data) {
+                                    images.append(image)
+                                    ImageCacheService.shared.storeImage(image, for: url)
+                                }
+                            } else if let image = UIImage(data: data) {
+                                images.append(image)
+                                ImageCacheService.shared.storeImage(image, for: url)
+                            }
+                        }
+                        
+                        semaphore.signal()
+                        group.leave()
+                    }.resume()
                 }
-                group.leave()
-            }.resume()
+                
+                // Start the download process
+                attemptDownload()
+                
+                // Wait for the async operation to complete
+                semaphore.wait()
+            }
+            
+            downloadQueue.addOperation(operation)
         }
         
+        // Handle completion
         group.notify(queue: .main) {
-            if let error = fetchError {
-                completion(nil, error)
+            if images.isEmpty && lastError != nil {
+                completion(nil, lastError)
             } else {
                 completion(images, nil)
             }
         }
+    }
+    
+    // Helper method to downsample large images
+    private func downsampleImage(data: Data, to pointSize: CGSize) -> UIImage? {
+        let imageSourceOptions = [kCGImageSourceShouldCache: false] as CFDictionary
+        guard let imageSource = CGImageSourceCreateWithData(data as CFData, imageSourceOptions) else {
+            return nil
+        }
+        
+        let maxDimensionInPixels = max(pointSize.width, pointSize.height) * UIScreen.main.scale
+        
+        let downsampleOptions = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceShouldCacheImmediately: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceThumbnailMaxPixelSize: maxDimensionInPixels
+        ] as CFDictionary
+        
+        guard let downsampledImage = CGImageSourceCreateThumbnailAtIndex(imageSource, 0, downsampleOptions) else {
+            return nil
+        }
+        
+        return UIImage(cgImage: downsampledImage)
     }
     
     func fetchPhotosFromStorage(placeId: String, returnFirstImageOnly: Bool = false, completion: @escaping ([UIImage]?, Error?) -> Void) {
