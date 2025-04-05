@@ -12,65 +12,89 @@ struct PlaceReviewsView: View {
     @Binding var selectedImage: UIImage?
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var profile: ProfileViewModel
+    @State private var activeKeyboardReviewId: String? = nil
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 24) {
-                if let placeId = selectedPlaceVM.selectedPlace?.id.uuidString {
-                    let loadingState = selectedPlaceVM.reviewLoadingState(forPlaceId: placeId)
-                    let reviews = selectedPlaceVM.reviews // Use view model's reviews
-                    
-                    switch loadingState {
-                    case .loading:
-                        ProgressView()
-                            .padding()
-                            .frame(maxWidth: .infinity)
+        ScrollViewReader { scrollProxy in
+            ScrollView {
+                VStack(spacing: 24) {
+                    if let placeId = selectedPlaceVM.selectedPlace?.id.uuidString {
+                        let loadingState = selectedPlaceVM.reviewLoadingState(forPlaceId: placeId)
+                        let reviews = selectedPlaceVM.reviews // Use view model's reviews
                         
-                    case .loaded:
-                        if reviews.isEmpty {
-                            Text("No reviews yet.")
+                        switch loadingState {
+                        case .loading:
+                            ProgressView()
+                                .padding()
+                                .frame(maxWidth: .infinity)
+                            
+                        case .loaded:
+                            if reviews.isEmpty {
+                                Text("No reviews yet.")
+                                    .font(.subheadline)
+                                    .foregroundColor(.gray)
+                                    .padding()
+                            } else {
+                                ForEach(reviews, id: \.id) { review in
+                                    RestaurantReviewView(review: review, 
+                                                         selectedImage: $selectedImage,
+                                                         isActiveKeyboard: Binding(
+                                                            get: { activeKeyboardReviewId == review.id },
+                                                            set: { isActive in
+                                                                if isActive {
+                                                                    activeKeyboardReviewId = review.id
+                                                                    scrollToReview(review.id, proxy: scrollProxy)
+                                                                } else if activeKeyboardReviewId == review.id {
+                                                                    activeKeyboardReviewId = nil
+                                                                }
+                                                            }
+                                                         ))
+                                        .id(review.id) // Give each review a stable ID
+                                        .padding(.horizontal)
+                                        .padding(.vertical, 8)
+                                        .background(Color.white)
+                                        .cornerRadius(10)
+                                }
+                            }
+                            
+                        case .error(let error):
+                            Text("Failed to load reviews: \(error.localizedDescription)")
+                                .font(.subheadline)
+                                .foregroundColor(.red)
+                                .padding()
+                            
+                        case .idle:
+                            Text("Reviews not yet loaded")
                                 .font(.subheadline)
                                 .foregroundColor(.gray)
                                 .padding()
-                        } else {
-                            ForEach(reviews, id: \.id) { review in
-                                RestaurantReviewView(review: review, selectedImage: $selectedImage)
-                                    .padding(.horizontal)
-                                    .padding(.vertical, 8)
-                                    .background(Color.white)
-                                    .cornerRadius(10)
-                            }
                         }
-                        
-                    case .error(let error):
-                        Text("Failed to load reviews: \(error.localizedDescription)")
-                            .font(.subheadline)
-                            .foregroundColor(.red)
-                            .padding()
-                        
-                    case .idle:
-                        Text("Reviews not yet loaded")
+                    } else {
+                        Text("No place selected")
                             .font(.subheadline)
                             .foregroundColor(.gray)
                             .padding()
                     }
-                } else {
-                    Text("No place selected")
-                        .font(.subheadline)
-                        .foregroundColor(.gray)
-                        .padding()
                 }
+                .frame(maxWidth: .infinity)
+                .background(Color.white)
             }
-            .frame(maxWidth: .infinity)
             .background(Color.white)
+            .padding(.horizontal, -50)
+            .navigationTitle("Reviews")
+            .ignoresSafeArea(.all, edges: .all)
         }
-        .background(Color.white)
-        .padding(.horizontal, -50)
-        .navigationTitle("Reviews")
-        .ignoresSafeArea(.all, edges: .all)
         .onAppear {
             // Check like statuses when view appears
             selectedPlaceVM.checkLikeStatuses(userId: profile.userId)
+        }
+    }
+    
+    private func scrollToReview(_ reviewId: String, proxy: ScrollViewProxy) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            withAnimation {
+                proxy.scrollTo(reviewId, anchor: .top)
+            }
         }
     }
 }
@@ -192,6 +216,7 @@ struct RestaruantReviewViewMustOrder: View {
 struct RestaurantReviewView: View {
     let review: Review
     @Binding var selectedImage: UIImage?
+    @Binding var isActiveKeyboard: Bool
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var profile: ProfileViewModel
     @State private var showComments = false
@@ -308,7 +333,9 @@ struct RestaurantReviewView: View {
                 // Show comments section when expanded
                 VStack(alignment: .leading, spacing: 10) {
                     // Embedded comments view
-                    InlineCommentsView(reviewId: review.id)
+                    InlineCommentsView(reviewId: review.id, onKeyboardActive: { isActive in
+                        isActiveKeyboard = isActive
+                    })
                         .padding(.leading, 15) // Indentation for comments
                 }
                 .padding(8)
@@ -365,203 +392,261 @@ struct InlineCommentsView: View {
     @State private var isPickerPresented = false
     @State private var showingReplyField = false
     @State private var loadedCommentLimit = 5
+    @State private var keyboardHeight: CGFloat = 0
     @FocusState private var isTextFieldFocused: Bool
     
     let reviewId: String
+    let onKeyboardActive: (Bool) -> Void
     
     var body: some View {
-        VStack(spacing: 12) {
-            // Comments list
-            let comments = selectedPlaceVM.comments(for: reviewId)
-            let totalCommentCount = selectedPlaceVM.commentCount(for: reviewId)
-            let loadingState = selectedPlaceVM.commentLoadingState(for: reviewId)
-            
-            switch loadingState {
-            case .loading:
-                ProgressView()
-                    .padding()
-                    .frame(maxWidth: .infinity)
+        ScrollViewReader { scrollProxy in
+            VStack(spacing: 12) {
+                // Comments list
+                let comments = selectedPlaceVM.comments(for: reviewId)
+                let totalCommentCount = selectedPlaceVM.commentCount(for: reviewId)
+                let loadingState = selectedPlaceVM.commentLoadingState(for: reviewId)
                 
-            case .loaded:
-                if comments.isEmpty {
-                    Text("No comments yet. Be the first to comment!")
-                        .font(.caption)
-                        .foregroundColor(.gray)
-                        .padding(.vertical, 5)
+                switch loadingState {
+                case .loading:
+                    ProgressView()
+                        .padding()
+                        .frame(maxWidth: .infinity)
                     
-                    // If no comments, automatically focus the reply field
-                    if showingReplyField {
-                        // Comment input field
-                        HStack(spacing: 10) {
-                            // Comment text field with automatic focus
-                            TextField("Add a comment...", text: $commentText)
-                                .font(.footnote)
-                                .padding(8)
-                                .background(Color(.systemBackground))
-                                .cornerRadius(15)
-                                .foregroundColor(.primary)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 15)
-                                        .stroke(Color.gray.opacity(0.3), lineWidth: 1)
-                                )
-                                .focused($isTextFieldFocused)
-                                .onAppear {
-                                    // Automatically focus when shown
-                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                case .loaded:
+                    if comments.isEmpty {
+                        Text("No comments yet. Be the first to comment!")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                            .padding(.vertical, 5)
+                        
+                        // If no comments, automatically focus the reply field
+                        if showingReplyField {
+                            // Comment input field
+                            HStack(spacing: 10) {
+                                // Comment text field with automatic focus
+                                TextField("Add a comment...", text: $commentText)
+                                    .font(.footnote)
+                                    .padding(8)
+                                    .background(Color(.systemBackground))
+                                    .cornerRadius(15)
+                                    .foregroundColor(.primary)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 15)
+                                            .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+                                    )
+                                    .focused($isTextFieldFocused)
+                                    .onAppear {
+                                        // Automatically focus when shown
+                                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                            isTextFieldFocused = true
+                                            // Scroll to ensure input field is visible
+                                            scrollProxy.scrollTo("commentInputField", anchor: .bottom)
+                                        }
+                                    }
+                                
+                                // Submit button
+                                Button(action: {
+                                    submitComment()
+                                    showingReplyField = false
+                                    isTextFieldFocused = false
+                                }) {
+                                    Image(systemName: "paperplane.fill")
+                                        .foregroundColor(commentText.isEmpty ? .gray : .blue)
+                                        .font(.footnote)
+                                }
+                                .disabled(commentText.isEmpty)
+                                
+                                // Photo button
+                                Button(action: {
+                                    isPickerPresented = true
+                                }) {
+                                    Image(systemName: "photo")
+                                        .foregroundColor(.gray)
+                                        .font(.footnote)
+                                }
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 5)
+                            .id("commentInputField")
+                        } else {
+                            // Only show reply button when not yet replying
+                            HStack(spacing: 8) {
+                                // Small horizontal line
+                                Rectangle()
+                                    .frame(width: 16, height: 1)
+                                    .foregroundColor(.gray.opacity(0.5))
+                                
+                                Button(action: {
+                                    showingReplyField = true
+                                }) {
+                                    Text("Reply")
+                                        .font(.footnote)
+                                        .foregroundColor(.gray)
+                                }
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.leading, 15) // Indent to align
+                            .padding(.vertical, 5)
+                        }
+                    } else {
+                        // Show existing comments with spacing
+                        VStack(spacing: 16) {
+                            ForEach(comments) { comment in
+                                HStack(alignment: .top, spacing: 5) {
+                                    // Actual comment
+                                    InlineCommentView(comment: comment)
+                                }
+                            }
+                            
+                            // Load more comments button if there are more to load
+                            if comments.count < totalCommentCount {
+                                Button(action: {
+                                    loadMoreComments()
+                                }) {
+                                    HStack {
+                                        Text("Load more comments")
+                                            .font(.caption)
+                                            .foregroundColor(.blue)
+                                        
+                                        Image(systemName: "arrow.down.circle")
+                                            .font(.caption)
+                                            .foregroundColor(.blue)
+                                    }
+                                    .padding(.vertical, 8)
+                                }
+                                .frame(maxWidth: .infinity, alignment: .center)
+                            }
+                        }
+                        .padding(.leading, 8)
+                        
+                        // Add reply button or comment input field below comments
+                        if showingReplyField {
+                            // Comment input when reply is clicked
+                            HStack(spacing: 10) {
+                                // Comment text field
+                                TextField("Add a comment...", text: $commentText)
+                                    .font(.footnote)
+                                    .padding(8)
+                                    .background(Color(.systemBackground))
+                                    .cornerRadius(15)
+                                    .foregroundColor(.primary)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 15)
+                                            .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+                                    )
+                                    .focused($isTextFieldFocused)
+                                    .onChange(of: isTextFieldFocused) { focused in
+                                        if focused {
+                                            // Small delay to ensure UI is updated
+                                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                                withAnimation {
+                                                    // This will trigger our keyboard height adjustment
+                                                    showingReplyField = true
+                                                    // Scroll to ensure input field is visible
+                                                    scrollProxy.scrollTo("commentInputField", anchor: .bottom)
+                                                }
+                                            }
+                                        }
+                                    }
+                                
+                                // Submit button
+                                Button(action: {
+                                    submitComment()
+                                    showingReplyField = false
+                                    isTextFieldFocused = false
+                                }) {
+                                    Image(systemName: "paperplane.fill")
+                                        .foregroundColor(commentText.isEmpty ? .gray : .blue)
+                                        .font(.footnote)
+                                }
+                                .disabled(commentText.isEmpty)
+                                
+                                // Photo button
+                                Button(action: {
+                                    isPickerPresented = true
+                                }) {
+                                    Image(systemName: "photo")
+                                        .foregroundColor(.gray)
+                                        .font(.footnote)
+                                }
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 5)
+                            .id("commentInputField") // Give it a stable ID for scrolling
+                        } else {
+                            // Only show reply button when not yet replying
+                            HStack(spacing: 8) {
+                                // Small horizontal line
+                                Rectangle()
+                                    .frame(width: 16, height: 1)
+                                    .foregroundColor(.gray.opacity(0.5))
+                                
+                                Button(action: {
+                                    showingReplyField = true
+                                    // Add a small delay to ensure view updates first
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                                         isTextFieldFocused = true
                                     }
+                                }) {
+                                    Text("Reply")
+                                        .font(.footnote)
+                                        .foregroundColor(.gray)
                                 }
-                            
-                            // Submit button
-                            Button(action: {
-                                submitComment()
-                                showingReplyField = false
-                                isTextFieldFocused = false
-                            }) {
-                                Image(systemName: "paperplane.fill")
-                                    .foregroundColor(commentText.isEmpty ? .gray : .blue)
-                                    .font(.footnote)
                             }
-                            .disabled(commentText.isEmpty)
-                            
-                            // Photo button
-                            Button(action: {
-                                isPickerPresented = true
-                            }) {
-                                Image(systemName: "photo")
-                                    .foregroundColor(.gray)
-                                    .font(.footnote)
-                            }
-                        }
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 5)
-                    } else {
-                        // Only show reply button when not yet replying
-                        HStack(spacing: 8) {
-                            // Small horizontal line
-                            Rectangle()
-                                .frame(width: 16, height: 1)
-                                .foregroundColor(.gray.opacity(0.5))
-                            
-                            Button(action: {
-                                showingReplyField = true
-                            }) {
-                                Text("Reply")
-                                    .font(.footnote)
-                                    .foregroundColor(.gray)
-                            }
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.leading, 15) // Indent to align
-                        .padding(.vertical, 5)
-                    }
-                } else {
-                    // Show existing comments with spacing
-                    VStack(spacing: 16) {
-                        ForEach(comments) { comment in
-                            HStack(alignment: .top, spacing: 5) {
-                                // Actual comment
-                                InlineCommentView(comment: comment)
-                            }
-                        }
-                        
-                        // Load more comments button if there are more to load
-                        if comments.count < totalCommentCount {
-                            Button(action: {
-                                loadMoreComments()
-                            }) {
-                                HStack {
-                                    Text("Load more comments")
-                                        .font(.caption)
-                                        .foregroundColor(.blue)
-                                    
-                                    Image(systemName: "arrow.down.circle")
-                                        .font(.caption)
-                                        .foregroundColor(.blue)
-                                }
-                                .padding(.vertical, 8)
-                            }
-                            .frame(maxWidth: .infinity, alignment: .center)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.leading, 15) // Indent to align
+                            .padding(.vertical, 5)
                         }
                     }
-                    .padding(.leading, 8)
                     
-                    // Add reply button or comment input field below comments
-                    if showingReplyField {
-                        // Comment input when reply is clicked
-                        HStack(spacing: 10) {
-                            // Comment text field
-                            TextField("Add a comment...", text: $commentText)
-                                .font(.footnote)
-                                .padding(8)
-                                .background(Color(.systemBackground))
-                                .cornerRadius(15)
-                                .foregroundColor(.primary)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 15)
-                                        .stroke(Color.gray.opacity(0.3), lineWidth: 1)
-                                )
-                                .focused($isTextFieldFocused)
-                            
-                            // Submit button
-                            Button(action: {
-                                submitComment()
-                                showingReplyField = false
-                                isTextFieldFocused = false
-                            }) {
-                                Image(systemName: "paperplane.fill")
-                                    .foregroundColor(commentText.isEmpty ? .gray : .blue)
-                                    .font(.footnote)
-                            }
-                            .disabled(commentText.isEmpty)
-                            
-                            // Photo button
-                            Button(action: {
-                                isPickerPresented = true
-                            }) {
-                                Image(systemName: "photo")
-                                    .foregroundColor(.gray)
-                                    .font(.footnote)
-                            }
-                        }
-                        .padding(.horizontal, 8)
+                case .error(let error):
+                    Text("Failed to load comments: \(error.localizedDescription)")
+                        .font(.caption)
+                        .foregroundColor(.red)
                         .padding(.vertical, 5)
-                    } else {
-                        // Only show reply button when not yet replying
-                        HStack(spacing: 8) {
-                            // Small horizontal line
-                            Rectangle()
-                                .frame(width: 16, height: 1)
-                                .foregroundColor(.gray.opacity(0.5))
-                            
-                            Button(action: {
-                                showingReplyField = true
-                            }) {
-                                Text("Reply")
-                                    .font(.footnote)
-                                    .foregroundColor(.gray)
-                            }
+                    
+                case .idle:
+                    ProgressView()
+                        .padding()
+                        .frame(maxWidth: .infinity)
+                }
+            }
+            .padding(.bottom, showingReplyField ? keyboardHeight : 0)
+            .animation(.easeOut(duration: 0.25), value: keyboardHeight)
+            .onChange(of: showingReplyField) { show in
+                if show {
+                    // When reply field is shown, scroll to it
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        withAnimation {
+                            scrollProxy.scrollTo("commentInputField", anchor: .bottom)
                         }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.leading, 15) // Indent to align
-                        .padding(.vertical, 5)
                     }
                 }
-                
-            case .error(let error):
-                Text("Failed to load comments: \(error.localizedDescription)")
-                    .font(.caption)
-                    .foregroundColor(.red)
-                    .padding(.vertical, 5)
-                
-            case .idle:
-                ProgressView()
-                    .padding()
-                    .frame(maxWidth: .infinity)
+            }
+            .onChange(of: isTextFieldFocused) { focused in
+                // Report keyboard state to parent
+                onKeyboardActive(focused)
             }
         }
         .sheet(isPresented: $isPickerPresented) {
             MultiImagePicker(images: $selectedImages, selectionLimit: 5)
+        }
+        .onAppear {
+            NotificationCenter.default.addObserver(forName: UIResponder.keyboardWillShowNotification, object: nil, queue: .main) { notification in
+                let keyboardFrame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect ?? .zero
+                keyboardHeight = keyboardFrame.height - 10 // Provide much more space to clear keyboard suggestions
+                onKeyboardActive(true)
+            }
+            
+            NotificationCenter.default.addObserver(forName: UIResponder.keyboardWillHideNotification, object: nil, queue: .main) { _ in
+                keyboardHeight = 0
+                onKeyboardActive(false)
+            }
+        }
+        .onDisappear {
+            NotificationCenter.default.removeObserver(self, name: UIResponder.keyboardWillShowNotification, object: nil)
+            NotificationCenter.default.removeObserver(self, name: UIResponder.keyboardWillHideNotification, object: nil)
+            onKeyboardActive(false)
         }
     }
      
