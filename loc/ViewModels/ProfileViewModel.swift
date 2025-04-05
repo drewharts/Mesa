@@ -24,7 +24,7 @@ class ProfileViewModel: ObservableObject {
     @Published var favoritePlaceViewModels: [PlaceViewModel] = []
     @Published var profilePhoto: SwiftUI.Image? = nil
     @Published var profilePhotoImage: UIImage? = nil
-    @Published private var userProfilePhotos: [String: UIImage] = [:]
+    @Published private var userProfilePhotos: [String: UIImage] = [:] //userID : Profile Picture
 
     @Published var friends: [User] = []
     @Published var followers: Int = 0

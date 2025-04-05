@@ -82,7 +82,7 @@ struct RestaruantReviewViewProfileInformation: View {
     var body: some View {
         HStack(alignment: .center, spacing: 16) { // Increased spacing between photo and text
             // Profile Photo from Cache
-            if let profilePhoto = selectedPlaceVM.profilePhoto(forUserId: review.userId) {
+            if let profilePhoto = profile.profilePhoto(forUserId: review.userId) {
                 Image(uiImage: profilePhoto)
                     .resizable()
                     .scaledToFill()
