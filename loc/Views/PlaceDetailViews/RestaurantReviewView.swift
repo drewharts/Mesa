@@ -333,7 +333,7 @@ struct RestaurantReviewView: View {
                 // Show comments section when expanded
                 VStack(alignment: .leading, spacing: 10) {
                     // Embedded comments view
-                    InlineCommentsView(reviewId: review.id, onKeyboardActive: { isActive in
+                    InlineCommentsView(reviewId: review.id, selectedImage: $selectedImage, onKeyboardActive: { isActive in
                         isActiveKeyboard = isActive
                     })
                         .padding(.leading, 15) // Indentation for comments
@@ -394,9 +394,16 @@ struct InlineCommentsView: View {
     @State private var loadedCommentLimit = 5
     @State private var keyboardHeight: CGFloat = 0
     @FocusState private var isTextFieldFocused: Bool
+    @Binding var selectedImage: UIImage?
     
     let reviewId: String
     let onKeyboardActive: (Bool) -> Void
+    
+    init(reviewId: String, selectedImage: Binding<UIImage?>, onKeyboardActive: @escaping (Bool) -> Void) {
+        self.reviewId = reviewId
+        self._selectedImage = selectedImage
+        self.onKeyboardActive = onKeyboardActive
+    }
     
     var body: some View {
         ScrollViewReader { scrollProxy in
@@ -451,23 +458,70 @@ struct InlineCommentsView: View {
                                     isTextFieldFocused = false
                                 }) {
                                     Image(systemName: "paperplane.fill")
-                                        .foregroundColor(commentText.isEmpty ? .gray : .blue)
+                                        .foregroundColor(commentText.isEmpty && selectedImages.isEmpty ? .gray : .blue)
                                         .font(.footnote)
                                 }
-                                .disabled(commentText.isEmpty)
+                                .disabled(commentText.isEmpty && selectedImages.isEmpty)
                                 
-                                // Photo button
+                                // Photo button with indicator dot when images are selected
                                 Button(action: {
                                     isPickerPresented = true
                                 }) {
-                                    Image(systemName: "photo")
-                                        .foregroundColor(.gray)
-                                        .font(.footnote)
+                                    ZStack(alignment: .topTrailing) {
+                                        Image(systemName: "photo")
+                                            .foregroundColor(!selectedImages.isEmpty ? .blue : .gray)
+                                            .font(.footnote)
+                                        
+                                        // Show count indicator if images are selected
+                                        if !selectedImages.isEmpty {
+                                            Text("\(selectedImages.count)")
+                                                .font(.system(size: 10))
+                                                .foregroundColor(.white)
+                                                .frame(width: 14, height: 14)
+                                                .background(Circle().fill(Color.red))
+                                                .offset(x: 8, y: -8)
+                                        }
+                                    }
                                 }
                             }
                             .padding(.horizontal, 8)
                             .padding(.vertical, 5)
                             .id("commentInputField")
+                            
+                            // Display selected images preview if any
+                            if !selectedImages.isEmpty {
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    HStack(spacing: 8) {
+                                        ForEach(0..<selectedImages.count, id: \.self) { index in
+                                            ZStack(alignment: .topTrailing) {
+                                                Image(uiImage: selectedImages[index])
+                                                    .resizable()
+                                                    .scaledToFill()
+                                                    .frame(width: 60, height: 60)
+                                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                                                    .overlay(
+                                                        RoundedRectangle(cornerRadius: 8)
+                                                            .stroke(Color.gray.opacity(0.3), lineWidth: 0.5)
+                                                    )
+                                                
+                                                // Remove button
+                                                Button(action: {
+                                                    selectedImages.remove(at: index)
+                                                }) {
+                                                    Image(systemName: "xmark.circle.fill")
+                                                        .foregroundColor(.white)
+                                                        .background(Circle().fill(Color.black.opacity(0.6)))
+                                                        .font(.system(size: 16))
+                                                }
+                                                .padding(4)
+                                            }
+                                        }
+                                    }
+                                    .padding(.horizontal, 8)
+                                }
+                                .frame(height: 70)
+                                .padding(.bottom, 5)
+                            }
                         } else {
                             // Only show reply button when not yet replying
                             HStack(spacing: 8) {
@@ -494,7 +548,7 @@ struct InlineCommentsView: View {
                             ForEach(comments) { comment in
                                 HStack(alignment: .top, spacing: 5) {
                                     // Actual comment
-                                    InlineCommentView(comment: comment)
+                                    InlineCommentView(comment: comment, selectedImage: $selectedImage)
                                 }
                             }
                             
@@ -556,23 +610,70 @@ struct InlineCommentsView: View {
                                     isTextFieldFocused = false
                                 }) {
                                     Image(systemName: "paperplane.fill")
-                                        .foregroundColor(commentText.isEmpty ? .gray : .blue)
+                                        .foregroundColor(commentText.isEmpty && selectedImages.isEmpty ? .gray : .blue)
                                         .font(.footnote)
                                 }
-                                .disabled(commentText.isEmpty)
+                                .disabled(commentText.isEmpty && selectedImages.isEmpty)
                                 
-                                // Photo button
+                                // Photo button with indicator dot when images are selected
                                 Button(action: {
                                     isPickerPresented = true
                                 }) {
-                                    Image(systemName: "photo")
-                                        .foregroundColor(.gray)
-                                        .font(.footnote)
+                                    ZStack(alignment: .topTrailing) {
+                                        Image(systemName: "photo")
+                                            .foregroundColor(!selectedImages.isEmpty ? .blue : .gray)
+                                            .font(.footnote)
+                                        
+                                        // Show count indicator if images are selected
+                                        if !selectedImages.isEmpty {
+                                            Text("\(selectedImages.count)")
+                                                .font(.system(size: 10))
+                                                .foregroundColor(.white)
+                                                .frame(width: 14, height: 14)
+                                                .background(Circle().fill(Color.red))
+                                                .offset(x: 8, y: -8)
+                                        }
+                                    }
                                 }
                             }
                             .padding(.horizontal, 8)
                             .padding(.vertical, 5)
                             .id("commentInputField") // Give it a stable ID for scrolling
+                            
+                            // Display selected images preview if any
+                            if !selectedImages.isEmpty {
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    HStack(spacing: 8) {
+                                        ForEach(0..<selectedImages.count, id: \.self) { index in
+                                            ZStack(alignment: .topTrailing) {
+                                                Image(uiImage: selectedImages[index])
+                                                    .resizable()
+                                                    .scaledToFill()
+                                                    .frame(width: 60, height: 60)
+                                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                                                    .overlay(
+                                                        RoundedRectangle(cornerRadius: 8)
+                                                            .stroke(Color.gray.opacity(0.3), lineWidth: 0.5)
+                                                    )
+                                                
+                                                // Remove button
+                                                Button(action: {
+                                                    selectedImages.remove(at: index)
+                                                }) {
+                                                    Image(systemName: "xmark.circle.fill")
+                                                        .foregroundColor(.white)
+                                                        .background(Circle().fill(Color.black.opacity(0.6)))
+                                                        .font(.system(size: 16))
+                                                }
+                                                .padding(4)
+                                            }
+                                        }
+                                    }
+                                    .padding(.horizontal, 8)
+                                }
+                                .frame(height: 70)
+                                .padding(.bottom, 5)
+                            }
                         } else {
                             // Only show reply button when not yet replying
                             HStack(spacing: 8) {
@@ -659,7 +760,8 @@ struct InlineCommentsView: View {
     }
     
     private func submitComment() {
-        guard !commentText.isEmpty else { return }
+        // Allow submission if either text or images are present
+        guard !commentText.isEmpty || !selectedImages.isEmpty else { return }
         
         selectedPlaceVM.addComment(
             reviewId: reviewId,
@@ -683,6 +785,7 @@ struct InlineCommentView: View {
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var profile: ProfileViewModel
     @State private var showFullText = false
+    @Binding var selectedImage: UIImage?
     
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -777,6 +880,14 @@ struct InlineCommentView: View {
                                 .scaledToFill()
                                 .frame(width: 60, height: 60)
                                 .clipShape(RoundedRectangle(cornerRadius: 6))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .stroke(Color.gray.opacity(0.3), lineWidth: 0.5)
+                                )
+                                .onTapGesture {
+                                    selectedImage = photos[index]
+                                }
+                                .shadow(radius: 1)
                         }
                     }
                 }

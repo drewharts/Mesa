@@ -385,6 +385,8 @@ class SelectedPlaceViewModel: ObservableObject {
             return
         }
         
+        print("Loading \(comment.images.count) photos for comment ID: \(comment.id)")
+        
         firestoreService.fetchPhotosFromStorage(urls: comment.images) { [weak self] images, error in
             guard let self = self else { return }
             
@@ -392,6 +394,7 @@ class SelectedPlaceViewModel: ObservableObject {
                 if let error = error {
                     print("Error loading comment photos: \(error.localizedDescription)")
                 } else if let images = images {
+                    print("Successfully loaded \(images.count) photos for comment ID: \(comment.id)")
                     self.commentPhotos[comment.id] = images
                 }
             }
