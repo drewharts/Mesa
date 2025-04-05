@@ -49,6 +49,7 @@ class SelectedPlaceViewModel: ObservableObject {
     private var likedComments: Set<String> = [] // commentIds that are liked by the current user
     private var commentLoadingStates: [String: LoadingState] = [:] // reviewId -> loading state
     private var commentPhotos: [String: [UIImage]] = [:] // commentId -> photos
+    private var reviewCommentCounts: [String: Int] = [:] // reviewId -> comment count
 
     // MARK: - Loading State Enum
     enum LoadingState: Equatable {
@@ -155,6 +156,7 @@ class SelectedPlaceViewModel: ObservableObject {
                     fetchedReviews.forEach { review in
                         self.loadReviewPhotos(for: review)
                         self.loadProfilePhoto(for: review)
+                        self.loadCommentCountForReview(placeId: placeId, reviewId: review.id)
                     }
                     self.reviewLoadingStates[placeId] = .loaded
                 }
@@ -296,23 +298,30 @@ class SelectedPlaceViewModel: ObservableObject {
     func loadCommentsForReview(reviewId: String) {
         guard let placeId = selectedPlace?.id.uuidString else { return }
         
-        // Set loading state
-        commentLoadingStates[reviewId] = .loading
+        DispatchQueue.main.async {
+            self.commentLoadingStates[reviewId] = .loading
+        }
         
         firestoreService.fetchComments(placeId: placeId, reviewId: reviewId) { [weak self] comments, error in
             guard let self = self else { return }
             
             DispatchQueue.main.async {
                 if let error = error {
+                    print("Error loading comments: \(error.localizedDescription)")
                     self.commentLoadingStates[reviewId] = .error(error)
-                } else if let comments = comments {
-                    // Store comments for this review
-                    self.placeReviewComments[reviewId] = comments
+                } else {
+                    let fetchedComments = comments ?? []
+                    self.placeReviewComments[reviewId] = fetchedComments
+                    
+                    // Update our count
+                    self.reviewCommentCounts[reviewId] = fetchedComments.count
+                    
                     self.commentLoadingStates[reviewId] = .loaded
                     
-                    // Load photos for each comment
-                    for comment in comments {
-                        self.loadCommentPhotos(for: comment)
+                    for comment in fetchedComments {
+                        if !comment.images.isEmpty {
+                            self.loadCommentPhotos(for: comment)
+                        }
                     }
                 }
             }
@@ -347,6 +356,13 @@ class SelectedPlaceViewModel: ObservableObject {
                     var currentComments = self.placeReviewComments[reviewId] ?? []
                     currentComments.insert(savedComment, at: 0) // Add at the top
                     self.placeReviewComments[reviewId] = currentComments
+                    
+                    // Update the comment count
+                    let currentCount = self.reviewCommentCounts[reviewId] ?? 0
+                    self.reviewCommentCounts[reviewId] = currentCount + 1
+                    
+                    // Ensure loading state is set to loaded
+                    self.commentLoadingStates[reviewId] = .loaded
                     
                     // Load comment photos if any
                     if !savedComment.images.isEmpty {
@@ -474,6 +490,16 @@ class SelectedPlaceViewModel: ObservableObject {
     
     func isCommentLiked(_ commentId: String) -> Bool {
         return likedComments.contains(commentId)
+    }
+    
+    // Returns the number of comments for a specific review
+    func commentCount(for reviewId: String) -> Int {
+        // First check our stored counts
+        if let count = reviewCommentCounts[reviewId] {
+            return count
+        }
+        // Fall back to the comment array count if needed
+        return placeReviewComments[reviewId]?.count ?? 0
     }
 
     // MARK: - Public Methods
@@ -607,5 +633,37 @@ class SelectedPlaceViewModel: ObservableObject {
     // Add helper method to check if a review is liked
     func isReviewLiked(_ reviewId: String) -> Bool {
         return likedReviews.contains(reviewId)
+    }
+
+    // Load comment count for a review (without loading all comments)
+    private func loadCommentCountForReview(placeId: String, reviewId: String) {
+        firestoreService.fetchCommentCount(placeId: placeId, reviewId: reviewId) { [weak self] count, error in
+            guard let self = self else { return }
+            
+            DispatchQueue.main.async {
+                if let error = error {
+                    print("Error fetching comment count: \(error.localizedDescription)")
+                } else if let count = count {
+                    // Store the count in our dictionary
+                    self.reviewCommentCounts[reviewId] = count
+                    
+                    // Create a placeholder array with the right number of empty comments
+                    // This ensures commentCount returns the correct count even before comments are loaded
+                    if count > 0 {
+                        if self.placeReviewComments[reviewId] == nil {
+                            // Store empty array with the right capacity
+                            self.placeReviewComments[reviewId] = []
+                            
+                            // Mark as idle so actual comments can be loaded when needed
+                            self.commentLoadingStates[reviewId] = .idle
+                        }
+                    } else {
+                        // If no comments, initialize with empty array
+                        self.placeReviewComments[reviewId] = []
+                        self.commentLoadingStates[reviewId] = .loaded
+                    }
+                }
+            }
+        }
     }
 }

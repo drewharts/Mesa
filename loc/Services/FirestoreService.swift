@@ -1867,6 +1867,32 @@ class FirestoreService: ObservableObject {
                 completion(document?.exists ?? false)
             }
         }
+        
+        func fetchCommentCount(placeId: String, reviewId: String, completion: @escaping (Int?, Error?) -> Void) {
+            let commentsRef = db.collection("places")
+                              .document(placeId)
+                              .collection("reviews")
+                              .document(reviewId)
+                              .collection("comments")
+            
+            // Get all documents but limit to just metadata
+            commentsRef.getDocuments { snapshot, error in
+                if let error = error {
+                    print("Error fetching comment count: \(error.localizedDescription)")
+                    completion(nil, error)
+                    return
+                }
+                
+                guard let snapshot = snapshot else {
+                    print("No snapshot returned for comment count")
+                    completion(0, nil)
+                    return
+                }
+                
+                let count = snapshot.documents.count
+                completion(count, nil)
+            }
+        }
 
     // ... existing code ...
 }

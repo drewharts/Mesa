@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import UIKit
 
 struct PlaceReviewsView: View {
     @Binding var selectedImage: UIImage?
@@ -292,63 +293,53 @@ struct RestaurantReviewView: View {
                 .padding(.horizontal)
                 
             case .idle:
-                Text("Photos not yet loaded")
-                    .font(.footnote)
-                    .foregroundColor(.gray)
-                    .padding(.horizontal)
+                ProgressView()
+                    .padding()
+                    .frame(maxWidth: .infinity)
             }
             
-            // Add Comment and Like buttons
-            HStack(spacing: 20) {
-                
-                // Comment button
-                Button(action: {
-                    // Load comments if needed before showing
-                    if !showComments {
-                        selectedPlaceVM.loadCommentsForReview(reviewId: review.id)
-                        selectedPlaceVM.checkCommentLikeStatuses(userId: profile.userId, reviewId: review.id)
-                    }
-                    withAnimation {
-                        showComments.toggle()
-                    }
-                }) {
-                    HStack(spacing: 4) {
-                        Image(systemName: showComments ? "bubble.left.fill" : "bubble.left")
-                            .foregroundColor(.gray)
-                            .opacity(0.7)
-                        
-                        Text("Comments")
-                            .font(.footnote)
-                            .foregroundColor(.gray)
-                    }
-                }
-            }
-            .padding(.horizontal)
-            .padding(.bottom, 10)
-            
-            // Comments section (expandable/collapsible)
             if showComments {
+                // Show comments section when expanded
                 VStack(alignment: .leading, spacing: 10) {
-                    // Comments title
-                    HStack {
-                        Text("Comments")
-                            .font(.subheadline)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.black)
-                        Spacer()
-                    }
-                    .padding(.horizontal)
-                    .padding(.top, 5)
-                    
                     // Embedded comments view
                     InlineCommentsView(reviewId: review.id)
                         .padding(.leading, 15) // Indentation for comments
                 }
                 .padding(8)
-                .background(Color.gray.opacity(0.1))
-                .cornerRadius(8)
                 .padding(.horizontal)
                 .transition(.opacity.combined(with: .move(edge: .top)))
+            } else {
+                // Show reply button when comments are hidden
+                HStack(spacing: 8) {
+                    // Small horizontal line
+                    Rectangle()
+                        .frame(width: 16, height: 1)
+                        .foregroundColor(.gray.opacity(0.5))
+                    
+                    // Comment button positioned to the left
+                    Button(action: {
+                        // Load comments if needed before showing
+                        if !showComments {
+                            selectedPlaceVM.loadCommentsForReview(reviewId: review.id)
+                            selectedPlaceVM.checkCommentLikeStatuses(userId: profile.userId, reviewId: review.id)
+                        }
+                        withAnimation {
+                            showComments.toggle()
+                        }
+                    }) {
+                        let commentCount = selectedPlaceVM.commentCount(for: review.id)
+                        Text(commentCount > 0 ? 
+                             "Show \(commentCount) \(commentCount == 1 ? "reply" : "replies")" : 
+                             "Reply")
+                            .font(.footnote)
+                            .foregroundColor(.gray)
+                            .fontWeight(.semibold)
+                    }
+                    
+                    Spacer()
+                }
+                .padding(.leading, 30) // Left padding to align with the indentation
+                .padding(.bottom, 10)
             }
         }
         .padding(.vertical)
@@ -366,6 +357,8 @@ struct InlineCommentsView: View {
     @State private var commentText = ""
     @State private var selectedImages: [UIImage] = []
     @State private var isPickerPresented = false
+    @State private var showingReplyField = false
+    @FocusState private var isTextFieldFocused: Bool
     
     let reviewId: String
     
@@ -387,23 +380,145 @@ struct InlineCommentsView: View {
                         .font(.caption)
                         .foregroundColor(.gray)
                         .padding(.vertical, 5)
+                    
+                    // If no comments, automatically focus the reply field
+                    if showingReplyField {
+                        // Comment input field
+                        HStack(spacing: 10) {
+                            // Comment text field with automatic focus
+                            TextField("Add a comment...", text: $commentText)
+                                .font(.footnote)
+                                .padding(8)
+                                .background(Color(.systemBackground))
+                                .cornerRadius(15)
+                                .foregroundColor(.primary)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 15)
+                                        .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+                                )
+                                .focused($isTextFieldFocused)
+                                .onAppear {
+                                    // Automatically focus when shown
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                        isTextFieldFocused = true
+                                    }
+                                }
+                            
+                            // Submit button
+                            Button(action: {
+                                submitComment()
+                                showingReplyField = false
+                                isTextFieldFocused = false
+                            }) {
+                                Image(systemName: "paperplane.fill")
+                                    .foregroundColor(commentText.isEmpty ? .gray : .blue)
+                                    .font(.footnote)
+                            }
+                            .disabled(commentText.isEmpty)
+                            
+                            // Photo button
+                            Button(action: {
+                                isPickerPresented = true
+                            }) {
+                                Image(systemName: "photo")
+                                    .foregroundColor(.gray)
+                                    .font(.footnote)
+                            }
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 5)
+                    } else {
+                        // Only show reply button when not yet replying
+                        HStack(spacing: 8) {
+                            // Small horizontal line
+                            Rectangle()
+                                .frame(width: 16, height: 1)
+                                .foregroundColor(.gray.opacity(0.5))
+                            
+                            Button(action: {
+                                showingReplyField = true
+                            }) {
+                                Text("Reply")
+                                    .font(.footnote)
+                                    .foregroundColor(.gray)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.leading, 15) // Indent to align
+                        .padding(.vertical, 5)
+                    }
                 } else {
-                    // Comments thread with connection line
-                    VStack(spacing: 6) {
+                    // Show existing comments with spacing
+                    VStack(spacing: 16) {
                         ForEach(comments) { comment in
-                            HStack(alignment: .top, spacing: 0) {
-                                // Curved connection line
-                                ConnectionLine()
-                                    .stroke(Color.gray.opacity(0.5), lineWidth: 1.5)
-                                    .frame(width: 20, height: 30)
-                                    .padding(.top, 12)
-                                
+                            HStack(alignment: .top, spacing: 5) {
                                 // Actual comment
                                 InlineCommentView(comment: comment)
                             }
                         }
                     }
                     .padding(.leading, 8)
+                    
+                    // Add reply button or comment input field below comments
+                    if showingReplyField {
+                        // Comment input when reply is clicked
+                        HStack(spacing: 10) {
+                            // Comment text field
+                            TextField("Add a comment...", text: $commentText)
+                                .font(.footnote)
+                                .padding(8)
+                                .background(Color(.systemBackground))
+                                .cornerRadius(15)
+                                .foregroundColor(.primary)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 15)
+                                        .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+                                )
+                                .focused($isTextFieldFocused)
+                            
+                            // Submit button
+                            Button(action: {
+                                submitComment()
+                                showingReplyField = false
+                                isTextFieldFocused = false
+                            }) {
+                                Image(systemName: "paperplane.fill")
+                                    .foregroundColor(commentText.isEmpty ? .gray : .blue)
+                                    .font(.footnote)
+                            }
+                            .disabled(commentText.isEmpty)
+                            
+                            // Photo button
+                            Button(action: {
+                                isPickerPresented = true
+                            }) {
+                                Image(systemName: "photo")
+                                    .foregroundColor(.gray)
+                                    .font(.footnote)
+                            }
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 5)
+                    } else {
+                        // Only show reply button when not yet replying
+                        HStack(spacing: 8) {
+                            // Small horizontal line
+                            Rectangle()
+                                .frame(width: 16, height: 1)
+                                .foregroundColor(.gray.opacity(0.5))
+                            
+                            Button(action: {
+                                showingReplyField = true
+                            }) {
+                                Text("Reply")
+                                    .font(.footnote)
+                                    .foregroundColor(.gray)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.leading, 15) // Indent to align
+                        .padding(.vertical, 5)
+                    }
                 }
                 
             case .error(let error):
@@ -413,47 +528,10 @@ struct InlineCommentsView: View {
                     .padding(.vertical, 5)
                 
             case .idle:
-                Text("Loading comments...")
-                    .font(.caption)
-                    .foregroundColor(.gray)
-                    .padding(.vertical, 5)
+                ProgressView()
+                    .padding()
+                    .frame(maxWidth: .infinity)
             }
-            
-            // Add comment input
-            HStack(spacing: 10) {
-                // Comment text field
-                TextField("Add a comment...", text: $commentText)
-                    .font(.footnote)
-                    .padding(8)
-                    .background(Color(.systemBackground))
-                    .cornerRadius(15)
-                    .foregroundColor(.primary) // Use .primary for proper dark/light mode colors
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 15)
-                            .stroke(Color.gray.opacity(0.3), lineWidth: 1)
-                    )
-                
-                // Submit button
-                Button(action: {
-                    submitComment()
-                }) {
-                    Image(systemName: "paperplane.fill")
-                        .foregroundColor(commentText.isEmpty ? .gray : .blue)
-                        .font(.footnote)
-                }
-                .disabled(commentText.isEmpty)
-                
-                // Photo button
-                Button(action: {
-                    isPickerPresented = true
-                }) {
-                    Image(systemName: "photo")
-                        .foregroundColor(.gray)
-                        .font(.footnote)
-                }
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 5)
         }
         .sheet(isPresented: $isPickerPresented) {
             MultiImagePicker(images: $selectedImages, selectionLimit: 5)
@@ -498,19 +576,19 @@ struct InlineCommentView: View {
                             Image(systemName: "person.circle")
                                 .resizable()
                                 .scaledToFit()
-                                .frame(width: 24, height: 24)
+                                .frame(width: 34, height: 34)
                                 .foregroundColor(.gray)
                         case .success(let image):
                             image
                                 .resizable()
                                 .scaledToFill()
-                                .frame(width: 24, height: 24)
+                                .frame(width: 34, height: 34)
                                 .clipShape(Circle())
                         case .failure:
                             Image(systemName: "person.circle")
                                 .resizable()
                                 .scaledToFit()
-                                .frame(width: 24, height: 24)
+                                .frame(width: 34, height: 34)
                                 .foregroundColor(.gray)
                         @unknown default:
                             EmptyView()
@@ -520,7 +598,7 @@ struct InlineCommentView: View {
                     Image(systemName: "person.circle")
                         .resizable()
                         .scaledToFit()
-                        .frame(width: 24, height: 24)
+                        .frame(width: 34, height: 34)
                         .foregroundColor(.gray)
                 }
                 
@@ -586,9 +664,6 @@ struct InlineCommentView: View {
                 .padding(.leading, 32) // Aligns with the text
             }
         }
-        .padding(8)
-        .background(Color(.secondarySystemBackground)) // Better dark/light mode support
-        .cornerRadius(8)
     }
     
     // Helper function to format timestamp
@@ -609,24 +684,6 @@ struct InlineCommentView: View {
             formatter.timeStyle = .none
             return formatter.string(from: date)
         }
-    }
-}
-
-// Custom shape for the curved connection line
-struct ConnectionLine: Shape {
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        
-        // Start at top center
-        path.move(to: CGPoint(x: rect.midX, y: 0))
-        
-        // Draw curved line to right side
-        path.addQuadCurve(
-            to: CGPoint(x: rect.maxX, y: rect.midY),
-            control: CGPoint(x: rect.midX, y: rect.midY - 5)
-        )
-        
-        return path
     }
 }
 
