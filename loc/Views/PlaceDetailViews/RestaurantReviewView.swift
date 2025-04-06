@@ -820,8 +820,34 @@ struct InlineCommentView: View {
         VStack(alignment: .leading, spacing: 4) {
             // User info and comment text
             HStack(alignment: .top, spacing: 8) {
-                // Profile photo (smaller size)
-                if let url = URL(string: comment.profilePhotoUrl) {
+                // First try to get the profile photo from cache
+                if let cachedPhoto = profile.profilePhoto(forUserId: comment.userId) {
+                    Image(uiImage: cachedPhoto)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 34, height: 34)
+                        .clipShape(Circle())
+                        .onTapGesture {
+                            // Check if this is the logged-in user's profile
+                            if comment.userId == profile.userId {
+                                // Show the user's own profile page directly
+                                showProfileView = true
+                            } else {
+                                // For other users, fetch and show their profile
+                                firestoreService.fetchUserById(userId: comment.userId) { profileData in
+                                    if let profileData = profileData {
+                                        userProfileViewModel.selectUser(profileData, currentUserId: profile.userId)
+                                    }
+                                }
+                            }
+                        }
+                        .background(
+                            NavigationLink(destination: ProfileView(), isActive: $showProfileView) {
+                                EmptyView()
+                            }
+                        )
+                // If not in cache, use AsyncImage as fallback
+                } else if let url = URL(string: comment.profilePhotoUrl) {
                     AsyncImage(url: url) { phase in
                         switch phase {
                         case .empty:
