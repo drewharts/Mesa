@@ -68,6 +68,7 @@ class UserProfileViewModel: ObservableObject {
                 if success {
                     DispatchQueue.main.async {
                         self.isFollowing = false
+                        self.followers = max(0, self.followers - 1)
                     }
                 }
             }
@@ -76,6 +77,7 @@ class UserProfileViewModel: ObservableObject {
                 if success {
                     DispatchQueue.main.async {
                         self.isFollowing = true
+                        self.followers += 1
                     }
                 }
             }
