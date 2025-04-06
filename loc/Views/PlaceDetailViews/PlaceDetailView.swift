@@ -17,6 +17,7 @@ struct PlaceDetailView: View {
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var locationManager: LocationManager
+    @EnvironmentObject var userProfileViewModel: UserProfileViewModel
     @Environment(\.isScrollingEnabled) var isScrollingEnabled // Access scroll state
 
     @StateObject private var viewModel = PlaceDetailViewModel()
@@ -37,6 +38,7 @@ struct PlaceDetailView: View {
                         showNoPhoneNumberAlert: $showNoPhoneNumberAlert,
                         selectedImage: $selectedImage
                     )
+                    .environmentObject(userProfileViewModel)
                     .scrollDisabled(!isScrollingEnabled) // Disable scrolling based on sheet height
                 }
             }

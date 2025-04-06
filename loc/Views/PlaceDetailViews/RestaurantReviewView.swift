@@ -12,6 +12,7 @@ struct PlaceReviewsView: View {
     @Binding var selectedImage: UIImage?
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var profile: ProfileViewModel
+    @EnvironmentObject var userProfileViewModel: UserProfileViewModel
     @State private var activeKeyboardReviewId: String? = nil
 
     var body: some View {
@@ -49,6 +50,7 @@ struct PlaceReviewsView: View {
                                                                 }
                                                             }
                                                          ))
+                                        .environmentObject(userProfileViewModel)
                                         .id(review.id) // Give each review a stable ID
                                         .padding(.horizontal)
                                         .padding(.vertical, 8)
@@ -103,6 +105,8 @@ struct RestaruantReviewViewProfileInformation: View {
     let review: Review
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var profile: ProfileViewModel
+    @EnvironmentObject var userProfileViewModel: UserProfileViewModel
+    @State private var showProfileView = false
 
     var body: some View {
         HStack(alignment: .center, spacing: 16) { // Increased spacing between photo and text
@@ -113,6 +117,25 @@ struct RestaruantReviewViewProfileInformation: View {
                     .scaledToFill()
                     .frame(width: 50, height: 50)
                     .clipShape(Circle())
+                    .onTapGesture {
+                        // Check if this is the logged-in user's profile
+                        if review.userId == profile.userId {
+                            // Show the user's own profile page directly
+                            showProfileView = true
+                        } else {
+                            // For other users, fetch and show their profile
+                            firestoreService.fetchUserById(userId: review.userId) { profileData in
+                                if let profileData = profileData {
+                                    userProfileViewModel.selectUser(profileData, currentUserId: profile.userId)
+                                }
+                            }
+                        }
+                    }
+                    .background(
+                        NavigationLink(destination: ProfileView(), isActive: $showProfileView) {
+                            EmptyView()
+                        }
+                    )
             } else if selectedPlaceVM.profilePhotoLoadingState(forUserId: review.userId) == .loading {
                 ProgressView()
                     .frame(width: 50, height: 50)
@@ -219,6 +242,7 @@ struct RestaurantReviewView: View {
     @Binding var isActiveKeyboard: Bool
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var profile: ProfileViewModel
+    @EnvironmentObject var userProfileViewModel: UserProfileViewModel
     @State private var showComments = false
 
     var body: some View {
@@ -387,6 +411,7 @@ struct RestaurantReviewView: View {
 struct InlineCommentsView: View {
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var profile: ProfileViewModel
+    @EnvironmentObject var userProfileViewModel: UserProfileViewModel
     @State private var commentText = ""
     @State private var selectedImages: [UIImage] = []
     @State private var isPickerPresented = false
@@ -784,8 +809,12 @@ struct InlineCommentView: View {
     let comment: loc.Comment
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var profile: ProfileViewModel
+    @EnvironmentObject var userProfileViewModel: UserProfileViewModel
     @State private var showFullText = false
+    @State private var showProfileView = false
     @Binding var selectedImage: UIImage?
+    
+    private let firestoreService = FirestoreService()
     
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -807,6 +836,25 @@ struct InlineCommentView: View {
                                 .scaledToFill()
                                 .frame(width: 34, height: 34)
                                 .clipShape(Circle())
+                                .onTapGesture {
+                                    // Check if this is the logged-in user's profile
+                                    if comment.userId == profile.userId {
+                                        // Show the user's own profile page directly
+                                        showProfileView = true
+                                    } else {
+                                        // For other users, fetch and show their profile
+                                        firestoreService.fetchUserById(userId: comment.userId) { profileData in
+                                            if let profileData = profileData {
+                                                userProfileViewModel.selectUser(profileData, currentUserId: profile.userId)
+                                            }
+                                        }
+                                    }
+                                }
+                                .background(
+                                    NavigationLink(destination: ProfileView(), isActive: $showProfileView) {
+                                        EmptyView()
+                                    }
+                                )
                         case .failure:
                             Image(systemName: "person.circle")
                                 .resizable()
@@ -979,4 +1027,7 @@ struct RatingView: View {
 //    // Return the view with sample data
 //    PlaceReviewsView(reviews: sampleReviews)
 //}
+
+// Add the FirestoreService as a property
+private let firestoreService = FirestoreService()
 

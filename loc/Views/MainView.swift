@@ -156,6 +156,7 @@ struct MainView: View {
                             sheetHeight: $sheetHeight,
                             minSheetHeight: minSheetHeight
                         )
+                        .environmentObject(userProfileViewModel)
                         .frame(maxWidth: .infinity)
                     }
                 }

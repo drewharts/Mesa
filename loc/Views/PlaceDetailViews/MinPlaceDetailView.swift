@@ -14,6 +14,7 @@ struct MinPlaceDetailView: View {
     @ObservedObject var viewModel: PlaceDetailViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var locationManager: LocationManager
+    @EnvironmentObject var userProfileViewModel: UserProfileViewModel
     @Environment(\.isScrollingEnabled) var isScrollingEnabled // Access scroll state
 
     @Binding var showNoPhoneNumberAlert: Bool
@@ -179,7 +180,7 @@ struct MinPlaceDetailView: View {
                     )
                 case .reviews:
                     PlaceReviewsView(selectedImage: $selectedImage)
-                    
+                        .environmentObject(userProfileViewModel)
                 }
             }
             .padding(.horizontal, 30)

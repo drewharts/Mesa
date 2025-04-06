@@ -1895,5 +1895,27 @@ class FirestoreService: ObservableObject {
             }
         }
 
-    // ... existing code ...
+    func fetchUserById(userId: String, completion: @escaping (ProfileData?) -> Void) {
+        db.collection("users").document(userId).getDocument { document, error in
+            if let error = error {
+                print("Error fetching user \(userId): \(error.localizedDescription)")
+                completion(nil)
+                return
+            }
+            
+            guard let document = document, document.exists else {
+                print("User \(userId) not found")
+                completion(nil)
+                return
+            }
+            
+            do {
+                let profileData = try document.data(as: ProfileData.self)
+                completion(profileData)
+            } catch {
+                print("Error decoding user \(userId): \(error.localizedDescription)")
+                completion(nil)
+            }
+        }
+    }
 }
