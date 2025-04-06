@@ -908,15 +908,15 @@ class FirestoreService: ObservableObject {
         }
     }
     
-    func deleteList(userId: String, listName: String, completion: @escaping (Error?) -> Void) {
+    func deleteList(userId: String, listId: String, completion: @escaping (Error?) -> Void) {
         let listRef = db.collection("users").document(userId)
-                        .collection("placeLists").document(listName)
+                        .collection("placeLists").document(listId)
         
         listRef.delete { error in
             if let error = error {
-                print("Error deleting list '\(listName)': \(error.localizedDescription)")
+                print("Error deleting list '\(listId)': \(error.localizedDescription)")
             } else {
-                print("List successfully deleted: \(listName)")
+                print("List successfully deleted: \(listId)")
             }
             completion(error)
         }

@@ -543,7 +543,7 @@ class ProfileViewModel: ObservableObject {
     func removePlaceList(placeList: PlaceList) {
         if let index = userLists.firstIndex(where: { $0.id == placeList.id }) {
             userLists.remove(at: index)
-            firestoreService.deleteList(userId: self.userId, listName: placeList.name) { error in
+            firestoreService.deleteList(userId: self.userId, listId: placeList.id.uuidString) { error in
                 if error == nil, let index = self.userLists.firstIndex(where: { $0.id == placeList.id }) {
                     self.userLists.remove(at: index)
                 }

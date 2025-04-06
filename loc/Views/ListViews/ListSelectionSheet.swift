@@ -30,27 +30,47 @@ struct ListDescription: View {
 // ListSelectionRowView
 struct ListSelectionRowView: View {
     @EnvironmentObject var profile: ProfileViewModel
+    @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
     let list: PlaceList
     let place: DetailPlace
+    @State private var backgroundColor: Color = Color(.systemGray5)
 
     var body: some View {
         Button(action: {
             togglePlaceInList()
         }) {
             HStack {
-                if let listImage = profile.listImages[list.id] {
-                    Image(uiImage: listImage)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .frame(width: 75, height: 75)
-                        .clipped()
-                        .cornerRadius(4)
-                } else {
-                    Rectangle()
-                        .frame(width: 75, height: 75)
-                        .foregroundColor(.gray.opacity(0.2))
-                        .cornerRadius(4)
+                // Display list image, place image, or colored rectangle
+                Group {
+                    if let listImage = profile.listImages[list.id] {
+                        // List has a custom image
+                        Image(uiImage: listImage)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                    } else if let placeIds = profile.placeListMBPlaces[list.id], 
+                              !placeIds.isEmpty, 
+                              let firstPlaceId = placeIds.first,
+                              let image = detailPlaceViewModel.placeImages[firstPlaceId] {
+                        // Use the first place's image
+                        Image(uiImage: image)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                    } else {
+                        // No image available, use a colored rectangle
+                        Rectangle()
+                            .foregroundColor(backgroundColor)
+                            .onAppear {
+                                backgroundColor = Color(
+                                    red: Double.random(in: 0.5...0.9),
+                                    green: Double.random(in: 0.5...0.9),
+                                    blue: Double.random(in: 0.5...0.9)
+                                )
+                            }
+                    }
                 }
+                .frame(width: 75, height: 75)
+                .clipped()
+                .cornerRadius(4)
 
                 ListDescription(placeList: list)
 
@@ -86,6 +106,7 @@ struct ListSelectionRowView: View {
 // MARK: - ListsInSelectionSheet
 struct ListsInSelectionSheet: View {
     @EnvironmentObject var profile: ProfileViewModel
+    @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
     let place: DetailPlace
 
     var body: some View {
@@ -107,6 +128,7 @@ struct ListsInSelectionSheet: View {
 struct ListSelectionSheet: View {
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var lists: PlaceListViewModel
+    @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
     let place: DetailPlace
     @Binding var isPresented: Bool
     @State private var showNewListSheet = false
@@ -129,7 +151,7 @@ struct ListSelectionSheet: View {
                 }) {
                     Image(systemName: "plus")
                         .imageScale(.small)
-                        .foregroundColor(.black)
+                        .foregroundColor(.gray)
                         .padding(8)
                         .background(Circle().fill(.white))
                 }
