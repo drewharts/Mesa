@@ -244,6 +244,15 @@ struct RestaurantReviewView: View {
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var userProfileViewModel: UserProfileViewModel
     @State private var showComments = false
+    
+    // Static dictionary to track which review comments should be hidden
+    private static var hiddenComments = [String: Bool]()
+    
+    // Static method to hide comments for a specific review
+    static func hideComments(reviewId: String) {
+        // This is called from InlineCommentsView to hide its parent review's comments
+        NotificationCenter.default.post(name: Notification.Name("HideCommentsFor-\(reviewId)"), object: nil)
+    }
 
     var body: some View {
         VStack(spacing: 16) {
@@ -403,6 +412,17 @@ struct RestaurantReviewView: View {
         .onAppear {
             // Check like statuses using the proper userId from profile
             selectedPlaceVM.checkLikeStatuses(userId: profile.userId)
+            
+            // Listen for the hide comments notification
+            NotificationCenter.default.addObserver(forName: Notification.Name("HideCommentsFor-\(review.id)"), object: nil, queue: .main) { _ in
+                withAnimation {
+                    showComments = false
+                }
+            }
+        }
+        .onDisappear {
+            // Remove the observer when view disappears
+            NotificationCenter.default.removeObserver(self, name: Notification.Name("HideCommentsFor-\(review.id)"), object: nil)
         }
     }
 }
@@ -557,6 +577,10 @@ struct InlineCommentsView: View {
                                 
                                 Button(action: {
                                     showingReplyField = true
+                                    // Add a small delay to ensure view updates first
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                        isTextFieldFocused = true
+                                    }
                                 }) {
                                     Text("Reply")
                                         .font(.footnote)
@@ -715,6 +739,25 @@ struct InlineCommentsView: View {
                                     }
                                 }) {
                                     Text("Reply")
+                                        .font(.footnote)
+                                        .foregroundColor(.gray)
+                                }
+                                
+                                // Add vertical separator and hide button
+                                Rectangle()
+                                    .fill(Color.gray.opacity(0.5))
+                                    .frame(width: 1, height: 14)
+                                    .padding(.horizontal, 8)
+                                
+                                Button(action: {
+                                    // Hide comments when clicked
+                                    withAnimation {
+                                        onKeyboardActive(false)
+                                        isTextFieldFocused = false
+                                        RestaurantReviewView.hideComments(reviewId: reviewId)
+                                    }
+                                }) {
+                                    Text("Hide")
                                         .font(.footnote)
                                         .foregroundColor(.gray)
                                 }
@@ -1012,47 +1055,6 @@ struct RatingView: View {
         }
     }
 }
-
-//#Preview {
-//    // Sample review data
-//    let sampleReviews = [
-//        Review(
-//            id: "1", // String ID for the review
-//            userId: "user1",
-//            profilePhotoUrl: "",
-//            userFirstName: "John",
-//            userLastName: "Doe",
-//            placeId: "place1", // String ID for the place
-//            placeName: "Italian Bistro",
-//            foodRating: 4.5,
-//            serviceRating: 3.8,
-//            ambienceRating: 4.0,
-//            favoriteDishes: ["Pizza", "Pasta"],
-//            reviewText: "Great food and vibe, but service could be faster!",
-//            timestamp: Date(),
-//            images: ["https://example.com/image1.jpg", "https://example.com/image2.jpg"]
-//        ),
-//        Review(
-//            id: "2",
-//            userId: "user2",
-//            profilePhotoUrl: "",
-//            userFirstName: "Jane",
-//            userLastName: "Smith",
-//            placeId: "place2",
-//            placeName: "Cafe Verde",
-//            foodRating: 3.0,
-//            serviceRating: 4.0,
-//            ambienceRating: 4.5,
-//            favoriteDishes: ["Salad"],
-//            reviewText: "Loved the ambience, food was okay.",
-//            timestamp: Date().addingTimeInterval(-86400), // Yesterday
-//            images: []
-//        )
-//    ]
-//    
-//    // Return the view with sample data
-//    PlaceReviewsView(reviews: sampleReviews)
-//}
 
 // Add the FirestoreService as a property
 private let firestoreService = FirestoreService()
