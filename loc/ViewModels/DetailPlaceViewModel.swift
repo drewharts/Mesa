@@ -9,6 +9,7 @@ import Foundation
 import UIKit
 import FirebaseFirestore
 import MapboxSearch
+import FirebaseAuth
 
 
 class DetailPlaceViewModel: ObservableObject {
@@ -17,9 +18,29 @@ class DetailPlaceViewModel: ObservableObject {
     @Published var placeSavers: [String: [User]] = [:] // Tracks who saved each place
 
     private let firestoreService: FirestoreService
+    private var notificationObserver: NSObjectProtocol?
 
     init(firestoreService: FirestoreService) {
         self.firestoreService = firestoreService
+        
+        // Add observer for map refresh notifications
+        notificationObserver = NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("RefreshMapAnnotations"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self = self else { return }
+            print("DetailPlaceViewModel received map refresh notification")
+            // Force a refresh by triggering objectWillChange
+            self.objectWillChange.send()
+        }
+    }
+    
+    deinit {
+        // Remove observer when this view model is deallocated
+        if let observer = notificationObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
     }
 
     // Fetch place data (e.g., from Firestore)
@@ -45,7 +66,18 @@ class DetailPlaceViewModel: ObservableObject {
 
     func fetchPlaceImage(for placeId: String) {
         guard placeImages[placeId] == nil else { return }
-        firestoreService.fetchReviews(placeId: placeId, latestOnly: false) { [weak self] (reviews, error) in
+        
+        // Get the current user ID
+        guard let currentUserId = Auth.auth().currentUser?.uid else {
+            print("Error: Current user ID is not available")
+            DispatchQueue.main.async {
+                self.placeImages[placeId] = nil
+            }
+            return
+        }
+        
+        // Use friends' reviews to get images
+        firestoreService.fetchFriendsReviews(placeId: placeId, currentUserId: currentUserId) { [weak self] (reviews, error) in
             guard let self = self else { return }
             if let error = error {
                 print("Error fetching reviews for place \(placeId): \(error.localizedDescription)")
@@ -144,4 +176,5 @@ class DetailPlaceViewModel: ObservableObject {
                 }
             }
         }
-    }}
+    }
+}

@@ -9,16 +9,154 @@ import SwiftUI
 import PhotosUI
 import MapboxSearch
 
-struct ListHeaderView: View {
+// MARK: - ListDeletionRowView
+struct ListDeletionRowView: View {
+    @EnvironmentObject var profile: ProfileViewModel
+    @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
+    let list: PlaceList
+    var onDelete: (PlaceList) -> Void
+    @State private var backgroundColor: Color = Color(.systemGray5)
+    
     var body: some View {
-        Text("LISTS")
-            .font(.subheadline)
-            .fontWeight(.medium)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.leading, 20)
-            .foregroundStyle(.black)
-            .padding(.vertical, -25)
-            .padding(.horizontal, 10)
+        Button(action: {
+            onDelete(list)
+        }) {
+            HStack {
+                // Display list image, place image, or colored rectangle
+                Group {
+                    if let image = profile.listImages[list.id] {
+                        // List has a custom image
+                        Image(uiImage: image)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                    } else if let placeIds = profile.placeListMBPlaces[list.id], 
+                              !placeIds.isEmpty, 
+                              let firstPlaceId = placeIds.first,
+                              let image = detailPlaceViewModel.placeImages[firstPlaceId] {
+                        // Use the first place's image
+                        Image(uiImage: image)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                    } else {
+                        // No image available, use a colored rectangle
+                        Rectangle()
+                            .foregroundColor(backgroundColor)
+                            .onAppear {
+                                backgroundColor = Color(
+                                    red: Double.random(in: 0.5...0.9),
+                                    green: Double.random(in: 0.5...0.9),
+                                    blue: Double.random(in: 0.5...0.9)
+                                )
+                            }
+                    }
+                }
+                .frame(width: 75, height: 75)
+                .clipped()
+                .cornerRadius(4)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(list.name)
+                        .font(.body)
+                        .foregroundStyle(Color.primary.opacity(1.0))
+
+                    Text("\(profile.placeListMBPlaces[list.id]?.count ?? 0) Places")
+                        .font(.caption)
+                        .foregroundStyle(Color.secondary.opacity(1.0))
+                }
+                .padding(.horizontal, 15)
+                
+                Spacer()
+                
+                Image(systemName: "trash")
+                    .foregroundColor(.gray)
+                    .padding(.trailing, 10)
+            }
+            .padding(.top, 20)
+            .padding(.horizontal, 15)
+        }
+    }
+}
+
+// MARK: - ListDeletionSheet
+struct ListDeletionSheet: View {
+    @EnvironmentObject var profile: ProfileViewModel
+    @Binding var isPresented: Bool
+    
+    var body: some View {
+        VStack(spacing: 10) {
+            HStack {
+                Spacer()
+                
+                Text("Delete List")
+                    .font(.headline)
+                    .padding(.leading, 20)
+                
+                Spacer()
+                
+                Button(action: {
+                    isPresented = false
+                }) {
+                    Image(systemName: "xmark")
+                        .imageScale(.small)
+                        .foregroundColor(.gray)
+                        .padding(8)
+                        .background(Circle().fill(.white))
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 10)
+            
+            ScrollView {
+                if !profile.userLists.isEmpty {
+                    ForEach(profile.userLists) { list in
+                        ListDeletionRowView(list: list, onDelete: { list in
+                            profile.removePlaceList(placeList: list)
+                            if profile.userLists.isEmpty {
+                                isPresented = false
+                            }
+                        })
+                    }
+                } else {
+                    Text("No lists available")
+                        .foregroundColor(.gray)
+                        .padding(.horizontal)
+                        .padding(.vertical, 30)
+                }
+            }
+            
+            Spacer()
+        }
+        .cornerRadius(20)
+        .padding()
+    }
+}
+
+struct ListHeaderView: View {
+    var onAddList: () -> Void
+    var onDeleteList: () -> Void
+    
+    var body: some View {
+        HStack {
+            Text("LISTS")
+                .font(.subheadline)
+                .fontWeight(.medium)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .foregroundStyle(.black)
+            
+            Button(action: onDeleteList) {
+                Image(systemName: "minus.circle")
+                    .foregroundColor(.gray)
+            }
+            
+            Button(action: onAddList) {
+                Image(systemName: "plus.circle")
+                    .foregroundColor(.gray)
+            }
+        }
+        .padding(.leading, 20)
+        .padding(.trailing, 20)
+        .padding(.vertical, -25)
+        .padding(.horizontal, 10)
     }
 }
 
@@ -171,7 +309,6 @@ struct ProfileListDescription: View {
     }
 }
 
-
 struct ProfileViewListsView: View {
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
@@ -181,10 +318,16 @@ struct ProfileViewListsView: View {
     @State private var showingImagePicker = false
     @State private var inputImage: [UIImage] = []
     @State private var selectedList: PlaceListViewModel?
+    @State private var showingNewListSheet = false
+    @State private var showingDeleteListSheet = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            ListHeaderView()
+            ListHeaderView(onAddList: {
+                showingNewListSheet = true
+            }, onDeleteList: {
+                showingDeleteListSheet = true
+            })
 
             if !profile.userLists.isEmpty {
                 ForEach(profile.userLists, id: \.id) { list in // Explicitly use id
@@ -211,6 +354,14 @@ struct ProfileViewListsView: View {
         .padding(.vertical)
         .sheet(isPresented: $showingImagePicker) {
             ImagePicker(images: $inputImage, selectionLimit: 1)
+        }
+        .sheet(isPresented: $showingNewListSheet) {
+            NewListView(isPresented: $showingNewListSheet, onSave: { listName in
+                profile.addNewPlaceList(named: listName, city: "", emoji: "", image: "")
+            })
+        }
+        .sheet(isPresented: $showingDeleteListSheet) {
+            ListDeletionSheet(isPresented: $showingDeleteListSheet)
         }
         .onChange(of: inputImage) { _ in
             guard let newImage = inputImage.first, let selectedList = selectedList else { return }

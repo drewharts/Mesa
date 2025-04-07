@@ -16,6 +16,10 @@
 		</dict>
 		<dict/>
 	</array>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>comgooglemaps</string>
+	</array>
 	<key>MBXAccessToken</key>
 	<string>pk.eyJ1IjoiZHJld2hhcnRzIiwiYSI6ImNtNnNpbnBrdjA4aXcyaXE0aDV3Y25qZTQifQ.3TUkiF3r3mHx44dyywy2JQ</string>
 </dict>

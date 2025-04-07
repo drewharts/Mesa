@@ -58,6 +58,17 @@ struct MapView: View {
                     viewport = .camera(center: currentCoords, zoom: 13)
                     hasInitialized = true
                 }
+                
+                // Add notification observer for map refresh
+                NotificationCenter.default.addObserver(forName: NSNotification.Name("RefreshMapAnnotations"), object: nil, queue: .main) { [self] _ in
+                    print("Received map refresh notification - refreshing annotations")
+                    // Force map to redraw by making a minor state change
+                    let currentCenter = viewport.camera?.center
+                    // Create a very slightly different viewport to force refresh
+                    withAnimation(.easeInOut(duration: 0.1)) {
+                        viewport = .camera(center: currentCenter, zoom: viewport.camera?.zoom, bearing: viewport.camera?.bearing)
+                    }
+                }
             }
             .onChange(of: selectedPlaceVM.selectedPlace) { newPlace in
                 guard let place = newPlace, let coordinate = place.coordinate else {
@@ -72,6 +83,15 @@ struct MapView: View {
                 withViewportAnimation(.easeOut(duration: 2.0)) {
                     viewport = .camera(center: newCenter, zoom: 14)
                 }
+            }
+            .onChange(of: profile.placeAnnotationImages) { _ in
+                print("Place annotation images changed - refreshing map")
+                let currentViewport = viewport
+                viewport = currentViewport
+            }
+            .onDisappear {
+                // Remove notification observer
+                NotificationCenter.default.removeObserver(self, name: NSNotification.Name("RefreshMapAnnotations"), object: nil)
             }
         }
     }

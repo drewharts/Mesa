@@ -9,6 +9,7 @@ import Foundation
 import MapboxSearch
 import CoreLocation
 import UIKit
+import FirebaseAuth
 
 class SelectedPlaceViewModel: ObservableObject {
     private let firestoreService: FirestoreService
@@ -20,7 +21,7 @@ class SelectedPlaceViewModel: ObservableObject {
                let currentLocation = locationManager.currentLocation {
                 loadData(for: place, currentLocation: currentLocation.coordinate)
                 loadReviews(for: place)
-                getPlacePhotos(for: place)
+//                getPlacePhotos(for: place)
                 
                 // Clear previous likes when loading a new place
                 likedReviews.removeAll()
@@ -43,6 +44,12 @@ class SelectedPlaceViewModel: ObservableObject {
 
     // Add new property to track liked reviews
     @Published private var likedReviews: Set<String> = []
+
+    // MARK: - Comment Management Properties
+    private var placeReviewComments: [String: [Comment]] = [:] // reviewId -> comments
+    private var commentLoadingStates: [String: LoadingState] = [:] // reviewId -> loading state
+    private var commentPhotos: [String: [UIImage]] = [:] // commentId -> photos
+    private var reviewCommentCounts: [String: Int] = [:] // reviewId -> comment count
 
     // MARK: - Loading State Enum
     enum LoadingState: Equatable {
@@ -131,7 +138,18 @@ class SelectedPlaceViewModel: ObservableObject {
             self.reviewLoadingStates[placeId] = .loading
         }
         
-        firestoreService.fetchReviews(placeId: placeId) { [weak self] reviews, error in
+        // Use the user's ID to get only reviews from followed users
+        guard let currentUserId = Auth.auth().currentUser?.uid else {
+            print("Error: Current user ID is not available")
+            DispatchQueue.main.async {
+                self.reviewLoadingStates[placeId] = .error(NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "User not logged in"]))
+                self.placeReviews[placeId] = []
+            }
+            return
+        }
+        
+        // Use the new method to fetch only reviews from friends and the current user
+        firestoreService.fetchFriendsReviews(placeId: placeId, currentUserId: currentUserId) { [weak self] reviews, error in
             guard let self = self else { return }
             
             DispatchQueue.main.async {
@@ -149,6 +167,7 @@ class SelectedPlaceViewModel: ObservableObject {
                     fetchedReviews.forEach { review in
                         self.loadReviewPhotos(for: review)
                         self.loadProfilePhoto(for: review)
+                        self.loadCommentCountForReview(placeId: placeId, reviewId: review.id)
                     }
                     self.reviewLoadingStates[placeId] = .loaded
                 }
@@ -212,6 +231,11 @@ class SelectedPlaceViewModel: ObservableObject {
                 }
             }
         }
+    }
+    
+    // Public method to reload review photos
+    func reloadReviewPhotos(for review: Review) {
+        self.loadReviewPhotos(for: review)
     }
     
     private func loadProfilePhoto(for review: Review) {
@@ -280,6 +304,137 @@ class SelectedPlaceViewModel: ObservableObject {
         }
     }
     
+    // MARK: - Comment Methods
+    
+    func loadCommentsForReview(reviewId: String) {
+        guard let placeId = selectedPlace?.id.uuidString else { return }
+        
+        DispatchQueue.main.async {
+            self.commentLoadingStates[reviewId] = .loading
+        }
+        
+        // Add limit and order by timestamp to get only the most recent 5 comments
+        firestoreService.fetchComments(placeId: placeId, reviewId: reviewId, limit: 5) { [weak self] comments, error in
+            guard let self = self else { return }
+            
+            DispatchQueue.main.async {
+                if let error = error {
+                    print("Error loading comments: \(error.localizedDescription)")
+                    self.commentLoadingStates[reviewId] = .error(error)
+                } else {
+                    let fetchedComments = comments ?? []
+                    self.placeReviewComments[reviewId] = fetchedComments
+                    
+                    // Update our count - but don't reset if we already have a larger count
+                    // This ensures we display the correct total even when loading limited comments
+                    if self.reviewCommentCounts[reviewId] == nil || self.reviewCommentCounts[reviewId]! < fetchedComments.count {
+                        self.reviewCommentCounts[reviewId] = fetchedComments.count
+                    }
+                    
+                    self.commentLoadingStates[reviewId] = .loaded
+                    
+                    // Efficiently load photos only for comments that have them
+                    for comment in fetchedComments where !comment.images.isEmpty {
+                        self.loadCommentPhotos(for: comment)
+                    }
+                }
+            }
+        }
+    }
+    
+    func addComment(reviewId: String, text: String, images: [UIImage], userId: String, userFirstName: String, userLastName: String, profilePhotoUrl: String) {
+        guard let placeId = selectedPlace?.id.uuidString else { return }
+        
+        let commentId = UUID().uuidString
+        
+        let comment = Comment(
+            id: commentId,
+            reviewId: reviewId,
+            userId: userId,
+            profilePhotoUrl: profilePhotoUrl,
+            userFirstName: userFirstName,
+            userLastName: userLastName,
+            commentText: text,
+            timestamp: Date(),
+            images: [],
+            likes: 0
+        )
+        
+        firestoreService.addComment(placeId: placeId, reviewId: reviewId, comment: comment, images: images) { [weak self] result in
+            guard let self = self else { return }
+            
+            DispatchQueue.main.async {
+                switch result {
+                case .success(let savedComment):
+                    // Add the comment to our local collection
+                    var currentComments = self.placeReviewComments[reviewId] ?? []
+                    currentComments.insert(savedComment, at: 0) // Add at the top
+                    self.placeReviewComments[reviewId] = currentComments
+                    
+                    // Update the comment count
+                    let currentCount = self.reviewCommentCounts[reviewId] ?? 0
+                    self.reviewCommentCounts[reviewId] = currentCount + 1
+                    
+                    // Ensure loading state is set to loaded
+                    self.commentLoadingStates[reviewId] = .loaded
+                    
+                    // Load comment photos if any
+                    if !savedComment.images.isEmpty {
+                        self.loadCommentPhotos(for: savedComment)
+                    }
+                    
+                case .failure(let error):
+                    print("Error adding comment: \(error.localizedDescription)")
+                }
+            }
+        }
+    }
+    
+    private func loadCommentPhotos(for comment: Comment) {
+        // Skip if already loaded or no images
+        if commentPhotos[comment.id] != nil || comment.images.isEmpty {
+            return
+        }
+        print("Loading \(comment.images.count) photos for comment ID: \(comment.id)")
+        
+        firestoreService.fetchPhotosFromStorage(urls: comment.images) { [weak self] images, error in
+            guard let self = self else { return }
+            
+            DispatchQueue.main.async {
+                if let error = error {
+                    print("Error loading comment photos: \(error.localizedDescription)")
+                } else if let images = images {
+                    print("Successfully loaded \(images.count) photos for comment ID: \(comment.id)")
+                    self.commentPhotos[comment.id] = images
+                }
+            }
+        }
+    }
+    
+    // MARK: - Comment Public Accessors
+    
+    func comments(for reviewId: String) -> [Comment] {
+        return placeReviewComments[reviewId] ?? []
+    }
+    
+    func commentLoadingState(for reviewId: String) -> LoadingState {
+        return commentLoadingStates[reviewId] ?? .idle
+    }
+    
+    func commentPhotos(for comment: Comment) -> [UIImage] {
+        return commentPhotos[comment.id] ?? []
+    }
+    
+    // Returns the number of comments for a specific review
+    func commentCount(for reviewId: String) -> Int {
+        // First check our stored counts
+        if let count = reviewCommentCounts[reviewId] {
+            return count
+        }
+        // Fall back to the comment array count if needed
+        return placeReviewComments[reviewId]?.count ?? 0
+    }
+
     // MARK: - Public Methods
     func addReview(_ review: Review) {
         guard let placeId = selectedPlace?.id.uuidString else { return }
@@ -298,13 +453,17 @@ class SelectedPlaceViewModel: ObservableObject {
     func formattedTimestamp(for review: Review) -> String {
         let now = Date()
         let calendar = Calendar.current
-        let daysSince = calendar.dateComponents([.day], from: review.timestamp, to: now).day ?? 0
+        let components = calendar.dateComponents([.minute, .hour, .day], from: review.timestamp, to: now)
         
-        if daysSince < 30 {
-            return daysSince == 0 ? "Today" : "\(daysSince) day\(daysSince == 1 ? "" : "s") ago"
+        if let minutes = components.minute, minutes < 60 && (components.hour ?? 0) == 0 && (components.day ?? 0) == 0 {
+            return minutes == 0 ? "Just now" : "\(minutes)m"
+        } else if let hours = components.hour, hours < 24 && (components.day ?? 0) == 0 {
+            return "\(hours)h"
+        } else if let days = components.day {
+            return "\(days)d"
         } else {
             let formatter = DateFormatter()
-            formatter.dateStyle = .medium
+            formatter.dateStyle = .short
             formatter.timeStyle = .none
             return formatter.string(from: review.timestamp)
         }
@@ -411,5 +570,69 @@ class SelectedPlaceViewModel: ObservableObject {
     // Add helper method to check if a review is liked
     func isReviewLiked(_ reviewId: String) -> Bool {
         return likedReviews.contains(reviewId)
+    }
+
+    // Load comment count for a review (without loading all comments)
+    private func loadCommentCountForReview(placeId: String, reviewId: String) {
+        firestoreService.fetchCommentCount(placeId: placeId, reviewId: reviewId) { [weak self] count, error in
+            guard let self = self else { return }
+            
+            DispatchQueue.main.async {
+                if let error = error {
+                    print("Error fetching comment count: \(error.localizedDescription)")
+                } else if let count = count {
+                    // Store the count in our dictionary
+                    self.reviewCommentCounts[reviewId] = count
+                    
+                    // Create a placeholder array with the right number of empty comments
+                    // This ensures commentCount returns the correct count even before comments are loaded
+                    if count > 0 {
+                        if self.placeReviewComments[reviewId] == nil {
+                            // Store empty array with the right capacity
+                            self.placeReviewComments[reviewId] = []
+                            
+                            // Mark as idle so actual comments can be loaded when needed
+                            self.commentLoadingStates[reviewId] = .idle
+                        }
+                    } else {
+                        // If no comments, initialize with empty array
+                        self.placeReviewComments[reviewId] = []
+                        self.commentLoadingStates[reviewId] = .loaded
+                    }
+                }
+            }
+        }
+    }
+
+    // Load additional comments beyond the initial 5
+    func loadMoreComments(placeId: String, reviewId: String, limit: Int) {
+        DispatchQueue.main.async {
+            // Don't change loading state to .loading to avoid flickering the UI
+            // Just keep the existing comments visible while loading more
+        }
+        
+        firestoreService.fetchComments(placeId: placeId, reviewId: reviewId, limit: limit) { [weak self] comments, error in
+            guard let self = self else { return }
+            
+            DispatchQueue.main.async {
+                if let error = error {
+                    print("Error loading more comments: \(error.localizedDescription)")
+                    // Don't update loading state to error to preserve existing comments
+                } else {
+                    let fetchedComments = comments ?? []
+                    self.placeReviewComments[reviewId] = fetchedComments
+                    
+                    // Only update comment count if we get more than we knew about
+                    if self.reviewCommentCounts[reviewId] == nil || self.reviewCommentCounts[reviewId]! < fetchedComments.count {
+                        self.reviewCommentCounts[reviewId] = fetchedComments.count
+                    }
+                    
+                    // Load photos for new comments
+                    for comment in fetchedComments where !comment.images.isEmpty && self.commentPhotos[comment.id] == nil {
+                        self.loadCommentPhotos(for: comment)
+                    }
+                }
+            }
+        }
     }
 }
