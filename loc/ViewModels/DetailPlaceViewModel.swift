@@ -17,9 +17,29 @@ class DetailPlaceViewModel: ObservableObject {
     @Published var placeSavers: [String: [User]] = [:] // Tracks who saved each place
 
     private let firestoreService: FirestoreService
+    private var notificationObserver: NSObjectProtocol?
 
     init(firestoreService: FirestoreService) {
         self.firestoreService = firestoreService
+        
+        // Add observer for map refresh notifications
+        notificationObserver = NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("RefreshMapAnnotations"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self = self else { return }
+            print("DetailPlaceViewModel received map refresh notification")
+            // Force a refresh by triggering objectWillChange
+            self.objectWillChange.send()
+        }
+    }
+    
+    deinit {
+        // Remove observer when this view model is deallocated
+        if let observer = notificationObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
     }
 
     // Fetch place data (e.g., from Firestore)

@@ -138,98 +138,113 @@ class ProfileViewModel: ObservableObject {
         return image
     }
     
+    // Rebuild all map annotation images completely
+    func rebuildAllMapAnnotations() {
+        print("Rebuilding all map annotations")
+        // Get all places that need annotations
+        let allPlaceIds = Set(detailPlaceViewModel.places.keys)
+        
+        // Process each place and generate a new annotation image
+        for placeId in allPlaceIds {
+            updatePlaceAnnotationImages(for: placeId)
+        }
+        
+        // Trigger UI refresh in both view models
+        objectWillChange.send()
+        detailPlaceViewModel.objectWillChange.send()
+        
+        // Notify the detailPlaceViewModel to refresh the map
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            NotificationCenter.default.post(name: NSNotification.Name("RefreshMapAnnotations"), object: nil)
+        }
+    }
+    
+    // Completely rebuild friend relationships and map annotations
+    func rebuildMapAfterFriendChange(friendId: String, isAddingFriend: Bool) {
+        print("Rebuilding map after \(isAddingFriend ? "adding" : "removing") friend: \(friendId)")
+        
+        // Step 1: If removing friend, clean up all references to them
+        if !isAddingFriend {
+            // Remove from placeSaversByPlace
+            for (placeId, _) in placeSaversByPlace {
+                placeSaversByPlace[placeId]?.removeAll(where: { $0.id == friendId })
+                detailPlaceViewModel.placeSavers[placeId]?.removeAll(where: { $0.id == friendId })
+            }
+            
+            // Remove their profile photo
+            userProfilePhotos.removeValue(forKey: friendId)
+        }
+        
+        // Step 2: Clear all annotation images to force fresh rebuilding
+        placeAnnotationImages.removeAll()
+        
+        // Step 3: Fetch followers count
+        fetchFollowers(userId: userId)
+        
+        // Step 4: Completely rebuild all place annotation images
+        print("Starting complete rebuild of all place annotations")
+        rebuildAllMapAnnotations()
+        
+        // Step 5: Force another map refresh after a slight delay
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            print("Sending delayed map refresh notification")
+            NotificationCenter.default.post(name: NSNotification.Name("RefreshMapAnnotations"), object: nil)
+        }
+    }
+    
     func toggleFollowUser(userId: String) {
         if let friendIndex = friends.firstIndex(where: { $0.id == userId }) {
-            let friendToRemove = friends[friendIndex]
+            // UNFOLLOW: Remove from friends array
             friends.remove(at: friendIndex)
             
+            // Rebuild map annotations with the friend removed
             DispatchQueue.main.async { [weak self] in
                 guard let self = self else { return }
-                
-                // Keep track of all affected places
-                var affectedPlaceIds = Set<String>()
-                
-                // Identify all places this friend had saved and collect their IDs
-                for (placeId, users) in self.placeSaversByPlace {
-                    if users.contains(where: { $0.id == userId }) {
-                        // Remove the friend from placeSaversByPlace
-                        self.placeSaversByPlace[placeId]?.removeAll(where: { $0.id == userId })
-                        // Update the DetailPlaceViewModel too
-                        self.detailPlaceViewModel.placeSavers[placeId]?.removeAll(where: { $0.id == userId })
-                        // Add to affected places
-                        affectedPlaceIds.insert(placeId)
-                    }
-                }
-                
-                // Update all affected place annotations
-                for placeId in affectedPlaceIds {
-                    self.updatePlaceAnnotationImages(for: placeId)
-                }
-                
-                self.fetchFollowers(userId: self.userId)
-                print("Successfully unfollowed user \(userId)")
+                self.rebuildMapAfterFriendChange(friendId: userId, isAddingFriend: false)
             }
         } else {
+            // FOLLOW: Add to friends array
             firestoreService.fetchCurrentUser(userId: userId) { [weak self] user, error in
-                guard let self = self else { return }
-                if let userToFollow = user {
-                    DispatchQueue.main.async { [weak self] in
-                        guard let self = self else { return }
-                        self.friends.append(userToFollow)
-                        
-                        // Load the profile photo first, then fetch places
-                        let photoLoadGroup = DispatchGroup()
-                        photoLoadGroup.enter()
-                        
-                        if let photoURL = userToFollow.profilePhotoURL {
-                            self.loadUserProfilePhoto(from: photoURL, forUserId: userToFollow.id) {
-                                photoLoadGroup.leave()
-                            }
-                        } else {
-                            self.userProfilePhotos[userToFollow.id] = nil
+                guard let self = self, let userToFollow = user else { return }
+                
+                DispatchQueue.main.async { [weak self] in
+                    guard let self = self else { return }
+                    
+                    // Add to friends array
+                    self.friends.append(userToFollow)
+                    
+                    // Load profile photo first
+                    let photoLoadGroup = DispatchGroup()
+                    photoLoadGroup.enter()
+                    
+                    if let photoURL = userToFollow.profilePhotoURL {
+                        self.loadUserProfilePhoto(from: photoURL, forUserId: userToFollow.id) {
                             photoLoadGroup.leave()
                         }
+                    } else {
+                        self.userProfilePhotos[userToFollow.id] = UIImage(named: "defaultProfile")
+                        photoLoadGroup.leave()
+                    }
+                    
+                    // Fetch places after photo is loaded
+                    photoLoadGroup.notify(queue: .main) {
+                        let placesFetchGroup = DispatchGroup()
                         
-                        // After photo is loaded, proceed with place fetching
-                        photoLoadGroup.notify(queue: .main) {
-                            // Track all places affected by adding this friend
-                            var affectedPlaceIds = Set<String>()
-                            let placesFetchGroup = DispatchGroup()
-                            
-                            // Fetch favorite places
-                            placesFetchGroup.enter()
-                            self.fetchFriendFavPlaces(friend: userToFollow) {
-                                // Collect IDs of places this friend has saved
-                                for (placeId, users) in self.placeSaversByPlace {
-                                    if users.contains(where: { $0.id == userToFollow.id }) {
-                                        affectedPlaceIds.insert(placeId)
-                                    }
-                                }
-                                placesFetchGroup.leave()
-                            }
-                            
-                            // Fetch places in lists
-                            placesFetchGroup.enter()
-                            self.fetchAndProcessFriendLists(friend: userToFollow) {
-                                // Collect more IDs of places this friend has in lists
-                                for (placeId, users) in self.placeSaversByPlace {
-                                    if users.contains(where: { $0.id == userToFollow.id }) {
-                                        affectedPlaceIds.insert(placeId)
-                                    }
-                                }
-                                placesFetchGroup.leave()
-                            }
-                            
-                            // After all places are fetched, update annotations
-                            placesFetchGroup.notify(queue: .main) {
-                                // Update all place annotations this friend had saved
-                                for placeId in affectedPlaceIds {
-                                    self.updatePlaceAnnotationImages(for: placeId)
-                                }
-                                
-                                self.fetchFollowers(userId: self.userId)
-                                print("Successfully followed user \(userId) and updated \(affectedPlaceIds.count) place annotations")
-                            }
+                        // Fetch favorite places
+                        placesFetchGroup.enter()
+                        self.fetchFriendFavPlaces(friend: userToFollow) {
+                            placesFetchGroup.leave()
+                        }
+                        
+                        // Fetch list places
+                        placesFetchGroup.enter()
+                        self.fetchAndProcessFriendLists(friend: userToFollow) {
+                            placesFetchGroup.leave()
+                        }
+                        
+                        // After places are fetched, rebuild map
+                        placesFetchGroup.notify(queue: .main) {
+                            self.rebuildMapAfterFriendChange(friendId: userId, isAddingFriend: true)
                         }
                     }
                 }
