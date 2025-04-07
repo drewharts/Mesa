@@ -145,7 +145,27 @@ class ProfileViewModel: ObservableObject {
             
             DispatchQueue.main.async { [weak self] in
                 guard let self = self else { return }
-                // No need for removeFriendPlaces; DetailPlaceViewModel manages placeSavers
+                
+                // Keep track of all affected places
+                var affectedPlaceIds = Set<String>()
+                
+                // Identify all places this friend had saved and collect their IDs
+                for (placeId, users) in self.placeSaversByPlace {
+                    if users.contains(where: { $0.id == userId }) {
+                        // Remove the friend from placeSaversByPlace
+                        self.placeSaversByPlace[placeId]?.removeAll(where: { $0.id == userId })
+                        // Update the DetailPlaceViewModel too
+                        self.detailPlaceViewModel.placeSavers[placeId]?.removeAll(where: { $0.id == userId })
+                        // Add to affected places
+                        affectedPlaceIds.insert(placeId)
+                    }
+                }
+                
+                // Update all affected place annotations
+                for placeId in affectedPlaceIds {
+                    self.updatePlaceAnnotationImages(for: placeId)
+                }
+                
                 self.fetchFollowers(userId: self.userId)
                 print("Successfully unfollowed user \(userId)")
             }
@@ -156,18 +176,61 @@ class ProfileViewModel: ObservableObject {
                     DispatchQueue.main.async { [weak self] in
                         guard let self = self else { return }
                         self.friends.append(userToFollow)
+                        
+                        // Load the profile photo first, then fetch places
+                        let photoLoadGroup = DispatchGroup()
+                        photoLoadGroup.enter()
+                        
                         if let photoURL = userToFollow.profilePhotoURL {
                             self.loadUserProfilePhoto(from: photoURL, forUserId: userToFollow.id) {
-                                self.fetchFriendFavPlaces(friend: userToFollow) {}
-                                self.fetchAndProcessFriendLists(friend: userToFollow) {}
+                                photoLoadGroup.leave()
                             }
                         } else {
                             self.userProfilePhotos[userToFollow.id] = nil
-                            self.fetchFriendFavPlaces(friend: userToFollow) {}
-                            self.fetchAndProcessFriendLists(friend: userToFollow) {}
+                            photoLoadGroup.leave()
                         }
-                        self.fetchFollowers(userId: self.userId)
-                        print("Successfully followed user \(userId)")
+                        
+                        // After photo is loaded, proceed with place fetching
+                        photoLoadGroup.notify(queue: .main) {
+                            // Track all places affected by adding this friend
+                            var affectedPlaceIds = Set<String>()
+                            let placesFetchGroup = DispatchGroup()
+                            
+                            // Fetch favorite places
+                            placesFetchGroup.enter()
+                            self.fetchFriendFavPlaces(friend: userToFollow) {
+                                // Collect IDs of places this friend has saved
+                                for (placeId, users) in self.placeSaversByPlace {
+                                    if users.contains(where: { $0.id == userToFollow.id }) {
+                                        affectedPlaceIds.insert(placeId)
+                                    }
+                                }
+                                placesFetchGroup.leave()
+                            }
+                            
+                            // Fetch places in lists
+                            placesFetchGroup.enter()
+                            self.fetchAndProcessFriendLists(friend: userToFollow) {
+                                // Collect more IDs of places this friend has in lists
+                                for (placeId, users) in self.placeSaversByPlace {
+                                    if users.contains(where: { $0.id == userToFollow.id }) {
+                                        affectedPlaceIds.insert(placeId)
+                                    }
+                                }
+                                placesFetchGroup.leave()
+                            }
+                            
+                            // After all places are fetched, update annotations
+                            placesFetchGroup.notify(queue: .main) {
+                                // Update all place annotations this friend had saved
+                                for placeId in affectedPlaceIds {
+                                    self.updatePlaceAnnotationImages(for: placeId)
+                                }
+                                
+                                self.fetchFollowers(userId: self.userId)
+                                print("Successfully followed user \(userId) and updated \(affectedPlaceIds.count) place annotations")
+                            }
+                        }
                     }
                 }
             }
@@ -330,14 +393,14 @@ class ProfileViewModel: ObservableObject {
     }
     
     private func combinedCircularImage(image1: UIImage?, image2: UIImage? = nil, image3: UIImage? = nil) -> UIImage {
-        let totalSize = CGSize(width: 60, height: 40)
+        let totalSize = CGSize(width: 80, height: 40)
         let singleCircleSize = CGSize(width: 40, height: 40)
         let renderer = UIGraphicsImageRenderer(size: totalSize)
         
         return renderer.image { context in
             let firstRect = CGRect(x: 0, y: 0, width: singleCircleSize.width, height: singleCircleSize.height)
             let secondRect = CGRect(x: 15, y: 0, width: singleCircleSize.width, height: singleCircleSize.height)
-            let thirdRect = CGRect(x: 10, y: 10, width: singleCircleSize.width, height: singleCircleSize.height)
+            let thirdRect = CGRect(x: 30, y: 0, width: singleCircleSize.width, height: singleCircleSize.height)
             
             func drawCircularImage(_ image: UIImage?, in rect: CGRect) {
                 guard let image = image else { return }
