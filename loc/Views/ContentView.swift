@@ -15,6 +15,7 @@ struct ContentView: View {
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var detailPlaceVM: DetailPlaceViewModel
     @EnvironmentObject var firestoreService: FirestoreService
+    @StateObject private var userProfileViewModel = UserProfileViewModel()
 
     var body: some View {
         if userSession.isUserLoggedIn {
@@ -24,6 +25,7 @@ struct ContentView: View {
                     .environmentObject(locationManager)
                     .environmentObject(selectedPlaceVM)
                     .environmentObject(detailPlaceVM)
+                    .environmentObject(userProfileViewModel)
             } else {
                 ProgressView("Loading profile...")
             }

@@ -5,6 +5,7 @@
 //
 
 import SwiftUI
+// Ensure all necessary UI components are imported
 
 struct ProfileView: View {
     @Environment(\.presentationMode) var presentationMode: Binding<PresentationMode>
@@ -12,6 +13,7 @@ struct ProfileView: View {
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var placeVM: DetailPlaceViewModel
+    @EnvironmentObject var userProfileViewModel: UserProfileViewModel
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
@@ -25,24 +27,9 @@ struct ProfileView: View {
                     .font(.title2)
                     .fontWeight(.bold)
                     .foregroundColor(.black)
-                HStack(spacing: 50) {
-                    VStack {
-                        Text("\(profile.followers)")
-                            .foregroundStyle(.black)
-                        Text("Followers")
-                            .foregroundStyle(.black)
-                            .font(.footnote)
-                            .fontWeight(.light)
-                    }
-                    VStack {
-                        Text("\(profile.following)")
-                            .foregroundStyle(.black)
-                        Text("Following")
-                            .foregroundStyle(.black)
-                            .font(.footnote)
-                            .fontWeight(.light)
-                    }
-                }
+                
+                // Replace static followers/following display with interactive component
+                ProfileFollowCountsView()
 
                 Divider()
                     .padding(.top, 15)

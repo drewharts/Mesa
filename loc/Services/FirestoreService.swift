@@ -505,6 +505,115 @@ class FirestoreService: ObservableObject {
             self.fetchProfiles(for: followingIds, completion: completion)
         }
     }
+    
+    func fetchFollowerProfiles(for userId: String, completion: @escaping ([User]?, Error?) -> Void) {
+        // First get the IDs of users who follow this user
+        db.collection("followers")
+            .whereField("followingId", isEqualTo: userId)
+            .getDocuments { snapshot, error in
+                if let error = error {
+                    completion(nil, error)
+                    return
+                }
+                
+                guard let snapshot = snapshot else {
+                    completion([], nil)
+                    return
+                }
+                
+                let followerIds = snapshot.documents.compactMap { document in
+                    document.get("followerId") as? String
+                }
+                
+                guard !followerIds.isEmpty else {
+                    completion([], nil)
+                    return
+                }
+                
+                // Then fetch the full profile for each follower ID
+                self.fetchProfiles(for: followerIds, completion: completion)
+            }
+    }
+    
+    func fetchFollowingProfilesData(for userId: String, completion: @escaping ([ProfileData]?, Error?) -> Void) {
+        fetchFriends(userId: userId) { followingIds, error in
+            if let error = error {
+                completion(nil, error)
+                return
+            }
+            
+            guard let followingIds = followingIds, !followingIds.isEmpty else {
+                completion([], nil)
+                return
+            }
+            
+            self.fetchProfilesData(for: followingIds, completion: completion)
+        }
+    }
+    
+    func fetchFollowerProfilesData(for userId: String, completion: @escaping ([ProfileData]?, Error?) -> Void) {
+        // First get the IDs of users who follow this user
+        db.collection("followers")
+            .whereField("followingId", isEqualTo: userId)
+            .getDocuments { snapshot, error in
+                if let error = error {
+                    completion(nil, error)
+                    return
+                }
+                
+                guard let snapshot = snapshot else {
+                    completion([], nil)
+                    return
+                }
+                
+                let followerIds = snapshot.documents.compactMap { document in
+                    document.get("followerId") as? String
+                }
+                
+                guard !followerIds.isEmpty else {
+                    completion([], nil)
+                    return
+                }
+                
+                // Then fetch the full profile for each follower ID
+                self.fetchProfilesData(for: followerIds, completion: completion)
+            }
+    }
+    
+    func fetchProfilesData(for userIds: [String], completion: @escaping ([ProfileData]?, Error?) -> Void) {
+        var profiles: [ProfileData] = []
+        let dispatchGroup = DispatchGroup()
+        
+        for userId in userIds {
+            dispatchGroup.enter()
+            db.collection("users").document(userId).getDocument { document, error in
+                if let error = error {
+                    print("Error fetching user \(userId): \(error.localizedDescription)")
+                    dispatchGroup.leave()
+                    return
+                }
+                
+                guard let document = document, document.exists else {
+                    print("User \(userId) not found")
+                    dispatchGroup.leave()
+                    return
+                }
+                
+                do {
+                    let profile = try document.data(as: ProfileData.self)
+                    profiles.append(profile)
+                } catch {
+                    print("Error decoding user \(userId): \(error.localizedDescription)")
+                }
+                dispatchGroup.leave()
+            }
+        }
+        
+        dispatchGroup.notify(queue: .main) {
+            completion(profiles, nil)
+        }
+    }
+    
     func getNumberFollowers(forUserId userId: String, completion: @escaping (Int, Error?) -> Void) {
         db.collection("followers")
             .whereField("followingId", isEqualTo: userId)

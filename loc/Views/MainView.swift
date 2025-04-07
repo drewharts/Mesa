@@ -16,7 +16,7 @@ struct MainView: View {
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var profileViewModel: ProfileViewModel
     @StateObject private var viewModel = SearchViewModel()
-    @StateObject private var userProfileViewModel = UserProfileViewModel()
+    @EnvironmentObject var userProfileViewModel: UserProfileViewModel
     @EnvironmentObject var locationManager: LocationManager
 
     @FocusState private var searchIsFocused: Bool
@@ -68,7 +68,11 @@ struct MainView: View {
                                 .padding(.trailing, 20)
 
                                 // Profile Button (unchanged)
-                                NavigationLink(destination: ProfileView(), isActive: $showProfileView) {
+                                NavigationLink(
+                                    destination: ProfileView()
+                                        .environmentObject(userProfileViewModel),
+                                    isActive: $showProfileView
+                                ) {
                                     Button(action: {
                                         showProfileView = true
                                         selectedPlaceVM.isDetailSheetPresented = false

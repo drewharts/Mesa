@@ -29,6 +29,8 @@ class ProfileViewModel: ObservableObject {
     @Published var friends: [User] = []
     @Published var followers: Int = 0
     @Published var following: Int = 0
+    @Published var followerProfiles: [ProfileData] = []
+    @Published var followingProfiles: [ProfileData] = []
     @Published var placeSaversByPlace: [String: [User]] = [:] // Maps place IDs to users who saved them
     
     @Published var placeAnnotationImages: [String: UIImage] = [:] // Still here for now
@@ -363,6 +365,14 @@ class ProfileViewModel: ObservableObject {
     func addPlaceToList(listId: UUID, place: DetailPlace) {
         let placeId = place.id.uuidString
         placeListMBPlaces[listId, default: []].append(placeId)
+        
+        // Update the local PlaceList model's places array
+        if let index = userLists.firstIndex(where: { $0.id == listId }) {
+            let newPlace = Place(id: place.id, name: place.name, address: place.address!)
+            userLists[index].places.append(newPlace)
+            objectWillChange.send() // Explicitly notify observers of the change
+        }
+        
         let newPlace = Place(id: place.id, name: place.name, address: place.address!)
         firestoreService.addPlaceToList(userId: userId, listName: listId.uuidString, place: newPlace)
         firestoreService.addToAllPlaces(detailPlace: place) { [weak self] error in
@@ -390,6 +400,13 @@ class ProfileViewModel: ObservableObject {
             placeIds.removeAll { $0 == placeId }
             placeListMBPlaces[listId] = placeIds
         }
+        
+        // Update the local PlaceList model's places array
+        if let index = userLists.firstIndex(where: { $0.id == listId }) {
+            userLists[index].places.removeAll { $0.id.uuidString == placeId }
+            objectWillChange.send() // Explicitly notify observers of the change
+        }
+        
         firestoreService.removePlaceFromList(userId: userId, listName: listId.uuidString, placeId: placeId)
         self.updatePlaceAnnotationImages(for: placeId)
     }
@@ -571,11 +588,41 @@ class ProfileViewModel: ObservableObject {
         firestoreService.getNumberFollowers(forUserId: userId) { [weak self] (count, _) in
             self?.followers = count
         }
+        
+        // Also fetch the follower profiles for display
+        firestoreService.fetchFollowerProfilesData(for: userId) { [weak self] profiles, error in
+            guard let self = self else { return }
+            DispatchQueue.main.async {
+                self.followerProfiles = profiles ?? []
+                
+                // Load profile photos for followers
+                for follower in self.followerProfiles {
+                    if let photoURLString = follower.profilePhotoURL?.absoluteString {
+                        self.loadUserProfilePhoto(from: photoURLString, forUserId: follower.id) { }
+                    }
+                }
+            }
+        }
     }
     
     func fetchFollowing(userId: String) {
         firestoreService.getNumberFollowing(forUserId: userId) { [weak self] (count, _) in
             self?.following = count
+        }
+        
+        // Also fetch the following profiles for display
+        firestoreService.fetchFollowingProfilesData(for: userId) { [weak self] profiles, error in
+            guard let self = self else { return }
+            DispatchQueue.main.async {
+                self.followingProfiles = profiles ?? []
+                
+                // Load profile photos for users being followed
+                for following in self.followingProfiles {
+                    if let photoURLString = following.profilePhotoURL?.absoluteString {
+                        self.loadUserProfilePhoto(from: photoURLString, forUserId: following.id) { }
+                    }
+                }
+            }
         }
     }
     
