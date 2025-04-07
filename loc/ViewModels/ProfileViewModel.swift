@@ -185,10 +185,15 @@ class ProfileViewModel: ObservableObject {
         print("Starting complete rebuild of all place annotations")
         rebuildAllMapAnnotations()
         
-        // Step 5: Force another map refresh after a slight delay
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            print("Sending delayed map refresh notification")
-            NotificationCenter.default.post(name: NSNotification.Name("RefreshMapAnnotations"), object: nil)
+        // Step 5: Send multiple refresh notifications with delays to ensure refresh
+        let delays = [0.1, 0.5, 1.0]
+        for delay in delays {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                print("Sending map refresh notification (delay: \(delay)s)")
+                NotificationCenter.default.post(name: NSNotification.Name("RefreshMapAnnotations"), object: nil)
+                // Also notify the DetailPlaceViewModel directly
+                self.detailPlaceViewModel.objectWillChange.send()
+            }
         }
     }
     
