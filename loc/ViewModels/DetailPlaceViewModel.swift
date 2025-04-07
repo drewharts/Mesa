@@ -9,6 +9,7 @@ import Foundation
 import UIKit
 import FirebaseFirestore
 import MapboxSearch
+import FirebaseAuth
 
 
 class DetailPlaceViewModel: ObservableObject {
@@ -65,7 +66,18 @@ class DetailPlaceViewModel: ObservableObject {
 
     func fetchPlaceImage(for placeId: String) {
         guard placeImages[placeId] == nil else { return }
-        firestoreService.fetchReviews(placeId: placeId, latestOnly: false) { [weak self] (reviews, error) in
+        
+        // Get the current user ID
+        guard let currentUserId = Auth.auth().currentUser?.uid else {
+            print("Error: Current user ID is not available")
+            DispatchQueue.main.async {
+                self.placeImages[placeId] = nil
+            }
+            return
+        }
+        
+        // Use friends' reviews to get images
+        firestoreService.fetchFriendsReviews(placeId: placeId, currentUserId: currentUserId) { [weak self] (reviews, error) in
             guard let self = self else { return }
             if let error = error {
                 print("Error fetching reviews for place \(placeId): \(error.localizedDescription)")
@@ -164,4 +176,5 @@ class DetailPlaceViewModel: ObservableObject {
                 }
             }
         }
-    }}
+    }
+}

@@ -434,6 +434,58 @@ class FirestoreService: ObservableObject {
         }
     }
 
+    // Fetch only reviews from users that the current user follows
+    func fetchFriendsReviews(placeId: String, currentUserId: String, completion: @escaping ([Review]?, Error?) -> Void) {
+        // Step 1: Get list of users the current user follows
+        fetchFriends(userId: currentUserId) { [weak self] followingIds, error in
+            guard let self = self else { return }
+            
+            if let error = error {
+                print("Error fetching following list: \(error.localizedDescription)")
+                completion(nil, error)
+                return
+            }
+            
+            // Handle case where user doesn't follow anyone or error occurred
+            guard let followingIds = followingIds, !followingIds.isEmpty else {
+                print("User doesn't follow anyone, showing no reviews")
+                completion([], nil)
+                return
+            }
+            
+            // Always include the current user's own reviews
+            var userIdsToFetch = Set(followingIds)
+            userIdsToFetch.insert(currentUserId)
+            
+            // Step 2: Fetch all reviews for the place
+            let reviewsRef = self.db.collection("places")
+                             .document(placeId)
+                             .collection("reviews")
+            
+            reviewsRef.order(by: "timestamp", descending: true).getDocuments { snapshot, error in
+                if let error = error {
+                    print("Error fetching reviews for place \(placeId): \(error.localizedDescription)")
+                    completion(nil, error)
+                    return
+                }
+                
+                guard let snapshot = snapshot else {
+                    print("No snapshot returned for reviews of place \(placeId)")
+                    completion([], nil)
+                    return
+                }
+                
+                // Step 3: Filter reviews to only those from followed users and the current user
+                let reviews: [Review] = snapshot.documents.compactMap { document in
+                    guard let review = try? document.data(as: Review.self) else { return nil }
+                    return userIdsToFetch.contains(review.userId) ? review : nil
+                }
+                
+                completion(reviews, nil)
+            }
+        }
+    }
+
     func fetchFriends(userId: String, completion: @escaping ([String]?, Error?) -> Void) {
         db.collection("following")
             .whereField("followerId", isEqualTo: userId)

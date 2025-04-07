@@ -9,6 +9,7 @@ import Foundation
 import MapboxSearch
 import CoreLocation
 import UIKit
+import FirebaseAuth
 
 class SelectedPlaceViewModel: ObservableObject {
     private let firestoreService: FirestoreService
@@ -138,7 +139,18 @@ class SelectedPlaceViewModel: ObservableObject {
             self.reviewLoadingStates[placeId] = .loading
         }
         
-        firestoreService.fetchReviews(placeId: placeId) { [weak self] reviews, error in
+        // Use the user's ID to get only reviews from followed users
+        guard let currentUserId = Auth.auth().currentUser?.uid else {
+            print("Error: Current user ID is not available")
+            DispatchQueue.main.async {
+                self.reviewLoadingStates[placeId] = .error(NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "User not logged in"]))
+                self.placeReviews[placeId] = []
+            }
+            return
+        }
+        
+        // Use the new method to fetch only reviews from friends and the current user
+        firestoreService.fetchFriendsReviews(placeId: placeId, currentUserId: currentUserId) { [weak self] reviews, error in
             guard let self = self else { return }
             
             DispatchQueue.main.async {
