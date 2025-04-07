@@ -117,7 +117,15 @@ class UserProfileViewModel: ObservableObject {
         print("Starting fetchFavoritePlaceImages for \(userFavorites.count) favorites")
         for place in userFavorites {
             fetchImage(for: place) { [weak self] placeId, image in
-                self?.favoritePlaceImages[placeId] = image
+                guard let self = self else { return }
+                DispatchQueue.main.async {
+                    if let image = image {
+                        self.favoritePlaceImages[placeId] = image
+                        // Explicitly trigger UI update
+                        self.objectWillChange.send()
+                        print("Updated image for place \(placeId) in favoritePlaceImages")
+                    }
+                }
             }
         }
     }
@@ -180,6 +188,8 @@ class UserProfileViewModel: ObservableObject {
             return
         }
         
+        // When viewing someone else's profile, we want to see ALL their reviews for images,
+        // not just reviews from people we follow, so we'll use the original fetchReviews method
         firestoreService.fetchReviews(placeId: placeId, latestOnly: true) { [weak self] (reviews, error) in
             guard let self = self else { return }
             if let error = error {
