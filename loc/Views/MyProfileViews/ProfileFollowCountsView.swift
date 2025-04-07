@@ -23,7 +23,8 @@ struct ProfileFollowCountsView: View {
                     Text("\(profile.followers)")
                         .font(.headline)
                         .foregroundColor(.black)
-                    
+                        .fontWeight(.regular)
+
                     Text("Followers")
                         .font(.caption)
                         .foregroundColor(.gray)
@@ -42,6 +43,7 @@ struct ProfileFollowCountsView: View {
                     Text("\(profile.following)")
                         .font(.headline)
                         .foregroundColor(.black)
+                        .fontWeight(.regular)
                     
                     Text("Following")
                         .font(.caption)
