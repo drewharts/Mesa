@@ -386,11 +386,13 @@ struct RestaurantReviewView: View {
                     Button(action: {
                         // Load comments if needed before showing
                         if !showComments {
-                            selectedPlaceVM.loadCommentsForReview(reviewId: review.id)
-                            selectedPlaceVM.checkCommentLikeStatuses(userId: profile.userId, reviewId: review.id)
-                        }
-                        withAnimation {
-                            showComments.toggle()
+                            // Only fetch comments if we don't already have them
+                            if selectedPlaceVM.commentLoadingState(for: review.id) == .idle {
+                                selectedPlaceVM.loadCommentsForReview(reviewId: review.id)
+                            }
+                            withAnimation {
+                                showComments.toggle()
+                            }
                         }
                     }) {
                         let commentCount = selectedPlaceVM.commentCount(for: review.id)
@@ -955,22 +957,7 @@ struct InlineCommentView: View {
                         
                         Spacer()
                         
-                        // Like button (smaller)
-                        Button(action: {
-                            selectedPlaceVM.likeComment(comment: comment, userId: profile.userId)
-                        }) {
-                            HStack(spacing: 2) {
-                                Image(systemName: selectedPlaceVM.isCommentLiked(comment.id) ? "heart.fill" : "heart")
-                                    .foregroundColor(selectedPlaceVM.isCommentLiked(comment.id) ? .red : .gray)
-                                    .font(.caption2)
-                                
-                                Text("\(comment.likes)")
-                                    .font(.caption2)
-                                    .foregroundColor(.gray)
-                            }
-                        }
-                        .disabled(comment.userId == profile.userId)
-                        .opacity(comment.userId == profile.userId ? 0.5 : 1)
+                        // Like button removed
                     }
                     
                     // Comment text

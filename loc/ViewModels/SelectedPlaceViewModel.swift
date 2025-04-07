@@ -47,7 +47,6 @@ class SelectedPlaceViewModel: ObservableObject {
 
     // MARK: - Comment Management Properties
     private var placeReviewComments: [String: [Comment]] = [:] // reviewId -> comments
-    private var likedComments: Set<String> = [] // commentIds that are liked by the current user
     private var commentLoadingStates: [String: LoadingState] = [:] // reviewId -> loading state
     private var commentPhotos: [String: [UIImage]] = [:] // commentId -> photos
     private var reviewCommentCounts: [String: Int] = [:] // reviewId -> comment count
@@ -392,11 +391,10 @@ class SelectedPlaceViewModel: ObservableObject {
     }
     
     private func loadCommentPhotos(for comment: Comment) {
-        // Skip if there are no images or if already loaded
-        if comment.images.isEmpty || commentPhotos[comment.id] != nil {
+        // Skip if already loaded or no images
+        if commentPhotos[comment.id] != nil || comment.images.isEmpty {
             return
         }
-        
         print("Loading \(comment.images.count) photos for comment ID: \(comment.id)")
         
         firestoreService.fetchPhotosFromStorage(urls: comment.images) { [weak self] images, error in
@@ -408,85 +406,6 @@ class SelectedPlaceViewModel: ObservableObject {
                 } else if let images = images {
                     print("Successfully loaded \(images.count) photos for comment ID: \(comment.id)")
                     self.commentPhotos[comment.id] = images
-                }
-            }
-        }
-    }
-    
-    func likeComment(comment: Comment, userId: String) {
-        guard let placeId = selectedPlace?.id.uuidString else { return }
-        
-        // Prevent liking your own comment
-        if comment.userId == userId {
-            print("Cannot like your own comment")
-            return
-        }
-        
-        firestoreService.hasUserLikedComment(userId: userId, commentId: comment.id) { [weak self] isLiked in
-            guard let self = self else { return }
-            
-            if isLiked {
-                // Unlike the comment
-                self.firestoreService.unlikeComment(userId: userId, placeId: placeId, reviewId: comment.reviewId, commentId: comment.id) { [weak self] result in
-                    guard let self = self else { return }
-                    
-                    switch result {
-                    case .success:
-                        DispatchQueue.main.async {
-                            if var currentComments = self.placeReviewComments[comment.reviewId] {
-                                if let index = currentComments.firstIndex(where: { $0.id == comment.id }) {
-                                    // Create a new Comment instance with updated likes count
-                                    var updatedComment = currentComments[index]
-                                    updatedComment.likes = max(0, updatedComment.likes - 1)
-                                    currentComments[index] = updatedComment
-                                    self.placeReviewComments[comment.reviewId] = currentComments
-                                    self.likedComments.remove(comment.id)
-                                }
-                            }
-                        }
-                    case .failure(let error):
-                        print("Error unliking comment: \(error.localizedDescription)")
-                    }
-                }
-            } else {
-                // Like the comment
-                self.firestoreService.likeComment(userId: userId, placeId: placeId, reviewId: comment.reviewId, commentId: comment.id) { [weak self] result in
-                    guard let self = self else { return }
-                    
-                    switch result {
-                    case .success:
-                        DispatchQueue.main.async {
-                            if var currentComments = self.placeReviewComments[comment.reviewId] {
-                                if let index = currentComments.firstIndex(where: { $0.id == comment.id }) {
-                                    // Create a new Comment instance with updated likes count
-                                    var updatedComment = currentComments[index]
-                                    updatedComment.likes += 1
-                                    currentComments[index] = updatedComment
-                                    self.placeReviewComments[comment.reviewId] = currentComments
-                                    self.likedComments.insert(comment.id)
-                                }
-                            }
-                        }
-                    case .failure(let error):
-                        print("Error liking comment: \(error.localizedDescription)")
-                    }
-                }
-            }
-        }
-    }
-    
-    func checkCommentLikeStatuses(userId: String, reviewId: String) {
-        guard let comments = placeReviewComments[reviewId] else { return }
-        
-        // Clear previous comment likes before checking
-        likedComments.removeAll()
-        
-        comments.forEach { comment in
-            firestoreService.hasUserLikedComment(userId: userId, commentId: comment.id) { [weak self] isLiked in
-                DispatchQueue.main.async {
-                    if isLiked {
-                        self?.likedComments.insert(comment.id)
-                    }
                 }
             }
         }
@@ -504,10 +423,6 @@ class SelectedPlaceViewModel: ObservableObject {
     
     func commentPhotos(for comment: Comment) -> [UIImage] {
         return commentPhotos[comment.id] ?? []
-    }
-    
-    func isCommentLiked(_ commentId: String) -> Bool {
-        return likedComments.contains(commentId)
     }
     
     // Returns the number of comments for a specific review
