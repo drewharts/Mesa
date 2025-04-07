@@ -8,6 +8,7 @@
 
 import FirebaseFirestore
 import FirebaseStorage
+import UIKit
 
 class FirestoreService: ObservableObject {
     private let db = Firestore.firestore()
@@ -189,11 +190,7 @@ class FirestoreService: ObservableObject {
     }
     
     func fetchPhotosFromStorage(urls: [String], completion: @escaping ([UIImage]?, Error?) -> Void) {
-        var images: [UIImage] = []
-        let group = DispatchGroup()
-        var fetchError: Error?
-        
-        // If no URLs provided, return empty array immediately
+        // Early exit for empty URLs
         guard !urls.isEmpty else {
             DispatchQueue.main.async {
                 completion([], nil)
@@ -201,31 +198,122 @@ class FirestoreService: ObservableObject {
             return
         }
         
+        var images: [UIImage] = []
+        let group = DispatchGroup()
+        var lastError: Error?
+        
+        // Use OperationQueue to limit concurrent downloads
+        let downloadQueue = OperationQueue()
+        downloadQueue.maxConcurrentOperationCount = 3 // Limit concurrent downloads
+        
         for urlString in urls {
+            // Skip invalid URLs
             guard let url = URL(string: urlString) else {
                 print("Invalid URL: \(urlString)")
                 continue
             }
             
+            // Check cache first
+            if let cachedImage = ImageCacheService.shared.getImage(for: url) {
+                images.append(cachedImage)
+                continue
+            }
+            
             group.enter()
-            URLSession.shared.dataTask(with: url) { data, response, error in
-                if let error = error {
-                    print("Error downloading image from \(urlString): \(error.localizedDescription)")
-                    fetchError = error
-                } else if let data = data, let image = UIImage(data: data) {
-                    images.append(image)
+            
+            // Create download operation
+            let operation = BlockOperation {
+                // Create a semaphore to handle the async task within the operation
+                let semaphore = DispatchSemaphore(value: 0)
+                
+                var retryCount = 0
+                let maxRetries = 2
+                
+                func attemptDownload() {
+                    // Configure the URLRequest with timeout
+                    var request = URLRequest(url: url)
+                    request.timeoutInterval = 15 // 15 seconds timeout
+                    
+                    URLSession.shared.dataTask(with: request) { data, response, error in
+                        // Handle error with retry logic
+                        if let error = error {
+                            if retryCount < maxRetries {
+                                retryCount += 1
+                                print("Retry \(retryCount) for URL: \(urlString)")
+                                attemptDownload() // Recursive retry
+                                return
+                            }
+                            
+                            print("Error downloading image after \(maxRetries) retries from \(urlString): \(error.localizedDescription)")
+                            lastError = error
+                            semaphore.signal()
+                            group.leave()
+                            return
+                        }
+                        
+                        // Process image data
+                        if let data = data {
+                            // Check for image data size and possibly downsample for large images
+                            if data.count > 1024 * 1024 { // If larger than 1MB
+                                if let downsampledImage = self.downsampleImage(data: data, to: CGSize(width: 1000, height: 1000)) {
+                                    images.append(downsampledImage)
+                                    ImageCacheService.shared.storeImage(downsampledImage, for: url)
+                                } else if let image = UIImage(data: data) {
+                                    images.append(image)
+                                    ImageCacheService.shared.storeImage(image, for: url)
+                                }
+                            } else if let image = UIImage(data: data) {
+                                images.append(image)
+                                ImageCacheService.shared.storeImage(image, for: url)
+                            }
+                        }
+                        
+                        semaphore.signal()
+                        group.leave()
+                    }.resume()
                 }
-                group.leave()
-            }.resume()
+                
+                // Start the download process
+                attemptDownload()
+                
+                // Wait for the async operation to complete
+                semaphore.wait()
+            }
+            
+            downloadQueue.addOperation(operation)
         }
         
+        // Handle completion
         group.notify(queue: .main) {
-            if let error = fetchError {
-                completion(nil, error)
+            if images.isEmpty && lastError != nil {
+                completion(nil, lastError)
             } else {
                 completion(images, nil)
             }
         }
+    }
+    
+    // Helper method to downsample large images
+    private func downsampleImage(data: Data, to pointSize: CGSize) -> UIImage? {
+        let imageSourceOptions = [kCGImageSourceShouldCache: false] as CFDictionary
+        guard let imageSource = CGImageSourceCreateWithData(data as CFData, imageSourceOptions) else {
+            return nil
+        }
+        
+        let maxDimensionInPixels = max(pointSize.width, pointSize.height) * UIScreen.main.scale
+        
+        let downsampleOptions = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceShouldCacheImmediately: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceThumbnailMaxPixelSize: maxDimensionInPixels
+        ] as CFDictionary
+        
+        guard let downsampledImage = CGImageSourceCreateThumbnailAtIndex(imageSource, 0, downsampleOptions) else {
+            return nil
+        }
+        
+        return UIImage(cgImage: downsampledImage)
     }
     
     func fetchPhotosFromStorage(placeId: String, returnFirstImageOnly: Bool = false, completion: @escaping ([UIImage]?, Error?) -> Void) {
@@ -346,6 +434,58 @@ class FirestoreService: ObservableObject {
         }
     }
 
+    // Fetch only reviews from users that the current user follows
+    func fetchFriendsReviews(placeId: String, currentUserId: String, completion: @escaping ([Review]?, Error?) -> Void) {
+        // Step 1: Get list of users the current user follows
+        fetchFriends(userId: currentUserId) { [weak self] followingIds, error in
+            guard let self = self else { return }
+            
+            if let error = error {
+                print("Error fetching following list: \(error.localizedDescription)")
+                completion(nil, error)
+                return
+            }
+            
+            // Handle case where user doesn't follow anyone or error occurred
+            guard let followingIds = followingIds, !followingIds.isEmpty else {
+                print("User doesn't follow anyone, showing no reviews")
+                completion([], nil)
+                return
+            }
+            
+            // Always include the current user's own reviews
+            var userIdsToFetch = Set(followingIds)
+            userIdsToFetch.insert(currentUserId)
+            
+            // Step 2: Fetch all reviews for the place
+            let reviewsRef = self.db.collection("places")
+                             .document(placeId)
+                             .collection("reviews")
+            
+            reviewsRef.order(by: "timestamp", descending: true).getDocuments { snapshot, error in
+                if let error = error {
+                    print("Error fetching reviews for place \(placeId): \(error.localizedDescription)")
+                    completion(nil, error)
+                    return
+                }
+                
+                guard let snapshot = snapshot else {
+                    print("No snapshot returned for reviews of place \(placeId)")
+                    completion([], nil)
+                    return
+                }
+                
+                // Step 3: Filter reviews to only those from followed users and the current user
+                let reviews: [Review] = snapshot.documents.compactMap { document in
+                    guard let review = try? document.data(as: Review.self) else { return nil }
+                    return userIdsToFetch.contains(review.userId) ? review : nil
+                }
+                
+                completion(reviews, nil)
+            }
+        }
+    }
+
     func fetchFriends(userId: String, completion: @escaping ([String]?, Error?) -> Void) {
         db.collection("following")
             .whereField("followerId", isEqualTo: userId)
@@ -417,6 +557,115 @@ class FirestoreService: ObservableObject {
             self.fetchProfiles(for: followingIds, completion: completion)
         }
     }
+    
+    func fetchFollowerProfiles(for userId: String, completion: @escaping ([User]?, Error?) -> Void) {
+        // First get the IDs of users who follow this user
+        db.collection("followers")
+            .whereField("followingId", isEqualTo: userId)
+            .getDocuments { snapshot, error in
+                if let error = error {
+                    completion(nil, error)
+                    return
+                }
+                
+                guard let snapshot = snapshot else {
+                    completion([], nil)
+                    return
+                }
+                
+                let followerIds = snapshot.documents.compactMap { document in
+                    document.get("followerId") as? String
+                }
+                
+                guard !followerIds.isEmpty else {
+                    completion([], nil)
+                    return
+                }
+                
+                // Then fetch the full profile for each follower ID
+                self.fetchProfiles(for: followerIds, completion: completion)
+            }
+    }
+    
+    func fetchFollowingProfilesData(for userId: String, completion: @escaping ([ProfileData]?, Error?) -> Void) {
+        fetchFriends(userId: userId) { followingIds, error in
+            if let error = error {
+                completion(nil, error)
+                return
+            }
+            
+            guard let followingIds = followingIds, !followingIds.isEmpty else {
+                completion([], nil)
+                return
+            }
+            
+            self.fetchProfilesData(for: followingIds, completion: completion)
+        }
+    }
+    
+    func fetchFollowerProfilesData(for userId: String, completion: @escaping ([ProfileData]?, Error?) -> Void) {
+        // First get the IDs of users who follow this user
+        db.collection("followers")
+            .whereField("followingId", isEqualTo: userId)
+            .getDocuments { snapshot, error in
+                if let error = error {
+                    completion(nil, error)
+                    return
+                }
+                
+                guard let snapshot = snapshot else {
+                    completion([], nil)
+                    return
+                }
+                
+                let followerIds = snapshot.documents.compactMap { document in
+                    document.get("followerId") as? String
+                }
+                
+                guard !followerIds.isEmpty else {
+                    completion([], nil)
+                    return
+                }
+                
+                // Then fetch the full profile for each follower ID
+                self.fetchProfilesData(for: followerIds, completion: completion)
+            }
+    }
+    
+    func fetchProfilesData(for userIds: [String], completion: @escaping ([ProfileData]?, Error?) -> Void) {
+        var profiles: [ProfileData] = []
+        let dispatchGroup = DispatchGroup()
+        
+        for userId in userIds {
+            dispatchGroup.enter()
+            db.collection("users").document(userId).getDocument { document, error in
+                if let error = error {
+                    print("Error fetching user \(userId): \(error.localizedDescription)")
+                    dispatchGroup.leave()
+                    return
+                }
+                
+                guard let document = document, document.exists else {
+                    print("User \(userId) not found")
+                    dispatchGroup.leave()
+                    return
+                }
+                
+                do {
+                    let profile = try document.data(as: ProfileData.self)
+                    profiles.append(profile)
+                } catch {
+                    print("Error decoding user \(userId): \(error.localizedDescription)")
+                }
+                dispatchGroup.leave()
+            }
+        }
+        
+        dispatchGroup.notify(queue: .main) {
+            completion(profiles, nil)
+        }
+    }
+    
     func getNumberFollowers(forUserId userId: String, completion: @escaping (Int, Error?) -> Void) {
         db.collection("followers")
             .whereField("followingId", isEqualTo: userId)
@@ -820,15 +1069,15 @@ class FirestoreService: ObservableObject {
         }
     }
     
-    func deleteList(userId: String, listName: String, completion: @escaping (Error?) -> Void) {
+    func deleteList(userId: String, listId: String, completion: @escaping (Error?) -> Void) {
         let listRef = db.collection("users").document(userId)
-                        .collection("placeLists").document(listName)
+                        .collection("placeLists").document(listId)
         
         listRef.delete { error in
             if let error = error {
-                print("Error deleting list '\(listName)': \(error.localizedDescription)")
+                print("Error deleting list '\(listId)': \(error.localizedDescription)")
             } else {
-                print("List successfully deleted: \(listName)")
+                print("List successfully deleted: \(listId)")
             }
             completion(error)
         }
@@ -1469,6 +1718,365 @@ class FirestoreService: ObservableObject {
         
         dispatchGroup.notify(queue: .main) {
             completion(updateError)
+        }
+    }
+    
+        // MARK: - Comment Methods
+        
+        func addComment(placeId: String, reviewId: String, comment: Comment, images: [UIImage], completion: @escaping (Result<Comment, Error>) -> Void) {
+            // 1) Upload images first if any
+            uploadImagesForComment(comment: comment, images: images) { [weak self] result in
+                guard let self = self else { return }
+                
+                switch result {
+                case .success(let downloadURLs):
+                    // 2) Update the comment to include the new image URLs
+                    var updatedComment = comment
+                    updatedComment.images = downloadURLs
+                    
+                    // 3) Save the updated comment to Firestore
+                    self.saveComment(placeId: placeId, reviewId: reviewId, comment: updatedComment) { saveResult in
+                        switch saveResult {
+                        case .success:
+                            // Return the updated comment
+                            completion(.success(updatedComment))
+                        case .failure(let error):
+                            completion(.failure(error))
+                        }
+                    }
+                    
+                case .failure(let error):
+                    // If image upload fails, return the error
+                    completion(.failure(error))
+                }
+            }
+        }
+        
+        private func saveComment(placeId: String, reviewId: String, comment: Comment, completion: @escaping (Result<Void, Error>) -> Void) {
+            // Reference to the comment document
+            let commentRef = db.collection("places")
+                              .document(placeId)
+                              .collection("reviews")
+                              .document(reviewId)
+                              .collection("comments")
+                              .document(comment.id)
+            
+            // Add comment to the review's comments subcollection
+            do {
+                try commentRef.setData(from: comment) { error in
+                    if let error = error {
+                        print("Error saving comment: \(error.localizedDescription)")
+                        completion(.failure(error))
+                    } else {
+                        // Also save to user's comments collection for easier querying
+                        let userCommentRef = self.db.collection("users")
+                                                .document(comment.userId)
+                                                .collection("comments")
+                                                .document(comment.id)
+                        
+                        do {
+                            try userCommentRef.setData(from: comment) { error in
+                                if let error = error {
+                                    print("Error saving user's comment reference: \(error.localizedDescription)")
+                                    completion(.failure(error))
+                                } else {
+                                    completion(.success(()))
+                                }
+                            }
+                        } catch {
+                            print("Error encoding comment data for user reference: \(error.localizedDescription)")
+                            completion(.failure(error))
+                        }
+                    }
+                }
+            } catch {
+                print("Error encoding comment data: \(error.localizedDescription)")
+                completion(.failure(error))
+            }
+        }
+        
+        private func uploadImagesForComment(comment: Comment, images: [UIImage], completion: @escaping (Result<[String], Error>) -> Void) {
+            // If there are no images, return immediately with an empty array
+            guard !images.isEmpty else {
+                completion(.success([]))
+                return
+            }
+            
+            var downloadURLs: [String] = []
+            var errors: [Error] = []
+
+            // A DispatchGroup to wait for all uploads
+            let dispatchGroup = DispatchGroup()
+            
+            for image in images {
+                dispatchGroup.enter()
+                
+                // 1. Generate a unique name for each image
+                let imageName = UUID().uuidString
+                
+                // 2. Store comment images in a separate folder
+                let storageRef = storage.reference()
+                    .child("comments/\(comment.id)/\(imageName).jpg")
+                
+                // 3. Convert the UIImage to JPEG data
+                guard let imageData = image.jpegData(compressionQuality: 0.5) else {
+                    errors.append(
+                        NSError(domain: "FirestoreService", code: 0, userInfo: [
+                            NSLocalizedDescriptionKey: "Could not convert image to data"
+                        ])
+                    )
+                    dispatchGroup.leave()
+                    continue
+                }
+
+                // 4. Upload the image data
+                storageRef.putData(imageData, metadata: nil) { metadata, error in
+                    if let error = error {
+                        errors.append(error)
+                        dispatchGroup.leave()
+                        return
+                    }
+                    
+                    // 5. Once uploaded, fetch the download URL
+                    storageRef.downloadURL { url, error in
+                        if let error = error {
+                            errors.append(error)
+                        } else if let downloadURL = url {
+                            downloadURLs.append(downloadURL.absoluteString)
+                        }
+                        dispatchGroup.leave()
+                    }
+                }
+            }
+            
+            // 6. When all uploads finish, call completion
+            dispatchGroup.notify(queue: .main) {
+                if let firstError = errors.first {
+                    completion(.failure(firstError))
+                } else {
+                    completion(.success(downloadURLs))
+                }
+            }
+        }
+        
+        func fetchComments(placeId: String, reviewId: String, limit: Int = 20, completion: @escaping ([Comment]?, Error?) -> Void) {
+            let commentsRef = db.collection("places")
+                              .document(placeId)
+                              .collection("reviews")
+                              .document(reviewId)
+                              .collection("comments")
+            
+            // Get comments, ordered by timestamp with a limit
+            commentsRef.order(by: "timestamp", descending: true)
+                     .limit(to: limit)
+                     .getDocuments { snapshot, error in
+                if let error = error {
+                    print("Error fetching comments: \(error.localizedDescription)")
+                    completion(nil, error)
+                    return
+                }
+                
+                guard let snapshot = snapshot else {
+                    print("No snapshot returned for comments")
+                    completion([], nil)
+                    return
+                }
+                
+                // Decode each document into a Comment object
+                let comments: [Comment] = snapshot.documents.compactMap { document in
+                    try? document.data(as: Comment.self)
+                }
+                
+                completion(comments, nil)
+            }
+        }
+        
+        func likeComment(userId: String, placeId: String, reviewId: String, commentId: String, completion: @escaping (Result<Void, Error>) -> Void) {
+            let commentRef = db.collection("places")
+                               .document(placeId)
+                               .collection("reviews")
+                               .document(reviewId)
+                               .collection("comments")
+                               .document(commentId)
+            
+            let likeRef = db.collection("commentLikes").document("\(userId)_\(commentId)")
+            
+            // Use a transaction to handle both the like count and the like record
+            db.runTransaction({ (transaction, errorPointer) -> Any? in
+                // First check if user has already liked
+                let likeDocument: DocumentSnapshot
+                do {
+                    try likeDocument = transaction.getDocument(likeRef)
+                    if likeDocument.exists {
+                        let error = NSError(domain: "AppErrorDomain", code: -1, userInfo: [
+                            NSLocalizedDescriptionKey: "User has already liked this comment"
+                        ])
+                        errorPointer?.pointee = error
+                        return nil
+                    }
+                } catch let fetchError as NSError {
+                    errorPointer?.pointee = fetchError
+                    return nil
+                }
+                
+                // Then get the comment and increment likes
+                let commentDocument: DocumentSnapshot
+                do {
+                    try commentDocument = transaction.getDocument(commentRef)
+                } catch let fetchError as NSError {
+                    errorPointer?.pointee = fetchError
+                    return nil
+                }
+                
+                guard let oldLikes = commentDocument.data()?["likes"] as? Int else {
+                    let error = NSError(domain: "AppErrorDomain", code: -1, userInfo: [
+                        NSLocalizedDescriptionKey: "Unable to retrieve likes count"
+                    ])
+                    errorPointer?.pointee = error
+                    return nil
+                }
+                
+                // Create the like record
+                let likeData: [String: Any] = [
+                    "userId": userId,
+                    "commentId": commentId,
+                    "reviewId": reviewId,
+                    "placeId": placeId,
+                    "timestamp": FieldValue.serverTimestamp()
+                ]
+                
+                // Update both documents in the transaction
+                transaction.setData(likeData, forDocument: likeRef)
+                transaction.updateData(["likes": oldLikes + 1], forDocument: commentRef)
+                
+                return nil
+            }) { (_, error) in
+                if let error = error {
+                    completion(.failure(error))
+                } else {
+                    completion(.success(()))
+                }
+            }
+        }
+        
+        func unlikeComment(userId: String, placeId: String, reviewId: String, commentId: String, completion: @escaping (Result<Void, Error>) -> Void) {
+            let commentRef = db.collection("places")
+                               .document(placeId)
+                               .collection("reviews")
+                               .document(reviewId)
+                               .collection("comments")
+                               .document(commentId)
+            
+            let likeRef = db.collection("commentLikes").document("\(userId)_\(commentId)")
+            
+            db.runTransaction({ (transaction, errorPointer) -> Any? in
+                // First verify the like exists
+                let likeDocument: DocumentSnapshot
+                do {
+                    try likeDocument = transaction.getDocument(likeRef)
+                    if !likeDocument.exists {
+                        let error = NSError(domain: "AppErrorDomain", code: -1, userInfo: [
+                            NSLocalizedDescriptionKey: "User has not liked this comment"
+                        ])
+                        errorPointer?.pointee = error
+                        return nil
+                    }
+                } catch let fetchError as NSError {
+                    errorPointer?.pointee = fetchError
+                    return nil
+                }
+                
+                // Then get the comment and decrement likes
+                let commentDocument: DocumentSnapshot
+                do {
+                    try commentDocument = transaction.getDocument(commentRef)
+                } catch let fetchError as NSError {
+                    errorPointer?.pointee = fetchError
+                    return nil
+                }
+                
+                guard let oldLikes = commentDocument.data()?["likes"] as? Int else {
+                    let error = NSError(domain: "AppErrorDomain", code: -1, userInfo: [
+                        NSLocalizedDescriptionKey: "Unable to retrieve likes count"
+                    ])
+                    errorPointer?.pointee = error
+                    return nil
+                }
+                
+                // Delete the like record and decrement the count
+                transaction.deleteDocument(likeRef)
+                transaction.updateData(["likes": max(0, oldLikes - 1)], forDocument: commentRef)
+                
+                return nil
+            }) { (_, error) in
+                if let error = error {
+                    completion(.failure(error))
+                } else {
+                    completion(.success(()))
+                }
+            }
+        }
+        
+        func hasUserLikedComment(userId: String, commentId: String, completion: @escaping (Bool) -> Void) {
+            let likeRef = db.collection("commentLikes").document("\(userId)_\(commentId)")
+            
+            likeRef.getDocument { document, error in
+                if let error = error {
+                    print("Error checking comment like status: \(error.localizedDescription)")
+                    completion(false)
+                    return
+                }
+                completion(document?.exists ?? false)
+            }
+        }
+        
+        func fetchCommentCount(placeId: String, reviewId: String, completion: @escaping (Int?, Error?) -> Void) {
+            let commentsRef = db.collection("places")
+                              .document(placeId)
+                              .collection("reviews")
+                              .document(reviewId)
+                              .collection("comments")
+            
+            // Get all documents but limit to just metadata
+            commentsRef.getDocuments { snapshot, error in
+                if let error = error {
+                    print("Error fetching comment count: \(error.localizedDescription)")
+                    completion(nil, error)
+                    return
+                }
+                
+                guard let snapshot = snapshot else {
+                    print("No snapshot returned for comment count")
+                    completion(0, nil)
+                    return
+                }
+                
+                let count = snapshot.documents.count
+                completion(count, nil)
+            }
+        }
+
+    func fetchUserById(userId: String, completion: @escaping (ProfileData?) -> Void) {
+        db.collection("users").document(userId).getDocument { document, error in
+            if let error = error {
+                print("Error fetching user \(userId): \(error.localizedDescription)")
+                completion(nil)
+                return
+            }
+            
+            guard let document = document, document.exists else {
+                print("User \(userId) not found")
+                completion(nil)
+                return
+            }
+            
+            do {
+                let profileData = try document.data(as: ProfileData.self)
+                completion(profileData)
+            } catch {
+                print("Error decoding user \(userId): \(error.localizedDescription)")
+                completion(nil)
+            }
         }
     }
 }

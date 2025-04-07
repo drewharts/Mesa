@@ -5,31 +5,46 @@
 //  Created by Andrew Hartsfield II on 11/9/24.
 //
 
-
 import SwiftUI
+import CoreLocation
+import FirebaseAuth
 
 struct SplashScreenView: View {
     @State private var isActive = false
+    @EnvironmentObject var userSession: UserSession
+    @EnvironmentObject var locationManager: LocationManager
     
     var body: some View {
-        if isActive {
+        if isActive, 
+           (userSession.profileViewModel?.isLoading == false || !userSession.isUserLoggedIn),
+           locationManager.currentLocation != nil {
             ContentView()
                 .transition(.opacity)
         } else {
             GeometryReader { geometry in
-                Image("SplashScreen") // Replace with your image name
+                Image("SplashScreen")
                     .resizable()
-                    .scaledToFill() // Scale to fill the entire screen, may crop edges
-                    .frame(width: geometry.size.width, height: geometry.size.height) // Set to full screen size
-                    .clipped() // Ensure any overflow is clipped
+                    .scaledToFill()
+                    .frame(width: geometry.size.width, height: geometry.size.height)
+                    .clipped()
             }
             .edgesIgnoringSafeArea(.all)
             .onAppear {
-                DispatchQueue.main.asyncAfter(deadline: .now()) {
-                    withAnimation {
-                        isActive = true
-                    }
+                // Start the transition check
+                startTransitionCheck()
+            }
+        }
+    }
+    
+    private func startTransitionCheck() {
+        // Check periodically if conditions are met to transition
+        Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { timer in
+            if (userSession.profileViewModel?.isLoading == false || !userSession.isUserLoggedIn),
+               locationManager.currentLocation != nil {
+                withAnimation {
+                    self.isActive = true
                 }
+                timer.invalidate()
             }
         }
     }

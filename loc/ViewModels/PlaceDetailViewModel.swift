@@ -8,6 +8,7 @@
 import SwiftUI
 import MapKit
 import MapboxSearch
+import UIKit
 
 class PlaceDetailViewModel: ObservableObject {
     @Published var photos: [UIImage] = []
@@ -22,7 +23,7 @@ class PlaceDetailViewModel: ObservableObject {
 
     
     var placeIconURL: URL?
-    /// Keep track of which place we've loaded, so we don’t fetch again unnecessarily.
+    /// Keep track of which place we've loaded, so we don't fetch again unnecessarily.
     private(set) var currentPlaceID: String?
 
     init() {
@@ -152,5 +153,31 @@ class PlaceDetailViewModel: ObservableObject {
             }
         }
         return nil
+    }
+
+    func openInGoogleMaps(latitude: Double, longitude: Double) {
+        let googleMapsURL = URL(string: "comgooglemaps://?center=\(latitude),\(longitude)&zoom=14")!
+        let fallbackURL = URL(string: "https://maps.google.com/?q=\(latitude),\(longitude)")!
+        
+        // Check if the Google Maps app can be opened
+        if UIApplication.shared.canOpenURL(googleMapsURL) {
+            UIApplication.shared.open(googleMapsURL, options: [:], completionHandler: nil)
+        } else {
+            // Fallback to opening in browser if the app isn't installed
+            UIApplication.shared.open(fallbackURL, options: [:], completionHandler: nil)
+        }
+    }
+
+    func openGoogleMapsWithPlace(query: String) {
+        // Encode the query to handle spaces and special characters
+        guard let encodedQuery = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+              let googleMapsURL = URL(string: "comgooglemaps://?q=\(encodedQuery)") else { return }
+        let fallbackURL = URL(string: "https://maps.google.com/?q=\(encodedQuery)")!
+        
+        if UIApplication.shared.canOpenURL(googleMapsURL) {
+            UIApplication.shared.open(googleMapsURL, options: [:], completionHandler: nil)
+        } else {
+            UIApplication.shared.open(fallbackURL, options: [:], completionHandler: nil)
+        }
     }
 }
