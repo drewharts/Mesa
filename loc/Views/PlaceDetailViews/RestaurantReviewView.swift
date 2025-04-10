@@ -31,10 +31,10 @@ struct PlaceReviewsView: View {
                             
                         case .loaded:
                             if reviews.isEmpty {
-                                Text("No reviews yet.")
+                                Text("Be the first to write a review!")
                                     .font(.subheadline)
                                     .foregroundColor(.gray)
-                                    .padding()
+                                    .padding(20)
                             } else {
                                 ForEach(reviews, id: \.id) { review in
                                     RestaurantReviewView(review: review, 
@@ -83,7 +83,6 @@ struct PlaceReviewsView: View {
             }
             .background(Color.white)
             .padding(.horizontal, -50)
-            .navigationTitle("Reviews")
             .ignoresSafeArea(.all, edges: .all)
         }
         .onAppear {
@@ -251,7 +250,7 @@ struct RestaurantReviewView: View {
     // Static method to hide comments for a specific review
     static func hideComments(reviewId: String) {
         // This is called from InlineCommentsView to hide its parent review's comments
-        NotificationCenter.default.post(name: Notification.Name("HideCommentsFor-\(reviewId)"), object: nil)
+        Foundation.NotificationCenter.default.post(name: Foundation.Notification.Name("HideCommentsFor-\(reviewId)"), object: nil)
     }
 
     var body: some View {
@@ -416,7 +415,7 @@ struct RestaurantReviewView: View {
             selectedPlaceVM.checkLikeStatuses(userId: profile.userId)
             
             // Listen for the hide comments notification
-            NotificationCenter.default.addObserver(forName: Notification.Name("HideCommentsFor-\(review.id)"), object: nil, queue: .main) { _ in
+            NotificationCenter.default.addObserver(forName: Foundation.Notification.Name("HideCommentsFor-\(review.id)"), object: nil, queue: .main) { _ in
                 withAnimation {
                     showComments = false
                 }
@@ -424,7 +423,7 @@ struct RestaurantReviewView: View {
         }
         .onDisappear {
             // Remove the observer when view disappears
-            NotificationCenter.default.removeObserver(self, name: Notification.Name("HideCommentsFor-\(review.id)"), object: nil)
+            NotificationCenter.default.removeObserver(self, name: Foundation.Notification.Name("HideCommentsFor-\(review.id)"), object: nil)
         }
     }
 }
