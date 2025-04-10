@@ -1763,30 +1763,84 @@ class FirestoreService: ObservableObject {
             
             // Add comment to the review's comments subcollection
             do {
-                try commentRef.setData(from: comment) { error in
+                try commentRef.setData(from: comment) { [weak self] error in
+                    guard let self = self else { return }
+                    
                     if let error = error {
                         print("Error saving comment: \(error.localizedDescription)")
                         completion(.failure(error))
-                    } else {
-                        // Also save to user's comments collection for easier querying
-                        let userCommentRef = self.db.collection("users")
-                                                .document(comment.userId)
-                                                .collection("comments")
-                                                .document(comment.id)
-                        
-                        do {
-                            try userCommentRef.setData(from: comment) { error in
+                        return
+                    }
+                    
+                    // Also save to user's comments collection for easier querying
+                    let userCommentRef = self.db.collection("users")
+                                            .document(comment.userId)
+                                            .collection("comments")
+                                            .document(comment.id)
+                    
+                    do {
+                        try userCommentRef.setData(from: comment) { [weak self] error in
+                            guard let self = self else { return }
+                            
+                            if let error = error {
+                                print("Error saving user's comment reference: \(error.localizedDescription)")
+                                completion(.failure(error))
+                                return
+                            }
+                            
+                            // Fetch the review to get the review author's ID
+                            let reviewRef = self.db.collection("places")
+                                                .document(placeId)
+                                                .collection("reviews")
+                                                .document(reviewId)
+                            
+                            reviewRef.getDocument { [weak self] (document, error) in
+                                guard let self = self else { return }
+                                
                                 if let error = error {
-                                    print("Error saving user's comment reference: \(error.localizedDescription)")
-                                    completion(.failure(error))
-                                } else {
+                                    print("Error fetching review for notification: \(error.localizedDescription)")
                                     completion(.success(()))
+                                    return
+                                }
+                                
+                                guard let document = document,
+                                      let review = try? document.data(as: Review.self) else {
+                                    completion(.success(()))
+                                    return
+                                }
+                                
+                                // Temporarily remove the check for self-comments to allow testing
+                                // Create notification for the review author
+                                let notification = Notification(
+                                    id: UUID().uuidString,
+                                    userId: review.userId,
+                                    type: .commentOnReview,
+                                    reviewId: reviewId,
+                                    commentId: comment.id,
+                                    placeId: placeId,
+                                    placeName: review.placeName,
+                                    actorId: comment.userId,
+                                    actorFirstName: comment.userFirstName,
+                                    actorLastName: comment.userLastName,
+                                    actorProfilePhotoUrl: comment.profilePhotoUrl,
+                                    timestamp: Date(),
+                                    isRead: false
+                                )
+                                
+                                self.createNotification(notification: notification) { result in
+                                    switch result {
+                                    case .success:
+                                        completion(.success(()))
+                                    case .failure(let error):
+                                        print("Error creating notification: \(error.localizedDescription)")
+                                        completion(.success(())) // Still complete successfully even if notification fails
+                                    }
                                 }
                             }
-                        } catch {
-                            print("Error encoding comment data for user reference: \(error.localizedDescription)")
-                            completion(.failure(error))
                         }
+                    } catch {
+                        print("Error encoding comment data for user reference: \(error.localizedDescription)")
+                        completion(.failure(error))
                     }
                 }
             } catch {
@@ -2076,6 +2130,102 @@ class FirestoreService: ObservableObject {
             } catch {
                 print("Error decoding user \(userId): \(error.localizedDescription)")
                 completion(nil)
+            }
+        }
+    }
+
+    // MARK: - Notification Methods
+
+    func createNotification(notification: Notification, completion: @escaping (Result<Void, Error>) -> Void) {
+        let notificationRef = db.collection("notifications").document(notification.id)
+        
+        do {
+            try notificationRef.setData(from: notification) { error in
+                if let error = error {
+                    print("Error creating notification: \(error.localizedDescription)")
+                    completion(.failure(error))
+                } else {
+                    completion(.success(()))
+                }
+            }
+        } catch {
+            print("Error encoding notification data: \(error.localizedDescription)")
+            completion(.failure(error))
+        }
+    }
+
+    func fetchNotifications(userId: String, limit: Int = 20, completion: @escaping ([Notification]?, Error?) -> Void) {
+        let notificationsRef = db.collection("notifications")
+            .whereField("userId", isEqualTo: userId)
+            .order(by: "timestamp", descending: true)
+            .limit(to: limit)
+        
+        notificationsRef.getDocuments { snapshot, error in
+            if let error = error {
+                print("Error fetching notifications: \(error.localizedDescription)")
+                completion(nil, error)
+                return
+            }
+            
+            guard let snapshot = snapshot else {
+                print("No snapshot returned for notifications")
+                completion([], nil)
+                return
+            }
+            
+            let notifications: [Notification] = snapshot.documents.compactMap { document in
+                try? document.data(as: Notification.self)
+            }
+            
+            completion(notifications, nil)
+        }
+    }
+
+    func markNotificationAsRead(notificationId: String, completion: @escaping (Result<Void, Error>) -> Void) {
+        let notificationRef = db.collection("notifications").document(notificationId)
+        
+        notificationRef.updateData(["isRead": true]) { error in
+            if let error = error {
+                print("Error marking notification as read: \(error.localizedDescription)")
+                completion(.failure(error))
+            } else {
+                completion(.success(()))
+            }
+        }
+    }
+
+    func markAllNotificationsAsRead(userId: String, completion: @escaping (Result<Void, Error>) -> Void) {
+        let notificationsRef = db.collection("notifications")
+            .whereField("userId", isEqualTo: userId)
+            .whereField("isRead", isEqualTo: false)
+        
+        notificationsRef.getDocuments { [weak self] snapshot, error in
+            guard let self = self else { return }
+            
+            if let error = error {
+                print("Error fetching unread notifications: \(error.localizedDescription)")
+                completion(.failure(error))
+                return
+            }
+            
+            guard let documents = snapshot?.documents else {
+                completion(.success(()))
+                return
+            }
+            
+            let batch = self.db.batch()
+            
+            for document in documents {
+                batch.updateData(["isRead": true], forDocument: document.reference)
+            }
+            
+            batch.commit { error in
+                if let error = error {
+                    print("Error marking notifications as read: \(error.localizedDescription)")
+                    completion(.failure(error))
+                } else {
+                    completion(.success(()))
+                }
             }
         }
     }

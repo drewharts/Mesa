@@ -169,10 +169,24 @@ class ProfileViewModel: ObservableObject {
             for (placeId, _) in placeSaversByPlace {
                 placeSaversByPlace[placeId]?.removeAll(where: { $0.id == friendId })
                 detailPlaceViewModel.placeSavers[placeId]?.removeAll(where: { $0.id == friendId })
+                
+                // If no users left for this place, remove it from the map
+                if placeSaversByPlace[placeId]?.isEmpty ?? true {
+                    detailPlaceViewModel.places.removeValue(forKey: placeId)
+                    placeAnnotationImages.removeValue(forKey: placeId)
+                }
             }
             
             // Remove their profile photo
             userProfilePhotos.removeValue(forKey: friendId)
+            
+            // Clean up any places that were only saved by this friend
+            let placesToRemove = placeSaversByPlace.filter { $0.value.isEmpty }.map { $0.key }
+            for placeId in placesToRemove {
+                placeSaversByPlace.removeValue(forKey: placeId)
+                detailPlaceViewModel.places.removeValue(forKey: placeId)
+                placeAnnotationImages.removeValue(forKey: placeId)
+            }
         }
         
         // Step 2: Clear all annotation images to force fresh rebuilding
@@ -218,7 +232,8 @@ class ProfileViewModel: ObservableObject {
         } else {
             // FOLLOW: Add to friends array
             firestoreService.fetchCurrentUser(userId: userId) { [weak self] user, error in
-                guard let self = self, let userToFollow = user else { return }
+                guard let self = self,
+                      let userToFollow = user else { return }
                 
                 DispatchQueue.main.async { [weak self] in
                     guard let self = self else { return }
@@ -228,6 +243,14 @@ class ProfileViewModel: ObservableObject {
                     
                     // Immediately update following count
                     self.following += 1
+                    
+                    // Fetch the profile data from the database
+                    self.firestoreService.fetchFollowingProfilesData(for: self.userId) { [weak self] profiles, error in
+                        guard let self = self else { return }
+                        DispatchQueue.main.async {
+                            self.followingProfiles = profiles ?? []
+                        }
+                    }
                     
                     // Load profile photo first
                     let photoLoadGroup = DispatchGroup()
@@ -255,6 +278,12 @@ class ProfileViewModel: ObservableObject {
                         // Fetch list places
                         placesFetchGroup.enter()
                         self.fetchAndProcessFriendLists(friend: userToFollow) {
+                            placesFetchGroup.leave()
+                        }
+                        
+                        // Fetch reviewed places
+                        placesFetchGroup.enter()
+                        self.fetchFriendReviewedPlaces(friend: userToFollow) {
                             placesFetchGroup.leave()
                         }
                         

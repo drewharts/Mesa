@@ -67,6 +67,25 @@ struct MainView: View {
                                 .padding(.top, 10)
                                 .padding(.trailing, 20)
 
+                                // Notifications Button
+                                Button(action: {
+                                    // Present notifications view
+                                    let notificationsView = NotificationsView(userId: userSession.profileViewModel?.userId ?? "")
+                                    let hostingController = UIHostingController(rootView: notificationsView)
+                                    UIApplication.shared.windows.first?.rootViewController?.present(hostingController, animated: true)
+                                }) {
+                                    Image(systemName: "bell")
+                                        .foregroundColor(.blue)
+                                        .frame(width: 60, height: 60)
+                                        .background(Color.white)
+                                        .clipShape(Circle())
+                                        .overlay(
+                                            Circle().stroke(Color.gray, lineWidth: 2)
+                                        )
+                                        .shadow(radius: 4)
+                                }
+                                .padding(.trailing, 20)
+
                                 // Profile Button (unchanged)
                                 NavigationLink(
                                     destination: ProfileView()
