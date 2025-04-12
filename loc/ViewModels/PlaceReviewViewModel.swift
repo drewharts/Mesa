@@ -14,7 +14,6 @@ class PlaceReviewViewModel: ObservableObject {
     @Published var foodRating: Double = 0
     @Published var serviceRating: Double = 0
     @Published var ambienceRating: Double = 0
-    @Published var genericRating: Double = 0
     @Published var favoriteDishes: [String] = []
     @Published var reviewText: String = ""
     @Published var images: [UIImage] = []

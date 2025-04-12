@@ -29,8 +29,8 @@ struct CreatePlaceReviewView: View {
     
     // Add enum for review types
     enum ReviewType: String, CaseIterable {
-        case restaurant = "Restaurant Review"
-        case generic = "Generic Review"
+        case restaurant = "Restaurant"
+        case generic = "Generic"
     }
     
     init(isPresented: Binding<Bool>, place: DetailPlace, userId: String, profilePhotoUrl: String, userFirstName: String, userLastName: String) {
@@ -79,18 +79,6 @@ struct CreatePlaceReviewView: View {
                     if reviewType == .restaurant {
                         RatingSlidersView(foodRating: $viewModel.foodRating, serviceRating: $viewModel.serviceRating, ambienceRating: $viewModel.ambienceRating)
                         UpvoteFavDishesView(favoriteDishes: $viewModel.favoriteDishes)
-                    } else {
-                        // Generic rating slider
-                        VStack(alignment: .leading) {
-                            Text("Rating")
-                                .font(.headline)
-                            HStack {
-                                Slider(value: $viewModel.genericRating, in: 0...5, step: 0.5)
-                                Text(String(format: "%.1f", viewModel.genericRating))
-                                    .font(.subheadline)
-                            }
-                        }
-                        .padding()
                     }
                     
                     Divider()

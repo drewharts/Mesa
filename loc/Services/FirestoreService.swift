@@ -440,34 +440,23 @@ class FirestoreService: ObservableObject {
     }
 
     func fetchFriends(userId: String, completion: @escaping ([String]?, Error?) -> Void) {
-        print("🔍 DEBUG: Starting fetchFriends for userId: \(userId)")
-        
         db.collection("following")
             .whereField("followerId", isEqualTo: userId)
             .getDocuments { snapshot, error in
                 if let error = error {
-                    print("❌ DEBUG: Error fetching following list: \(error.localizedDescription)")
                     completion(nil, error)
                     return
                 }
                 
                 guard let snapshot = snapshot else {
-                    print("⚠️ DEBUG: No snapshot returned for following list")
                     completion([], nil)
                     return
                 }
                 
-                print("✅ DEBUG: Found \(snapshot.documents.count) following relationships")
-                
                 let followingIds = snapshot.documents.compactMap { document in
-                    let followingId = document.get("followingId") as? String
-                    if followingId == nil {
-                        print("⚠️ DEBUG: Document missing followingId: \(document.documentID)")
-                    }
-                    return followingId
+                    document.get("followingId") as? String
                 }
                 
-                print("✅ DEBUG: Extracted \(followingIds.count) following IDs: \(followingIds)")
                 completion(followingIds, nil)
             }
     }
@@ -1053,7 +1042,6 @@ class FirestoreService: ObservableObject {
             .collection("placeLists").document(listName)
             .getDocument { document, error in
                 if let error = error {
-                    print("Error fetching list: \(error.localizedDescription)")
                     completion(.failure(error))
                     return
                 }
@@ -1068,7 +1056,6 @@ class FirestoreService: ObservableObject {
                     let placeList = try document.data(as: PlaceList.self)
                     completion(.success(placeList))
                 } catch {
-                    print("Error decoding list: \(error.localizedDescription)")
                     completion(.failure(error))
                 }
             }
@@ -2051,63 +2038,48 @@ class FirestoreService: ObservableObject {
 
     // New implementation that avoids EXC_BAD_ACCESS
     func fetchFriendsReviews(placeId: String, currentUserId: String, completion: @escaping ([ReviewProtocol]?, Error?) -> Void) {
-        print("🔍 DEBUG: Starting fetchFriendsReviews for placeId: \(placeId), currentUserId: \(currentUserId)")
-        
         // Step 1: Get list of users the current user follows
         fetchFriends(userId: currentUserId) { [weak self] followingIds, error in
             guard let self = self else { 
-                print("❌ DEBUG: Self was deallocated in fetchFriends callback")
                 completion(nil, NSError(domain: "FirestoreService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Self was deallocated"]))
                 return 
             }
             
             if let error = error {
-                print("❌ DEBUG: Error fetching following list: \(error.localizedDescription)")
                 completion(nil, error)
                 return
             }
             
             // Handle case where user doesn't follow anyone or error occurred
             guard let followingIds = followingIds, !followingIds.isEmpty else {
-                print("⚠️ DEBUG: User doesn't follow anyone or followingIds is nil/empty")
                 completion([], nil)
                 return
             }
             
-            print("✅ DEBUG: Successfully fetched \(followingIds.count) following IDs: \(followingIds)")
-            
             // Always include the current user's own reviews
             var userIdsToFetch = Set(followingIds)
             userIdsToFetch.insert(currentUserId)
-            print("✅ DEBUG: Total users to fetch reviews from: \(userIdsToFetch.count) (including current user)")
             
             // Step 2: Fetch all reviews for the place
             let reviewsRef = self.db.collection("places")
                              .document(placeId)
                              .collection("reviews")
             
-            print("🔍 DEBUG: Fetching reviews from path: places/\(placeId)/reviews")
-            
             reviewsRef.order(by: "timestamp", descending: true).getDocuments { [weak self] snapshot, error in
                 guard let self = self else {
-                    print("❌ DEBUG: Self was deallocated in getDocuments callback")
                     completion(nil, NSError(domain: "FirestoreService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Self was deallocated"]))
                     return
                 }
                 
                 if let error = error {
-                    print("❌ DEBUG: Error fetching reviews for place \(placeId): \(error.localizedDescription)")
                     completion(nil, error)
                     return
                 }
                 
                 guard let snapshot = snapshot else {
-                    print("⚠️ DEBUG: No snapshot returned for reviews of place \(placeId)")
                     completion([], nil)
                     return
                 }
-                
-                print("✅ DEBUG: Successfully fetched \(snapshot.documents.count) total reviews for place \(placeId)")
                 
                 // Step 3: Filter reviews to only those from followed users and the current user
                 // Use concrete types first to avoid memory issues
@@ -2128,30 +2100,22 @@ class FirestoreService: ObservableObject {
                         switch type {
                         case .restaurant:
                             if let restaurantReview = try? document.data(as: RestaurantReview.self) {
-                                print("✅ DEBUG: Found restaurant review from followed user: \(restaurantReview.userId)")
                                 restaurantReviews.append(restaurantReview)
                             }
                         case .generic:
                             if let genericReview = try? document.data(as: GenericReview.self) {
-                                print("✅ DEBUG: Found generic review from followed user: \(genericReview.userId)")
                                 genericReviews.append(genericReview)
                             }
                         }
                     } else {
                         // Fallback to trying both types if type field is missing
                         if let restaurantReview = try? document.data(as: RestaurantReview.self) {
-                            print("✅ DEBUG: Found restaurant review (no type field) from followed user: \(restaurantReview.userId)")
                             restaurantReviews.append(restaurantReview)
                         } else if let genericReview = try? document.data(as: GenericReview.self) {
-                            print("✅ DEBUG: Found generic review (no type field) from followed user: \(genericReview.userId)")
                             genericReviews.append(genericReview)
-                        } else {
-                            print("⚠️ DEBUG: Failed to decode review document: \(document.documentID)")
                         }
                     }
                 }
-                
-                print("✅ DEBUG: Found \(restaurantReviews.count) restaurant reviews and \(genericReviews.count) generic reviews")
                 
                 // Convert to protocol type at the end to avoid memory issues
                 var allReviews: [ReviewProtocol] = []
@@ -2165,8 +2129,6 @@ class FirestoreService: ObservableObject {
                 for review in genericReviews {
                     allReviews.append(review)
                 }
-                
-                print("✅ DEBUG: Total reviews to return: \(allReviews.count)")
                 
                 // Ensure we're on the main thread when calling the completion handler
                 DispatchQueue.main.async {
