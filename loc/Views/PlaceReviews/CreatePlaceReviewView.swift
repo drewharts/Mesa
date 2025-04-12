@@ -9,7 +9,7 @@ import SwiftUI
 import PhotosUI
 import MapboxSearch
 
-struct PlaceReviewView: View {
+struct CreatePlaceReviewView: View {
     @Environment(\.presentationMode) var presentationMode: Binding<PresentationMode>
     @Binding var isPresented: Bool
     @EnvironmentObject var profile: ProfileViewModel

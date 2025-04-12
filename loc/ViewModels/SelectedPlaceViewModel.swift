@@ -31,7 +31,7 @@ class SelectedPlaceViewModel: ObservableObject {
     @Published var isDetailSheetPresented: Bool = false
     @Published var isRestaurantOpen: Bool = false // New property to track open status
     @Published private var placePhotos: [String: [UIImage]] = [:] // Cache for place-level photos by placeId
-    @Published private var placeReviews: [String: [Review]] = [:] // Cache for reviews by placeId
+    @Published private var placeReviews: [String: [any ReviewProtocol]] = [:] // Cache for reviews by placeId
     @Published private var reviewPhotos: [String: [UIImage]] = [:] // Cache for review photos by reviewId
     @Published private var userProfilePhotos: [String: UIImage] = [:] // Cache for profile photos by userId
     
@@ -149,7 +149,7 @@ class SelectedPlaceViewModel: ObservableObject {
         }
         
         // Use the new method to fetch only reviews from friends and the current user
-        firestoreService.fetchFriendsReviews(placeId: placeId, currentUserId: currentUserId) { [weak self] reviews, error in
+        firestoreService.fetchFriendsRestaurantReviews(placeId: placeId, currentUserId: currentUserId) { [weak self] reviews, error in
             guard let self = self else { return }
             
             DispatchQueue.main.async {
@@ -177,8 +177,15 @@ class SelectedPlaceViewModel: ObservableObject {
     
     private func calculateAvgRating(for placeId: String) -> Double {
         guard let reviews = placeReviews[placeId], !reviews.isEmpty else { return 0 }
-        let total = reviews.reduce(0.0) { $0 + $1.foodRating }
-        return total / Double(reviews.count)
+        
+        let restaurantReviews = reviews.compactMap { $0 as? RestaurantReview }
+        guard !restaurantReviews.isEmpty else { return 0 }
+        
+        let total = restaurantReviews.reduce(into: 0.0) { result, review in
+            result += review.foodRating
+        }
+        
+        return total / Double(restaurantReviews.count)
     }
     
     private func getPlacePhotos(for place: DetailPlace) {
@@ -203,7 +210,7 @@ class SelectedPlaceViewModel: ObservableObject {
         }
     }
     
-    private func loadReviewPhotos(for review: Review) {
+    private func loadReviewPhotos<T: ReviewProtocol>(for review: T) {
         let reviewId = review.id
         guard !review.images.isEmpty else {
             DispatchQueue.main.async {
@@ -234,11 +241,11 @@ class SelectedPlaceViewModel: ObservableObject {
     }
     
     // Public method to reload review photos
-    func reloadReviewPhotos(for review: Review) {
+    func reloadReviewPhotos<T: ReviewProtocol>(for review: T) {
         self.loadReviewPhotos(for: review)
     }
     
-    private func loadProfilePhoto(for review: Review) {
+    private func loadProfilePhoto<T: ReviewProtocol>(for review: T) {
         let userId = review.userId
         let photoUrlString = review.profilePhotoUrl
         
@@ -436,7 +443,7 @@ class SelectedPlaceViewModel: ObservableObject {
     }
 
     // MARK: - Public Methods
-    func addReview(_ review: Review) {
+    func addReview<T: ReviewProtocol>(_ review: T) {
         guard let placeId = selectedPlace?.id.uuidString else { return }
         
         DispatchQueue.main.async { [weak self] in
@@ -450,7 +457,7 @@ class SelectedPlaceViewModel: ObservableObject {
         }
     }
     
-    func formattedTimestamp(for review: Review) -> String {
+    func formattedTimestamp<T: ReviewProtocol>(for review: T) -> String {
         let now = Date()
         let calendar = Calendar.current
         let components = calendar.dateComponents([.minute, .hour, .day], from: review.timestamp, to: now)
@@ -470,7 +477,7 @@ class SelectedPlaceViewModel: ObservableObject {
     }
     
     // MARK: - Public Accessors
-    var reviews: [Review] {
+    var reviews: [any ReviewProtocol] {
         guard let placeId = selectedPlace?.id.uuidString else { return [] }
         return placeReviews[placeId] ?? []
     }
@@ -485,11 +492,11 @@ class SelectedPlaceViewModel: ObservableObject {
         return placePhotos[placeId] ?? []
     }
     
-    func photos(for review: Review) -> [UIImage] {
+    func photos(for review: any ReviewProtocol) -> [UIImage] {
         return reviewPhotos[review.id] ?? []
     }
     
-    func photoLoadingState(for review: Review) -> LoadingState {
+    func photoLoadingState(for review: any ReviewProtocol) -> LoadingState {
         return reviewPhotoLoadingStates[review.id] ?? .idle
     }
     
@@ -505,7 +512,7 @@ class SelectedPlaceViewModel: ObservableObject {
         return reviewLoadingStates[placeId] ?? .idle
     }
     
-    func likeReview(_ review: Review, userId: String) {
+    func likeReview<T: ReviewProtocol>(_ review: T, userId: String) {
         guard let placeId = selectedPlace?.id.uuidString else { return }
         
         // Prevent liking your own review

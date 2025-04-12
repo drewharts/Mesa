@@ -400,7 +400,7 @@ class FirestoreService: ObservableObject {
             }
     }
     
-    func fetchReviews(placeId: String, latestOnly: Bool = false, completion: @escaping ([Review]?, Error?) -> Void) {
+    func fetchReviews<T: ReviewProtocol>(placeId: String, latestOnly: Bool = false, completion: @escaping ([T]?, Error?) -> Void) {
         // Reference to the reviews subcollection under the place document
         let reviewsRef = db.collection("places")
                          .document(placeId)
@@ -425,17 +425,22 @@ class FirestoreService: ObservableObject {
                 return
             }
             
-            // Decode each document into a Review object
-            let reviews: [Review] = snapshot.documents.compactMap { document in
-                try? document.data(as: Review.self)
+            // Decode each document into the appropriate Review type
+            let reviews: [T] = snapshot.documents.compactMap { document in
+                try? document.data(as: T.self)
             }
             
             completion(reviews, nil)
         }
     }
 
+    // Convenience method for backward compatibility
+    func fetchReviews(placeId: String, latestOnly: Bool = false, completion: @escaping ([RestaurantReview]?, Error?) -> Void) {
+        fetchReviews(placeId: placeId, latestOnly: latestOnly, completion: completion)
+    }
+
     // Fetch only reviews from users that the current user follows
-    func fetchFriendsReviews(placeId: String, currentUserId: String, completion: @escaping ([Review]?, Error?) -> Void) {
+    func fetchFriendsReviews<T: ReviewProtocol>(placeId: String, currentUserId: String, completion: @escaping ([T]?, Error?) -> Void) {
         // Step 1: Get list of users the current user follows
         fetchFriends(userId: currentUserId) { [weak self] followingIds, error in
             guard let self = self else { return }
@@ -476,14 +481,19 @@ class FirestoreService: ObservableObject {
                 }
                 
                 // Step 3: Filter reviews to only those from followed users and the current user
-                let reviews: [Review] = snapshot.documents.compactMap { document in
-                    guard let review = try? document.data(as: Review.self) else { return nil }
+                let reviews: [T] = snapshot.documents.compactMap { document in
+                    guard let review = try? document.data(as: T.self) else { return nil }
                     return userIdsToFetch.contains(review.userId) ? review : nil
                 }
                 
                 completion(reviews, nil)
             }
         }
+    }
+
+    // Convenience method for backward compatibility
+    func fetchFriendsReviews(placeId: String, currentUserId: String, completion: @escaping ([RestaurantReview]?, Error?) -> Void) {
+        fetchFriendsReviews<RestaurantReview>(placeId: placeId, currentUserId: currentUserId, completion: completion)
     }
 
     func fetchFriends(userId: String, completion: @escaping ([String]?, Error?) -> Void) {
@@ -800,10 +810,10 @@ class FirestoreService: ObservableObject {
                 }
     }
     
-    func saveReviewWithImages(
-        review: Review,
+    func saveReviewWithImages<T: ReviewProtocol>(
+        review: T,
         images: [UIImage],
-        completion: @escaping (Result<Review, Error>) -> Void
+        completion: @escaping (Result<T, Error>) -> Void
     ) {
         // 1) Upload images first
         uploadImagesForReview(review: review, images: images) { [weak self] result in
@@ -834,7 +844,7 @@ class FirestoreService: ObservableObject {
     }
 
 
-    func saveReview(_ review: Review, completion: @escaping (Result<Void, Error>) -> Void) {
+    func saveReview<T: ReviewProtocol>(_ review: T, completion: @escaping (Result<Void, Error>) -> Void) {
         // 1. Build references for both locations
         let placeReviewRef = db.collection("places")
                               .document(review.placeId)
@@ -867,8 +877,8 @@ class FirestoreService: ObservableObject {
         }
     }
     
-    func uploadImagesForReview(
-        review: Review,
+    func uploadImagesForReview<T: ReviewProtocol>(
+        review: T,
         images: [UIImage],
         completion: @escaping (Result<[String], Error>) -> Void
     ) {
@@ -1461,7 +1471,7 @@ class FirestoreService: ObservableObject {
         }
     }
 
-    func fetchUserReviews(userId: String, completion: @escaping ([Review]?, Error?) -> Void) {
+    func fetchUserReviews<T: ReviewProtocol>(userId: String, completion: @escaping ([T]?, Error?) -> Void) {
         // Reference to the user's reviews collection
         let reviewsRef = db.collection("users")
                           .document(userId)
@@ -1482,13 +1492,18 @@ class FirestoreService: ObservableObject {
                 return
             }
             
-            // Decode each document into a Review object
-            let reviews: [Review] = snapshot.documents.compactMap { document in
-                try? document.data(as: Review.self)
+            // Decode each document into the appropriate Review type
+            let reviews: [T] = snapshot.documents.compactMap { document in
+                try? document.data(as: T.self)
             }
             
             completion(reviews, nil)
         }
+    }
+
+    // Convenience method for backward compatibility
+    func fetchUserReviews(userId: String, completion: @escaping ([RestaurantReview]?, Error?) -> Void) {
+        fetchUserReviews(userId: userId, completion: completion)
     }
 
     func fetchUserReviewPlaces(userId: String, user: User, completion: @escaping ([DetailPlace]?, Error?) -> Void) {
@@ -1514,7 +1529,7 @@ class FirestoreService: ObservableObject {
             
             // Get all reviews and their placeIds
             let reviews = snapshot.documents.compactMap { document in
-                try? document.data(as: Review.self)
+                try? document.data(as: RestaurantReview.self)
             }
             
             let placeIds = Set(reviews.map { $0.placeId })
@@ -1641,7 +1656,7 @@ class FirestoreService: ObservableObject {
             var batchCount = 0
             
             for document in documents {
-                guard let review = try? document.data(as: Review.self) else { continue }
+                guard let review = try? document.data(as: RestaurantReview.self) else { continue }
                 
                 // Get reference to the review in the place's collection
                 let placeReviewRef = self.db.collection("places")
@@ -2076,6 +2091,58 @@ class FirestoreService: ObservableObject {
             } catch {
                 print("Error decoding user \(userId): \(error.localizedDescription)")
                 completion(nil)
+            }
+        }
+    }
+
+    // New method to fetch friends' restaurant reviews without using the generic version
+    func fetchFriendsRestaurantReviews(placeId: String, currentUserId: String, completion: @escaping ([RestaurantReview]?, Error?) -> Void) {
+        // Step 1: Get list of users the current user follows
+        fetchFriends(userId: currentUserId) { [weak self] followingIds, error in
+            guard let self = self else { return }
+            
+            if let error = error {
+                print("Error fetching following list: \(error.localizedDescription)")
+                completion(nil, error)
+                return
+            }
+            
+            // Handle case where user doesn't follow anyone or error occurred
+            guard let followingIds = followingIds, !followingIds.isEmpty else {
+                print("User doesn't follow anyone, showing no reviews")
+                completion([], nil)
+                return
+            }
+            
+            // Always include the current user's own reviews
+            var userIdsToFetch = Set(followingIds)
+            userIdsToFetch.insert(currentUserId)
+            
+            // Step 2: Fetch all reviews for the place
+            let reviewsRef = self.db.collection("places")
+                             .document(placeId)
+                             .collection("reviews")
+            
+            reviewsRef.order(by: "timestamp", descending: true).getDocuments { snapshot, error in
+                if let error = error {
+                    print("Error fetching reviews for place \(placeId): \(error.localizedDescription)")
+                    completion(nil, error)
+                    return
+                }
+                
+                guard let snapshot = snapshot else {
+                    print("No snapshot returned for reviews of place \(placeId)")
+                    completion([], nil)
+                    return
+                }
+                
+                // Step 3: Filter reviews to only those from followed users and the current user
+                let reviews: [RestaurantReview] = snapshot.documents.compactMap { document in
+                    guard let review = try? document.data(as: RestaurantReview.self) else { return nil }
+                    return userIdsToFetch.contains(review.userId) ? review : nil
+                }
+                
+                completion(reviews, nil)
             }
         }
     }
