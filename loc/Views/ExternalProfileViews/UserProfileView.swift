@@ -12,6 +12,7 @@ struct UserProfileView: View {
     @ObservedObject var viewModel: UserProfileViewModel
     @EnvironmentObject var profile: ProfileViewModel
     @Environment(\.presentationMode) var presentationMode
+    @State private var refreshToggle = false
 
     var body: some View {
         ScrollView {
@@ -23,9 +24,10 @@ struct UserProfileView: View {
                     onToggleFollow: {
                         viewModel.toggleFollowUser(currentUserId: userId)
                         profile.toggleFollowUser(userId: viewModel.selectedUser!.id)
+                        // Force UI refresh
+                        refreshToggle.toggle()
                     }
                 )
-
 
                 // Name
                 Text(viewModel.selectedUser!.fullName)
@@ -55,6 +57,7 @@ struct UserProfileView: View {
             }
             .padding(.bottom, 20)
         }
+        .id(refreshToggle) // Force view refresh when toggle changes
         .onAppear {
             viewModel.checkIfFollowing(currentUserId: userId)
         }

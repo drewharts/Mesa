@@ -12,6 +12,7 @@ struct ProfileFollowCountsView: View {
     @EnvironmentObject var userProfileViewModel: UserProfileViewModel
     @State private var showingFollowers = false
     @State private var showingFollowing = false
+    @State private var refreshToggle = false
     
     var body: some View {
         HStack(spacing: 24) {
@@ -24,6 +25,7 @@ struct ProfileFollowCountsView: View {
                         .font(.headline)
                         .foregroundColor(.black)
                         .fontWeight(.regular)
+                        .id("followers_\(refreshToggle)")
 
                     Text("Followers")
                         .font(.caption)
@@ -44,6 +46,7 @@ struct ProfileFollowCountsView: View {
                         .font(.headline)
                         .foregroundColor(.black)
                         .fontWeight(.regular)
+                        .id("following_\(refreshToggle)")
                     
                     Text("Following")
                         .font(.caption)
@@ -56,5 +59,11 @@ struct ProfileFollowCountsView: View {
             }
         }
         .padding(.vertical, 10)
+        .onChange(of: profile.following) { _ in
+            refreshToggle.toggle()
+        }
+        .onChange(of: profile.followers) { _ in
+            refreshToggle.toggle()
+        }
     }
 } 

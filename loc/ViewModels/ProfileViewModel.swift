@@ -202,9 +202,17 @@ class ProfileViewModel: ObservableObject {
             // UNFOLLOW: Remove from friends array
             friends.remove(at: friendIndex)
             
-            // Rebuild map annotations with the friend removed
+            // Immediately update following count
             DispatchQueue.main.async { [weak self] in
                 guard let self = self else { return }
+                self.following = max(0, self.following - 1)
+                
+                // Remove from following profiles if present
+                if let profileIndex = self.followingProfiles.firstIndex(where: { $0.id == userId }) {
+                    self.followingProfiles.remove(at: profileIndex)
+                }
+                
+                // Rebuild map annotations with the friend removed
                 self.rebuildMapAfterFriendChange(friendId: userId, isAddingFriend: false)
             }
         } else {
@@ -217,6 +225,9 @@ class ProfileViewModel: ObservableObject {
                     
                     // Add to friends array
                     self.friends.append(userToFollow)
+                    
+                    // Immediately update following count
+                    self.following += 1
                     
                     // Load profile photo first
                     let photoLoadGroup = DispatchGroup()
