@@ -17,6 +17,7 @@ struct CreatePlaceReviewView: View {
     @State private var showButtonHighlight = false
     @State private var showAlert = false
     @State private var alertMessage = ""
+    @State private var reviewType = ReviewType.restaurant
     
     let place: DetailPlace
 
@@ -25,6 +26,12 @@ struct CreatePlaceReviewView: View {
     // Image picker states
     @State private var showingImagePicker = false
     @State private var inputImages: [UIImage] = []
+    
+    // Add enum for review types
+    enum ReviewType: String, CaseIterable {
+        case restaurant = "Restaurant Review"
+        case generic = "Generic Review"
+    }
     
     init(isPresented: Binding<Bool>, place: DetailPlace, userId: String, profilePhotoUrl: String, userFirstName: String, userLastName: String) {
         self._isPresented = isPresented
@@ -58,10 +65,33 @@ struct CreatePlaceReviewView: View {
             ScrollView {
                 VStack(spacing: 16) {
                     PlaceReviewHeaderView(placeName: place.name ?? "Unnamed Place")
-
-                    RatingSlidersView(foodRating: $viewModel.foodRating, serviceRating: $viewModel.serviceRating, ambienceRating: $viewModel.ambienceRating)
-
-                    UpvoteFavDishesView(favoriteDishes: $viewModel.favoriteDishes)
+                    
+                    // Add review type picker
+                    Picker("Review Type", selection: $reviewType) {
+                        ForEach(ReviewType.allCases, id: \.self) { type in
+                            Text(type.rawValue).tag(type)
+                        }
+                    }
+                    .pickerStyle(SegmentedPickerStyle())
+                    .padding(.horizontal)
+                    
+                    // Show different rating options based on review type
+                    if reviewType == .restaurant {
+                        RatingSlidersView(foodRating: $viewModel.foodRating, serviceRating: $viewModel.serviceRating, ambienceRating: $viewModel.ambienceRating)
+                        UpvoteFavDishesView(favoriteDishes: $viewModel.favoriteDishes)
+                    } else {
+                        // Generic rating slider
+                        VStack(alignment: .leading) {
+                            Text("Rating")
+                                .font(.headline)
+                            HStack {
+                                Slider(value: $viewModel.genericRating, in: 0...5, step: 0.5)
+                                Text(String(format: "%.1f", viewModel.genericRating))
+                                    .font(.subheadline)
+                            }
+                        }
+                        .padding()
+                    }
                     
                     Divider()
                         .padding(.top, 15)
@@ -96,7 +126,10 @@ struct CreatePlaceReviewView: View {
                         viewModel.images = []
                         viewModel.images = inputImages
                         
-                        // 3. Submit the review
+                        // 3. Set the review type
+                        viewModel.reviewType = reviewType
+                        
+                        // 4. Submit the review
                         viewModel.submitReview { result in
                             switch result {
                             case .success(let savedReview):

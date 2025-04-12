@@ -14,9 +14,11 @@ class PlaceReviewViewModel: ObservableObject {
     @Published var foodRating: Double = 0
     @Published var serviceRating: Double = 0
     @Published var ambienceRating: Double = 0
+    @Published var genericRating: Double = 0
     @Published var favoriteDishes: [String] = []
     @Published var reviewText: String = ""
     @Published var images: [UIImage] = []
+    @Published var reviewType: CreatePlaceReviewView.ReviewType = .restaurant
 
     // You might track loading & error states for UI feedback:
     @Published var isLoading: Bool = false
@@ -45,45 +47,64 @@ class PlaceReviewViewModel: ObservableObject {
         self.firestoreService = firestoreService
     }
 
-    func submitReview(completion: @escaping (Result<Review, Error>) -> Void) {
-            isLoading = true
-            errorMessage = nil
-            
-            var newReview = Review(
-                id: UUID().uuidString, // Temporary ID, may be overridden by Firestore
+    func submitReview(completion: @escaping (Result<any ReviewProtocol, Error>) -> Void) {
+        // Create the review object first
+        let timestamp = Date()
+        let reviewId = UUID().uuidString
+        
+        if reviewType == .restaurant {
+            let review = RestaurantReview(
+                id: reviewId,
                 userId: userId,
                 profilePhotoUrl: profilePhotoUrl,
                 userFirstName: userFirstName,
                 userLastName: userLastName,
-                placeId: place.id.uuidString ?? "unknown_place_id",
+                placeId: place.id.uuidString,
                 placeName: place.name ?? "Unnamed Place",
                 foodRating: foodRating,
                 serviceRating: serviceRating,
                 ambienceRating: ambienceRating,
                 favoriteDishes: favoriteDishes,
                 reviewText: reviewText,
-                timestamp: Date(),
-                images: [],
+                timestamp: timestamp,
+                images: [], // Will be updated by saveReviewWithImages
                 likes: 0
             )
-
-            // Call FirestoreService and pass the result
-            firestoreService.saveReviewWithImages(review: newReview, images: images) { [weak self] result in
-                DispatchQueue.main.async {
-                    guard let self = self else { return }
-                    self.isLoading = false
-
-                    switch result {
-                    case .success(let savedReview):
-                        // Return the saved review (with Firestore ID, image URLs, etc.)
-                        completion(.success(savedReview))
-                    case .failure(let error):
-                        self.errorMessage = error.localizedDescription
-                        completion(.failure(error))
-                    }
+            
+            // Use the saveReviewWithImages method to handle both image upload and review saving
+            firestoreService.saveReviewWithImages(review: review, images: images) { result in
+                switch result {
+                case .success(let savedReview):
+                    completion(.success(savedReview))
+                case .failure(let error):
+                    completion(.failure(error))
+                }
+            }
+        } else {
+            let review = GenericReview(
+                id: reviewId,
+                userId: userId,
+                profilePhotoUrl: profilePhotoUrl,
+                userFirstName: userFirstName,
+                userLastName: userLastName,
+                placeId: place.id.uuidString,
+                placeName: place.name ?? "Unnamed Place",
+                reviewText: reviewText,
+                timestamp: timestamp,
+                images: [], // Will be updated by saveReviewWithImages
+                likes: 0
+            )
+            
+            // Use the saveReviewWithImages method to handle both image upload and review saving
+            firestoreService.saveReviewWithImages(review: review, images: images) { result in
+                switch result {
+                case .success(let savedReview):
+                    completion(.success(savedReview))
+                case .failure(let error):
+                    completion(.failure(error))
                 }
             }
         }
-
+    }
 }
 

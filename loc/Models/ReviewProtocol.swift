@@ -1,3 +1,17 @@
+//
+//  ReviewProtocol.swift
+//  loc
+//
+//  Created by Andrew Hartsfield II on 4/11/25.
+//
+
+import Foundation
+
+enum ReviewType: String, Codable {
+    case generic = "generic"
+    case detailed = "detailed"
+}
+
 protocol ReviewProtocol: Codable {
     var id: String { get }
     var userId: String { get }

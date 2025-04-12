@@ -8,6 +8,48 @@
 import SwiftUI
 import UIKit
 
+struct PlaceReviewsListView : View {
+    @EnvironmentObject var userProfileViewModel: UserProfileViewModel
+    var reviews: [any ReviewProtocol]
+    @State private var activeKeyboardReviewId: String? = nil
+    @Binding var selectedImage: UIImage?
+    let scrollProxy: ScrollViewProxy
+
+    var body: some View {
+        ForEach(reviews, id: \.id) { review in
+            if let restaurantReview = review as? RestaurantReview {
+                RestaurantReviewView(review: restaurantReview,
+                                   selectedImage: $selectedImage,
+                                   isActiveKeyboard: Binding(
+                                      get: { activeKeyboardReviewId == review.id },
+                                      set: { isActive in
+                                          if isActive {
+                                              activeKeyboardReviewId = review.id
+                                              scrollToReview(review.id, proxy: scrollProxy)
+                                          } else if activeKeyboardReviewId == review.id {
+                                              activeKeyboardReviewId = nil
+                                          }
+                                      }
+                                   ))
+                    .environmentObject(userProfileViewModel)
+                    .id(review.id)
+                    .padding(.horizontal)
+                    .padding(.vertical, 8)
+                    .background(Color.white)
+                    .cornerRadius(10)
+            }
+            // Add handling for other review types here if needed
+        }
+    }
+    private func scrollToReview(_ reviewId: String, proxy: ScrollViewProxy) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            withAnimation {
+                proxy.scrollTo(reviewId, anchor: .top)
+            }
+        }
+    }
+}
+
 struct PlaceReviewsView: View {
     @Binding var selectedImage: UIImage?
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
@@ -36,27 +78,9 @@ struct PlaceReviewsView: View {
                                     .foregroundColor(.gray)
                                     .padding(20)
                             } else {
-                                ForEach(reviews, id: \.id) { review in
-                                    RestaurantReviewView(review: review, 
-                                                         selectedImage: $selectedImage,
-                                                         isActiveKeyboard: Binding(
-                                                            get: { activeKeyboardReviewId == review.id },
-                                                            set: { isActive in
-                                                                if isActive {
-                                                                    activeKeyboardReviewId = review.id
-                                                                    scrollToReview(review.id, proxy: scrollProxy)
-                                                                } else if activeKeyboardReviewId == review.id {
-                                                                    activeKeyboardReviewId = nil
-                                                                }
-                                                            }
-                                                         ))
-                                        .environmentObject(userProfileViewModel)
-                                        .id(review.id) // Give each review a stable ID
-                                        .padding(.horizontal)
-                                        .padding(.vertical, 8)
-                                        .background(Color.white)
-                                        .cornerRadius(10)
-                                }
+                                PlaceReviewsListView(reviews: reviews, 
+                                                   selectedImage: $selectedImage, 
+                                                   scrollProxy: scrollProxy)
                             }
                             
                         case .error(let error):
@@ -101,7 +125,7 @@ struct PlaceReviewsView: View {
 }
 
 struct RestaruantReviewViewProfileInformation: View {
-    let review: Review
+    let review: RestaurantReview
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var userProfileViewModel: UserProfileViewModel
@@ -206,7 +230,7 @@ struct RestaruantReviewViewProfileInformation: View {
 }
 
 struct RestaruantReviewViewMustOrder: View {
-    let review: Review
+    let review: RestaurantReview
     
     var body: some View {
         VStack(alignment: .leading, spacing: 15) {
@@ -236,7 +260,7 @@ struct RestaruantReviewViewMustOrder: View {
 }
 
 struct RestaurantReviewView: View {
-    let review: Review
+    let review: RestaurantReview
     @Binding var selectedImage: UIImage?
     @Binding var isActiveKeyboard: Bool
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
