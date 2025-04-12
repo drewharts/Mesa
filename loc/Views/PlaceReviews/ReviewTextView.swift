@@ -22,7 +22,7 @@ struct ReviewTextView: View {
                 .foregroundStyle(.black)
 
             if reviewText.isEmpty {
-                Text("Add a review...")
+                Text("Anything interesting?")
                     .font(.subheadline)
                     .foregroundColor(.black)
                     .font(.footnote)

@@ -8,6 +8,67 @@
 import SwiftUI
 import UIKit
 
+struct PlaceReviewsListView : View {
+    @EnvironmentObject var userProfileViewModel: UserProfileViewModel
+    var reviews: [any ReviewProtocol]
+    @State private var activeKeyboardReviewId: String? = nil
+    @Binding var selectedImage: UIImage?
+    let scrollProxy: ScrollViewProxy
+
+    var body: some View {
+        ForEach(reviews, id: \.id) { review in
+            if let restaurantReview = review as? RestaurantReview {
+                RestaurantReviewView(review: restaurantReview,
+                                   selectedImage: $selectedImage,
+                                   isActiveKeyboard: Binding(
+                                      get: { activeKeyboardReviewId == review.id },
+                                      set: { isActive in
+                                          if isActive {
+                                              activeKeyboardReviewId = review.id
+                                              scrollToReview(review.id, proxy: scrollProxy)
+                                          } else if activeKeyboardReviewId == review.id {
+                                              activeKeyboardReviewId = nil
+                                          }
+                                      }
+                                   ))
+                    .environmentObject(userProfileViewModel)
+                    .id(review.id)
+                    .padding(.horizontal)
+                    .padding(.vertical, 8)
+                    .background(Color.white)
+                    .cornerRadius(10)
+            } else if let genericReview = review as? GenericReview {
+                GenericReviewView(review: genericReview,
+                                selectedImage: $selectedImage,
+                                isActiveKeyboard: Binding(
+                                   get: { activeKeyboardReviewId == review.id },
+                                   set: { isActive in
+                                       if isActive {
+                                           activeKeyboardReviewId = review.id
+                                           scrollToReview(review.id, proxy: scrollProxy)
+                                       } else if activeKeyboardReviewId == review.id {
+                                           activeKeyboardReviewId = nil
+                                       }
+                                   }
+                                ))
+                    .environmentObject(userProfileViewModel)
+                    .id(review.id)
+                    .padding(.horizontal)
+                    .padding(.vertical, 8)
+                    .background(Color.white)
+                    .cornerRadius(10)
+            }
+        }
+    }
+    private func scrollToReview(_ reviewId: String, proxy: ScrollViewProxy) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            withAnimation {
+                proxy.scrollTo(reviewId, anchor: .top)
+            }
+        }
+    }
+}
+
 struct PlaceReviewsView: View {
     @Binding var selectedImage: UIImage?
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
@@ -36,27 +97,9 @@ struct PlaceReviewsView: View {
                                     .foregroundColor(.gray)
                                     .padding(20)
                             } else {
-                                ForEach(reviews, id: \.id) { review in
-                                    RestaurantReviewView(review: review, 
-                                                         selectedImage: $selectedImage,
-                                                         isActiveKeyboard: Binding(
-                                                            get: { activeKeyboardReviewId == review.id },
-                                                            set: { isActive in
-                                                                if isActive {
-                                                                    activeKeyboardReviewId = review.id
-                                                                    scrollToReview(review.id, proxy: scrollProxy)
-                                                                } else if activeKeyboardReviewId == review.id {
-                                                                    activeKeyboardReviewId = nil
-                                                                }
-                                                            }
-                                                         ))
-                                        .environmentObject(userProfileViewModel)
-                                        .id(review.id) // Give each review a stable ID
-                                        .padding(.horizontal)
-                                        .padding(.vertical, 8)
-                                        .background(Color.white)
-                                        .cornerRadius(10)
-                                }
+                                PlaceReviewsListView(reviews: reviews, 
+                                                   selectedImage: $selectedImage, 
+                                                   scrollProxy: scrollProxy)
                             }
                             
                         case .error(let error):
@@ -101,7 +144,7 @@ struct PlaceReviewsView: View {
 }
 
 struct RestaruantReviewViewProfileInformation: View {
-    let review: Review
+    let review: ReviewProtocol
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var userProfileViewModel: UserProfileViewModel
@@ -206,7 +249,7 @@ struct RestaruantReviewViewProfileInformation: View {
 }
 
 struct RestaruantReviewViewMustOrder: View {
-    let review: Review
+    let review: RestaurantReview
     
     var body: some View {
         VStack(alignment: .leading, spacing: 15) {
@@ -236,7 +279,7 @@ struct RestaruantReviewViewMustOrder: View {
 }
 
 struct RestaurantReviewView: View {
-    let review: Review
+    let review: RestaurantReview
     @Binding var selectedImage: UIImage?
     @Binding var isActiveKeyboard: Bool
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
@@ -1044,4 +1087,128 @@ struct RatingView: View {
 
 // Add the FirestoreService as a property
 private let firestoreService = FirestoreService()
+
+struct GenericReviewView: View {
+    let review: GenericReview
+    @Binding var selectedImage: UIImage?
+    @Binding var isActiveKeyboard: Bool
+    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
+    @EnvironmentObject var profile: ProfileViewModel
+    @EnvironmentObject var userProfileViewModel: UserProfileViewModel
+    @State private var showComments = false
+    
+    // Static dictionary to track which review comments should be hidden
+    private static var hiddenComments = [String: Bool]()
+    
+    // Static method to hide comments for a specific review
+    static func hideComments(reviewId: String) {
+        // This is called from InlineCommentsView to hide its parent review's comments
+        Foundation.NotificationCenter.default.post(name: Foundation.Notification.Name("HideCommentsFor-\(reviewId)"), object: nil)
+    }
+
+    var body: some View {
+        VStack(spacing: 16) {
+            // Header: Profile Picture, Name, and Timestamp
+            RestaruantReviewViewProfileInformation(review: review)
+            
+            // Review Text
+            Text(review.reviewText)
+                .font(.footnote)
+                .foregroundColor(.gray)
+                .padding(.horizontal)
+                .multilineTextAlignment(.leading)
+                .padding(.bottom, 15)
+            
+            // Images (Horizontal Scrolling) with Loading State
+            let reviewPhotos = selectedPlaceVM.photos(for: review)
+            let loadingState = selectedPlaceVM.photoLoadingState(for: review)
+            
+            switch loadingState {
+            case .loading:
+                ZStack {
+                    VStack {
+                        ProgressView()
+                            .scaleEffect(1.2)
+                        
+                        Text("Loading photos...")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                            .padding(.top, 8)
+                    }
+                }
+                .frame(height: 150)
+                .padding(.horizontal)
+                
+            case .loaded:
+                if !reviewPhotos.isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(reviewPhotos, id: \.self) { image in
+                                Image(uiImage: image)
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .frame(width: 120, height: 120)
+                                    .cornerRadius(8)
+                                    .onTapGesture {
+                                        selectedImage = image
+                                    }
+                            }
+                        }
+                        .padding(.horizontal)
+                    }
+                    .frame(height: 150)
+                }
+                
+            case .error(let error):
+                Text("Failed to load photos: \(error.localizedDescription)")
+                    .font(.caption)
+                    .foregroundColor(.red)
+                    .padding()
+                
+            case .idle:
+                EmptyView()
+            }
+            
+            // Comments Section
+            if showComments {
+                InlineCommentsView(reviewId: review.id, selectedImage: $selectedImage) { isActive in
+                    isActiveKeyboard = isActive
+                }
+                .padding(.top, 8)
+            }
+            
+            // Comments Toggle Button
+            Button(action: {
+                withAnimation {
+                    showComments.toggle()
+                }
+            }) {
+                HStack {
+                    Text(showComments ? "Hide Comments" : "Show Comments")
+                        .font(.footnote)
+                        .foregroundColor(.blue)
+                    
+                    Image(systemName: showComments ? "chevron.up" : "chevron.down")
+                        .foregroundColor(.blue)
+                }
+            }
+            .padding(.horizontal)
+        }
+        .onAppear {
+            // Check like statuses using the proper userId from profile
+            selectedPlaceVM.checkLikeStatuses(userId: profile.userId)
+            
+            // Listen for the hide comments notification
+            NotificationCenter.default.addObserver(forName: Foundation.Notification.Name("HideCommentsFor-\(review.id)"), object: nil, queue: .main) { _ in
+                withAnimation {
+                    showComments = false
+                }
+            }
+        }
+        .onDisappear {
+            // Remove the observer when view disappears
+            NotificationCenter.default.removeObserver(self, name: Foundation.Notification.Name("HideCommentsFor-\(review.id)"), object: nil)
+        }
+    }
+}
 
