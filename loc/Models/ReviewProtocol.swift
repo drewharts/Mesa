@@ -9,7 +9,7 @@ import Foundation
 
 enum ReviewType: String, Codable {
     case generic = "generic"
-    case detailed = "detailed"
+    case restaurant = "restaurant"
 }
 
 protocol ReviewProtocol: Codable {

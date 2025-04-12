@@ -22,7 +22,7 @@ class PlaceReviewViewModel: ObservableObject {
 
     // You might track loading & error states for UI feedback:
     @Published var isLoading: Bool = false
-    @Published var errorMessage: String?
+    @Published var errorMessage: String? 
 
     // MARK: - Private/Internal
     private let place: DetailPlace

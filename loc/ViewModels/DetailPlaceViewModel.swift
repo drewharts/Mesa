@@ -76,8 +76,8 @@ class DetailPlaceViewModel: ObservableObject {
             return
         }
         
-        // Use friends' reviews to get images
-        firestoreService.fetchFriendsRestaurantReviews(placeId: placeId, currentUserId: currentUserId) { [weak self] (reviews, error) in
+        // Use friends' reviews to get images (both restaurant and generic)
+        firestoreService.fetchFriendsReviews(placeId: placeId, currentUserId: currentUserId) { [weak self] (reviews, error) in
             guard let self = self else { return }
             if let error = error {
                 print("Error fetching reviews for place \(placeId): \(error.localizedDescription)")

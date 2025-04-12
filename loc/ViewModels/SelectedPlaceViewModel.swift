@@ -148,8 +148,8 @@ class SelectedPlaceViewModel: ObservableObject {
             return
         }
         
-        // Use the new method to fetch only reviews from friends and the current user
-        firestoreService.fetchFriendsRestaurantReviews(placeId: placeId, currentUserId: currentUserId) { [weak self] reviews, error in
+        // Use the new method to fetch reviews from friends and the current user (both restaurant and generic)
+        firestoreService.fetchFriendsReviews(placeId: placeId, currentUserId: currentUserId) { [weak self] reviews, error in
             guard let self = self else { return }
             
             DispatchQueue.main.async {
@@ -178,14 +178,26 @@ class SelectedPlaceViewModel: ObservableObject {
     private func calculateAvgRating(for placeId: String) -> Double {
         guard let reviews = placeReviews[placeId], !reviews.isEmpty else { return 0 }
         
+        // Filter restaurant reviews
         let restaurantReviews = reviews.compactMap { $0 as? RestaurantReview }
-        guard !restaurantReviews.isEmpty else { return 0 }
         
-        let total = restaurantReviews.reduce(into: 0.0) { result, review in
-            result += review.foodRating
+        // If we have restaurant reviews, calculate based on food rating
+        if !restaurantReviews.isEmpty {
+            let total = restaurantReviews.reduce(into: 0.0) { result, review in
+                result += review.foodRating
+            }
+            return total / Double(restaurantReviews.count)
         }
         
-        return total / Double(restaurantReviews.count)
+        // If no restaurant reviews, check for generic reviews
+        let genericReviews = reviews.compactMap { $0 as? GenericReview }
+        if !genericReviews.isEmpty {
+            // For generic reviews, we could use a default rating or a different calculation
+            // For now, we'll return a default value
+            return 0.0
+        }
+        
+        return 0.0
     }
     
     private func getPlacePhotos(for place: DetailPlace) {

@@ -42,6 +42,6 @@ struct RestaurantReview: ReviewProtocol {
         self.timestamp = timestamp
         self.images = images
         self.likes = likes
-        self.type = .detailed
+        self.type = .restaurant
     }
 }
