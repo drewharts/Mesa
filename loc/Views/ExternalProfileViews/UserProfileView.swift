@@ -61,8 +61,10 @@ struct UserProfileView: View {
         .onAppear {
             viewModel.checkIfFollowing(currentUserId: userId)
         }
-        .background(Color.white)
         .navigationBarBackButtonHidden(true)
+        .toolbarBackground(Color(.systemGray6), for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
                 Button(action: {

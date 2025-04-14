@@ -45,11 +45,23 @@ struct ProfileFavoriteListView: View {
                                     .frame(width: 85, height: 85)
                                     .cornerRadius(50)
                                     .clipped()
+                                    .overlay(
+                                        Circle()
+                                            .stroke(Color.white, lineWidth: 1)
+                                            .frame(width: 85, height: 85)
+                                    )
+                                    .shadow(color: .black.opacity(0.2), radius: 3, x: 0, y: 2)
                             } else {
                                 Rectangle()
                                     .fill(Color.blue.opacity(0.3))
                                     .frame(width: 85, height: 85)
                                     .cornerRadius(50)
+                                    .overlay(
+                                        Circle()
+                                            .stroke(Color.white, lineWidth: 1)
+                                            .frame(width: 85, height: 85)
+                                    )
+                                    .shadow(color: .black.opacity(0.2), radius: 3, x: 0, y: 2)
                             }
                         }
                         Text(detailPlace?.name.prefix(15) ?? "Unknown")

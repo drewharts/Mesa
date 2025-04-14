@@ -178,11 +178,25 @@ struct PlaceListCellView: View {
                         .frame(width: 90, height: 90)
                         .clipped()
                         .cornerRadius(4)
+                        .overlay(
+                            Rectangle()
+                                .stroke(Color.white, lineWidth: 2)
+                                .frame(width: 90, height: 90)
+                                .cornerRadius(4)
+                        )
+                        .shadow(color: .black.opacity(0.2), radius: 3, x: 0, y: 2)
                 } else {
                     Rectangle()
                         .frame(width: 90, height: 90)
                         .foregroundColor(.gray)
                         .cornerRadius(4)
+                        .overlay(
+                            Rectangle()
+                                .stroke(Color.white, lineWidth: 2)
+                                .frame(width: 90, height: 90)
+                                .cornerRadius(4)
+                        )
+                        .shadow(color: .black.opacity(0.2), radius: 3, x: 0, y: 2)
                 }
 
                 VStack(alignment: .leading, spacing: 4) {
@@ -226,11 +240,11 @@ struct PlaceListCellView: View {
 
 struct MyProfileHorizontalListPlaces: View {
     @EnvironmentObject var viewModel: ProfileViewModel
-    @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel // Add this
+    @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @Environment(\.presentationMode) var presentationMode
     
-    let places: [DetailPlace] // Keep as [DetailPlace]
+    let places: [DetailPlace]
     @State private var placeColors: [UUID: Color] = [:]
     
     var body: some View {
@@ -241,26 +255,44 @@ struct MyProfileHorizontalListPlaces: View {
                     selectedPlaceVM.isDetailSheetPresented = true
                     presentationMode.wrappedValue.dismiss()
                 }) {
-                    VStack {
-                        if let image = detailPlaceViewModel.placeImages[place.id.uuidString] { // Use DetailPlaceViewModel
+                    VStack(spacing: 4) {
+                        if let image = detailPlaceViewModel.placeImages[place.id.uuidString] {
                             Image(uiImage: image)
                                 .resizable()
                                 .scaledToFill()
                                 .frame(width: 85, height: 85)
                                 .cornerRadius(50)
                                 .clipped()
+                                .overlay(
+                                    Circle()
+                                        .stroke(Color.white, lineWidth: 1)
+                                        .frame(width: 85, height: 85)
+                                )
+                                .shadow(color: .black.opacity(0.2), radius: 3, x: 0, y: 2)
                         } else {
                             Circle()
                                 .frame(width: 85, height: 85)
                                 .foregroundColor(colorForPlace(place))
-                                .onAppear {
-                                    detailPlaceViewModel.fetchPlaceImage(for: place.id.uuidString)
-                                }
+                                .overlay(
+                                    Circle()
+                                        .stroke(Color.white, lineWidth: 1)
+                                        .frame(width: 85, height: 85)
+                                )
+                                .shadow(color: .black.opacity(0.2), radius: 3, x: 0, y: 2)
                         }
                         
-                        Text(place.name ?? "Unknown")
-                            .font(.footnote)
+                        Text(place.name.prefix(15))
                             .foregroundColor(.black)
+                            .fontWeight(.semibold)
+                            .font(.footnote)
+                            .multilineTextAlignment(.center)
+                            .lineLimit(1)
+                            .frame(width: 85)
+                        
+                        Text(place.city?.prefix(15) ?? "")
+                            .foregroundColor(.black)
+                            .font(.caption)
+                            .fontWeight(.light)
                             .multilineTextAlignment(.center)
                             .lineLimit(1)
                             .frame(width: 85)
@@ -312,7 +344,7 @@ struct ProfileListDescription: View {
 struct ProfileViewListsView: View {
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
-    @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel // Add this
+    @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
     @Environment(\.presentationMode) private var presentationMode
 
     @State private var showingImagePicker = false
@@ -330,7 +362,7 @@ struct ProfileViewListsView: View {
             })
 
             if !profile.userLists.isEmpty {
-                ForEach(profile.userLists, id: \.id) { list in // Explicitly use id
+                ForEach(profile.userLists, id: \.id) { list in
                     VStack(alignment: .leading) {
                         ProfileListDescription(list: list)
                         

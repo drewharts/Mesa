@@ -37,10 +37,22 @@ struct UserProfileFavoritesView: View {
                                         .frame(width: 85, height: 85)
                                         .cornerRadius(50)
                                         .clipped()
+                                        .overlay(
+                                            Circle()
+                                                .stroke(Color.white, lineWidth: 2)
+                                                .frame(width: 85, height: 85)
+                                        )
+                                        .shadow(color: .black.opacity(0.2), radius: 3, x: 0, y: 2)
                                 } else {
                                     Circle()
                                         .frame(width: 85, height: 85)
                                         .foregroundColor(placeColors[userFavorites[index].id] ?? .green)
+                                        .overlay(
+                                            Circle()
+                                                .stroke(Color.white, lineWidth: 2)
+                                                .frame(width: 85, height: 85)
+                                        )
+                                        .shadow(color: .black.opacity(0.2), radius: 3, x: 0, y: 2)
                                 }
 
                                 Text(userFavorites[index].name.prefix(15) ?? "Unknown")
@@ -69,6 +81,12 @@ struct UserProfileFavoritesView: View {
                                 Circle()
                                     .frame(width: 85, height: 85)
                                     .foregroundColor(emptyCircleColors[index] ?? randomColor())
+                                    .overlay(
+                                        Circle()
+                                            .stroke(Color.white, lineWidth: 2)
+                                            .frame(width: 85, height: 85)
+                                    )
+                                    .shadow(color: .black.opacity(0.2), radius: 3, x: 0, y: 2)
                                 
                                 if !userFavorites.isEmpty {
                                     Text("")
