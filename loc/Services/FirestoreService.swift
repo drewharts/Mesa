@@ -400,7 +400,7 @@ class FirestoreService: ObservableObject {
             }
     }
     
-    func fetchReviews<T: ReviewProtocol>(placeId: String, latestOnly: Bool = false, completion: @escaping ([T]?, Error?) -> Void) {
+    func fetchReviews<ReviewProtocol>(placeId: String, latestOnly: Bool = false, completion: @escaping ([ReviewProtocol]?, Error?) -> Void) {
         // Reference to the reviews subcollection under the place document
         let reviewsRef = db.collection("places")
                          .document(placeId)
@@ -425,18 +425,53 @@ class FirestoreService: ObservableObject {
                 return
             }
             
-            // Decode each document into the appropriate Review type
-            let reviews: [T] = snapshot.documents.compactMap { document in
-                try? document.data(as: T.self)
+            // Use concrete types first to avoid memory issues
+            var restaurantReviews: [RestaurantReview] = []
+            var genericReviews: [GenericReview] = []
+            
+            for document in snapshot.documents {
+                // Check the type field to determine how to decode
+                if let typeString = document.data()["type"] as? String,
+                   let type = ReviewType(rawValue: typeString) {
+                    
+                    switch type {
+                    case .restaurant:
+                        if let restaurantReview = try? document.data(as: RestaurantReview.self) {
+                            restaurantReviews.append(restaurantReview)
+                        }
+                    case .generic:
+                        if let genericReview = try? document.data(as: GenericReview.self) {
+                            genericReviews.append(genericReview)
+                        }
+                    }
+                } else {
+                    // Fallback to trying both types if type field is missing
+                    if let restaurantReview = try? document.data(as: RestaurantReview.self) {
+                        restaurantReviews.append(restaurantReview)
+                    } else if let genericReview = try? document.data(as: GenericReview.self) {
+                        genericReviews.append(genericReview)
+                    }
+                }
             }
             
-            completion(reviews, nil)
+            // Return the appropriate type based on the generic parameter
+            if ReviewProtocol.self == RestaurantReview.self {
+                let typedReviews = restaurantReviews as! [ReviewProtocol]
+                DispatchQueue.main.async {
+                    completion(typedReviews, nil)
+                }
+            } else if ReviewProtocol.self == GenericReview.self {
+                let typedReviews = genericReviews as! [ReviewProtocol]
+                DispatchQueue.main.async {
+                    completion(typedReviews, nil)
+                }
+            } else {
+                // If the requested type doesn't match either concrete type, return an empty array
+                DispatchQueue.main.async {
+                    completion([], nil)
+                }
+            }
         }
-    }
-
-    // Convenience method for backward compatibility
-    func fetchReviews(placeId: String, latestOnly: Bool = false, completion: @escaping ([RestaurantReview]?, Error?) -> Void) {
-        fetchReviews(placeId: placeId, latestOnly: latestOnly, completion: completion)
     }
 
     func fetchFriends(userId: String, completion: @escaping ([String]?, Error?) -> Void) {
@@ -1440,11 +1475,6 @@ class FirestoreService: ObservableObject {
             
             completion(reviews, nil)
         }
-    }
-
-    // Convenience method for backward compatibility
-    func fetchUserReviews(userId: String, completion: @escaping ([RestaurantReview]?, Error?) -> Void) {
-        fetchUserReviews(userId: userId, completion: completion)
     }
 
     func fetchUserReviewPlaces(userId: String, user: User, completion: @escaping ([DetailPlace]?, Error?) -> Void) {
