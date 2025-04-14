@@ -39,7 +39,7 @@ struct UserProfileFavoritesView: View {
                                         .clipped()
                                         .overlay(
                                             Circle()
-                                                .stroke(Color.white, lineWidth: 2)
+                                                .stroke(Color.white, lineWidth: 1)
                                                 .frame(width: 85, height: 85)
                                         )
                                         .shadow(color: .black.opacity(0.2), radius: 3, x: 0, y: 2)
@@ -49,13 +49,13 @@ struct UserProfileFavoritesView: View {
                                         .foregroundColor(placeColors[userFavorites[index].id] ?? .green)
                                         .overlay(
                                             Circle()
-                                                .stroke(Color.white, lineWidth: 2)
+                                                .stroke(Color.white, lineWidth: 1)
                                                 .frame(width: 85, height: 85)
                                         )
                                         .shadow(color: .black.opacity(0.2), radius: 3, x: 0, y: 2)
                                 }
 
-                                Text(userFavorites[index].name.prefix(15) ?? "Unknown")
+                                Text(userFavorites[index].name.prefix(15))
                                     .foregroundColor(.black)
                                     .fontWeight(.semibold)
                                     .font(.footnote)
@@ -83,7 +83,7 @@ struct UserProfileFavoritesView: View {
                                     .foregroundColor(emptyCircleColors[index] ?? randomColor())
                                     .overlay(
                                         Circle()
-                                            .stroke(Color.white, lineWidth: 2)
+                                            .stroke(Color.white, lineWidth: 1)
                                             .frame(width: 85, height: 85)
                                     )
                                     .shadow(color: .black.opacity(0.2), radius: 3, x: 0, y: 2)

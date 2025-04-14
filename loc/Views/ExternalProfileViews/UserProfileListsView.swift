@@ -22,7 +22,7 @@ struct UserProfileListViewJustListsPlaces: View {
                     selectedPlaceVM.isDetailSheetPresented = true
                     presentationMode.wrappedValue.dismiss()
                 }) {
-                    VStack {
+                    VStack(spacing: 4) {
                         if let image = viewModel.placeImages[place.id.uuidString ?? ""] {
                             Image(uiImage: image)
                                 .resizable()
@@ -30,15 +30,36 @@ struct UserProfileListViewJustListsPlaces: View {
                                 .frame(width: 85, height: 85)
                                 .cornerRadius(50)
                                 .clipped()
+                                .overlay(
+                                    Circle()
+                                        .stroke(Color.white, lineWidth: 1)
+                                        .frame(width: 85, height: 85)
+                                )
+                                .shadow(color: .black.opacity(0.2), radius: 3, x: 0, y: 2)
                         } else {
                             Circle()
                                 .frame(width: 85, height: 85)
                                 .foregroundColor(placeColors[place.id] ?? .gray)
+                                .overlay(
+                                    Circle()
+                                        .stroke(Color.white, lineWidth: 1)
+                                        .frame(width: 85, height: 85)
+                                )
+                                .shadow(color: .black.opacity(0.2), radius: 3, x: 0, y: 2)
                         }
                         
-                        Text(place.name ?? "Unknown")
-                            .font(.footnote)
+                        Text(place.name.prefix(15))
                             .foregroundColor(.black)
+                            .fontWeight(.semibold)
+                            .font(.footnote)
+                            .multilineTextAlignment(.center)
+                            .lineLimit(1)
+                            .frame(width: 85)
+                            
+                        Text(place.city?.prefix(15) ?? "")
+                            .foregroundColor(.black)
+                            .font(.caption)
+                            .fontWeight(.light)
                             .multilineTextAlignment(.center)
                             .lineLimit(1)
                             .frame(width: 85)
