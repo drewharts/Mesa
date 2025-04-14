@@ -49,6 +49,7 @@ struct locApp: App {
                 .environmentObject(selectedPlaceVM)
                 .environmentObject(detailPlaceVM)
                 .environmentObject(firestoreService)
+                .preferredColorScheme(.light)
                 .onAppear {
                     if let currentUser = Auth.auth().currentUser {
                         userSession.isUserLoggedIn = true

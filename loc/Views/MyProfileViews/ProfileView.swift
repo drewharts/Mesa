@@ -63,6 +63,7 @@ struct ProfileView: View {
             .padding(.top, 10)
         }
         .navigationBarBackButtonHidden(true)
+        .preferredColorScheme(.light)
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
                 Button(action: {
