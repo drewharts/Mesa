@@ -189,8 +189,8 @@ class UserProfileViewModel: ObservableObject {
         }
         
         // When viewing someone else's profile, we want to see ALL their reviews for images,
-        // not just reviews from people we follow, so we'll use the original fetchReviews method
-        firestoreService.fetchReviews(placeId: placeId, latestOnly: true) { [weak self] (reviews, error) in
+        // not just reviews from people we follow, so we'll use the generic fetchReviews method
+        firestoreService.fetchReviews(placeId: placeId, latestOnly: true) { [weak self] (reviews: [ReviewProtocol]?, error) in
             guard let self = self else { return }
             if let error = error {
                 print("Error fetching reviews for place \(placeId): \(error.localizedDescription)")
