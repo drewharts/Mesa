@@ -662,6 +662,18 @@ class ProfileViewModel: ObservableObject {
         }
     }
     
+    // Placeholder function for adding a place to a list
+    func addPlaceToList(place: DetailPlace, list: PlaceList) {
+        print("Adding place \(place.name) to list \(list.name) TESTING")
+        // TODO: Implement actual functionality
+    }
+    
+    // Placeholder function for removing a place from a list
+    func removePlaceFromList(place: DetailPlace, list: PlaceList) {
+        print("Removing place \(place.name) from list \(list.name) TESTING")
+        // TODO: Implement actual functionality
+    }
+    
     // Helpers
     private func loadUserProfilePhoto(from url: URL, forUserId userId: String, completion: @escaping () -> Void) {
         if userProfilePhotos[userId] != nil { completion(); return }

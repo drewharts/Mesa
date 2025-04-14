@@ -324,19 +324,129 @@ struct MyProfileHorizontalListPlaces: View {
     }
 }
 
-struct ProfileListDescription: View {
-    @State var list: PlaceList
+struct ListPlacesPopupView: View {
+    @Environment(\.presentationMode) var presentationMode
+    @EnvironmentObject var profile: ProfileViewModel
+    @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
+    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
+    let list: PlaceList
     
     var body: some View {
-        HStack {
-            Text(list.name)
-                .font(.callout)
-                .fontWeight(.medium)
-                .foregroundColor(.black)
-                .padding(.leading, 20)
-            Text("\(list.places.count) \(list.places.count == 1 ? "place" : "places")")
-                .font(.caption)
-                .foregroundStyle(.black)
+        VStack(spacing: 10) {
+            HStack {
+                Spacer()
+                
+                Text(list.name)
+                    .font(.headline)
+                    .padding(.leading, 20)
+                
+                Spacer()
+                
+                Button(action: {
+                    // TODO: Show place selection sheet
+                    print("Add place to list \(list.name) TESTING")
+                }) {
+                    Image(systemName: "plus")
+                        .imageScale(.small)
+                        .foregroundColor(.blue)
+                        .padding(8)
+                        .background(Circle().fill(.white))
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 10)
+            
+            if let placeIds = profile.placeListMBPlaces[list.id] {
+                let places = placeIds.compactMap { detailPlaceViewModel.places[$0] }
+                if !places.isEmpty {
+                    List {
+                        ForEach(places, id: \.id) { place in
+                            Button(action: {
+                                selectedPlaceVM.selectedPlace = place
+                                selectedPlaceVM.isDetailSheetPresented = true
+                                presentationMode.wrappedValue.dismiss()
+                            }) {
+                                HStack {
+                                    if let image = detailPlaceViewModel.placeImages[place.id.uuidString] {
+                                        Image(uiImage: image)
+                                            .resizable()
+                                            .aspectRatio(contentMode: .fill)
+                                            .frame(width: 60, height: 60)
+                                            .cornerRadius(8)
+                                            .clipped()
+                                    } else {
+                                        Rectangle()
+                                            .foregroundColor(.gray)
+                                            .frame(width: 60, height: 60)
+                                            .cornerRadius(8)
+                                    }
+                                    
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(place.name)
+                                            .font(.body)
+                                            .foregroundColor(.black)
+                                        
+                                        if let city = place.city {
+                                            Text(city)
+                                                .font(.caption)
+                                                .foregroundColor(.gray)
+                                        }
+                                    }
+                                    .padding(.leading, 12)
+                                    
+                                    Spacer()
+                                    
+                                    Image(systemName: "chevron.right")
+                                        .foregroundColor(.gray)
+                                }
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                        }
+                        .onDelete { indexSet in
+                            let placesToRemove = indexSet.map { places[$0] }
+                            for place in placesToRemove {
+                                profile.removePlaceFromList(place: place, list: list)
+                            }
+                        }
+                    }
+                    .listStyle(PlainListStyle())
+                } else {
+                    Text("No places in this list")
+                        .foregroundColor(.gray)
+                        .padding(.vertical, 30)
+                }
+            } else {
+                Text("Loading places...")
+                    .foregroundColor(.gray)
+                    .padding(.vertical, 30)
+            }
+        }
+        .cornerRadius(20)
+        .padding()
+    }
+}
+
+struct ProfileListDescription: View {
+    @State var list: PlaceList
+    @State private var showingPlacesPopup = false
+    
+    var body: some View {
+        Button(action: {
+            showingPlacesPopup = true
+        }) {
+            HStack {
+                Text(list.name)
+                    .font(.callout)
+                    .fontWeight(.medium)
+                    .foregroundColor(.black)
+                    .padding(.leading, 20)
+                Text("\(list.places.count) \(list.places.count == 1 ? "place" : "places")")
+                    .font(.caption)
+                    .foregroundStyle(.black)
+            }
+        }
+        .sheet(isPresented: $showingPlacesPopup) {
+            ListPlacesPopupView(list: list)
         }
     }
 }
