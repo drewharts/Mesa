@@ -162,13 +162,24 @@ struct MyProfileHorizontalListPlaces: View {
                             .lineLimit(1)
                             .frame(width: 85)
                         
-                        Text(place.city?.prefix(15) ?? "")
-                            .foregroundColor(.black)
-                            .font(.caption)
-                            .fontWeight(.light)
-                            .multilineTextAlignment(.center)
-                            .lineLimit(1)
-                            .frame(width: 85)
+                        // Display restaurant type instead of city
+                        if let type = detailPlaceViewModel.placeTypes[place.id.uuidString] {
+                            Text(type.prefix(15))
+                                .foregroundColor(.black)
+                                .font(.caption)
+                                .fontWeight(.light)
+                                .multilineTextAlignment(.center)
+                                .lineLimit(1)
+                                .frame(width: 85)
+                        } else if let city = place.city {
+                            Text(city.prefix(15))
+                                .foregroundColor(.black)
+                                .font(.caption)
+                                .fontWeight(.light)
+                                .multilineTextAlignment(.center)
+                                .lineLimit(1)
+                                .frame(width: 85)
+                        }
                     }
                     .padding(.trailing, 10)
                 }
@@ -288,7 +299,12 @@ struct ListPlacesPopupView: View {
                                                     .foregroundColor(.white)
                                                     .lineLimit(1)
                                                 
-                                                if let city = place.city {
+                                                if let type = detailPlaceViewModel.placeTypes[place.id.uuidString] {
+                                                    Text(type)
+                                                        .font(.subheadline)
+                                                        .foregroundColor(.white.opacity(0.7))
+                                                        .lineLimit(1)
+                                                } else if let city = place.city {
                                                     Text(city)
                                                         .font(.subheadline)
                                                         .foregroundColor(.white.opacity(0.7))

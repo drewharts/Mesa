@@ -16,9 +16,11 @@ class DetailPlaceViewModel: ObservableObject {
     @Published var places: [String: DetailPlace] = [:] // Formerly placeLookup
     @Published var placeImages: [String: UIImage] = [:] // Consolidated place images
     @Published var placeSavers: [String: [User]] = [:] // Tracks who saved each place
+    @Published var placeTypes: [String: String] = [:] // Tracks restaurant types
 
     private let firestoreService: FirestoreService
     private var notificationObserver: NSObjectProtocol?
+    private let placeDetailVM = PlaceDetailViewModel() // For restaurant type calculation
 
     init(firestoreService: FirestoreService) {
         self.firestoreService = firestoreService
@@ -43,6 +45,14 @@ class DetailPlaceViewModel: ObservableObject {
         }
     }
 
+    // Calculate and store restaurant type
+    private func calculateRestaurantType(for place: DetailPlace) {
+        let placeId = place.id.uuidString
+        if let type = placeDetailVM.getRestaurantType(for: place) {
+            placeTypes[placeId] = type
+        }
+    }
+
     // Fetch place data (e.g., from Firestore)
     func fetchPlaceDetails(placeId: String, completion: @escaping (DetailPlace?) -> Void) {
         firestoreService.fetchPlace(withId: placeId) { [weak self] result in
@@ -55,6 +65,7 @@ class DetailPlaceViewModel: ObservableObject {
                 DispatchQueue.main.async {
                     self.places[placeId] = detailPlace
                     self.fetchPlaceImage(for: placeId) // Fetch image if not already present
+                    self.calculateRestaurantType(for: detailPlace) // Calculate restaurant type
                     completion(detailPlace)
                 }
             case .failure(let error):
@@ -155,6 +166,8 @@ class DetailPlaceViewModel: ObservableObject {
             
             // If place exists, return it
             if let existingDetailPlace = existingDetailPlace {
+                // Calculate restaurant type for existing place
+                self.calculateRestaurantType(for: existingDetailPlace)
                 completion(existingDetailPlace)
                 return
             }
@@ -172,6 +185,7 @@ class DetailPlaceViewModel: ObservableObject {
                 DispatchQueue.main.async {
                     self.places[detailPlace.id.uuidString] = detailPlace
                     self.fetchPlaceImage(for: detailPlace.id.uuidString)
+                    self.calculateRestaurantType(for: detailPlace) // Calculate restaurant type
                     completion(detailPlace)
                 }
             }

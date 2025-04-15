@@ -9,6 +9,7 @@ import SwiftUI
 
 struct UserProfileListViewJustListsPlaces: View {
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
+    @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
     @Environment(\.presentationMode) var presentationMode
     @State private var placeColors: [UUID: Color] = [:]
 
@@ -55,14 +56,24 @@ struct UserProfileListViewJustListsPlaces: View {
                             .multilineTextAlignment(.center)
                             .lineLimit(1)
                             .frame(width: 85)
-                            
-                        Text(place.city?.prefix(15) ?? "")
-                            .foregroundColor(.black)
-                            .font(.caption)
-                            .fontWeight(.light)
-                            .multilineTextAlignment(.center)
-                            .lineLimit(1)
-                            .frame(width: 85)
+                        
+                        if let type = detailPlaceViewModel.placeTypes[place.id.uuidString] {
+                            Text(type.prefix(15))
+                                .foregroundColor(.black)
+                                .font(.caption)
+                                .fontWeight(.light)
+                                .multilineTextAlignment(.center)
+                                .lineLimit(1)
+                                .frame(width: 85)
+                        } else if let city = place.city {
+                            Text(city.prefix(15))
+                                .foregroundColor(.black)
+                                .font(.caption)
+                                .fontWeight(.light)
+                                .multilineTextAlignment(.center)
+                                .lineLimit(1)
+                                .frame(width: 85)
+                        }
                     }
                     .padding(.trailing, 10)
                 }

@@ -34,6 +34,7 @@ class SelectedPlaceViewModel: ObservableObject {
     @Published private var placeReviews: [String: [any ReviewProtocol]] = [:] // Cache for reviews by placeId
     @Published private var reviewPhotos: [String: [UIImage]] = [:] // Cache for review photos by reviewId
     @Published private var userProfilePhotos: [String: UIImage] = [:] // Cache for profile photos by userId
+    @Published private var restaurantTypes: [String: String] = [:] // Dictionary to store restaurant types by placeId
     
     @Published var placeRating: Double = 0
     
@@ -76,12 +77,29 @@ class SelectedPlaceViewModel: ObservableObject {
         self.firestoreService = firestoreService
     }
     
+    // Get restaurant type for a place
+    func getRestaurantType(for placeId: String) -> String? {
+        return restaurantTypes[placeId]
+    }
+    
+    // Calculate restaurant type and store in dictionary
+    func calculateAndStoreRestaurantType(for place: DetailPlace) {
+        let placeId = place.id.uuidString
+        let placeDetailVM = PlaceDetailViewModel()
+        if let type = placeDetailVM.getRestaurantType(for: place) {
+            restaurantTypes[placeId] = type
+        }
+    }
+    
     // MARK: - Private Methods
     private func loadData(for place: DetailPlace, currentLocation: CLLocationCoordinate2D) {
         print("Loading data for \(place.name) at location \(currentLocation)")
         
         // Compute whether the restaurant is open now
         let openNow = isRestaurantOpenNow(place)
+        
+        // Calculate and store restaurant type
+        calculateAndStoreRestaurantType(for: place)
         
         DispatchQueue.main.async {
             self.isRestaurantOpen = openNow
