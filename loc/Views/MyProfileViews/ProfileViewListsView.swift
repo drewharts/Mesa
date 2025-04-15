@@ -393,13 +393,13 @@ struct ListPlacesPopupView: View {
                                             // Gradient overlay that extends from the bottom
                                             LinearGradient(
                                                 gradient: Gradient(colors: [
-                                                    Color.black.opacity(0.8),
-                                                    Color.black.opacity(0.6),
-                                                    Color.black.opacity(0.4),
-                                                    Color.black.opacity(0.0)
+                                                    Color.black.opacity(0.0),
+                                                    Color.black.opacity(0.1),
+                                                    Color.black.opacity(0.2),
+                                                    Color.black.opacity(1.0)
                                                 ]),
-                                                startPoint: .bottom,
-                                                endPoint: .top
+                                                startPoint: .top,
+                                                endPoint: .bottom
                                             )
                                             .frame(width: cardWidth, height: cardHeight)
                                             
