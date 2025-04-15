@@ -1018,21 +1018,44 @@ class FirestoreService: ObservableObject {
     }
     
     func removePlaceFromList(userId: String, listName: String, placeId: String) {
+        // First get the current list to find the place object
         db.collection("users").document(userId)
             .collection("placeLists").document(listName)
-            .updateData(["places": FieldValue.arrayRemove([placeId])]) { error in
+            .getDocument { [weak self] document, error in
+                guard let self = self else { return }
+                
                 if let error = error {
-                    print("Error removing place from list: \(error.localizedDescription)")
-                } else {
-                    print("Place successfully removed from list: \(listName)")
+                    print("Error fetching list: \(error.localizedDescription)")
+                    return
+                }
+                
+                guard let document = document, document.exists,
+                      let placeList = try? document.data(as: PlaceList.self) else {
+                    print("List not found or could not be decoded")
+                    return
+                }
+                
+                // Find the place object to remove
+                if let placeToRemove = placeList.places.first(where: { $0.id.uuidString == placeId }) {
+                    // Create a dictionary representation of the place
+                    let placeDict: [String: Any] = [
+                        "id": placeToRemove.id.uuidString,
+                        "name": placeToRemove.name,
+                        "address": placeToRemove.address
+                    ]
                     
-                    self.removeUserFromMapPlace(userId: userId, placeId: placeId) { success, error in
-                           if let error = error {
-                               print("Error removing user from mapPlace: \(error.localizedDescription)")
-                           } else {
-                               print("User successfully removed from mapPlace.")
-                           }
-                       }
+                    // Now remove the place using the dictionary
+                    self.db.collection("users").document(userId)
+                        .collection("placeLists").document(listName)
+                        .updateData(["places": FieldValue.arrayRemove([placeDict])]) { error in
+                            if let error = error {
+                                print("Error removing place from list: \(error.localizedDescription)")
+                            } else {
+                                print("Place successfully removed from list: \(listName)")
+                            }
+                        }
+                } else {
+                    print("Place not found in list")
                 }
             }
     }

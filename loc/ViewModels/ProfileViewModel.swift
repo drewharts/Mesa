@@ -670,8 +670,25 @@ class ProfileViewModel: ObservableObject {
     
     // Placeholder function for removing a place from a list
     func removePlaceFromList(place: DetailPlace, list: PlaceList) {
-        print("Removing place \(place.name) from list \(list.name) TESTING")
-        // TODO: Implement actual functionality
+        let placeId = place.id.uuidString
+        
+        // Remove from local data structures
+        if var placeIds = placeListMBPlaces[list.id] {
+            placeIds.removeAll { $0 == placeId }
+            placeListMBPlaces[list.id] = placeIds
+        }
+        
+        // Update the local PlaceList model's places array
+        if let index = userLists.firstIndex(where: { $0.id == list.id }) {
+            userLists[index].places.removeAll { $0.id.uuidString == placeId }
+            objectWillChange.send() // Explicitly notify observers of the change
+        }
+        
+        // Update Firestore
+        firestoreService.removePlaceFromList(userId: self.userId, listName: list.id.uuidString, placeId: placeId)
+        
+        // Update place annotation images
+        self.updatePlaceAnnotationImages(for: placeId)
     }
     
     // Helpers
