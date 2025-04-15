@@ -330,6 +330,7 @@ struct ListPlacesPopupView: View {
     @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     let list: PlaceList
+    @State private var showingDeleteConfirmation = false
     
     private let columns = [
         GridItem(.flexible(), spacing: 15),
@@ -343,27 +344,31 @@ struct ListPlacesPopupView: View {
     var body: some View {
         VStack(spacing: 10) {
             HStack {
+                Button(action: {
+                    showingDeleteConfirmation = true
+                }) {
+                    Image(systemName: "trash")
+                        .foregroundColor(.gray)
+                        .frame(width: 44, height: 44)
+                }
+                
                 Spacer()
                 
                 Text(list.name)
                     .font(.headline)
-                    .padding(.leading, 20)
+                    .frame(maxWidth: .infinity, alignment: .center)
                 
                 Spacer()
                 
-                Button(action: {
-                    // TODO: Show place selection sheet
-                    print("Add place to list \(list.name) TESTING")
-                }) {
-                    Image(systemName: "plus")
-                        .imageScale(.medium)
-                        .foregroundColor(.gray)
-                        .padding(10)
-                        .background(Circle().fill(.white))
-                }
+                // Empty view with same width as trash button for perfect centering
+                Color.clear
+                    .frame(width: 44, height: 44)
             }
             .padding(.horizontal, 20)
             .padding(.top, 10)
+            
+            Spacer()
+                .frame(height: 20) // Add extra space between title and content
             
             if let placeIds = profile.placeListMBPlaces[list.id] {
                 let places = placeIds.compactMap { detailPlaceViewModel.places[$0] }
@@ -456,6 +461,15 @@ struct ListPlacesPopupView: View {
         }
         .cornerRadius(20)
         .padding()
+        .alert("Delete List", isPresented: $showingDeleteConfirmation) {
+            Button("Cancel", role: .cancel) { }
+            Button("Delete", role: .destructive) {
+                profile.removePlaceList(placeList: list)
+                presentationMode.wrappedValue.dismiss()
+            }
+        } message: {
+            Text("Are you sure you want to delete this list? This action cannot be undone.")
+        }
     }
 }
 
