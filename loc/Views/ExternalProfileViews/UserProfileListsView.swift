@@ -101,7 +101,7 @@ struct UserProfileListViewJustLists: View {
                             .fontWeight(.medium)
                             .foregroundColor(.black)
                             .padding(.leading, 20)
-                        Text("\(list.places.count) \(list.places.count == 1 ? "place" : "places")")
+                        Text("\(viewModel.placeListMapboxPlaces[list.id]?.count ?? 0) \(viewModel.placeListMapboxPlaces[list.id]?.count == 1 ? "place" : "places")")
                             .font(.caption)
                             .foregroundStyle(.black)
                     }

@@ -349,6 +349,7 @@ struct ListPlacesPopupView: View {
 struct ProfileListDescription: View {
     @State var list: PlaceList
     @State private var showingPlacesPopup = false
+    @EnvironmentObject var profile: ProfileViewModel
     
     var body: some View {
         Button(action: {
@@ -360,7 +361,7 @@ struct ProfileListDescription: View {
                     .fontWeight(.medium)
                     .foregroundColor(.black)
                     .padding(.leading, 20)
-                Text("\(list.places.count) \(list.places.count == 1 ? "place" : "places")")
+                Text("\(profile.placeListMBPlaces[list.id]?.count ?? 0) \(profile.placeListMBPlaces[list.id]?.count == 1 ? "place" : "places")")
                     .font(.caption)
                     .foregroundStyle(.black)
             }
