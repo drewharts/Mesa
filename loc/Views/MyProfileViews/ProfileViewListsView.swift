@@ -331,6 +331,15 @@ struct ListPlacesPopupView: View {
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     let list: PlaceList
     
+    private let columns = [
+        GridItem(.flexible(), spacing: 15),
+        GridItem(.flexible(), spacing: 15)
+    ]
+    
+    // Reduced width to create more space between cards
+    private let cardWidth: CGFloat = UIScreen.main.bounds.width / 2 - 35 // Increased spacing from edges
+    private let cardHeight: CGFloat = 180 // Slightly reduced height
+    
     var body: some View {
         VStack(spacing: 10) {
             HStack {
@@ -347,9 +356,9 @@ struct ListPlacesPopupView: View {
                     print("Add place to list \(list.name) TESTING")
                 }) {
                     Image(systemName: "plus")
-                        .imageScale(.small)
-                        .foregroundColor(.blue)
-                        .padding(8)
+                        .imageScale(.medium)
+                        .foregroundColor(.gray)
+                        .padding(10)
                         .background(Circle().fill(.white))
                 }
             }
@@ -359,57 +368,81 @@ struct ListPlacesPopupView: View {
             if let placeIds = profile.placeListMBPlaces[list.id] {
                 let places = placeIds.compactMap { detailPlaceViewModel.places[$0] }
                 if !places.isEmpty {
-                    List {
-                        ForEach(places, id: \.id) { place in
-                            Button(action: {
-                                selectedPlaceVM.selectedPlace = place
-                                selectedPlaceVM.isDetailSheetPresented = true
-                                presentationMode.wrappedValue.dismiss()
-                            }) {
-                                HStack {
-                                    if let image = detailPlaceViewModel.placeImages[place.id.uuidString] {
-                                        Image(uiImage: image)
-                                            .resizable()
-                                            .aspectRatio(contentMode: .fill)
-                                            .frame(width: 60, height: 60)
-                                            .cornerRadius(8)
-                                            .clipped()
-                                    } else {
-                                        Rectangle()
-                                            .foregroundColor(.gray)
-                                            .frame(width: 60, height: 60)
-                                            .cornerRadius(8)
-                                    }
-                                    
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        Text(place.name)
-                                            .font(.body)
-                                            .foregroundColor(.black)
-                                        
-                                        if let city = place.city {
-                                            Text(city)
-                                                .font(.caption)
-                                                .foregroundColor(.gray)
+                    ScrollView {
+                        LazyVGrid(columns: columns, spacing: 15) {
+                            ForEach(places, id: \.id) { place in
+                                Button(action: {
+                                    selectedPlaceVM.selectedPlace = place
+                                    selectedPlaceVM.isDetailSheetPresented = true
+                                    presentationMode.wrappedValue.dismiss()
+                                }) {
+                                    VStack(alignment: .leading, spacing: 0) {
+                                        ZStack(alignment: .bottom) {
+                                            if let image = detailPlaceViewModel.placeImages[place.id.uuidString] {
+                                                Image(uiImage: image)
+                                                    .resizable()
+                                                    .aspectRatio(contentMode: .fill)
+                                                    .frame(width: cardWidth, height: cardHeight)
+                                                    .clipped()
+                                            } else {
+                                                Rectangle()
+                                                    .foregroundColor(.gray)
+                                                    .frame(width: cardWidth, height: cardHeight)
+                                            }
+                                            
+                                            // Gradient overlay that extends from the bottom
+                                            LinearGradient(
+                                                gradient: Gradient(colors: [
+                                                    Color.black.opacity(0.8),
+                                                    Color.black.opacity(0.6),
+                                                    Color.black.opacity(0.4),
+                                                    Color.black.opacity(0.0)
+                                                ]),
+                                                startPoint: .bottom,
+                                                endPoint: .top
+                                            )
+                                            .frame(width: cardWidth, height: cardHeight)
+                                            
+                                            // Text overlay at the bottom
+                                            VStack(alignment: .leading, spacing: 4) {
+                                                Text(place.name)
+                                                    .font(.headline)
+                                                    .foregroundColor(.white)
+                                                    .lineLimit(1)
+                                                
+                                                if let city = place.city {
+                                                    Text(city)
+                                                        .font(.subheadline)
+                                                        .foregroundColor(.white.opacity(0.7))
+                                                        .lineLimit(1)
+                                                }
+                                            }
+                                            .padding(.horizontal, 12)
+                                            .padding(.bottom, 12)
+                                            .frame(maxWidth: .infinity, alignment: .leading)
                                         }
                                     }
-                                    .padding(.leading, 12)
-                                    
-                                    Spacer()
-                                    
-                                    Image(systemName: "chevron.right")
-                                        .foregroundColor(.gray)
+                                    .frame(width: cardWidth, height: cardHeight)
+                                    .background(Color.white)
+                                    .clipShape(RoundedRectangle(cornerRadius: 20))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 20)
+                                            .stroke(Color.white, lineWidth: 2)
+                                    )
+                                    .shadow(color: Color.black.opacity(0.2), radius: 5, x: 0, y: 2)
+                                }
+                                .contextMenu {
+                                    Button(role: .destructive) {
+                                        profile.removePlaceFromList(place: place, list: list)
+                                    } label: {
+                                        Label("Remove from list", systemImage: "trash")
+                                    }
                                 }
                             }
-                            .buttonStyle(PlainButtonStyle())
                         }
-                        .onDelete { indexSet in
-                            let placesToRemove = indexSet.map { places[$0] }
-                            for place in placesToRemove {
-                                profile.removePlaceFromList(place: place, list: list)
-                            }
-                        }
+                        .padding(.horizontal, 20) // Increased horizontal padding
+                        .padding(.vertical, 10)
                     }
-                    .listStyle(PlainListStyle())
                 } else {
                     Text("No places in this list")
                         .foregroundColor(.gray)
