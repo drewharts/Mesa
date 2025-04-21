@@ -50,7 +50,7 @@ struct AddFavoritesCurrentFavoritesView: View {
 
 struct FavoritesContentDisplay: View {
     @EnvironmentObject var profile: ProfileViewModel
-    var prediction: SearchSuggestion
+    var prediction: MesaPlaceSuggestion
     @State private var lastTappedPlaceID: String?
 
     var body: some View {
@@ -59,7 +59,7 @@ struct FavoritesContentDisplay: View {
             HStack {
                 Text(prediction.name)
                     .foregroundColor(.primary)
-                Text((prediction.address?.place) ?? "")
+                Text((prediction.address) ?? "")
                     .foregroundColor(.secondary)
                 Spacer()
             }

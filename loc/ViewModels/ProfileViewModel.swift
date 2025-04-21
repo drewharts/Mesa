@@ -578,22 +578,22 @@ class ProfileViewModel: ObservableObject {
         }
     }
     
-    func addFavoriteFromSuggestion(_ suggestion: SearchSuggestion) {
-        mapboxSearchService.selectSuggestion(suggestion) { [weak self] result in
-            guard let self = self else { return }
-            self.detailPlaceViewModel.searchResultToDetailPlace(place: result) { place in
-                let placeId = place.id.uuidString
-                DispatchQueue.main.async {
-                    self.userFavorites.append(placeId)
-                    self.firestoreService.addProfileFavorite(userId: self.userId, place: place)
-                    if let user = self.currentUser {
-                        self.detailPlaceViewModel.updatePlaceSavers(placeId: placeId, user: user)
-                    }
-                    self.detailPlaceViewModel.fetchPlaceImage(for: placeId)
-                    self.updatePlaceAnnotationImages(for: placeId)
-                }
-            }
-        }
+    func addFavoriteFromSuggestion(_ suggestion: MesaPlaceSuggestion) {
+//        mapboxSearchService.selectSuggestion(suggestion) { [weak self] result in
+//            guard let self = self else { return }
+//            self.detailPlaceViewModel.searchResultToDetailPlace(place: result) { place in
+//                let placeId = place.id.uuidString
+//                DispatchQueue.main.async {
+//                    self.userFavorites.append(placeId)
+//                    self.firestoreService.addProfileFavorite(userId: self.userId, place: place)
+//                    if let user = self.currentUser {
+//                        self.detailPlaceViewModel.updatePlaceSavers(placeId: placeId, user: user)
+//                    }
+//                    self.detailPlaceViewModel.fetchPlaceImage(for: placeId)
+//                    self.updatePlaceAnnotationImages(for: placeId)
+//                }
+//            }
+//        }
     }
     
     func numberOfFavoritePlaces() -> Int {

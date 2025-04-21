@@ -13,7 +13,7 @@ import FirebaseFirestore
 
 class SearchViewModel: ObservableObject {
     @Published var searchText = ""  // User's search input
-    @Published var searchResults: [SearchSuggestion] = []
+    @Published var searchResults: [MesaPlaceSuggestion] = []
     @Published var userResults: [ProfileData] = []
     @Published var searchError: String?
     @Published var selectedUser: ProfileData?
@@ -22,6 +22,7 @@ class SearchViewModel: ObservableObject {
 
     private let firestoreService = FirestoreService()
     private let mapboxSearchService = MapboxSearchService()
+    private let backendService = PlaceSearchService()
     
     private var cancellables = Set<AnyCancellable>()
 
@@ -39,11 +40,13 @@ class SearchViewModel: ObservableObject {
     }
 
     func searchPlaces(query: String) {
-        mapboxSearchService.searchPlaces(
+        backendService.searchPlaces(
             query: query,
             onResultsUpdated: { [weak self] results in
-                DispatchQueue.main.async {
-                    self?.searchResults = results
+                if let mesaSuggestions = results as? [MesaPlaceSuggestion] {
+                    DispatchQueue.main.async {
+                        self?.searchResults = mesaSuggestions
+                    }
                 }
             },
             onError: { [weak self] error in
@@ -95,23 +98,23 @@ class SearchViewModel: ObservableObject {
         }
     }
     
-    func selectSuggestion(_ suggestion: SearchSuggestion) {
+    func selectSuggestion(_ suggestion: MesaPlaceSuggestion) {
         print("🔍 User selected suggestion: \(suggestion.id) - \(suggestion.name)")
-        mapboxSearchService.selectSuggestion(
-            suggestion,
-            onResultResolved: { [weak self] result in
-                DispatchQueue.main.async {
-                    print("✅ Resolved result: \(result.id) - \(result.name)")
-
-                    // Use the asynchronous searchResultToDetailPlace with a completion handler
-                    self?.searchResultToDetailPlace(place: result) { [weak self] detailPlace in
-                        guard let self = self else { return }
-                        self.selectedPlaceVM?.selectedPlace = detailPlace
-                        self.selectedPlaceVM?.isDetailSheetPresented = true
-                    }
-                }
-            }
-        )
+//        mapboxSearchService.selectSuggestion(
+//            suggestion,
+//            onResultResolved: { [weak self] result in
+//                DispatchQueue.main.async {
+//                    print("✅ Resolved result: \(result.id) - \(result.name)")
+//
+//                    // Use the asynchronous searchResultToDetailPlace with a completion handler
+//                    self?.searchResultToDetailPlace(place: result) { [weak self] detailPlace in
+//                        guard let self = self else { return }
+//                        self.selectedPlaceVM?.selectedPlace = detailPlace
+//                        self.selectedPlaceVM?.isDetailSheetPresented = true
+//                    }
+//                }
+//            }
+//        )
     }
     
     private func searchUsers(query: String) {
