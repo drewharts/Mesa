@@ -100,21 +100,18 @@ class SearchViewModel: ObservableObject {
     
     func selectSuggestion(_ suggestion: MesaPlaceSuggestion) {
         print("🔍 User selected suggestion: \(suggestion.id) - \(suggestion.name)")
-//        mapboxSearchService.selectSuggestion(
-//            suggestion,
-//            onResultResolved: { [weak self] result in
-//                DispatchQueue.main.async {
-//                    print("✅ Resolved result: \(result.id) - \(result.name)")
-//
-//                    // Use the asynchronous searchResultToDetailPlace with a completion handler
-//                    self?.searchResultToDetailPlace(place: result) { [weak self] detailPlace in
-//                        guard let self = self else { return }
-//                        self.selectedPlaceVM?.selectedPlace = detailPlace
-//                        self.selectedPlaceVM?.isDetailSheetPresented = true
-//                    }
-//                }
-//            }
-//        )
+        backendService.selectSuggestion(suggestion) { [weak self] result in
+            print("✅ Place Details Result:")
+            print("  ID: \(result.id)")
+            print("  Name: \(result.name)")
+            print("  Address: \(result.address ?? "No address")")
+            print("  Location: (\(result.coordinate.latitude), \(result.coordinate.longitude))")
+            print("  Source: \(result.source)")
+            print("  Additional Data:")
+            for (key, value) in result.additional_data {
+                print("    \(key): \(value)")
+            }
+        }
     }
     
     private func searchUsers(query: String) {

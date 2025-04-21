@@ -27,6 +27,21 @@ struct MesaLocation: Codable {
     let longitude: Double
 }
 
+/// Model for place details from Mesa backend
+struct MesaPlaceDetails: Codable {
+    let additional_data: [String: String]
+    let address: String
+    let id: String
+    let location: MesaLocation
+    let name: String
+    let source: String
+}
+
+/// Response model for Mesa backend place details endpoint
+struct MesaPlaceDetailsResponse: Codable {
+    let place: MesaPlaceDetails
+}
+
 /// Model for suggestion data from Mesa backend
 struct MesaSuggestion: Codable, Identifiable {
     let address: String
@@ -59,7 +74,7 @@ struct MesaPlaceResult: PlaceResult {
     let address: String?
     let coordinate: CLLocationCoordinate2D
     let source: String
-    // Additional properties could be added as needed
+    let additional_data: [String: String]
 }
 
 // MARK: - Mesa Backend Service
@@ -138,14 +153,68 @@ class MesaBackendService {
         task.resume()
     }
     
-    /// Fetch place details from Mesa backend (placeholder for future implementation)
+    /// Fetch place details from Mesa backend
     func fetchPlaceDetails(
         placeId: String,
+        source: String,
         completion: @escaping (Result<MesaPlaceResult, Error>) -> Void
     ) {
-        // TODO: Implement place details endpoint once available
-        // For now, return a not implemented error
-        completion(.failure(NSError(domain: "MesaBackend", code: -1, userInfo: [NSLocalizedDescriptionKey: "Place details endpoint not implemented yet"])))
+        guard var urlComponents = URLComponents(string: "\(baseURL)/search/place-details") else {
+            completion(.failure(NSError(domain: "MesaBackend", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"])))
+            return
+        }
+        
+        // Add query parameters
+        urlComponents.queryItems = [
+            URLQueryItem(name: "place_id", value: placeId),
+            URLQueryItem(name: "source", value: source)
+        ]
+        
+        guard let url = urlComponents.url else {
+            completion(.failure(NSError(domain: "MesaBackend", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"])))
+            return
+        }
+        
+        print("🌐 Fetching place details from URL: \(url.absoluteString)")
+        
+        let task = session.dataTask(with: url) { data, response, error in
+            if let error = error {
+                completion(.failure(error))
+                return
+            }
+            
+            guard let httpResponse = response as? HTTPURLResponse,
+                  (200...299).contains(httpResponse.statusCode) else {
+                completion(.failure(NSError(domain: "MesaBackend", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid server response"])))
+                return
+            }
+            
+            guard let data = data else {
+                completion(.failure(NSError(domain: "MesaBackend", code: -1, userInfo: [NSLocalizedDescriptionKey: "No data received"])))
+                return
+            }
+            
+            do {
+                let response = try JSONDecoder().decode(MesaPlaceDetailsResponse.self, from: data)
+                let placeDetails = response.place
+                let result = MesaPlaceResult(
+                    id: placeDetails.id,
+                    name: placeDetails.name,
+                    address: placeDetails.address,
+                    coordinate: CLLocationCoordinate2D(
+                        latitude: placeDetails.location.latitude,
+                        longitude: placeDetails.location.longitude
+                    ),
+                    source: placeDetails.source,
+                    additional_data: placeDetails.additional_data
+                )
+                completion(.success(result))
+            } catch {
+                completion(.failure(error))
+            }
+        }
+        
+        task.resume()
     }
 }
 
@@ -198,7 +267,7 @@ class PlaceSearchService {
         _ suggestion: MesaPlaceSuggestion,
         onResultResolved: @escaping DetailCallback
     ) {
-        mesaBackendService.fetchPlaceDetails(placeId: suggestion.id) { result in
+        mesaBackendService.fetchPlaceDetails(placeId: suggestion.id, source: suggestion.source) { result in
             switch result {
             case .success(let details):
                 DispatchQueue.main.async {
@@ -213,7 +282,8 @@ class PlaceSearchService {
                         name: suggestion.name,
                         address: suggestion.address,
                         coordinate: suggestion.coordinate,
-                        source: suggestion.source
+                        source: suggestion.source,
+                        additional_data: [:]
                     ))
                 }
             }
@@ -228,7 +298,7 @@ class PlaceSearchService {
         placeId: String,
         completion: @escaping DetailResultCallback
     ) {
-        mesaBackendService.fetchPlaceDetails(placeId: placeId) { result in
+        mesaBackendService.fetchPlaceDetails(placeId: placeId, source: "") { result in
             switch result {
             case .success(let details):
                 completion(.success(details))
