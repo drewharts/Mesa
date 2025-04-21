@@ -101,15 +101,28 @@ class SearchViewModel: ObservableObject {
     func selectSuggestion(_ suggestion: MesaPlaceSuggestion) {
         print("🔍 User selected suggestion: \(suggestion.id) - \(suggestion.name)")
         backendService.selectSuggestion(suggestion) { [weak self] result in
-            print("✅ Place Details Result:")
-            print("  ID: \(result.id)")
-            print("  Name: \(result.name)")
-            print("  Address: \(result.address ?? "No address")")
-            print("  Location: (\(result.coordinate.latitude), \(result.coordinate.longitude))")
-            print("  Source: \(result.source)")
-            print("  Additional Data:")
-            for (key, value) in result.additional_data {
-                print("    \(key): \(value)")
+            if let mesaResult = result as? MesaPlaceResult {
+                print("✅ Place Details Result (Mesa):")
+                print("  ID: \(mesaResult.id)")
+                print("  Name: \(mesaResult.name)")
+                print("  Address: \(mesaResult.address ?? "No address")")
+                print("  Location: (\(mesaResult.coordinate.latitude), \(mesaResult.coordinate.longitude))")
+                print("  Source: \(mesaResult.source)")
+                print("  Additional Data:")
+                for (key, value) in mesaResult.additional_data {
+                    print("    \(key): \(value)")
+                }
+            } else if let detailPlace = result as? DetailPlace {
+                print("✅ Place Details Result (Local):")
+                print("  ID: \(detailPlace.id)")
+                print("  Name: \(detailPlace.name)")
+                print("  Address: \(detailPlace.address)")
+                print("  Location: (\(detailPlace.latitude), \(detailPlace.longitude))")
+                print("  Source: \(detailPlace.source)")
+                print("  Additional Data:")
+                for (key, value) in detailPlace.additionalData {
+                    print("    \(key): \(value)")
+                }
             }
         }
     }

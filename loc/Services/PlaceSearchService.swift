@@ -27,6 +27,59 @@ struct MesaLocation: Codable {
     let longitude: Double
 }
 
+/// Model for Google address components
+struct GoogleAddressComponent: Codable {
+    let long_name: String
+    let short_name: String
+    let types: [String]
+}
+
+/// Model for Google geometry
+struct GoogleGeometry: Codable {
+    let location: MesaLocation
+    let viewport: GoogleViewport
+}
+
+/// Model for Google viewport
+struct GoogleViewport: Codable {
+    let northeast: MesaLocation
+    let southwest: MesaLocation
+}
+
+/// Model for Google opening hours period
+struct GoogleOpeningHoursPeriod: Codable {
+    let close: GoogleTime
+    let open: GoogleTime
+}
+
+/// Model for Google time
+struct GoogleTime: Codable {
+    let day: Int
+    let time: String
+}
+
+/// Model for Google opening hours
+struct GoogleOpeningHours: Codable {
+    let open_now: Bool
+    let periods: [GoogleOpeningHoursPeriod]
+    let weekday_text: [String]
+}
+
+/// Model for Google place details
+struct GooglePlaceDetails: Codable {
+    let address_components: [GoogleAddressComponent]
+    let business_status: String
+    let city: String
+    let formatted_address: String
+    let geometry: GoogleGeometry
+    let name: String
+    let opening_hours: GoogleOpeningHours?
+    let place_id: String
+    let rating: Double?
+    let types: [String]
+    let website: String?
+}
+
 /// Model for place details from Mesa backend
 struct MesaPlaceDetails: Codable {
     let additional_data: [String: String]
@@ -34,7 +87,7 @@ struct MesaPlaceDetails: Codable {
     let id: String
     let location: MesaLocation
     let name: String
-    let source: String
+    let provider: String
 }
 
 /// Response model for Mesa backend place details endpoint
@@ -153,11 +206,123 @@ class MesaBackendService {
         task.resume()
     }
     
+    /// Handle Google place details
+    private func handleGooglePlaceDetails(_ data: [String: Any]) -> MesaPlaceResult {
+        var additionalData: [String: String] = [:]
+        
+        // Handle address components
+        if let addressComponents = data["address_components"] as? [[String: Any]] {
+            for component in addressComponents {
+                if let types = component["types"] as? [String],
+                   let longName = component["long_name"] as? String {
+                    for type in types {
+                        additionalData["address_\(type)"] = longName
+                    }
+                }
+            }
+        }
+        
+        // Add other Google-specific fields
+        if let businessStatus = data["business_status"] as? String {
+            additionalData["business_status"] = businessStatus
+        }
+        if let city = data["city"] as? String {
+            additionalData["city"] = city
+        }
+        if let formattedAddress = data["formatted_address"] as? String {
+            additionalData["formatted_address"] = formattedAddress
+        }
+        if let rating = data["rating"] as? Double {
+            additionalData["rating"] = String(rating)
+        }
+        if let types = data["types"] as? [String] {
+            additionalData["types"] = types.joined(separator: ",")
+        }
+        if let website = data["website"] as? String {
+            additionalData["website"] = website
+        }
+        
+        // Handle opening hours
+        if let openingHours = data["opening_hours"] as? [String: Any] {
+            if let openNow = openingHours["open_now"] as? Bool {
+                additionalData["open_now"] = String(openNow)
+            }
+            if let weekdayText = openingHours["weekday_text"] as? [String] {
+                additionalData["weekday_text"] = weekdayText.joined(separator: "|")
+            }
+        }
+        
+        // Extract location data
+        var latitude: Double = 0
+        var longitude: Double = 0
+        if let geometry = data["geometry"] as? [String: Any],
+           let location = geometry["location"] as? [String: Any] {
+            latitude = location["lat"] as? Double ?? 0
+            longitude = location["lng"] as? Double ?? 0
+        }
+        
+        return MesaPlaceResult(
+            id: data["place_id"] as? String ?? "",
+            name: data["name"] as? String ?? "",
+            address: data["formatted_address"] as? String,
+            coordinate: CLLocationCoordinate2D(
+                latitude: latitude,
+                longitude: longitude
+            ),
+            source: "google",
+            additional_data: additionalData
+        )
+    }
+    
+    /// Handle Mapbox place details
+    private func handleMapboxPlaceDetails(_ data: [String: Any]) -> MesaPlaceResult {
+        var additionalData: [String: String] = [:]
+        
+        // Convert all additional data to strings
+        for (key, value) in data {
+            additionalData[key] = "\(value)"
+        }
+        
+        return MesaPlaceResult(
+            id: data["id"] as? String ?? "",
+            name: data["name"] as? String ?? "",
+            address: data["address"] as? String,
+            coordinate: CLLocationCoordinate2D(
+                latitude: (data["location"] as? [String: Any])?["latitude"] as? Double ?? 0,
+                longitude: (data["location"] as? [String: Any])?["longitude"] as? Double ?? 0
+            ),
+            source: "mapbox",
+            additional_data: additionalData
+        )
+    }
+    
+    /// Handle local place details
+    private func handleLocalPlaceDetails(_ data: [String: Any]) -> DetailPlace {
+        // Create a DetailPlace from local data
+        let detailPlace = DetailPlace(
+            id: data["id"] as? UUID ??,
+            name: data["name"] as? String ?? "",
+            address: data["address"] as? String ?? "",
+            latitude: (data["location"] as? [String: Any])?["latitude"] as? Double ?? 0,
+            longitude: (data["location"] as? [String: Any])?["longitude"] as? Double ?? 0,
+            source: "local"
+        )
+        
+        // Add any additional data to the DetailPlace
+        if let additionalData = data["additional_data"] as? [String: Any] {
+            for (key, value) in additionalData {
+                detailPlace.additionalData[key] = "\(value)"
+            }
+        }
+        
+        return detailPlace
+    }
+    
     /// Fetch place details from Mesa backend
     func fetchPlaceDetails(
         placeId: String,
         source: String,
-        completion: @escaping (Result<MesaPlaceResult, Error>) -> Void
+        completion: @escaping (Result<Any, Error>) -> Void
     ) {
         guard var urlComponents = URLComponents(string: "\(baseURL)/search/place-details") else {
             completion(.failure(NSError(domain: "MesaBackend", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"])))
@@ -167,7 +332,7 @@ class MesaBackendService {
         // Add query parameters
         urlComponents.queryItems = [
             URLQueryItem(name: "place_id", value: placeId),
-            URLQueryItem(name: "source", value: source)
+            URLQueryItem(name: "provider", value: source)
         ]
         
         guard let url = urlComponents.url else {
@@ -195,21 +360,28 @@ class MesaBackendService {
             }
             
             do {
-                let response = try JSONDecoder().decode(MesaPlaceDetailsResponse.self, from: data)
-                let placeDetails = response.place
-                let result = MesaPlaceResult(
-                    id: placeDetails.id,
-                    name: placeDetails.name,
-                    address: placeDetails.address,
-                    coordinate: CLLocationCoordinate2D(
-                        latitude: placeDetails.location.latitude,
-                        longitude: placeDetails.location.longitude
-                    ),
-                    source: placeDetails.source,
-                    additional_data: placeDetails.additional_data
-                )
-                completion(.success(result))
+                if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let place = json["place"] as? [String: Any],
+                   let additionalData = place["additional_data"] as? [String: Any] {
+                    
+                    let result: Any
+                    switch source {
+                    case "google":
+                        result = self.handleGooglePlaceDetails(additionalData)
+                    case "mapbox":
+                        result = self.handleMapboxPlaceDetails(additionalData)
+                    case "local":
+                        result = self.handleLocalPlaceDetails(place)
+                    default:
+                        throw NSError(domain: "MesaBackend", code: -1, userInfo: [NSLocalizedDescriptionKey: "Unsupported provider"])
+                    }
+                    
+                    completion(.success(result))
+                } else {
+                    throw NSError(domain: "MesaBackend", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid response format"])
+                }
             } catch {
+                print("Error decoding place details: \(error)")
                 completion(.failure(error))
             }
         }
@@ -225,9 +397,9 @@ class PlaceSearchService {
     // MARK: - Type Aliases for Callbacks
     
     typealias SuggestionsCallback = ([MesaPlaceSuggestion]) -> Void
-    typealias DetailCallback = (MesaPlaceResult) -> Void
+    typealias DetailCallback = (Any) -> Void
     typealias ErrorCallback = (String) -> Void
-    typealias DetailResultCallback = (Result<MesaPlaceResult, Error>) -> Void
+    typealias DetailResultCallback = (Result<Any, Error>) -> Void
     
     // MARK: - Properties
     
