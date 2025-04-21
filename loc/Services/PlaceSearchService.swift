@@ -1,5 +1,7 @@
 import Foundation
 import CoreLocation
+import FirebaseFirestore
+import MapboxSearch
 
 // MARK: - Search Service Protocols
 
@@ -207,46 +209,11 @@ class MesaBackendService {
     }
     
     /// Handle Google place details
-    private func handleGooglePlaceDetails(_ data: [String: Any]) -> MesaPlaceResult {
+    private func handleGooglePlaceDetails(_ data: [String: Any]) -> DetailPlace {
         var additionalData: [String: String] = [:]
         
-        // Handle address components
-        if let addressComponents = data["address_components"] as? [[String: Any]] {
-            for component in addressComponents {
-                if let types = component["types"] as? [String],
-                   let longName = component["long_name"] as? String {
-                    for type in types {
-                        additionalData["address_\(type)"] = longName
-                    }
-                }
-            }
-        }
-        
-        // Add other Google-specific fields
-        if let businessStatus = data["business_status"] as? String {
-            additionalData["business_status"] = businessStatus
-        }
-        if let city = data["city"] as? String {
-            additionalData["city"] = city
-        }
-        if let formattedAddress = data["formatted_address"] as? String {
-            additionalData["formatted_address"] = formattedAddress
-        }
-        if let rating = data["rating"] as? Double {
-            additionalData["rating"] = String(rating)
-        }
-        if let types = data["types"] as? [String] {
-            additionalData["types"] = types.joined(separator: ",")
-        }
-        if let website = data["website"] as? String {
-            additionalData["website"] = website
-        }
-        
-        // Handle opening hours
+        // Extract opening hours if available
         if let openingHours = data["opening_hours"] as? [String: Any] {
-            if let openNow = openingHours["open_now"] as? Bool {
-                additionalData["open_now"] = String(openNow)
-            }
             if let weekdayText = openingHours["weekday_text"] as? [String] {
                 additionalData["weekday_text"] = weekdayText.joined(separator: "|")
             }
@@ -261,21 +228,22 @@ class MesaBackendService {
             longitude = location["lng"] as? Double ?? 0
         }
         
-        return MesaPlaceResult(
-            id: data["place_id"] as? String ?? "",
-            name: data["name"] as? String ?? "",
-            address: data["formatted_address"] as? String,
-            coordinate: CLLocationCoordinate2D(
-                latitude: latitude,
-                longitude: longitude
-            ),
-            source: "google",
-            additional_data: additionalData
-        )
+        // Create DetailPlace object
+        var detailPlace = DetailPlace()
+        detailPlace.id = UUID()
+        detailPlace.name = data["name"] as? String ?? ""
+        detailPlace.address = data["formatted_address"] as? String
+        detailPlace.coordinate = GeoPoint(latitude: latitude, longitude: longitude)
+        detailPlace.rating = data["rating"] as? Double
+        detailPlace.OpenHours = additionalData["weekday_text"]?.components(separatedBy: "|")
+        detailPlace.priceLevel = data["price_level"] as? String
+        detailPlace.categories = data["types"] as? [String]
+        
+        return detailPlace
     }
     
     /// Handle Mapbox place details
-    private func handleMapboxPlaceDetails(_ data: [String: Any]) -> MesaPlaceResult {
+    private func handleMapboxPlaceDetails(_ data: [String: Any]) -> DetailPlace {
         var additionalData: [String: String] = [:]
         
         // Convert all additional data to strings
@@ -283,23 +251,58 @@ class MesaBackendService {
             additionalData[key] = "\(value)"
         }
         
-        return MesaPlaceResult(
-            id: data["id"] as? String ?? "",
-            name: data["name"] as? String ?? "",
-            address: data["address"] as? String,
-            coordinate: CLLocationCoordinate2D(
-                latitude: (data["location"] as? [String: Any])?["latitude"] as? Double ?? 0,
-                longitude: (data["location"] as? [String: Any])?["longitude"] as? Double ?? 0
-            ),
-            source: "mapbox",
-            additional_data: additionalData
-        )
+        // Create DetailPlace object
+        var detailPlace = DetailPlace()
+        detailPlace.id = UUID()
+        detailPlace.name = data["name"] as? String ?? ""
+        detailPlace.address = data["address"] as? String
+        detailPlace.mapboxId = data["id"] as? String
+        
+        if let location = data["location"] as? [String: Any] {
+            let latitude = location["latitude"] as? Double ?? 0
+            let longitude = location["longitude"] as? Double ?? 0
+            detailPlace.coordinate = GeoPoint(latitude: latitude, longitude: longitude)
+        }
+        
+        detailPlace.categories = data["categories"] as? [String]
+        detailPlace.phone = data["phone"] as? String
+        detailPlace.rating = data["rating"] as? Double
+        detailPlace.OpenHours = data["hours"] as? [String]
+        detailPlace.description = data["description"] as? String
+        detailPlace.priceLevel = data["price_level"] as? String
+        
+        return detailPlace
     }
     
     /// Handle local place details
     private func handleLocalPlaceDetails(_ data: [String: Any]) -> DetailPlace {
-        // The local data is already in DetailPlace format
-        return data as! DetailPlace
+        // Create a new DetailPlace object
+        var detailPlace = DetailPlace()
+        
+        // Extract the additional_data which contains most of the fields
+        if let additionalData = data["additional_data"] as? [String: Any] {
+            // Set basic fields
+            detailPlace.id = UUID(uuidString: additionalData["id"] as? String ?? "") ?? UUID()
+            detailPlace.name = additionalData["name"] as? String ?? ""
+            detailPlace.address = additionalData["address"] as? String
+            detailPlace.city = additionalData["city"] as? String
+            detailPlace.mapboxId = additionalData["mapboxId"] as? String
+            
+            // Set categories
+            detailPlace.categories = additionalData["categories"] as? [String]
+            
+            // Set OpenHours
+            detailPlace.OpenHours = additionalData["OpenHours"] as? [String]
+            
+            // Set coordinate
+            if let coordinate = additionalData["coordinate"] as? [String: Any],
+               let latitude = coordinate["latitude"] as? Double,
+               let longitude = coordinate["longitude"] as? Double {
+                detailPlace.coordinate = GeoPoint(latitude: latitude, longitude: longitude)
+            }
+        }
+        
+        return detailPlace
     }
     
     /// Fetch place details from Mesa backend
