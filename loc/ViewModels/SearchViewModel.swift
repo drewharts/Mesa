@@ -117,12 +117,9 @@ class SearchViewModel: ObservableObject {
                 print("  ID: \(detailPlace.id)")
                 print("  Name: \(detailPlace.name)")
                 print("  Address: \(detailPlace.address)")
-                print("  Location: (\(detailPlace.latitude), \(detailPlace.longitude))")
-                print("  Source: \(detailPlace.source)")
+                print("  Location: (\(detailPlace.coordinate?.latitude), \(detailPlace.coordinate?.longitude))")
+                print("  Source: local)")
                 print("  Additional Data:")
-                for (key, value) in detailPlace.additionalData {
-                    print("    \(key): \(value)")
-                }
             }
         }
     }

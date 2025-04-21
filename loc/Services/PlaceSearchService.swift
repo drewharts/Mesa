@@ -298,24 +298,8 @@ class MesaBackendService {
     
     /// Handle local place details
     private func handleLocalPlaceDetails(_ data: [String: Any]) -> DetailPlace {
-        // Create a DetailPlace from local data
-        let detailPlace = DetailPlace(
-            id: data["id"] as? UUID ??,
-            name: data["name"] as? String ?? "",
-            address: data["address"] as? String ?? "",
-            latitude: (data["location"] as? [String: Any])?["latitude"] as? Double ?? 0,
-            longitude: (data["location"] as? [String: Any])?["longitude"] as? Double ?? 0,
-            source: "local"
-        )
-        
-        // Add any additional data to the DetailPlace
-        if let additionalData = data["additional_data"] as? [String: Any] {
-            for (key, value) in additionalData {
-                detailPlace.additionalData[key] = "\(value)"
-            }
-        }
-        
-        return detailPlace
+        // The local data is already in DetailPlace format
+        return data as! DetailPlace
     }
     
     /// Fetch place details from Mesa backend
