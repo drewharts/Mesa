@@ -175,19 +175,12 @@ class DetailPlaceViewModel: ObservableObject {
             // Create new DetailPlace using the new constructor
             let detailPlace = DetailPlace(from: place)
             
-            // Save to Firestore
-            self.firestoreService.addToAllPlaces(detailPlace: detailPlace) { error in
-                if let error = error {
-                    print("Error saving new place to Firestore: \(error.localizedDescription)")
-                }
-                
-                // Update local state and fetch image on main thread
-                DispatchQueue.main.async {
-                    self.places[detailPlace.id.uuidString] = detailPlace
-                    self.fetchPlaceImage(for: detailPlace.id.uuidString)
-                    self.calculateRestaurantType(for: detailPlace) // Calculate restaurant type
-                    completion(detailPlace)
-                }
+            // Update local state and fetch image on main thread
+            DispatchQueue.main.async {
+                self.places[detailPlace.id.uuidString] = detailPlace
+                self.fetchPlaceImage(for: detailPlace.id.uuidString)
+                self.calculateRestaurantType(for: detailPlace) // Calculate restaurant type
+                completion(detailPlace)
             }
         }
     }

@@ -19,7 +19,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
     var categories: [String]?
     var phone: String?
     var rating: Double?
-    var OpenHours: [String]?
+    var openHours: [String]?
     var description: String?
     var priceLevel: String?
     var reservable: Bool?
@@ -39,7 +39,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         self.categories = nil
         self.phone = nil
         self.rating = nil
-        self.OpenHours = nil
+        self.openHours = nil
         self.description = nil
         self.priceLevel = nil
         self.reservable = nil
@@ -59,7 +59,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         self.categories = nil
         self.phone = nil
         self.rating = nil
-        self.OpenHours = nil
+        self.openHours = nil
         self.description = nil
         self.priceLevel = nil
         self.reservable = nil
@@ -80,7 +80,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         self.categories = nil
         self.phone = nil
         self.rating = nil
-        self.OpenHours = nil
+        self.openHours = nil
         self.description = nil
         self.priceLevel = nil
         self.reservable = nil
@@ -107,9 +107,9 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         
         // Handle OpenHours
         if let openHours = searchResult.metadata?.openHours as? OpenHours {
-            self.OpenHours = DetailPlace.serializeOpenHours(openHours)
+            self.openHours = DetailPlace.serializeOpenHours(openHours)
         } else {
-            self.OpenHours = nil
+            self.openHours = nil
         }
         
         self.description = searchResult.metadata?.description

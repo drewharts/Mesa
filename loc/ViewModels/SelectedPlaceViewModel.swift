@@ -108,7 +108,7 @@ class SelectedPlaceViewModel: ObservableObject {
     }
     
     func isRestaurantOpenNow(_ place: DetailPlace) -> Bool {
-        guard let openHours = place.OpenHours, !openHours.isEmpty else { return false }
+        guard let openHours = place.openHours, !openHours.isEmpty else { return false }
         
         let now = Date()
         let calendar = Calendar.current

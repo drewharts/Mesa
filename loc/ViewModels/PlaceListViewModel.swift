@@ -23,7 +23,10 @@ class PlaceListViewModel: ObservableObject, Identifiable {
         self.placeList = placeList
         self.firestoreService = firestoreService
         self.userId = userId
-        loadPlaceLists()
+        // Initialize placeViewModels directly from the provided placeList
+        self.placeViewModels = placeList.places.map { place in
+            PlaceViewModel(place: place)
+        }
         loadImage()
     }
     
@@ -33,9 +36,11 @@ class PlaceListViewModel: ObservableObject, Identifiable {
 
     // Load the place lists from Firestore.
     func loadPlaceLists() {
+        print("📋 Loading place list: \(placeList.name) for user: \(userId)")
         firestoreService.fetchList(userId: userId, listName: placeList.name) { [weak self] result in
             switch result {
             case .success(let fetchedPlaceList):
+                print("✅ Successfully loaded list: \(fetchedPlaceList.name) with \(fetchedPlaceList.places.count) places")
                 DispatchQueue.main.async {
                     self?.placeList = fetchedPlaceList
                     self?.placeViewModels = fetchedPlaceList.places.map { place in
@@ -43,7 +48,7 @@ class PlaceListViewModel: ObservableObject, Identifiable {
                     }
                 }
             case .failure(let error):
-                print("Failed to load place list: \(error.localizedDescription)")
+                print("❌ Failed to load list: \(self?.placeList.name ?? "unknown") - Error: \(error.localizedDescription)")
             }
         }
     }

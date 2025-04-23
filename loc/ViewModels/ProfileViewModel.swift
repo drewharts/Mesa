@@ -469,19 +469,16 @@ class ProfileViewModel: ObservableObject {
         
         let newPlace = Place(id: place.id, name: place.name, address: place.address!)
         firestoreService.addPlaceToList(userId: userId, listName: listId.uuidString, place: newPlace)
-        firestoreService.addToAllPlaces(detailPlace: place) { [weak self] error in
-            guard let self = self else { return }
-            if error == nil {
-                self.detailPlaceViewModel.places[placeId] = place
-                if let user = self.currentUser {
-                    self.detailPlaceViewModel.updatePlaceSavers(placeId: placeId, user: user)
-                    // Add to placeSaversByPlace dictionary
-                    self.updatePlaceSavers(placeId: placeId, user: user)
-                }
-                self.detailPlaceViewModel.fetchPlaceImage(for: placeId)
-                self.updatePlaceAnnotationImages(for: placeId)
-            }
+        
+        // Update local state
+        self.detailPlaceViewModel.places[placeId] = place
+        if let user = self.currentUser {
+            self.detailPlaceViewModel.updatePlaceSavers(placeId: placeId, user: user)
+            // Add to placeSaversByPlace dictionary
+            self.updatePlaceSavers(placeId: placeId, user: user)
         }
+        self.detailPlaceViewModel.fetchPlaceImage(for: placeId)
+        self.updatePlaceAnnotationImages(for: placeId)
     }
     
     private func searchResultToDetailPlace(place: SearchResult, completion: @escaping (DetailPlace) -> Void) {
@@ -625,11 +622,14 @@ class ProfileViewModel: ObservableObject {
     }
     
     func loadPlaceLists() {
+        print("📋 Loading all place lists for user: \(userId)")
         firestoreService.fetchLists(userId: userId) { [weak self] placeLists in
             guard let self = self else { return }
+            print("📊 Found \(placeLists.count) lists for user \(self.userId)")
             DispatchQueue.main.async {
-                self.placeListViewModels = placeLists.map {
-                    PlaceListViewModel(placeList: $0, firestoreService: self.firestoreService, userId: self.userId)
+                self.placeListViewModels = placeLists.map { list in
+                    print("📝 Creating view model for list: \(list.name)")
+                    return PlaceListViewModel(placeList: list, firestoreService: self.firestoreService, userId: self.userId)
                 }
             }
         }

@@ -47,11 +47,14 @@ class PlaceReviewViewModel: ObservableObject {
     }
 
     func submitReview(completion: @escaping (Result<any ReviewProtocol, Error>) -> Void) {
+        print("🎯 Starting review submission process")
         // Create the review object first
         let timestamp = Date()
         let reviewId = UUID().uuidString
+        print("📝 Generated review ID: \(reviewId)")
         
         if reviewType == .restaurant {
+            print("🍽️ Creating restaurant review")
             let review = RestaurantReview(
                 id: reviewId,
                 userId: userId,
@@ -70,16 +73,20 @@ class PlaceReviewViewModel: ObservableObject {
                 likes: 0
             )
             
+            print("🔄 Calling saveReviewWithImages for restaurant review")
             // Use the saveReviewWithImages method to handle both image upload and review saving
             firestoreService.saveReviewWithImages(review: review, images: images) { result in
                 switch result {
                 case .success(let savedReview):
+                    print("✅ Successfully saved restaurant review")
                     completion(.success(savedReview))
                 case .failure(let error):
+                    print("❌ Error saving restaurant review: \(error.localizedDescription)")
                     completion(.failure(error))
                 }
             }
         } else {
+            print("📝 Creating generic review")
             let review = GenericReview(
                 id: reviewId,
                 userId: userId,
@@ -94,12 +101,15 @@ class PlaceReviewViewModel: ObservableObject {
                 likes: 0
             )
             
+            print("🔄 Calling saveReviewWithImages for generic review")
             // Use the saveReviewWithImages method to handle both image upload and review saving
             firestoreService.saveReviewWithImages(review: review, images: images) { result in
                 switch result {
                 case .success(let savedReview):
+                    print("✅ Successfully saved generic review")
                     completion(.success(savedReview))
                 case .failure(let error):
+                    print("❌ Error saving generic review: \(error.localizedDescription)")
                     completion(.failure(error))
                 }
             }

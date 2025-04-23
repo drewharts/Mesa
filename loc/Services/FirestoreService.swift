@@ -793,36 +793,71 @@ class FirestoreService: ObservableObject {
         images: [UIImage],
         completion: @escaping (Result<T, Error>) -> Void
     ) {
-        // 1) Upload images first
+        print("🖼️ Starting saveReviewWithImages process")
+        print("📝 Review ID: \(review.id)")
+        print("📸 Number of images to upload: \(images.count)")
+        
+        // If there are no images, just save the review
+        if images.isEmpty {
+            print("ℹ️ No images to upload, proceeding with review save only")
+            saveReview(review) { result in
+                switch result {
+                case .success:
+                    print("✅ Successfully saved review without images")
+                    completion(.success(review))
+                case .failure(let error):
+                    print("❌ Error saving review without images: \(error.localizedDescription)")
+                    completion(.failure(error))
+                }
+            }
+            return
+        }
+        
+        // Upload images first
+        print("🔄 Starting image upload process")
         uploadImagesForReview(review: review, images: images) { [weak self] result in
-            guard let self = self else { return }
+            guard let self = self else {
+                print("❌ Self was deallocated during image upload")
+                return
+            }
             
             switch result {
-            case .success(let downloadURLs):
-                // 2) Update the review to include the new image URLs
-                var updatedReview = review
-                updatedReview.images = downloadURLs
+            case .success(let imageUrls):
+                print("✅ Successfully uploaded \(imageUrls.count) images")
+                print("🔗 Image URLs: \(imageUrls)")
                 
-                // 3) Save the updated review to Firestore
-                self.saveReview(updatedReview) { saveResult in
-                    switch saveResult {
+                // Create a new review with the image URLs
+                var updatedReview = review
+                updatedReview.images = imageUrls
+                
+                print("🔄 Saving review with image URLs")
+                // Save the review with the image URLs
+                self.saveReview(updatedReview) { result in
+                    switch result {
                     case .success:
-                        // Return the updated review instead of Void
+                        print("✅ Successfully saved review with images")
                         completion(.success(updatedReview))
                     case .failure(let error):
+                        print("❌ Error saving review with images: \(error.localizedDescription)")
                         completion(.failure(error))
                     }
                 }
                 
             case .failure(let error):
-                // If image upload fails, return the error
+                print("❌ Error uploading images: \(error.localizedDescription)")
                 completion(.failure(error))
             }
         }
     }
 
 
+
+
     func saveReview<T: ReviewProtocol>(_ review: T, completion: @escaping (Result<Void, Error>) -> Void) {
+        print("📝 Starting to save review with ID: \(review.id)")
+        print("📍 Place ID: \(review.placeId)")
+        print("👤 User ID: \(review.userId)")
+        
         // 1. Build references for both locations
         let placeReviewRef = db.collection("places")
                               .document(review.placeId)
@@ -834,23 +869,32 @@ class FirestoreService: ObservableObject {
                              .collection("reviews")
                              .document(review.id)
         
+        print("🔍 Created Firestore references:")
+        print("   - Place review path: \(placeReviewRef.path)")
+        print("   - User review path: \(userReviewRef.path)")
+        
         // 2. Encode the Review
         do {
             let reviewData = try Firestore.Encoder().encode(review)
+            print("✅ Successfully encoded review data")
             
             // 3. Use a batch write to save to both locations atomically
             let batch = db.batch()
             batch.setData(reviewData, forDocument: placeReviewRef)
             batch.setData(reviewData, forDocument: userReviewRef)
             
+            print("🔄 Committing batch write...")
             batch.commit { error in
                 if let error = error {
+                    print("❌ Error saving review: \(error.localizedDescription)")
                     completion(.failure(error))
                 } else {
+                    print("✅ Successfully saved review to both locations")
                     completion(.success(()))
                 }
             }
         } catch {
+            print("❌ Error encoding review: \(error.localizedDescription)")
             completion(.failure(error))
         }
     }
@@ -1096,15 +1140,18 @@ class FirestoreService: ObservableObject {
     
     
     func fetchList(userId: String, listName: String, completion: @escaping (Result<PlaceList, Error>) -> Void) {
+        print("🔍 Attempting to fetch list for user \(userId) with name: \(listName)")
         db.collection("users").document(userId)
             .collection("placeLists").document(listName)
             .getDocument { document, error in
                 if let error = error {
+                    print("❌ Error fetching list \(listName) for user \(userId): \(error.localizedDescription)")
                     completion(.failure(error))
                     return
                 }
 
                 guard let document = document, document.exists else {
+                    print("⚠️ List not found - User: \(userId), List Name: \(listName)")
                     let notFoundError = NSError(domain: "FirestoreError", code: 404, userInfo: [NSLocalizedDescriptionKey: "List not found"])
                     completion(.failure(notFoundError))
                     return
@@ -1112,8 +1159,10 @@ class FirestoreService: ObservableObject {
 
                 do {
                     let placeList = try document.data(as: PlaceList.self)
+                    print("✅ Successfully fetched list \(listName) for user \(userId)")
                     completion(.success(placeList))
                 } catch {
+                    print("❌ Error decoding list \(listName) for user \(userId): \(error.localizedDescription)")
                     completion(.failure(error))
                 }
             }

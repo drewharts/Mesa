@@ -141,7 +141,7 @@ class PlaceDetailViewModel: ObservableObject {
         let recognizedTypes = [
             "American", "Japanese", "Korean", "Mexican",
             "Italian", "Chinese", "Greek", "Vietnamese",
-            "Barbecue", "Indian", "Clothing", "Grocery", "Hotel",
+            "Barbecue", "Indian", "Grocery", "Hotel",
             "Bookstore", "Pharmacy", "Library", "Bakery", "Convenience Store",
             "Clothes", "Pizza", "Coffee Shop", "Steakhouse"
         ]

@@ -21,8 +21,8 @@ class SearchViewModel: ObservableObject {
     weak var selectedPlaceVM: SelectedPlaceViewModel?
 
     private let firestoreService = FirestoreService()
-    private let mapboxSearchService = MapboxSearchService()
-    private let backendService = PlaceSearchService()
+//    private let mapboxSearchService = MapboxSearchService()
+    private let searchService = PlaceSearchService()
     
     private var cancellables = Set<AnyCancellable>()
 
@@ -40,7 +40,7 @@ class SearchViewModel: ObservableObject {
     }
 
     func searchPlaces(query: String) {
-        backendService.searchPlaces(
+        searchService.searchPlaces(
             query: query,
             onResultsUpdated: { [weak self] results in
                 if let mesaSuggestions = results as? [MesaPlaceSuggestion] {
@@ -68,7 +68,7 @@ class SearchViewModel: ObservableObject {
             if var existingDetailPlace = existingDetailPlace {
                 // Update the OpenHours for the existing place
                 if let openHours = place.metadata?.openHours as? OpenHours {
-                    existingDetailPlace.OpenHours = DetailPlace.serializeOpenHours(openHours)
+                    existingDetailPlace.openHours = DetailPlace.serializeOpenHours(openHours)
                     
                     // Update the place in Firestore
                     self?.firestoreService.updatePlace(detailPlace: existingDetailPlace) { error in
@@ -86,13 +86,6 @@ class SearchViewModel: ObservableObject {
             // If no existing place is found, create a new DetailPlace using the initializer
             var detailPlace = DetailPlace(from: place)
             
-            // Save the new DetailPlace to Firestore if it doesn't exist
-            self?.firestoreService.addToAllPlaces(detailPlace: detailPlace) { error in
-                if let error = error {
-                    print("Error saving new place to Firestore: \(error.localizedDescription)")
-                }
-            }
-            
             // Return the newly created DetailPlace
             completion(detailPlace)
         }
@@ -100,28 +93,29 @@ class SearchViewModel: ObservableObject {
     
     func selectSuggestion(_ suggestion: MesaPlaceSuggestion) {
         print("🔍 User selected suggestion: \(suggestion.id) - \(suggestion.name)")
-        backendService.selectSuggestion(suggestion) { [weak self] result in
-            if let mesaResult = result as? MesaPlaceResult {
-                print("✅ Place Details Result (Mesa):")
-                print("  ID: \(mesaResult.id)")
-                print("  Name: \(mesaResult.name)")
-                print("  Address: \(mesaResult.address ?? "No address")")
-                print("  Location: (\(mesaResult.coordinate.latitude), \(mesaResult.coordinate.longitude))")
-                print("  Source: \(mesaResult.source)")
-                print("  Additional Data:")
-                for (key, value) in mesaResult.additional_data {
-                    print("    \(key): \(value)")
+        searchService.selectSuggestion(
+            suggestion,
+            onResultResolved: { [weak self] result in
+                DispatchQueue.main.async {
+                    self?.selectedPlaceVM?.selectedPlace = result
+                    self?.selectedPlaceVM?.isDetailSheetPresented = true
+                    
+                    // Print detailed information about the place
+                    print("✅ Place Details Result:")
+                    print("  ID: \(result.id)")
+                    print("  Name: \(result.name)")
+                    print("  Address: \(result.address)")
+                    print("  Location: (\(result.coordinate?.latitude ?? 0), \(result.coordinate?.longitude ?? 0))")
+                    print("  Source: local")
+                    print("  Open Hours: \(result.openHours?.joined(separator: ", ") ?? "Not available")")
+                    print("  Phone: \(result.phone ?? "Not available")")
+                    print("  Description: \(result.description ?? "Not available")")
+                    print("  Categories: \(result.categories?.joined(separator: ", ") ?? "None")")
+                    print("  Rating: \(result.rating ?? 0)")
+                    print("  Price Level: \(result.priceLevel ?? "Not available")")
                 }
-            } else if let detailPlace = result as? DetailPlace {
-                print("✅ Place Details Result (Local):")
-                print("  ID: \(detailPlace.id)")
-                print("  Name: \(detailPlace.name)")
-                print("  Address: \(detailPlace.address)")
-                print("  Location: (\(detailPlace.coordinate?.latitude), \(detailPlace.coordinate?.longitude))")
-                print("  Source: local)")
-                print("  Additional Data:")
             }
-        }
+        )
     }
     
     private func searchUsers(query: String) {
