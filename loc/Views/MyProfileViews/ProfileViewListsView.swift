@@ -118,7 +118,7 @@ struct MyProfileHorizontalListPlaces: View {
     @Environment(\.presentationMode) var presentationMode
     
     let places: [DetailPlace]
-    @State private var placeColors: [UUID: Color] = [:]
+    @Binding var placeColors: [UUID: Color]
     
     var body: some View {
         HStack {
@@ -215,6 +215,7 @@ struct ListPlacesPopupView: View {
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     let list: PlaceList
     @State private var showingDeleteConfirmation = false
+    @Binding var placeColors: [UUID: Color]
     
     private let columns = [
         GridItem(.flexible(), spacing: 15),
@@ -275,7 +276,7 @@ struct ListPlacesPopupView: View {
                                                     .clipped()
                                             } else {
                                                 Rectangle()
-                                                    .foregroundColor(.gray)
+                                                    .foregroundColor(colorForPlace(place))
                                                     .frame(width: cardWidth, height: cardHeight)
                                             }
                                             
@@ -334,7 +335,7 @@ struct ListPlacesPopupView: View {
                                 }
                             }
                         }
-                        .padding(.horizontal, 20) // Increased horizontal padding
+                        .padding(.horizontal, 20)
                         .padding(.vertical, 10)
                     }
                 } else {
@@ -350,6 +351,16 @@ struct ListPlacesPopupView: View {
         }
         .cornerRadius(20)
         .padding()
+        .onAppear {
+            if let placeIds = profile.placeListMBPlaces[list.id] {
+                let places = placeIds.compactMap { detailPlaceViewModel.places[$0] }
+                for place in places {
+                    if placeColors[place.id] == nil {
+                        placeColors[place.id] = randomColor()
+                    }
+                }
+            }
+        }
         .alert("Delete List", isPresented: $showingDeleteConfirmation) {
             Button("Cancel", role: .cancel) { }
             Button("Delete", role: .destructive) {
@@ -360,12 +371,25 @@ struct ListPlacesPopupView: View {
             Text("Are you sure you want to delete this list? This action cannot be undone.")
         }
     }
+    
+    private func randomColor() -> Color {
+        Color(
+            red: Double.random(in: 0...1),
+            green: Double.random(in: 0...1),
+            blue: Double.random(in: 0...1)
+        )
+    }
+    
+    private func colorForPlace(_ place: DetailPlace) -> Color {
+        placeColors[place.id] ?? .gray
+    }
 }
 
 struct ProfileListDescription: View {
     @State var list: PlaceList
     @State private var showingPlacesPopup = false
     @EnvironmentObject var profile: ProfileViewModel
+    @Binding var placeColors: [UUID: Color]
     
     var body: some View {
         Button(action: {
@@ -383,7 +407,7 @@ struct ProfileListDescription: View {
             }
         }
         .sheet(isPresented: $showingPlacesPopup) {
-            ListPlacesPopupView(list: list)
+            ListPlacesPopupView(list: list, placeColors: $placeColors)
         }
     }
 }
@@ -398,6 +422,7 @@ struct ProfileViewListsView: View {
     @State private var inputImage: [UIImage] = []
     @State private var selectedList: PlaceListViewModel?
     @State private var showingNewListSheet = false
+    @State private var placeColors: [UUID: Color] = [:]
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -408,11 +433,11 @@ struct ProfileViewListsView: View {
             if !profile.userLists.isEmpty {
                 ForEach(profile.userLists.sorted(by: { $0.sortOrder < $1.sortOrder }), id: \.id) { list in
                     VStack(alignment: .leading) {
-                        ProfileListDescription(list: list)
+                        ProfileListDescription(list: list, placeColors: $placeColors)
                         
                         if let placeIds = profile.placeListMBPlaces[list.id] {
                             ScrollView(.horizontal, showsIndicators: false) {
-                                MyProfileHorizontalListPlaces(places: placeIds.compactMap { detailPlaceViewModel.places[$0] })
+                                MyProfileHorizontalListPlaces(places: placeIds.compactMap { detailPlaceViewModel.places[$0] }, placeColors: $placeColors)
                             }
                         } else {
                             Text("Loading places...")
