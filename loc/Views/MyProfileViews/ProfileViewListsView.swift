@@ -406,7 +406,7 @@ struct ProfileViewListsView: View {
             })
 
             if !profile.userLists.isEmpty {
-                ForEach(profile.userLists, id: \.id) { list in
+                ForEach(profile.userLists.sorted(by: { $0.sortOrder < $1.sortOrder }), id: \.id) { list in
                     VStack(alignment: .leading) {
                         ProfileListDescription(list: list)
                         

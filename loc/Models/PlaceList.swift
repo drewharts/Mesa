@@ -14,5 +14,6 @@ struct PlaceList: Codable, Identifiable {
     var city: String
     var emoji: String
     var image: String?
+    var sortOrder: Int = 0 // Default to 0 for backward compatibility
 }
 

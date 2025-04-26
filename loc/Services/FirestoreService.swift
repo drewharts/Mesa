@@ -204,7 +204,7 @@ class FirestoreService: ObservableObject {
         
         // Use OperationQueue to limit concurrent downloads
         let downloadQueue = OperationQueue()
-        downloadQueue.maxConcurrentOperationCount = 3 // Limit concurrent downloads
+        downloadQueue.maxConcurrentOperationCount = 10 // Limit concurrent downloads
         
         for urlString in urls {
             // Skip invalid URLs
@@ -1587,27 +1587,49 @@ class FirestoreService: ObservableObject {
             let dispatchGroup = DispatchGroup()
             var fetchError: Error?
             
-            // Fetch each unique place
-            for placeId in placeIds {
-                dispatchGroup.enter()
+            // First, get all the places with these IDs to get their mapboxIds
+            let placesRef = db.collection("places")
+            placesRef.whereField("id", in: Array(placeIds)).getDocuments { [weak self] snapshot, error in
+                guard let self = self else { return }
                 
-                self.fetchPlace(withId: placeId) { result in
-                    switch result {
-                    case .success(let place):
-                        places.append(place)
-                    case .failure(let error):
-                        print("Error fetching place \(placeId): \(error.localizedDescription)")
-                        fetchError = error
-                    }
-                    dispatchGroup.leave()
-                }
-            }
-            
-            dispatchGroup.notify(queue: .main) {
-                if let error = fetchError {
+                if let error = error {
+                    print("Error fetching places: \(error.localizedDescription)")
                     completion(nil, error)
-                } else {
-                    completion(places, nil)
+                    return
+                }
+                
+                guard let snapshot = snapshot else {
+                    print("No places found for the given IDs")
+                    completion([], nil)
+                    return
+                }
+                
+                // Get all the mapboxIds from the places
+                let mapboxIds = snapshot.documents.compactMap { document -> String? in
+                    let data = document.data()
+                    return data["mapboxId"] as? String
+                }
+                
+                // Now fetch the full place details using mapboxIds
+                for mapboxId in mapboxIds {
+                    dispatchGroup.enter()
+                    self.findPlace(mapboxId: mapboxId) { detailPlace, error in
+                        if let error = error {
+                            print("Error fetching place with mapboxId \(mapboxId): \(error.localizedDescription)")
+                            fetchError = error
+                        } else if let detailPlace = detailPlace {
+                            places.append(detailPlace)
+                        }
+                        dispatchGroup.leave()
+                    }
+                }
+                
+                dispatchGroup.notify(queue: .main) {
+                    if let error = fetchError {
+                        completion(nil, error)
+                    } else {
+                        completion(places, nil)
+                    }
                 }
             }
         }

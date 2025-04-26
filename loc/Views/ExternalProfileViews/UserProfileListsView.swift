@@ -104,7 +104,7 @@ struct UserProfileListViewJustLists: View {
 
     var body: some View {
         ScrollView {
-            ForEach(placeLists) { list in
+            ForEach(placeLists.sorted(by: { $0.sortOrder < $1.sortOrder })) { list in
                 VStack(alignment: .leading) {
                     HStack {
                         Text(list.name)
