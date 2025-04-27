@@ -29,6 +29,8 @@ class ProfileViewModel: ObservableObject {
     @Published var friends: [User] = []
     @Published var followers: Int = 0
     @Published var following: Int = 0
+    @Published var myPlacesCount: Int = 0
+    @Published var myCreatedPlaceIds: [String] = []
     @Published var followerProfiles: [ProfileData] = []
     @Published var followingProfiles: [ProfileData] = []
     @Published var placeSaversByPlace: [String: [User]] = [:] // Maps place IDs to users who saved them
@@ -37,7 +39,7 @@ class ProfileViewModel: ObservableObject {
     
     private let firestoreService: FirestoreService
     private let profileFirestoreService = ProfileFirestoreService()
-    private let detailPlaceViewModel: DetailPlaceViewModel
+    internal let detailPlaceViewModel: DetailPlaceViewModel
     public let userId: String
     private let mapboxSearchService = MapboxSearchService()
     
@@ -95,6 +97,7 @@ class ProfileViewModel: ObservableObject {
         
         fetchFollowers(userId: userId)
         fetchFollowing(userId: userId)
+        fetchMyPlacesCount(userId: userId)
         
         dispatchGroup.enter()
         processFollowedUsersAndPlaces { [weak self] in
@@ -1066,6 +1069,25 @@ class ProfileViewModel: ObservableObject {
             }
         } else {
             placeSaversByPlace[placeId] = [user]
+        }
+    }
+    
+    func fetchMyPlacesCount(userId: String) {
+        firestoreService.fetchMyPlaces(userId: userId) { [weak self] places in
+            guard let self = self else { return }
+            DispatchQueue.main.async {
+                self.myPlacesCount = places?.count ?? 0
+                
+                // Fetch images for each created place
+                if let places = places {
+                    for place in places {
+                        let placeId = place.id.uuidString
+                        self.myCreatedPlaceIds.append(placeId)
+                        self.detailPlaceViewModel.places[placeId] = place
+                        self.detailPlaceViewModel.fetchPlaceImage(for: placeId)
+                    }
+                }
+            }
         }
     }
 }

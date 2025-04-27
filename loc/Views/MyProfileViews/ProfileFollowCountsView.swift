@@ -12,6 +12,7 @@ struct ProfileFollowCountsView: View {
     @EnvironmentObject var userProfileViewModel: UserProfileViewModel
     @State private var showingFollowers = false
     @State private var showingFollowing = false
+    @State private var showingMyPlaces = false
     @State private var refreshToggle = false
     
     var body: some View {
@@ -57,12 +58,35 @@ struct ProfileFollowCountsView: View {
                 FollowingListView()
                     .environmentObject(userProfileViewModel)
             }
+            
+            // My Places count
+            Button(action: {
+                showingMyPlaces = true
+            }) {
+                VStack {
+                    Text("\(profile.myPlacesCount)")
+                        .font(.headline)
+                        .foregroundColor(.black)
+                        .fontWeight(.regular)
+                        .id("myPlaces_\(refreshToggle)")
+                    
+                    Text("My Places")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                }
+            }
+            .sheet(isPresented: $showingMyPlaces) {
+                MyPlacesListView()
+            }
         }
         .padding(.vertical, 10)
         .onChange(of: profile.following) { _ in
             refreshToggle.toggle()
         }
         .onChange(of: profile.followers) { _ in
+            refreshToggle.toggle()
+        }
+        .onChange(of: profile.myPlacesCount) { _ in
             refreshToggle.toggle()
         }
     }
