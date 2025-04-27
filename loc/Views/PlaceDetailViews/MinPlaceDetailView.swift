@@ -128,13 +128,15 @@ struct MinPlaceDetailView: View {
                             )
                     }
                     
-                    Text(String(format: "%.1f", selectedPlaceVM.placeRating ?? 0.0))
-                        .font(.caption)
-                        .foregroundColor(.black)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 4)
-                        .background(Color.yellow)
-                        .cornerRadius(10)
+                    if !selectedPlaceVM.reviews.isEmpty && (selectedPlaceVM.placeRating ?? 0.0) > 0 {
+                        Text(String(format: "%.1f", selectedPlaceVM.placeRating ?? 0.0))
+                            .font(.caption)
+                            .foregroundColor(.black)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 4)
+                            .background(Color.yellow)
+                            .cornerRadius(10)
+                    }
                     
                     Button(action: {
                         selectedTab = .about
