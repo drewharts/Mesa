@@ -146,7 +146,7 @@ class PlaceDetailViewModel: ObservableObject {
             "Clothes", "Pizza", "Coffee Shop", "Steakhouse", "Venezuelan",
             "Columbian", "Peruvian", "Salvadoran", "Argentinian", "Brazilian",
             "Spanish", "French", "German", "Thai", "Turkish",
-            "Moroccan", "Lebanese", "Egyptian"
+            "Moroccan", "Lebanese", "Egyptian", "Home"
         ]
         //TODO: this may need some revision at a later date
         guard let placeTypes = place.categories else { return nil }

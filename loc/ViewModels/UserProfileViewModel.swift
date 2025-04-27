@@ -29,12 +29,13 @@ class UserProfileViewModel: ObservableObject {
             self.selectedUser = user
             self.isUserDetailPresented = true
             self.checkIfFollowing(currentUserId: currentUserId)
+            self.fetchProfileFavorites(userId: user.id)
+            self.fetchLists(userId: user.id)
+            self.fetchFollowers(userId: user.id)
+            self.fetchFavoritePlaceImages()
         }
         
-        fetchProfileFavorites(userId: user.id)
-        fetchLists(userId: user.id)
-        fetchFollowers(userId: user.id)
-        fetchFavoritePlaceImages()
+
     }
     
     func fetchFollowers(userId: String) {
@@ -178,20 +179,65 @@ class UserProfileViewModel: ObservableObject {
         }
     }
     
+    private func downloadFirstSuccessfulImage(from urls: [URL], for placeId: String, completion: @escaping (UIImage?) -> Void) {
+        let group = DispatchGroup()
+        var downloadedImage: UIImage?
+        
+        print("Attempting to download image for place \(placeId) from \(urls.count) URLs")
+        
+        for url in urls {
+            group.enter()
+            print("Trying URL: \(url.absoluteString)")
+            
+            URLSession.shared.dataTask(with: url) { data, response, error in
+                defer { group.leave() }
+                
+                if let error = error {
+                    print("Error downloading image from \(url.absoluteString): \(error.localizedDescription)")
+                    return
+                }
+                
+                if let data = data, let image = UIImage(data: data) {
+                    print("Successfully downloaded image from \(url.absoluteString)")
+                    downloadedImage = image
+                } else {
+                    print("Failed to create image from data for URL: \(url.absoluteString)")
+                }
+            }.resume()
+            
+            // If we got an image, we can stop trying other URLs
+            if downloadedImage != nil {
+                break
+            }
+        }
+        
+        group.notify(queue: .main) {
+            if let image = downloadedImage {
+                print("Successfully cached image for place \(placeId)")
+                self.placeImages[placeId] = image
+            } else {
+                print("Failed to download any image for place \(placeId)")
+            }
+            completion(downloadedImage)
+        }
+    }
+    
     // Helper method to fetch images with completion handler
     private func fetchImage(for place: DetailPlace, completion: @escaping (String, UIImage?) -> Void) {
         let placeId = place.id.uuidString
+        print("Starting image fetch for place: \(place.name) (\(placeId))")
         
         // Skip if image already exists in either dictionary
         if favoritePlaceImages[placeId] != nil || placeImages[placeId] != nil {
+            print("Image already cached for place \(placeId)")
             completion(placeId, favoritePlaceImages[placeId] ?? placeImages[placeId])
             return
         }
         
-        // When viewing someone else's profile, we want to see ALL their reviews for images,
-        // not just reviews from people we follow, so we'll use the generic fetchReviews method
-        firestoreService.fetchReviews(placeId: placeId, latestOnly: true) { [weak self] (reviews: [ReviewProtocol]?, error) in
+        // Fetch reviews for this place
+        firestoreService.fetchReviews(placeId: placeId, latestOnly: false) { [weak self] (reviews: [ReviewProtocol]?, error) in
             guard let self = self else { return }
+            
             if let error = error {
                 print("Error fetching reviews for place \(placeId): \(error.localizedDescription)")
                 DispatchQueue.main.async {
@@ -200,33 +246,28 @@ class UserProfileViewModel: ObservableObject {
                 return
             }
             
-            print("Fetched \(reviews?.count ?? 0) reviews for place \(placeId)")
-            if let firstReview = reviews?.first,
-               let firstPhotoURLString = firstReview.images.first,
-               let url = URL(string: firstPhotoURLString) {
-                print("Fetching image from URL: \(firstPhotoURLString)")
-                URLSession.shared.dataTask(with: url) { data, response, error in
-                    if let error = error {
-                        print("Error loading image for place \(placeId): \(error.localizedDescription)")
-                        DispatchQueue.main.async {
-                            completion(placeId, nil)
-                        }
-                        return
+            print("Found \(reviews?.count ?? 0) reviews for place \(placeId)")
+            
+            // Collect all image URLs from all reviews
+            var imageURLs: [URL] = []
+            for review in reviews ?? [] {
+                for urlString in review.images {
+                    if let url = URL(string: urlString) {
+                        imageURLs.append(url)
                     }
-                    if let data = data, let image = UIImage(data: data) {
-                        DispatchQueue.main.async {
-                            completion(placeId, image)
-                            print("Loaded image for place \(placeId)")
-                        }
-                    } else {
-                        DispatchQueue.main.async {
-                            completion(placeId, nil)
-                            print("No image data for place \(placeId)")
-                        }
+                }
+            }
+            
+            print("Found \(imageURLs.count) image URLs for place \(placeId)")
+            
+            if !imageURLs.isEmpty {
+                self.downloadFirstSuccessfulImage(from: imageURLs, for: placeId) { image in
+                    DispatchQueue.main.async {
+                        completion(placeId, image)
                     }
-                }.resume()
+                }
             } else {
-                print("No valid review or image URL for place \(placeId)")
+                print("No image URLs found for place \(placeId)")
                 DispatchQueue.main.async {
                     completion(placeId, nil)
                 }

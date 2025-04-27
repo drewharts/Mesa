@@ -10,6 +10,7 @@ import MapboxSearch
 import CoreLocation
 import UIKit
 import FirebaseAuth
+import FirebaseFirestore
 
 class SelectedPlaceViewModel: ObservableObject {
     private let firestoreService: FirestoreService
@@ -671,5 +672,41 @@ class SelectedPlaceViewModel: ObservableObject {
                 }
             }
         }
+    }
+
+    func createNewPlace(name: String, description: String?, coordinate: CLLocationCoordinate2D, userId: String) {
+        // Create a new place
+        var newPlace = DetailPlace()
+        newPlace.name = name
+        newPlace.description = description
+        newPlace.coordinate = GeoPoint(
+            latitude: coordinate.latitude,
+            longitude: coordinate.longitude
+        )
+        
+        // Save to main places collection
+        firestoreService.addToAllPlaces(detailPlace: newPlace) { error in
+            if let error = error {
+                print("Error saving place to main collection: \(error.localizedDescription)")
+            } else {
+                print("Successfully saved place to main collection")
+                
+                // Save to user's myPlaces collection
+                self.firestoreService.addToMyPlaces(userId: userId, detailPlace: newPlace) { error in
+                    if let error = error {
+                        print("Error saving place to user's collection: \(error.localizedDescription)")
+                    } else {
+                        // Notify that a new place was created to refresh map annotations
+                        DispatchQueue.main.async {
+                            NotificationCenter.default.post(name: NSNotification.Name("RefreshMapAnnotations"), object: nil)
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Update the UI
+        selectedPlace = newPlace
+        isDetailSheetPresented = true
     }
 }

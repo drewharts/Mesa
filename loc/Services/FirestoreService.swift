@@ -1338,6 +1338,26 @@ class FirestoreService: ObservableObject {
         }
     }
 
+    func addToMyPlaces(userId: String, detailPlace: DetailPlace, completion: @escaping (Error?) -> Void) {
+        do {
+            try db.collection("users")
+                .document(userId)
+                .collection("myPlaces")
+                .document(detailPlace.id.uuidString)
+                .setData(from: detailPlace) { error in
+                    if let error = error {
+                        print("Error saving place to user's collection: \(error.localizedDescription)")
+                    } else {
+                        print("Successfully saved place to user's collection")
+                    }
+                    completion(error)
+                }
+        } catch {
+            print("Error encoding place for user's collection: \(error.localizedDescription)")
+            completion(error)
+        }
+    }
+
     func verifyOpenHoursField(completion: @escaping (Int, Int, Error?) -> Void) {
         db.collection("places").getDocuments { snapshot, error in
             if let error = error {
@@ -2260,5 +2280,24 @@ class FirestoreService: ObservableObject {
                 }
             }
         }
+    }
+
+    func fetchMyPlaces(userId: String, completion: @escaping ([DetailPlace]?) -> Void) {
+        db.collection("users")
+            .document(userId)
+            .collection("myPlaces")
+            .getDocuments { snapshot, error in
+                if let error = error {
+                    print("Error fetching myPlaces: \(error.localizedDescription)")
+                    completion([])
+                    return
+                }
+                
+                let detailPlaces = snapshot?.documents.compactMap {
+                    try? $0.data(as: DetailPlace.self)
+                } ?? []
+                
+                completion(detailPlaces)
+            }
     }
 }

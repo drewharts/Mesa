@@ -60,6 +60,29 @@ class ProfileViewModel: ObservableObject {
             }
         }
         
+        // Fetch myPlaces and process them for map annotations
+        dispatchGroup.enter()
+        firestoreService.fetchMyPlaces(userId: userId) { [weak self] places in
+            guard let self = self, let places = places else {
+                dispatchGroup.leave()
+                return
+            }
+            
+            DispatchQueue.main.async {
+                for place in places {
+                    let placeId = place.id.uuidString
+                    self.detailPlaceViewModel.places[placeId] = place
+                    if let currentUser = self.currentUser {
+                        self.detailPlaceViewModel.updatePlaceSavers(placeId: placeId, user: currentUser)
+                        self.updatePlaceSavers(placeId: placeId, user: currentUser)
+                    }
+                    self.detailPlaceViewModel.fetchPlaceImage(for: placeId)
+                    self.updatePlaceAnnotationImages(for: placeId)
+                }
+                dispatchGroup.leave()
+            }
+        }
+        
         loadPlaceLists()
         if let url = data.profilePhotoURL {
             loadImage(from: url)
