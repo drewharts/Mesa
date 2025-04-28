@@ -65,7 +65,7 @@ struct MinPlaceDetailView: View {
                         Button(action: {
                             viewModel.showListSelection = true
                         }) {
-                            Image(systemName: "bookmark")
+                            Image(systemName: profile.isPlaceInAnyList(placeId: selectedPlaceVM.selectedPlace?.id.uuidString ?? "") ? "bookmark.fill" : "bookmark")
                                 .font(.title3)
                         }
                     }

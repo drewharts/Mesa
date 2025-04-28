@@ -1090,4 +1090,8 @@ class ProfileViewModel: ObservableObject {
             }
         }
     }
+    
+    func isPlaceInAnyList(placeId: String) -> Bool {
+        return placeListMBPlaces.values.contains { $0.contains(placeId) }
+    }
 }
