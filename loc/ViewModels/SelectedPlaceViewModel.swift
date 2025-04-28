@@ -22,7 +22,7 @@ class SelectedPlaceViewModel: ObservableObject {
                let currentLocation = locationManager.currentLocation {
                 loadData(for: place, currentLocation: currentLocation.coordinate)
                 loadReviews(for: place)
-//                getPlacePhotos(for: place)
+                getPlacePhotos(for: place)
                 
                 // Clear previous likes when loading a new place
                 likedReviews.removeAll()
@@ -225,17 +225,47 @@ class SelectedPlaceViewModel: ObservableObject {
             self.photoLoadingStates[placeId] = .loading
         }
         
-        firestoreService.fetchPhotosFromStorage(placeId: placeId) { [weak self] images, error in
+        // First fetch all reviews for this place
+        firestoreService.fetchFriendsReviews(placeId: placeId, currentUserId: Auth.auth().currentUser?.uid ?? "") { [weak self] reviews, error in
             guard let self = self else { return }
             
-            DispatchQueue.main.async {
-                if let error = error {
-                    print("Error fetching photos for place \(placeId): \(error.localizedDescription)")
+            if let error = error {
+                print("Error fetching reviews for place \(placeId): \(error.localizedDescription)")
+                DispatchQueue.main.async {
                     self.photoLoadingStates[placeId] = .error(error)
                     self.placePhotos[placeId] = []
-                } else {
-                    self.placePhotos[placeId] = images ?? []
+                }
+                return
+            }
+            
+            // Collect all photo URLs from all reviews
+            var photoURLs: [String] = []
+            for review in reviews ?? [] {
+                photoURLs.append(contentsOf: review.images)
+            }
+            
+            // If no photos found, update state and return
+            if photoURLs.isEmpty {
+                DispatchQueue.main.async {
                     self.photoLoadingStates[placeId] = .loaded
+                    self.placePhotos[placeId] = []
+                }
+                return
+            }
+            
+            // Fetch the actual images using the URLs
+            firestoreService.fetchPhotosFromStorage(urls: photoURLs) { [weak self] images, error in
+                guard let self = self else { return }
+                
+                DispatchQueue.main.async {
+                    if let error = error {
+                        print("Error fetching photos for place \(placeId): \(error.localizedDescription)")
+                        self.photoLoadingStates[placeId] = .error(error)
+                        self.placePhotos[placeId] = []
+                    } else {
+                        self.placePhotos[placeId] = images ?? []
+                        self.photoLoadingStates[placeId] = .loaded
+                    }
                 }
             }
         }
