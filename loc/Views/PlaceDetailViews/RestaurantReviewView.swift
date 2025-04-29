@@ -8,9 +8,6 @@
 import SwiftUI
 import UIKit
 
-// This file now serves as a container for review-related views
-// All individual view components have been moved to their own files in the PlaceReviews directory
-
 struct PlaceReviewsListView : View {
     @EnvironmentObject var userProfileViewModel: UserProfileViewModel
     var reviews: [any ReviewProtocol]

@@ -78,14 +78,12 @@ class ProfileViewModel: ObservableObject {
                         self.detailPlaceViewModel.updatePlaceSavers(placeId: placeId, user: currentUser)
                         self.updatePlaceSavers(placeId: placeId, user: currentUser)
                     }
-                    self.detailPlaceViewModel.fetchPlaceImage(for: placeId)
                     self.updatePlaceAnnotationImages(for: placeId)
                 }
                 dispatchGroup.leave()
             }
         }
         
-        loadPlaceLists()
         if let url = data.profilePhotoURL {
             loadImage(from: url)
         }
@@ -323,7 +321,6 @@ class ProfileViewModel: ObservableObject {
                     self.detailPlaceViewModel.updatePlaceSavers(placeId: placeId, user: user)
                     // Add to our placeSaversByPlace dictionary
                     self.updatePlaceSavers(placeId: placeId, user: user)
-                    self.detailPlaceViewModel.fetchPlaceImage(for: placeId)
                     self.updatePlaceAnnotationImages(for: placeId)
                 }
                 
@@ -373,7 +370,6 @@ class ProfileViewModel: ObservableObject {
                     self.detailPlaceViewModel.places[placeId] = place
                     self.detailPlaceViewModel.updatePlaceSavers(placeId: placeId, user: friend)
                     self.updatePlaceSavers(placeId: placeId, user: friend)
-                    self.detailPlaceViewModel.fetchPlaceImage(for: placeId)
                     self.updatePlaceAnnotationImages(for: placeId)
                 }
                 completion()
@@ -503,7 +499,6 @@ class ProfileViewModel: ObservableObject {
             // Add to placeSaversByPlace dictionary
             self.updatePlaceSavers(placeId: placeId, user: user)
         }
-        self.detailPlaceViewModel.fetchPlaceImage(for: placeId)
         self.updatePlaceAnnotationImages(for: placeId)
     }
     
@@ -540,7 +535,6 @@ class ProfileViewModel: ObservableObject {
                         let placeId = place.id.uuidString
                         self.detailPlaceViewModel.places[placeId] = place
                         self.detailPlaceViewModel.updatePlaceSavers(placeId: placeId, user: friend)
-                        self.detailPlaceViewModel.fetchPlaceImage(for: placeId)
                         self.updatePlaceAnnotationImages(for: placeId)
                     }
                     pendingFetches -= 1
@@ -553,8 +547,14 @@ class ProfileViewModel: ObservableObject {
     private func fetchLists(userId: String, completion: @escaping () -> Void = {}) {
         firestoreService.fetchLists(userId: userId) { [weak self] lists in
             guard let self = self else { completion(); return }
+            print("📊 Found \(lists.count) lists for user \(self.userId)")
             DispatchQueue.main.async {
                 self.userLists = lists
+                self.placeListViewModels = lists.map { list in
+                    print("📝 Creating view model for list: \(list.name)")
+                    return PlaceListViewModel(placeList: list, firestoreService: self.firestoreService, userId: self.userId)
+                }
+                
                 guard !lists.isEmpty else { completion(); return }
                 
                 var pendingFetches = lists.count
@@ -570,7 +570,6 @@ class ProfileViewModel: ObservableObject {
                                 self.detailPlaceViewModel.updatePlaceSavers(placeId: placeId, user: currentUser)
                                 // Add to our placeSaversByPlace dictionary
                                 self.updatePlaceSavers(placeId: placeId, user: currentUser)
-                                self.detailPlaceViewModel.fetchPlaceImage(for: placeId)
                                 self.updatePlaceAnnotationImages(for: placeId)
                             }
                         }
@@ -644,20 +643,6 @@ class ProfileViewModel: ObservableObject {
 
         dispatchGroup.notify(queue: .main) {
             DispatchQueue.main.async { completion(fetchedPlaces) }
-        }
-    }
-    
-    func loadPlaceLists() {
-        print("📋 Loading all place lists for user: \(userId)")
-        firestoreService.fetchLists(userId: userId) { [weak self] placeLists in
-            guard let self = self else { return }
-            print("📊 Found \(placeLists.count) lists for user \(self.userId)")
-            DispatchQueue.main.async {
-                self.placeListViewModels = placeLists.map { list in
-                    print("📝 Creating view model for list: \(list.name)")
-                    return PlaceListViewModel(placeList: list, firestoreService: self.firestoreService, userId: self.userId)
-                }
-            }
         }
     }
     
@@ -793,7 +778,6 @@ class ProfileViewModel: ObservableObject {
                         self.detailPlaceViewModel.updatePlaceSavers(placeId: placeId, user: currentUser)
                         // Add to placeSaversByPlace dictionary
                         self.updatePlaceSavers(placeId: placeId, user: currentUser)
-                        self.detailPlaceViewModel.fetchPlaceImage(for: placeId)
                         self.updatePlaceAnnotationImages(for: placeId)
                     }
                 }
@@ -829,7 +813,6 @@ class ProfileViewModel: ObservableObject {
                         self.detailPlaceViewModel.updatePlaceSavers(placeId: placeId, user: friend)
                         // Add to placeSaversByPlace dictionary
                         self.updatePlaceSavers(placeId: placeId, user: friend)
-                        self.detailPlaceViewModel.fetchPlaceImage(for: placeId)
                         self.updatePlaceAnnotationImages(for: placeId)
                     }
                 }
@@ -940,7 +923,7 @@ class ProfileViewModel: ObservableObject {
                                     // Update in DetailPlaceViewModel for consistency
                                     self.detailPlaceViewModel.updatePlaceSavers(placeId: placeId, user: friend)
                                     // Fetch the place image
-                                    self.detailPlaceViewModel.fetchPlaceImage(for: placeId)
+                                    self.updatePlaceAnnotationImages(for: placeId)
                                 }
                                 dispatchGroup.leave()
                             }
@@ -968,7 +951,7 @@ class ProfileViewModel: ObservableObject {
                                             // Update in DetailPlaceViewModel
                                             self.detailPlaceViewModel.updatePlaceSavers(placeId: placeId, user: friend)
                                             // Fetch the place image
-                                            self.detailPlaceViewModel.fetchPlaceImage(for: placeId)
+                                            self.updatePlaceAnnotationImages(for: placeId)
                                         }
                                         listDispatchGroup.leave()
                                     }
@@ -1084,7 +1067,8 @@ class ProfileViewModel: ObservableObject {
                         let placeId = place.id.uuidString
                         self.myCreatedPlaceIds.append(placeId)
                         self.detailPlaceViewModel.places[placeId] = place
-                        self.detailPlaceViewModel.fetchPlaceImage(for: placeId)
+                        // Fetch images - NOW DONE LAZILY IN VIEWS
+                        // REMOVED: self.detailPlaceViewModel.fetchPlaceImage(for: placeId)
                     }
                 }
             }

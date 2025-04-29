@@ -6,7 +6,6 @@
 //
 
 import SwiftUI
-import UIKit
 
 struct PlaceDetailView: View {
     @Binding var sheetHeight: CGFloat

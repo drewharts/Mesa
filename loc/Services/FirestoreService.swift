@@ -1603,53 +1603,61 @@ class FirestoreService: ObservableObject {
                 return
             }
             
-            var places: [DetailPlace] = []
+            var allPlaces: [DetailPlace] = []
             let dispatchGroup = DispatchGroup()
-            var fetchError: Error?
+            var firstError: Error?
             
-            // First, get all the places with these IDs to get their mapboxIds
             let placesRef = db.collection("places")
-            placesRef.whereField("id", in: Array(placeIds)).getDocuments { [weak self] snapshot, error in
-                guard let self = self else { return }
-                
-                if let error = error {
-                    print("Error fetching places: \(error.localizedDescription)")
-                    completion(nil, error)
-                    return
-                }
-                
-                guard let snapshot = snapshot else {
-                    print("No places found for the given IDs")
-                    completion([], nil)
-                    return
-                }
-                
-                // Get all the mapboxIds from the places
-                let mapboxIds = snapshot.documents.compactMap { document -> String? in
-                    let data = document.data()
-                    return data["mapboxId"] as? String
-                }
-                
-                // Now fetch the full place details using mapboxIds
-                for mapboxId in mapboxIds {
-                    dispatchGroup.enter()
-                    self.findPlace(mapboxId: mapboxId) { detailPlace, error in
-                        if let error = error {
-                            print("Error fetching place with mapboxId \(mapboxId): \(error.localizedDescription)")
-                            fetchError = error
-                        } else if let detailPlace = detailPlace {
-                            places.append(detailPlace)
-                        }
+            let placeIdsArray = Array(placeIds)
+            let chunkSize = 30
+            let chunks = stride(from: 0, to: placeIdsArray.count, by: chunkSize).map {
+                Array(placeIdsArray[$0..<min($0 + chunkSize, placeIdsArray.count)])
+            }
+            
+            print("Fetching place details for \(placeIdsArray.count) review places in \(chunks.count) chunks...")
+            
+            // Fetch details for each chunk
+            for chunk in chunks {
+                dispatchGroup.enter()
+                placesRef.whereField("id", in: chunk).getDocuments { snapshot, error in
+                    if let error = error {
+                        print("Error fetching place chunk: \(error.localizedDescription)")
+                        if firstError == nil { firstError = error } // Capture first error
+                        dispatchGroup.leave()
+                        return
+                    }
+                    
+                    guard let snapshot = snapshot else {
+                        print("No places found for a chunk")
+                        dispatchGroup.leave()
+                        return
+                    }
+                    
+                    // Decode places from the current chunk
+                    let chunkPlaces = snapshot.documents.compactMap { try? $0.data(as: DetailPlace.self) }
+                    
+                    // --- Concurrently fetch Mapbox details if needed (Removed for simplicity based on previous code) ---
+                    // The original code seemed to fetch Firestore places first, then Mapbox places based on mapboxId.
+                    // If you need full GMSPlace/Mapbox data, further fetching based on mapboxId would be needed here.
+                    // For now, we assume the DetailPlace from Firestore is sufficient.
+                    // -------------------------------------------------------------------------------------------
+                    
+                    // Append places from this chunk
+                    // Use DispatchQueue.main if you need to update UI immediately, otherwise append directly
+                    DispatchQueue.main.async { // Or sync queue if preferred
+                        allPlaces.append(contentsOf: chunkPlaces)
                         dispatchGroup.leave()
                     }
                 }
-                
-                dispatchGroup.notify(queue: .main) {
-                    if let error = fetchError {
-                        completion(nil, error)
-                    } else {
-                        completion(places, nil)
-                    }
+            }
+            
+            // Notify when all chunks are processed
+            dispatchGroup.notify(queue: .main) {
+                if let error = firstError {
+                    completion(nil, error) // Return the first error encountered
+                } else {
+                    print("Successfully fetched details for \(allPlaces.count) review places.")
+                    completion(allPlaces, nil)
                 }
             }
         }
