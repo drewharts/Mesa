@@ -19,14 +19,6 @@ struct locApp: App {
         let providerFactory = AppAttestProviderFactory()
         AppCheck.setAppCheckProviderFactory(providerFactory)
 
-        // Run migrations right after Firebase configuration
-//        MigrationManager.shared.runMigrations { error in
-//            if let error = error {
-//                print("Migration failed: \(error.localizedDescription)")
-//            } else {
-//                print("Migrations completed successfully")
-//            }
-//        }
         let firestore = FirestoreService()
         let profileFirestore = ProfileFirestoreService()
         let location = LocationManager()
