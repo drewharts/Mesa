@@ -15,6 +15,7 @@ class ProfileViewModel: ObservableObject {
     @Published var user: ProfileData? 
     @Published var userPicture: UIImage?
     @Published var userLists: [PlaceList] = []
+    @Published var userListsPlaces: [String: [String]] = [:] // [listId: [placeId]]
     @Published var userFavorites: [String] = []
     @Published var userFollowing: [ProfileData] = []
     @Published var userFollowers: [ProfileData] = []
@@ -171,31 +172,35 @@ class ProfileViewModel: ObservableObject {
     
     
      // Returns unique users who saved a place, excluding the current logged-in user
-     func getUniquePlaceSaversExcludingCurrentUser(forPlaceId placeId: String) -> [User] {
-//         guard let users = placeSaversByPlace[placeId] else { return [] }
-//        
-//         var uniqueUsers: [User] = []
-//         var seenIds = Set<String>()
-//        
-//         for user in users {
-//             // Skip the current logged-in user
-//             if user.id == user.Id {
-//                 continue
-//             }
-//            
-//             // Add other unique users
-//             if !seenIds.contains(user.id) {
-//                 uniqueUsers.append(user)
-//                 seenIds.insert(user.id)
-//             }
-//         }
-//        
-//         return uniqueUsers
-         return []
+     func getUniquePlaceSaversExcludingCurrentUser(forPlaceId placeId: String) -> [ProfileData] {
+         guard let userIds = detailPlaceViewModel.placeSavers[placeId], let currentUserId = user?.id else { return [] }
+         
+         // Filter out the current user and map to ProfileData in userFollowing
+         let uniqueUsers = userIds
+             .filter { $0 != currentUserId }
+             .compactMap { userId in
+                 userFollowing.first(where: { $0.id == userId })
+             }
+         
+         return uniqueUsers
      }
     
      func isPlaceInAnyList(placeId: String) -> Bool {
 //         return placeListMBPlaces.values.contains { $0.contains(placeId) }
          return false
      }
+
+    /// Returns a dictionary mapping each PlaceList's id to the count of places in that list
+    func placeCountsForAllLists() -> [UUID: Int] {
+        var counts: [UUID: Int] = [:]
+        for list in userLists {
+            counts[list.id] = list.places.count
+        }
+        return counts
+    }
+
+    /// Returns the count of places in the PlaceList with the given id, or 0 if not found
+    func placeCount(forListId listId: UUID) -> Int {
+        return userLists.first(where: { $0.id == listId })?.places.count ?? 0
+    }
 }

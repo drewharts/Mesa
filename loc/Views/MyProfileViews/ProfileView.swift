@@ -27,8 +27,8 @@ struct ProfileView: View {
                 ProfilePictureView()
 
                 // Name
-                let firstName = profile.data.firstName
-                let lastName = profile.data.lastName
+                let firstName = profile.user.firstName ?? ""
+                let lastName = profile.user.lastName ?? ""
                 Text("\(firstName) \(lastName)")
                     .font(.title2)
                     .fontWeight(.bold)

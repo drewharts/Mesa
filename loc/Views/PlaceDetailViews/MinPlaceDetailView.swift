@@ -16,6 +16,7 @@ struct MinPlaceDetailView: View {
     @EnvironmentObject var locationManager: LocationManager
     @EnvironmentObject var userProfileViewModel: UserProfileViewModel
     @Environment(\.isScrollingEnabled) var isScrollingEnabled // Access scroll state
+    @EnvironmentObject var userSession: UserSession
 
     @Binding var showNoPhoneNumberAlert: Bool
     @Binding var selectedImage: UIImage?
@@ -57,7 +58,7 @@ struct MinPlaceDetailView: View {
                     Spacer()
                     
                     HStack(spacing: 16) {
-                        NavigationLink(destination: CreatePlaceReviewView(isPresented: .constant(false), place: selectedPlaceVM.selectedPlace!, userId: profile.user.id!, profilePhotoUrl: profile.user?.profilePhotoURL.absoluteString ?? "", userFirstName: profile.user?.firstName, userLastName: profile.user?.lastName)) {
+                        NavigationLink(destination: CreatePlaceReviewView(isPresented: .constant(false), place: selectedPlaceVM.selectedPlace!, userId: userSession.currentUserId!, profilePhotoUrl: profile.user?.profilePhotoURL?.absoluteString ?? "", userFirstName: profile.user!.firstName, userLastName: profile.user!.lastName)) {
                             Image(systemName: "plus")
                                 .font(.title3)
                         }
@@ -208,6 +209,7 @@ enum DetailTab {
 // MARK: - Profile Circles View
 struct ProfileCirclesView: View {
     @EnvironmentObject var profile: ProfileViewModel
+    @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
     let placeId: String?
     
     var body: some View {
@@ -250,12 +252,12 @@ struct ProfileCirclesView: View {
     }
     
     // Helper method to get profile images for displayed users
-    private func getProfileImagesForDisplayedUsers(users: [User], placeId: String) -> (UIImage?, UIImage?, UIImage?) {
+    private func getProfileImagesForDisplayedUsers(users: [ProfileData], placeId: String) -> (UIImage?, UIImage?, UIImage?) {
         guard !users.isEmpty else { return (nil, nil, nil) }
         
         let firstThreeUsers = users.prefix(3)
         let images = firstThreeUsers.map { user -> UIImage? in
-            profile.profilePhoto(forUserId: user.id)
+            detailPlaceViewModel.userProfilePicture[user.id]
         }
         
         let paddedImages = (images + [nil, nil, nil]).prefix(3)

@@ -38,6 +38,7 @@ class DataManager {
         loadProfileData(userId: userId)
         loadUserFavoritePlaces(userId: userId)
         loadUserPlaceLists(userId: userId)
+        loadUserMyPlaces(userId: userId)
         loadFollowing(userId: userId)
         loadFollowers(userId: userId)
         calculateMapAnnotations()
@@ -45,6 +46,19 @@ class DataManager {
     
     func calculateMapAnnotations() {
         detailPlaceViewModel.calculateAnnotationPlaces()
+    }
+    
+    func loadUserMyPlaces(userId: String) {
+        fireStoreService.fetchMyPlaces(userId: userId) { places in
+            if let places = places {
+                for place in places {
+                    self.profileViewModel.myPlaces.append(place.id.uuidString)
+                    self.detailPlaceViewModel.places[place.id.uuidString] = place
+                }
+            } else {
+                print("Error loading my places: No places found or error occurred")
+            }
+        }
     }
     
     // Load's current user's profile data and profile picture
@@ -120,6 +134,9 @@ class DataManager {
             // If this is for the current user, update the ProfileViewModel
             if forUser == nil {
                 self.profileViewModel.userLists = lists
+                self.profileViewModel.userListsPlaces = lists.reduce(into: [String: [String]]()) { result, list in
+                    result[list.id.uuidString] = list.places.map { $0.id.uuidString }
+                }
             }
             
             // Process places in each list

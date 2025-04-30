@@ -17,7 +17,7 @@ struct MyPlacesListView: View {
     private let cardHeight: CGFloat = 180
     
     var createdPlaces: [DetailPlace] {
-        profile.myCreatedPlaceIds.compactMap { id in
+        profile.myPlaces.compactMap { id in
             profile.detailPlaceViewModel.places[id]
         }
     }
