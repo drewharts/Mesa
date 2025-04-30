@@ -19,16 +19,12 @@ struct ContentView: View {
 
     var body: some View {
         if userSession.isUserLoggedIn {
-            if let profileViewModel = userSession.profileViewModel {
-                MainView()
-                    .environmentObject(profileViewModel)
-                    .environmentObject(locationManager)
-                    .environmentObject(selectedPlaceVM)
-                    .environmentObject(detailPlaceVM)
-                    .environmentObject(userProfileViewModel)
-            } else {
-                ProgressView("Loading profile...")
-            }
+            MainView()
+                .environmentObject(profileViewModel)
+                .environmentObject(locationManager)
+                .environmentObject(selectedPlaceVM)
+                .environmentObject(detailPlaceVM)
+                .environmentObject(userProfileViewModel)
         } else {
             LoginView(viewModel: LoginViewModel(firestoreService: firestoreService))
         }

@@ -1,0 +1,65 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# File patterns: DataManager.swift
+
+# DataManager Documentation
+
+## Overview
+The `DataManager` class serves as the central coordinator for data operations in the application, primarily handling interactions between Firestore database and various view models. It acts as a bridge between the data layer (FirestoreService) and the presentation layer (ProfileViewModel and DetailPlaceViewModel).
+
+## Architecture
+
+### Data Flow
+1. **FirestoreService**: The primary data source that handles all direct database operations
+2. **DataManager**: Coordinates data fetching and distribution
+3. **ViewModels**: 
+   - ProfileViewModel: Handles user-specific data
+   - DetailPlaceViewModel: Acts as a cache for place details
+
+### ViewModel Responsibilities
+
+#### ProfileViewModel
+- Stores user profile information
+- Maintains lists of place IDs (favorites, lists, etc.)
+- Contains minimal place data (just IDs)
+- Focuses on user-specific data and relationships
+
+#### DetailPlaceViewModel
+- Acts as a cache for detailed place information
+- Stores complete place data including images, descriptions, etc.
+- Can be queried using place IDs to retrieve full place details
+- Optimized for heavy data storage and retrieval
+
+## Data Loading Strategy
+
+### Profile Data
+- User profile information
+- Favorite place IDs
+- Place list IDs
+- Following/Followers relationships
+
+### Place Data
+- Detailed place information
+- Place images
+- Nearby places
+- Reviews and ratings
+
+## Usage Pattern
+1. ProfileViewModel requests user data
+2. DataManager fetches data from Firestore via FirestoreService
+3. Basic data is stored in ProfileViewModel
+4. When detailed place information is needed:
+   - ProfileViewModel provides place ID
+   - DataManager checks DetailPlaceViewModel cache
+   - If not cached, fetches from Firestore and updates cache
+
+## Benefits
+- Efficient data loading
+- Reduced database queries
+- Clear separation of concerns
+- Optimized memory usage
+- Better user experience with cached data
+

@@ -15,9 +15,7 @@ struct SplashScreenView: View {
     @EnvironmentObject var locationManager: LocationManager
     
     var body: some View {
-        if isActive, 
-           (userSession.profileViewModel?.isLoading == false || !userSession.isUserLoggedIn),
-           locationManager.currentLocation != nil {
+        if userSession.isUserLoggedIn {
             ContentView()
                 .transition(.opacity)
         } else {

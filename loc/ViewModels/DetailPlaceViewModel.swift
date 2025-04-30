@@ -15,8 +15,10 @@ import FirebaseAuth
 class DetailPlaceViewModel: ObservableObject {
     @Published var places: [String: DetailPlace] = [:] // Formerly placeLookup
     @Published var placeImages: [String: UIImage] = [:] // Consolidated place images
-    @Published var placeSavers: [String: [User]] = [:] // Tracks who saved each place
+    @Published var placeSavers: [String: [String]] = [:] // Tracks who saved each place PlaceId -> UserIds
     @Published var placeTypes: [String: String] = [:] // Tracks restaurant types
+
+    @Published var userProfilePicture: [String: UIImage] = [:] // Each user's profile picture
 
     private let firestoreService: FirestoreService
     private var notificationObserver: NSObjectProtocol?
@@ -139,13 +141,14 @@ class DetailPlaceViewModel: ObservableObject {
 
     // Update placeSavers when a user saves a place
     func updatePlaceSavers(placeId: String, user: User) {
-        if placeSavers[placeId] != nil {
-            if !placeSavers[placeId]!.contains(where: { $0.id == user.id }) {
-                placeSavers[placeId]!.append(user)
-            }
-        } else {
-            placeSavers[placeId] = [user]
-        }
+        print("fix later")
+//        if placeSavers[placeId] != nil {
+//            if !placeSavers[placeId]!.contains(where: { $0.id == user.id }) {
+//                placeSavers[placeId]!.append(user)
+//            }
+//        } else {
+//            placeSavers[placeId] = [user]
+//        }
     }
 
     // Convert SearchResult to DetailPlace and save it

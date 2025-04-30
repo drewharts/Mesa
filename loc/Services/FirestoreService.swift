@@ -168,7 +168,7 @@ class FirestoreService: ObservableObject {
     }
 
     
-    func fetchCurrentUser(userId: String, completion: @escaping (User?, Error?) -> Void) {
+    func fetchUser(userId: String, completion: @escaping (User?, Error?) -> Void) {
         db.collection("users").document(userId).getDocument { document, error in
             if let error = error {
                 completion(nil, error)
@@ -2164,26 +2164,26 @@ class FirestoreService: ObservableObject {
             }
         }
 
-    func fetchUserById(userId: String, completion: @escaping (ProfileData?) -> Void) {
+    func fetchUserById(userId: String, completion: @escaping (Result<ProfileData, Error>) -> Void) {
         db.collection("users").document(userId).getDocument { document, error in
             if let error = error {
-                print("Error fetching user \(userId): \(error.localizedDescription)")
-                completion(nil)
+                completion(.failure(error))
                 return
             }
             
             guard let document = document, document.exists else {
-                print("User \(userId) not found")
-                completion(nil)
+                let notFoundError = NSError(domain: "FirestoreService", code: 404, userInfo: [
+                    NSLocalizedDescriptionKey: "User not found"
+                ])
+                completion(.failure(notFoundError))
                 return
             }
             
             do {
                 let profileData = try document.data(as: ProfileData.self)
-                completion(profileData)
+                completion(.success(profileData))
             } catch {
-                print("Error decoding user \(userId): \(error.localizedDescription)")
-                completion(nil)
+                completion(.failure(error))
             }
         }
     }

@@ -87,13 +87,11 @@ class LoginViewModel: ObservableObject {
             fullName: "\(user.profile?.givenName ?? "") \(user.profile?.familyName ?? "")"
         )
         let detailPlaceVM = DetailPlaceViewModel(firestoreService: firestoreService.self)
-        let profileViewModel = ProfileViewModel(data: profileData, firestoreService: firestoreService.self, detailPlaceViewModel: detailPlaceVM, userId: uid)
 
         FirestoreService().saveUserProfile(uid: uid, profileData: profileData) { [weak self] error in
             if let error = error {
                 self?.errorMessage = "Error saving profile: \(error.localizedDescription)"
             } else {
-                userSession.profileViewModel = profileViewModel
                 userSession.isUserLoggedIn = true
             }
         }
