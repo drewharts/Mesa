@@ -15,6 +15,7 @@ struct ContentView: View {
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var detailPlaceVM: DetailPlaceViewModel
     @EnvironmentObject var firestoreService: FirestoreService
+    @EnvironmentObject var profileViewModel: ProfileViewModel
     @StateObject private var userProfileViewModel = UserProfileViewModel()
 
     var body: some View {

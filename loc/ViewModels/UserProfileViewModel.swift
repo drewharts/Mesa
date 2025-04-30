@@ -274,4 +274,12 @@ class UserProfileViewModel: ObservableObject {
             }
         }
     }
+    
+    func downloadImage(from url: URL) async throws -> UIImage {
+        let (data, _) = try await URLSession.shared.data(from: url)
+        guard let image = UIImage(data: data) else {
+            throw NSError(domain: "ImageError", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to create image from data"])
+        }
+        return image
+    }
 }

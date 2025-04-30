@@ -10,16 +10,18 @@ import UIKit
 
 struct UserRow: View {
     @EnvironmentObject var profile: ProfileViewModel
+    @EnvironmentObject var detailPlaceVM: DetailPlaceViewModel
+    @EnvironmentObject var userSession: UserSession
     let user: ProfileData
-    @EnvironmentObject var userProfileViewModel: UserProfileViewModel
+    @EnvironmentObject var userProfileVM: UserProfileViewModel
     
     var body: some View {
         Button(action: {
-            userProfileViewModel.selectUser(user, currentUserId: profile.userId)
+            userProfileVM.selectUser(user, currentUserId: userSession.currentUserId!)
         }) {
             HStack(spacing: 12) {
                 // User profile photo
-                if let profileImage = profile.profilePhoto(forUserId: user.id) {
+                if let profileImage = detailPlaceVM.userProfilePicture[user.id] {
                     Image(uiImage: profileImage)
                         .resizable()
                         .aspectRatio(contentMode: .fill)
@@ -65,7 +67,7 @@ struct FollowersListView: View {
     var body: some View {
         NavigationView {
             VStack {
-                if profile.followerProfiles.isEmpty {
+                if profile.userFollowers.isEmpty {
                     VStack(spacing: 16) {
                         Spacer()
                         Text("No Followers Yet")
@@ -82,7 +84,7 @@ struct FollowersListView: View {
                     }
                 } else {
                     List {
-                        ForEach(profile.followerProfiles) { user in
+                        ForEach(profile.userFollowers) { user in
                             UserRow(user: user)
                         }
                     }

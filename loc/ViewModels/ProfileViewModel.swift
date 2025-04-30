@@ -16,9 +16,8 @@ class ProfileViewModel: ObservableObject {
     @Published var userPicture: UIImage?
     @Published var userLists: [PlaceList] = []
     @Published var userFavorites: [String] = []
-    @Published var userFollowing: [User] = []
-    @Published var userFollowers: [User] = []
-    @Published var userPlaceSavers: [String: [User]] = [:]
+    @Published var userFollowing: [ProfileData] = []
+    @Published var userFollowers: [ProfileData] = []
     //TODO: Implement my places
     @Published var myPlaces: [String] = []
     
@@ -132,6 +131,9 @@ class ProfileViewModel: ObservableObject {
              if image1 != nil { drawCircularImage(image1, in: firstRect) }
          }
      }
+    func addFavoriteFromSuggestion(place: MesaPlaceSuggestion) {
+        //get rid of this in the future
+    }
     
      func isPlaceInList(listId: UUID, placeId: String) -> Bool {
          return false

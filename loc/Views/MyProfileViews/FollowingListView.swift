@@ -16,7 +16,7 @@ struct FollowingListView: View {
     var body: some View {
         NavigationView {
             VStack {
-                if profile.followingProfiles.isEmpty {
+                if profile.userFollowing.isEmpty {
                     VStack(spacing: 16) {
                         Spacer()
                         Text("Not Following Anyone Yet")
@@ -33,7 +33,7 @@ struct FollowingListView: View {
                     }
                 } else {
                     List {
-                        ForEach(profile.followingProfiles) { profileData in
+                        ForEach(profile.userFollowing) { profileData in
                             UserRow(user: profileData)
                         }
                     }

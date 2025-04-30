@@ -76,7 +76,7 @@ struct FavoritesContentDisplay: View {
                 .contentShape(Rectangle()) // Makes the entire rectangle tappable, not just the area with content
                 .onTapGesture {
                     // 1) Append to favorites (directly via ProfileViewModel)
-                    profile.addFavoriteFromSuggestion(prediction)
+                    profile.addFavoriteFromSuggestion(place: prediction)
                     // 2) Highlight this row
                     lastTappedPlaceID = prediction.id
 

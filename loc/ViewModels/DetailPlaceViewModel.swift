@@ -16,6 +16,7 @@ class DetailPlaceViewModel: ObservableObject {
     @Published var places: [String: DetailPlace] = [:] // Formerly placeLookup
     @Published var placeImages: [String: UIImage] = [:] // Consolidated place images
     @Published var placeSavers: [String: [String]] = [:] // Tracks who saved each place PlaceId -> UserIds
+    @Published var placeAnnotations: [String: UIImage] = [:] // Each place annotation's combined profile images
     @Published var placeTypes: [String: String] = [:] // Tracks restaurant types
 
     @Published var userProfilePicture: [String: UIImage] = [:] // Each user's profile picture
@@ -37,6 +38,30 @@ class DetailPlaceViewModel: ObservableObject {
             print("DetailPlaceViewModel received map refresh notification")
             // Force a refresh by triggering objectWillChange
             self.objectWillChange.send()
+        }
+    }
+    
+    func calculateAnnotationPlaces() {
+        for (placeId, userIds) in placeSavers {
+            // Get up to 3 profile pictures for this place's savers
+            let profilePictures = userIds.prefix(3).compactMap { userProfilePicture[$0] }
+            
+            // Create combined image using the existing function
+            let combinedImage: UIImage
+            switch profilePictures.count {
+            case 1:
+                combinedImage = combinedCircularImage(image1: profilePictures[0])
+            case 2:
+                combinedImage = combinedCircularImage(image1: profilePictures[0], image2: profilePictures[1])
+            case 3:
+                combinedImage = combinedCircularImage(image1: profilePictures[0], image2: profilePictures[1], image3: profilePictures[2])
+            default:
+                // If no profile pictures, use a default image or nil
+                combinedImage = combinedCircularImage(image1: nil)
+            }
+            
+            // Store the combined image in placeAnnotations
+            placeAnnotations[placeId] = combinedImage
         }
     }
     
@@ -185,6 +210,40 @@ class DetailPlaceViewModel: ObservableObject {
                 self.calculateRestaurantType(for: detailPlace) // Calculate restaurant type
                 completion(detailPlace)
             }
+        }
+    }
+    
+    private func combinedCircularImage(image1: UIImage?, image2: UIImage? = nil, image3: UIImage? = nil) -> UIImage {
+        let totalSize = CGSize(width: 80, height: 40)
+        let singleCircleSize = CGSize(width: 40, height: 40)
+        let renderer = UIGraphicsImageRenderer(size: totalSize)
+       
+        return renderer.image { context in
+            let firstRect = CGRect(x: 0, y: 0, width: singleCircleSize.width, height: singleCircleSize.height)
+            let secondRect = CGRect(x: 15, y: 0, width: singleCircleSize.width, height: singleCircleSize.height)
+            let thirdRect = CGRect(x: 30, y: 0, width: singleCircleSize.width, height: singleCircleSize.height)
+           
+            func drawCircularImage(_ image: UIImage?, in rect: CGRect) {
+                guard let image = image else { return }
+                context.cgContext.saveGState()
+                let circlePath = UIBezierPath(ovalIn: rect)
+                circlePath.addClip()
+                image.draw(in: rect)
+                context.cgContext.setStrokeColor(UIColor.white.cgColor)
+                context.cgContext.setLineWidth(1.0)
+                context.cgContext.strokeEllipse(in: rect.insetBy(dx: 0.5, dy: 0.5))
+                context.cgContext.restoreGState()
+            }
+           
+            if image3 != nil { drawCircularImage(image3, in: thirdRect) }
+            if image2 != nil { drawCircularImage(image2, in: secondRect) }
+            if image1 != nil { drawCircularImage(image1, in: firstRect) }
+        }
+    }
+    
+    func getAllSavedDetailPlaces() -> [DetailPlace] {
+        placeSavers.keys.compactMap { placeId in
+            places[placeId]
         }
     }
 }
