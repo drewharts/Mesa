@@ -169,9 +169,12 @@ struct RestaruantReviewViewProfileInformation: View {
                             showProfileView = true
                         } else {
                             // For other users, fetch and show their profile
-                            firestoreService.fetchUserById(userId: review.userId) { profileData in
-                                if let profileData = profileData {
+                            firestoreService.fetchUserById(userId: review.userId) { result in
+                                switch result {
+                                case .success(let profileData):
                                     userProfileViewModel.selectUser(profileData, currentUserId: userSession.currentUserId!)
+                                case .failure:
+                                    break // Optionally handle error
                                 }
                             }
                         }
@@ -204,13 +207,13 @@ struct RestaruantReviewViewProfileInformation: View {
                 // Add likes button and count
                 HStack(spacing: 4) {
                     Button(action: {
-                        selectedPlaceVM.likeReview(review, userId: profile.userId)
+                        selectedPlaceVM.likeReview(review, userId: userSession.currentUserId!)
                     }) {
                         Image(systemName: selectedPlaceVM.isReviewLiked(review.id) ? "heart.fill" : "heart")
-                            .foregroundColor(review.userId == profile.userId ? .gray : (selectedPlaceVM.isReviewLiked(review.id) ? .red : .gray))
-                            .opacity(review.userId == profile.userId ? 0.3 : 0.7)
+                            .foregroundColor(review.userId == userSession.currentUserId! ? .gray : (selectedPlaceVM.isReviewLiked(review.id) ? .red : .gray))
+                            .opacity(review.userId == userSession.currentUserId! ? 0.3 : 0.7)
                     }
-                    .disabled(review.userId == profile.userId)
+                    .disabled(review.userId == userSession.currentUserId!)
                     
                     Text("\(review.likes)")
                         .font(.footnote)
@@ -928,9 +931,12 @@ struct InlineCommentView: View {
                                 showProfileView = true
                             } else {
                                 // For other users, fetch and show their profile
-                                firestoreService.fetchUserById(userId: comment.userId) { profileData in
-                                    if let profileData = profileData {
+                                firestoreService.fetchUserById(userId: comment.userId) { result in
+                                    switch result {
+                                    case .success(let profileData):
                                         userProfileViewModel.selectUser(profileData, currentUserId: userSession.currentUserId!)
+                                    case .failure:
+                                        break // Optionally handle error
                                     }
                                 }
                             }
@@ -958,14 +964,17 @@ struct InlineCommentView: View {
                                 .clipShape(Circle())
                                 .onTapGesture {
                                     // Check if this is the logged-in user's profile
-                                    if comment.userId == profile.userId {
+                                    if comment.userId == userSession.currentUserId! {
                                         // Show the user's own profile page directly
                                         showProfileView = true
                                     } else {
                                         // For other users, fetch and show their profile
-                                        firestoreService.fetchUserById(userId: comment.userId) { profileData in
-                                            if let profileData = profileData {
-                                                userProfileViewModel.selectUser(profileData, currentUserId: profile.userId)
+                                        firestoreService.fetchUserById(userId: comment.userId) { result in
+                                            switch result {
+                                            case .success(let profileData):
+                                                userProfileViewModel.selectUser(profileData, currentUserId: userSession.currentUserId!)
+                                            case .failure:
+                                                break // Optionally handle error
                                             }
                                         }
                                     }

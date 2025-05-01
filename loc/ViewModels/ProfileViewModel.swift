@@ -145,7 +145,20 @@ class ProfileViewModel: ObservableObject {
      }
     
      func removePlaceFromList(listId: UUID, place: DetailPlace) {
+         let listIdString = listId.uuidString
+         guard
+             var places = userListsPlaces[listIdString],
+             let index = places.firstIndex(of: place.id.uuidString),
+             let userId = userSession.currentUserId,
+             let list = userLists.first(where: { $0.id == listId })
+         else {
+             return
+         }
 
+         places.remove(at: index)
+         userListsPlaces[listIdString] = places
+
+         firestoreService.removePlaceFromList(userId: userId, listName: list.name, placeId: place.id.uuidString)
      }
     
      func removeFavoritePlace(place: DetailPlace) {
@@ -159,14 +172,16 @@ class ProfileViewModel: ObservableObject {
      }
     
      func removePlaceList(placeList: PlaceList) {
-//         if let index = userLists.firstIndex(where: { $0.id == placeList.id }) {
-//             userLists.remove(at: index)
-//             firestoreService.deleteList(user.Id: self.user.Id, listId: placeList.id.uuidString) { error in
-//                 if error == nil, let index = self.userLists.firstIndex(where: { $0.id == placeList.id }) {
-//                     self.userLists.remove(at: index)
-//                 }
-//             }
-//         }
+         
+         
+         if let index = userLists.firstIndex(where: { $0.id == placeList.id }) {
+             userLists.remove(at: index)
+             firestoreService.deleteList(userId: userSession.currentUserId!,listId: placeList.id.uuidString) { error in
+                 if error == nil, let index = self.userLists.firstIndex(where: { $0.id == placeList.id }) {
+                     self.userLists.remove(at: index)
+                 }
+             }
+         }
      }
 
     

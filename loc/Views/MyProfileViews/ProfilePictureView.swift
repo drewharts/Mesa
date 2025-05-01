@@ -17,8 +17,8 @@ struct ProfilePictureView: View {
     
     var body: some View {
         Group {
-            if let profilePhoto = profile.profilePhoto {
-                profilePhoto
+            if let profilePhoto = profile.userPicture {
+                Image(uiImage: profilePhoto)
                     .resizable()
                     .scaledToFill()
                     .frame(width: 100, height: 100)
@@ -58,11 +58,11 @@ struct ProfilePictureView: View {
             }
         }
         .fullScreenCover(isPresented: $showingFullScreen) {
-            if let profilePhoto = profile.profilePhoto {
+            if let profilePhoto = profile.userPicture {
                 ZStack {
                     Color.black.edgesIgnoringSafeArea(.all)
                     
-                    profilePhoto
+                    Image(uiImage: profilePhoto)
                         .resizable()
                         .scaledToFit()
                         .padding()

@@ -33,83 +33,83 @@ struct ListHeaderView: View {
     }
 }
 
-struct PlaceListCellView: View {
-    let list: PlaceList
-    @EnvironmentObject var profile: ProfileViewModel
-    @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel // Add this
-    @Binding var showingImagePicker: Bool
-    
-    var onPlaceSelected: ((SearchResult) -> Void)?
-
-    var body: some View {
-        NavigationLink(destination: PlaceListView(places: getPlacesForList())) {
-            HStack {
-                if let image = profile.listImages[list.id] {
-                    Image(uiImage: image)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .frame(width: 90, height: 90)
-                        .clipped()
-                        .cornerRadius(4)
-                        .overlay(
-                            Rectangle()
-                                .stroke(Color.white, lineWidth: 2)
-                                .frame(width: 90, height: 90)
-                                .cornerRadius(4)
-                        )
-                        .shadow(color: .black.opacity(0.2), radius: 3, x: 0, y: 2)
-                } else {
-                    Rectangle()
-                        .frame(width: 90, height: 90)
-                        .foregroundColor(.gray)
-                        .cornerRadius(4)
-                        .overlay(
-                            Rectangle()
-                                .stroke(Color.white, lineWidth: 2)
-                                .frame(width: 90, height: 90)
-                                .cornerRadius(4)
-                        )
-                        .shadow(color: .black.opacity(0.2), radius: 3, x: 0, y: 2)
-                }
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(list.name)
-                        .font(.body)
-                        .foregroundStyle(.black)
-
-                    Text("\(profile.placeListMBPlaces[list.id]?.count ?? 0) Places")
-                        .font(.caption)
-                        .foregroundStyle(.black)
-                }
-                .padding(.horizontal, 15)
-                Spacer()
-            }
-            .padding(.vertical, 10)
-            .padding(.horizontal, 30)
-            .contentShape(Rectangle())
-        }
-        .contextMenu {
-            Button {
-                showingImagePicker = true
-            } label: {
-                Label("Add Photo", systemImage: "photo")
-            }
-        }
-        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-            Button(role: .destructive) {
-                profile.removePlaceList(placeList: list)
-            } label: {
-                Label("Delete", systemImage: "trash")
-            }
-        }
-    }
-    
-    // Helper to convert place IDs to DetailPlace objects
-    private func getPlacesForList() -> [DetailPlace] {
-        let placeIds = profile.placeListMBPlaces[list.id] ?? []
-        return placeIds.compactMap { detailPlaceViewModel.places[$0] }
-    }
-}
+//struct PlaceListCellView: View {
+//    let list: PlaceList
+//    @EnvironmentObject var profile: ProfileViewModel
+//    @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel // Add this
+//    @Binding var showingImagePicker: Bool
+//    
+//    var onPlaceSelected: ((SearchResult) -> Void)?
+//
+//    var body: some View {
+//        NavigationLink(destination: PlaceListView(places: getPlacesForList())) {
+//            HStack {
+//                if let image = profile.listImages[list.id] {
+//                    Image(uiImage: image)
+//                        .resizable()
+//                        .aspectRatio(contentMode: .fill)
+//                        .frame(width: 90, height: 90)
+//                        .clipped()
+//                        .cornerRadius(4)
+//                        .overlay(
+//                            Rectangle()
+//                                .stroke(Color.white, lineWidth: 2)
+//                                .frame(width: 90, height: 90)
+//                                .cornerRadius(4)
+//                        )
+//                        .shadow(color: .black.opacity(0.2), radius: 3, x: 0, y: 2)
+//                } else {
+//                    Rectangle()
+//                        .frame(width: 90, height: 90)
+//                        .foregroundColor(.gray)
+//                        .cornerRadius(4)
+//                        .overlay(
+//                            Rectangle()
+//                                .stroke(Color.white, lineWidth: 2)
+//                                .frame(width: 90, height: 90)
+//                                .cornerRadius(4)
+//                        )
+//                        .shadow(color: .black.opacity(0.2), radius: 3, x: 0, y: 2)
+//                }
+//
+//                VStack(alignment: .leading, spacing: 4) {
+//                    Text(list.name)
+//                        .font(.body)
+//                        .foregroundStyle(.black)
+//
+//                    Text("\(profile.placeListMBPlaces[list.id]?.count ?? 0) Places")
+//                        .font(.caption)
+//                        .foregroundStyle(.black)
+//                }
+//                .padding(.horizontal, 15)
+//                Spacer()
+//            }
+//            .padding(.vertical, 10)
+//            .padding(.horizontal, 30)
+//            .contentShape(Rectangle())
+//        }
+//        .contextMenu {
+//            Button {
+//                showingImagePicker = true
+//            } label: {
+//                Label("Add Photo", systemImage: "photo")
+//            }
+//        }
+//        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+//            Button(role: .destructive) {
+//                profile.removePlaceList(placeList: list)
+//            } label: {
+//                Label("Delete", systemImage: "trash")
+//            }
+//        }
+//    }
+//    
+//    // Helper to convert place IDs to DetailPlace objects
+//    private func getPlacesForList() -> [DetailPlace] {
+//        let placeIds = profile.placeListMBPlaces[list.id] ?? []
+//        return placeIds.compactMap { detailPlaceViewModel.places[$0] }
+//    }
+//}
 
 struct MyProfileHorizontalListPlaces: View {
     @EnvironmentObject var viewModel: ProfileViewModel
@@ -204,7 +204,155 @@ struct MyProfileHorizontalListPlaces: View {
     }
     
     private func colorForPlace(_ place: DetailPlace) -> Color {
-        placeColors[place.id] ?? .gray
+        Color(
+            red: Double.random(in: 0...1),
+            green: Double.random(in: 0...1),
+            blue: Double.random(in: 0...1)
+        )
+    }
+}
+
+struct ListPlacesPopUpListView: View {
+    let list: PlaceList
+
+    @EnvironmentObject var profile: ProfileViewModel
+    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
+    @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
+    @Environment(\.presentationMode) var presentationMode
+
+    // Reduced width to create more space between cards
+    private let cardWidth: CGFloat = UIScreen.main.bounds.width / 2 - 35 // Increased spacing from edges
+    private let cardHeight: CGFloat = 180 // Slightly reduced height
+    
+    private let columns = [
+        GridItem(.flexible(), spacing: 15),
+        GridItem(.flexible(), spacing: 15)
+    ]
+    
+    // Precompute places
+    var places: [DetailPlace] {
+        guard let placeIds = profile.userListsPlaces[list.id.uuidString] else { return [] }
+        return placeIds.compactMap { detailPlaceViewModel.places[$0] }
+    }
+
+    var body: some View {
+        if let _ = profile.userListsPlaces[list.id.uuidString] {
+            if !places.isEmpty {
+                ScrollView {
+                    LazyVGrid(columns: columns, spacing: 15) {
+                        ForEach(places, id: \ .id) { place in
+                            ListPlaceGridCell(
+                                place: place,
+                                list: list,
+                                cardWidth: cardWidth,
+                                cardHeight: cardHeight
+                            )
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 10)
+                }
+            } else {
+                Text("No places in this list")
+                    .foregroundColor(.gray)
+                    .padding(.vertical, 30)
+            }
+        } else {
+            Text("Loading places...")
+                .foregroundColor(.gray)
+                .padding(.vertical, 30)
+        }
+    }
+}
+
+// New subview for grid cell
+struct ListPlaceGridCell: View {
+    let place: DetailPlace
+    let list: PlaceList
+    let cardWidth: CGFloat
+    let cardHeight: CGFloat
+
+    @EnvironmentObject var profile: ProfileViewModel
+    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
+    @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
+    @Environment(\.presentationMode) var presentationMode
+
+    var body: some View {
+        Button(action: {
+            selectedPlaceVM.selectedPlace = place
+            selectedPlaceVM.isDetailSheetPresented = true
+            presentationMode.wrappedValue.dismiss()
+        }) {
+            VStack(alignment: .leading, spacing: 0) {
+                ZStack(alignment: .bottom) {
+                    if let image = detailPlaceViewModel.placeImages[place.id.uuidString] {
+                        Image(uiImage: image)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(width: cardWidth, height: cardHeight)
+                            .clipped()
+                    } else {
+                        Rectangle()
+                            .foregroundColor(colorForPlace(place))
+                            .frame(width: cardWidth, height: cardHeight)
+                    }
+                    LinearGradient(
+                        gradient: Gradient(colors: [
+                            Color.black.opacity(0.0),
+                            Color.black.opacity(0.1),
+                            Color.black.opacity(0.2),
+                            Color.black.opacity(1.0)
+                        ]),
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .frame(width: cardWidth, height: cardHeight)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(place.name)
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .lineLimit(1)
+                        if let type = detailPlaceViewModel.placeTypes[place.id.uuidString] {
+                            Text(type)
+                                .font(.subheadline)
+                                .foregroundColor(.white.opacity(0.7))
+                                .lineLimit(1)
+                        } else if let city = place.city {
+                            Text(city)
+                                .font(.subheadline)
+                                .foregroundColor(.white.opacity(0.7))
+                                .lineLimit(1)
+                        }
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+            .frame(width: cardWidth, height: cardHeight)
+            .background(Color.white)
+            .clipShape(RoundedRectangle(cornerRadius: 20))
+            .overlay(
+                RoundedRectangle(cornerRadius: 20)
+                    .stroke(Color.white, lineWidth: 2)
+            )
+            .shadow(color: Color.black.opacity(0.2), radius: 5, x: 0, y: 2)
+        }
+        .contextMenu {
+            Button(role: .destructive) {
+                profile.removePlaceFromList(listId: list.id, place: place)
+            } label: {
+                Label("Remove from list", systemImage: "trash")
+            }
+        }
+    }
+
+    private func colorForPlace(_ place: DetailPlace) -> Color {
+        Color(
+            red: Double.random(in: 0...1),
+            green: Double.random(in: 0...1),
+            blue: Double.random(in: 0...1)
+        )
     }
 }
 
@@ -227,132 +375,13 @@ struct ListPlacesPopupView: View {
     private let cardHeight: CGFloat = 180 // Slightly reduced height
     
     var body: some View {
-        VStack(spacing: 10) {
-            HStack {
-                Button(action: {
-                    showingDeleteConfirmation = true
-                }) {
-                    Image(systemName: "trash")
-                        .foregroundColor(.gray)
-                        .frame(width: 44, height: 44)
-                }
-                
-                Spacer()
-                
-                Text(list.name)
-                    .font(.headline)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                
-                Spacer()
-                
-                // Empty view with same width as trash button for perfect centering
-                Color.clear
-                    .frame(width: 44, height: 44)
-            }
-            .padding(.horizontal, 20)
-            .padding(.top, 10)
-            
-            Spacer()
-                .frame(height: 20) // Add extra space between title and content
-            
-            if let placeIds = profile.placeListMBPlaces[list.id] {
-                let places = placeIds.compactMap { detailPlaceViewModel.places[$0] }
-                if !places.isEmpty {
-                    ScrollView {
-                        LazyVGrid(columns: columns, spacing: 15) {
-                            ForEach(places, id: \.id) { place in
-                                Button(action: {
-                                    selectedPlaceVM.selectedPlace = place
-                                    selectedPlaceVM.isDetailSheetPresented = true
-                                    presentationMode.wrappedValue.dismiss()
-                                }) {
-                                    VStack(alignment: .leading, spacing: 0) {
-                                        ZStack(alignment: .bottom) {
-                                            if let image = detailPlaceViewModel.placeImages[place.id.uuidString] {
-                                                Image(uiImage: image)
-                                                    .resizable()
-                                                    .aspectRatio(contentMode: .fill)
-                                                    .frame(width: cardWidth, height: cardHeight)
-                                                    .clipped()
-                                            } else {
-                                                Rectangle()
-                                                    .foregroundColor(colorForPlace(place))
-                                                    .frame(width: cardWidth, height: cardHeight)
-                                            }
-                                            
-                                            // Gradient overlay that extends from the bottom
-                                            LinearGradient(
-                                                gradient: Gradient(colors: [
-                                                    Color.black.opacity(0.0),
-                                                    Color.black.opacity(0.1),
-                                                    Color.black.opacity(0.2),
-                                                    Color.black.opacity(1.0)
-                                                ]),
-                                                startPoint: .top,
-                                                endPoint: .bottom
-                                            )
-                                            .frame(width: cardWidth, height: cardHeight)
-                                            
-                                            // Text overlay at the bottom
-                                            VStack(alignment: .leading, spacing: 4) {
-                                                Text(place.name)
-                                                    .font(.headline)
-                                                    .foregroundColor(.white)
-                                                    .lineLimit(1)
-                                                
-                                                if let type = detailPlaceViewModel.placeTypes[place.id.uuidString] {
-                                                    Text(type)
-                                                        .font(.subheadline)
-                                                        .foregroundColor(.white.opacity(0.7))
-                                                        .lineLimit(1)
-                                                } else if let city = place.city {
-                                                    Text(city)
-                                                        .font(.subheadline)
-                                                        .foregroundColor(.white.opacity(0.7))
-                                                        .lineLimit(1)
-                                                }
-                                            }
-                                            .padding(.horizontal, 12)
-                                            .padding(.bottom, 12)
-                                            .frame(maxWidth: .infinity, alignment: .leading)
-                                        }
-                                    }
-                                    .frame(width: cardWidth, height: cardHeight)
-                                    .background(Color.white)
-                                    .clipShape(RoundedRectangle(cornerRadius: 20))
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 20)
-                                            .stroke(Color.white, lineWidth: 2)
-                                    )
-                                    .shadow(color: Color.black.opacity(0.2), radius: 5, x: 0, y: 2)
-                                }
-                                .contextMenu {
-                                    Button(role: .destructive) {
-                                        profile.removePlaceFromList(place: place, list: list)
-                                    } label: {
-                                        Label("Remove from list", systemImage: "trash")
-                                    }
-                                }
-                            }
-                        }
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 10)
-                    }
-                } else {
-                    Text("No places in this list")
-                        .foregroundColor(.gray)
-                        .padding(.vertical, 30)
-                }
-            } else {
-                Text("Loading places...")
-                    .foregroundColor(.gray)
-                    .padding(.vertical, 30)
-            }
-        }
-        .cornerRadius(20)
-        .padding()
+        ListPlacesPopupContent(
+            list: list,
+            placeColors: $placeColors,
+            showingDeleteConfirmation: $showingDeleteConfirmation
+        )
         .onAppear {
-            if let placeIds = profile.placeListMBPlaces[list.id] {
+            if let placeIds = profile.userListsPlaces[list.id.uuidString] {
                 let places = placeIds.compactMap { detailPlaceViewModel.places[$0] }
                 for place in places {
                     if placeColors[place.id] == nil {
@@ -381,7 +410,48 @@ struct ListPlacesPopupView: View {
     }
     
     private func colorForPlace(_ place: DetailPlace) -> Color {
-        placeColors[place.id] ?? .gray
+        Color(
+            red: Double.random(in: 0...1),
+            green: Double.random(in: 0...1),
+            blue: Double.random(in: 0...1)
+        )
+    }
+}
+
+// New subview to break up complexity
+struct ListPlacesPopupContent: View {
+    let list: PlaceList
+    @Binding var placeColors: [UUID: Color]
+    @Binding var showingDeleteConfirmation: Bool
+    @EnvironmentObject var profile: ProfileViewModel
+    @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
+    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
+
+    var body: some View {
+        VStack(spacing: 10) {
+            HStack {
+                Button(action: {
+                    showingDeleteConfirmation = true
+                }) {
+                    Image(systemName: "trash")
+                        .foregroundColor(.gray)
+                        .frame(width: 44, height: 44)
+                }
+                Spacer()
+                Text(list.name)
+                    .font(.headline)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                Spacer()
+                Color.clear
+                    .frame(width: 44, height: 44)
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 10)
+            Spacer().frame(height: 20)
+            ListPlacesPopUpListView(list: list)
+        }
+        .cornerRadius(20)
+        .padding()
     }
 }
 
@@ -401,7 +471,7 @@ struct ProfileListDescription: View {
                     .fontWeight(.medium)
                     .foregroundColor(.black)
                     .padding(.leading, 20)
-                Text("\(profile.placeListMBPlaces[list.id]?.count ?? 0) \(profile.placeListMBPlaces[list.id]?.count == 1 ? "place" : "places")")
+                Text("\(profile.userListsPlaces[list.id.uuidString]?.count ?? 0) \(profile.userListsPlaces[list.id.uuidString]?.count == 1 ? "place" : "places")")
                     .font(.caption)
                     .foregroundStyle(.black)
             }
@@ -424,27 +494,25 @@ struct ProfileViewListsView: View {
     @State private var showingNewListSheet = false
     @State private var placeColors: [UUID: Color] = [:]
     
+    // Precompute sorted lists
+    var sortedLists: [PlaceList] {
+        profile.userLists.sorted { $0.sortOrder < $1.sortOrder }
+    }
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             ListHeaderView(onAddList: {
                 showingNewListSheet = true
             })
 
-            if !profile.userLists.isEmpty {
-                ForEach(profile.userLists.sorted(by: { $0.sortOrder < $1.sortOrder }), id: \.id) { list in
-                    VStack(alignment: .leading) {
-                        ProfileListDescription(list: list, placeColors: $placeColors)
-                        
-                        if let placeIds = profile.placeListMBPlaces[list.id] {
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                MyProfileHorizontalListPlaces(places: placeIds.compactMap { detailPlaceViewModel.places[$0] }, placeColors: $placeColors)
-                            }
-                        } else {
-                            Text("Loading places...")
-                                .foregroundColor(.gray)
-                                .padding(.leading, 20)
-                        }
-                    }
+            if !sortedLists.isEmpty {
+                ForEach(sortedLists, id: \ .id) { list in
+                    ProfileListSection(
+                        list: list,
+                        placeIds: profile.userListsPlaces[list.id.uuidString],
+                        detailPlaceViewModel: detailPlaceViewModel,
+                        placeColors: $placeColors
+                    )
                 }
             } else {
                 Text("No lists available")
@@ -461,16 +529,33 @@ struct ProfileViewListsView: View {
                 profile.addNewPlaceList(named: listName, city: "", emoji: "", image: "")
             })
         }
-        .onChange(of: inputImage) { _ in
-            guard let newImage = inputImage.first, let selectedList = selectedList else { return }
-            selectedList.addPhotoToList(image: newImage)
-            profile.listImages[selectedList.placeList.id] = newImage
-            inputImage = []
-            self.selectedList = nil
-        }
         .onChange(of: selectedPlaceVM.isDetailSheetPresented) { newValue in
             if newValue == true {
                 presentationMode.wrappedValue.dismiss()
+            }
+        }
+    }
+}
+
+// New subview to break up complexity
+struct ProfileListSection: View {
+    let list: PlaceList
+    let placeIds: [String]?
+    let detailPlaceViewModel: DetailPlaceViewModel
+    @Binding var placeColors: [UUID: Color]
+
+    var body: some View {
+        VStack(alignment: .leading) {
+            ProfileListDescription(list: list, placeColors: $placeColors)
+            if let placeIds = placeIds {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    let places = placeIds.compactMap { detailPlaceViewModel.places[$0] }
+                    MyProfileHorizontalListPlaces(places: places, placeColors: $placeColors)
+                }
+            } else {
+                Text("Loading places...")
+                    .foregroundColor(.gray)
+                    .padding(.leading, 20)
             }
         }
     }

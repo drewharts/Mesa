@@ -13,6 +13,7 @@ struct locApp: App {
     @StateObject private var userSession: UserSession
     @StateObject private var profileViewModel: ProfileViewModel
     @StateObject private var detailPlaceViewModel: DetailPlaceViewModel
+    @StateObject private var selectedPlaceViewModel: SelectedPlaceViewModel
     private let dataManager: DataManager
 
     init() {
@@ -25,6 +26,7 @@ struct locApp: App {
         let detailVM = DetailPlaceViewModel(firestoreService: firestore)
         let userSess = UserSession(firestoreService: firestore, locationManager: location, detailPlaceVM: detailVM)
         let profileVM = ProfileViewModel(userSession: userSess, firestoreService: firestore, detailPlaceViewModel: detailVM)
+        let selectedPlaceVM = SelectedPlaceViewModel(locationManager: location, firestoreService: firestore)
         
         // Initialize DataManager with all required parameters
         let dataMgr = DataManager(
@@ -41,6 +43,7 @@ struct locApp: App {
         self._profileViewModel = StateObject(wrappedValue: profileVM)
         self._detailPlaceViewModel = StateObject(wrappedValue: detailVM)
         self.dataManager = dataMgr
+        self._selectedPlaceViewModel = StateObject(wrappedValue: selectedPlaceVM)
     }
 
     var body: some Scene {
@@ -50,6 +53,7 @@ struct locApp: App {
                 .environmentObject(locationManager)
                 .environmentObject(profileViewModel)
                 .environmentObject(detailPlaceViewModel)
+                .environmentObject(selectedPlaceViewModel)
                 .preferredColorScheme(.light)
                 .onAppear {
                     if let currentUser = Auth.auth().currentUser {
