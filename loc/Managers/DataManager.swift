@@ -68,7 +68,7 @@ class DataManager {
             case .success(let profileData):
                 self.profileViewModel.user = profileData
                 if let profilePhotoUrl = profileData.profilePhotoURL {
-                    self.AddProfilePicture(userId: userId, profilePhotoUrl: profilePhotoUrl)
+                    self.AddProfilePicture(userId: userId, profilePhotoUrl: profilePhotoUrl, isCurrentUser: true)
                 }
                 self.profileViewModel.finishLoading()
             case .failure(let error):
@@ -92,11 +92,13 @@ class DataManager {
         }.resume()
     }
 
-    func AddProfilePicture(userId: String, profilePhotoUrl: URL) {
+    func AddProfilePicture(userId: String, profilePhotoUrl: URL, isCurrentUser: Bool = false) {
         downloadImage(from: profilePhotoUrl) { image in
             if let image = image {
+                if isCurrentUser {
+                    self.profileViewModel.userPicture = image
+                }
                 self.detailPlaceViewModel.userProfilePicture[userId] = image
-                self.profileViewModel.userPicture = image
             } else {
                 print("Failed to download profile picture from URL: \(profilePhotoUrl)")
             }
