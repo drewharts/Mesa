@@ -22,7 +22,7 @@ struct ProfileFollowCountsView: View {
                 showingFollowers = true
             }) {
                 VStack {
-                    Text("\(profile.followers)")
+                    Text("\(profile.userFollowers.count)")
                         .font(.headline)
                         .foregroundColor(.black)
                         .fontWeight(.regular)
@@ -43,7 +43,7 @@ struct ProfileFollowCountsView: View {
                 showingFollowing = true
             }) {
                 VStack {
-                    Text("\(profile.following)")
+                    Text("\(profile.userFollowing.count)")
                         .font(.headline)
                         .foregroundColor(.black)
                         .fontWeight(.regular)
@@ -64,7 +64,7 @@ struct ProfileFollowCountsView: View {
                 showingMyPlaces = true
             }) {
                 VStack {
-                    Text("\(profile.myPlacesCount)")
+                    Text("\(profile.myPlaces.count)")
                         .font(.headline)
                         .foregroundColor(.black)
                         .fontWeight(.regular)
@@ -80,13 +80,13 @@ struct ProfileFollowCountsView: View {
             }
         }
         .padding(.vertical, 10)
-        .onChange(of: profile.following) { _ in
+        .onChange(of: profile.userFollowing.count) { _ in
             refreshToggle.toggle()
         }
-        .onChange(of: profile.followers) { _ in
+        .onChange(of: profile.userFollowers.count) { _ in
             refreshToggle.toggle()
         }
-        .onChange(of: profile.myPlacesCount) { _ in
+        .onChange(of: profile.myPlaces.count) { _ in
             refreshToggle.toggle()
         }
     }

@@ -74,6 +74,7 @@ struct PlaceReviewsView: View {
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var userProfileViewModel: UserProfileViewModel
+    @EnvironmentObject var userSession: UserSession
     @State private var activeKeyboardReviewId: String? = nil
 
     var body: some View {
@@ -130,7 +131,7 @@ struct PlaceReviewsView: View {
         }
         .onAppear {
             // Check like statuses when view appears
-            selectedPlaceVM.checkLikeStatuses(userId: profile.userId)
+            selectedPlaceVM.checkLikeStatuses(userId: userSession.currentUserId! )
         }
     }
     
@@ -147,13 +148,15 @@ struct RestaruantReviewViewProfileInformation: View {
     let review: ReviewProtocol
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var profile: ProfileViewModel
+    @EnvironmentObject var detailPlaceVM: DetailPlaceViewModel
+    @EnvironmentObject var userSession: UserSession
     @EnvironmentObject var userProfileViewModel: UserProfileViewModel
     @State private var showProfileView = false
 
     var body: some View {
         HStack(alignment: .center, spacing: 16) { // Increased spacing between photo and text
             // Profile Photo from Cache
-            if let profilePhoto = profile.profilePhoto(forUserId: review.userId) {
+            if let profilePhoto = detailPlaceVM.userProfilePicture[review.userId] {
                 Image(uiImage: profilePhoto)
                     .resizable()
                     .scaledToFill()
@@ -161,14 +164,14 @@ struct RestaruantReviewViewProfileInformation: View {
                     .clipShape(Circle())
                     .onTapGesture {
                         // Check if this is the logged-in user's profile
-                        if review.userId == profile.userId {
+                        if review.userId == userSession.currentUserId! {
                             // Show the user's own profile page directly
                             showProfileView = true
                         } else {
                             // For other users, fetch and show their profile
                             firestoreService.fetchUserById(userId: review.userId) { profileData in
                                 if let profileData = profileData {
-                                    userProfileViewModel.selectUser(profileData, currentUserId: profile.userId)
+                                    userProfileViewModel.selectUser(profileData, currentUserId: userSession.currentUserId!)
                                 }
                             }
                         }
@@ -285,6 +288,7 @@ struct RestaurantReviewView: View {
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var userProfileViewModel: UserProfileViewModel
+    @EnvironmentObject var userSession: UserSession
     @State private var showComments = false
     
     // Static dictionary to track which review comments should be hidden
@@ -455,7 +459,7 @@ struct RestaurantReviewView: View {
         .padding(.vertical)
         .onAppear {
             // Check like statuses using the proper userId from profile
-            selectedPlaceVM.checkLikeStatuses(userId: profile.userId)
+            selectedPlaceVM.checkLikeStatuses(userId: userSession.currentUserId!)
             
             // Listen for the hide comments notification
             NotificationCenter.default.addObserver(forName: Foundation.Notification.Name("HideCommentsFor-\(review.id)"), object: nil, queue: .main) { _ in
@@ -476,6 +480,7 @@ struct InlineCommentsView: View {
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var userProfileViewModel: UserProfileViewModel
+    @EnvironmentObject var userSession: UserSession
     @State private var commentText = ""
     @State private var selectedImages: [UIImage] = []
     @State private var isPickerPresented = false
@@ -879,10 +884,10 @@ struct InlineCommentsView: View {
             reviewId: reviewId,
             text: commentText,
             images: selectedImages,
-            userId: profile.userId,
-            userFirstName: profile.currentUser?.firstName ?? "unknown",
-            userLastName: profile.currentUser?.lastName ?? "unknown",
-            profilePhotoUrl: profile.currentUser?.profilePhotoURL?.absoluteString ?? ""
+            userId: userSession.currentUserId ?? "unknown",
+            userFirstName: profile.user?.firstName ?? "unknown",
+            userLastName: profile.user?.lastName ?? "unknown",
+            profilePhotoUrl: profile.user?.profilePhotoURL?.absoluteString ?? ""
         )
         
         // Clear form
@@ -897,6 +902,8 @@ struct InlineCommentView: View {
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var userProfileViewModel: UserProfileViewModel
+    @EnvironmentObject var detailplaceVM: DetailPlaceViewModel
+    @EnvironmentObject var userSession: UserSession
     @State private var showFullText = false
     @State private var showProfileView = false
     @Binding var selectedImage: UIImage?
@@ -908,7 +915,7 @@ struct InlineCommentView: View {
             // User info and comment text
             HStack(alignment: .top, spacing: 8) {
                 // First try to get the profile photo from cache
-                if let cachedPhoto = profile.profilePhoto(forUserId: comment.userId) {
+                if let cachedPhoto = detailplaceVM.userProfilePicture[comment.userId] {
                     Image(uiImage: cachedPhoto)
                         .resizable()
                         .scaledToFill()
@@ -916,14 +923,14 @@ struct InlineCommentView: View {
                         .clipShape(Circle())
                         .onTapGesture {
                             // Check if this is the logged-in user's profile
-                            if comment.userId == profile.userId {
+                            if comment.userId == userSession.currentUserId {
                                 // Show the user's own profile page directly
                                 showProfileView = true
                             } else {
                                 // For other users, fetch and show their profile
                                 firestoreService.fetchUserById(userId: comment.userId) { profileData in
                                     if let profileData = profileData {
-                                        userProfileViewModel.selectUser(profileData, currentUserId: profile.userId)
+                                        userProfileViewModel.selectUser(profileData, currentUserId: userSession.currentUserId!)
                                     }
                                 }
                             }
@@ -1095,6 +1102,7 @@ struct GenericReviewView: View {
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var userProfileViewModel: UserProfileViewModel
+    @EnvironmentObject var userSession: UserSession
     @State private var showComments = false
     
     // Static dictionary to track which review comments should be hidden
@@ -1196,7 +1204,7 @@ struct GenericReviewView: View {
         }
         .onAppear {
             // Check like statuses using the proper userId from profile
-            selectedPlaceVM.checkLikeStatuses(userId: profile.userId)
+            selectedPlaceVM.checkLikeStatuses(userId: userSession.currentUserId!)
             
             // Listen for the hide comments notification
             NotificationCenter.default.addObserver(forName: Foundation.Notification.Name("HideCommentsFor-\(review.id)"), object: nil, queue: .main) { _ in
