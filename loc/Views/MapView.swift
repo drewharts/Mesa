@@ -5,8 +5,7 @@
 //
 
 import SwiftUI
-import MapboxMaps
-import FirebaseFirestore
+import MapKit
 
 struct MapView: View {
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
@@ -15,8 +14,10 @@ struct MapView: View {
     @EnvironmentObject var detailPlaceVM: DetailPlaceViewModel
     
     private let defaultCenter = CLLocationCoordinate2D(latitude: 39.5, longitude: -98.0)
-    @State var viewport: Viewport = .camera(center: CLLocationCoordinate2D(latitude: 39.5, longitude: -98.0), zoom: 10)
-    @State private var hasInitialized = false
+    @State private var region: MKCoordinateRegion = MKCoordinateRegion(
+        center: CLLocationCoordinate2D(latitude: 39.5, longitude: -98.0),
+        span: MKCoordinateSpan(latitudeDelta: 0.1, longitudeDelta: 0.1)
+    )
     @State private var showCreatePlacePopup = false
     @State private var newPlaceName = ""
     @State private var newPlaceDescription = ""
@@ -26,102 +27,59 @@ struct MapView: View {
     
     var body: some View {
         let currentCoords = locationManager.currentLocation?.coordinate ?? defaultCenter
+        let places = detailPlaceVM.getAllSavedDetailPlaces().compactMap { place -> PlaceAnnotationItem? in
+            guard let geoPoint = place.coordinate else { return nil }
+            return PlaceAnnotationItem(
+                id: place.id,
+                coordinate: CLLocationCoordinate2D(latitude: geoPoint.latitude, longitude: geoPoint.longitude),
+                place: place
+            )
+        }
         
         ZStack {
-            Map(viewport: $viewport) {
-                Puck2D()
-                Puck2D(bearing: .heading)
-                
-                ForEvery(detailPlaceVM.getAllSavedDetailPlaces()) { place in
-                    let placeId = place.id.uuidString
-                    if let annotationImage = detailPlaceVM.placeAnnotations[placeId] {
-                        PointAnnotation(coordinate: CLLocationCoordinate2D(
-                            latitude: place.coordinate!.latitude, longitude: place.coordinate!.longitude
-                        ))
-                        .image(.init(image: annotationImage, name: "dest-pin-\(placeId)"))
-                        .onTapGesture {
-                            selectedPlaceVM.selectedPlace = place
-                            selectedPlaceVM.isDetailSheetPresented = true
-                        }
+            Map(coordinateRegion: $region, annotationItems: places) { item in
+                MapAnnotation(coordinate: item.coordinate) {
+                    if let annotationImage = detailPlaceVM.placeAnnotations[item.place.id.uuidString] {
+                        Image(uiImage: annotationImage)
+                            .resizable()
+                            .frame(width: 40, height: 40)
+                            .clipShape(Circle())
+                            .onTapGesture {
+                                selectedPlaceVM.selectedPlace = item.place
+                                selectedPlaceVM.isDetailSheetPresented = true
+                            }
+                    } else {
+                        Circle()
+                            .fill(Color.blue)
+                            .frame(width: 30, height: 30)
+                            .onTapGesture {
+                                selectedPlaceVM.selectedPlace = item.place
+                                selectedPlaceVM.isDetailSheetPresented = true
+                            }
                     }
                 }
-                
-                if let selectedPlace = selectedPlaceVM.selectedPlace {
-                    let currentPlaceLocation = CLLocationCoordinate2D(
-                        latitude: selectedPlace.coordinate!.latitude,
-                        longitude: selectedPlace.coordinate!.longitude
-                    )
+            }
+            .onAppear {
+                region.center = currentCoords
+                region.span = MKCoordinateSpan(latitudeDelta: 0.1, longitudeDelta: 0.1)
+            }
+            .onChange(of: selectedPlaceVM.selectedPlace) { newPlace in
+                guard let place = newPlace, let geoPoint = place.coordinate else { return }
+                let newCenter = CLLocationCoordinate2D(latitude: geoPoint.latitude, longitude: geoPoint.longitude)
+                withAnimation {
+                    region.center = newCenter
+                    region.span = MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
                 }
             }
-//            .onMapTapGesture { _ in
-//                onMapTap?()
-//            }
-//            .onMapLongPressGesture { context in
-//                newPlaceCoordinate = context.coordinate
-//                showCreatePlacePopup = true
-//            }
-//            .onAppear {
-//                if !hasInitialized {
-//                    print("Initial setup with coords: \(currentCoords)")
-//                    viewport = .camera(center: currentCoords, zoom: 13)
-//                    hasInitialized = true
-//                }
-//                
-//                // Add notification observer for map refresh
-//                NotificationCenter.default.addObserver(forName: NSNotification.Name("RefreshMapAnnotations"), object: nil, queue: .main) { [self] _ in
-//                    print("Received map refresh notification - refreshing annotations")
-//                    // Force map to redraw by making a minor state change
-//                    let currentCenter = viewport.camera?.center
-//                    // Create a very slightly different viewport to force refresh
-//                    withAnimation(.easeInOut(duration: 0.1)) {
-//                        viewport = .camera(center: currentCenter, zoom: viewport.camera?.zoom, bearing: viewport.camera?.bearing)
-//                    }
-//                }
-//            }
-//            .onChange(of: selectedPlaceVM.selectedPlace) { newPlace in
-//                guard let place = newPlace, let coordinate = place.coordinate else {
-//                    print("No valid place or coordinate")
-//                    return
-//                }
-//                let newCenter = CLLocationCoordinate2D(
-//                    latitude: coordinate.latitude,
-//                    longitude: coordinate.longitude
-//                )
-//                withViewportAnimation(.easeOut(duration: 2.0)) {
-//                    viewport = .camera(center: newCenter, zoom: 14)
-//                }
-//            }
-//            .onChange(of: profile.placeAnnotationImages) { _ in
-//                let currentViewport = viewport
-//                viewport = currentViewport
-//            }
-//            .onDisappear {
-//                // Remove notification observer
-//                NotificationCenter.default.removeObserver(self, name: NSNotification.Name("RefreshMapAnnotations"), object: nil)
-//            }
-            
-//            if showCreatePlacePopup, let coordinate = newPlaceCoordinate {
-//                Color.black.opacity(0.3)
-//                    .edgesIgnoringSafeArea(.all)
-//                    .onTapGesture {
-//                        showCreatePlacePopup = false
-//                    }
-//                
-//                CreatePlacePopupView(
-//                    isPresented: $showCreatePlacePopup,
-//                    placeName: $newPlaceName,
-//                    placeDescription: $newPlaceDescription,
-//                    coordinate: coordinate
-//                ) { name, description in
-//                    selectedPlaceVM.createNewPlace(
-//                        name: name,
-//                        description: description,
-//                        coordinate: coordinate,
-//                        userId: profile.userId
-//                    )
-//                }
-//                .padding()
-//            }
+            // Optionally, add long press gesture for creating a new place
+            // .gesture(LongPressGesture().onEnded { value in ... })
+            // Add popup for creating a new place if needed
         }
     }
+}
+
+struct PlaceAnnotationItem: Identifiable {
+    let id: UUID
+    let coordinate: CLLocationCoordinate2D
+    let place: DetailPlace
 }
