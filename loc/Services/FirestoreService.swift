@@ -112,37 +112,50 @@ class FirestoreService: ObservableObject {
     }
     
     // Fetch all places from Firestore
-        func fetchAllPlaces(completion: @escaping ([DetailPlace]?, Error?) -> Void) {
-            print("Fetching all places from Firestore...")
-            db.collection("places").getDocuments { (snapshot, error) in
+    func fetchAllPlaces(completion: @escaping ([DetailPlace]?, Error?) -> Void) {
+        print("Fetching all places from Firestore...")
+        db.collection("places").getDocuments { (snapshot, error) in
+            if let error = error {
+                print("Error fetching places: \(error.localizedDescription)")
+                completion(nil, error)
+                return
+            }
+            guard let documents = snapshot?.documents else {
+                print("No places found in Firestore.")
+                completion([], nil)
+                return
+            }
+            let places = documents.compactMap { try? $0.data(as: DetailPlace.self) }
+            print("Fetched \(places.count) places.")
+            completion(places, nil)
+        }
+    }
+    
+    // Async version of fetchAllPlaces
+    func fetchAllPlaces() async throws -> [DetailPlace] {
+        return try await withCheckedThrowingContinuation { continuation in
+            fetchAllPlaces { places, error in
                 if let error = error {
-                    print("Error fetching places: \(error.localizedDescription)")
-                    completion(nil, error)
+                    continuation.resume(throwing: error)
                     return
                 }
-                guard let documents = snapshot?.documents else {
-                    print("No places found in Firestore.")
-                    completion([], nil)
-                    return
-                }
-                let places = documents.compactMap { try? $0.data(as: DetailPlace.self) }
-                print("Fetched \(places.count) places.")
-                completion(places, nil)
+                continuation.resume(returning: places ?? [])
             }
         }
-
-        // Update OpenHours for a specific place
-        func updateOpenHours(for placeId: String, openHours: [String]?, completion: @escaping (Error?) -> Void) {
-            let data: [String: Any] = ["OpenHours": openHours as Any]
-            db.collection("places").document(placeId).updateData(data) { error in
-                if let error = error {
-                    print("Error updating OpenHours for place \(placeId): \(error.localizedDescription)")
-                } else {
-                    print("Successfully updated OpenHours for place \(placeId)")
-                }
-                completion(error)
+    }
+    
+    // Update OpenHours for a specific place
+    func updateOpenHours(for placeId: String, openHours: [String]?, completion: @escaping (Error?) -> Void) {
+        let data: [String: Any] = ["OpenHours": openHours as Any]
+        db.collection("places").document(placeId).updateData(data) { error in
+            if let error = error {
+                print("Error updating OpenHours for place \(placeId): \(error.localizedDescription)")
+            } else {
+                print("Successfully updated OpenHours for place \(placeId)")
             }
+            completion(error)
         }
+    }
     
     func addFieldToAllPlaces(fieldName: String, fieldValue: Any) {
         let db = Firestore.firestore()

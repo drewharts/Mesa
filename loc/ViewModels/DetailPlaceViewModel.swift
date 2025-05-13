@@ -246,4 +246,26 @@ class DetailPlaceViewModel: ObservableObject {
             places[placeId]
         }
     }
+
+    // Refresh all places data asynchronously
+    @MainActor
+    func refreshPlaces() async {
+        do {
+            // Fetch all places from Firestore
+            let refreshedPlaces = try await firestoreService.fetchAllPlaces()
+            
+            // Update local cache
+            for place in refreshedPlaces {
+                places[place.id.uuidString] = place
+                fetchPlaceImage(for: place.id.uuidString)
+                calculateRestaurantType(for: place)
+            }
+            
+            // Notify UI that data has changed
+            self.objectWillChange.send()
+            print("Successfully refreshed \(refreshedPlaces.count) places")
+        } catch {
+            print("Error refreshing places: \(error.localizedDescription)")
+        }
+    }
 }

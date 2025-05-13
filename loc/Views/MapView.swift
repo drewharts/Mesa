@@ -22,6 +22,7 @@ struct MapView: View {
     @State private var newPlaceName = ""
     @State private var newPlaceDescription = ""
     @State private var newPlaceCoordinate: CLLocationCoordinate2D?
+    @State private var mapPosition = MapCameraPosition.automatic
     
     var onMapTap: (() -> Void)?
     
@@ -35,11 +36,24 @@ struct MapView: View {
                 place: place
             )
         }
-        let initCamera = MapCamera(centerCoordinate: currentCoords, distance: 1000)
-        let initialPosition = MapCameraPosition.camera(initCamera)
         
-        Map(initialPosition: initialPosition) {
-
+        Map(position: $mapPosition) {
+            ForEach(places) { place in
+                Annotation(
+                    place.place.name,
+                    coordinate: place.coordinate,
+                    anchor: .bottom
+                ) {
+                    PlaceAnnotationView(
+                        place: place.place,
+                        image: detailPlaceVM.placeAnnotations[place.place.id.uuidString],
+                        annotationImage: detailPlaceVM.placeAnnotations[place.place.id.uuidString]
+                    )
+                    .onTapGesture {
+                        selectedPlaceVM.selectedPlace = place.place
+                    }
+                }
+            }
         }
         .mapControlVisibility(.hidden)
         .ignoresSafeArea()
@@ -49,14 +63,58 @@ struct MapView: View {
                 onTap()
             }
         }
-        .onChange(of: selectedPlaceVM.selectedPlace) { newPlace in
-            guard let place = newPlace, let geoPoint = place.coordinate else { return }
+        .onChange(of: selectedPlaceVM.selectedPlace) { oldValue, newValue in
+            guard let place = newValue, let geoPoint = place.coordinate else { return }
             let newCenter = CLLocationCoordinate2D(latitude: geoPoint.latitude, longitude: geoPoint.longitude)
             // Update camera when a place is selected
             withAnimation {
-                // You may need to update this with the correct camera position API
+                mapPosition = .camera(MapCamera(centerCoordinate: newCenter, distance: 500))
             }
         }
+        .onAppear {
+            // Set initial position when the view appears
+            let camera = MapCamera(centerCoordinate: currentCoords, distance: 1000)
+            mapPosition = .camera(camera)
+            
+            // Setup notification observer for place updates
+            setupNotificationObservers()
+        }
+        .onDisappear {
+            // Remove notification observers
+            removeNotificationObservers()
+        }
+        .task {
+            // Refresh places whenever the view appears
+            await detailPlaceVM.refreshPlaces()
+            
+            // Calculate annotation images
+            detailPlaceVM.calculateAnnotationPlaces()
+        }
+    }
+    
+    // MARK: - Private Methods
+    
+    // Listen for notifications about place changes
+    private func setupNotificationObservers() {
+        NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("RefreshMapAnnotations"),
+            object: nil,
+            queue: .main
+        ) { _ in
+            // Refresh places when notified
+            Task {
+                await detailPlaceVM.refreshPlaces()
+                detailPlaceVM.calculateAnnotationPlaces()
+            }
+        }
+    }
+    
+    private func removeNotificationObservers() {
+        NotificationCenter.default.removeObserver(
+            self,
+            name: NSNotification.Name("RefreshMapAnnotations"),
+            object: nil
+        )
     }
 }
 
@@ -64,4 +122,48 @@ struct PlaceAnnotationItem: Identifiable {
     let id: UUID
     let coordinate: CLLocationCoordinate2D
     let place: DetailPlace
+}
+
+struct PlaceAnnotationView: View {
+    let place: DetailPlace
+    let image: UIImage?
+    let annotationImage: UIImage?
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            if let annotationImage = annotationImage {
+                Image(uiImage: annotationImage)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 40, height: 40)
+                    .clipShape(Circle())
+                    .overlay(Circle().stroke(Color.white, lineWidth: 2))
+            } else if let image = image {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 30, height: 30)
+                    .clipShape(Circle())
+                    .overlay(Circle().stroke(Color.white, lineWidth: 2))
+            } else {
+                Image(systemName: "mappin")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 20, height: 20)
+                    .foregroundColor(.red)
+                    .padding(5)
+                    .background(Color.white)
+                    .clipShape(Circle())
+            }
+            
+            Image(systemName: "triangle.fill")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 10, height: 10)
+                .foregroundColor(.white)
+                .rotationEffect(.degrees(180))
+                .offset(y: -3)
+        }
+        .shadow(radius: 2)
+    }
 }
