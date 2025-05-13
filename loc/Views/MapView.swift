@@ -35,45 +35,27 @@ struct MapView: View {
                 place: place
             )
         }
+        let initCamera = MapCamera(centerCoordinate: currentCoords, distance: 1000)
+        let initialPosition = MapCameraPosition.camera(initCamera)
         
-        ZStack {
-            Map(coordinateRegion: $region, annotationItems: places) { item in
-                MapAnnotation(coordinate: item.coordinate) {
-                    if let annotationImage = detailPlaceVM.placeAnnotations[item.place.id.uuidString] {
-                        Image(uiImage: annotationImage)
-                            .resizable()
-                            .frame(width: 40, height: 40)
-                            .clipShape(Circle())
-                            .onTapGesture {
-                                selectedPlaceVM.selectedPlace = item.place
-                                selectedPlaceVM.isDetailSheetPresented = true
-                            }
-                    } else {
-                        Circle()
-                            .fill(Color.blue)
-                            .frame(width: 30, height: 30)
-                            .onTapGesture {
-                                selectedPlaceVM.selectedPlace = item.place
-                                selectedPlaceVM.isDetailSheetPresented = true
-                            }
-                    }
-                }
+        Map(initialPosition: initialPosition) {
+
+        }
+        .mapControlVisibility(.hidden)
+        .ignoresSafeArea()
+        .onTapGesture {
+            // Handle map tap
+            if let onTap = onMapTap {
+                onTap()
             }
-            .onAppear {
-                region.center = currentCoords
-                region.span = MKCoordinateSpan(latitudeDelta: 0.1, longitudeDelta: 0.1)
+        }
+        .onChange(of: selectedPlaceVM.selectedPlace) { newPlace in
+            guard let place = newPlace, let geoPoint = place.coordinate else { return }
+            let newCenter = CLLocationCoordinate2D(latitude: geoPoint.latitude, longitude: geoPoint.longitude)
+            // Update camera when a place is selected
+            withAnimation {
+                // You may need to update this with the correct camera position API
             }
-            .onChange(of: selectedPlaceVM.selectedPlace) { newPlace in
-                guard let place = newPlace, let geoPoint = place.coordinate else { return }
-                let newCenter = CLLocationCoordinate2D(latitude: geoPoint.latitude, longitude: geoPoint.longitude)
-                withAnimation {
-                    region.center = newCenter
-                    region.span = MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
-                }
-            }
-            // Optionally, add long press gesture for creating a new place
-            // .gesture(LongPressGesture().onEnded { value in ... })
-            // Add popup for creating a new place if needed
         }
     }
 }

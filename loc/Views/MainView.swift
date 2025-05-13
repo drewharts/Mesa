@@ -8,7 +8,6 @@
 
 import SwiftUI
 import FirebaseAuth
-import MapboxMaps
 import MapboxSearch
 
 struct MainView: View {
@@ -29,14 +28,16 @@ struct MainView: View {
 
     var body: some View {
         NavigationView {
-            ZStack(alignment: .top) {
+            ZStack {
+                // Map layer
                 MapView(onMapTap: {
                     searchIsFocused = false
                     isSearchBarMinimized = true
                 })
                 .ignoresSafeArea()
                 .edgesIgnoringSafeArea(.all)
-
+                
+                // UI overlay layer
                 VStack(spacing: 16) {
                     if isSearchBarMinimized {
                         HStack {
@@ -49,7 +50,6 @@ struct MainView: View {
                                         }
                                         isSearchBarMinimized.toggle()
                                     }
-                                    // Delay focus to ensure TextField is rendered
                                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                                         searchIsFocused = true
                                     }
@@ -59,15 +59,12 @@ struct MainView: View {
                                         .frame(width: 60, height: 60)
                                         .background(Color.white)
                                         .clipShape(Circle())
-                                        .overlay(
-                                            Circle().stroke(Color.gray, lineWidth: 2)
-                                        )
+                                        .overlay(Circle().stroke(Color.gray, lineWidth: 2))
                                         .shadow(radius: 4)
                                 }
                                 .padding(.top, 10)
                                 .padding(.trailing, 20)
-
-                                // Profile Button (unchanged)
+                                
                                 NavigationLink(
                                     destination: ProfileView()
                                         .environmentObject(userProfileViewModel),
@@ -82,9 +79,7 @@ struct MainView: View {
                                                 .resizable()
                                                 .frame(width: 60, height: 60)
                                                 .clipShape(Circle())
-                                                .overlay(
-                                                    Circle().stroke(Color.gray, lineWidth: 2)
-                                                )
+                                                .overlay(Circle().stroke(Color.gray, lineWidth: 2))
                                                 .shadow(radius: 4)
                                         } else {
                                             Image(systemName: "person.crop.circle")
@@ -93,9 +88,7 @@ struct MainView: View {
                                                 .frame(width: 60, height: 60)
                                                 .background(Color.white)
                                                 .clipShape(Circle())
-                                                .overlay(
-                                                    Circle().stroke(Color.gray, lineWidth: 2)
-                                                )
+                                                .overlay(Circle().stroke(Color.gray, lineWidth: 2))
                                                 .shadow(radius: 4)
                                         }
                                     }
@@ -116,7 +109,7 @@ struct MainView: View {
                             .padding(.horizontal, 20)
                             .padding(.top, 10)
                             .padding(.bottom, -10)
-
+                        
                         if !viewModel.searchResults.isEmpty || !viewModel.userResults.isEmpty {
                             SearchResultsView(
                                 placeResults: viewModel.searchResults,
@@ -142,14 +135,10 @@ struct MainView: View {
                             .padding(.bottom, 50)
                         }
                     }
+                    Spacer()
                 }
-                .sheet(isPresented: $userProfileViewModel.isUserDetailPresented) {
-                    if let user = userProfileViewModel.selectedUser {
-                        UserProfileView(userId: userSession.currentUserId!, viewModel: userProfileViewModel)
-                    }
-                }
-                .transition(.move(edge: .top).combined(with: .opacity))
-
+                .navigationBarHidden(true)
+                
                 if selectedPlaceVM.isDetailSheetPresented {
                     BottomSheetView(
                         isPresented: $selectedPlaceVM.isDetailSheetPresented,
@@ -165,13 +154,18 @@ struct MainView: View {
                     }
                 }
             }
-            .onAppear {
-                locationManager.requestLocationPermission()
-                viewModel.selectedPlaceVM = selectedPlaceVM
-                viewModel.searchText = ""
+            .sheet(isPresented: $userProfileViewModel.isUserDetailPresented) {
+                if let user = userProfileViewModel.selectedUser {
+                    UserProfileView(userId: userSession.currentUserId!, viewModel: userProfileViewModel)
+                }
             }
         }
         .navigationViewStyle(StackNavigationViewStyle())
+        .onAppear {
+            locationManager.requestLocationPermission()
+            viewModel.selectedPlaceVM = selectedPlaceVM
+            viewModel.searchText = ""
+        }
     }
 
     private func handleMapTap() {
