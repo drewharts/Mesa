@@ -99,6 +99,7 @@ class DataManager {
                     self.profileViewModel.userPicture = image
                 }
                 self.detailPlaceViewModel.userProfilePicture[userId] = image
+                self.detailPlaceViewModel.calculateAnnotationPlaces()
             } else {
                 print("Failed to download profile picture from URL: \(profilePhotoUrl)")
             }

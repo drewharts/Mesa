@@ -28,19 +28,22 @@ struct MapView: View {
     
     var body: some View {
         let currentCoords = locationManager.currentLocation?.coordinate ?? defaultCenter
-        let places = detailPlaceVM.getAllSavedDetailPlaces().compactMap { place -> PlaceAnnotationItem? in
-            guard let geoPoint = place.coordinate else { return nil }
-            return PlaceAnnotationItem(
-                id: place.id,
-                coordinate: CLLocationCoordinate2D(latitude: geoPoint.latitude, longitude: geoPoint.longitude),
-                place: place
-            )
-        }
         
         Map(position: $mapPosition) {
-            ForEach(places) { place in
+            ForEach(detailPlaceVM.savedDetailPlaces.compactMap { place -> PlaceAnnotationItem? in
+                guard let geoPoint = place.coordinate else {
+                    print("Skipping place \(place.id) due to nil coordinate")
+                    return nil
+                }
+                print("Adding annotation for \(place.id) at \(geoPoint.latitude), \(geoPoint.longitude)")
+                return PlaceAnnotationItem(
+                    id: place.id,
+                    coordinate: CLLocationCoordinate2D(latitude: geoPoint.latitude, longitude: geoPoint.longitude),
+                    place: place
+                )
+            }) { place in
                 Annotation(
-                    place.place.name,
+                    "",
                     coordinate: place.coordinate,
                     anchor: .bottom
                 ) {
@@ -130,40 +133,10 @@ struct PlaceAnnotationView: View {
     let annotationImage: UIImage?
     
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: 2) {
             if let annotationImage = annotationImage {
                 Image(uiImage: annotationImage)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: 40, height: 40)
-                    .clipShape(Circle())
-                    .overlay(Circle().stroke(Color.white, lineWidth: 2))
-            } else if let image = image {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: 30, height: 30)
-                    .clipShape(Circle())
-                    .overlay(Circle().stroke(Color.white, lineWidth: 2))
-            } else {
-                Image(systemName: "mappin")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 20, height: 20)
-                    .foregroundColor(.red)
-                    .padding(5)
-                    .background(Color.white)
-                    .clipShape(Circle())
             }
-            
-            Image(systemName: "triangle.fill")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 10, height: 10)
-                .foregroundColor(.white)
-                .rotationEffect(.degrees(180))
-                .offset(y: -3)
         }
-        .shadow(radius: 2)
     }
 }

@@ -61,7 +61,10 @@ class DetailPlaceViewModel: ObservableObject {
             }
             
             // Store the combined image in placeAnnotations
-            placeAnnotations[placeId] = combinedImage
+            DispatchQueue.main.async {
+                self.placeAnnotations[placeId] = combinedImage
+                self.objectWillChange.send()
+            }
         }
     }
     
@@ -241,7 +244,7 @@ class DetailPlaceViewModel: ObservableObject {
         }
     }
     
-    func getAllSavedDetailPlaces() -> [DetailPlace] {
+    var savedDetailPlaces: [DetailPlace] {
         placeSavers.keys.compactMap { placeId in
             places[placeId]
         }
