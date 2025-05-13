@@ -31,14 +31,9 @@ struct MapView: View {
         
         Map(position: $mapPosition) {
             ForEach(detailPlaceVM.savedDetailPlaces.compactMap { place -> PlaceAnnotationItem? in
-                guard let geoPoint = place.coordinate else {
-                    print("Skipping place \(place.id) due to nil coordinate")
-                    return nil
-                }
-                print("Adding annotation for \(place.id) at \(geoPoint.latitude), \(geoPoint.longitude)")
                 return PlaceAnnotationItem(
                     id: place.id,
-                    coordinate: CLLocationCoordinate2D(latitude: geoPoint.latitude, longitude: geoPoint.longitude),
+                    coordinate: CLLocationCoordinate2D(latitude: place.coordinate!.latitude, longitude: place.coordinate!.longitude),
                     place: place
                 )
             }) { place in
@@ -60,12 +55,6 @@ struct MapView: View {
         }
         .mapControlVisibility(.hidden)
         .ignoresSafeArea()
-        .onTapGesture {
-            // Handle map tap
-            if let onTap = onMapTap {
-                onTap()
-            }
-        }
         .onChange(of: selectedPlaceVM.selectedPlace) { oldValue, newValue in
             guard let place = newValue, let geoPoint = place.coordinate else { return }
             let newCenter = CLLocationCoordinate2D(latitude: geoPoint.latitude, longitude: geoPoint.longitude)
@@ -82,10 +71,10 @@ struct MapView: View {
             // Setup notification observer for place updates
             setupNotificationObservers()
         }
-        .onDisappear {
-            // Remove notification observers
-            removeNotificationObservers()
-        }
+         .onDisappear {
+             // Remove notification observers
+             removeNotificationObservers()
+         }
         .task {
             // Refresh places whenever the view appears
             await detailPlaceVM.refreshPlaces()
