@@ -68,6 +68,8 @@ struct MapView: View {
             let camera = MapCamera(centerCoordinate: currentCoords, distance: 1000)
             mapPosition = .camera(camera)
             
+            
+            
             // Setup notification observer for place updates
             setupNotificationObservers()
         }
@@ -77,7 +79,7 @@ struct MapView: View {
          }
         .task {
             // Refresh places whenever the view appears
-            await detailPlaceVM.refreshPlaces()
+            await profile.refreshUserPlaces()
             
             // Calculate annotation images
             detailPlaceVM.calculateAnnotationPlaces()
@@ -95,8 +97,8 @@ struct MapView: View {
         ) { _ in
             // Refresh places when notified
             Task {
-                await detailPlaceVM.refreshPlaces()
-                detailPlaceVM.calculateAnnotationPlaces()
+                await profile.refreshUserPlaces()
+                await detailPlaceVM.calculateAnnotationPlaces()
             }
         }
     }

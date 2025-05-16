@@ -218,4 +218,13 @@ class ProfileViewModel: ObservableObject {
     func placeCount(forListId listId: UUID) -> Int {
         return userLists.first(where: { $0.id == listId })?.places.count ?? 0
     }
+    
+    func refreshUserPlaces() async {
+        // Combine all place IDs from favorites and all lists, then de-duplicate
+        var allPlaceIds = Set(userFavorites)
+        for list in userListsPlaces.values {
+            allPlaceIds.formUnion(list)
+        }
+        await detailPlaceViewModel.refreshPlaces(detailPlaces: Array(allPlaceIds))
+    }
 }
