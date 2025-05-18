@@ -78,6 +78,10 @@ struct ProfileView: View {
                 }
             }
         }
+        .task {
+            await profile.refreshUserPlaces()
+        }
+        
         .navigationBarTitleDisplayMode(.inline)
     }
 }
