@@ -15,13 +15,12 @@ import FirebaseFirestore
 class LoginViewModel: ObservableObject {
     @Published var errorMessage: String?
     private let firestoreService: FirestoreService
+    private let dataManager: DataManager
     
-    // Instead of having isUserLoggedIn and profile here,
-    // we'll rely on the UserSession environment object passed from the view.
-    // That means your login view should pass `UserSession` as an environment object.
     
-    init(firestoreService: FirestoreService) {
+    init(firestoreService: FirestoreService, dataManager: DataManager) {
         self.firestoreService = firestoreService
+        self.dataManager = dataManager
     }
 
     func signInWithGoogle(userSession: UserSession) {
@@ -76,23 +75,36 @@ class LoginViewModel: ObservableObject {
             return
         }
 
-        let profileData = ProfileData(
-            id: uid,
-            firstName: user.profile?.givenName ?? "",
-            lastName: user.profile?.familyName ?? "",
-            email: user.profile?.email ?? "",
-            profilePhotoURL: user.profile?.imageURL(withDimension: 200),
-            phoneNumber: "",
-            fullNameLower: "\(user.profile?.givenName ?? "") \(user.profile?.familyName ?? "")".lowercased(),
-            fullName: "\(user.profile?.givenName ?? "") \(user.profile?.familyName ?? "")"
-        )
-        let detailPlaceVM = DetailPlaceViewModel(firestoreService: firestoreService.self)
-
-        FirestoreService().saveUserProfile(uid: uid, profileData: profileData) { [weak self] error in
-            if let error = error {
-                self?.errorMessage = "Error saving profile: \(error.localizedDescription)"
-            } else {
+        // Check if profile exists first
+        firestoreService.fetchUserById(userId: uid) { [weak self] result in
+            switch result {
+            case .success(_):
+                // Profile exists, do not overwrite
                 userSession.isUserLoggedIn = true
+                self?.dataManager.initializeProfileData(userId: uid)
+            case .failure(let error):
+                // Only create if not found (404)
+                if (error as NSError).code == 404 {
+                    let profileData = ProfileData(
+                        id: uid,
+                        firstName: user.profile?.givenName ?? "",
+                        lastName: user.profile?.familyName ?? "",
+                        email: user.profile?.email ?? "",
+                        profilePhotoURL: user.profile?.imageURL(withDimension: 200),
+                        phoneNumber: "",
+                        fullNameLower: "\(user.profile?.givenName ?? "") \(user.profile?.familyName ?? "")".lowercased(),
+                        fullName: "\(user.profile?.givenName ?? "") \(user.profile?.familyName ?? "")"
+                    )
+                    self?.firestoreService.saveUserProfile(uid: uid, profileData: profileData) { [weak self] error in
+                        if let error = error {
+                            self?.errorMessage = "Error saving profile: \(error.localizedDescription)"
+                        } else {
+                            userSession.isUserLoggedIn = true
+                        }
+                    }
+                } else {
+                    self?.errorMessage = "Error fetching profile: \(error.localizedDescription)"
+                }
             }
         }
     }

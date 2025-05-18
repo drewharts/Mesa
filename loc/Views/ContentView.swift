@@ -16,6 +16,7 @@ struct ContentView: View {
     @EnvironmentObject var detailPlaceVM: DetailPlaceViewModel
     @EnvironmentObject var firestoreService: FirestoreService
     @EnvironmentObject var profileViewModel: ProfileViewModel
+    @EnvironmentObject var dataManager: DataManager
     @StateObject private var userProfileViewModel = UserProfileViewModel()
 
     var body: some View {
@@ -26,8 +27,9 @@ struct ContentView: View {
                 .environmentObject(selectedPlaceVM)
                 .environmentObject(detailPlaceVM)
                 .environmentObject(userProfileViewModel)
+                .environmentObject(firestoreService)
         } else {
-            LoginView(viewModel: LoginViewModel(firestoreService: firestoreService))
+            LoginView(viewModel: LoginViewModel(firestoreService: firestoreService, dataManager: dataManager))
         }
     }
 }

@@ -54,6 +54,8 @@ struct locApp: App {
                 .environmentObject(profileViewModel)
                 .environmentObject(detailPlaceViewModel)
                 .environmentObject(selectedPlaceViewModel)
+                .environmentObject(firestoreService)
+                .environmentObject(dataManager)
                 .preferredColorScheme(.light)
                 .onAppear {
                     if let currentUser = Auth.auth().currentUser {

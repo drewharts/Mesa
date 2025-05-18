@@ -12,7 +12,7 @@ import UIKit
 //TODO:
     // include my places
     // include all places friends have reviewed
-class DataManager {
+class DataManager: ObservableObject {
     private let fireStoreService: FirestoreService
     private let userSession: UserSession
     private let locationManager: LocationManager
