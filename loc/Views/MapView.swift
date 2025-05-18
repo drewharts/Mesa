@@ -23,6 +23,7 @@ struct MapView: View {
     @State private var newPlaceDescription = ""
     @State private var newPlaceCoordinate: CLLocationCoordinate2D?
     @State private var mapPosition = MapCameraPosition.automatic
+    @State private var mapRefreshToggle = false
     
     var onMapTap: (() -> Void)?
     
@@ -53,22 +54,31 @@ struct MapView: View {
                 }
             }
         }
+        .id(mapRefreshToggle)
         .mapControlVisibility(.hidden)
         .ignoresSafeArea()
         .onChange(of: selectedPlaceVM.selectedPlace) { oldValue, newValue in
-            guard let place = newValue, let geoPoint = place.coordinate else { return }
+            guard let place = newValue, let geoPoint = place.coordinate else {
+                // Reset to default if no place is selected
+                withAnimation(.easeInOut) {
+                    mapPosition = .camera(MapCamera(centerCoordinate: defaultCenter, distance: 1000))
+                }
+                return
+            }
             let newCenter = CLLocationCoordinate2D(latitude: geoPoint.latitude, longitude: geoPoint.longitude)
-            // Update camera when a place is selected
-            withAnimation {
-                mapPosition = .camera(MapCamera(centerCoordinate: newCenter, distance: 500))
+            // Reset mapPosition to automatic before setting new camera
+            mapPosition = .automatic
+            DispatchQueue.main.async {
+                withAnimation(.easeInOut) {
+                    mapPosition = .camera(MapCamera(centerCoordinate: newCenter, distance: 500))
+                    mapRefreshToggle.toggle()
+                }
             }
         }
         .onAppear {
             // Set initial position when the view appears
             let camera = MapCamera(centerCoordinate: currentCoords, distance: 1000)
             mapPosition = .camera(camera)
-            
-            
             
             // Setup notification observer for place updates
             setupNotificationObservers()
