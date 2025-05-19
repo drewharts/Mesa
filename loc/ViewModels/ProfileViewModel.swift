@@ -82,28 +82,6 @@ class ProfileViewModel: ObservableObject {
      func toggleFollowUser(userId: String) {
 
      }
-
-    
-//    public func getFirstThreeProfileImages(forKey key: String) -> (UIImage?, UIImage?, UIImage?) {
-////        guard let users = detailPlaceViewModel.placeSavers[key], !users.isEmpty else {
-////            print("CREATING DEFAULT PROFILE IMAGES BC NO USERS FOUND")
-////            let defaultImage = UIImage(named: "defaultProfile")
-////            return (defaultImage, nil, nil)
-////        }
-////        
-////        let firstThreeUsers = users.prefix(3)
-////        let images = firstThreeUsers.map { user -> UIImage? in
-////            if let photo = self.userProfilePhotos[user.id] {
-////                return photo
-////            } else {
-////                // Return default image since we should have loaded all photos by now
-////                return UIImage(named: "defaultProfile")
-////            }
-////        }
-////        
-////        let paddedImages = (images + [nil, nil, nil]).prefix(3)
-////        return (paddedImages[0], paddedImages[1], paddedImages[2])
-//    }
     
      private func combinedCircularImage(image1: UIImage?, image2: UIImage? = nil, image3: UIImage? = nil) -> UIImage {
          let totalSize = CGSize(width: 80, height: 40)
@@ -132,6 +110,7 @@ class ProfileViewModel: ObservableObject {
              if image1 != nil { drawCircularImage(image1, in: firstRect) }
          }
      }
+    
     func addFavoriteFromSuggestion(place: MesaPlaceSuggestion) {
         //get rid of this in the future
     }
