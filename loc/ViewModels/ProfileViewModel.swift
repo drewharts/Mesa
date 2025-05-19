@@ -173,8 +173,6 @@ class ProfileViewModel: ObservableObject {
      }
     
      func removePlaceList(placeList: PlaceList) {
-         
-         
          if let index = userLists.firstIndex(where: { $0.id == placeList.id }) {
              userLists.remove(at: index)
              firestoreService.deleteList(userId: userSession.currentUserId!,listId: placeList.id.uuidString) { error in
@@ -202,8 +200,7 @@ class ProfileViewModel: ObservableObject {
      }
     
      func isPlaceInAnyList(placeId: String) -> Bool {
-//         return placeListMBPlaces.values.contains { $0.contains(placeId) }
-         return false
+         return userListsPlaces.values.contains { $0.contains(placeId) }
      }
 
     /// Returns a dictionary mapping each PlaceList's id to the count of places in that list
