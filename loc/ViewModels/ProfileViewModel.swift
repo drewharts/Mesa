@@ -166,9 +166,10 @@ class ProfileViewModel: ObservableObject {
      }
     
      func addNewPlaceList(named name: String, city: String, emoji: String, image: String) {
-//         let newPlaceList = PlaceList(name: name, city: city, emoji: emoji, image: image)
-//         userLists.append(newPlaceList)
-//         firestoreService.createNewList(placeList: newPlaceList, userId: user.id)
+         let newPlaceList = PlaceList(name: name, city: city, emoji: emoji, image: image)
+         userLists.append(newPlaceList)
+         guard let userId = user?.id else { return }
+         firestoreService.createNewList(placeList: newPlaceList, userID: userId)
      }
     
      func removePlaceList(placeList: PlaceList) {
