@@ -48,8 +48,24 @@ class ProfileViewModel: ObservableObject {
     }
     
      func changeProfilePhoto(_ newImage: UIImage) async {
-
-     }
+        guard let userId = user?.id else { return }
+        startLoading()
+        let croppedImage = cropToSquare(newImage)
+        do {
+            let url = try await firestoreService.updateProfilePhoto(userId: userId, image: croppedImage)
+            // Update local user and userPicture
+            DispatchQueue.main.async {
+                self.user?.profilePhotoURL = url
+                self.userPicture = croppedImage
+                self.finishLoading()
+            }
+        } catch {
+            print("Failed to update profile photo: \(error)")
+            DispatchQueue.main.async {
+                self.finishLoading()
+            }
+        }
+    }
     
      private func cropToSquare(_ image: UIImage) -> UIImage {
          let cgImage = image.cgImage!
@@ -120,7 +136,7 @@ class ProfileViewModel: ObservableObject {
      }
     
      func addPlaceToList(listId: UUID, place: DetailPlace) {
-
+        
      }
     
      func removePlaceFromList(listId: UUID, place: DetailPlace) {
