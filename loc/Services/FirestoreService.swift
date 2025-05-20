@@ -2321,4 +2321,80 @@ class FirestoreService: ObservableObject {
                 completion(detailPlaces)
             }
     }
+
+    // MARK: - Async/Await Versions for DataManager
+    
+    func fetchUserById(userId: String) async throws -> ProfileData {
+        try await withCheckedThrowingContinuation { continuation in
+            self.fetchUserById(userId: userId) { result in
+                switch result {
+                case .success(let profileData):
+                    continuation.resume(returning: profileData)
+                case .failure(let error):
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+    
+    func fetchProfileFavorites(userId: String) async throws -> [DetailPlace] {
+        try await withCheckedThrowingContinuation { continuation in
+            self.fetchProfileFavorites(userId: userId) { places in
+                continuation.resume(returning: places ?? [])
+            }
+        }
+    }
+    
+    func fetchLists(userId: String) async throws -> [PlaceList] {
+        try await withCheckedThrowingContinuation { continuation in
+            self.fetchLists(userId: userId) { lists in
+                continuation.resume(returning: lists)
+            }
+        }
+    }
+    
+    func fetchPlace(withId placeId: String) async throws -> DetailPlace {
+        try await withCheckedThrowingContinuation { continuation in
+            self.fetchPlace(withId: placeId) { result in
+                switch result {
+                case .success(let detailPlace):
+                    continuation.resume(returning: detailPlace)
+                case .failure(let error):
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+    
+    func fetchMyPlaces(userId: String) async throws -> [DetailPlace] {
+        try await withCheckedThrowingContinuation { continuation in
+            self.fetchMyPlaces(userId: userId) { places in
+                continuation.resume(returning: places ?? [])
+            }
+        }
+    }
+    
+    func fetchFollowingProfilesData(for userId: String) async throws -> [ProfileData] {
+        try await withCheckedThrowingContinuation { continuation in
+            self.fetchFollowingProfilesData(for: userId) { profiles, error in
+                if let error = error {
+                    continuation.resume(throwing: error)
+                } else {
+                    continuation.resume(returning: profiles ?? [])
+                }
+            }
+        }
+    }
+    
+    func fetchFollowerProfilesData(for userId: String) async throws -> [ProfileData] {
+        try await withCheckedThrowingContinuation { continuation in
+            self.fetchFollowerProfilesData(for: userId) { profiles, error in
+                if let error = error {
+                    continuation.resume(throwing: error)
+                } else {
+                    continuation.resume(returning: profiles ?? [])
+                }
+            }
+        }
+    }
 }

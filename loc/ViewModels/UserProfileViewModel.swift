@@ -9,6 +9,7 @@ import UIKit
 import SwiftUICore
 import MapboxSearch
 
+@MainActor
 class UserProfileViewModel: ObservableObject {
     @Published var selectedUser: ProfileData?
     @Published var isUserDetailPresented = false
@@ -23,19 +24,22 @@ class UserProfileViewModel: ObservableObject {
     @Published var followers: Int = 0
     private let firestoreService = FirestoreService()
     private let mapboxSearchService = MapboxSearchService()
+    private let dataManager: DataManager
+    private let detailPlaceViewModel: DetailPlaceViewModel
+    
+    init(dataManager: DataManager, detailPlaceViewModel: DetailPlaceViewModel) {
+        self.dataManager = dataManager
+        self.detailPlaceViewModel = detailPlaceViewModel
+    }
     
     func selectUser(_ user: ProfileData, currentUserId: String) {
-        DispatchQueue.main.async {
-            self.selectedUser = user
-            self.isUserDetailPresented = true
-            self.checkIfFollowing(currentUserId: currentUserId)
-            self.fetchProfileFavorites(userId: user.id)
-            self.fetchLists(userId: user.id)
-            self.fetchFollowers(userId: user.id)
-            self.fetchFavoritePlaceImages()
-        }
-        
-
+        self.selectedUser = user
+        self.isUserDetailPresented = true
+        self.checkIfFollowing(currentUserId: currentUserId)
+        self.fetchProfileFavorites(userId: user.id)
+        self.fetchLists(userId: user.id)
+        self.fetchFollowers(userId: user.id)
+        self.fetchFavoritePlaceImages()
     }
     
     func fetchFollowers(userId: String) {
@@ -50,35 +54,36 @@ class UserProfileViewModel: ObservableObject {
     
     func checkIfFollowing(currentUserId: String) {
         guard let targetUserId = selectedUser?.id, !targetUserId.isEmpty else {
-            DispatchQueue.main.async { self.isFollowing = false }
+            self.isFollowing = false
             return
         }
-        
         firestoreService.isFollowingUser(followerId: currentUserId, followingId: targetUserId) { [weak self] isFollowing in
-            DispatchQueue.main.async {
-                self?.isFollowing = isFollowing
-            }
+            self?.isFollowing = isFollowing
         }
     }
     
     func toggleFollowUser(currentUserId: String) {
-        let targetUserId = selectedUser?.id ?? ""
-        
+        guard let targetUserId = selectedUser?.id else { return }
         if isFollowing {
             firestoreService.unfollowUser(followerId: currentUserId, followingId: targetUserId) { success, error in
                 if success {
-                    DispatchQueue.main.async {
-                        self.isFollowing = false
-                        self.followers = max(0, self.followers - 1)
-                    }
+                    self.isFollowing = false
+                    self.followers = max(0, self.followers - 1)
+                    // Remove user from placeSavers and recalculate annotations
+                    self.removeUserFromPlaceSavers(userId: targetUserId)
+                    self.detailPlaceViewModel.calculateAnnotationPlaces()
                 }
             }
         } else {
             firestoreService.followUser(followerId: currentUserId, followingId: targetUserId) { success, error in
                 if success {
-                    DispatchQueue.main.async {
-                        self.isFollowing = true
-                        self.followers += 1
+                    self.isFollowing = true
+                    self.followers += 1
+                    // Load new user's places and recalculate annotations
+                    Task {
+                        await self.dataManager.loadUserFavoritePlaces(userId: targetUserId, forUser: self.selectedUser)
+                        await self.dataManager.loadUserPlaceLists(userId: targetUserId, forUser: self.selectedUser)
+                        self.detailPlaceViewModel.calculateAnnotationPlaces()
                     }
                 }
             }
@@ -99,17 +104,15 @@ class UserProfileViewModel: ObservableObject {
         print("Fetching favorites for userId: \(userId)")
         firestoreService.fetchProfileFavorites(userId: userId) { [weak self] favorites in
             guard let self = self else { return }
-            DispatchQueue.main.async {
-                if favorites == nil {
-                    print("Favorites fetch returned nil - possible error or no data")
-                    self.userFavorites = []
-                } else if favorites!.isEmpty {
-                    print("No favorites found for userId: \(userId)")
-                    self.userFavorites = []
-                } else {
-                    print("Fetched \(favorites!.count) favorites for userId: \(userId)")
-                    self.userFavorites = favorites!
-                }
+            if favorites == nil {
+                print("Favorites fetch returned nil - possible error or no data")
+                self.userFavorites = []
+            } else if favorites!.isEmpty {
+                print("No favorites found for userId: \(userId)")
+                self.userFavorites = []
+            } else {
+                print("Fetched \(favorites!.count) favorites for userId: \(userId)")
+                self.userFavorites = favorites!
             }
         }
     }
@@ -119,13 +122,11 @@ class UserProfileViewModel: ObservableObject {
         for place in userFavorites {
             fetchImage(for: place) { [weak self] placeId, image in
                 guard let self = self else { return }
-                DispatchQueue.main.async {
-                    if let image = image {
-                        self.favoritePlaceImages[placeId] = image
-                        // Explicitly trigger UI update
-                        self.objectWillChange.send()
-                        print("Updated image for place \(placeId) in favoritePlaceImages")
-                    }
+                if let image = image {
+                    self.favoritePlaceImages[placeId] = image
+                    // Explicitly trigger UI update
+                    self.objectWillChange.send()
+                    print("Updated image for place \(placeId) in favoritePlaceImages")
                 }
             }
         }
@@ -133,18 +134,15 @@ class UserProfileViewModel: ObservableObject {
     
     private func fetchLists(userId: String) {
         firestoreService.fetchLists(userId: userId) { lists in
-            DispatchQueue.main.async {
-                self.userLists = lists
-                
-                // Fetch places and images for each PlaceList
-                for list in lists {
-                    self.fetchFirestorePlaces(for: list.places) { places in
-                        self.placeListMapboxPlaces[list.id] = places
-                        // Fetch images for places in this list
-                        for place in places {
-                            self.fetchImage(for: place) { [weak self] placeId, image in
-                                self?.placeImages[placeId] = image
-                            }
+            self.userLists = lists
+            // Fetch places and images for each PlaceList
+            for list in lists {
+                self.fetchFirestorePlaces(for: list.places) { places in
+                    self.placeListMapboxPlaces[list.id] = places
+                    // Fetch images for places in this list
+                    for place in places {
+                        self.fetchImage(for: place) { [weak self] placeId, image in
+                            self?.placeImages[placeId] = image
                         }
                     }
                 }
@@ -281,5 +279,16 @@ class UserProfileViewModel: ObservableObject {
             throw NSError(domain: "ImageError", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to create image from data"])
         }
         return image
+    }
+    
+    // Helper to remove a user from all placeSavers
+    private func removeUserFromPlaceSavers(userId: String) {
+        for (placeId, savers) in detailPlaceViewModel.placeSavers {
+            detailPlaceViewModel.placeSavers[placeId] = savers.filter { $0 != userId }
+            // Optionally, remove the place if no savers left:
+            // if detailPlaceViewModel.placeSavers[placeId]?.isEmpty == true {
+            //     detailPlaceViewModel.places.removeValue(forKey: placeId)
+            // }
+        }
     }
 }

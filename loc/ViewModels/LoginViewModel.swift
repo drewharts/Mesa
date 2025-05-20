@@ -81,7 +81,9 @@ class LoginViewModel: ObservableObject {
             case .success(_):
                 // Profile exists, do not overwrite
                 userSession.isUserLoggedIn = true
-                self?.dataManager.initializeProfileData(userId: uid)
+                Task {
+                    await self?.dataManager.initializeProfileData(userId: uid)
+                }
             case .failure(let error):
                 // Only create if not found (404)
                 if (error as NSError).code == 404 {

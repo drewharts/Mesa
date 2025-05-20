@@ -11,6 +11,7 @@ import Foundation
 import FirebaseFirestore
 import UIKit
 
+@MainActor
 class ProfileViewModel: ObservableObject {
     @Published var user: ProfileData? 
     @Published var userPicture: UIImage?
@@ -96,7 +97,7 @@ class ProfileViewModel: ObservableObject {
      }
     
      func toggleFollowUser(userId: String) {
-
+        
      }
     
      private func combinedCircularImage(image1: UIImage?, image2: UIImage? = nil, image3: UIImage? = nil) -> UIImage {

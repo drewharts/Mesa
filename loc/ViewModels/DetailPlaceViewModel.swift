@@ -11,7 +11,7 @@ import FirebaseFirestore
 import MapboxSearch
 import FirebaseAuth
 
-
+@MainActor
 class DetailPlaceViewModel: ObservableObject {
     @Published var places: [String: DetailPlace] = [:] // Formerly placeLookup
     @Published var placeImages: [String: UIImage] = [:] // Consolidated place images
@@ -38,6 +38,12 @@ class DetailPlaceViewModel: ObservableObject {
             print("DetailPlaceViewModel received map refresh notification")
             // Force a refresh by triggering objectWillChange
             self.objectWillChange.send()
+        }
+    }
+    
+    func removeUserFromPlaceSavers(userId: String) {
+        for (placeId, savers) in placeSavers {
+            placeSavers[placeId] = savers.filter { $0 != userId }
         }
     }
     

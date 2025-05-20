@@ -156,7 +156,7 @@ struct MainView: View {
             }
             .sheet(isPresented: $userProfileViewModel.isUserDetailPresented) {
                 if let user = userProfileViewModel.selectedUser {
-                    UserProfileView(userId: userSession.currentUserId!, viewModel: userProfileViewModel)
+                    UserProfileView(userId: userSession.currentUserId!, UserProfileVM: userProfileViewModel)
                 }
             }
         }

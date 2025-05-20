@@ -17,7 +17,7 @@ struct ContentView: View {
     @EnvironmentObject var firestoreService: FirestoreService
     @EnvironmentObject var profileViewModel: ProfileViewModel
     @EnvironmentObject var dataManager: DataManager
-    @StateObject private var userProfileViewModel = UserProfileViewModel()
+    @EnvironmentObject var userProfileViewModel: UserProfileViewModel
 
     var body: some View {
         if userSession.isUserLoggedIn {
