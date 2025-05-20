@@ -136,8 +136,29 @@ class ProfileViewModel: ObservableObject {
      }
     
      func addPlaceToList(listId: UUID, place: DetailPlace) {
-        
-     }
+        let listIdString = listId.uuidString
+        guard let userId = userSession.currentUserId else { return }
+        // Find the list in userLists
+        guard let listIndex = userLists.firstIndex(where: { $0.id == listId }) else { return }
+        // Convert DetailPlace to Place for FirestoreService
+        let placeForList = Place(id: place.id, name: place.name, address: place.address ?? "")
+        // Update local userListsPlaces
+        var places = userListsPlaces[listIdString] ?? []
+        if !places.contains(place.id.uuidString) {
+            places.append(place.id.uuidString)
+            userListsPlaces[listIdString] = places
+        }
+        // Update the places array in the PlaceList
+        if !userLists[listIndex].places.contains(where: { $0.id == place.id }) {
+            userLists[listIndex].places.append(placeForList)
+        }
+        // Persist to Firestore
+        firestoreService.addPlaceToList(userId: userId, listName: listIdString, place: placeForList)
+        // Update DetailPlaceViewModel's places dictionary for immediate UI update
+        if detailPlaceViewModel.places[place.id.uuidString] == nil {
+            detailPlaceViewModel.places[place.id.uuidString] = place
+        }
+    }
     
      func removePlaceFromList(listId: UUID, place: DetailPlace) {
          let listIdString = listId.uuidString

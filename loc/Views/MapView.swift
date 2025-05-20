@@ -54,31 +54,31 @@ struct MapView: View {
                 }
             }
         }
-        .id(mapRefreshToggle)
         .mapControlVisibility(.hidden)
         .ignoresSafeArea()
         .onChange(of: selectedPlaceVM.selectedPlace) { oldValue, newValue in
             guard let place = newValue, let geoPoint = place.coordinate else {
                 // Reset to default if no place is selected
-                withAnimation(.easeInOut) {
-                    mapPosition = .camera(MapCamera(centerCoordinate: defaultCenter, distance: 1000))
+                withAnimation(.easeOut) {
+                    mapPosition = .camera(MapCamera(centerCoordinate: defaultCenter, distance: 100))
                 }
                 return
             }
             let newCenter = CLLocationCoordinate2D(latitude: geoPoint.latitude, longitude: geoPoint.longitude)
-            // Reset mapPosition to automatic before setting new camera
-            mapPosition = .automatic
-            DispatchQueue.main.async {
-                withAnimation(.easeInOut) {
-                    mapPosition = .camera(MapCamera(centerCoordinate: newCenter, distance: 500))
-                    mapRefreshToggle.toggle()
-                }
+            withAnimation(.easeInOut) {
+                mapPosition = .camera(MapCamera(centerCoordinate: newCenter, distance: 500))
             }
         }
         .onAppear {
             // Set initial position when the view appears
-            let camera = MapCamera(centerCoordinate: currentCoords, distance: 1000)
-            mapPosition = .camera(camera)
+            if let place = selectedPlaceVM.selectedPlace, let geoPoint = place.coordinate {
+                let newCenter = CLLocationCoordinate2D(latitude: geoPoint.latitude, longitude: geoPoint.longitude)
+                let camera = MapCamera(centerCoordinate: newCenter, distance: 500)
+                mapPosition = .camera(camera)
+            } else {
+                let camera = MapCamera(centerCoordinate: currentCoords, distance: 1000)
+                mapPosition = .camera(camera)
+            }
             
             // Setup notification observer for place updates
             setupNotificationObservers()
