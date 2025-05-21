@@ -116,10 +116,15 @@ struct MyProfileHorizontalListPlaces: View {
     @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @Environment(\.presentationMode) var presentationMode
-    
-    let places: [DetailPlace]
+
+    let listId: UUID
     @Binding var placeColors: [UUID: Color]
     
+    var places: [DetailPlace] {
+        guard let placeIds = viewModel.userListsPlaces[listId.uuidString] else { return [] }
+        return placeIds.compactMap { detailPlaceViewModel.places[$0] }
+    }
+
     var body: some View {
         HStack {
             ForEach(places, id: \.id) { place in
@@ -547,10 +552,9 @@ struct ProfileListSection: View {
     var body: some View {
         VStack(alignment: .leading) {
             ProfileListDescription(list: list, placeColors: $placeColors)
-            if let placeIds = placeIds {
+            if let _ = placeIds {
                 ScrollView(.horizontal, showsIndicators: false) {
-                    let places = placeIds.compactMap { detailPlaceViewModel.places[$0] }
-                    MyProfileHorizontalListPlaces(places: places, placeColors: $placeColors)
+                    MyProfileHorizontalListPlaces(listId: list.id, placeColors: $placeColors)
                 }
             } else {
                 Text("Loading places...")
