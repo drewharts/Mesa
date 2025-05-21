@@ -10,6 +10,7 @@ import UIKit
 import FirebaseFirestore
 import MapboxSearch
 import FirebaseAuth
+import SwiftUI
 
 @MainActor
 class DetailPlaceViewModel: ObservableObject {
@@ -20,6 +21,8 @@ class DetailPlaceViewModel: ObservableObject {
     @Published var placeTypes: [String: String] = [:] // Tracks restaurant types
 
     @Published var userProfilePicture: [String: UIImage] = [:] // Each user's profile picture
+
+    @Published var placeColors: [String: Color] = [:] // Persistent color for each placeId
 
     private let firestoreService: FirestoreService
     private var notificationObserver: NSObjectProtocol?
@@ -271,6 +274,21 @@ class DetailPlaceViewModel: ObservableObject {
             // Notify UI that data has changed
             self.objectWillChange.send()
             print("Successfully refreshed \(detailPlaces.count) places")
+        }
+    }
+
+    // Add this method to get or generate a color for a place
+    func colorForPlace(placeId: String) -> Color {
+        if let color = placeColors[placeId] {
+            return color
+        } else {
+            let color = Color(
+                red: Double.random(in: 0...1),
+                green: Double.random(in: 0...1),
+                blue: Double.random(in: 0...1)
+            )
+            placeColors[placeId] = color
+            return color
         }
     }
 }

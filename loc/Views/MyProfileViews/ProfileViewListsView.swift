@@ -150,7 +150,7 @@ struct MyProfileHorizontalListPlaces: View {
                         } else {
                             Circle()
                                 .frame(width: 85, height: 85)
-                                .foregroundColor(colorForPlace(place))
+                                .foregroundColor(detailPlaceViewModel.colorForPlace(placeId: place.id.uuidString))
                                 .overlay(
                                     Circle()
                                         .stroke(Color.white, lineWidth: 1)
@@ -194,26 +194,14 @@ struct MyProfileHorizontalListPlaces: View {
         .onAppear {
             for place in places {
                 if placeColors[place.id] == nil {
-                    placeColors[place.id] = randomColor()
+                    placeColors[place.id] = Color(
+                        red: Double.random(in: 0...1),
+                        green: Double.random(in: 0...1),
+                        blue: Double.random(in: 0...1)
+                    )
                 }
             }
         }
-    }
-    
-    private func randomColor() -> Color {
-        Color(
-            red: Double.random(in: 0...1),
-            green: Double.random(in: 0...1),
-            blue: Double.random(in: 0...1)
-        )
-    }
-    
-    private func colorForPlace(_ place: DetailPlace) -> Color {
-        Color(
-            red: Double.random(in: 0...1),
-            green: Double.random(in: 0...1),
-            blue: Double.random(in: 0...1)
-        )
     }
 }
 
@@ -390,7 +378,11 @@ struct ListPlacesPopupView: View {
                 let places = placeIds.compactMap { detailPlaceViewModel.places[$0] }
                 for place in places {
                     if placeColors[place.id] == nil {
-                        placeColors[place.id] = randomColor()
+                        placeColors[place.id] = Color(
+                            red: Double.random(in: 0...1),
+                            green: Double.random(in: 0...1),
+                            blue: Double.random(in: 0...1)
+                        )
                     }
                 }
             }
@@ -404,22 +396,6 @@ struct ListPlacesPopupView: View {
         } message: {
             Text("Are you sure you want to delete this list? This action cannot be undone.")
         }
-    }
-    
-    private func randomColor() -> Color {
-        Color(
-            red: Double.random(in: 0...1),
-            green: Double.random(in: 0...1),
-            blue: Double.random(in: 0...1)
-        )
-    }
-    
-    private func colorForPlace(_ place: DetailPlace) -> Color {
-        Color(
-            red: Double.random(in: 0...1),
-            green: Double.random(in: 0...1),
-            blue: Double.random(in: 0...1)
-        )
     }
 }
 
