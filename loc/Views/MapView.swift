@@ -13,6 +13,8 @@ struct MapView: View {
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var detailPlaceVM: DetailPlaceViewModel
     
+    @Binding var recenterMap: Bool
+    
     private let defaultCenter = CLLocationCoordinate2D(latitude: 39.5, longitude: -98.0)
     @State private var region: MKCoordinateRegion = MKCoordinateRegion(
         center: CLLocationCoordinate2D(latitude: 39.5, longitude: -98.0),
@@ -111,6 +113,15 @@ struct MapView: View {
                 let newCenter = CLLocationCoordinate2D(latitude: geoPoint.latitude, longitude: geoPoint.longitude)
                 withAnimation(.easeInOut) {
                     mapPosition = .camera(MapCamera(centerCoordinate: newCenter, distance: 500))
+                }
+            }
+            .onChange(of: recenterMap) { oldValue, newValue in
+                if newValue {
+                    let coords = locationManager.currentLocation?.coordinate ?? defaultCenter
+                    withAnimation(.easeInOut) {
+                        mapPosition = .camera(MapCamera(centerCoordinate: coords, distance: 1000))
+                    }
+                    recenterMap = false
                 }
             }
             .onAppear {

@@ -25,12 +25,13 @@ struct MainView: View {
     @State private var maxSheetHeight: CGFloat = UIScreen.main.bounds.height * 0.85
     @State private var showProfileView = false
     @State private var triggerFocus = false
+    @State private var recenterMap = false
 
     var body: some View {
         NavigationView {
             ZStack {
                 // Map layer
-                MapView(onMapTap: {
+                MapView(recenterMap: $recenterMap, onMapTap: {
                     searchIsFocused = false
                     isSearchBarMinimized = true
                 })
@@ -151,6 +152,28 @@ struct MainView: View {
                         )
                         .environmentObject(userProfileViewModel)
                         .frame(maxWidth: .infinity)
+                    }
+                }
+
+                // Overlay recenter button (bottom right)
+                if isSearchBarMinimized && !searchIsFocused && !selectedPlaceVM.isDetailSheetPresented {
+                    VStack {
+                        Spacer()
+                        HStack {
+                            Spacer()
+                            Button(action: {
+                                recenterMap = true
+                            }) {
+                                Image(systemName: "location.fill")
+                                    .foregroundColor(.white)
+                                    .frame(width: 36, height: 36)
+                                    .background(Color.blue)
+                                    .clipShape(Circle())
+                                    .shadow(radius: 4)
+                            }
+                            .padding(.bottom, 20)
+                            .padding(.trailing, 20)
+                        }
                     }
                 }
             }
