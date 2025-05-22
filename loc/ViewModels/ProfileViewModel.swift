@@ -94,10 +94,6 @@ class ProfileViewModel: ObservableObject {
          return image
      }
     
-     // Rebuild all map annotation images completely
-     func rebuildAllMapAnnotations() {
-     }
-    
      func toggleFollowUser(userId: String) {
         guard let currentUserId = user?.id else { return }
         if userFollowing.contains(where: { $0.id == userId }) {
