@@ -56,6 +56,7 @@ class DataManager: ObservableObject {
             for place in places {
                 self.profileViewModel.myPlaces.append(place.id.uuidString)
                 self.detailPlaceViewModel.places[place.id.uuidString] = place
+                self.detailPlaceViewModel.fetchPlaceImage(for: place.id.uuidString)
                 // Add the current user as a saver for their own place
                 let placeId = place.id.uuidString
                 if self.detailPlaceViewModel.placeSavers[placeId] == nil {
