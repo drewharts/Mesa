@@ -198,8 +198,11 @@ class ProfileViewModel: ObservableObject {
 
          places.remove(at: index)
          userListsPlaces[listIdString] = places
+         
+         let placeForList = Place(id: place.id, name: place.name, address: place.address ?? "")
 
-         firestoreService.removePlaceFromList(userId: userId, listName: list.name, placeId: place.id.uuidString)
+
+         firestoreService.removePlaceFromList(userId: userId, listId: list.id, place: placeForList)
      }
     
      func removeFavoritePlace(place: DetailPlace) {
