@@ -9,9 +9,6 @@ import Foundation
 import FirebaseAuth
 import UIKit
 
-//TODO:
-    // include my places
-    // include all places friends have reviewed
 @MainActor
 class DataManager: ObservableObject {
     private let fireStoreService: FirestoreService
@@ -43,6 +40,7 @@ class DataManager: ObservableObject {
         await loadUserMyPlaces(userId: userId)
         await loadFollowing(userId: userId)
         await loadFollowers(userId: userId)
+        await loadReviewedPlacesForUserAndFollowing(userId: userId)
         calculateMapAnnotations()
     }
     
@@ -223,6 +221,47 @@ class DataManager: ObservableObject {
         let (followersCount, followingCount) = await (followers, following)
         profileViewModel.followersCount = followersCount
         profileViewModel.followingCount = followingCount
+    }
+    
+    // Loads all places the user has reviewed, even if not in favorites or lists
+    func loadUserReviewedPlaces(userId: String) async {
+        do {
+            // Fetch all reviews (RestaurantReview and GenericReview)
+            let restaurantReviews: [RestaurantReview] = try await fireStoreService.fetchUserReviews(userId: userId)
+            let genericReviews: [GenericReview] = try await fireStoreService.fetchUserReviews(userId: userId)
+            let allReviews: [ReviewProtocol] = restaurantReviews + genericReviews
+            
+            for review in allReviews {
+                let placeId = review.placeId
+                // Add userId to placeSavers if not already present
+                if self.detailPlaceViewModel.placeSavers[placeId] == nil {
+                    self.detailPlaceViewModel.placeSavers[placeId] = [userId]
+                } else if !self.detailPlaceViewModel.placeSavers[placeId]!.contains(userId) {
+                    self.detailPlaceViewModel.placeSavers[placeId]!.append(userId)
+                }
+                // Fetch and store the place if not already present
+                if self.detailPlaceViewModel.places[placeId] == nil {
+                    do {
+                        let detailPlace = try await fireStoreService.fetchPlace(withId: placeId)
+                        self.detailPlaceViewModel.places[placeId] = detailPlace
+                        self.detailPlaceViewModel.fetchPlaceImage(for: placeId)
+                    } catch {
+                        print("Error fetching place for reviewed placeId \(placeId): \(error.localizedDescription)")
+                    }
+                }
+            }
+        } catch {
+            print("Error loading user reviewed places: \(error.localizedDescription)")
+        }
+    }
+    
+    // Loads all reviewed places for the current user and their following
+    func loadReviewedPlacesForUserAndFollowing(userId: String) async {
+        let followingIds = profileViewModel.userFollowing.map { $0.id }
+        let allUserIds = followingIds + [userId]
+        for uid in allUserIds {
+            await loadUserReviewedPlaces(userId: uid)
+        }
     }
 }
 

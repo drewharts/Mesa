@@ -2396,4 +2396,18 @@ class FirestoreService: ObservableObject {
             }
         }
     }
+
+    // MARK: - Async/Await Versions for DataManager
+    
+    func fetchUserReviews<T: ReviewProtocol>(userId: String) async throws -> [T] {
+        try await withCheckedThrowingContinuation { continuation in
+            self.fetchUserReviews(userId: userId) { (reviews: [T]?, error) in
+                if let error = error {
+                    continuation.resume(throwing: error)
+                } else {
+                    continuation.resume(returning: reviews ?? [])
+                }
+            }
+        }
+    }
 }
