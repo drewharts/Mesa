@@ -56,6 +56,13 @@ class DataManager: ObservableObject {
             for place in places {
                 self.profileViewModel.myPlaces.append(place.id.uuidString)
                 self.detailPlaceViewModel.places[place.id.uuidString] = place
+                // Add the current user as a saver for their own place
+                let placeId = place.id.uuidString
+                if self.detailPlaceViewModel.placeSavers[placeId] == nil {
+                    self.detailPlaceViewModel.placeSavers[placeId] = [userId]
+                } else if !self.detailPlaceViewModel.placeSavers[placeId]!.contains(userId) {
+                    self.detailPlaceViewModel.placeSavers[placeId]!.append(userId)
+                }
             }
         } catch {
             print("Error loading my places: \(error.localizedDescription)")

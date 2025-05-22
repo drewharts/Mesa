@@ -54,6 +54,24 @@ struct MapView: View {
                         }
                     }
                 }
+                // Current location dot
+                if let userLocation = locationManager.currentLocation?.coordinate {
+                    Annotation(
+                        "",
+                        coordinate: userLocation,
+                        anchor: .center
+                    ) {
+                        Circle()
+                            .fill(Color.blue)
+                            .frame(width: 18, height: 18)
+                            .overlay(
+                                Circle()
+                                    .stroke(Color.white, lineWidth: 4)
+                                    .frame(width: 18, height: 18)
+                            )
+                            .shadow(radius: 4)
+                    }
+                }
             }
             .mapControlVisibility(.hidden)
             .ignoresSafeArea()
