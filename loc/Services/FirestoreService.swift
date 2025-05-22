@@ -2397,4 +2397,28 @@ class FirestoreService: ObservableObject {
             }
         }
     }
+
+    func getNumberFollowers(forUserId userId: String) async throws -> Int {
+        try await withCheckedThrowingContinuation { continuation in
+            self.getNumberFollowers(forUserId: userId) { count, error in
+                if let error = error {
+                    continuation.resume(throwing: error)
+                } else {
+                    continuation.resume(returning: count)
+                }
+            }
+        }
+    }
+    
+    func getNumberFollowing(forUserId userId: String) async throws -> Int {
+        try await withCheckedThrowingContinuation { continuation in
+            self.getNumberFollowing(forUserId: userId) { count, error in
+                if let error = error {
+                    continuation.resume(throwing: error)
+                } else {
+                    continuation.resume(returning: count)
+                }
+            }
+        }
+    }
 }

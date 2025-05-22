@@ -22,7 +22,7 @@ struct ProfileFollowCountsView: View {
                 showingFollowers = true
             }) {
                 VStack {
-                    Text("\(profile.userFollowers.count)")
+                    Text("\(profile.followersCount)")
                         .font(.headline)
                         .foregroundColor(.black)
                         .fontWeight(.regular)
@@ -43,7 +43,7 @@ struct ProfileFollowCountsView: View {
                 showingFollowing = true
             }) {
                 VStack {
-                    Text("\(profile.userFollowing.count)")
+                    Text("\(profile.followingCount)")
                         .font(.headline)
                         .foregroundColor(.black)
                         .fontWeight(.regular)

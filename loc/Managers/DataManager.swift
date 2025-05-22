@@ -37,6 +37,7 @@ class DataManager: ObservableObject {
     func initializeProfileData(userId: String) async {
         profileViewModel.startLoading()
         await loadProfileData(userId: userId)
+        await fetchFollowerAndFollowingCountsAsync(userId: userId)
         await loadUserFavoritePlaces(userId: userId)
         await loadUserPlaceLists(userId: userId)
         await loadUserMyPlaces(userId: userId)
@@ -208,6 +209,12 @@ class DataManager: ObservableObject {
         }
     }
     
-
+    func fetchFollowerAndFollowingCountsAsync(userId: String) async {
+        async let followers: Int = try! await fireStoreService.getNumberFollowers(forUserId: userId)
+        async let following: Int = try! await fireStoreService.getNumberFollowing(forUserId: userId)
+        let (followersCount, followingCount) = await (followers, following)
+        profileViewModel.followersCount = followersCount
+        profileViewModel.followingCount = followingCount
+    }
 }
 

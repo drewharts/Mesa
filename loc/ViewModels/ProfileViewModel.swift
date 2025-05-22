@@ -29,6 +29,8 @@ class ProfileViewModel: ObservableObject {
      @Published var showMaxFavoritesAlert: Bool = false
      @Published var isLoading: Bool = true
      private var loadingTasks: Int = 0
+     @Published var followersCount: Int = 0
+     @Published var followingCount: Int = 0
     
     init(userSession: UserSession, firestoreService: FirestoreService, detailPlaceViewModel: DetailPlaceViewModel) {
          self.firestoreService = firestoreService
@@ -97,8 +99,30 @@ class ProfileViewModel: ObservableObject {
      }
     
      func toggleFollowUser(userId: String) {
-        
-     }
+        guard let currentUserId = user?.id else { return }
+        if userFollowing.contains(where: { $0.id == userId }) {
+            // Unfollow
+            firestoreService.unfollowUser(followerId: currentUserId, followingId: userId) { [weak self] success, error in
+                if success {
+                    self?.userFollowing.removeAll { $0.id == userId }
+                    self?.followingCount = max(0, (self?.followingCount ?? 1) - 1)
+                }
+            }
+        } else {
+            // Follow
+            firestoreService.followUser(followerId: currentUserId, followingId: userId) { [weak self] success, error in
+                if success {
+                    // Fetch the ProfileData for the followed user and add to userFollowing
+                    self?.firestoreService.fetchUserById(userId: userId) { result in
+                        if case .success(let profileData) = result {
+                            self?.userFollowing.append(profileData)
+                        }
+                        self?.followingCount += 1
+                    }
+                }
+            }
+        }
+    }
     
      private func combinedCircularImage(image1: UIImage?, image2: UIImage? = nil, image3: UIImage? = nil) -> UIImage {
          let totalSize = CGSize(width: 80, height: 40)
