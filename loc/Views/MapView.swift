@@ -102,6 +102,12 @@ struct MapView: View {
                         }
                     }
             )
+            .simultaneousGesture(
+                TapGesture()
+                    .onEnded {
+                        onMapTap?()
+                    }
+            )
             .onChange(of: selectedPlaceVM.selectedPlace) { oldValue, newValue in
                 guard let place = newValue, let geoPoint = place.coordinate else {
                     // Reset to default if no place is selected

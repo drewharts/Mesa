@@ -31,10 +31,7 @@ struct MainView: View {
         NavigationView {
             ZStack {
                 // Map layer
-                MapView(recenterMap: $recenterMap, onMapTap: {
-                    searchIsFocused = false
-                    isSearchBarMinimized = true
-                })
+                MapView(recenterMap: $recenterMap, onMapTap: handleMapTap)
                 .ignoresSafeArea()
                 .edgesIgnoringSafeArea(.all)
                 
@@ -188,6 +185,12 @@ struct MainView: View {
             locationManager.requestLocationPermission()
             viewModel.selectedPlaceVM = selectedPlaceVM
             viewModel.searchText = ""
+        }
+        .onChange(of: selectedPlaceVM.isDetailSheetPresented) { newValue in
+            if newValue {
+                isSearchBarMinimized = true
+                searchIsFocused = false
+            }
         }
     }
 
