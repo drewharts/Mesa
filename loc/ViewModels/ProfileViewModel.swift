@@ -192,9 +192,30 @@ class ProfileViewModel: ObservableObject {
          firestoreService.removePlaceFromList(userId: userId, listId: list.id, place: placeForList)
      }
     
-     func removeFavoritePlace(place: DetailPlace) {
-
-     }
+     func addFavoritePlace(place: DetailPlace) {
+        guard let userId = userSession.currentUserId else { return }
+        // Prevent duplicates and enforce max 4 favorites
+        if userFavorites.count >= 4 {
+            showMaxFavoritesAlert = true
+            return
+        }
+        if !userFavorites.contains(place.id.uuidString) {
+            userFavorites.append(place.id.uuidString)
+            firestoreService.addProfileFavorite(userId: userId, place: place)
+        }
+    }
+    
+    func removeFavoritePlace(place: DetailPlace) {
+        guard let userId = userSession.currentUserId else { return }
+        if let index = userFavorites.firstIndex(of: place.id.uuidString) {
+            userFavorites.remove(at: index)
+            firestoreService.removeProfileFavorite(userId: userId, placeId: place.id.uuidString)
+        }
+    }
+    
+    func isPlaceFavorite(placeId: String) -> Bool {
+        return userFavorites.contains(placeId)
+    }
     
      func addNewPlaceList(named name: String, city: String, emoji: String, image: String) {
          let newPlaceList = PlaceList(name: name, city: city, emoji: emoji, image: image)

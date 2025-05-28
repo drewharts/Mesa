@@ -64,20 +64,20 @@ struct ProfileFavoriteListView: View {
                                     .shadow(color: .black.opacity(0.2), radius: 3, x: 0, y: 2)
                             }
                         }
-                        Text(detailPlace?.name.prefix(15) ?? "Unknown")
+                        Text(detailPlace?.name.prefix(15) ?? " ")
                             .foregroundColor(.black)
                             .fontWeight(.semibold)
                             .font(.footnote)
                             .multilineTextAlignment(.center)
                             .lineLimit(1)
-                            .frame(width: 85)
-                        Text(detailPlace?.city?.prefix(15) ?? "")
+                            .frame(width: 85, height: 18)
+                        Text(detailPlace?.city?.prefix(15) ?? " ")
                             .foregroundColor(.black)
                             .font(.caption)
                             .fontWeight(.light)
                             .multilineTextAlignment(.center)
                             .lineLimit(1)
-                            .frame(width: 85)
+                            .frame(width: 85, height: 15)
                     }
                     .onTapGesture {
                         selectedPlaceVM.selectedPlace = detailPlace
@@ -98,7 +98,10 @@ struct ProfileFavoriteListView: View {
                                     .font(.system(size: 20))
                                     .foregroundColor(.gray)
                             }
-                            .padding(.bottom, 20)
+                            Text(" ")
+                                .frame(width: 85, height: 18)
+                            Text(" ")
+                                .frame(width: 85, height: 15)
                         }
                         .onTapGesture {
                             showSearch = true
@@ -111,10 +114,6 @@ struct ProfileFavoriteListView: View {
 
             Divider()
                 .padding(.horizontal, 20)
-        }
-        // Present AddFavoritesView in a sheet
-        .sheet(isPresented: $showSearch) {
-            AddFavoritesView()
         }
     }
 }

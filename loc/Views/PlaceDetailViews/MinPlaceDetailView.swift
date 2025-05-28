@@ -58,6 +58,26 @@ struct MinPlaceDetailView: View {
                     Spacer()
                     
                     HStack(spacing: 16) {
+                        // Favorite star button
+                        Button(action: {
+                            guard let place = selectedPlaceVM.selectedPlace else { return }
+                            if profile.isPlaceFavorite(placeId: place.id.uuidString) {
+                                profile.removeFavoritePlace(place: place)
+                            } else {
+                                profile.addFavoritePlace(place: place)
+                            }
+                        }) {
+                            Image(systemName: {
+                                if let place = selectedPlaceVM.selectedPlace, profile.isPlaceFavorite(placeId: place.id.uuidString) {
+                                    return "star.fill"
+                                } else {
+                                    return "star"
+                                }
+                            }())
+                            .font(.title3)
+                            .foregroundColor(.yellow)
+                        }
+
                         NavigationLink(destination: CreatePlaceReviewView(isPresented: .constant(false), place: selectedPlaceVM.selectedPlace!, userId: userSession.currentUserId!, profilePhotoUrl: profile.user?.profilePhotoURL?.absoluteString ?? "", userFirstName: profile.user!.firstName, userLastName: profile.user!.lastName)) {
                             Image(systemName: "plus")
                                 .font(.title3)
@@ -196,6 +216,11 @@ struct MinPlaceDetailView: View {
                 message: Text("No phone number is available for this place."),
                 dismissButton: .default(Text("OK"))
             )
+        }
+        .alert("Max Favorites Reached", isPresented: $profile.showMaxFavoritesAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("You already have 4 favorites. Remove one before adding a new one.")
         }
     }
 }
