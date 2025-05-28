@@ -16,7 +16,11 @@ struct FollowingListView: View {
     var body: some View {
         NavigationView {
             VStack {
-                if profile.userFollowing.isEmpty {
+                if profile.isFollowingListLoading {
+                    Spacer()
+                    ProgressView()
+                    Spacer()
+                } else if profile.userFollowing.isEmpty {
                     VStack(spacing: 16) {
                         Spacer()
                         Text("Not Following Anyone Yet")

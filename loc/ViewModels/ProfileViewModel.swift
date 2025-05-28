@@ -32,27 +32,22 @@ class ProfileViewModel: ObservableObject {
      @Published var followersCount: Int = 0
      @Published var followingCount: Int = 0
     
+    // Separate loading states for counts
+    @Published var isFollowersLoading: Bool = true
+    @Published var isFollowingLoading: Bool = true
+    @Published var isMyPlacesLoading: Bool = true
+    // Popup list loading states
+    @Published var isFollowersListLoading: Bool = false
+    @Published var isFollowingListLoading: Bool = false
+    
     init(userSession: UserSession, firestoreService: FirestoreService, detailPlaceViewModel: DetailPlaceViewModel) {
          self.firestoreService = firestoreService
          self.detailPlaceViewModel = detailPlaceViewModel
         self.userSession = userSession
      }
     
-    func startLoading() {
-        loadingTasks += 1
-        isLoading = true
-    }
-    
-    func finishLoading() {
-        loadingTasks -= 1
-        if loadingTasks <= 0 {
-            isLoading = false
-        }
-    }
-    
      func changeProfilePhoto(_ newImage: UIImage) async {
         guard let userId = user?.id else { return }
-        startLoading()
         let croppedImage = cropToSquare(newImage)
         do {
             let url = try await firestoreService.updateProfilePhoto(userId: userId, image: croppedImage)
@@ -60,13 +55,9 @@ class ProfileViewModel: ObservableObject {
             DispatchQueue.main.async {
                 self.user?.profilePhotoURL = url
                 self.userPicture = croppedImage
-                self.finishLoading()
             }
         } catch {
             print("Failed to update profile photo: \(error)")
-            DispatchQueue.main.async {
-                self.finishLoading()
-            }
         }
     }
     

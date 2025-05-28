@@ -22,12 +22,16 @@ struct ProfileFollowCountsView: View {
                 showingFollowers = true
             }) {
                 VStack {
-                    Text("\(profile.followersCount)")
-                        .font(.headline)
-                        .foregroundColor(.black)
-                        .fontWeight(.regular)
-                        .id("followers_\(refreshToggle)")
-
+                    if profile.isFollowersLoading {
+                        ProgressView()
+                            .frame(width: 20, height: 20)
+                    } else {
+                        Text("\(profile.followersCount)")
+                            .font(.headline)
+                            .foregroundColor(.black)
+                            .fontWeight(.regular)
+                            .id("followers_\(refreshToggle)")
+                    }
                     Text("Followers")
                         .font(.caption)
                         .foregroundColor(.gray)
@@ -43,12 +47,16 @@ struct ProfileFollowCountsView: View {
                 showingFollowing = true
             }) {
                 VStack {
-                    Text("\(profile.followingCount)")
-                        .font(.headline)
-                        .foregroundColor(.black)
-                        .fontWeight(.regular)
-                        .id("following_\(refreshToggle)")
-                    
+                    if profile.isFollowingLoading {
+                        ProgressView()
+                            .frame(width: 20, height: 20)
+                    } else {
+                        Text("\(profile.followingCount)")
+                            .font(.headline)
+                            .foregroundColor(.black)
+                            .fontWeight(.regular)
+                            .id("following_\(refreshToggle)")
+                    }
                     Text("Following")
                         .font(.caption)
                         .foregroundColor(.gray)
@@ -64,12 +72,16 @@ struct ProfileFollowCountsView: View {
                 showingMyPlaces = true
             }) {
                 VStack {
-                    Text("\(profile.myPlaces.count)")
-                        .font(.headline)
-                        .foregroundColor(.black)
-                        .fontWeight(.regular)
-                        .id("myPlaces_\(refreshToggle)")
-                    
+                    if profile.isMyPlacesLoading {
+                        ProgressView()
+                            .frame(width: 20, height: 20)
+                    } else {
+                        Text("\(profile.myPlaces.count)")
+                            .font(.headline)
+                            .foregroundColor(.black)
+                            .fontWeight(.regular)
+                            .id("myPlaces_\(refreshToggle)")
+                    }
                     Text("My Places")
                         .font(.caption)
                         .foregroundColor(.gray)

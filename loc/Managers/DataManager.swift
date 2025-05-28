@@ -30,18 +30,25 @@ class DataManager: ObservableObject {
         self.profileViewModel = profileViewModel
         self.detailPlaceViewModel = detailPlaceViewModel
     }
-    
+
     func initializeProfileData(userId: String) async {
-        profileViewModel.startLoading()
+        startDataLoadingFlags()
         await loadProfileData(userId: userId)
         await fetchFollowerAndFollowingCountsAsync(userId: userId)
+        await loadUserMyPlaces(userId: userId)
         await loadUserFavoritePlaces(userId: userId)
         await loadUserPlaceLists(userId: userId)
-        await loadUserMyPlaces(userId: userId)
         await loadFollowing(userId: userId)
         await loadFollowers(userId: userId)
         await loadReviewedPlacesForUserAndFollowing(userId: userId)
         calculateMapAnnotations()
+    }
+
+    // Sets all relevant loading flags to true before data loading begins
+    func startDataLoadingFlags() {
+        profileViewModel.isFollowersListLoading = true
+        profileViewModel.isFollowingListLoading = true
+        profileViewModel.isMyPlacesLoading = true
     }
     
     func calculateMapAnnotations() {
@@ -49,6 +56,7 @@ class DataManager: ObservableObject {
     }
     
     func loadUserMyPlaces(userId: String) async {
+        profileViewModel.isMyPlacesLoading = true
         do {
             let places = try await fireStoreService.fetchMyPlaces(userId: userId)
             for place in places {
@@ -66,6 +74,7 @@ class DataManager: ObservableObject {
         } catch {
             print("Error loading my places: \(error.localizedDescription)")
         }
+        profileViewModel.isMyPlacesLoading = false
     }
     
     // Load's current user's profile data and profile picture
@@ -76,10 +85,8 @@ class DataManager: ObservableObject {
             if let profilePhotoUrl = profileData.profilePhotoURL {
                 self.AddProfilePicture(userId: userId, profilePhotoUrl: profilePhotoUrl, isCurrentUser: true)
             }
-            self.profileViewModel.finishLoading()
         } catch {
             print("Error loading profile data: \(error.localizedDescription)")
-            self.profileViewModel.finishLoading()
         }
     }
 
@@ -129,14 +136,8 @@ class DataManager: ObservableObject {
                     self.detailPlaceViewModel.placeSavers[placeId]!.append(userId)
                 }
             }
-            if forUser == nil {
-                self.profileViewModel.finishLoading()
-            }
         } catch {
             print("Error loading favorite places: \(error.localizedDescription)")
-            if forUser == nil {
-                self.profileViewModel.finishLoading()
-            }
         }
     }
     
@@ -154,14 +155,8 @@ class DataManager: ObservableObject {
             for list in lists {
                 await self.processPlacesInList(list: list, userId: userId)
             }
-            if forUser == nil {
-                self.profileViewModel.finishLoading()
-            }
         } catch {
             print("Error loading user place lists: \(error.localizedDescription)")
-            if forUser == nil {
-                self.profileViewModel.finishLoading()
-            }
         }
     }
 
@@ -184,6 +179,7 @@ class DataManager: ObservableObject {
     }
     
     func loadFollowing(userId: String) async {
+        profileViewModel.isFollowingListLoading = true
         do {
             let profiles = try await fireStoreService.fetchFollowingProfilesData(for: userId)
             // Store the profiles in the profileViewModel
@@ -195,32 +191,35 @@ class DataManager: ObservableObject {
                     self.AddProfilePicture(userId: profile.id, profilePhotoUrl: profilePhotoURL)
                 }
             }
-            self.profileViewModel.finishLoading()
         } catch {
             print("Error loading following profiles: \(error.localizedDescription)")
-            self.profileViewModel.finishLoading()
         }
+        profileViewModel.isFollowingListLoading = false
     }
 
     
     func loadFollowers(userId: String) async {
+        profileViewModel.isFollowersListLoading = true
         do {
             let profiles = try await fireStoreService.fetchFollowerProfilesData(for: userId)
             // Store the profiles in the profileViewModel
             self.profileViewModel.userFollowers = profiles
-            self.profileViewModel.finishLoading()
         } catch {
             print("Error loading followers: \(error.localizedDescription)")
-            self.profileViewModel.finishLoading()
         }
+        profileViewModel.isFollowersListLoading = false
     }
     
     func fetchFollowerAndFollowingCountsAsync(userId: String) async {
+        profileViewModel.isFollowersLoading = true
+        profileViewModel.isFollowingLoading = true
         async let followers: Int = try! await fireStoreService.getNumberFollowers(forUserId: userId)
         async let following: Int = try! await fireStoreService.getNumberFollowing(forUserId: userId)
         let (followersCount, followingCount) = await (followers, following)
         profileViewModel.followersCount = followersCount
         profileViewModel.followingCount = followingCount
+        profileViewModel.isFollowersLoading = false
+        profileViewModel.isFollowingLoading = false
     }
     
     // Loads all places the user has reviewed, even if not in favorites or lists

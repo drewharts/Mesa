@@ -67,7 +67,11 @@ struct FollowersListView: View {
     var body: some View {
         NavigationView {
             VStack {
-                if profile.userFollowers.isEmpty {
+                if profile.isFollowersListLoading {
+                    Spacer()
+                    ProgressView()
+                    Spacer()
+                } else if profile.userFollowers.isEmpty {
                     VStack(spacing: 16) {
                         Spacer()
                         Text("No Followers Yet")

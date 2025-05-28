@@ -25,7 +25,11 @@ struct MyPlacesListView: View {
     var body: some View {
         NavigationView {
             VStack {
-                if createdPlaces.isEmpty {
+                if profile.isMyPlacesLoading {
+                    Spacer()
+                    ProgressView()
+                    Spacer()
+                } else if createdPlaces.isEmpty {
                     VStack(spacing: 16) {
                         Spacer()
                         Text("No Places Created Yet")
