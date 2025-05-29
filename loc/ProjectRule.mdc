@@ -1,0 +1,15 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# File patterns: *.swift
+
+## Project Architecture
+We use an MVVM Architecture. That means we almost never put functions inside view files or model files.
+They should almost always reside within the viewmodel. We also have various services that connect to firestore
+or other APIs.
+
+## Code Standards
+Currently, we have a few bloated files with way too many lines. Our goal shoudl be to abstract as much as possible 
+and make each class no more than 200 lines.

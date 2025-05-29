@@ -8,7 +8,6 @@
 
 import SwiftUI
 import FirebaseAuth
-import MapboxMaps
 import MapboxSearch
 
 struct MainView: View {
@@ -26,17 +25,17 @@ struct MainView: View {
     @State private var maxSheetHeight: CGFloat = UIScreen.main.bounds.height * 0.85
     @State private var showProfileView = false
     @State private var triggerFocus = false
+    @State private var recenterMap = false
 
     var body: some View {
         NavigationView {
-            ZStack(alignment: .top) {
-                MapView(onMapTap: {
-                    searchIsFocused = false
-                    isSearchBarMinimized = true
-                })
+            ZStack {
+                // Map layer
+                MapView(recenterMap: $recenterMap, onMapTap: handleMapTap)
                 .ignoresSafeArea()
                 .edgesIgnoringSafeArea(.all)
-
+                
+                // UI overlay layer
                 VStack(spacing: 16) {
                     if isSearchBarMinimized {
                         HStack {
@@ -49,7 +48,6 @@ struct MainView: View {
                                         }
                                         isSearchBarMinimized.toggle()
                                     }
-                                    // Delay focus to ensure TextField is rendered
                                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                                         searchIsFocused = true
                                     }
@@ -59,15 +57,12 @@ struct MainView: View {
                                         .frame(width: 60, height: 60)
                                         .background(Color.white)
                                         .clipShape(Circle())
-                                        .overlay(
-                                            Circle().stroke(Color.gray, lineWidth: 2)
-                                        )
+                                        .overlay(Circle().stroke(Color.gray, lineWidth: 2))
                                         .shadow(radius: 4)
                                 }
                                 .padding(.top, 10)
                                 .padding(.trailing, 20)
-
-                                // Profile Button (unchanged)
+                                
                                 NavigationLink(
                                     destination: ProfileView()
                                         .environmentObject(userProfileViewModel),
@@ -77,14 +72,12 @@ struct MainView: View {
                                         showProfileView = true
                                         selectedPlaceVM.isDetailSheetPresented = false
                                     }) {
-                                        if let profilePhoto = userSession.profileViewModel?.profilePhoto {
-                                            profilePhoto
+                                        if let profilePhoto = profileViewModel.userPicture {
+                                            Image(uiImage: profilePhoto)
                                                 .resizable()
                                                 .frame(width: 60, height: 60)
                                                 .clipShape(Circle())
-                                                .overlay(
-                                                    Circle().stroke(Color.gray, lineWidth: 2)
-                                                )
+                                                .overlay(Circle().stroke(Color.gray, lineWidth: 2))
                                                 .shadow(radius: 4)
                                         } else {
                                             Image(systemName: "person.crop.circle")
@@ -93,9 +86,7 @@ struct MainView: View {
                                                 .frame(width: 60, height: 60)
                                                 .background(Color.white)
                                                 .clipShape(Circle())
-                                                .overlay(
-                                                    Circle().stroke(Color.gray, lineWidth: 2)
-                                                )
+                                                .overlay(Circle().stroke(Color.gray, lineWidth: 2))
                                                 .shadow(radius: 4)
                                         }
                                     }
@@ -116,7 +107,7 @@ struct MainView: View {
                             .padding(.horizontal, 20)
                             .padding(.top, 10)
                             .padding(.bottom, -10)
-
+                        
                         if !viewModel.searchResults.isEmpty || !viewModel.userResults.isEmpty {
                             SearchResultsView(
                                 placeResults: viewModel.searchResults,
@@ -129,7 +120,7 @@ struct MainView: View {
                                     }
                                 },
                                 onSelectUser: { user in
-                                    userProfileViewModel.selectUser(user, currentUserId: profileViewModel.userId)
+                                    userProfileViewModel.selectUser(user, currentUserId: userSession.currentUserId!)
                                     withAnimation {
                                         isSearchBarMinimized = true
                                         searchIsFocused = false
@@ -142,14 +133,10 @@ struct MainView: View {
                             .padding(.bottom, 50)
                         }
                     }
+                    Spacer()
                 }
-                .sheet(isPresented: $userProfileViewModel.isUserDetailPresented) {
-                    if let user = userProfileViewModel.selectedUser {
-                        UserProfileView(userId: profileViewModel.userId, viewModel: userProfileViewModel)
-                    }
-                }
-                .transition(.move(edge: .top).combined(with: .opacity))
-
+                .navigationBarHidden(true)
+                
                 if selectedPlaceVM.isDetailSheetPresented {
                     BottomSheetView(
                         isPresented: $selectedPlaceVM.isDetailSheetPresented,
@@ -164,14 +151,47 @@ struct MainView: View {
                         .frame(maxWidth: .infinity)
                     }
                 }
+
+                // Overlay recenter button (bottom right)
+                if isSearchBarMinimized && !searchIsFocused && !selectedPlaceVM.isDetailSheetPresented {
+                    VStack {
+                        Spacer()
+                        HStack {
+                            Spacer()
+                            Button(action: {
+                                recenterMap = true
+                            }) {
+                                Image(systemName: "location.fill")
+                                    .foregroundColor(.white)
+                                    .frame(width: 36, height: 36)
+                                    .background(Color.blue)
+                                    .clipShape(Circle())
+                                    .shadow(radius: 4)
+                            }
+                            .padding(.bottom, 20)
+                            .padding(.trailing, 20)
+                        }
+                    }
+                }
             }
-            .onAppear {
-                locationManager.requestLocationPermission()
-                viewModel.selectedPlaceVM = selectedPlaceVM
-                viewModel.searchText = ""
+            .sheet(isPresented: $userProfileViewModel.isUserDetailPresented) {
+                if let user = userProfileViewModel.selectedUser {
+                    UserProfileView(userId: userSession.currentUserId!, UserProfileVM: userProfileViewModel)
+                }
             }
         }
         .navigationViewStyle(StackNavigationViewStyle())
+        .onAppear {
+            locationManager.requestLocationPermission()
+            viewModel.selectedPlaceVM = selectedPlaceVM
+            viewModel.searchText = ""
+        }
+        .onChange(of: selectedPlaceVM.isDetailSheetPresented) { newValue in
+            if newValue {
+                isSearchBarMinimized = true
+                searchIsFocused = false
+            }
+        }
     }
 
     private func handleMapTap() {

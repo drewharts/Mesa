@@ -10,6 +10,7 @@ import MapboxSearch
 import CoreLocation
 import UIKit
 import FirebaseAuth
+import FirebaseFirestore
 
 class SelectedPlaceViewModel: ObservableObject {
     private let firestoreService: FirestoreService
@@ -21,7 +22,7 @@ class SelectedPlaceViewModel: ObservableObject {
                let currentLocation = locationManager.currentLocation {
                 loadData(for: place, currentLocation: currentLocation.coordinate)
                 loadReviews(for: place)
-//                getPlacePhotos(for: place)
+                getPlacePhotos(for: place)
                 
                 // Clear previous likes when loading a new place
                 likedReviews.removeAll()
@@ -34,6 +35,7 @@ class SelectedPlaceViewModel: ObservableObject {
     @Published private var placeReviews: [String: [any ReviewProtocol]] = [:] // Cache for reviews by placeId
     @Published private var reviewPhotos: [String: [UIImage]] = [:] // Cache for review photos by reviewId
     @Published private var userProfilePhotos: [String: UIImage] = [:] // Cache for profile photos by userId
+    @Published private var restaurantTypes: [String: String] = [:] // Dictionary to store restaurant types by placeId
     
     @Published var placeRating: Double = 0
     
@@ -76,12 +78,29 @@ class SelectedPlaceViewModel: ObservableObject {
         self.firestoreService = firestoreService
     }
     
+    // Get restaurant type for a place
+    func getRestaurantType(for placeId: String) -> String? {
+        return restaurantTypes[placeId]
+    }
+    
+    // Calculate restaurant type and store in dictionary
+    func calculateAndStoreRestaurantType(for place: DetailPlace) {
+        let placeId = place.id.uuidString
+        let placeDetailVM = PlaceDetailViewModel()
+        if let type = placeDetailVM.getRestaurantType(for: place) {
+            restaurantTypes[placeId] = type
+        }
+    }
+    
     // MARK: - Private Methods
     private func loadData(for place: DetailPlace, currentLocation: CLLocationCoordinate2D) {
         print("Loading data for \(place.name) at location \(currentLocation)")
         
         // Compute whether the restaurant is open now
         let openNow = isRestaurantOpenNow(place)
+        
+        // Calculate and store restaurant type
+        calculateAndStoreRestaurantType(for: place)
         
         DispatchQueue.main.async {
             self.isRestaurantOpen = openNow
@@ -90,7 +109,7 @@ class SelectedPlaceViewModel: ObservableObject {
     }
     
     func isRestaurantOpenNow(_ place: DetailPlace) -> Bool {
-        guard let openHours = place.OpenHours, !openHours.isEmpty else { return false }
+        guard let openHours = place.openHours, !openHours.isEmpty else { return false }
         
         let now = Date()
         let calendar = Calendar.current
@@ -206,17 +225,47 @@ class SelectedPlaceViewModel: ObservableObject {
             self.photoLoadingStates[placeId] = .loading
         }
         
-        firestoreService.fetchPhotosFromStorage(placeId: placeId) { [weak self] images, error in
+        // First fetch all reviews for this place
+        firestoreService.fetchFriendsReviews(placeId: placeId, currentUserId: Auth.auth().currentUser?.uid ?? "") { [weak self] reviews, error in
             guard let self = self else { return }
             
-            DispatchQueue.main.async {
-                if let error = error {
-                    print("Error fetching photos for place \(placeId): \(error.localizedDescription)")
+            if let error = error {
+                print("Error fetching reviews for place \(placeId): \(error.localizedDescription)")
+                DispatchQueue.main.async {
                     self.photoLoadingStates[placeId] = .error(error)
                     self.placePhotos[placeId] = []
-                } else {
-                    self.placePhotos[placeId] = images ?? []
+                }
+                return
+            }
+            
+            // Collect all photo URLs from all reviews
+            var photoURLs: [String] = []
+            for review in reviews ?? [] {
+                photoURLs.append(contentsOf: review.images)
+            }
+            
+            // If no photos found, update state and return
+            if photoURLs.isEmpty {
+                DispatchQueue.main.async {
                     self.photoLoadingStates[placeId] = .loaded
+                    self.placePhotos[placeId] = []
+                }
+                return
+            }
+            
+            // Fetch the actual images using the URLs
+            firestoreService.fetchPhotosFromStorage(urls: photoURLs) { [weak self] images, error in
+                guard let self = self else { return }
+                
+                DispatchQueue.main.async {
+                    if let error = error {
+                        print("Error fetching photos for place \(placeId): \(error.localizedDescription)")
+                        self.photoLoadingStates[placeId] = .error(error)
+                        self.placePhotos[placeId] = []
+                    } else {
+                        self.placePhotos[placeId] = images ?? []
+                        self.photoLoadingStates[placeId] = .loaded
+                    }
                 }
             }
         }
@@ -469,6 +518,61 @@ class SelectedPlaceViewModel: ObservableObject {
         }
     }
     
+    func deleteReview(reviewId: String, completion: @escaping (Result<Void, Error>) -> Void) {
+        guard let placeId = selectedPlace?.id.uuidString else {
+            completion(.failure(NSError(domain: "SelectedPlaceViewModel", code: -1, userInfo: [NSLocalizedDescriptionKey: "No selected place"])))
+            return
+        }
+        
+        // Find the review to get the userId
+        guard let review = placeReviews[placeId]?.first(where: { $0.id == reviewId }) else {
+            completion(.failure(NSError(domain: "SelectedPlaceViewModel", code: -1, userInfo: [NSLocalizedDescriptionKey: "Review not found in cache"])))
+            return
+        }
+        
+        print("🗑️ Deleting review \(reviewId) from SelectedPlaceViewModel")
+        
+        firestoreService.deleteReview(reviewId: reviewId, placeId: placeId, userId: review.userId) { [weak self] result in
+            guard let self = self else { return }
+            
+            switch result {
+            case .success:
+                DispatchQueue.main.async {
+                    // Remove the review from local cache
+                    if var currentReviews = self.placeReviews[placeId] {
+                        // Find and remove the review
+                        if let index = currentReviews.firstIndex(where: { $0.id == reviewId }) {
+                            currentReviews.remove(at: index)
+                            self.placeReviews[placeId] = currentReviews
+                            
+                            // Recalculate rating after deletion
+                            self.placeRating = self.calculateAvgRating(for: placeId)
+                            
+                            // Clean up cached photos for this review
+                            self.reviewPhotos.removeValue(forKey: reviewId)
+                            self.reviewPhotoLoadingStates.removeValue(forKey: reviewId)
+                            
+                            // Clean up cached comments for this review
+                            self.placeReviewComments.removeValue(forKey: reviewId)
+                            self.commentLoadingStates.removeValue(forKey: reviewId)
+                            self.reviewCommentCounts.removeValue(forKey: reviewId)
+                            
+                            // Remove from liked reviews set if it was there
+                            self.likedReviews.remove(reviewId)
+                            
+                            print("✅ Successfully removed review from local cache")
+                        }
+                    }
+                    completion(.success(()))
+                }
+                
+            case .failure(let error):
+                print("❌ Failed to delete review: \(error.localizedDescription)")
+                completion(.failure(error))
+            }
+        }
+    }
+    
     func formattedTimestamp<T: ReviewProtocol>(for review: T) -> String {
         let now = Date()
         let calendar = Calendar.current
@@ -653,5 +757,41 @@ class SelectedPlaceViewModel: ObservableObject {
                 }
             }
         }
+    }
+
+    func createNewPlace(name: String, description: String?, coordinate: CLLocationCoordinate2D, userId: String) {
+        // Create a new place
+        var newPlace = DetailPlace()
+        newPlace.name = name
+        newPlace.description = description
+        newPlace.coordinate = GeoPoint(
+            latitude: coordinate.latitude,
+            longitude: coordinate.longitude
+        )
+        
+        // Save to main places collection
+        firestoreService.addToAllPlaces(detailPlace: newPlace) { error in
+            if let error = error {
+                print("Error saving place to main collection: \(error.localizedDescription)")
+            } else {
+                print("Successfully saved place to main collection")
+                
+                // Save to user's myPlaces collection
+                self.firestoreService.addToMyPlaces(userId: userId, detailPlace: newPlace) { error in
+                    if let error = error {
+                        print("Error saving place to user's collection: \(error.localizedDescription)")
+                    } else {
+                        // Notify that a new place was created to refresh map annotations
+                        DispatchQueue.main.async {
+                            NotificationCenter.default.post(name: NSNotification.Name("RefreshMapAnnotations"), object: nil)
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Update the UI
+        selectedPlace = newPlace
+        isDetailSheetPresented = true
     }
 }

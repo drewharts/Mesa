@@ -10,35 +10,43 @@ struct locApp: App {
     
     @StateObject private var firestoreService: FirestoreService
     @StateObject private var locationManager: LocationManager
-    @StateObject private var detailPlaceVM: DetailPlaceViewModel
-    @StateObject private var selectedPlaceVM: SelectedPlaceViewModel
     @StateObject private var userSession: UserSession
+    @StateObject private var profileViewModel: ProfileViewModel
+    @StateObject private var detailPlaceViewModel: DetailPlaceViewModel
+    @StateObject private var selectedPlaceViewModel: SelectedPlaceViewModel
+    @StateObject private var userProfileViewModel: UserProfileViewModel
+    private let dataManager: DataManager
 
     init() {
         FirebaseApp.configure()
         let providerFactory = AppAttestProviderFactory()
         AppCheck.setAppCheckProviderFactory(providerFactory)
 
-        // Run migrations right after Firebase configuration
-//        MigrationManager.shared.runMigrations { error in
-//            if let error = error {
-//                print("Migration failed: \(error.localizedDescription)")
-//            } else {
-//                print("Migrations completed successfully")
-//            }
-//        }
         let firestore = FirestoreService()
-        let profileFirestore = ProfileFirestoreService()
         let location = LocationManager()
         let detailVM = DetailPlaceViewModel(firestoreService: firestore)
-        let selectedVM = SelectedPlaceViewModel(locationManager: location, firestoreService: firestore)
         let userSess = UserSession(firestoreService: firestore, locationManager: location, detailPlaceVM: detailVM)
+        let profileVM = ProfileViewModel(userSession: userSess, firestoreService: firestore, detailPlaceViewModel: detailVM)
+        let selectedPlaceVM = SelectedPlaceViewModel(locationManager: location, firestoreService: firestore)
+        
+        // Initialize DataManager with all required parameters
+        let dataMgr = DataManager(
+            fireStoreService: firestore,
+            userSession: userSess,
+            locationManager: location,
+            profileViewModel: profileVM,
+            detailPlaceViewModel: detailVM
+        )
 
         self._firestoreService = StateObject(wrappedValue: firestore)
         self._locationManager = StateObject(wrappedValue: location)
-        self._detailPlaceVM = StateObject(wrappedValue: detailVM)
-        self._selectedPlaceVM = StateObject(wrappedValue: selectedVM)
         self._userSession = StateObject(wrappedValue: userSess)
+        self._profileViewModel = StateObject(wrappedValue: profileVM)
+        self._detailPlaceViewModel = StateObject(wrappedValue: detailVM)
+        self.dataManager = dataMgr
+        self._selectedPlaceViewModel = StateObject(wrappedValue: selectedPlaceVM)
+        let userProfileVM = UserProfileViewModel(dataManager: dataMgr, detailPlaceViewModel: detailVM)
+        self._userProfileViewModel = StateObject(wrappedValue: userProfileVM)
     }
 
     var body: some Scene {
@@ -46,13 +54,18 @@ struct locApp: App {
             SplashScreenView()
                 .environmentObject(userSession)
                 .environmentObject(locationManager)
-                .environmentObject(selectedPlaceVM)
-                .environmentObject(detailPlaceVM)
+                .environmentObject(profileViewModel)
+                .environmentObject(detailPlaceViewModel)
+                .environmentObject(selectedPlaceViewModel)
                 .environmentObject(firestoreService)
-                .onAppear {
+                .environmentObject(dataManager)
+                .environmentObject(userProfileViewModel)
+                .preferredColorScheme(.light)
+                .task {
                     if let currentUser = Auth.auth().currentUser {
                         userSession.isUserLoggedIn = true
-                        userSession.fetchProfile(for: currentUser.uid)
+                        userSession.currentUserId = currentUser.uid
+                        await dataManager.initializeProfileData(userId: currentUser.uid)
                     }
                 }
         }

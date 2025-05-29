@@ -24,7 +24,7 @@ class UserSession: ObservableObject {
         self.detailPlaceVM = detailPlaceVM
         if let currentUser = Auth.auth().currentUser {
             self.isUserLoggedIn = true
-            fetchProfile(for: currentUser.uid)
+//            fetchProfile(for: currentUser.uid)
         } else {
             self.isUserLoggedIn = false
             self.profileViewModel = nil
@@ -42,32 +42,32 @@ class UserSession: ObservableObject {
         }
     }
     
-    func fetchProfile(for uid: String) {
-        let docRef = Firestore.firestore().collection("users").document(uid)
-        docRef.getDocument { [weak self] (document, error) in
-            guard let self = self else { return }
-            if let error = error {
-                print("Error fetching profile: \(error.localizedDescription)")
-                return
-            }
-            guard let document = document, document.exists else {
-                print("No profile found for user \(uid)")
-                return
-            }
-            do {
-                let profileData = try document.data(as: ProfileData.self)
-                let profileViewModel = ProfileViewModel(
-                    data: profileData,
-                    firestoreService: self.firestoreService,
-                    detailPlaceViewModel: self.detailPlaceVM,
-                    userId: uid
-                )
-                self.profileViewModel = profileViewModel
-            } catch {
-                print("Error decoding profile data: \(error)")
-            }
-        }
-    }
+//    func fetchProfile(for uid: String) {
+//        let docRef = Firestore.firestore().collection("users").document(uid)
+//        docRef.getDocument { [weak self] (document, error) in
+//            guard let self = self else { return }
+//            if let error = error {
+//                print("Error fetching profile: \(error.localizedDescription)")
+//                return
+//            }
+//            guard let document = document, document.exists else {
+//                print("No profile found for user \(uid)")
+//                return
+//            }
+//            do {
+//                let profileData = try document.data(as: ProfileData.self)
+//                let profileViewModel = ProfileViewModel(
+//                    data: profileData,
+//                    firestoreService: self.firestoreService,
+//                    detailPlaceViewModel: self.detailPlaceVM,
+//                    userId: uid
+//                )
+//                self.profileViewModel = profileViewModel
+//            } catch {
+//                print("Error decoding profile data: \(error)")
+//            }
+//        }
+//    }
     
     func signInWithGoogle(user: GIDGoogleUser) {
         guard let idToken = user.idToken?.tokenString else { return }
@@ -82,7 +82,7 @@ class UserSession: ObservableObject {
             self.isUserLoggedIn = true
             if let currentUser = Auth.auth().currentUser {
                 self.currentUserId = currentUser.uid
-                self.fetchProfile(for: currentUser.uid)
+//                self.fetchProfile(for: currentUser.uid)
             }
         }
     }

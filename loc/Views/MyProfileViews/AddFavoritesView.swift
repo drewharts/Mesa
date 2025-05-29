@@ -50,7 +50,7 @@ struct AddFavoritesCurrentFavoritesView: View {
 
 struct FavoritesContentDisplay: View {
     @EnvironmentObject var profile: ProfileViewModel
-    var prediction: SearchSuggestion
+    var prediction: MesaPlaceSuggestion
     @State private var lastTappedPlaceID: String?
 
     var body: some View {
@@ -59,7 +59,7 @@ struct FavoritesContentDisplay: View {
             HStack {
                 Text(prediction.name)
                     .foregroundColor(.primary)
-                Text((prediction.address?.place) ?? "")
+                Text((prediction.address) ?? "")
                     .foregroundColor(.secondary)
                 Spacer()
             }
@@ -76,7 +76,7 @@ struct FavoritesContentDisplay: View {
                 .contentShape(Rectangle()) // Makes the entire rectangle tappable, not just the area with content
                 .onTapGesture {
                     // 1) Append to favorites (directly via ProfileViewModel)
-                    profile.addFavoriteFromSuggestion(prediction)
+                    profile.addFavoriteFromSuggestion(place: prediction)
                     // 2) Highlight this row
                     lastTappedPlaceID = prediction.id
 

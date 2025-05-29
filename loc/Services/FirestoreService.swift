@@ -112,37 +112,50 @@ class FirestoreService: ObservableObject {
     }
     
     // Fetch all places from Firestore
-        func fetchAllPlaces(completion: @escaping ([DetailPlace]?, Error?) -> Void) {
-            print("Fetching all places from Firestore...")
-            db.collection("places").getDocuments { (snapshot, error) in
+    func fetchAllPlaces(completion: @escaping ([DetailPlace]?, Error?) -> Void) {
+        print("Fetching all places from Firestore...")
+        db.collection("places").getDocuments { (snapshot, error) in
+            if let error = error {
+                print("Error fetching places: \(error.localizedDescription)")
+                completion(nil, error)
+                return
+            }
+            guard let documents = snapshot?.documents else {
+                print("No places found in Firestore.")
+                completion([], nil)
+                return
+            }
+            let places = documents.compactMap { try? $0.data(as: DetailPlace.self) }
+            print("Fetched \(places.count) places.")
+            completion(places, nil)
+        }
+    }
+    
+    // Async version of fetchAllPlaces
+    func fetchAllPlaces() async throws -> [DetailPlace] {
+        return try await withCheckedThrowingContinuation { continuation in
+            fetchAllPlaces { places, error in
                 if let error = error {
-                    print("Error fetching places: \(error.localizedDescription)")
-                    completion(nil, error)
+                    continuation.resume(throwing: error)
                     return
                 }
-                guard let documents = snapshot?.documents else {
-                    print("No places found in Firestore.")
-                    completion([], nil)
-                    return
-                }
-                let places = documents.compactMap { try? $0.data(as: DetailPlace.self) }
-                print("Fetched \(places.count) places.")
-                completion(places, nil)
+                continuation.resume(returning: places ?? [])
             }
         }
-
-        // Update OpenHours for a specific place
-        func updateOpenHours(for placeId: String, openHours: [String]?, completion: @escaping (Error?) -> Void) {
-            let data: [String: Any] = ["OpenHours": openHours as Any]
-            db.collection("places").document(placeId).updateData(data) { error in
-                if let error = error {
-                    print("Error updating OpenHours for place \(placeId): \(error.localizedDescription)")
-                } else {
-                    print("Successfully updated OpenHours for place \(placeId)")
-                }
-                completion(error)
+    }
+    
+    // Update OpenHours for a specific place
+    func updateOpenHours(for placeId: String, openHours: [String]?, completion: @escaping (Error?) -> Void) {
+        let data: [String: Any] = ["OpenHours": openHours as Any]
+        db.collection("places").document(placeId).updateData(data) { error in
+            if let error = error {
+                print("Error updating OpenHours for place \(placeId): \(error.localizedDescription)")
+            } else {
+                print("Successfully updated OpenHours for place \(placeId)")
             }
+            completion(error)
         }
+    }
     
     func addFieldToAllPlaces(fieldName: String, fieldValue: Any) {
         let db = Firestore.firestore()
@@ -168,7 +181,7 @@ class FirestoreService: ObservableObject {
     }
 
     
-    func fetchCurrentUser(userId: String, completion: @escaping (User?, Error?) -> Void) {
+    func fetchUser(userId: String, completion: @escaping (User?, Error?) -> Void) {
         db.collection("users").document(userId).getDocument { document, error in
             if let error = error {
                 completion(nil, error)
@@ -204,7 +217,7 @@ class FirestoreService: ObservableObject {
         
         // Use OperationQueue to limit concurrent downloads
         let downloadQueue = OperationQueue()
-        downloadQueue.maxConcurrentOperationCount = 3 // Limit concurrent downloads
+        downloadQueue.maxConcurrentOperationCount = 10 // Limit concurrent downloads
         
         for urlString in urls {
             // Skip invalid URLs
@@ -400,7 +413,7 @@ class FirestoreService: ObservableObject {
             }
     }
     
-    func fetchReviews<ReviewProtocol>(placeId: String, latestOnly: Bool = false, completion: @escaping ([ReviewProtocol]?, Error?) -> Void) {
+    func fetchReviews<T>(placeId: String, latestOnly: Bool = false, completion: @escaping ([T]?, Error?) -> Void) {
         // Reference to the reviews subcollection under the place document
         let reviewsRef = db.collection("places")
                          .document(placeId)
@@ -409,7 +422,7 @@ class FirestoreService: ObservableObject {
         // Create the query based on the latestOnly flag
         let query = latestOnly ?
             reviewsRef.order(by: "timestamp", descending: true).limit(to: 1) : // Latest review only
-            reviewsRef.order(by: "timestamp", descending: false)              // All reviews
+            reviewsRef.order(by: "timestamp", descending: true)              // All reviews, most recent first
         
         // Fetch documents based on the query
         query.getDocuments { snapshot, error in
@@ -430,8 +443,18 @@ class FirestoreService: ObservableObject {
             var genericReviews: [GenericReview] = []
             
             for document in snapshot.documents {
+                let data = document.data()
+                let ts = data["timestamp"]
+                var dateString = "(unparsed)"
+                if let ts = ts as? Timestamp {
+                    dateString = "\(ts.dateValue())"
+                } else if let date = ts as? Date {
+                    dateString = "\(date)"
+                } else {
+                    dateString = String(describing: ts)
+                }
                 // Check the type field to determine how to decode
-                if let typeString = document.data()["type"] as? String,
+                if let typeString = data["type"] as? String,
                    let type = ReviewType(rawValue: typeString) {
                     
                     switch type {
@@ -454,22 +477,19 @@ class FirestoreService: ObservableObject {
                 }
             }
             
-            // Return the appropriate type based on the generic parameter
-            if ReviewProtocol.self == RestaurantReview.self {
-                let typedReviews = restaurantReviews as! [ReviewProtocol]
-                DispatchQueue.main.async {
-                    completion(typedReviews, nil)
-                }
-            } else if ReviewProtocol.self == GenericReview.self {
-                let typedReviews = genericReviews as! [ReviewProtocol]
-                DispatchQueue.main.async {
-                    completion(typedReviews, nil)
-                }
-            } else {
-                // If the requested type doesn't match either concrete type, return an empty array
-                DispatchQueue.main.async {
-                    completion([], nil)
-                }
+            // Client-side sort by timestamp to ensure correct order
+            var allReviewsUnsorted: [ReviewProtocol] = []
+            for review in restaurantReviews {
+                allReviewsUnsorted.append(review as ReviewProtocol)
+            }
+            for review in genericReviews {
+                allReviewsUnsorted.append(review as ReviewProtocol)
+            }
+            let allReviewsSorted = allReviewsUnsorted.sorted { $0.timestamp > $1.timestamp }
+            let typedReviews = allReviewsSorted as! [T]
+            // Ensure we're on the main thread when calling the completion handler
+            DispatchQueue.main.async {
+                completion(typedReviews, nil)
             }
         }
     }
@@ -793,36 +813,71 @@ class FirestoreService: ObservableObject {
         images: [UIImage],
         completion: @escaping (Result<T, Error>) -> Void
     ) {
-        // 1) Upload images first
+        print("🖼️ Starting saveReviewWithImages process")
+        print("📝 Review ID: \(review.id)")
+        print("📸 Number of images to upload: \(images.count)")
+        
+        // If there are no images, just save the review
+        if images.isEmpty {
+            print("ℹ️ No images to upload, proceeding with review save only")
+            saveReview(review) { result in
+                switch result {
+                case .success:
+                    print("✅ Successfully saved review without images")
+                    completion(.success(review))
+                case .failure(let error):
+                    print("❌ Error saving review without images: \(error.localizedDescription)")
+                    completion(.failure(error))
+                }
+            }
+            return
+        }
+        
+        // Upload images first
+        print("🔄 Starting image upload process")
         uploadImagesForReview(review: review, images: images) { [weak self] result in
-            guard let self = self else { return }
+            guard let self = self else {
+                print("❌ Self was deallocated during image upload")
+                return
+            }
             
             switch result {
-            case .success(let downloadURLs):
-                // 2) Update the review to include the new image URLs
-                var updatedReview = review
-                updatedReview.images = downloadURLs
+            case .success(let imageUrls):
+                print("✅ Successfully uploaded \(imageUrls.count) images")
+                print("🔗 Image URLs: \(imageUrls)")
                 
-                // 3) Save the updated review to Firestore
-                self.saveReview(updatedReview) { saveResult in
-                    switch saveResult {
+                // Create a new review with the image URLs
+                var updatedReview = review
+                updatedReview.images = imageUrls
+                
+                print("🔄 Saving review with image URLs")
+                // Save the review with the image URLs
+                self.saveReview(updatedReview) { result in
+                    switch result {
                     case .success:
-                        // Return the updated review instead of Void
+                        print("✅ Successfully saved review with images")
                         completion(.success(updatedReview))
                     case .failure(let error):
+                        print("❌ Error saving review with images: \(error.localizedDescription)")
                         completion(.failure(error))
                     }
                 }
                 
             case .failure(let error):
-                // If image upload fails, return the error
+                print("❌ Error uploading images: \(error.localizedDescription)")
                 completion(.failure(error))
             }
         }
     }
 
 
+
+
     func saveReview<T: ReviewProtocol>(_ review: T, completion: @escaping (Result<Void, Error>) -> Void) {
+        print("📝 Starting to save review with ID: \(review.id)")
+        print("📍 Place ID: \(review.placeId)")
+        print("👤 User ID: \(review.userId)")
+        
         // 1. Build references for both locations
         let placeReviewRef = db.collection("places")
                               .document(review.placeId)
@@ -834,23 +889,32 @@ class FirestoreService: ObservableObject {
                              .collection("reviews")
                              .document(review.id)
         
+        print("🔍 Created Firestore references:")
+        print("   - Place review path: \(placeReviewRef.path)")
+        print("   - User review path: \(userReviewRef.path)")
+        
         // 2. Encode the Review
         do {
             let reviewData = try Firestore.Encoder().encode(review)
+            print("✅ Successfully encoded review data")
             
             // 3. Use a batch write to save to both locations atomically
             let batch = db.batch()
             batch.setData(reviewData, forDocument: placeReviewRef)
             batch.setData(reviewData, forDocument: userReviewRef)
             
+            print("🔄 Committing batch write...")
             batch.commit { error in
                 if let error = error {
+                    print("❌ Error saving review: \(error.localizedDescription)")
                     completion(.failure(error))
                 } else {
+                    print("✅ Successfully saved review to both locations")
                     completion(.success(()))
                 }
             }
         } catch {
+            print("❌ Error encoding review: \(error.localizedDescription)")
             completion(.failure(error))
         }
     }
@@ -1017,24 +1081,22 @@ class FirestoreService: ObservableObject {
         }
     }
     
-    func removePlaceFromList(userId: String, listName: String, placeId: String) {
-        db.collection("users").document(userId)
-            .collection("placeLists").document(listName)
-            .updateData(["places": FieldValue.arrayRemove([placeId])]) { error in
-                if let error = error {
-                    print("Error removing place from list: \(error.localizedDescription)")
-                } else {
-                    print("Place successfully removed from list: \(listName)")
-                    
-                    self.removeUserFromMapPlace(userId: userId, placeId: placeId) { success, error in
-                           if let error = error {
-                               print("Error removing user from mapPlace: \(error.localizedDescription)")
-                           } else {
-                               print("User successfully removed from mapPlace.")
-                           }
-                       }
+    func removePlaceFromList(userId: String, listId: UUID, place: Place) {
+        let listIdString = listId.uuidString
+        do {
+            let encodedPlace = try Firestore.Encoder().encode(place)
+            db.collection("users").document(userId)
+                .collection("placeLists").document(listIdString)
+                .updateData(["places": FieldValue.arrayRemove([encodedPlace])]) { error in
+                    if let error = error {
+                        print("Error removing place from list: \(error.localizedDescription)")
+                    } else {
+                        print("Place successfully removed from list: \(listIdString)")
+                    }
                 }
-            }
+        } catch {
+            print("Error encoding place for removal: \(error.localizedDescription)")
+        }
     }
 
 
@@ -1073,15 +1135,18 @@ class FirestoreService: ObservableObject {
     
     
     func fetchList(userId: String, listName: String, completion: @escaping (Result<PlaceList, Error>) -> Void) {
+        print("🔍 Attempting to fetch list for user \(userId) with name: \(listName)")
         db.collection("users").document(userId)
             .collection("placeLists").document(listName)
             .getDocument { document, error in
                 if let error = error {
+                    print("❌ Error fetching list \(listName) for user \(userId): \(error.localizedDescription)")
                     completion(.failure(error))
                     return
                 }
 
                 guard let document = document, document.exists else {
+                    print("⚠️ List not found - User: \(userId), List Name: \(listName)")
                     let notFoundError = NSError(domain: "FirestoreError", code: 404, userInfo: [NSLocalizedDescriptionKey: "List not found"])
                     completion(.failure(notFoundError))
                     return
@@ -1089,8 +1154,10 @@ class FirestoreService: ObservableObject {
 
                 do {
                     let placeList = try document.data(as: PlaceList.self)
+                    print("✅ Successfully fetched list \(listName) for user \(userId)")
                     completion(.success(placeList))
                 } catch {
+                    print("❌ Error decoding list \(listName) for user \(userId): \(error.localizedDescription)")
                     completion(.failure(error))
                 }
             }
@@ -1105,7 +1172,6 @@ class FirestoreService: ObservableObject {
                     print("Error fetching lists: \(error.localizedDescription)")
                     completion([]) // Return an empty array if there's an error
                 } else {
-                    print("Document count: \(result?.documents.count ?? 0)")
                     let placeLists = result?.documents.compactMap { document in
                         try? document.data(as: PlaceList.self)
                     } ?? []
@@ -1262,6 +1328,26 @@ class FirestoreService: ObservableObject {
                 completion(error)
             }
         } catch {
+            completion(error)
+        }
+    }
+
+    func addToMyPlaces(userId: String, detailPlace: DetailPlace, completion: @escaping (Error?) -> Void) {
+        do {
+            try db.collection("users")
+                .document(userId)
+                .collection("myPlaces")
+                .document(detailPlace.id.uuidString)
+                .setData(from: detailPlace) { error in
+                    if let error = error {
+                        print("Error saving place to user's collection: \(error.localizedDescription)")
+                    } else {
+                        print("Successfully saved place to user's collection")
+                    }
+                    completion(error)
+                }
+        } catch {
+            print("Error encoding place for user's collection: \(error.localizedDescription)")
             completion(error)
         }
     }
@@ -1511,31 +1597,61 @@ class FirestoreService: ObservableObject {
                 return
             }
             
-            var places: [DetailPlace] = []
+            var allPlaces: [DetailPlace] = []
             let dispatchGroup = DispatchGroup()
-            var fetchError: Error?
+            var firstError: Error?
             
-            // Fetch each unique place
-            for placeId in placeIds {
+            let placesRef = db.collection("places")
+            let placeIdsArray = Array(placeIds)
+            let chunkSize = 30
+            let chunks = stride(from: 0, to: placeIdsArray.count, by: chunkSize).map {
+                Array(placeIdsArray[$0..<min($0 + chunkSize, placeIdsArray.count)])
+            }
+            
+            print("Fetching place details for \(placeIdsArray.count) review places in \(chunks.count) chunks...")
+            
+            // Fetch details for each chunk
+            for chunk in chunks {
                 dispatchGroup.enter()
-                
-                self.fetchPlace(withId: placeId) { result in
-                    switch result {
-                    case .success(let place):
-                        places.append(place)
-                    case .failure(let error):
-                        print("Error fetching place \(placeId): \(error.localizedDescription)")
-                        fetchError = error
+                placesRef.whereField("id", in: chunk).getDocuments { snapshot, error in
+                    if let error = error {
+                        print("Error fetching place chunk: \(error.localizedDescription)")
+                        if firstError == nil { firstError = error } // Capture first error
+                        dispatchGroup.leave()
+                        return
                     }
-                    dispatchGroup.leave()
+                    
+                    guard let snapshot = snapshot else {
+                        print("No places found for a chunk")
+                        dispatchGroup.leave()
+                        return
+                    }
+                    
+                    // Decode places from the current chunk
+                    let chunkPlaces = snapshot.documents.compactMap { try? $0.data(as: DetailPlace.self) }
+                    
+                    // --- Concurrently fetch Mapbox details if needed (Removed for simplicity based on previous code) ---
+                    // The original code seemed to fetch Firestore places first, then Mapbox places based on mapboxId.
+                    // If you need full GMSPlace/Mapbox data, further fetching based on mapboxId would be needed here.
+                    // For now, we assume the DetailPlace from Firestore is sufficient.
+                    // -------------------------------------------------------------------------------------------
+                    
+                    // Append places from this chunk
+                    // Use DispatchQueue.main if you need to update UI immediately, otherwise append directly
+                    DispatchQueue.main.async { // Or sync queue if preferred
+                        allPlaces.append(contentsOf: chunkPlaces)
+                        dispatchGroup.leave()
+                    }
                 }
             }
             
+            // Notify when all chunks are processed
             dispatchGroup.notify(queue: .main) {
-                if let error = fetchError {
-                    completion(nil, error)
+                if let error = firstError {
+                    completion(nil, error) // Return the first error encountered
                 } else {
-                    completion(places, nil)
+                    print("Successfully fetched details for \(allPlaces.count) review places.")
+                    completion(allPlaces, nil)
                 }
             }
         }
@@ -2042,26 +2158,26 @@ class FirestoreService: ObservableObject {
             }
         }
 
-    func fetchUserById(userId: String, completion: @escaping (ProfileData?) -> Void) {
+    func fetchUserById(userId: String, completion: @escaping (Result<ProfileData, Error>) -> Void) {
         db.collection("users").document(userId).getDocument { document, error in
             if let error = error {
-                print("Error fetching user \(userId): \(error.localizedDescription)")
-                completion(nil)
+                completion(.failure(error))
                 return
             }
             
             guard let document = document, document.exists else {
-                print("User \(userId) not found")
-                completion(nil)
+                let notFoundError = NSError(domain: "FirestoreService", code: 404, userInfo: [
+                    NSLocalizedDescriptionKey: "User not found"
+                ])
+                completion(.failure(notFoundError))
                 return
             }
             
             do {
                 let profileData = try document.data(as: ProfileData.self)
-                completion(profileData)
+                completion(.success(profileData))
             } catch {
-                print("Error decoding user \(userId): \(error.localizedDescription)")
-                completion(nil)
+                completion(.failure(error))
             }
         }
     }
@@ -2117,14 +2233,24 @@ class FirestoreService: ObservableObject {
                 var genericReviews: [GenericReview] = []
                 
                 for document in snapshot.documents {
+                    let data = document.data()
+                    let ts = data["timestamp"]
+                    var dateString = "(unparsed)"
+                    if let ts = ts as? Timestamp {
+                        dateString = "\(ts.dateValue())"
+                    } else if let date = ts as? Date {
+                        dateString = "\(date)"
+                    } else {
+                        dateString = String(describing: ts)
+                    }
                     // First check if the review is from a user we want to include
-                    guard let userId = document.data()["userId"] as? String,
+                    guard let userId = data["userId"] as? String,
                           userIdsToFetch.contains(userId) else {
                         continue // Skip reviews from users we don't follow
                     }
                     
                     // Check the type field to determine how to decode
-                    if let typeString = document.data()["type"] as? String,
+                    if let typeString = data["type"] as? String,
                        let type = ReviewType(rawValue: typeString) {
                         
                         switch type {
@@ -2147,24 +2273,348 @@ class FirestoreService: ObservableObject {
                     }
                 }
                 
-                // Convert to protocol type at the end to avoid memory issues
-                var allReviews: [ReviewProtocol] = []
-                
-                // Add restaurant reviews
+                // Client-side sort by timestamp to ensure correct order
+                var allReviewsUnsorted: [ReviewProtocol] = []
                 for review in restaurantReviews {
-                    allReviews.append(review)
+                    allReviewsUnsorted.append(review as ReviewProtocol)
                 }
-                
-                // Add generic reviews
                 for review in genericReviews {
-                    allReviews.append(review)
+                    allReviewsUnsorted.append(review as ReviewProtocol)
                 }
-                
+                let allReviewsSorted = allReviewsUnsorted.sorted { $0.timestamp > $1.timestamp }
                 // Ensure we're on the main thread when calling the completion handler
                 DispatchQueue.main.async {
-                    completion(allReviews, nil)
+                    completion(allReviewsSorted, nil)
                 }
             }
         }
+    }
+
+    func fetchMyPlaces(userId: String, completion: @escaping ([DetailPlace]?) -> Void) {
+        db.collection("users")
+            .document(userId)
+            .collection("myPlaces")
+            .getDocuments { snapshot, error in
+                if let error = error {
+                    print("Error fetching myPlaces: \(error.localizedDescription)")
+                    completion([])
+                    return
+                }
+                
+                let detailPlaces = snapshot?.documents.compactMap {
+                    try? $0.data(as: DetailPlace.self)
+                } ?? []
+                
+                completion(detailPlaces)
+            }
+    }
+
+    // MARK: - Async/Await Versions for DataManager
+    
+    func fetchUserById(userId: String) async throws -> ProfileData {
+        try await withCheckedThrowingContinuation { continuation in
+            self.fetchUserById(userId: userId) { result in
+                switch result {
+                case .success(let profileData):
+                    continuation.resume(returning: profileData)
+                case .failure(let error):
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+    
+    func fetchProfileFavorites(userId: String) async throws -> [DetailPlace] {
+        try await withCheckedThrowingContinuation { continuation in
+            self.fetchProfileFavorites(userId: userId) { places in
+                continuation.resume(returning: places ?? [])
+            }
+        }
+    }
+    
+    func fetchLists(userId: String) async throws -> [PlaceList] {
+        try await withCheckedThrowingContinuation { continuation in
+            self.fetchLists(userId: userId) { lists in
+                continuation.resume(returning: lists)
+            }
+        }
+    }
+    
+    func fetchPlace(withId placeId: String) async throws -> DetailPlace {
+        try await withCheckedThrowingContinuation { continuation in
+            self.fetchPlace(withId: placeId) { result in
+                switch result {
+                case .success(let detailPlace):
+                    continuation.resume(returning: detailPlace)
+                case .failure(let error):
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+    
+    func fetchMyPlaces(userId: String) async throws -> [DetailPlace] {
+        try await withCheckedThrowingContinuation { continuation in
+            self.fetchMyPlaces(userId: userId) { places in
+                continuation.resume(returning: places ?? [])
+            }
+        }
+    }
+    
+    func fetchFollowingProfilesData(for userId: String) async throws -> [ProfileData] {
+        try await withCheckedThrowingContinuation { continuation in
+            self.fetchFollowingProfilesData(for: userId) { profiles, error in
+                if let error = error {
+                    continuation.resume(throwing: error)
+                } else {
+                    continuation.resume(returning: profiles ?? [])
+                }
+            }
+        }
+    }
+    
+    func fetchFollowerProfilesData(for userId: String) async throws -> [ProfileData] {
+        try await withCheckedThrowingContinuation { continuation in
+            self.fetchFollowerProfilesData(for: userId) { profiles, error in
+                if let error = error {
+                    continuation.resume(throwing: error)
+                } else {
+                    continuation.resume(returning: profiles ?? [])
+                }
+            }
+        }
+    }
+
+    func getNumberFollowers(forUserId userId: String) async throws -> Int {
+        try await withCheckedThrowingContinuation { continuation in
+            self.getNumberFollowers(forUserId: userId) { count, error in
+                if let error = error {
+                    continuation.resume(throwing: error)
+                } else {
+                    continuation.resume(returning: count)
+                }
+            }
+        }
+    }
+    
+    func getNumberFollowing(forUserId userId: String) async throws -> Int {
+        try await withCheckedThrowingContinuation { continuation in
+            self.getNumberFollowing(forUserId: userId) { count, error in
+                if let error = error {
+                    continuation.resume(throwing: error)
+                } else {
+                    continuation.resume(returning: count)
+                }
+            }
+        }
+    }
+
+    // MARK: - Async/Await Versions for DataManager
+    
+    func fetchUserReviews<T: ReviewProtocol>(userId: String) async throws -> [T] {
+        try await withCheckedThrowingContinuation { continuation in
+            self.fetchUserReviews(userId: userId) { (reviews: [T]?, error) in
+                if let error = error {
+                    continuation.resume(throwing: error)
+                } else {
+                    continuation.resume(returning: reviews ?? [])
+                }
+            }
+        }
+    }
+    
+    func deleteReview(reviewId: String, placeId: String, userId: String, completion: @escaping (Result<Void, Error>) -> Void) {
+        print("🗑️ Starting review deletion process for ID: \(reviewId)")
+        print("📍 Place ID: \(placeId), User ID: \(userId)")
+        
+        // First fetch the review to get image URLs
+        let reviewRef = db.collection("places")
+                         .document(placeId)
+                         .collection("reviews")
+                         .document(reviewId)
+        
+        reviewRef.getDocument { [weak self] document, error in
+            guard let self = self else {
+                completion(.failure(NSError(domain: "FirestoreService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Self was deallocated"])))
+                return
+            }
+            
+            if let error = error {
+                print("❌ Error fetching review: \(error.localizedDescription)")
+                completion(.failure(error))
+                return
+            }
+            
+            guard let document = document, document.exists else {
+                print("❌ Review not found")
+                completion(.failure(NSError(domain: "FirestoreService", code: 404, userInfo: [NSLocalizedDescriptionKey: "Review not found"])))
+                return
+            }
+            
+            // Get image URLs from the review
+            let imageUrls = document.data()?["images"] as? [String] ?? []
+            print("📸 Found \(imageUrls.count) images to delete")
+            
+            // Delete images from Storage first
+            self.deleteReviewImages(reviewId: reviewId, imageUrls: imageUrls) { [weak self] imageDeleteResult in
+                guard let self = self else { return }
+                
+                switch imageDeleteResult {
+                case .success:
+                    print("✅ Successfully deleted review images")
+                case .failure(let error):
+                    print("⚠️ Warning: Failed to delete some images: \(error.localizedDescription)")
+                    // Continue with review deletion even if image deletion fails
+                }
+                
+                // Delete the review documents from both collections
+                self.deleteReviewDocuments(reviewId: reviewId, placeId: placeId, userId: userId) { result in
+                    switch result {
+                    case .success:
+                        print("✅ Successfully deleted review documents")
+                        completion(.success(()))
+                    case .failure(let error):
+                        print("❌ Error deleting review documents: \(error.localizedDescription)")
+                        completion(.failure(error))
+                    }
+                }
+            }
+        }
+    }
+    
+    private func deleteReviewImages(reviewId: String, imageUrls: [String], completion: @escaping (Result<Void, Error>) -> Void) {
+        // If no images to delete, return success immediately
+        guard !imageUrls.isEmpty else {
+            completion(.success(()))
+            return
+        }
+        
+        print("🖼️ Deleting \(imageUrls.count) images for review \(reviewId)")
+        
+        // Also delete the entire review folder from Storage
+        let reviewFolderRef = storage.reference().child("reviews/\(reviewId)")
+        
+        // List all items in the review folder and delete them
+        reviewFolderRef.listAll { result, error in
+            if let error = error {
+                print("⚠️ Error listing review images: \(error.localizedDescription)")
+                // Don't fail the entire operation for this
+                completion(.success(()))
+                return
+            }
+            
+            guard let result = result else {
+                completion(.success(()))
+                return
+            }
+            
+            let dispatchGroup = DispatchGroup()
+            var deletionErrors: [Error] = []
+            
+            // Delete each file in the folder
+            for item in result.items {
+                dispatchGroup.enter()
+                item.delete { error in
+                    if let error = error {
+                        print("⚠️ Error deleting image \(item.name): \(error.localizedDescription)")
+                        deletionErrors.append(error)
+                    } else {
+                        print("✅ Deleted image: \(item.name)")
+                    }
+                    dispatchGroup.leave()
+                }
+            }
+            
+            dispatchGroup.notify(queue: .main) {
+                if deletionErrors.isEmpty {
+                    completion(.success(()))
+                } else {
+                    // Return the first error but don't fail the entire operation
+                    print("⚠️ Some images failed to delete, but continuing with review deletion")
+                    completion(.success(()))
+                }
+            }
+        }
+    }
+    
+    private func deleteReviewDocuments(reviewId: String, placeId: String, userId: String, completion: @escaping (Result<Void, Error>) -> Void) {
+        print("📝 Deleting review documents from both collections")
+        
+        // References to both review locations
+        let placeReviewRef = db.collection("places")
+                              .document(placeId)
+                              .collection("reviews")
+                              .document(reviewId)
+        
+        let userReviewRef = db.collection("users")
+                             .document(userId)
+                             .collection("reviews")
+                             .document(reviewId)
+        
+        // Use a batch write to delete from both locations atomically
+        let batch = db.batch()
+        batch.deleteDocument(placeReviewRef)
+        batch.deleteDocument(userReviewRef)
+        
+        // Also delete any associated likes
+        deleteReviewLikes(reviewId: reviewId) { [weak self] _ in
+            guard let self = self else { return }
+            
+            // Commit the batch deletion
+            batch.commit { error in
+                if let error = error {
+                    print("❌ Error deleting review documents: \(error.localizedDescription)")
+                    completion(.failure(error))
+                } else {
+                    print("✅ Successfully deleted review documents from both collections")
+                    completion(.success(()))
+                }
+            }
+        }
+    }
+    
+    private func deleteReviewLikes(reviewId: String, completion: @escaping (Result<Void, Error>) -> Void) {
+        print("👍 Deleting likes for review \(reviewId)")
+        
+        // Find all likes for this review
+        db.collection("reviewLikes")
+            .whereField("reviewId", isEqualTo: reviewId)
+            .getDocuments { [weak self] snapshot, error in
+                guard let self = self else {
+                    completion(.failure(NSError(domain: "FirestoreService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Self was deallocated"])))
+                    return
+                }
+                
+                if let error = error {
+                    print("⚠️ Error fetching review likes: \(error.localizedDescription)")
+                    // Don't fail the entire operation for this
+                    completion(.success(()))
+                    return
+                }
+                
+                guard let documents = snapshot?.documents, !documents.isEmpty else {
+                    print("ℹ️ No likes found for review")
+                    completion(.success(()))
+                    return
+                }
+                
+                print("🗑️ Deleting \(documents.count) likes for review")
+                
+                // Delete all like documents in a batch
+                let batch = self.db.batch()
+                for document in documents {
+                    batch.deleteDocument(document.reference)
+                }
+                
+                batch.commit { error in
+                    if let error = error {
+                        print("⚠️ Error deleting review likes: \(error.localizedDescription)")
+                        // Don't fail the entire operation for this
+                    } else {
+                        print("✅ Successfully deleted review likes")
+                    }
+                    completion(.success(()))
+                }
+            }
     }
 }

@@ -10,56 +10,100 @@ import UIKit
 
 struct PlaceReviewsListView : View {
     @EnvironmentObject var userProfileViewModel: UserProfileViewModel
+    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
+    @EnvironmentObject var userSession: UserSession
     var reviews: [any ReviewProtocol]
     @State private var activeKeyboardReviewId: String? = nil
     @Binding var selectedImage: UIImage?
     let scrollProxy: ScrollViewProxy
+    @State private var reviewToDelete: (any ReviewProtocol)? = nil
+    @State private var showDeleteConfirmation = false
 
     var body: some View {
         ForEach(reviews, id: \.id) { review in
-            if let restaurantReview = review as? RestaurantReview {
-                RestaurantReviewView(review: restaurantReview,
-                                   selectedImage: $selectedImage,
-                                   isActiveKeyboard: Binding(
-                                      get: { activeKeyboardReviewId == review.id },
-                                      set: { isActive in
-                                          if isActive {
-                                              activeKeyboardReviewId = review.id
-                                              scrollToReview(review.id, proxy: scrollProxy)
-                                          } else if activeKeyboardReviewId == review.id {
-                                              activeKeyboardReviewId = nil
+            Group {
+                if let restaurantReview = review as? RestaurantReview {
+                    RestaurantReviewView(review: restaurantReview,
+                                       selectedImage: $selectedImage,
+                                       isActiveKeyboard: Binding(
+                                          get: { activeKeyboardReviewId == review.id },
+                                          set: { isActive in
+                                              if isActive {
+                                                  activeKeyboardReviewId = review.id
+                                                  scrollToReview(review.id, proxy: scrollProxy)
+                                              } else if activeKeyboardReviewId == review.id {
+                                                  activeKeyboardReviewId = nil
+                                              }
                                           }
-                                      }
-                                   ))
-                    .environmentObject(userProfileViewModel)
-                    .id(review.id)
-                    .padding(.horizontal)
-                    .padding(.vertical, 8)
-                    .background(Color.white)
-                    .cornerRadius(10)
-            } else if let genericReview = review as? GenericReview {
-                GenericReviewView(review: genericReview,
-                                selectedImage: $selectedImage,
-                                isActiveKeyboard: Binding(
-                                   get: { activeKeyboardReviewId == review.id },
-                                   set: { isActive in
-                                       if isActive {
-                                           activeKeyboardReviewId = review.id
-                                           scrollToReview(review.id, proxy: scrollProxy)
-                                       } else if activeKeyboardReviewId == review.id {
-                                           activeKeyboardReviewId = nil
+                                       ))
+                        .environmentObject(userProfileViewModel)
+                        .id(review.id)
+                        .padding(.horizontal)
+                        .padding(.vertical, 8)
+                        .background(Color.white)
+                        .cornerRadius(10)
+                } else if let genericReview = review as? GenericReview {
+                    GenericReviewView(review: genericReview,
+                                    selectedImage: $selectedImage,
+                                    isActiveKeyboard: Binding(
+                                       get: { activeKeyboardReviewId == review.id },
+                                       set: { isActive in
+                                           if isActive {
+                                               activeKeyboardReviewId = review.id
+                                               scrollToReview(review.id, proxy: scrollProxy)
+                                           } else if activeKeyboardReviewId == review.id {
+                                               activeKeyboardReviewId = nil
+                                           }
                                        }
-                                   }
-                                ))
-                    .environmentObject(userProfileViewModel)
-                    .id(review.id)
-                    .padding(.horizontal)
-                    .padding(.vertical, 8)
-                    .background(Color.white)
-                    .cornerRadius(10)
+                                    ))
+                        .environmentObject(userProfileViewModel)
+                        .id(review.id)
+                        .padding(.horizontal)
+                        .padding(.vertical, 8)
+                        .background(Color.white)
+                        .cornerRadius(10)
+                }
+            }
+            .onLongPressGesture(minimumDuration: 0.5) {
+                // Only allow deletion if this is the user's own review
+                if review.userId == userSession.currentUserId {
+                    // Haptic feedback
+                    let impactMed = UIImpactFeedbackGenerator(style: .medium)
+                    impactMed.impactOccurred()
+                    
+                    reviewToDelete = review
+                    showDeleteConfirmation = true
+                }
             }
         }
+        .alert("Delete Review", isPresented: $showDeleteConfirmation) {
+            Button("Cancel", role: .cancel) {
+                reviewToDelete = nil
+            }
+            Button("Delete", role: .destructive) {
+                if let review = reviewToDelete {
+                    deleteReview(review)
+                }
+            }
+        } message: {
+            Text("Are you sure you want to delete this review? This action cannot be undone.")
+        }
     }
+    
+    private func deleteReview(_ review: any ReviewProtocol) {
+        selectedPlaceVM.deleteReview(reviewId: review.id) { result in
+            switch result {
+            case .success:
+                print("✅ Review deleted successfully")
+                // The view model should handle updating the reviews list
+            case .failure(let error):
+                print("❌ Failed to delete review: \(error.localizedDescription)")
+                // You might want to show an error alert here
+            }
+        }
+        reviewToDelete = nil
+    }
+    
     private func scrollToReview(_ reviewId: String, proxy: ScrollViewProxy) {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             withAnimation {
@@ -74,6 +118,7 @@ struct PlaceReviewsView: View {
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var userProfileViewModel: UserProfileViewModel
+    @EnvironmentObject var userSession: UserSession
     @State private var activeKeyboardReviewId: String? = nil
 
     var body: some View {
@@ -130,7 +175,7 @@ struct PlaceReviewsView: View {
         }
         .onAppear {
             // Check like statuses when view appears
-            selectedPlaceVM.checkLikeStatuses(userId: profile.userId)
+            selectedPlaceVM.checkLikeStatuses(userId: userSession.currentUserId! )
         }
     }
     
@@ -147,13 +192,15 @@ struct RestaruantReviewViewProfileInformation: View {
     let review: ReviewProtocol
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var profile: ProfileViewModel
+    @EnvironmentObject var detailPlaceVM: DetailPlaceViewModel
+    @EnvironmentObject var userSession: UserSession
     @EnvironmentObject var userProfileViewModel: UserProfileViewModel
     @State private var showProfileView = false
 
     var body: some View {
         HStack(alignment: .center, spacing: 16) { // Increased spacing between photo and text
             // Profile Photo from Cache
-            if let profilePhoto = profile.profilePhoto(forUserId: review.userId) {
+            if let profilePhoto = detailPlaceVM.userProfilePicture[review.userId] {
                 Image(uiImage: profilePhoto)
                     .resizable()
                     .scaledToFill()
@@ -161,14 +208,17 @@ struct RestaruantReviewViewProfileInformation: View {
                     .clipShape(Circle())
                     .onTapGesture {
                         // Check if this is the logged-in user's profile
-                        if review.userId == profile.userId {
+                        if review.userId == userSession.currentUserId! {
                             // Show the user's own profile page directly
                             showProfileView = true
                         } else {
                             // For other users, fetch and show their profile
-                            firestoreService.fetchUserById(userId: review.userId) { profileData in
-                                if let profileData = profileData {
-                                    userProfileViewModel.selectUser(profileData, currentUserId: profile.userId)
+                            firestoreService.fetchUserById(userId: review.userId) { result in
+                                switch result {
+                                case .success(let profileData):
+                                    userProfileViewModel.selectUser(profileData, currentUserId: userSession.currentUserId!)
+                                case .failure:
+                                    break // Optionally handle error
                                 }
                             }
                         }
@@ -201,13 +251,13 @@ struct RestaruantReviewViewProfileInformation: View {
                 // Add likes button and count
                 HStack(spacing: 4) {
                     Button(action: {
-                        selectedPlaceVM.likeReview(review, userId: profile.userId)
+                        selectedPlaceVM.likeReview(review, userId: userSession.currentUserId!)
                     }) {
                         Image(systemName: selectedPlaceVM.isReviewLiked(review.id) ? "heart.fill" : "heart")
-                            .foregroundColor(review.userId == profile.userId ? .gray : (selectedPlaceVM.isReviewLiked(review.id) ? .red : .gray))
-                            .opacity(review.userId == profile.userId ? 0.3 : 0.7)
+                            .foregroundColor(review.userId == userSession.currentUserId! ? .gray : (selectedPlaceVM.isReviewLiked(review.id) ? .red : .gray))
+                            .opacity(review.userId == userSession.currentUserId! ? 0.3 : 0.7)
                     }
-                    .disabled(review.userId == profile.userId)
+                    .disabled(review.userId == userSession.currentUserId!)
                     
                     Text("\(review.likes)")
                         .font(.footnote)
@@ -285,6 +335,7 @@ struct RestaurantReviewView: View {
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var userProfileViewModel: UserProfileViewModel
+    @EnvironmentObject var userSession: UserSession
     @State private var showComments = false
     
     // Static dictionary to track which review comments should be hidden
@@ -455,7 +506,7 @@ struct RestaurantReviewView: View {
         .padding(.vertical)
         .onAppear {
             // Check like statuses using the proper userId from profile
-            selectedPlaceVM.checkLikeStatuses(userId: profile.userId)
+            selectedPlaceVM.checkLikeStatuses(userId: userSession.currentUserId!)
             
             // Listen for the hide comments notification
             NotificationCenter.default.addObserver(forName: Foundation.Notification.Name("HideCommentsFor-\(review.id)"), object: nil, queue: .main) { _ in
@@ -476,6 +527,7 @@ struct InlineCommentsView: View {
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var userProfileViewModel: UserProfileViewModel
+    @EnvironmentObject var userSession: UserSession
     @State private var commentText = ""
     @State private var selectedImages: [UIImage] = []
     @State private var isPickerPresented = false
@@ -879,10 +931,10 @@ struct InlineCommentsView: View {
             reviewId: reviewId,
             text: commentText,
             images: selectedImages,
-            userId: profile.userId,
-            userFirstName: profile.currentUser?.firstName ?? "unknown",
-            userLastName: profile.currentUser?.lastName ?? "unknown",
-            profilePhotoUrl: profile.currentUser?.profilePhotoURL?.absoluteString ?? ""
+            userId: userSession.currentUserId ?? "unknown",
+            userFirstName: profile.user?.firstName ?? "unknown",
+            userLastName: profile.user?.lastName ?? "unknown",
+            profilePhotoUrl: profile.user?.profilePhotoURL?.absoluteString ?? ""
         )
         
         // Clear form
@@ -897,6 +949,8 @@ struct InlineCommentView: View {
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var userProfileViewModel: UserProfileViewModel
+    @EnvironmentObject var detailplaceVM: DetailPlaceViewModel
+    @EnvironmentObject var userSession: UserSession
     @State private var showFullText = false
     @State private var showProfileView = false
     @Binding var selectedImage: UIImage?
@@ -908,7 +962,7 @@ struct InlineCommentView: View {
             // User info and comment text
             HStack(alignment: .top, spacing: 8) {
                 // First try to get the profile photo from cache
-                if let cachedPhoto = profile.profilePhoto(forUserId: comment.userId) {
+                if let cachedPhoto = detailplaceVM.userProfilePicture[comment.userId] {
                     Image(uiImage: cachedPhoto)
                         .resizable()
                         .scaledToFill()
@@ -916,14 +970,17 @@ struct InlineCommentView: View {
                         .clipShape(Circle())
                         .onTapGesture {
                             // Check if this is the logged-in user's profile
-                            if comment.userId == profile.userId {
+                            if comment.userId == userSession.currentUserId {
                                 // Show the user's own profile page directly
                                 showProfileView = true
                             } else {
                                 // For other users, fetch and show their profile
-                                firestoreService.fetchUserById(userId: comment.userId) { profileData in
-                                    if let profileData = profileData {
-                                        userProfileViewModel.selectUser(profileData, currentUserId: profile.userId)
+                                firestoreService.fetchUserById(userId: comment.userId) { result in
+                                    switch result {
+                                    case .success(let profileData):
+                                        userProfileViewModel.selectUser(profileData, currentUserId: userSession.currentUserId!)
+                                    case .failure:
+                                        break // Optionally handle error
                                     }
                                 }
                             }
@@ -951,14 +1008,17 @@ struct InlineCommentView: View {
                                 .clipShape(Circle())
                                 .onTapGesture {
                                     // Check if this is the logged-in user's profile
-                                    if comment.userId == profile.userId {
+                                    if comment.userId == userSession.currentUserId! {
                                         // Show the user's own profile page directly
                                         showProfileView = true
                                     } else {
                                         // For other users, fetch and show their profile
-                                        firestoreService.fetchUserById(userId: comment.userId) { profileData in
-                                            if let profileData = profileData {
-                                                userProfileViewModel.selectUser(profileData, currentUserId: profile.userId)
+                                        firestoreService.fetchUserById(userId: comment.userId) { result in
+                                            switch result {
+                                            case .success(let profileData):
+                                                userProfileViewModel.selectUser(profileData, currentUserId: userSession.currentUserId!)
+                                            case .failure:
+                                                break // Optionally handle error
                                             }
                                         }
                                     }
@@ -1095,6 +1155,7 @@ struct GenericReviewView: View {
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var userProfileViewModel: UserProfileViewModel
+    @EnvironmentObject var userSession: UserSession
     @State private var showComments = false
     
     // Static dictionary to track which review comments should be hidden
@@ -1196,7 +1257,7 @@ struct GenericReviewView: View {
         }
         .onAppear {
             // Check like statuses using the proper userId from profile
-            selectedPlaceVM.checkLikeStatuses(userId: profile.userId)
+            selectedPlaceVM.checkLikeStatuses(userId: userSession.currentUserId!)
             
             // Listen for the hide comments notification
             NotificationCenter.default.addObserver(forName: Foundation.Notification.Name("HideCommentsFor-\(review.id)"), object: nil, queue: .main) { _ in

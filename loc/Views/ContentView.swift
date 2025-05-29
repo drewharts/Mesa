@@ -15,22 +15,21 @@ struct ContentView: View {
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var detailPlaceVM: DetailPlaceViewModel
     @EnvironmentObject var firestoreService: FirestoreService
-    @StateObject private var userProfileViewModel = UserProfileViewModel()
+    @EnvironmentObject var profileViewModel: ProfileViewModel
+    @EnvironmentObject var dataManager: DataManager
+    @EnvironmentObject var userProfileViewModel: UserProfileViewModel
 
     var body: some View {
         if userSession.isUserLoggedIn {
-            if let profileViewModel = userSession.profileViewModel {
-                MainView()
-                    .environmentObject(profileViewModel)
-                    .environmentObject(locationManager)
-                    .environmentObject(selectedPlaceVM)
-                    .environmentObject(detailPlaceVM)
-                    .environmentObject(userProfileViewModel)
-            } else {
-                ProgressView("Loading profile...")
-            }
+            MainView()
+                .environmentObject(profileViewModel)
+                .environmentObject(locationManager)
+                .environmentObject(selectedPlaceVM)
+                .environmentObject(detailPlaceVM)
+                .environmentObject(userProfileViewModel)
+                .environmentObject(firestoreService)
         } else {
-            LoginView(viewModel: LoginViewModel(firestoreService: firestoreService))
+            LoginView(viewModel: LoginViewModel(firestoreService: firestoreService, dataManager: dataManager))
         }
     }
 }

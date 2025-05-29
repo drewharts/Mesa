@@ -6,12 +6,11 @@
 //
 
 import SwiftUI
-import MapboxSearch
 
 struct UserProfileFavoritesView: View {
     var userFavorites: [DetailPlace]
-    var placeImages: [String: UIImage]
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
+    @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
     @Environment(\.presentationMode) var presentationMode
     @State private var placeColors: [UUID: Color] = [:]
     @State private var emptyCircleColors: [Int: Color] = [:]
@@ -30,20 +29,32 @@ struct UserProfileFavoritesView: View {
                     ForEach(0..<4) { index in
                         if index < userFavorites.count {
                             VStack(spacing: 4) {
-                                if let image = placeImages[userFavorites[index].id.uuidString] {
+                                if let image = detailPlaceViewModel.placeImages[userFavorites[index].id.uuidString] {
                                     Image(uiImage: image)
                                         .resizable()
                                         .scaledToFill()
                                         .frame(width: 85, height: 85)
                                         .cornerRadius(50)
                                         .clipped()
+                                        .overlay(
+                                            Circle()
+                                                .stroke(Color.white, lineWidth: 1)
+                                                .frame(width: 85, height: 85)
+                                        )
+                                        .shadow(color: .black.opacity(0.2), radius: 3, x: 0, y: 2)
                                 } else {
                                     Circle()
                                         .frame(width: 85, height: 85)
                                         .foregroundColor(placeColors[userFavorites[index].id] ?? .green)
+                                        .overlay(
+                                            Circle()
+                                                .stroke(Color.white, lineWidth: 1)
+                                                .frame(width: 85, height: 85)
+                                        )
+                                        .shadow(color: .black.opacity(0.2), radius: 3, x: 0, y: 2)
                                 }
 
-                                Text(userFavorites[index].name.prefix(15) ?? "Unknown")
+                                Text(userFavorites[index].name.prefix(15))
                                     .foregroundColor(.black)
                                     .fontWeight(.semibold)
                                     .font(.footnote)
@@ -69,6 +80,12 @@ struct UserProfileFavoritesView: View {
                                 Circle()
                                     .frame(width: 85, height: 85)
                                     .foregroundColor(emptyCircleColors[index] ?? randomColor())
+                                    .overlay(
+                                        Circle()
+                                            .stroke(Color.white, lineWidth: 1)
+                                            .frame(width: 85, height: 85)
+                                    )
+                                    .shadow(color: .black.opacity(0.2), radius: 3, x: 0, y: 2)
                                 
                                 if !userFavorites.isEmpty {
                                     Text("")
@@ -99,6 +116,10 @@ struct UserProfileFavoritesView: View {
             for place in userFavorites {
                 if placeColors[place.id] == nil {
                     placeColors[place.id] = randomColor()
+                }
+                // Fetch image if not present in cache
+                if detailPlaceViewModel.placeImages[place.id.uuidString] == nil {
+                    detailPlaceViewModel.fetchPlaceImage(for: place.id.uuidString)
                 }
             }
             

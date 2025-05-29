@@ -16,6 +16,7 @@ struct MinPlaceDetailView: View {
     @EnvironmentObject var locationManager: LocationManager
     @EnvironmentObject var userProfileViewModel: UserProfileViewModel
     @Environment(\.isScrollingEnabled) var isScrollingEnabled // Access scroll state
+    @EnvironmentObject var userSession: UserSession
 
     @Binding var showNoPhoneNumberAlert: Bool
     @Binding var selectedImage: UIImage?
@@ -57,7 +58,27 @@ struct MinPlaceDetailView: View {
                     Spacer()
                     
                     HStack(spacing: 16) {
-                        NavigationLink(destination: CreatePlaceReviewView(isPresented: .constant(false), place: selectedPlaceVM.selectedPlace!, userId: profile.userId, profilePhotoUrl: profile.data.profilePhotoURL?.absoluteString ?? "", userFirstName: profile.data.firstName, userLastName: profile.data.lastName)) {
+                        // Favorite star button
+                        Button(action: {
+                            guard let place = selectedPlaceVM.selectedPlace else { return }
+                            if profile.isPlaceFavorite(placeId: place.id.uuidString) {
+                                profile.removeFavoritePlace(place: place)
+                            } else {
+                                profile.addFavoritePlace(place: place)
+                            }
+                        }) {
+                            Image(systemName: {
+                                if let place = selectedPlaceVM.selectedPlace, profile.isPlaceFavorite(placeId: place.id.uuidString) {
+                                    return "star.fill"
+                                } else {
+                                    return "star"
+                                }
+                            }())
+                            .font(.title3)
+                            .foregroundColor(.yellow)
+                        }
+
+                        NavigationLink(destination: CreatePlaceReviewView(isPresented: .constant(false), place: selectedPlaceVM.selectedPlace!, userId: userSession.currentUserId!, profilePhotoUrl: profile.user?.profilePhotoURL?.absoluteString ?? "", userFirstName: profile.user!.firstName, userLastName: profile.user!.lastName)) {
                             Image(systemName: "plus")
                                 .font(.title3)
                         }
@@ -65,7 +86,7 @@ struct MinPlaceDetailView: View {
                         Button(action: {
                             viewModel.showListSelection = true
                         }) {
-                            Image(systemName: "bookmark")
+                            Image(systemName: profile.isPlaceInAnyList(placeId: selectedPlaceVM.selectedPlace?.id.uuidString ?? "") ? "bookmark.fill" : "bookmark")
                                 .font(.title3)
                         }
                     }
@@ -128,13 +149,15 @@ struct MinPlaceDetailView: View {
                             )
                     }
                     
-                    Text(String(format: "%.1f", selectedPlaceVM.placeRating ?? 0.0))
-                        .font(.caption)
-                        .foregroundColor(.black)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 4)
-                        .background(Color.yellow)
-                        .cornerRadius(10)
+                    if !selectedPlaceVM.reviews.isEmpty && (selectedPlaceVM.placeRating ?? 0.0) > 0 {
+                        Text(String(format: "%.1f", selectedPlaceVM.placeRating ?? 0.0))
+                            .font(.caption)
+                            .foregroundColor(.black)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 4)
+                            .background(Color.yellow)
+                            .cornerRadius(10)
+                    }
                     
                     Button(action: {
                         selectedTab = .about
@@ -194,6 +217,11 @@ struct MinPlaceDetailView: View {
                 dismissButton: .default(Text("OK"))
             )
         }
+        .alert("Max Favorites Reached", isPresented: $profile.showMaxFavoritesAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("You already have 4 favorites. Remove one before adding a new one.")
+        }
     }
 }
 
@@ -206,6 +234,7 @@ enum DetailTab {
 // MARK: - Profile Circles View
 struct ProfileCirclesView: View {
     @EnvironmentObject var profile: ProfileViewModel
+    @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
     let placeId: String?
     
     var body: some View {
@@ -248,12 +277,12 @@ struct ProfileCirclesView: View {
     }
     
     // Helper method to get profile images for displayed users
-    private func getProfileImagesForDisplayedUsers(users: [User], placeId: String) -> (UIImage?, UIImage?, UIImage?) {
+    private func getProfileImagesForDisplayedUsers(users: [ProfileData], placeId: String) -> (UIImage?, UIImage?, UIImage?) {
         guard !users.isEmpty else { return (nil, nil, nil) }
         
         let firstThreeUsers = users.prefix(3)
         let images = firstThreeUsers.map { user -> UIImage? in
-            profile.profilePhoto(forUserId: user.id)
+            detailPlaceViewModel.userProfilePicture[user.id]
         }
         
         let paddedImages = (images + [nil, nil, nil]).prefix(3)

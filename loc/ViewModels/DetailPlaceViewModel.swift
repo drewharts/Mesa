@@ -10,15 +10,23 @@ import UIKit
 import FirebaseFirestore
 import MapboxSearch
 import FirebaseAuth
+import SwiftUI
 
-
+@MainActor
 class DetailPlaceViewModel: ObservableObject {
     @Published var places: [String: DetailPlace] = [:] // Formerly placeLookup
     @Published var placeImages: [String: UIImage] = [:] // Consolidated place images
-    @Published var placeSavers: [String: [User]] = [:] // Tracks who saved each place
+    @Published var placeSavers: [String: [String]] = [:] // Tracks who saved each place PlaceId -> UserIds
+    @Published var placeAnnotations: [String: UIImage] = [:] // Each place annotation's combined profile images
+    @Published var placeTypes: [String: String] = [:] // Tracks restaurant types
+
+    @Published var userProfilePicture: [String: UIImage] = [:] // Each user's profile picture
+
+    @Published var placeColors: [String: Color] = [:] // Persistent color for each placeId
 
     private let firestoreService: FirestoreService
     private var notificationObserver: NSObjectProtocol?
+    private let placeDetailVM = PlaceDetailViewModel() // For restaurant type calculation
 
     init(firestoreService: FirestoreService) {
         self.firestoreService = firestoreService
@@ -36,10 +44,51 @@ class DetailPlaceViewModel: ObservableObject {
         }
     }
     
+    func removeUserFromPlaceSavers(userId: String) {
+        for (placeId, savers) in placeSavers {
+            placeSavers[placeId] = savers.filter { $0 != userId }
+        }
+    }
+    
+    func calculateAnnotationPlaces() {
+        for (placeId, userIds) in placeSavers {
+            // Get up to 3 profile pictures for this place's savers
+            let profilePictures = userIds.prefix(3).compactMap { userProfilePicture[$0] }
+            
+            // Create combined image using the existing function
+            let combinedImage: UIImage
+            switch profilePictures.count {
+            case 1:
+                combinedImage = combinedCircularImage(image1: profilePictures[0])
+            case 2:
+                combinedImage = combinedCircularImage(image1: profilePictures[0], image2: profilePictures[1])
+            case 3:
+                combinedImage = combinedCircularImage(image1: profilePictures[0], image2: profilePictures[1], image3: profilePictures[2])
+            default:
+                // If no profile pictures, use a default image or nil
+                combinedImage = combinedCircularImage(image1: nil)
+            }
+            
+            // Store the combined image in placeAnnotations
+            DispatchQueue.main.async {
+                self.placeAnnotations[placeId] = combinedImage
+                self.objectWillChange.send()
+            }
+        }
+    }
+    
     deinit {
         // Remove observer when this view model is deallocated
         if let observer = notificationObserver {
             NotificationCenter.default.removeObserver(observer)
+        }
+    }
+
+    // Calculate and store restaurant type
+    private func calculateRestaurantType(for place: DetailPlace) {
+        let placeId = place.id.uuidString
+        if let type = placeDetailVM.getRestaurantType(for: place) {
+            placeTypes[placeId] = type
         }
     }
 
@@ -55,6 +104,7 @@ class DetailPlaceViewModel: ObservableObject {
                 DispatchQueue.main.async {
                     self.places[placeId] = detailPlace
                     self.fetchPlaceImage(for: placeId) // Fetch image if not already present
+                    self.calculateRestaurantType(for: detailPlace) // Calculate restaurant type
                     completion(detailPlace)
                 }
             case .failure(let error):
@@ -128,13 +178,14 @@ class DetailPlaceViewModel: ObservableObject {
 
     // Update placeSavers when a user saves a place
     func updatePlaceSavers(placeId: String, user: User) {
-        if placeSavers[placeId] != nil {
-            if !placeSavers[placeId]!.contains(where: { $0.id == user.id }) {
-                placeSavers[placeId]!.append(user)
-            }
-        } else {
-            placeSavers[placeId] = [user]
-        }
+        print("fix later")
+//        if placeSavers[placeId] != nil {
+//            if !placeSavers[placeId]!.contains(where: { $0.id == user.id }) {
+//                placeSavers[placeId]!.append(user)
+//            }
+//        } else {
+//            placeSavers[placeId] = [user]
+//        }
     }
 
     // Convert SearchResult to DetailPlace and save it
@@ -155,6 +206,8 @@ class DetailPlaceViewModel: ObservableObject {
             
             // If place exists, return it
             if let existingDetailPlace = existingDetailPlace {
+                // Calculate restaurant type for existing place
+                self.calculateRestaurantType(for: existingDetailPlace)
                 completion(existingDetailPlace)
                 return
             }
@@ -162,19 +215,80 @@ class DetailPlaceViewModel: ObservableObject {
             // Create new DetailPlace using the new constructor
             let detailPlace = DetailPlace(from: place)
             
-            // Save to Firestore
-            self.firestoreService.addToAllPlaces(detailPlace: detailPlace) { error in
-                if let error = error {
-                    print("Error saving new place to Firestore: \(error.localizedDescription)")
-                }
-                
-                // Update local state and fetch image on main thread
-                DispatchQueue.main.async {
-                    self.places[detailPlace.id.uuidString] = detailPlace
-                    self.fetchPlaceImage(for: detailPlace.id.uuidString)
-                    completion(detailPlace)
-                }
+            // Update local state and fetch image on main thread
+            DispatchQueue.main.async {
+                self.places[detailPlace.id.uuidString] = detailPlace
+                self.fetchPlaceImage(for: detailPlace.id.uuidString)
+                self.calculateRestaurantType(for: detailPlace) // Calculate restaurant type
+                completion(detailPlace)
             }
+        }
+    }
+    
+    private func combinedCircularImage(image1: UIImage?, image2: UIImage? = nil, image3: UIImage? = nil) -> UIImage {
+        let totalSize = CGSize(width: 80, height: 40)
+        let singleCircleSize = CGSize(width: 40, height: 40)
+        let renderer = UIGraphicsImageRenderer(size: totalSize)
+       
+        return renderer.image { context in
+            let firstRect = CGRect(x: 0, y: 0, width: singleCircleSize.width, height: singleCircleSize.height)
+            let secondRect = CGRect(x: 15, y: 0, width: singleCircleSize.width, height: singleCircleSize.height)
+            let thirdRect = CGRect(x: 30, y: 0, width: singleCircleSize.width, height: singleCircleSize.height)
+           
+            func drawCircularImage(_ image: UIImage?, in rect: CGRect) {
+                guard let image = image else { return }
+                context.cgContext.saveGState()
+                let circlePath = UIBezierPath(ovalIn: rect)
+                circlePath.addClip()
+                image.draw(in: rect)
+                context.cgContext.setStrokeColor(UIColor.white.cgColor)
+                context.cgContext.setLineWidth(1.0)
+                context.cgContext.strokeEllipse(in: rect.insetBy(dx: 0.5, dy: 0.5))
+                context.cgContext.restoreGState()
+            }
+           
+            if image3 != nil { drawCircularImage(image3, in: thirdRect) }
+            if image2 != nil { drawCircularImage(image2, in: secondRect) }
+            if image1 != nil { drawCircularImage(image1, in: firstRect) }
+        }
+    }
+    
+    var savedDetailPlaces: [DetailPlace] {
+        placeSavers.keys.compactMap { placeId in
+            places[placeId]
+        }
+    }
+
+    // Refresh all places data asynchronously
+    @MainActor
+    func refreshPlaces(detailPlaces: [String]) async {
+        do {
+            // Update local cache
+            for place in detailPlaces {
+                if self.placeImages[place] == nil {
+                    fetchPlaceImage(for: place)
+                }
+//                calculateRestaurantType(for: places[place]!)
+            }
+            
+            // Notify UI that data has changed
+            self.objectWillChange.send()
+            print("Successfully refreshed \(detailPlaces.count) places")
+        }
+    }
+
+    // Add this method to get or generate a color for a place
+    func colorForPlace(placeId: String) -> Color {
+        if let color = placeColors[placeId] {
+            return color
+        } else {
+            let color = Color(
+                red: Double.random(in: 0...1),
+                green: Double.random(in: 0...1),
+                blue: Double.random(in: 0...1)
+            )
+            placeColors[placeId] = color
+            return color
         }
     }
 }

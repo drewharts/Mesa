@@ -19,7 +19,7 @@ struct ListDescription: View {
                 .font(.body)
                 .foregroundStyle(Color.primary.opacity(1.0)) // Ensures black in light mode, white in dark mode
 
-            Text("\(profile.placeListMBPlaces[placeList.id]?.count ?? 0) Places")
+            Text("\(profile.placeCount(forListId: placeList.id)) Places")
                 .font(.caption)
                 .foregroundStyle(Color.secondary.opacity(1.0)) // Slightly lighter, adapts to mode
         }
@@ -42,31 +42,15 @@ struct ListSelectionRowView: View {
             HStack {
                 // Display list image, place image, or colored rectangle
                 Group {
-                    if let listImage = profile.listImages[list.id] {
-                        // List has a custom image
-                        Image(uiImage: listImage)
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                    } else if let placeIds = profile.placeListMBPlaces[list.id], 
-                              !placeIds.isEmpty, 
-                              let firstPlaceId = placeIds.first,
-                              let image = detailPlaceViewModel.placeImages[firstPlaceId] {
-                        // Use the first place's image
-                        Image(uiImage: image)
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                    } else {
-                        // No image available, use a colored rectangle
-                        Rectangle()
-                            .foregroundColor(backgroundColor)
-                            .onAppear {
-                                backgroundColor = Color(
-                                    red: Double.random(in: 0.5...0.9),
-                                    green: Double.random(in: 0.5...0.9),
-                                    blue: Double.random(in: 0.5...0.9)
-                                )
-                            }
-                    }
+                    Rectangle()
+                        .foregroundColor(backgroundColor)
+                        .onAppear {
+                            backgroundColor = Color(
+                                red: Double.random(in: 0.5...0.9),
+                                green: Double.random(in: 0.5...0.9),
+                                blue: Double.random(in: 0.5...0.9)
+                            )
+                        }
                 }
                 .frame(width: 75, height: 75)
                 .clipped()
@@ -77,7 +61,7 @@ struct ListSelectionRowView: View {
                 Spacer()
 
                 ZStack {
-                    if profile.placeListMBPlaces[list.id]?.contains(place.id.uuidString) ?? false {
+                    if profile.userListsPlaces[list.id.uuidString]?.contains(place.id.uuidString) ?? false {
                         Circle()
                             .fill(Color.primary)
                             .frame(width: 24, height: 24)

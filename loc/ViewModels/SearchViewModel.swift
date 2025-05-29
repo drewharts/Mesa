@@ -13,7 +13,7 @@ import FirebaseFirestore
 
 class SearchViewModel: ObservableObject {
     @Published var searchText = ""  // User's search input
-    @Published var searchResults: [SearchSuggestion] = []
+    @Published var searchResults: [MesaPlaceSuggestion] = []
     @Published var userResults: [ProfileData] = []
     @Published var searchError: String?
     @Published var selectedUser: ProfileData?
@@ -21,7 +21,8 @@ class SearchViewModel: ObservableObject {
     weak var selectedPlaceVM: SelectedPlaceViewModel?
 
     private let firestoreService = FirestoreService()
-    private let mapboxSearchService = MapboxSearchService()
+//    private let mapboxSearchService = MapboxSearchService()
+    private let searchService = PlaceSearchService()
     
     private var cancellables = Set<AnyCancellable>()
 
@@ -39,11 +40,13 @@ class SearchViewModel: ObservableObject {
     }
 
     func searchPlaces(query: String) {
-        mapboxSearchService.searchPlaces(
+        searchService.searchPlaces(
             query: query,
             onResultsUpdated: { [weak self] results in
-                DispatchQueue.main.async {
-                    self?.searchResults = results
+                if let mesaSuggestions = results as? [MesaPlaceSuggestion] {
+                    DispatchQueue.main.async {
+                        self?.searchResults = mesaSuggestions
+                    }
                 }
             },
             onError: { [weak self] error in
@@ -65,7 +68,7 @@ class SearchViewModel: ObservableObject {
             if var existingDetailPlace = existingDetailPlace {
                 // Update the OpenHours for the existing place
                 if let openHours = place.metadata?.openHours as? OpenHours {
-                    existingDetailPlace.OpenHours = DetailPlace.serializeOpenHours(openHours)
+                    existingDetailPlace.openHours = DetailPlace.serializeOpenHours(openHours)
                     
                     // Update the place in Firestore
                     self?.firestoreService.updatePlace(detailPlace: existingDetailPlace) { error in
@@ -83,32 +86,33 @@ class SearchViewModel: ObservableObject {
             // If no existing place is found, create a new DetailPlace using the initializer
             var detailPlace = DetailPlace(from: place)
             
-            // Save the new DetailPlace to Firestore if it doesn't exist
-            self?.firestoreService.addToAllPlaces(detailPlace: detailPlace) { error in
-                if let error = error {
-                    print("Error saving new place to Firestore: \(error.localizedDescription)")
-                }
-            }
-            
             // Return the newly created DetailPlace
             completion(detailPlace)
         }
     }
     
-    func selectSuggestion(_ suggestion: SearchSuggestion) {
+    func selectSuggestion(_ suggestion: MesaPlaceSuggestion) {
         print("🔍 User selected suggestion: \(suggestion.id) - \(suggestion.name)")
-        mapboxSearchService.selectSuggestion(
+        searchService.selectSuggestion(
             suggestion,
             onResultResolved: { [weak self] result in
                 DispatchQueue.main.async {
-                    print("✅ Resolved result: \(result.id) - \(result.name)")
-
-                    // Use the asynchronous searchResultToDetailPlace with a completion handler
-                    self?.searchResultToDetailPlace(place: result) { [weak self] detailPlace in
-                        guard let self = self else { return }
-                        self.selectedPlaceVM?.selectedPlace = detailPlace
-                        self.selectedPlaceVM?.isDetailSheetPresented = true
-                    }
+                    self?.selectedPlaceVM?.selectedPlace = result
+                    self?.selectedPlaceVM?.isDetailSheetPresented = true
+                    
+                    // Print detailed information about the place
+                    print("✅ Place Details Result:")
+                    print("  ID: \(result.id)")
+                    print("  Name: \(result.name)")
+                    print("  Address: \(result.address)")
+                    print("  Location: (\(result.coordinate?.latitude ?? 0), \(result.coordinate?.longitude ?? 0))")
+                    print("  Source: local")
+                    print("  Open Hours: \(result.openHours?.joined(separator: ", ") ?? "Not available")")
+                    print("  Phone: \(result.phone ?? "Not available")")
+                    print("  Description: \(result.description ?? "Not available")")
+                    print("  Categories: \(result.categories?.joined(separator: ", ") ?? "None")")
+                    print("  Rating: \(result.rating ?? 0)")
+                    print("  Price Level: \(result.priceLevel ?? "Not available")")
                 }
             }
         )

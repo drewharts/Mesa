@@ -12,6 +12,7 @@ struct ProfileFollowCountsView: View {
     @EnvironmentObject var userProfileViewModel: UserProfileViewModel
     @State private var showingFollowers = false
     @State private var showingFollowing = false
+    @State private var showingMyPlaces = false
     @State private var refreshToggle = false
     
     var body: some View {
@@ -21,12 +22,16 @@ struct ProfileFollowCountsView: View {
                 showingFollowers = true
             }) {
                 VStack {
-                    Text("\(profile.followers)")
-                        .font(.headline)
-                        .foregroundColor(.black)
-                        .fontWeight(.regular)
-                        .id("followers_\(refreshToggle)")
-
+                    if profile.isFollowersLoading {
+                        ProgressView()
+                            .frame(width: 20, height: 20)
+                    } else {
+                        Text("\(profile.followersCount)")
+                            .font(.headline)
+                            .foregroundColor(.black)
+                            .fontWeight(.regular)
+                            .id("followers_\(refreshToggle)")
+                    }
                     Text("Followers")
                         .font(.caption)
                         .foregroundColor(.gray)
@@ -42,12 +47,16 @@ struct ProfileFollowCountsView: View {
                 showingFollowing = true
             }) {
                 VStack {
-                    Text("\(profile.following)")
-                        .font(.headline)
-                        .foregroundColor(.black)
-                        .fontWeight(.regular)
-                        .id("following_\(refreshToggle)")
-                    
+                    if profile.isFollowingLoading {
+                        ProgressView()
+                            .frame(width: 20, height: 20)
+                    } else {
+                        Text("\(profile.followingCount)")
+                            .font(.headline)
+                            .foregroundColor(.black)
+                            .fontWeight(.regular)
+                            .id("following_\(refreshToggle)")
+                    }
                     Text("Following")
                         .font(.caption)
                         .foregroundColor(.gray)
@@ -57,12 +66,39 @@ struct ProfileFollowCountsView: View {
                 FollowingListView()
                     .environmentObject(userProfileViewModel)
             }
+            
+            // My Places count
+            Button(action: {
+                showingMyPlaces = true
+            }) {
+                VStack {
+                    if profile.isMyPlacesLoading {
+                        ProgressView()
+                            .frame(width: 20, height: 20)
+                    } else {
+                        Text("\(profile.myPlaces.count)")
+                            .font(.headline)
+                            .foregroundColor(.black)
+                            .fontWeight(.regular)
+                            .id("myPlaces_\(refreshToggle)")
+                    }
+                    Text("My Places")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                }
+            }
+            .sheet(isPresented: $showingMyPlaces) {
+                MyPlacesListView()
+            }
         }
         .padding(.vertical, 10)
-        .onChange(of: profile.following) { _ in
+        .onChange(of: profile.userFollowing.count) { _ in
             refreshToggle.toggle()
         }
-        .onChange(of: profile.followers) { _ in
+        .onChange(of: profile.userFollowers.count) { _ in
+            refreshToggle.toggle()
+        }
+        .onChange(of: profile.myPlaces.count) { _ in
             refreshToggle.toggle()
         }
     }
