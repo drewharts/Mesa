@@ -173,7 +173,7 @@ class DataManager: ObservableObject {
                     self.detailPlaceViewModel.placeSavers[placeId]!.append(userId)
                 }
             } catch {
-                print("Error fetching place details: \(error.localizedDescription)")
+                print("Error fetching place details: \(error.localizedDescription) (listId: \(list.id.uuidString), placeId: \(placeId))")
             }
         }
     }
