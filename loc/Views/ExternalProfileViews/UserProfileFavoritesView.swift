@@ -6,12 +6,11 @@
 //
 
 import SwiftUI
-import MapboxSearch
 
 struct UserProfileFavoritesView: View {
     var userFavorites: [DetailPlace]
-    var placeImages: [String: UIImage]
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
+    @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
     @Environment(\.presentationMode) var presentationMode
     @State private var placeColors: [UUID: Color] = [:]
     @State private var emptyCircleColors: [Int: Color] = [:]
@@ -30,7 +29,7 @@ struct UserProfileFavoritesView: View {
                     ForEach(0..<4) { index in
                         if index < userFavorites.count {
                             VStack(spacing: 4) {
-                                if let image = placeImages[userFavorites[index].id.uuidString] {
+                                if let image = detailPlaceViewModel.placeImages[userFavorites[index].id.uuidString] {
                                     Image(uiImage: image)
                                         .resizable()
                                         .scaledToFill()
@@ -117,6 +116,10 @@ struct UserProfileFavoritesView: View {
             for place in userFavorites {
                 if placeColors[place.id] == nil {
                     placeColors[place.id] = randomColor()
+                }
+                // Fetch image if not present in cache
+                if detailPlaceViewModel.placeImages[place.id.uuidString] == nil {
+                    detailPlaceViewModel.fetchPlaceImage(for: place.id.uuidString)
                 }
             }
             

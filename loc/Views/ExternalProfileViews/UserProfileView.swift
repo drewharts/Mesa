@@ -48,7 +48,7 @@ struct UserProfileView: View {
                     .padding(.horizontal, 20)
 
                 //favorites
-                UserProfileFavoritesView(userFavorites: UserProfileVM.userFavorites, placeImages: UserProfileVM.favoritePlaceImages)
+                UserProfileFavoritesView(userFavorites: UserProfileVM.userFavorites)
                 Divider()
                     .padding(.horizontal, 20)
                 //place lists
