@@ -413,7 +413,7 @@ class FirestoreService: ObservableObject {
             }
     }
     
-    func fetchReviews<ReviewProtocol>(placeId: String, latestOnly: Bool = false, completion: @escaping ([ReviewProtocol]?, Error?) -> Void) {
+    func fetchReviews<T>(placeId: String, latestOnly: Bool = false, completion: @escaping ([T]?, Error?) -> Void) {
         // Reference to the reviews subcollection under the place document
         let reviewsRef = db.collection("places")
                          .document(placeId)
@@ -422,7 +422,7 @@ class FirestoreService: ObservableObject {
         // Create the query based on the latestOnly flag
         let query = latestOnly ?
             reviewsRef.order(by: "timestamp", descending: true).limit(to: 1) : // Latest review only
-            reviewsRef.order(by: "timestamp", descending: false)              // All reviews
+            reviewsRef.order(by: "timestamp", descending: true)              // All reviews, most recent first
         
         // Fetch documents based on the query
         query.getDocuments { snapshot, error in
@@ -443,8 +443,19 @@ class FirestoreService: ObservableObject {
             var genericReviews: [GenericReview] = []
             
             for document in snapshot.documents {
+                let data = document.data()
+                let ts = data["timestamp"]
+                var dateString = "(unparsed)"
+                if let ts = ts as? Timestamp {
+                    dateString = "\(ts.dateValue())"
+                } else if let date = ts as? Date {
+                    dateString = "\(date)"
+                } else {
+                    dateString = String(describing: ts)
+                }
+                print("[DEBUG] Review id: \(document.documentID), type: \(data["type"] ?? "unknown"), timestamp: \(ts ?? "missing"), date: \(dateString)")
                 // Check the type field to determine how to decode
-                if let typeString = document.data()["type"] as? String,
+                if let typeString = data["type"] as? String,
                    let type = ReviewType(rawValue: typeString) {
                     
                     switch type {
@@ -467,22 +478,19 @@ class FirestoreService: ObservableObject {
                 }
             }
             
-            // Return the appropriate type based on the generic parameter
-            if ReviewProtocol.self == RestaurantReview.self {
-                let typedReviews = restaurantReviews as! [ReviewProtocol]
-                DispatchQueue.main.async {
-                    completion(typedReviews, nil)
-                }
-            } else if ReviewProtocol.self == GenericReview.self {
-                let typedReviews = genericReviews as! [ReviewProtocol]
-                DispatchQueue.main.async {
-                    completion(typedReviews, nil)
-                }
-            } else {
-                // If the requested type doesn't match either concrete type, return an empty array
-                DispatchQueue.main.async {
-                    completion([], nil)
-                }
+            // Client-side sort by timestamp to ensure correct order
+            var allReviewsUnsorted: [ReviewProtocol] = []
+            for review in restaurantReviews {
+                allReviewsUnsorted.append(review as ReviewProtocol)
+            }
+            for review in genericReviews {
+                allReviewsUnsorted.append(review as ReviewProtocol)
+            }
+            let allReviewsSorted = allReviewsUnsorted.sorted { $0.timestamp > $1.timestamp }
+            let typedReviews = allReviewsSorted as! [T]
+            // Ensure we're on the main thread when calling the completion handler
+            DispatchQueue.main.async {
+                completion(typedReviews, nil)
             }
         }
     }
@@ -2227,14 +2235,25 @@ class FirestoreService: ObservableObject {
                 var genericReviews: [GenericReview] = []
                 
                 for document in snapshot.documents {
+                    let data = document.data()
+                    let ts = data["timestamp"]
+                    var dateString = "(unparsed)"
+                    if let ts = ts as? Timestamp {
+                        dateString = "\(ts.dateValue())"
+                    } else if let date = ts as? Date {
+                        dateString = "\(date)"
+                    } else {
+                        dateString = String(describing: ts)
+                    }
+                    print("[DEBUG] Review id: \(document.documentID), type: \(data["type"] ?? "unknown"), timestamp: \(ts ?? "missing"), date: \(dateString)")
                     // First check if the review is from a user we want to include
-                    guard let userId = document.data()["userId"] as? String,
+                    guard let userId = data["userId"] as? String,
                           userIdsToFetch.contains(userId) else {
                         continue // Skip reviews from users we don't follow
                     }
                     
                     // Check the type field to determine how to decode
-                    if let typeString = document.data()["type"] as? String,
+                    if let typeString = data["type"] as? String,
                        let type = ReviewType(rawValue: typeString) {
                         
                         switch type {
@@ -2257,22 +2276,18 @@ class FirestoreService: ObservableObject {
                     }
                 }
                 
-                // Convert to protocol type at the end to avoid memory issues
-                var allReviews: [ReviewProtocol] = []
-                
-                // Add restaurant reviews
+                // Client-side sort by timestamp to ensure correct order
+                var allReviewsUnsorted: [ReviewProtocol] = []
                 for review in restaurantReviews {
-                    allReviews.append(review)
+                    allReviewsUnsorted.append(review as ReviewProtocol)
                 }
-                
-                // Add generic reviews
                 for review in genericReviews {
-                    allReviews.append(review)
+                    allReviewsUnsorted.append(review as ReviewProtocol)
                 }
-                
+                let allReviewsSorted = allReviewsUnsorted.sorted { $0.timestamp > $1.timestamp }
                 // Ensure we're on the main thread when calling the completion handler
                 DispatchQueue.main.async {
-                    completion(allReviews, nil)
+                    completion(allReviewsSorted, nil)
                 }
             }
         }
@@ -2409,5 +2424,200 @@ class FirestoreService: ObservableObject {
                 }
             }
         }
+    }
+    
+    func deleteReview(reviewId: String, placeId: String, userId: String, completion: @escaping (Result<Void, Error>) -> Void) {
+        print("🗑️ Starting review deletion process for ID: \(reviewId)")
+        print("📍 Place ID: \(placeId), User ID: \(userId)")
+        
+        // First fetch the review to get image URLs
+        let reviewRef = db.collection("places")
+                         .document(placeId)
+                         .collection("reviews")
+                         .document(reviewId)
+        
+        reviewRef.getDocument { [weak self] document, error in
+            guard let self = self else {
+                completion(.failure(NSError(domain: "FirestoreService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Self was deallocated"])))
+                return
+            }
+            
+            if let error = error {
+                print("❌ Error fetching review: \(error.localizedDescription)")
+                completion(.failure(error))
+                return
+            }
+            
+            guard let document = document, document.exists else {
+                print("❌ Review not found")
+                completion(.failure(NSError(domain: "FirestoreService", code: 404, userInfo: [NSLocalizedDescriptionKey: "Review not found"])))
+                return
+            }
+            
+            // Get image URLs from the review
+            let imageUrls = document.data()?["images"] as? [String] ?? []
+            print("📸 Found \(imageUrls.count) images to delete")
+            
+            // Delete images from Storage first
+            self.deleteReviewImages(reviewId: reviewId, imageUrls: imageUrls) { [weak self] imageDeleteResult in
+                guard let self = self else { return }
+                
+                switch imageDeleteResult {
+                case .success:
+                    print("✅ Successfully deleted review images")
+                case .failure(let error):
+                    print("⚠️ Warning: Failed to delete some images: \(error.localizedDescription)")
+                    // Continue with review deletion even if image deletion fails
+                }
+                
+                // Delete the review documents from both collections
+                self.deleteReviewDocuments(reviewId: reviewId, placeId: placeId, userId: userId) { result in
+                    switch result {
+                    case .success:
+                        print("✅ Successfully deleted review documents")
+                        completion(.success(()))
+                    case .failure(let error):
+                        print("❌ Error deleting review documents: \(error.localizedDescription)")
+                        completion(.failure(error))
+                    }
+                }
+            }
+        }
+    }
+    
+    private func deleteReviewImages(reviewId: String, imageUrls: [String], completion: @escaping (Result<Void, Error>) -> Void) {
+        // If no images to delete, return success immediately
+        guard !imageUrls.isEmpty else {
+            completion(.success(()))
+            return
+        }
+        
+        print("🖼️ Deleting \(imageUrls.count) images for review \(reviewId)")
+        
+        // Also delete the entire review folder from Storage
+        let reviewFolderRef = storage.reference().child("reviews/\(reviewId)")
+        
+        // List all items in the review folder and delete them
+        reviewFolderRef.listAll { result, error in
+            if let error = error {
+                print("⚠️ Error listing review images: \(error.localizedDescription)")
+                // Don't fail the entire operation for this
+                completion(.success(()))
+                return
+            }
+            
+            guard let result = result else {
+                completion(.success(()))
+                return
+            }
+            
+            let dispatchGroup = DispatchGroup()
+            var deletionErrors: [Error] = []
+            
+            // Delete each file in the folder
+            for item in result.items {
+                dispatchGroup.enter()
+                item.delete { error in
+                    if let error = error {
+                        print("⚠️ Error deleting image \(item.name): \(error.localizedDescription)")
+                        deletionErrors.append(error)
+                    } else {
+                        print("✅ Deleted image: \(item.name)")
+                    }
+                    dispatchGroup.leave()
+                }
+            }
+            
+            dispatchGroup.notify(queue: .main) {
+                if deletionErrors.isEmpty {
+                    completion(.success(()))
+                } else {
+                    // Return the first error but don't fail the entire operation
+                    print("⚠️ Some images failed to delete, but continuing with review deletion")
+                    completion(.success(()))
+                }
+            }
+        }
+    }
+    
+    private func deleteReviewDocuments(reviewId: String, placeId: String, userId: String, completion: @escaping (Result<Void, Error>) -> Void) {
+        print("📝 Deleting review documents from both collections")
+        
+        // References to both review locations
+        let placeReviewRef = db.collection("places")
+                              .document(placeId)
+                              .collection("reviews")
+                              .document(reviewId)
+        
+        let userReviewRef = db.collection("users")
+                             .document(userId)
+                             .collection("reviews")
+                             .document(reviewId)
+        
+        // Use a batch write to delete from both locations atomically
+        let batch = db.batch()
+        batch.deleteDocument(placeReviewRef)
+        batch.deleteDocument(userReviewRef)
+        
+        // Also delete any associated likes
+        deleteReviewLikes(reviewId: reviewId) { [weak self] _ in
+            guard let self = self else { return }
+            
+            // Commit the batch deletion
+            batch.commit { error in
+                if let error = error {
+                    print("❌ Error deleting review documents: \(error.localizedDescription)")
+                    completion(.failure(error))
+                } else {
+                    print("✅ Successfully deleted review documents from both collections")
+                    completion(.success(()))
+                }
+            }
+        }
+    }
+    
+    private func deleteReviewLikes(reviewId: String, completion: @escaping (Result<Void, Error>) -> Void) {
+        print("👍 Deleting likes for review \(reviewId)")
+        
+        // Find all likes for this review
+        db.collection("reviewLikes")
+            .whereField("reviewId", isEqualTo: reviewId)
+            .getDocuments { [weak self] snapshot, error in
+                guard let self = self else {
+                    completion(.failure(NSError(domain: "FirestoreService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Self was deallocated"])))
+                    return
+                }
+                
+                if let error = error {
+                    print("⚠️ Error fetching review likes: \(error.localizedDescription)")
+                    // Don't fail the entire operation for this
+                    completion(.success(()))
+                    return
+                }
+                
+                guard let documents = snapshot?.documents, !documents.isEmpty else {
+                    print("ℹ️ No likes found for review")
+                    completion(.success(()))
+                    return
+                }
+                
+                print("🗑️ Deleting \(documents.count) likes for review")
+                
+                // Delete all like documents in a batch
+                let batch = self.db.batch()
+                for document in documents {
+                    batch.deleteDocument(document.reference)
+                }
+                
+                batch.commit { error in
+                    if let error = error {
+                        print("⚠️ Error deleting review likes: \(error.localizedDescription)")
+                        // Don't fail the entire operation for this
+                    } else {
+                        print("✅ Successfully deleted review likes")
+                    }
+                    completion(.success(()))
+                }
+            }
     }
 }

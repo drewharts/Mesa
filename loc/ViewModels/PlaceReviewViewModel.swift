@@ -115,5 +115,27 @@ class PlaceReviewViewModel: ObservableObject {
            }
        }
    }
+
+   func deleteReview(reviewId: String, completion: @escaping (Result<Void, Error>) -> Void) {
+       print("🗑️ Starting review deletion process for ID: \(reviewId)")
+       isLoading = true
+       errorMessage = nil
+       
+       firestoreService.deleteReview(reviewId: reviewId, placeId: place.id.uuidString, userId: userId) { [weak self] result in
+           DispatchQueue.main.async {
+               self?.isLoading = false
+               
+               switch result {
+               case .success:
+                   print("✅ Successfully deleted review with ID: \(reviewId)")
+                   completion(.success(()))
+               case .failure(let error):
+                   print("❌ Error deleting review: \(error.localizedDescription)")
+                   self?.errorMessage = "Failed to delete review: \(error.localizedDescription)"
+                   completion(.failure(error))
+               }
+           }
+       }
+   }
 }
 
