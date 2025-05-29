@@ -453,7 +453,6 @@ class FirestoreService: ObservableObject {
                 } else {
                     dateString = String(describing: ts)
                 }
-                print("[DEBUG] Review id: \(document.documentID), type: \(data["type"] ?? "unknown"), timestamp: \(ts ?? "missing"), date: \(dateString)")
                 // Check the type field to determine how to decode
                 if let typeString = data["type"] as? String,
                    let type = ReviewType(rawValue: typeString) {
@@ -1173,7 +1172,6 @@ class FirestoreService: ObservableObject {
                     print("Error fetching lists: \(error.localizedDescription)")
                     completion([]) // Return an empty array if there's an error
                 } else {
-                    print("Document count: \(result?.documents.count ?? 0)")
                     let placeLists = result?.documents.compactMap { document in
                         try? document.data(as: PlaceList.self)
                     } ?? []
@@ -2245,7 +2243,6 @@ class FirestoreService: ObservableObject {
                     } else {
                         dateString = String(describing: ts)
                     }
-                    print("[DEBUG] Review id: \(document.documentID), type: \(data["type"] ?? "unknown"), timestamp: \(ts ?? "missing"), date: \(dateString)")
                     // First check if the review is from a user we want to include
                     guard let userId = data["userId"] as? String,
                           userIdsToFetch.contains(userId) else {
