@@ -286,7 +286,7 @@ struct ListPlaceGridCell: View {
                             .clipped()
                     } else {
                         Rectangle()
-                            .foregroundColor(colorForPlace(place))
+                            .foregroundColor(detailPlaceViewModel.colorForPlace(placeId: place.id.uuidString))
                             .frame(width: cardWidth, height: cardHeight)
                     }
                     LinearGradient(
@@ -338,14 +338,6 @@ struct ListPlaceGridCell: View {
                 Label("Remove from list", systemImage: "trash")
             }
         }
-    }
-
-    private func colorForPlace(_ place: DetailPlace) -> Color {
-        Color(
-            red: Double.random(in: 0...1),
-            green: Double.random(in: 0...1),
-            blue: Double.random(in: 0...1)
-        )
     }
 }
 
