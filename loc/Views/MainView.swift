@@ -37,64 +37,7 @@ struct MainView: View {
                 
                 // UI overlay layer
                 VStack(spacing: 16) {
-                    if isSearchBarMinimized {
-                        HStack {
-                            Spacer()
-                            VStack(spacing: 10) {
-                                Button(action: {
-                                    withAnimation {
-                                        if sheetHeight == maxSheetHeight {
-                                            sheetHeight = minSheetHeight
-                                        }
-                                        isSearchBarMinimized.toggle()
-                                    }
-                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                                        searchIsFocused = true
-                                    }
-                                }) {
-                                    Image(systemName: "magnifyingglass")
-                                        .foregroundColor(.blue)
-                                        .frame(width: 60, height: 60)
-                                        .background(Color.white)
-                                        .clipShape(Circle())
-                                        .overlay(Circle().stroke(Color.gray, lineWidth: 2))
-                                        .shadow(radius: 4)
-                                }
-                                .padding(.top, 10)
-                                .padding(.trailing, 20)
-                                
-                                NavigationLink(
-                                    destination: ProfileView()
-                                        .environmentObject(userProfileViewModel),
-                                    isActive: $showProfileView
-                                ) {
-                                    Button(action: {
-                                        showProfileView = true
-                                        selectedPlaceVM.isDetailSheetPresented = false
-                                    }) {
-                                        if let profilePhoto = profileViewModel.userPicture {
-                                            Image(uiImage: profilePhoto)
-                                                .resizable()
-                                                .frame(width: 60, height: 60)
-                                                .clipShape(Circle())
-                                                .overlay(Circle().stroke(Color.gray, lineWidth: 2))
-                                                .shadow(radius: 4)
-                                        } else {
-                                            Image(systemName: "person.crop.circle")
-                                                .resizable()
-                                                .foregroundColor(.blue)
-                                                .frame(width: 60, height: 60)
-                                                .background(Color.white)
-                                                .clipShape(Circle())
-                                                .overlay(Circle().stroke(Color.gray, lineWidth: 2))
-                                                .shadow(radius: 4)
-                                        }
-                                    }
-                                }
-                                .padding(.trailing, 20)
-                            }
-                        }
-                    } else {
+                    if !isSearchBarMinimized {
                         TextField("Search here...", text: $viewModel.searchText)
                             .padding()
                             .background(Color.white)
@@ -152,10 +95,82 @@ struct MainView: View {
                     }
                 }
 
-                // Overlay recenter button (bottom right)
+                // Overlay search/profile buttons (bottom right)
                 if isSearchBarMinimized && !searchIsFocused && !selectedPlaceVM.isDetailSheetPresented {
                     VStack {
                         Spacer()
+                        HStack {
+                            Spacer()
+                            VStack(spacing: 10) {
+                                Button(action: {
+                                    withAnimation {
+                                        if sheetHeight == maxSheetHeight {
+                                            sheetHeight = minSheetHeight
+                                        }
+                                        isSearchBarMinimized.toggle()
+                                    }
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                                        searchIsFocused = true
+                                    }
+                                }) {
+                                    Image(systemName: "magnifyingglass")
+                                        .foregroundColor(.blue)
+                                        .frame(width: 60, height: 60)
+                                        .background(Color.white)
+                                        .clipShape(Circle())
+                                        .overlay(Circle().stroke(Color.gray.opacity(0.2), lineWidth: 2))
+                                        .shadow(radius: 4)
+                                }
+                                NavigationLink(
+                                    destination: ProfileView()
+                                        .environmentObject(userProfileViewModel),
+                                    isActive: $showProfileView
+                                ) {
+                                    Button(action: {
+                                        showProfileView = true
+                                        selectedPlaceVM.isDetailSheetPresented = false
+                                    }) {
+                                        if let profilePhoto = profileViewModel.userPicture {
+                                            Image(uiImage: profilePhoto)
+                                                .resizable()
+                                                .frame(width: 60, height: 60)
+                                                .clipShape(Circle())
+                                                .overlay(Circle().stroke(Color.gray.opacity(0.2), lineWidth: 2))
+                                                .shadow(radius: 4)
+                                        } else {
+                                            Image(systemName: "person.crop.circle")
+                                                .resizable()
+                                                .foregroundColor(.blue)
+                                                .frame(width: 60, height: 60)
+                                                .background(Color.white)
+                                                .clipShape(Circle())
+                                                .overlay(Circle().stroke(Color.gray.opacity(0.2), lineWidth: 2))
+                                                .shadow(radius: 4)
+                                        }
+                                    }
+                                }
+                                // Feed Button
+                                Button(action: {
+                                    // TODO: Implement feed action
+                                }) {
+                                    Image(systemName: "house")
+                                        .foregroundColor(.blue)
+                                        .frame(width: 60, height: 60)
+                                        .background(Color.white)
+                                        .clipShape(Circle())
+                                        .overlay(Circle().stroke(Color.gray.opacity(0.2), lineWidth: 2))
+                                        .shadow(radius: 4)
+                                }
+                            }
+                        }
+                        .padding(.bottom, 20)
+                        .padding(.trailing, 20)
+                    }
+                }
+
+                // Overlay recenter button (top right)
+                if isSearchBarMinimized && !searchIsFocused && !selectedPlaceVM.isDetailSheetPresented {
+                    VStack {
                         HStack {
                             Spacer()
                             Button(action: {
@@ -168,9 +183,10 @@ struct MainView: View {
                                     .clipShape(Circle())
                                     .shadow(radius: 4)
                             }
-                            .padding(.bottom, 20)
+                            .padding(.top, 20)
                             .padding(.trailing, 20)
                         }
+                        Spacer()
                     }
                 }
             }
