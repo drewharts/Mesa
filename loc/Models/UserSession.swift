@@ -8,6 +8,7 @@
 import FirebaseAuth
 import GoogleSignIn
 import FirebaseFirestore
+import FirebaseMessaging
 import SwiftUI
 
 class UserSession: ObservableObject {
@@ -24,6 +25,9 @@ class UserSession: ObservableObject {
         self.detailPlaceVM = detailPlaceVM
         if let currentUser = Auth.auth().currentUser {
             self.isUserLoggedIn = true
+            self.currentUserId = currentUser.uid
+            // Register for FCM token updates
+            self.registerForFCMToken()
 //            fetchProfile(for: currentUser.uid)
         } else {
             self.isUserLoggedIn = false
@@ -37,8 +41,29 @@ class UserSession: ObservableObject {
             GIDSignIn.sharedInstance.signOut()
             isUserLoggedIn = false
             profileViewModel = nil
+            currentUserId = nil
         } catch let signOutError as NSError {
             print("Error signing out: \(signOutError)")
+        }
+    }
+    
+    // MARK: - FCM Token Management
+    func registerForFCMToken() {
+        guard let currentUserId = self.currentUserId else { return }
+        
+        Messaging.messaging().token { [weak self] token, error in
+            if let error = error {
+                print("Error fetching FCM registration token: \(error)")
+            } else if let token = token {
+                print("FCM registration token: \(token)")
+                self?.firestoreService.updateFCMToken(userId: currentUserId, token: token) { error in
+                    if let error = error {
+                        print("Error updating FCM token in Firestore: \(error)")
+                    } else {
+                        print("FCM token successfully updated in Firestore")
+                    }
+                }
+            }
         }
     }
     
@@ -82,6 +107,8 @@ class UserSession: ObservableObject {
             self.isUserLoggedIn = true
             if let currentUser = Auth.auth().currentUser {
                 self.currentUserId = currentUser.uid
+                // Register for FCM token after successful login
+                self.registerForFCMToken()
 //                self.fetchProfile(for: currentUser.uid)
             }
         }

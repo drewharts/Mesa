@@ -17,4 +17,5 @@ struct ProfileData: Codable, Identifiable {
     var phoneNumber: String
     var fullNameLower: String
     var fullName: String
+    var fcmToken: String?
 }

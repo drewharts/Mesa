@@ -2,7 +2,9 @@ import SwiftUI
 import Firebase
 import FirebaseAuth
 import FirebaseAppCheck
+import FirebaseMessaging
 import GoogleSignIn
+import UserNotifications
 
 @main
 struct locApp: App {
@@ -75,13 +77,101 @@ struct locApp: App {
 class AppDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
+        
+        // Set FCM messaging delegate
+        Messaging.messaging().delegate = self
+        
+        // Set UNUserNotificationCenter delegate
+        UNUserNotificationCenter.current().delegate = self
+        
+        // Request notification permissions and register for remote notifications
+        requestNotificationPermissions(application: application)
+        
         return true
+    }
+    
+    private func requestNotificationPermissions(application: UIApplication) {
+        let authOptions: UNAuthorizationOptions = [.alert, .badge, .sound]
+        UNUserNotificationCenter.current().requestAuthorization(options: authOptions) { granted, error in
+            print("🔔 Notification permission granted: \(granted)")
+            if let error = error {
+                print("❌ Error requesting notification permissions: \(error)")
+                return
+            }
+            
+            if granted {
+                DispatchQueue.main.async {
+                    // Register for remote notifications on main thread
+                    application.registerForRemoteNotifications()
+                    print("📱 Registering for remote notifications...")
+                }
+            } else {
+                print("⚠️ User denied notification permissions")
+            }
+        }
+    }
+    
+    // Called when APNs token is received
+    func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        print("📱 APNS token received: \(deviceToken.map { String(format: "%02.2hhx", $0) }.joined())")
+        
+        // Set APNS token for FCM
+        Messaging.messaging().apnsToken = deviceToken
+        
+        // Now FCM can generate its token
+        print("🔥 APNS token set, FCM will now generate token...")
+    }
+    
+    // Called when registration for remote notifications fails
+    func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
+        print("❌ Failed to register for remote notifications: \(error)")
     }
     
     func application(_ app: UIApplication,
                      open url: URL,
                      options: [UIApplication.OpenURLOptionsKey : Any] = [:]) -> Bool {
         return GIDSignIn.sharedInstance.handle(url)
+    }
+}
+
+// MARK: - FCM Messaging Delegate
+extension AppDelegate: MessagingDelegate {
+    func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
+        print("🔥 Firebase registration token received: \(String(describing: fcmToken))")
+        
+        // Save the FCM token to Firestore if user is logged in
+        if let fcmToken = fcmToken, let currentUserId = Auth.auth().currentUser?.uid {
+            let firestoreService = FirestoreService()
+            firestoreService.updateFCMToken(userId: currentUserId, token: fcmToken) { error in
+                if let error = error {
+                    print("❌ Error updating FCM token: \(error)")
+                } else {
+                    print("✅ FCM token successfully updated in Firestore")
+                }
+            }
+        }
+    }
+}
+
+// MARK: - User Notification Center Delegate
+extension AppDelegate: UNUserNotificationCenterDelegate {
+    // Handle notifications when app is in foreground
+    func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+        completionHandler([.banner, .sound, .badge])
+    }
+    
+    // Handle notification tap
+    func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completionHandler: @escaping () -> Void) {
+        let userInfo = response.notification.request.content.userInfo
+        
+        // Handle the notification tap (navigate to specific review/place)
+        if let reviewId = userInfo["reviewId"] as? String,
+           let placeId = userInfo["placeId"] as? String {
+            // You can add navigation logic here
+            print("👆 User tapped notification for review: \(reviewId) at place: \(placeId)")
+        }
+        
+        completionHandler()
     }
 }
 
