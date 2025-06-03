@@ -12,6 +12,7 @@ struct PlaceReviewsListView : View {
     @EnvironmentObject var userProfileViewModel: UserProfileViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var userSession: UserSession
+    @EnvironmentObject var notificationManager: NotificationManager
     var reviews: [any ReviewProtocol]
     @State private var activeKeyboardReviewId: String? = nil
     @Binding var selectedImage: UIImage?
@@ -36,12 +37,14 @@ struct PlaceReviewsListView : View {
                                               }
                                           }
                                        ))
-                        .environmentObject(userProfileViewModel)
+                        
                         .id(review.id)
                         .padding(.horizontal)
                         .padding(.vertical, 8)
-                        .background(Color.white)
+                        .background(notificationManager.highlightedReviewId == review.id ? 
+                                   Color.blue.opacity(0.1) : Color.white)
                         .cornerRadius(10)
+                        .animation(.easeInOut(duration: 0.3), value: notificationManager.highlightedReviewId)
                 } else if let genericReview = review as? GenericReview {
                     GenericReviewView(review: genericReview,
                                     selectedImage: $selectedImage,
@@ -60,8 +63,10 @@ struct PlaceReviewsListView : View {
                         .id(review.id)
                         .padding(.horizontal)
                         .padding(.vertical, 8)
-                        .background(Color.white)
+                        .background(notificationManager.highlightedReviewId == review.id ? 
+                                   Color.blue.opacity(0.1) : Color.white)
                         .cornerRadius(10)
+                        .animation(.easeInOut(duration: 0.3), value: notificationManager.highlightedReviewId)
                 }
             }
             .onLongPressGesture(minimumDuration: 0.5) {
@@ -119,6 +124,7 @@ struct PlaceReviewsView: View {
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var userProfileViewModel: UserProfileViewModel
     @EnvironmentObject var userSession: UserSession
+    @EnvironmentObject var notificationManager: NotificationManager
     @State private var activeKeyboardReviewId: String? = nil
 
     var body: some View {
@@ -172,6 +178,25 @@ struct PlaceReviewsView: View {
             .background(Color.white)
             .padding(.horizontal, -50)
             .ignoresSafeArea(.all, edges: .all)
+            .onReceive(notificationManager.$highlightedReviewId) { reviewId in
+                if let reviewId = reviewId {
+                    // Wait for reviews to load, then scroll to the specific review
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                        withAnimation(.easeInOut(duration: 0.8)) {
+                            scrollProxy.scrollTo(reviewId, anchor: .center)
+                        }
+                        
+                        // Add haptic feedback when scrolling to the review
+                        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+                        impactFeedback.impactOccurred()
+                        
+                        // Clear the highlighted review after scrolling
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                            notificationManager.clearHighlightedReview()
+                        }
+                    }
+                }
+            }
         }
         .onAppear {
             // Check like statuses when view appears
@@ -1203,58 +1228,115 @@ struct GenericReviewView: View {
             case .loaded:
                 if !reviewPhotos.isEmpty {
                     ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
-                            ForEach(reviewPhotos, id: \.self) { image in
-                                Image(uiImage: image)
+                        LazyHStack(spacing: 16) {
+                            ForEach(reviewPhotos, id: \.self) { photo in
+                                Image(uiImage: photo)
                                     .resizable()
-                                    .aspectRatio(contentMode: .fill)
-                                    .frame(width: 120, height: 120)
-                                    .cornerRadius(8)
+                                    .scaledToFill()
+                                    .frame(width: 150, height: 150)
+                                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 10)
+                                            .stroke(Color.gray.opacity(0.3), lineWidth: 0.5)
+                                    )
+                                    .shadow(radius: 2)
                                     .onTapGesture {
-                                        selectedImage = image
+                                        selectedImage = photo
                                     }
                             }
                         }
                         .padding(.horizontal)
                     }
-                    .frame(height: 150)
+                } else {
+                    Text("No photos available")
+                        .font(.footnote)
+                        .foregroundColor(.gray)
+                        .padding(.horizontal)
                 }
                 
             case .error(let error):
-                Text("Failed to load photos: \(error.localizedDescription)")
-                    .font(.caption)
-                    .foregroundColor(.red)
-                    .padding()
+                VStack(spacing: 8) {
+                    HStack {
+                        Image(systemName: "exclamationmark.triangle")
+                            .foregroundColor(.orange)
+                        
+                        Text("Failed to load photos: \(error.localizedDescription)")
+                            .font(.footnote)
+                            .foregroundColor(.red)
+                    }
+                    .padding(.horizontal)
+                    
+                    Button(action: {
+                        // Trigger reload of photos
+                        selectedPlaceVM.reloadReviewPhotos(for: review)
+                    }) {
+                        Text("Retry")
+                            .font(.footnote)
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(Color.blue)
+                            .cornerRadius(8)
+                    }
+                }
+                .padding(.vertical, 8)
+                .padding(.horizontal)
                 
             case .idle:
-                EmptyView()
+                ProgressView()
+                    .padding()
+                    .frame(maxWidth: .infinity)
             }
             
-            // Comments Section
             if showComments {
-                InlineCommentsView(reviewId: review.id, selectedImage: $selectedImage) { isActive in
-                    isActiveKeyboard = isActive
+                // Show comments section when expanded
+                VStack(alignment: .leading, spacing: 10) {
+                    // Embedded comments view
+                    InlineCommentsView(reviewId: review.id, selectedImage: $selectedImage, onKeyboardActive: { isActive in
+                        isActiveKeyboard = isActive
+                    })
+                        .padding(.leading, 15) // Indentation for comments
                 }
-                .padding(.top, 8)
-            }
-            
-            // Comments Toggle Button
-            Button(action: {
-                withAnimation {
-                    showComments.toggle()
-                }
-            }) {
-                HStack {
-                    Text(showComments ? "Hide Comments" : "Show Comments")
-                        .font(.footnote)
-                        .foregroundColor(.blue)
+                .padding(8)
+                .padding(.horizontal)
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            } else {
+                // Show reply button when comments are hidden
+                HStack(spacing: 8) {
+                    // Small horizontal line
+                    Rectangle()
+                        .frame(width: 16, height: 1)
+                        .foregroundColor(.gray.opacity(0.5))
                     
-                    Image(systemName: showComments ? "chevron.up" : "chevron.down")
-                        .foregroundColor(.blue)
+                    // Comment button positioned to the left
+                    Button(action: {
+                        // Load comments if needed before showing
+                        if !showComments {
+                            // Only fetch comments if we don't already have them
+                            if selectedPlaceVM.commentLoadingState(for: review.id) == .idle {
+                                selectedPlaceVM.loadCommentsForReview(reviewId: review.id)
+                            }
+                            withAnimation {
+                                showComments.toggle()
+                            }
+                        }
+                    }) {
+                        let commentCount = selectedPlaceVM.commentCount(for: review.id)
+                        Text(commentCount > 0 ? 
+                             "Show \(commentCount) \(commentCount == 1 ? "reply" : "replies")" : 
+                             "Reply")
+                            .font(.footnote)
+                            .foregroundColor(.gray)
+                            .fontWeight(.semibold)
+                    }
+                    
+                    Spacer()
                 }
+                .padding(.leading, 30) // Left padding to align with the indentation
+                .padding(.bottom, 10)
             }
-            .padding(.horizontal)
         }
+        .padding(.vertical)
         .onAppear {
             // Check like statuses using the proper userId from profile
             selectedPlaceVM.checkLikeStatuses(userId: userSession.currentUserId!)

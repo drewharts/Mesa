@@ -15,8 +15,9 @@ struct MinPlaceDetailView: View {
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var locationManager: LocationManager
     @EnvironmentObject var userProfileViewModel: UserProfileViewModel
-    @Environment(\.isScrollingEnabled) var isScrollingEnabled // Access scroll state
     @EnvironmentObject var userSession: UserSession
+    @EnvironmentObject var notificationManager: NotificationManager
+    @Environment(\.isScrollingEnabled) var isScrollingEnabled // Access scroll state
 
     @Binding var showNoPhoneNumberAlert: Bool
     @Binding var selectedImage: UIImage?
@@ -210,6 +211,12 @@ struct MinPlaceDetailView: View {
         }
         .scrollDisabled(!isScrollingEnabled) // Disable scrolling based on sheet height
         .navigationBarTitleDisplayMode(.inline)
+        .onReceive(notificationManager.$highlightedReviewId) { reviewId in
+            if reviewId != nil {
+                // Switch to reviews tab when there's a highlighted review
+                selectedTab = .reviews
+            }
+        }
         .alert(isPresented: $showNoPhoneNumberAlert) {
             Alert(
                 title: Text("Phone Number Not Available"),

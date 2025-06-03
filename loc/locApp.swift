@@ -17,6 +17,7 @@ struct locApp: App {
     @StateObject private var detailPlaceViewModel: DetailPlaceViewModel
     @StateObject private var selectedPlaceViewModel: SelectedPlaceViewModel
     @StateObject private var userProfileViewModel: UserProfileViewModel
+    @StateObject private var notificationManager = NotificationManager.shared
     private let dataManager: DataManager
 
     init() {
@@ -62,6 +63,7 @@ struct locApp: App {
                 .environmentObject(firestoreService)
                 .environmentObject(dataManager)
                 .environmentObject(userProfileViewModel)
+                .environmentObject(notificationManager)
                 .preferredColorScheme(.light)
                 .task {
                     if let currentUser = Auth.auth().currentUser {
@@ -164,11 +166,36 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
     func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completionHandler: @escaping () -> Void) {
         let userInfo = response.notification.request.content.userInfo
         
-        // Handle the notification tap (navigate to specific review/place)
+        // Handle review notifications
         if let reviewId = userInfo["reviewId"] as? String,
-           let placeId = userInfo["placeId"] as? String {
-            // You can add navigation logic here
+           let placeId = userInfo["placeId"] as? String,
+           let userId = userInfo["userId"] as? String {
             print("👆 User tapped notification for review: \(reviewId) at place: \(placeId)")
+            
+            // Use NotificationManager to coordinate navigation
+            NotificationManager.shared.handleNotificationTap(
+                reviewId: reviewId,
+                placeId: placeId,
+                userId: userId
+            )
+        }
+        // Handle comment notifications  
+        else if let commentId = userInfo["commentId"] as? String,
+                let reviewId = userInfo["reviewId"] as? String,
+                let placeId = userInfo["placeId"] as? String,
+                let type = userInfo["type"] as? String,
+                type == "comment" {
+            print("👆 User tapped notification for comment: \(commentId) on review: \(reviewId) at place: \(placeId)")
+            
+            // For comments, we still navigate to the review (which will show the comments)
+            // The reviewAuthorId is the person who should receive the notification
+            let reviewAuthorId = userInfo["reviewAuthorId"] as? String ?? "unknown"
+            
+            NotificationManager.shared.handleNotificationTap(
+                reviewId: reviewId,
+                placeId: placeId,
+                userId: reviewAuthorId
+            )
         }
         
         completionHandler()

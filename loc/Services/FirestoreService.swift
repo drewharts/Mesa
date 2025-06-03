@@ -2692,4 +2692,15 @@ class FirestoreService: ObservableObject {
             completion(usersWithTokens, totalUsers, coverage)
         }
     }
+
+    func getDetailPlace(placeId: String, completion: @escaping (DetailPlace?, Error?) -> Void) {
+        fetchPlace(withId: placeId) { result in
+            switch result {
+            case .success(let place):
+                completion(place, nil)
+            case .failure(let error):
+                completion(nil, error)
+            }
+        }
+    }
 }

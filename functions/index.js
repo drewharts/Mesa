@@ -146,4 +146,138 @@ exports.notifyFriendsOnReview = onDocumentCreated('places/{placeId}/reviews/{rev
     console.error('Error in notifyFriendsOnReview:', error);
     return null;
   }
+});
+
+// Cloud Function to notify review author when someone comments on their review
+exports.notifyReviewAuthorOnComment = onDocumentCreated('places/{placeId}/reviews/{reviewId}/comments/{commentId}', async (event) => {
+  const snap = event.data;
+  const { placeId, reviewId, commentId } = event.params;
+  
+  if (!snap) {
+    console.log('No data associated with the event');
+    return;
+  }
+  
+  const commentData = snap.data();
+  
+  console.log(`💬 New comment detected on review ${reviewId} by user ${commentData.userId}`);
+  
+  try {
+    const db = getFirestore();
+    
+    // Get the original review to find its author
+    const reviewRef = db.collection('places').doc(placeId).collection('reviews').doc(reviewId);
+    const reviewDoc = await reviewRef.get();
+    
+    if (!reviewDoc.exists) {
+      console.log('❌ Review not found');
+      return null;
+    }
+    
+    const reviewData = reviewDoc.data();
+    const reviewAuthorId = reviewData.userId;
+    
+    // Don't notify if user is commenting on their own review
+    if (commentData.userId === reviewAuthorId) {
+      console.log('ℹ️ User commented on their own review, no notification needed');
+      return null;
+    }
+    
+    console.log(`📝 Comment by ${commentData.userFirstName} ${commentData.userLastName} on ${reviewData.userFirstName} ${reviewData.userLastName}'s review`);
+    
+    // Get the review author's FCM token
+    const reviewAuthorRef = db.collection('users').doc(reviewAuthorId);
+    const reviewAuthorDoc = await reviewAuthorRef.get();
+    
+    if (!reviewAuthorDoc.exists) {
+      console.log(`❌ Review author ${reviewAuthorId} not found`);
+      return null;
+    }
+    
+    const reviewAuthorData = reviewAuthorDoc.data();
+    const fcmToken = reviewAuthorData.fcmToken;
+    
+    if (!fcmToken || fcmToken.trim().length === 0) {
+      console.log(`⚠️ Review author ${reviewAuthorId} has no FCM token`);
+      // Still create in-app notification even without FCM token
+    }
+    
+    // Get place name for the notification
+    const placeRef = db.collection('places').doc(placeId);
+    const placeDoc = await placeRef.get();
+    const placeName = placeDoc.exists ? (placeDoc.data().name || 'a place') : 'a place';
+    
+    // Prepare notification data
+    const notificationTitle = 'New Comment on Your Review!';
+    const notificationBody = `${commentData.userFirstName} ${commentData.userLastName} commented on your review of ${placeName}`;
+    
+    // Send push notification if FCM token exists
+    if (fcmToken && fcmToken.trim().length > 0) {
+      const message = {
+        token: fcmToken,
+        notification: {
+          title: notificationTitle,
+          body: notificationBody,
+        },
+        data: {
+          type: 'comment',
+          reviewId: reviewId,
+          commentId: commentId,
+          placeId: placeId,
+          userId: commentData.userId, // The person who commented
+          reviewAuthorId: reviewAuthorId // The person who wrote the review
+        },
+        apns: {
+          payload: {
+            aps: {
+              badge: 1,
+              sound: 'default'
+            }
+          }
+        }
+      };
+      
+      try {
+        const messaging = getMessaging();
+        const response = await messaging.send(message);
+        console.log(`✅ Push notification sent successfully: ${response}`);
+      } catch (error) {
+        console.error(`❌ Error sending push notification: ${error}`);
+      }
+    }
+    
+    // Create in-app notification for the review author
+    const inAppNotification = {
+      id: commentId, // Use comment ID as notification ID
+      type: 'comment',
+      title: notificationTitle,
+      message: notificationBody,
+      timestamp: db.FieldValue.serverTimestamp(),
+      read: false,
+      data: {
+        reviewId: reviewId,
+        commentId: commentId,
+        placeId: placeId,
+        placeName: placeName,
+        commenterUserId: commentData.userId,
+        commenterName: `${commentData.userFirstName} ${commentData.userLastName}`
+      }
+    };
+    
+    // Save in-app notification
+    await db.collection('users')
+            .doc(reviewAuthorId)
+            .collection('notifications')
+            .doc(commentId)
+            .set(inAppNotification);
+    
+    console.log(`✅ In-app notification created for review author ${reviewAuthorId}`);
+    console.log(`📊 Comment notification process completed successfully`);
+    
+    return { success: true, notificationType: 'comment', reviewAuthorId: reviewAuthorId };
+    
+  } catch (error) {
+    console.error(`❌ Error in notifyReviewAuthorOnComment: ${error}`);
+    return null;
+  }
 }); 
