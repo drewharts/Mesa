@@ -510,7 +510,7 @@ class SelectedPlaceViewModel: ObservableObject {
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
             var currentReviews = self.placeReviews[placeId] ?? []
-            currentReviews.append(review)
+            currentReviews.insert(review, at: 0) // Insert at the beginning instead of appending
             self.placeReviews[placeId] = currentReviews
             self.placeRating = self.calculateAvgRating(for: placeId)
             self.loadReviewPhotos(for: review)

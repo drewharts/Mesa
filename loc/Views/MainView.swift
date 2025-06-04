@@ -14,9 +14,10 @@ struct MainView: View {
     @EnvironmentObject var userSession: UserSession
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var profileViewModel: ProfileViewModel
-    @StateObject private var viewModel = SearchViewModel()
     @EnvironmentObject var userProfileViewModel: UserProfileViewModel
     @EnvironmentObject var locationManager: LocationManager
+    @EnvironmentObject var notificationManager: NotificationManager
+    @StateObject private var viewModel = SearchViewModel()
 
     @FocusState private var searchIsFocused: Bool
     @State private var isSearchBarMinimized = true
@@ -148,6 +149,7 @@ struct MainView: View {
                             minSheetHeight: minSheetHeight
                         )
                         .environmentObject(userProfileViewModel)
+                        .environmentObject(notificationManager)
                         .frame(maxWidth: .infinity)
                     }
                 }

@@ -2617,4 +2617,90 @@ class FirestoreService: ObservableObject {
                 }
             }
     }
+
+    // MARK: - FCM Token Management
+    func updateFCMToken(userId: String, token: String, completion: @escaping (Error?) -> Void) {
+        let userRef = db.collection("users").document(userId)
+        userRef.updateData([
+            "fcmToken": token
+        ]) { error in
+            completion(error)
+        }
+    }
+    
+    func getFCMTokens(for userIds: [String], completion: @escaping ([String]) -> Void) {
+        guard !userIds.isEmpty else {
+            completion([])
+            return
+        }
+        
+        // Firestore 'in' queries are limited to 10 items at a time
+        let chunks = userIds.chunked(into: 10)
+        var allTokens: [String] = []
+        let dispatchGroup = DispatchGroup()
+        
+        for chunk in chunks {
+            dispatchGroup.enter()
+            db.collection("users")
+                .whereField(FieldPath.documentID(), in: chunk)
+                .getDocuments { snapshot, error in
+                    if let error = error {
+                        print("Error fetching FCM tokens: \(error)")
+                        dispatchGroup.leave()
+                        return
+                    }
+                    
+                    let tokens = snapshot?.documents.compactMap { document in
+                        document.get("fcmToken") as? String
+                    } ?? []
+                    
+                    allTokens.append(contentsOf: tokens)
+                    dispatchGroup.leave()
+                }
+        }
+        
+        dispatchGroup.notify(queue: .main) {
+            completion(allTokens)
+        }
+    }
+    
+    // MARK: - FCM Token Coverage (Optional - for monitoring transition)
+    func checkFCMTokenCoverage(completion: @escaping (Int, Int, Double) -> Void) {
+        db.collection("users").getDocuments { snapshot, error in
+            if let error = error {
+                print("Error checking FCM token coverage: \(error)")
+                completion(0, 0, 0.0)
+                return
+            }
+            
+            guard let documents = snapshot?.documents else {
+                completion(0, 0, 0.0)
+                return
+            }
+            
+            let totalUsers = documents.count
+            let usersWithTokens = documents.filter { document in
+                if let token = document.get("fcmToken") as? String {
+                    return !token.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                }
+                return false
+            }.count
+            
+            let coverage = totalUsers > 0 ? Double(usersWithTokens) / Double(totalUsers) * 100 : 0.0
+            
+            print("📊 FCM Token Coverage: \(usersWithTokens)/\(totalUsers) users (\(String(format: "%.1f", coverage))%)")
+            completion(usersWithTokens, totalUsers, coverage)
+        }
+    }
+
+    func getDetailPlace(placeId: String, completion: @escaping (DetailPlace?, Error?) -> Void) {
+        fetchPlace(withId: placeId) { result in
+            switch result {
+            case .success(let place):
+                completion(place, nil)
+            case .failure(let error):
+                completion(nil, error)
+            }
+        }
+    }
 }
