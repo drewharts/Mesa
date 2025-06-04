@@ -31,6 +31,7 @@
 		B0E659862D37436000F8527E /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = B0E659852D37436000F8527E /* FirebaseStorage */; };
 		B0EDE3F02CF7980100F33939 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = B0EDE3EF2CF7980100F33939 /* FirebaseFirestore */; };
 		B0EDE3F22CF7985900F33939 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = B0EDE3F12CF7985900F33939 /* FirebaseFirestore */; };
+		B0FE7F7C2DEFF32D006600D0 /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = B0FE7F7B2DEFF32D006600D0 /* FirebaseMessaging */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -82,6 +83,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B0FE7F7C2DEFF32D006600D0 /* FirebaseMessaging in Frameworks */,
 				B03AE5C02D54785B00B986B1 /* MapboxSearch in Frameworks */,
 				B0821C682C641B9100BA126E /* CoreLocationUI.framework in Frameworks */,
 				B0EDE3F22CF7985900F33939 /* FirebaseFirestore in Frameworks */,
@@ -237,6 +239,7 @@
 				B03AE5BF2D54785B00B986B1 /* MapboxSearch */,
 				B03AE5C12D54785B00B986B1 /* MapboxSearchUI */,
 				B03AE5C42D5478A000B986B1 /* MapboxMaps */,
+				B0FE7F7B2DEFF32D006600D0 /* FirebaseMessaging */,
 			);
 			productName = loc;
 			productReference = B054DC5D2C42F5DA00C98088 /* loc.app */;
@@ -546,7 +549,6 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 3.01;
-
 				PRODUCT_BUNDLE_IDENTIFIER = drewharts.locc;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -586,7 +588,6 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 3.01;
-
 				PRODUCT_BUNDLE_IDENTIFIER = drewharts.locc;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -840,6 +841,10 @@
 		B0EDE3F12CF7985900F33939 /* FirebaseFirestore */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = FirebaseFirestore;
+		};
+		B0FE7F7B2DEFF32D006600D0 /* FirebaseMessaging */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = FirebaseMessaging;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
