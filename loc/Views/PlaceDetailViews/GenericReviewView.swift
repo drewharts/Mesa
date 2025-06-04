@@ -1,15 +1,7 @@
-//
-//  PlaceReviewView.swift
-//  loc
-//
-//  Created by Andrew Hartsfield II on 3/1/25.
-//
-
 import SwiftUI
-import UIKit
 
-struct RestaurantReviewView: View {
-    let review: RestaurantReview
+struct GenericReviewView: View {
+    let review: GenericReview
     @Binding var selectedImage: UIImage?
     @Binding var isActiveKeyboard: Bool
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
@@ -31,18 +23,6 @@ struct RestaurantReviewView: View {
         VStack(spacing: 16) {
             // Header: Profile Picture, Name, and Timestamp
             RestaruantReviewViewProfileInformation(review: review)
-
-            // Ratings (Food, Ambience, Service)
-            HStack(spacing: 45) {
-                RatingView(title: "Food", score: review.foodRating, color: .green)
-                RatingView(title: "Ambience", score: review.ambienceRating, color: .green)
-                RatingView(title: "Service", score: review.serviceRating, color: .yellow)
-            }
-            .padding(.horizontal)
-            .padding(.bottom, 15)
-            
-            // Must Order Section
-            RestaruantReviewViewMustOrder(review: review)
             
             // Review Text
             Text(review.reviewText)
@@ -142,7 +122,7 @@ struct RestaurantReviewView: View {
                     InlineCommentsView(reviewId: review.id, selectedImage: $selectedImage, onKeyboardActive: { isActive in
                         isActiveKeyboard = isActive
                     })
-                        .padding(.leading, 15) // Indentation for comments
+                        .padding(Edge.Set.leading, 15) // Indentation for comments
                 }
                 .padding(8)
                 .padding(.horizontal)
@@ -201,4 +181,3 @@ struct RestaurantReviewView: View {
         }
     }
 }
-

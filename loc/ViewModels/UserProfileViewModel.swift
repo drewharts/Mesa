@@ -42,6 +42,18 @@ class UserProfileViewModel: ObservableObject {
         self.fetchFavoritePlaceImages()
     }
     
+    func fetchAndSelectUser(userId: String, currentUserId: String) {
+        firestoreService.fetchUserById(userId: userId) { [weak self] result in
+            switch result {
+            case .success(let profileData):
+                self?.selectUser(profileData, currentUserId: currentUserId)
+            case .failure(let error):
+                print("Error fetching user profile: \(error.localizedDescription)")
+                // Optionally handle error - could show an alert or set an error state
+            }
+        }
+    }
+    
     func fetchFollowers(userId: String) {
         firestoreService.getNumberFollowers(forUserId: userId) { (count, error) in
             if let error = error {
