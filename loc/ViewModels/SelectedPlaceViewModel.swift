@@ -759,7 +759,7 @@ class SelectedPlaceViewModel: ObservableObject {
         }
     }
 
-    func createNewPlace(name: String, description: String?, coordinate: CLLocationCoordinate2D, userId: String) {
+    func createNewPlace(name: String, description: String?, coordinate: CLLocationCoordinate2D, userId: String, profileVM: ProfileViewModel? = nil, detailPlaceVM: DetailPlaceViewModel? = nil) {
         // Create a new place
         var newPlace = DetailPlace()
         newPlace.name = name
@@ -768,6 +768,27 @@ class SelectedPlaceViewModel: ObservableObject {
             latitude: coordinate.latitude,
             longitude: coordinate.longitude
         )
+        
+        // Immediately update local state for instant UI feedback
+        DispatchQueue.main.async {
+            // Add to DetailPlaceViewModel's places dictionary
+            if let detailPlaceVM = detailPlaceVM {
+                detailPlaceVM.places[newPlace.id.uuidString] = newPlace
+                
+                // Add current user to placeSavers for this place
+                detailPlaceVM.placeSavers[newPlace.id.uuidString] = [userId]
+                
+                // Trigger annotation calculation for immediate display
+                detailPlaceVM.calculateAnnotationPlaces()
+            }
+            
+            // Update ProfileViewModel's myPlaces list
+            if let profileVM = profileVM {
+                if !profileVM.myPlaces.contains(newPlace.id.uuidString) {
+                    profileVM.myPlaces.append(newPlace.id.uuidString)
+                }
+            }
+        }
         
         // Save to main places collection
         firestoreService.addToAllPlaces(detailPlace: newPlace) { error in
@@ -781,10 +802,7 @@ class SelectedPlaceViewModel: ObservableObject {
                     if let error = error {
                         print("Error saving place to user's collection: \(error.localizedDescription)")
                     } else {
-                        // Notify that a new place was created to refresh map annotations
-                        DispatchQueue.main.async {
-                            NotificationCenter.default.post(name: NSNotification.Name("RefreshMapAnnotations"), object: nil)
-                        }
+                        print("Successfully saved place to user's myPlaces collection")
                     }
                 }
             }
