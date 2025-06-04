@@ -11,6 +11,7 @@ import GoogleSignIn
 import FirebaseAuth
 import FirebaseCore
 import FirebaseFirestore
+import FirebaseMessaging
 
 class LoginViewModel: ObservableObject {
     @Published var errorMessage: String?
@@ -79,29 +80,37 @@ class LoginViewModel: ObservableObject {
         firestoreService.fetchUserById(userId: uid) { [weak self] result in
             switch result {
             case .success(_):
-                // Profile exists, do not overwrite
+                // Profile exists, update FCM token and proceed
                 userSession.isUserLoggedIn = true
+                userSession.currentUserId = uid
+                userSession.registerForFCMToken()
                 Task {
                     await self?.dataManager.initializeProfileData(userId: uid)
                 }
             case .failure(let error):
                 // Only create if not found (404)
                 if (error as NSError).code == 404 {
-                    let profileData = ProfileData(
-                        id: uid,
-                        firstName: user.profile?.givenName ?? "",
-                        lastName: user.profile?.familyName ?? "",
-                        email: user.profile?.email ?? "",
-                        profilePhotoURL: user.profile?.imageURL(withDimension: 200),
-                        phoneNumber: "",
-                        fullNameLower: "\(user.profile?.givenName ?? "") \(user.profile?.familyName ?? "")".lowercased(),
-                        fullName: "\(user.profile?.givenName ?? "") \(user.profile?.familyName ?? "")"
-                    )
-                    self?.firestoreService.saveUserProfile(uid: uid, profileData: profileData) { [weak self] error in
-                        if let error = error {
-                            self?.errorMessage = "Error saving profile: \(error.localizedDescription)"
-                        } else {
-                            userSession.isUserLoggedIn = true
+                    // Get FCM token for new user
+                    Messaging.messaging().token { [weak self] token, error in
+                        let profileData = ProfileData(
+                            id: uid,
+                            firstName: user.profile?.givenName ?? "",
+                            lastName: user.profile?.familyName ?? "",
+                            email: user.profile?.email ?? "",
+                            profilePhotoURL: user.profile?.imageURL(withDimension: 200),
+                            phoneNumber: "",
+                            fullNameLower: "\(user.profile?.givenName ?? "") \(user.profile?.familyName ?? "")".lowercased(),
+                            fullName: "\(user.profile?.givenName ?? "") \(user.profile?.familyName ?? "")",
+                            fcmToken: token
+                        )
+                        self?.firestoreService.saveUserProfile(uid: uid, profileData: profileData) { [weak self] error in
+                            if let error = error {
+                                self?.errorMessage = "Error saving profile: \(error.localizedDescription)"
+                            } else {
+                                userSession.isUserLoggedIn = true
+                                userSession.currentUserId = uid
+                                userSession.registerForFCMToken()
+                            }
                         }
                     }
                 } else {

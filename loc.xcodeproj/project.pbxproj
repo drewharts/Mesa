@@ -31,6 +31,8 @@
 		B0E659862D37436000F8527E /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = B0E659852D37436000F8527E /* FirebaseStorage */; };
 		B0EDE3F02CF7980100F33939 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = B0EDE3EF2CF7980100F33939 /* FirebaseFirestore */; };
 		B0EDE3F22CF7985900F33939 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = B0EDE3F12CF7985900F33939 /* FirebaseFirestore */; };
+		B0FE79332DECF7FD006600D0 /* FirebaseInAppMessaging-Beta in Frameworks */ = {isa = PBXBuildFile; productRef = B0FE79322DECF7FD006600D0 /* FirebaseInAppMessaging-Beta */; };
+		B0FE79352DECF7FD006600D0 /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = B0FE79342DECF7FD006600D0 /* FirebaseMessaging */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -65,6 +67,7 @@
 		B0821C672C641B9100BA126E /* CoreLocationUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreLocationUI.framework; path = System/Library/Frameworks/CoreLocationUI.framework; sourceTree = SDKROOT; };
 		B0A819142CEA5F2A0041416F /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		B0C31A862D94CB6400E481F4 /* .gitignore */ = {isa = PBXFileReference; lastKnownFileType = text; path = .gitignore; sourceTree = "<group>"; };
+		B0FE79382DEE9AD0006600D0 /* loc.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = loc.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -90,9 +93,11 @@
 				B054DC902C4301FB00C98088 /* GoogleMaps in Frameworks */,
 				B0384E852CE2D19A00FC72F7 /* FirebaseAnalyticsOnDeviceConversion in Frameworks */,
 				B0384E8F2CE2D54200FC72F7 /* FirebaseAuth in Frameworks */,
+				B0FE79352DECF7FD006600D0 /* FirebaseMessaging in Frameworks */,
 				B0EDE3F02CF7980100F33939 /* FirebaseFirestore in Frameworks */,
 				B0A819182CEA5F970041416F /* GoogleSignIn in Frameworks */,
 				B03AE5C22D54785B00B986B1 /* MapboxSearchUI in Frameworks */,
+				B0FE79332DECF7FD006600D0 /* FirebaseInAppMessaging-Beta in Frameworks */,
 				B0384E892CE2D19A00FC72F7 /* FirebaseAppCheck in Frameworks */,
 				B0384E832CE2D19A00FC72F7 /* FirebaseAnalytics in Frameworks */,
 				B061F1DE2C5815FA00042CB0 /* GooglePlaces in Frameworks */,
@@ -146,6 +151,7 @@
 		B054DC5F2C42F5DA00C98088 /* loc */ = {
 			isa = PBXGroup;
 			children = (
+				B0FE79382DEE9AD0006600D0 /* loc.entitlements */,
 				B0EBD65F2D921E0D00E846D8 /* Migrations */,
 				B0E659872D39D54300F8527E /* Extensions */,
 				B00311FF2CDACE01002AE03B /* Managers */,
@@ -237,6 +243,8 @@
 				B03AE5BF2D54785B00B986B1 /* MapboxSearch */,
 				B03AE5C12D54785B00B986B1 /* MapboxSearchUI */,
 				B03AE5C42D5478A000B986B1 /* MapboxMaps */,
+				B0FE79322DECF7FD006600D0 /* FirebaseInAppMessaging-Beta */,
+				B0FE79342DECF7FD006600D0 /* FirebaseMessaging */,
 			);
 			productName = loc;
 			productReference = B054DC5D2C42F5DA00C98088 /* loc.app */;
@@ -522,6 +530,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = loc/loc.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				CODE_SIGN_STYLE = Manual;
@@ -549,7 +558,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = drewharts.locc;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
-				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = Locc;
+				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = "Profile Mesa PN";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -561,6 +570,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = loc/loc.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				CODE_SIGN_STYLE = Manual;
@@ -588,7 +598,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = drewharts.locc;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
-				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = Locc;
+				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = "Profile Mesa PN";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -838,6 +848,14 @@
 		B0EDE3F12CF7985900F33939 /* FirebaseFirestore */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = FirebaseFirestore;
+		};
+		B0FE79322DECF7FD006600D0 /* FirebaseInAppMessaging-Beta */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = "FirebaseInAppMessaging-Beta";
+		};
+		B0FE79342DECF7FD006600D0 /* FirebaseMessaging */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = FirebaseMessaging;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
