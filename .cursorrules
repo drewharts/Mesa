@@ -28,6 +28,13 @@
 - **ENVIRONMENT OBJECTS**: Use `@EnvironmentObject` to access ViewModels
 - **SIMPLE BINDINGS**: Only simple `@State` for local UI state like animations or temporary states
 
+### Function Length Guidelines
+- **30-LINE LIMIT**: Functions should almost never exceed 30 lines of code
+- **BREAK INTO PARTS**: Long functions should be broken into smaller, focused functions that improve readability
+- **LOGICAL SEPARATION**: Split functions at natural logical boundaries (separate concerns, distinct operations)
+- **MEANINGFUL NAMES**: Each extracted function should have a clear, descriptive name that explains its purpose
+- **SINGLE RESPONSIBILITY**: Each function should have one clear responsibility or purpose
+
 ### File Structure
 ```
 Views/
@@ -51,6 +58,7 @@ ViewModels/
 3. **Business logic in View bodies**
 4. **Network calls or async operations in Views**
 5. **Complex data manipulation in Views**
+6. **Functions longer than 30 lines**
 
 ### Acceptable in Views
 - `var body: some View { ... }`
@@ -65,6 +73,7 @@ When finding violations:
 2. **Extract Functions**: Move functions to appropriate ViewModels
 3. **Create ViewModels**: If no ViewModel exists, create one for the business logic
 4. **Update Dependencies**: Ensure proper `@EnvironmentObject` setup
+5. **Refactor Long Functions**: Break functions longer than 30 lines into smaller, focused functions
 
 ## Enforcement
 - Every Pull Request should be checked against these rules
