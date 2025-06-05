@@ -19,78 +19,134 @@ struct UserProfileView: View {
 
     var body: some View {
         ZStack {
-            VStack(spacing: 0) {
-                // Fixed top section - Profile Picture, Name, Followers
-                VStack(spacing: 20) {
-                    // Profile Picture
-                    UserProfileProfilePictureView(
-                        profilePhotoURL: UserProfileVM.selectedUser?.profilePhotoURL,
-                        isFollowing: UserProfileVM.isFollowing,
-                        onToggleFollow: {
-                            //TODO: Need to populate user's annotations on the map after following/unfollowing
-                            UserProfileVM.toggleFollowUser(currentUserId: userId)
-                            profileVM.toggleFollowUser(userId: UserProfileVM.selectedUser!.id)
-                            // Force UI refresh
-                            refreshToggle.toggle()
+            ScrollView {
+                VStack(spacing: 0) {
+                    // Profile Picture, Name, Followers - now scrollable
+                    VStack(spacing: 20) {
+                        // Profile Picture
+                        UserProfileProfilePictureView(
+                            profilePhotoURL: UserProfileVM.selectedUser?.profilePhotoURL,
+                            isFollowing: UserProfileVM.isFollowing,
+                            onToggleFollow: {
+                                //TODO: Need to populate user's annotations on the map after following/unfollowing
+                                UserProfileVM.toggleFollowUser(currentUserId: userId)
+                                profileVM.toggleFollowUser(userId: UserProfileVM.selectedUser!.id)
+                                // Force UI refresh
+                                refreshToggle.toggle()
+                            }
+                        )
+
+                        // Name
+                        Text(UserProfileVM.selectedUser!.fullName)
+                            .font(.title)
+                            .fontWeight(.bold)
+                            .foregroundColor(.black)
+                        
+                        VStack {
+                            Text("\(UserProfileVM.followers)")
+                                .foregroundStyle(.black)
+                            Text("Followers")
+                                .foregroundStyle(.black)
+                                .font(.footnote)
+                                .fontWeight(.light)
                         }
-                    )
-
-                    // Name
-                    Text(UserProfileVM.selectedUser!.fullName)
-                        .font(.title)
-                        .fontWeight(.bold)
-                        .foregroundColor(.black)
-                    
-                    VStack {
-                        Text("\(UserProfileVM.followers)")
-                            .foregroundStyle(.black)
-                        Text("Followers")
-                            .foregroundStyle(.black)
-                            .font(.footnote)
-                            .fontWeight(.light)
                     }
-                }
-                .padding(.top, 20)
-                .padding(.bottom, 20)
-                
-                Divider()
-                    .padding(.horizontal, 20)
-                
-                // Swipeable content section
-                TabView(selection: $selectedTab) {
-                    // First page - Favorites and Lists
-                    ScrollView {
-                        VStack(spacing: 20) {
-                            //favorites
-                            UserProfileFavoritesView(userFavorites: UserProfileVM.userFavorites)
+                    .padding(.top, 20)
+                    .padding(.bottom, 20)
+                    
+                    Divider()
+                        .padding(.horizontal, 20)
+                    
+                    // Content section - now scrollable with the rest
+                    VStack(spacing: 0) {
+                        // Tab selection buttons
+                        HStack(spacing: 40) {
+                            Button(action: { selectedTab = 0 }) {
+                                VStack(spacing: 4) {
+                                    Text("Profile")
+                                        .font(.subheadline)
+                                        .fontWeight(selectedTab == 0 ? .semibold : .regular)
+                                        .foregroundColor(selectedTab == 0 ? .black : .gray)
+                                        .frame(minHeight: 20) // Ensure consistent height
+                                    
+                                    Rectangle()
+                                        .fill(selectedTab == 0 ? Color.black : Color.clear)
+                                        .frame(width: 50, height: 2) // Shortened width
+                                        .animation(.easeInOut(duration: 0.3), value: selectedTab)
+                                }
+                            }
                             
-                            Divider()
-                                .padding(.horizontal, 20)
-                            
-                            //place lists
-                            UserProfileListsView(viewModel: UserProfileVM, placeLists: UserProfileVM.userLists)
-
-                            Spacer()
+                            Button(action: { selectedTab = 1 }) {
+                                VStack(spacing: 4) {
+                                    Text("Reviews")
+                                        .font(.subheadline)
+                                        .fontWeight(selectedTab == 1 ? .semibold : .regular)
+                                        .foregroundColor(selectedTab == 1 ? .black : .gray)
+                                        .frame(minHeight: 20) // Ensure consistent height
+                                    
+                                    Rectangle()
+                                        .fill(selectedTab == 1 ? Color.black : Color.clear)
+                                        .frame(width: 50, height: 2) // Shortened width
+                                        .animation(.easeInOut(duration: 0.3), value: selectedTab)
+                                }
+                            }
                         }
                         .padding(.top, 20)
-                        .padding(.bottom, 20)
+                        .padding(.bottom, 10)
+                        
+                        // Content based on selected tab
+                        if selectedTab == 0 {
+                            VStack(spacing: 20) {
+                                //favorites
+                                UserProfileFavoritesView(userFavorites: UserProfileVM.userFavorites)
+                                
+                                Divider()
+                                    .padding(.horizontal, 20)
+                                
+                                //place lists
+                                UserProfileListsView(viewModel: UserProfileVM, placeLists: UserProfileVM.userLists)
+
+                                Spacer(minLength: 50)
+                            }
+                            .padding(.top, 10)
+                            .transition(.asymmetric(
+                                insertion: .move(edge: .leading).combined(with: .opacity),
+                                removal: .move(edge: .trailing).combined(with: .opacity)
+                            ))
+                        } else {
+                            UserProfileActivityView(UserProfileVM: UserProfileVM)
+                                .padding(.top, 10)
+                                .transition(.asymmetric(
+                                    insertion: .move(edge: .trailing).combined(with: .opacity),
+                                    removal: .move(edge: .leading).combined(with: .opacity)
+                                ))
+                        }
                     }
-                    .tag(0)
-                    
-                    // Second page - Activity View
-                    UserProfileActivityView(UserProfileVM: UserProfileVM)
-                        .tag(1)
-                }
-                .environmentObject(UserProfileVM)
-                .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
-                .onChange(of: selectedTab) {
-                    // Show indicators and start fade timer when tab changes
-                    showPageIndicators = true
-                    startFadeOutTimer()
+                    .gesture(
+                        DragGesture()
+                            .onEnded { gesture in
+                                let horizontalMovement = gesture.translation.width
+                                let verticalMovement = abs(gesture.translation.height)
+                                
+                                // Only respond to primarily horizontal swipes
+                                if abs(horizontalMovement) > 50 && abs(horizontalMovement) > verticalMovement {
+                                    withAnimation(.easeInOut(duration: 0.3)) {
+                                        if horizontalMovement > 0 && selectedTab == 1 {
+                                            // Swipe right: go to Profile
+                                            selectedTab = 0
+                                        } else if horizontalMovement < 0 && selectedTab == 0 {
+                                            // Swipe left: go to Reviews
+                                            selectedTab = 1
+                                        }
+                                    }
+                                }
+                            }
+                    )
                 }
             }
+            .environmentObject(UserProfileVM)
             
-            // Page indicator dots closer to the bottom
+            // Page indicator dots at the bottom
             VStack {
                 Spacer()
                 HStack(spacing: 8) {
@@ -102,7 +158,7 @@ struct UserProfileView: View {
                 }
                 .opacity(showPageIndicators ? 1.0 : 0.0)
                 .animation(.easeInOut(duration: 0.3), value: showPageIndicators)
-                .padding(.bottom, 10) // Even closer to bottom
+                .padding(.bottom, 10)
             }
         }
         .id(refreshToggle) // Force view refresh when toggle changes
@@ -112,6 +168,11 @@ struct UserProfileView: View {
         }
         .onDisappear {
             fadeOutTimer?.invalidate() // Clean up timer
+        }
+        .onChange(of: selectedTab) {
+            // Show indicators and start fade timer when tab changes
+            showPageIndicators = true
+            startFadeOutTimer()
         }
         .navigationBarBackButtonHidden(true)
         .toolbarBackground(Color(.systemGray6), for: .navigationBar)

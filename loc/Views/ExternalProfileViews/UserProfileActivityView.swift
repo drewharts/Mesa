@@ -23,53 +23,51 @@ struct UserProfileActivityView: View {
     ]
     
     var body: some View {
-        ScrollView {
-            VStack(spacing: 20) {
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("PLACES REVIEWED")
-                        .font(.subheadline)
-                        .fontWeight(.medium)
+        VStack(spacing: 20) {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("PLACES REVIEWED")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.leading, 20)
+                    .foregroundStyle(.black)
+                    .padding(.top, 20)
+                    .padding(.bottom, 10)
+                
+                if UserProfileVM.isLoadingReviewedPlaces {
+                    VStack {
+                        ProgressView()
+                            .scaleEffect(1.2)
+                        Text("Loading reviews...")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                            .padding(.top, 8)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 50)
+                } else if !UserProfileVM.getReviewedPlaces().isEmpty {
+                    LazyVGrid(columns: columns, spacing: 15) {
+                        ForEach(UserProfileVM.getReviewedPlaces(), id: \.id) { place in
+                            UserReviewedPlaceGridCell(
+                                place: place,
+                                cardWidth: cardWidth,
+                                cardHeight: cardHeight
+                            )
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                } else {
+                    Text("No places reviewed yet")
+                        .foregroundColor(.gray)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.leading, 20)
-                        .foregroundStyle(.black)
-                        .padding(.top, 20)
-                        .padding(.bottom, 10)
-                    
-                    if UserProfileVM.isLoadingReviewedPlaces {
-                        VStack {
-                            ProgressView()
-                                .scaleEffect(1.2)
-                            Text("Loading reviews...")
-                                .font(.caption)
-                                .foregroundColor(.gray)
-                                .padding(.top, 8)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 50)
-                    } else if !UserProfileVM.getReviewedPlaces().isEmpty {
-                        LazyVGrid(columns: columns, spacing: 15) {
-                            ForEach(UserProfileVM.getReviewedPlaces(), id: \.id) { place in
-                                UserReviewedPlaceGridCell(
-                                    place: place,
-                                    cardWidth: cardWidth,
-                                    cardHeight: cardHeight
-                                )
-                            }
-                        }
-                        .padding(.horizontal, 20)
-                    } else {
-                        Text("No places reviewed yet")
-                            .foregroundColor(.gray)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.leading, 20)
-                            .padding(.vertical, 30)
-                    }
+                        .padding(.vertical, 30)
                 }
-                
-                Spacer()
             }
-            .padding(.bottom, 20)
+            
+            Spacer(minLength: 50)
         }
+        .padding(.bottom, 20)
         .onAppear {
             UserProfileVM.loadUserReviewedPlacesIfNeeded()
         }
