@@ -81,6 +81,7 @@ struct UserProfileView: View {
                     UserProfileActivityView(UserProfileVM: UserProfileVM)
                         .tag(1)
                 }
+                .environmentObject(UserProfileVM)
                 .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
                 .onChange(of: selectedTab) {
                     // Show indicators and start fade timer when tab changes

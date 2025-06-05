@@ -22,9 +22,12 @@ struct UserReviewedPlaceGridCell: View {
             selectedPlaceVM.selectedPlace = place
             selectedPlaceVM.isDetailSheetPresented = true
             
-            // Dismiss the user profile sheet by setting the view model property
+            // Dismiss the user profile sheet properly
+            userProfileViewModel.isUserDetailPresented = false
+            
+            // Also call presentationMode dismiss as backup
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                userProfileViewModel.isUserDetailPresented = false
+                presentationMode.wrappedValue.dismiss()
             }
         }) {
             VStack(alignment: .leading, spacing: 0) {
