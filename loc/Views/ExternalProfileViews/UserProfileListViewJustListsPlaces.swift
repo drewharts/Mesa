@@ -3,6 +3,7 @@ import SwiftUI
 struct UserProfileListViewJustListsPlaces: View {
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
+    @EnvironmentObject var userProfileViewModel: UserProfileViewModel
     @Environment(\.presentationMode) var presentationMode
     @Binding var placeColors: [UUID: Color]
 
@@ -14,7 +15,11 @@ struct UserProfileListViewJustListsPlaces: View {
                 Button(action: {
                     selectedPlaceVM.selectedPlace = place
                     selectedPlaceVM.isDetailSheetPresented = true
-                    presentationMode.wrappedValue.dismiss()
+                    
+                    // Dismiss the user profile sheet by setting the view model property
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        userProfileViewModel.isUserDetailPresented = false
+                    }
                 }) {
                     VStack(spacing: 4) {
                         if let image = viewModel.placeImages[place.id.uuidString] {

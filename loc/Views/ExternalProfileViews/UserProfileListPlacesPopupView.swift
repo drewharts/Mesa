@@ -11,6 +11,7 @@ struct UserProfileListPlacesPopupView: View {
     @Environment(\.presentationMode) var presentationMode
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
+    @EnvironmentObject var userProfileViewModel: UserProfileViewModel
     let list: PlaceList
     @ObservedObject var viewModel: UserProfileViewModel
     @Binding var placeColors: [UUID: Color]
@@ -48,7 +49,11 @@ struct UserProfileListPlacesPopupView: View {
                                 Button(action: {
                                     selectedPlaceVM.selectedPlace = place
                                     selectedPlaceVM.isDetailSheetPresented = true
-                                    presentationMode.wrappedValue.dismiss()
+                                    
+                                    // Dismiss the user profile sheet by setting the view model property
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                        userProfileViewModel.isUserDetailPresented = false
+                                    }
                                 }) {
                                     VStack(alignment: .leading, spacing: 0) {
                                         ZStack(alignment: .bottom) {
