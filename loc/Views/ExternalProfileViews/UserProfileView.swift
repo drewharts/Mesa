@@ -14,6 +14,8 @@ struct UserProfileView: View {
     @Environment(\.presentationMode) var presentationMode
     @State private var refreshToggle = false
     @State private var selectedTab = 0
+    @State private var showPageIndicators = true
+    @State private var fadeOutTimer: Timer?
 
     var body: some View {
         ZStack {
@@ -80,9 +82,14 @@ struct UserProfileView: View {
                         .tag(1)
                 }
                 .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
+                .onChange(of: selectedTab) {
+                    // Show indicators and start fade timer when tab changes
+                    showPageIndicators = true
+                    startFadeOutTimer()
+                }
             }
             
-            // Simple page indicator dots at the bottom
+            // Page indicator dots closer to the bottom
             VStack {
                 Spacer()
                 HStack(spacing: 8) {
@@ -92,12 +99,18 @@ struct UserProfileView: View {
                             .frame(width: 8, height: 8)
                     }
                 }
-                .padding(.bottom, 30)
+                .opacity(showPageIndicators ? 1.0 : 0.0)
+                .animation(.easeInOut(duration: 0.3), value: showPageIndicators)
+                .padding(.bottom, 10) // Even closer to bottom
             }
         }
         .id(refreshToggle) // Force view refresh when toggle changes
         .onAppear {
             UserProfileVM.checkIfFollowing(currentUserId: userId)
+            startFadeOutTimer() // Start timer when view appears
+        }
+        .onDisappear {
+            fadeOutTimer?.invalidate() // Clean up timer
         }
         .navigationBarBackButtonHidden(true)
         .toolbarBackground(Color(.systemGray6), for: .navigationBar)
@@ -117,16 +130,17 @@ struct UserProfileView: View {
                     }
                 }
             }
-            
-            // Add page indicator dots in the navigation bar
-            ToolbarItem(placement: .principal) {
-                HStack(spacing: 8) {
-                    ForEach(0..<2, id: \.self) { index in
-                        Circle()
-                            .fill(selectedTab == index ? Color.blue : Color.gray.opacity(0.5))
-                            .frame(width: 8, height: 8)
-                    }
-                }
+        }
+    }
+    
+    private func startFadeOutTimer() {
+        // Invalidate existing timer
+        fadeOutTimer?.invalidate()
+        
+        // Start new timer for 5 seconds
+        fadeOutTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: false) { _ in
+            withAnimation(.easeInOut(duration: 0.5)) {
+                showPageIndicators = false
             }
         }
     }

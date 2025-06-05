@@ -22,6 +22,11 @@ class UserProfileViewModel: ObservableObject {
     @Published var placeImages: [String: UIImage] = [:]
     @Published var isFollowing: Bool = false
     @Published var followers: Int = 0
+    
+    // Reviewed places loading state
+    @Published var isLoadingReviewedPlaces: Bool = false
+    private var hasAttemptedLoadReviewedPlaces: [String: Bool] = [:]
+    
     private let firestoreService = FirestoreService()
     private let mapboxSearchService = MapboxSearchService()
     private let dataManager: DataManager
@@ -302,5 +307,44 @@ class UserProfileViewModel: ObservableObject {
             //     detailPlaceViewModel.places.removeValue(forKey: placeId)
             // }
         }
+    }
+    
+    // MARK: - Reviewed Places Loading
+    
+    func loadUserReviewedPlacesIfNeeded() {
+        guard let userId = selectedUser?.id else { return }
+        
+        // Only load if we haven't attempted to load for this user yet
+        if hasAttemptedLoadReviewedPlaces[userId] != true {
+            isLoadingReviewedPlaces = true
+            hasAttemptedLoadReviewedPlaces[userId] = true
+            
+            Task {
+                await dataManager.loadUserReviewedPlaces(userId: userId)
+                
+                // Update loading state on main thread
+                await MainActor.run {
+                    isLoadingReviewedPlaces = false
+                }
+            }
+        }
+    }
+    
+    func resetReviewedPlacesLoadingState() {
+        isLoadingReviewedPlaces = false
+        hasAttemptedLoadReviewedPlaces.removeAll()
+    }
+    
+    // Get places that this user has reviewed
+    func getReviewedPlaces() -> [DetailPlace] {
+        guard let userId = selectedUser?.id else { return [] }
+        
+        // Find all places where this user is in the placeSavers array
+        let reviewedPlaceIds = detailPlaceViewModel.placeSavers.compactMap { (placeId, userIds) -> String? in
+            return userIds.contains(userId) ? placeId : nil
+        }
+        
+        // Get the actual DetailPlace objects for those IDs
+        return reviewedPlaceIds.compactMap { detailPlaceViewModel.places[$0] }
     }
 }
