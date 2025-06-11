@@ -10,7 +10,6 @@ import UserNotifications
 struct locApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     
-    @StateObject private var firestoreService: FirestoreService
     @StateObject private var locationManager: LocationManager
     @StateObject private var userSession: UserSession
     @StateObject private var profileViewModel: ProfileViewModel
@@ -18,38 +17,48 @@ struct locApp: App {
     @StateObject private var selectedPlaceViewModel: SelectedPlaceViewModel
     @StateObject private var userProfileViewModel: UserProfileViewModel
     @StateObject private var notificationManager = NotificationManager.shared
+    
     private let dataManager: DataManager
+    private let userService = UserService.shared
+    private let placeService = PlaceService.shared
+    private let reviewService = ReviewService.shared
+    private let imageService = ImageService.shared
 
     init() {
         FirebaseApp.configure()
         let providerFactory = AppAttestProviderFactory()
         AppCheck.setAppCheckProviderFactory(providerFactory)
 
-        let firestore = FirestoreService()
         let location = LocationManager()
-        let detailVM = DetailPlaceViewModel(firestoreService: firestore)
-        let userSess = UserSession(firestoreService: firestore, locationManager: location, detailPlaceVM: detailVM)
-        let profileVM = ProfileViewModel(userSession: userSess, firestoreService: firestore, detailPlaceViewModel: detailVM)
-        let selectedPlaceVM = SelectedPlaceViewModel(locationManager: location, firestoreService: firestore)
         
-        // Initialize DataManager with all required parameters
+        // Pass specific services to the view models
+        let detailVM = DetailPlaceViewModel(placeService: placeService, reviewService: reviewService, imageService: imageService, userService: userService)
+        let userSess = UserSession(userService: userService, locationManager: location, detailPlaceVM: detailVM)
+        let profileVM = ProfileViewModel(userSession: userSess, placeService: placeService, reviewService: reviewService, userService: userService, detailPlaceViewModel: detailVM)
+        let selectedPlaceVM = SelectedPlaceViewModel(locationManager: location, placeService: placeService)
+        
         let dataMgr = DataManager(
-            fireStoreService: firestore,
+            userService: userService,
+            placeService: placeService,
+            reviewService: reviewService,
             userSession: userSess,
             locationManager: location,
             profileViewModel: profileVM,
             detailPlaceViewModel: detailVM
         )
 
-        self._firestoreService = StateObject(wrappedValue: firestore)
         self._locationManager = StateObject(wrappedValue: location)
         self._userSession = StateObject(wrappedValue: userSess)
         self._profileViewModel = StateObject(wrappedValue: profileVM)
         self._detailPlaceViewModel = StateObject(wrappedValue: detailVM)
         self.dataManager = dataMgr
         self._selectedPlaceViewModel = StateObject(wrappedValue: selectedPlaceVM)
+        
         let userProfileVM = UserProfileViewModel(dataManager: dataMgr, detailPlaceViewModel: detailVM)
         self._userProfileViewModel = StateObject(wrappedValue: userProfileVM)
+        
+        // Pass user service to AppDelegate
+        appDelegate.userService = userService
     }
 
     var body: some Scene {
@@ -60,10 +69,13 @@ struct locApp: App {
                 .environmentObject(profileViewModel)
                 .environmentObject(detailPlaceViewModel)
                 .environmentObject(selectedPlaceViewModel)
-                .environmentObject(firestoreService)
                 .environmentObject(dataManager)
                 .environmentObject(userProfileViewModel)
                 .environmentObject(notificationManager)
+                .environmentObject(userService)
+                .environmentObject(placeService)
+                .environmentObject(reviewService)
+                .environmentObject(imageService)
                 .preferredColorScheme(.light)
                 .task {
                     if let currentUser = Auth.auth().currentUser {
@@ -77,6 +89,8 @@ struct locApp: App {
 }
 
 class AppDelegate: NSObject, UIApplicationDelegate {
+    var userService: UserService?
+
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         
@@ -143,8 +157,7 @@ extension AppDelegate: MessagingDelegate {
         
         // Save the FCM token to Firestore if user is logged in
         if let fcmToken = fcmToken, let currentUserId = Auth.auth().currentUser?.uid {
-            let firestoreService = FirestoreService()
-            firestoreService.updateFCMToken(userId: currentUserId, token: fcmToken) { error in
+            userService?.updateFCMToken(userId: currentUserId, token: fcmToken) { error in
                 if let error = error {
                     print("❌ Error updating FCM token: \(error)")
                 } else {
