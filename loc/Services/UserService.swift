@@ -468,26 +468,6 @@ class UserService: ObservableObject {
         }
     }
 
-    func fetchProfileFavorites(userId: String, completion: @escaping ([DetailPlace]?) -> Void) {
-        db.collection("users")
-            .document(userId)
-            .collection("favorites")
-            .getDocuments { snapshot, error in
-                
-                if let error = error {
-                    print("Error fetching favorites: \(error.localizedDescription)")
-                    completion([])
-                } else {
-                    // Attempt to decode each document into a DetailPlace
-                    let detailPlaces = snapshot?.documents.compactMap {
-                        try? $0.data(as: DetailPlace.self)
-                    } ?? []
-                    
-                    completion(detailPlaces)
-                }
-            }
-    }
-
     func fetchUserReviewPlaces(userId: String, user: User, completion: @escaping ([DetailPlace]?, Error?) -> Void) {
         // Reference to the user's reviews collection
         let reviewsRef = db.collection("users")

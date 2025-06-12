@@ -24,13 +24,15 @@ class DetailPlaceViewModel: ObservableObject {
 
     @Published var placeColors: [String: Color] = [:] // Persistent color for each placeId
 
-    private let firestoreService: FirestoreService
+    private let placeService: PlaceService
+    private let userService: UserService
+    
     private var notificationObserver: NSObjectProtocol?
     private let placeDetailVM = PlaceDetailViewModel() // For restaurant type calculation
 
-    init(firestoreService: FirestoreService) {
-        self.firestoreService = firestoreService
-        
+    init(placeService: PlaceService, userService: UserService) {
+        self.placeService = placeService
+        self.userService = userService
         // Add observer for map refresh notifications
         notificationObserver = NotificationCenter.default.addObserver(
             forName: NSNotification.Name("RefreshMapAnnotations"),
@@ -94,7 +96,7 @@ class DetailPlaceViewModel: ObservableObject {
 
     // Fetch place data (e.g., from Firestore)
     func fetchPlaceDetails(placeId: String, completion: @escaping (DetailPlace?) -> Void) {
-        firestoreService.fetchPlace(withId: placeId) { [weak self] result in
+        placeService.fetchPlace(withId: placeId) { [weak self] result in
             guard let self = self else {
                 completion(nil)
                 return
@@ -127,7 +129,7 @@ class DetailPlaceViewModel: ObservableObject {
         }
         
         // Use friends' reviews to get images (both restaurant and generic)
-        firestoreService.fetchFriendsReviews(placeId: placeId, currentUserId: currentUserId) { [weak self] (reviews, error) in
+        userService.fetchFriendsReviews(placeId: placeId, currentUserId: currentUserId) { [weak self] (reviews, error) in
             guard let self = self else { return }
             if let error = error {
                 print("Error fetching reviews for place \(placeId): \(error.localizedDescription)")
@@ -196,7 +198,7 @@ class DetailPlaceViewModel: ObservableObject {
             return
         }
         
-        firestoreService.findPlace(mapboxId: mapboxId) { [weak self] existingDetailPlace, error in
+        placeService.findPlace(mapboxId: mapboxId) { [weak self] existingDetailPlace, error in
             guard let self = self else { return }
             
             // Log any errors from Firestore lookup

@@ -20,7 +20,8 @@ class SearchViewModel: ObservableObject {
 
     weak var selectedPlaceVM: SelectedPlaceViewModel?
 
-    private let firestoreService = FirestoreService()
+    private let placeService: PlaceService
+    private let userService: UserService
 //    private let mapboxSearchService = MapboxSearchService()
     private let searchService = PlaceSearchService()
     
@@ -59,7 +60,7 @@ class SearchViewModel: ObservableObject {
     
     private func searchResultToDetailPlace(place: SearchResult, completion: @escaping (DetailPlace) -> Void) {
         // First, check if the DetailPlace exists in Firestore using mapboxId
-        firestoreService.findPlace(mapboxId: place.mapboxId!) { [weak self] existingDetailPlace, error in
+        placeService.findPlace(mapboxId: place.mapboxId!) { [weak self] existingDetailPlace, error in
             if let error = error {
                 print("Error checking for existing place: \(error.localizedDescription)")
                 // If there's an error, proceed to create a new DetailPlace (or handle differently)
@@ -71,7 +72,7 @@ class SearchViewModel: ObservableObject {
                     existingDetailPlace.openHours = DetailPlace.serializeOpenHours(openHours)
                     
                     // Update the place in Firestore
-                    self?.firestoreService.updatePlace(detailPlace: existingDetailPlace) { error in
+                    self?.placeService.updatePlace(detailPlace: existingDetailPlace) { error in
                         if let error = error {
                             print("Error updating place hours in Firestore: \(error.localizedDescription)")
                         }
@@ -124,7 +125,7 @@ class SearchViewModel: ObservableObject {
             return
         }
 
-        firestoreService.searchUsers(query: query) { [weak self] users, error in
+        userService.searchUsers(query: query) { [weak self] users, error in
             if let error = error {
                 print("Error searching users: \(error.localizedDescription)")
                 return

@@ -89,69 +89,7 @@ class ReviewService: ObservableObject {
         }
     }
 
-        func saveReviewWithImages<T: ReviewProtocol>(
-        review: T,
-        images: [UIImage],
-        completion: @escaping (Result<T, Error>) -> Void
-    ) {
-        print("🖼️ Starting saveReviewWithImages process")
-        print("📝 Review ID: \(review.id)")
-        print("📸 Number of images to upload: \(images.count)")
-        
-        // If there are no images, just save the review
-        if images.isEmpty {
-            print("ℹ️ No images to upload, proceeding with review save only")
-            saveReview(review) { result in
-                switch result {
-                case .success:
-                    print("✅ Successfully saved review without images")
-                    completion(.success(review))
-                case .failure(let error):
-                    print("❌ Error saving review without images: \(error.localizedDescription)")
-                    completion(.failure(error))
-                }
-            }
-            return
-        }
-        
-        // Upload images first
-        print("🔄 Starting image upload process")
-        uploadImagesForReview(review: review, images: images) { [weak self] result in
-            guard let self = self else {
-                print("❌ Self was deallocated during image upload")
-                return
-            }
-            
-            switch result {
-            case .success(let imageUrls):
-                print("✅ Successfully uploaded \(imageUrls.count) images")
-                print("🔗 Image URLs: \(imageUrls)")
-                
-                // Create a new review with the image URLs
-                var updatedReview = review
-                updatedReview.images = imageUrls
-                
-                print("🔄 Saving review with image URLs")
-                // Save the review with the image URLs
-                self.saveReview(updatedReview) { result in
-                    switch result {
-                    case .success:
-                        print("✅ Successfully saved review with images")
-                        completion(.success(updatedReview))
-                    case .failure(let error):
-                        print("❌ Error saving review with images: \(error.localizedDescription)")
-                        completion(.failure(error))
-                    }
-                }
-                
-            case .failure(let error):
-                print("❌ Error uploading images: \(error.localizedDescription)")
-                completion(.failure(error))
-            }
-        }
-    }
-
-        func saveReview<T: ReviewProtocol>(_ review: T, completion: @escaping (Result<Void, Error>) -> Void) {
+    func saveReview<T: ReviewProtocol>(_ review: T, completion: @escaping (Result<Void, Error>) -> Void) {
         print("📝 Starting to save review with ID: \(review.id)")
         print("📍 Place ID: \(review.placeId)")
         print("👤 User ID: \(review.userId)")
@@ -323,30 +261,14 @@ class ReviewService: ObservableObject {
         }
     }
 
-    func addComment(placeId: String, reviewId: String, comment: Comment, images: [UIImage], completion: @escaping (Result<Comment, Error>) -> Void) {
-        // 1) Upload images first if any
-        uploadImagesForComment(comment: comment, images: images) { [weak self] result in
-            guard let self = self else { return }
-            
-            switch result {
-            case .success(let downloadURLs):
-                // 2) Update the comment to include the new image URLs
-                var updatedComment = comment
-                updatedComment.images = downloadURLs
-                
-                // 3) Save the updated comment to Firestore
-                self.saveComment(placeId: placeId, reviewId: reviewId, comment: updatedComment) { saveResult in
-                    switch saveResult {
-                    case .success:
-                        // Return the updated comment
-                        completion(.success(updatedComment))
-                    case .failure(let error):
-                        completion(.failure(error))
-                    }
-                }
-                
+    func addComment(placeId: String, reviewId: String, comment: Comment, completion: @escaping (Result<Comment, Error>) -> Void) {
+        // Save the updated comment to Firestore
+        self.saveComment(placeId: placeId, reviewId: reviewId, comment: comment) { saveResult in
+            switch saveResult {
+            case .success:
+                // Return the saved comment
+                completion(.success(comment))
             case .failure(let error):
-                // If image upload fails, return the error
                 completion(.failure(error))
             }
         }

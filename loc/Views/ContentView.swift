@@ -14,8 +14,12 @@ struct ContentView: View {
     @EnvironmentObject var userSession: UserSession
     @EnvironmentObject var locationManager: LocationManager
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
+    
+    // TODO: not sure if this is how we want to do it with env vars for specific services?
+    @EnvironmentObject var userService: UserService
+    @EnvironmentObject var placeService: PlaceService
+    
     @EnvironmentObject var detailPlaceVM: DetailPlaceViewModel
-    @EnvironmentObject var firestoreService: FirestoreService
     @EnvironmentObject var profileViewModel: ProfileViewModel
     @EnvironmentObject var dataManager: DataManager
     @EnvironmentObject var userProfileViewModel: UserProfileViewModel
@@ -31,7 +35,6 @@ struct ContentView: View {
                 .environmentObject(selectedPlaceVM)
                 .environmentObject(detailPlaceVM)
                 .environmentObject(userProfileViewModel)
-                .environmentObject(firestoreService)
                 .onReceive(notificationManager.$pendingNavigation) { pendingNavigation in
                     handleNotificationNavigation(pendingNavigation)
                 }
@@ -41,7 +44,7 @@ struct ContentView: View {
                     Text(navigationErrorMessage)
                 }
         } else {
-            LoginView(viewModel: LoginViewModel(firestoreService: firestoreService, dataManager: dataManager))
+            LoginView(viewModel: LoginViewModel(userService: userService, dataManager: dataManager))
         }
     }
     
@@ -51,7 +54,7 @@ struct ContentView: View {
         print("🚀 Processing notification navigation to place: \(navigation.placeId), review: \(navigation.reviewId)")
         
         // Fetch the place details first
-        firestoreService.getDetailPlace(placeId: navigation.placeId) { place, error in
+        placeService.getDetailPlace(placeId: navigation.placeId) { place, error in
             DispatchQueue.main.async {
                 if let place = place {
                     print("✅ Found place: \(place.name ?? "Unknown")")

@@ -11,20 +11,28 @@ import UIKit
 
 @MainActor
 class DataManager: ObservableObject {
-    private let fireStoreService: FirestoreService
+    // Firestore Services
+    private let userService: UserService
+    private let placeService: PlaceService
+    private let reviewService: ReviewService
+    
     private let userSession: UserSession
     private let locationManager: LocationManager
     private let profileViewModel: ProfileViewModel
     private let detailPlaceViewModel: DetailPlaceViewModel
     
     init(
-        fireStoreService: FirestoreService,
+        userService: UserService,
+        placeService: PlaceService,
+        reviewService: ReviewService,
         userSession: UserSession,
         locationManager: LocationManager,
         profileViewModel: ProfileViewModel,
         detailPlaceViewModel: DetailPlaceViewModel
     ) {
-        self.fireStoreService = fireStoreService
+        self.userService = userService
+        self.placeService = placeService
+        self.reviewService = reviewService
         self.userSession = userSession
         self.locationManager = locationManager
         self.profileViewModel = profileViewModel
@@ -58,7 +66,7 @@ class DataManager: ObservableObject {
     func loadUserMyPlaces(userId: String) async {
         profileViewModel.isMyPlacesLoading = true
         do {
-            let places = try await fireStoreService.fetchMyPlaces(userId: userId)
+            let places = try await placeService.fetchMyPlaces(userId: userId)
             for place in places {
                 self.profileViewModel.myPlaces.append(place.id.uuidString)
                 self.detailPlaceViewModel.places[place.id.uuidString] = place
@@ -80,7 +88,7 @@ class DataManager: ObservableObject {
     // Load's current user's profile data and profile picture
     func loadProfileData(userId: String) async {
         do {
-            let profileData = try await fireStoreService.fetchUserById(userId: userId)
+            let profileData = try await userService.fetchUserById(userId: userId)
             self.profileViewModel.user = profileData
             if let profilePhotoUrl = profileData.profilePhotoURL {
                 self.AddProfilePicture(userId: userId, profilePhotoUrl: profilePhotoUrl, isCurrentUser: true)
@@ -120,7 +128,7 @@ class DataManager: ObservableObject {
     
     func loadUserFavoritePlaces(userId: String, forUser: ProfileData? = nil) async {
         do {
-            let places = try await fireStoreService.fetchProfileFavorites(userId: userId)
+            let places = try await placeService.fetchProfileFavorites(userId: userId)
             // If this is for the current user, update the ProfileViewModel
             if forUser == nil {
                 self.profileViewModel.userFavorites = places.map { $0.id.uuidString }
@@ -143,7 +151,7 @@ class DataManager: ObservableObject {
     
     func loadUserPlaceLists(userId: String, forUser: ProfileData? = nil) async {
         do {
-            let lists = try await fireStoreService.fetchLists(userId: userId)
+            let lists = try await placeService.fetchLists(userId: userId)
             // If this is for the current user, update the ProfileViewModel
             if forUser == nil {
                 self.profileViewModel.userLists = lists
@@ -164,7 +172,7 @@ class DataManager: ObservableObject {
         for place in list.places {
             let placeId = place.id.uuidString
             do {
-                let detailPlace = try await fireStoreService.fetchPlace(withId: placeId)
+                let detailPlace = try await placeService.fetchPlace(withId: placeId)
                 self.detailPlaceViewModel.places[placeId] = detailPlace
                 // If we have a user object, update the place savers
                 if self.detailPlaceViewModel.placeSavers[placeId] == nil {
@@ -181,7 +189,7 @@ class DataManager: ObservableObject {
     func loadFollowing(userId: String) async {
         profileViewModel.isFollowingListLoading = true
         do {
-            let profiles = try await fireStoreService.fetchFollowingProfilesData(for: userId)
+            let profiles = try await userService.fetchFollowingProfilesData(for: userId)
             // Store the profiles in the profileViewModel
             self.profileViewModel.userFollowing = profiles
             for profile in profiles {
@@ -201,7 +209,7 @@ class DataManager: ObservableObject {
     func loadFollowers(userId: String) async {
         profileViewModel.isFollowersListLoading = true
         do {
-            let profiles = try await fireStoreService.fetchFollowerProfilesData(for: userId)
+            let profiles = try await userService.fetchFollowerProfilesData(for: userId)
             // Store the profiles in the profileViewModel
             self.profileViewModel.userFollowers = profiles
         } catch {
@@ -213,8 +221,8 @@ class DataManager: ObservableObject {
     func fetchFollowerAndFollowingCountsAsync(userId: String) async {
         profileViewModel.isFollowersLoading = true
         profileViewModel.isFollowingLoading = true
-        async let followers: Int = try! await fireStoreService.getNumberFollowers(forUserId: userId)
-        async let following: Int = try! await fireStoreService.getNumberFollowing(forUserId: userId)
+        async let followers: Int = try! await userService.getNumberFollowers(forUserId: userId)
+        async let following: Int = try! await userService.getNumberFollowing(forUserId: userId)
         let (followersCount, followingCount) = await (followers, following)
         profileViewModel.followersCount = followersCount
         profileViewModel.followingCount = followingCount
@@ -226,8 +234,8 @@ class DataManager: ObservableObject {
     func loadUserReviewedPlaces(userId: String) async {
         do {
             // Fetch all reviews (RestaurantReview and GenericReview)
-            let restaurantReviews: [RestaurantReview] = try await fireStoreService.fetchUserReviews(userId: userId)
-            let genericReviews: [GenericReview] = try await fireStoreService.fetchUserReviews(userId: userId)
+            let restaurantReviews: [RestaurantReview] = try await reviewService.fetchUserReviews(userId: userId)
+            let genericReviews: [GenericReview] = try await reviewService.fetchUserReviews(userId: userId)
             let allReviews: [ReviewProtocol] = restaurantReviews + genericReviews
             
             for review in allReviews {
@@ -241,7 +249,7 @@ class DataManager: ObservableObject {
                 // Fetch and store the place if not already present
                 if self.detailPlaceViewModel.places[placeId] == nil {
                     do {
-                        let detailPlace = try await fireStoreService.fetchPlace(withId: placeId)
+                        let detailPlace = try await placeService.fetchPlace(withId: placeId)
                         self.detailPlaceViewModel.places[placeId] = detailPlace
                         self.detailPlaceViewModel.fetchPlaceImage(for: placeId)
                     } catch {

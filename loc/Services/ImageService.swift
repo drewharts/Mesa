@@ -2,7 +2,7 @@ import Foundation
 import FirebaseStorage
 import UIKit
 
-class ImageService {
+class ImageService: ObservableObject {
     static let shared = ImageService()
     private let storage = FirebaseManager.shared.storage
     private let db = FirebaseManager.shared.db
@@ -398,7 +398,7 @@ class ImageService {
         }
     }
 
-    private func uploadImagesForComment(comment: Comment, images: [UIImage], completion: @escaping (Result<[String], Error>) -> Void) {
+    func uploadImagesForComment(comment: Comment, images: [UIImage], completion: @escaping (Result<[String], Error>) -> Void) {
         // If there are no images, return immediately with an empty array
         guard !images.isEmpty else {
             completion(.success([]))
@@ -424,7 +424,7 @@ class ImageService {
             // 3. Convert the UIImage to JPEG data
             guard let imageData = image.jpegData(compressionQuality: 0.5) else {
                 errors.append(
-                    NSError(domain: "FirestoreService", code: 0, userInfo: [
+                    NSError(domain: "ImageService", code: 0, userInfo: [
                         NSLocalizedDescriptionKey: "Could not convert image to data"
                     ])
                 )

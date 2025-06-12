@@ -327,6 +327,26 @@ class PlaceService: ObservableObject {
                 completion(detailPlaces)
             }
     }
+    
+    func fetchProfileFavorites(userId: String, completion: @escaping ([DetailPlace]?) -> Void) {
+        db.collection("users")
+            .document(userId)
+            .collection("favorites")
+            .getDocuments { snapshot, error in
+                
+                if let error = error {
+                    print("Error fetching favorites: \(error.localizedDescription)")
+                    completion([])
+                } else {
+                    // Attempt to decode each document into a DetailPlace
+                    let detailPlaces = snapshot?.documents.compactMap {
+                        try? $0.data(as: DetailPlace.self)
+                    } ?? []
+                    
+                    completion(detailPlaces)
+                }
+            }
+    }
 
     func fetchProfileFavorites(userId: String) async throws -> [DetailPlace] {
         try await withCheckedThrowingContinuation { continuation in
@@ -336,7 +356,7 @@ class PlaceService: ObservableObject {
         }
     }
 
-        func fetchLists(userId: String) async throws -> [PlaceList] {
+    func fetchLists(userId: String) async throws -> [PlaceList] {
         try await withCheckedThrowingContinuation { continuation in
             self.fetchLists(userId: userId) { lists in
                 continuation.resume(returning: lists)

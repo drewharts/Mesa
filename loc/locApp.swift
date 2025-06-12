@@ -10,55 +10,49 @@ import UserNotifications
 struct locApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     
+    private let container: DependencyContainer
+
     @StateObject private var locationManager: LocationManager
     @StateObject private var userSession: UserSession
     @StateObject private var profileViewModel: ProfileViewModel
     @StateObject private var detailPlaceViewModel: DetailPlaceViewModel
     @StateObject private var selectedPlaceViewModel: SelectedPlaceViewModel
     @StateObject private var userProfileViewModel: UserProfileViewModel
-    @StateObject private var notificationManager = NotificationManager.shared
+    @StateObject private var notificationManager: NotificationManager
+    @StateObject private var dataManager: DataManager
     
-    private let dataManager: DataManager
-    private let userService = UserService.shared
-    private let placeService = PlaceService.shared
-    private let reviewService = ReviewService.shared
-    private let imageService = ImageService.shared
+    // Services are also ObservableObjects and should be managed as state.
+    @StateObject private var userService: UserService
+    @StateObject private var placeService: PlaceService
+    @StateObject private var reviewService: ReviewService
+    @StateObject private var imageService: ImageService
 
     init() {
         FirebaseApp.configure()
         let providerFactory = AppAttestProviderFactory()
         AppCheck.setAppCheckProviderFactory(providerFactory)
 
-        let location = LocationManager()
+        // Create the dependency container
+        let container = DependencyContainer()
+        self.container = container
         
-        // Pass specific services to the view models
-        let detailVM = DetailPlaceViewModel(placeService: placeService, reviewService: reviewService, imageService: imageService, userService: userService)
-        let userSess = UserSession(userService: userService, locationManager: location, detailPlaceVM: detailVM)
-        let profileVM = ProfileViewModel(userSession: userSess, placeService: placeService, reviewService: reviewService, userService: userService, detailPlaceViewModel: detailVM)
-        let selectedPlaceVM = SelectedPlaceViewModel(locationManager: location, placeService: placeService)
+        // Initialize all @StateObject properties from the container
+        self._locationManager = StateObject(wrappedValue: container.locationManager)
+        self._userSession = StateObject(wrappedValue: container.userSession)
+        self._profileViewModel = StateObject(wrappedValue: container.profileViewModel)
+        self._detailPlaceViewModel = StateObject(wrappedValue: container.detailPlaceViewModel)
+        self._selectedPlaceViewModel = StateObject(wrappedValue: container.selectedPlaceViewModel)
+        self._userProfileViewModel = StateObject(wrappedValue: container.userProfileViewModel)
+        self._notificationManager = StateObject(wrappedValue: container.notificationManager)
+        self._dataManager = StateObject(wrappedValue: container.dataManager)
         
-        let dataMgr = DataManager(
-            userService: userService,
-            placeService: placeService,
-            reviewService: reviewService,
-            userSession: userSess,
-            locationManager: location,
-            profileViewModel: profileVM,
-            detailPlaceViewModel: detailVM
-        )
-
-        self._locationManager = StateObject(wrappedValue: location)
-        self._userSession = StateObject(wrappedValue: userSess)
-        self._profileViewModel = StateObject(wrappedValue: profileVM)
-        self._detailPlaceViewModel = StateObject(wrappedValue: detailVM)
-        self.dataManager = dataMgr
-        self._selectedPlaceViewModel = StateObject(wrappedValue: selectedPlaceVM)
-        
-        let userProfileVM = UserProfileViewModel(dataManager: dataMgr, detailPlaceViewModel: detailVM)
-        self._userProfileViewModel = StateObject(wrappedValue: userProfileVM)
+        self._userService = StateObject(wrappedValue: container.userService)
+        self._placeService = StateObject(wrappedValue: container.placeService)
+        self._reviewService = StateObject(wrappedValue: container.reviewService)
+        self._imageService = StateObject(wrappedValue: container.imageService)
         
         // Pass user service to AppDelegate
-        appDelegate.userService = userService
+        appDelegate.userService = container.userService
     }
 
     var body: some Scene {
