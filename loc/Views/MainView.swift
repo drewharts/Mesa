@@ -17,7 +17,7 @@ struct MainView: View {
     @EnvironmentObject var userProfileViewModel: UserProfileViewModel
     @EnvironmentObject var locationManager: LocationManager
     @EnvironmentObject var notificationManager: NotificationManager
-    @StateObject private var viewModel = SearchViewModel()
+    @EnvironmentObject var viewModel: SearchViewModel
 
     @FocusState private var searchIsFocused: Bool
     @State private var isSearchBarMinimized = true

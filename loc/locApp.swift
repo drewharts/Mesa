@@ -16,6 +16,7 @@ struct locApp: App {
     @StateObject private var detailPlaceViewModel: DetailPlaceViewModel
     @StateObject private var selectedPlaceViewModel: SelectedPlaceViewModel
     @StateObject private var userProfileViewModel: UserProfileViewModel
+    @StateObject private var searchViewModel: SearchViewModel
     @StateObject private var notificationManager = NotificationManager.shared
     
     private let dataManager: DataManager
@@ -79,6 +80,10 @@ struct locApp: App {
             reviewService: services.reviewService
         )
 
+        let searchVM = SearchViewModel(
+            placeService: services.placeService,
+            userService: services.userService
+        )
 
         self._locationManager = StateObject(wrappedValue: location)
         self._userSession = StateObject(wrappedValue: userSess)
@@ -87,6 +92,7 @@ struct locApp: App {
         self.dataManager = dataMgr
         self._selectedPlaceViewModel = StateObject(wrappedValue: selectedPlaceVM)
         self._userProfileViewModel = StateObject(wrappedValue: userProfileVM)
+        self._searchViewModel = StateObject(wrappedValue: searchVM)
         
         // Pass user service to AppDelegate
         appDelegate.userService = services.userService
@@ -102,6 +108,7 @@ struct locApp: App {
                 .environmentObject(selectedPlaceViewModel)
                 .environmentObject(dataManager)
                 .environmentObject(userProfileViewModel)
+                .environmentObject(searchViewModel)
                 .environmentObject(notificationManager)
                 .environmentObject(serviceContainer)
                 .preferredColorScheme(.light)
