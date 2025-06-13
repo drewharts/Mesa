@@ -27,7 +27,11 @@ class SearchViewModel: ObservableObject {
     
     private var cancellables = Set<AnyCancellable>()
 
-    init() {
+    init(placeService: PlaceService, userService: UserService) {
+        // Initialize dependencies through dependency injection
+        self.placeService = placeService
+        self.userService = userService
+        
         // ✅ Debounce to limit API calls while typing
         $searchText
             .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main) // 300ms delay

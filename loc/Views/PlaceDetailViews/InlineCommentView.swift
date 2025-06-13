@@ -11,8 +11,6 @@ struct InlineCommentView: View {
     @State private var showProfileView = false
     @Binding var selectedImage: UIImage?
     
-    private let firestoreService = FirestoreService()
-    
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             // User info and comment text
@@ -31,14 +29,7 @@ struct InlineCommentView: View {
                                 showProfileView = true
                             } else {
                                 // For other users, fetch and show their profile
-                                firestoreService.fetchUserById(userId: comment.userId) { result in
-                                    switch result {
-                                    case .success(let profileData):
-                                        userProfileViewModel.selectUser(profileData, currentUserId: userSession.currentUserId!)
-                                    case .failure:
-                                        break // Optionally handle error
-                                    }
-                                }
+                                userProfileViewModel.fetchAndSelectUser(userId: comment.userId, currentUserId: userSession.currentUserId!)
                             }
                         }
                         .background(
@@ -69,14 +60,7 @@ struct InlineCommentView: View {
                                         showProfileView = true
                                     } else {
                                         // For other users, fetch and show their profile
-                                        firestoreService.fetchUserById(userId: comment.userId) { result in
-                                            switch result {
-                                            case .success(let profileData):
-                                                userProfileViewModel.selectUser(profileData, currentUserId: userSession.currentUserId!)
-                                            case .failure:
-                                                break // Optionally handle error
-                                            }
-                                        }
+                                        userProfileViewModel.fetchAndSelectUser(userId: comment.userId, currentUserId: userSession.currentUserId!)
                                     }
                                 }
                                 .background(
