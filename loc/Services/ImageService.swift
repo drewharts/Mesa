@@ -2,7 +2,7 @@ import Foundation
 import FirebaseStorage
 import UIKit
 
-class ImageService: ObservableObject {
+class ImageService {
     static let shared = ImageService()
     private let storage = FirebaseManager.shared.storage
     private let db = FirebaseManager.shared.db

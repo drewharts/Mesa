@@ -28,7 +28,6 @@ class SearchViewModel: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
 
     init() {
-        
         // ✅ Debounce to limit API calls while typing
         $searchText
             .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main) // 300ms delay

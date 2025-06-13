@@ -10,49 +10,86 @@ import UserNotifications
 struct locApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     
-    private let container: DependencyContainer
-
     @StateObject private var locationManager: LocationManager
     @StateObject private var userSession: UserSession
     @StateObject private var profileViewModel: ProfileViewModel
     @StateObject private var detailPlaceViewModel: DetailPlaceViewModel
     @StateObject private var selectedPlaceViewModel: SelectedPlaceViewModel
     @StateObject private var userProfileViewModel: UserProfileViewModel
-    @StateObject private var notificationManager: NotificationManager
-    @StateObject private var dataManager: DataManager
+    @StateObject private var notificationManager = NotificationManager.shared
     
-    // Services are also ObservableObjects and should be managed as state.
-    @StateObject private var userService: UserService
-    @StateObject private var placeService: PlaceService
-    @StateObject private var reviewService: ReviewService
-    @StateObject private var imageService: ImageService
+    private let dataManager: DataManager
+    private let serviceContainer = ServiceContainer.shared
 
     init() {
         FirebaseApp.configure()
         let providerFactory = AppAttestProviderFactory()
         AppCheck.setAppCheckProviderFactory(providerFactory)
 
-        // Create the dependency container
-        let container = DependencyContainer()
-        self.container = container
+        // Get services from container
+        let services = ServiceContainer.shared
+        services.setupServices()
         
-        // Initialize all @StateObject properties from the container
-        self._locationManager = StateObject(wrappedValue: container.locationManager)
-        self._userSession = StateObject(wrappedValue: container.userSession)
-        self._profileViewModel = StateObject(wrappedValue: container.profileViewModel)
-        self._detailPlaceViewModel = StateObject(wrappedValue: container.detailPlaceViewModel)
-        self._selectedPlaceViewModel = StateObject(wrappedValue: container.selectedPlaceViewModel)
-        self._userProfileViewModel = StateObject(wrappedValue: container.userProfileViewModel)
-        self._notificationManager = StateObject(wrappedValue: container.notificationManager)
-        self._dataManager = StateObject(wrappedValue: container.dataManager)
+        let location = services.locationManager
         
-        self._userService = StateObject(wrappedValue: container.userService)
-        self._placeService = StateObject(wrappedValue: container.placeService)
-        self._reviewService = StateObject(wrappedValue: container.reviewService)
-        self._imageService = StateObject(wrappedValue: container.imageService)
+        // Pass individual services to view models (keeps current pattern)
+        let detailVM = DetailPlaceViewModel(
+            placeService: services.placeService, 
+            userService: services.userService
+        )
+        
+        let userSess = UserSession(
+            userService: services.userService, 
+            locationManager: location, 
+            detailPlaceVM: detailVM
+        )
+        
+        let profileVM = ProfileViewModel(
+            userSession: userSess, 
+            userService: services.userService, 
+            detailPlaceViewModel: detailVM, 
+            imageService: services.imageService, 
+            placeService: services.placeService, 
+            reviewService: services.reviewService
+        )
+        
+        let selectedPlaceVM = SelectedPlaceViewModel(
+            locationManager: location,
+            reviewService: services.reviewService,
+            placeService: services.placeService,
+            userService: services.userService,
+            imageService: services.imageService
+        )
+        
+        let dataMgr = DataManager(
+            userService: services.userService,
+            placeService: services.placeService,
+            reviewService: services.reviewService,
+            userSession: userSess,
+            locationManager: location,
+            profileViewModel: profileVM,
+            detailPlaceViewModel: detailVM
+        )
+
+        let userProfileVM = UserProfileViewModel(
+            dataManager: dataMgr, 
+            detailPlaceViewModel: detailVM,
+            placeService: services.placeService,
+            userService: services.userService,
+            reviewService: services.reviewService
+        )
+
+
+        self._locationManager = StateObject(wrappedValue: location)
+        self._userSession = StateObject(wrappedValue: userSess)
+        self._profileViewModel = StateObject(wrappedValue: profileVM)
+        self._detailPlaceViewModel = StateObject(wrappedValue: detailVM)
+        self.dataManager = dataMgr
+        self._selectedPlaceViewModel = StateObject(wrappedValue: selectedPlaceVM)
+        self._userProfileViewModel = StateObject(wrappedValue: userProfileVM)
         
         // Pass user service to AppDelegate
-        appDelegate.userService = container.userService
+        appDelegate.userService = services.userService
     }
 
     var body: some Scene {
@@ -66,10 +103,7 @@ struct locApp: App {
                 .environmentObject(dataManager)
                 .environmentObject(userProfileViewModel)
                 .environmentObject(notificationManager)
-                .environmentObject(userService)
-                .environmentObject(placeService)
-                .environmentObject(reviewService)
-                .environmentObject(imageService)
+                .environmentObject(serviceContainer)
                 .preferredColorScheme(.light)
                 .task {
                     if let currentUser = Auth.auth().currentUser {
