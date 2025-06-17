@@ -8,62 +8,60 @@ import SwiftUI
 import PhotosUI
 import CoreLocation
 import ImageIO
+import UIKit
 
 @MainActor
 class PhotoImportViewModel: ObservableObject {
     @Published var selectedItem: PhotosPickerItem?
     @Published var selectedImage: UIImage?
-    @Published var detectedLocation: CLLocation?
-    @Published var detectedPlaceName: String?
+    @Published var detectedCoordinates: (latitude: Double, longitude: Double)?
     @Published var isProcessingPhoto: Bool = false
-    @Published var isLocationDetectionEnabled: Bool = true
-    @Published var showLocationAlert: Bool = false
-    @Published var errorMessage: String?
+    @Published var nearbyPlaces: [NearbyPlaceFeature] = []
+    @Published var isLoadingNearbyPlaces: Bool = false
+    @Published var showPlaceSelection: Bool = false
+    @Published var selectedPlace: NearbyPlaceFeature?
     
-    private let locationManager = CLLocationManager()
-    private let geocoder = CLGeocoder()
-    
-    init() {
-        setupLocationManager()
-    }
-    
-    private func setupLocationManager() {
-        locationManager.desiredAccuracy = kCLLocationAccuracyBest
-        locationManager.requestWhenInUseAuthorization()
-    }
+    private let nearbyPlacesService = NearbyPlacesService()
     
     func processSelectedPhoto() async {
         guard let selectedItem = selectedItem else { return }
         
         isProcessingPhoto = true
-        errorMessage = nil
         
         do {
             // Load the image data
             if let imageData = try await selectedItem.loadTransferable(type: Data.self) {
                 selectedImage = UIImage(data: imageData)
                 
-                // Extract location from photo metadata
-                await extractLocationFromPhoto(data: imageData)
+                // Extract coordinates from photo metadata
+                await extractCoordinatesFromPhoto(data: imageData)
             }
         } catch {
-            errorMessage = "Failed to load photo: \(error.localizedDescription)"
+            print("Failed to load photo: \(error.localizedDescription)")
         }
         
         isProcessingPhoto = false
     }
     
-    private func extractLocationFromPhoto(data: Data) async {
+    private func extractCoordinatesFromPhoto(data: Data) async {
+        print("📸 Starting coordinate extraction...")
+        
         guard let imageSource = CGImageSourceCreateWithData(data as CFData, nil),
-              let imageProperties = CGImageSourceCopyPropertiesAtIndex(imageSource, 0, nil) as? [String: Any],
-              let gpsData = imageProperties[kCGImagePropertyGPSDictionary as String] as? [String: Any] else {
-            
-            // No GPS data found in photo, optionally use current location
-            if isLocationDetectionEnabled {
-                await useCurrentLocation()
-            }
+              let imageProperties = CGImageSourceCopyPropertiesAtIndex(imageSource, 0, nil) as? [String: Any] else {
+            print("❌ Failed to get image properties")
+            detectedCoordinates = nil
             return
         }
+        
+        print("✅ Got image properties")
+        
+        guard let gpsData = imageProperties[kCGImagePropertyGPSDictionary as String] as? [String: Any] else {
+            print("❌ No GPS data found in photo")
+            detectedCoordinates = nil
+            return
+        }
+        
+        print("✅ Found GPS data: \(gpsData)")
         
         // Extract GPS coordinates
         if let latitude = gpsData[kCGImagePropertyGPSLatitude as String] as? Double,
@@ -74,69 +72,56 @@ class PhotoImportViewModel: ObservableObject {
             let finalLatitude = (latitudeRef == "S") ? -latitude : latitude
             let finalLongitude = (longitudeRef == "W") ? -longitude : longitude
             
-            detectedLocation = CLLocation(latitude: finalLatitude, longitude: finalLongitude)
+            detectedCoordinates = (latitude: finalLatitude, longitude: finalLongitude)
+            print("🎯 Extracted coordinates: \(finalLatitude), \(finalLongitude)")
             
-            // Reverse geocode to get place name
-            await reverseGeocodeLocation()
+            // Fetch nearby places
+            await fetchNearbyPlaces(latitude: finalLatitude, longitude: finalLongitude)
+        } else {
+            print("❌ Failed to parse coordinate values")
+            detectedCoordinates = nil
         }
     }
     
-    private func useCurrentLocation() async {
-        guard locationManager.authorizationStatus == .authorizedWhenInUse ||
-              locationManager.authorizationStatus == .authorizedAlways else {
-            showLocationAlert = true
-            return
-        }
-        
-        // Get current location
-        if let currentLocation = locationManager.location {
-            detectedLocation = currentLocation
-            await reverseGeocodeLocation()
-        }
-    }
-    
-    private func reverseGeocodeLocation() async {
-        guard let location = detectedLocation else { return }
+    func fetchNearbyPlaces(latitude: Double, longitude: Double) async {
+        isLoadingNearbyPlaces = true
         
         do {
-            let placemarks = try await geocoder.reverseGeocodeLocation(location)
-            if let placemark = placemarks.first {
-                detectedPlaceName = formatPlaceName(from: placemark)
+            let response = try await nearbyPlacesService.fetchNearbyPlaces(
+                latitude: latitude,
+                longitude: longitude
+            )
+            
+            nearbyPlaces = response.features
+            print("🏢 Found \(nearbyPlaces.count) nearby places")
+            
+            if nearbyPlaces.isEmpty {
+                print("❌ No nearby places found - need to create new place")
+                // TODO: Handle create new place flow
+            } else {
+                showPlaceSelection = true
             }
+            
         } catch {
-            errorMessage = "Failed to detect place name: \(error.localizedDescription)"
+            print("❌ Failed to fetch nearby places: \(error)")
         }
+        
+        isLoadingNearbyPlaces = false
     }
     
-    private func formatPlaceName(from placemark: CLPlacemark) -> String {
-        var components: [String] = []
-        
-        if let name = placemark.name {
-            components.append(name)
-        }
-        
-        if let locality = placemark.locality {
-            components.append(locality)
-        }
-        
-        if let country = placemark.country {
-            components.append(country)
-        }
-        
-        return components.joined(separator: ", ")
+    func selectPlace(_ place: NearbyPlaceFeature) {
+        selectedPlace = place
+        showPlaceSelection = false
+        print("✅ Selected place: \(place.properties.name)")
+        // TODO: Navigate to review screen with selected place
     }
     
     func clearSelection() {
         selectedItem = nil
         selectedImage = nil
-        detectedLocation = nil
-        detectedPlaceName = nil
-        errorMessage = nil
-    }
-    
-    func createReviewWithDetectedLocation() {
-        // TODO: Integrate with review creation flow
-        // This method will be called when user wants to create a review
-        // with the detected location and photo
+        detectedCoordinates = nil
+        nearbyPlaces = []
+        selectedPlace = nil
+        showPlaceSelection = false
     }
 } 

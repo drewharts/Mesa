@@ -49,6 +49,68 @@ struct ProfileView: View {
                 ProfileFavoriteListView()
                 ProfileViewListsView()
 
+                // Photo Processing Display
+                if let coordinates = photoImportVM.detectedCoordinates {
+                    VStack(spacing: 12) {
+                        Text("📍 PHOTO COORDINATES")
+                            .font(.title2)
+                            .fontWeight(.bold)
+                            .foregroundColor(.white)
+                        
+                        VStack(spacing: 8) {
+                            Text("Latitude: \(coordinates.latitude, specifier: "%.6f")")
+                                .font(.title3)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.white)
+                            
+                            Text("Longitude: \(coordinates.longitude, specifier: "%.6f")")
+                                .font(.title3)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.white)
+                        }
+                        
+                        // Loading nearby places indicator
+                        if photoImportVM.isLoadingNearbyPlaces {
+                            HStack {
+                                ProgressView()
+                                    .scaleEffect(0.8)
+                                Text("Finding nearby places...")
+                                    .font(.subheadline)
+                            }
+                            .foregroundColor(.white)
+                        }
+                        
+                        // Selected place display
+                        if let selectedPlace = photoImportVM.selectedPlace {
+                            VStack(spacing: 4) {
+                                Text("✅ Selected Place:")
+                                    .font(.caption)
+                                    .foregroundColor(.green)
+                                Text(selectedPlace.properties.name)
+                                    .font(.headline)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.white)
+                            }
+                        }
+                        
+                        Button("CLEAR ALL") {
+                            photoImportVM.clearSelection()
+                        }
+                        .font(.headline)
+                        .fontWeight(.bold)
+                        .foregroundColor(.red)
+                        .padding(.vertical, 8)
+                        .padding(.horizontal, 16)
+                        .background(Color.white)
+                        .cornerRadius(8)
+                    }
+                    .padding(20)
+                    .background(Color.blue)
+                    .cornerRadius(15)
+                    .padding(.horizontal, 20)
+                    .shadow(radius: 10)
+                }
+
                 // Logout Button
                 Button(action: {
                     userSession.logout()
@@ -109,15 +171,14 @@ struct ProfileView: View {
             .onChange(of: photoImportVM.selectedItem) { _ in
                 Task {
                     await photoImportVM.processSelectedPhoto()
-                    showingPhotoPicker = false
                 }
             }
         }
-        .alert("Location Detection", isPresented: $photoImportVM.showLocationAlert) {
-            Button("OK") { }
-        } message: {
-            Text("Location access is required to detect places from photos. Please enable location access in Settings.")
+        .sheet(isPresented: $photoImportVM.showPlaceSelection) {
+            PlaceSelectionView(photoImportVM: photoImportVM)
         }
+
         .navigationBarTitleDisplayMode(.inline)
     }
 }
+
