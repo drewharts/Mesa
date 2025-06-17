@@ -5,6 +5,7 @@
 //
 
 import SwiftUI
+import PhotosUI
 
 struct ProfileView: View {
     @Environment(\.presentationMode) var presentationMode: Binding<PresentationMode>
@@ -13,6 +14,9 @@ struct ProfileView: View {
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var placeVM: DetailPlaceViewModel
     @EnvironmentObject var userProfileViewModel: UserProfileViewModel
+    @StateObject private var photoImportVM = PhotoImportViewModel()
+    
+    @State private var showingPhotoPicker = false
 
     init() {
         // Configure navigation bar appearance to remove the bottom border
@@ -77,11 +81,43 @@ struct ProfileView: View {
                     }
                 }
             }
+            
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button(action: {
+                    showingPhotoPicker = true
+                }) {
+                    Image(systemName: "photo.badge.plus")
+                        .foregroundColor(.black)
+                        .font(.body)
+                }
+                .padding(.trailing, 10)
+            }
         }
         .task {
             await profile.refreshUserPlaces()
         }
-        
+        .sheet(isPresented: $showingPhotoPicker) {
+            PhotosPicker(
+                selection: $photoImportVM.selectedItem,
+                matching: .images,
+                photoLibrary: .shared()
+            ) {
+                Text("Select Photo for Review")
+                    .font(.headline)
+                    .padding()
+            }
+            .onChange(of: photoImportVM.selectedItem) { _ in
+                Task {
+                    await photoImportVM.processSelectedPhoto()
+                    showingPhotoPicker = false
+                }
+            }
+        }
+        .alert("Location Detection", isPresented: $photoImportVM.showLocationAlert) {
+            Button("OK") { }
+        } message: {
+            Text("Location access is required to detect places from photos. Please enable location access in Settings.")
+        }
         .navigationBarTitleDisplayMode(.inline)
     }
 }
