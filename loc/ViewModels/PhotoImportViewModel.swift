@@ -12,56 +12,94 @@ import UIKit
 
 @MainActor
 class PhotoImportViewModel: ObservableObject {
-    @Published var selectedItem: PhotosPickerItem?
-    @Published var selectedImage: UIImage?
+    @Published var selectedItems: [PhotosPickerItem] = []
+    @Published var selectedImages: [UIImage] = []
     @Published var detectedCoordinates: (latitude: Double, longitude: Double)?
     @Published var isProcessingPhoto: Bool = false
     @Published var nearbyPlaces: [NearbyPlaceFeature] = []
     @Published var isLoadingNearbyPlaces: Bool = false
     @Published var showPlaceSelection: Bool = false
     @Published var selectedPlace: NearbyPlaceFeature?
+    @Published var showReviewTypeSelection: Bool = false
+    @Published var noLocationDataError: Bool = false
+    @Published var shouldNavigateToPlaceDetail: Bool = false
+    @Published var createdPlaceForDetail: DetailPlace?
+    @Published var searchRadiusUsed: Int = 50
     
     private let nearbyPlacesService = NearbyPlacesService()
     
-    func processSelectedPhoto() async {
-        guard let selectedItem = selectedItem else { return }
+    func processSelectedPhotos() async {
+        guard !selectedItems.isEmpty else { return }
         
         isProcessingPhoto = true
+        selectedImages = []
+        detectedCoordinates = nil
+        noLocationDataError = false
+        
+        // Show place selection screen immediately while processing
+        await MainActor.run {
+            showPlaceSelection = true
+        }
         
         do {
-            // Load the image data
-            if let imageData = try await selectedItem.loadTransferable(type: Data.self) {
-                selectedImage = UIImage(data: imageData)
-                
-                // Extract coordinates from photo metadata
-                await extractCoordinatesFromPhoto(data: imageData)
+            var foundCoordinates = false
+            
+            // Load all images first
+            for item in selectedItems {
+                if let imageData = try await item.loadTransferable(type: Data.self),
+                   let image = UIImage(data: imageData) {
+                    selectedImages.append(image)
+                }
             }
+            
+            // Now check each photo for coordinates until we find one
+            for (index, item) in selectedItems.enumerated() {
+                if let imageData = try await item.loadTransferable(type: Data.self) {
+                    print("📸 Checking photo \(index + 1) for GPS coordinates...")
+                    
+                    if await extractCoordinatesFromPhoto(data: imageData, photoIndex: index + 1) {
+                        foundCoordinates = true
+                        break // Stop once we find coordinates
+                    }
+                }
+            }
+            
+            // If no coordinates found in any photo, show error
+            if !foundCoordinates {
+                print("❌ No GPS coordinates found in any of the selected photos")
+                await MainActor.run {
+                    noLocationDataError = true
+                    showPlaceSelection = false // Hide place selection on error
+                }
+            }
+            
         } catch {
-            print("Failed to load photo: \(error.localizedDescription)")
+            print("Failed to load photos: \(error.localizedDescription)")
+            await MainActor.run {
+                showPlaceSelection = false
+            }
         }
         
         isProcessingPhoto = false
     }
     
-    private func extractCoordinatesFromPhoto(data: Data) async {
-        print("📸 Starting coordinate extraction...")
+    private func extractCoordinatesFromPhoto(data: Data, photoIndex: Int) async -> Bool {
+        print("📸 Starting coordinate extraction for photo \(photoIndex)...")
         
         guard let imageSource = CGImageSourceCreateWithData(data as CFData, nil),
               let imageProperties = CGImageSourceCopyPropertiesAtIndex(imageSource, 0, nil) as? [String: Any] else {
-            print("❌ Failed to get image properties")
-            detectedCoordinates = nil
-            return
+            print("❌ Failed to get image properties for photo \(photoIndex)")
+            return false
         }
         
-        print("✅ Got image properties")
+        print("✅ Got image properties for photo \(photoIndex)")
         
         guard let gpsData = imageProperties[kCGImagePropertyGPSDictionary as String] as? [String: Any] else {
-            print("❌ No GPS data found in photo")
-            detectedCoordinates = nil
-            return
+            print("❌ No GPS data found in photo \(photoIndex)")
+            return false
         }
         
-        print("✅ Found GPS data: \(gpsData)")
+        print("✅ Found GPS data in photo \(photoIndex): \(gpsData)")
         
         // Extract GPS coordinates
         if let latitude = gpsData[kCGImagePropertyGPSLatitude as String] as? Double,
@@ -73,13 +111,14 @@ class PhotoImportViewModel: ObservableObject {
             let finalLongitude = (longitudeRef == "W") ? -longitude : longitude
             
             detectedCoordinates = (latitude: finalLatitude, longitude: finalLongitude)
-            print("🎯 Extracted coordinates: \(finalLatitude), \(finalLongitude)")
+            print("🎯 Extracted coordinates from photo \(photoIndex): \(finalLatitude), \(finalLongitude)")
             
             // Fetch nearby places
             await fetchNearbyPlaces(latitude: finalLatitude, longitude: finalLongitude)
+            return true
         } else {
-            print("❌ Failed to parse coordinate values")
-            detectedCoordinates = nil
+            print("❌ Failed to parse coordinate values from photo \(photoIndex)")
+            return false
         }
     }
     
@@ -87,19 +126,38 @@ class PhotoImportViewModel: ObservableObject {
         isLoadingNearbyPlaces = true
         
         do {
-            let response = try await nearbyPlacesService.fetchNearbyPlaces(
+            // First try with default radius (50m)
+            print("🔍 Searching for nearby places within 50m...")
+            var response = try await nearbyPlacesService.fetchNearbyPlaces(
                 latitude: latitude,
-                longitude: longitude
+                longitude: longitude,
+                radiusMeters: 50
             )
             
             nearbyPlaces = response.features
-            print("🏢 Found \(nearbyPlaces.count) nearby places")
+            print("🏢 Found \(nearbyPlaces.count) places within 50m")
             
+            // If no places found, try with larger radius (100m)
             if nearbyPlaces.isEmpty {
-                print("❌ No nearby places found - need to create new place")
-                // TODO: Handle create new place flow
+                print("🔍 No places found within 50m, expanding search to 100m...")
+                response = try await nearbyPlacesService.fetchNearbyPlaces(
+                    latitude: latitude,
+                    longitude: longitude,
+                    radiusMeters: 100
+                )
+                
+                nearbyPlaces = response.features
+                print("🏢 Found \(nearbyPlaces.count) places within 100m")
+                
+                if nearbyPlaces.isEmpty {
+                    print("❌ No nearby places found even within 100m - user can create new place")
+                    searchRadiusUsed = 100
+                } else {
+                    print("✅ Expanded search successful - found places within 100m")
+                    searchRadiusUsed = 100
+                }
             } else {
-                showPlaceSelection = true
+                searchRadiusUsed = 50
             }
             
         } catch {
@@ -112,16 +170,30 @@ class PhotoImportViewModel: ObservableObject {
     func selectPlace(_ place: NearbyPlaceFeature) {
         selectedPlace = place
         showPlaceSelection = false
+        showReviewTypeSelection = true
         print("✅ Selected place: \(place.properties.name)")
-        // TODO: Navigate to review screen with selected place
+    }
+    
+    func navigateToPlaceDetail(place: DetailPlace) {
+        createdPlaceForDetail = place
+        shouldNavigateToPlaceDetail = true
+        
+        // Clear all other states
+        showReviewTypeSelection = false
+        showPlaceSelection = false
     }
     
     func clearSelection() {
-        selectedItem = nil
-        selectedImage = nil
+        selectedItems = []
+        selectedImages = []
         detectedCoordinates = nil
         nearbyPlaces = []
         selectedPlace = nil
         showPlaceSelection = false
+        showReviewTypeSelection = false
+        noLocationDataError = false
+        shouldNavigateToPlaceDetail = false
+        createdPlaceForDetail = nil
+        searchRadiusUsed = 50
     }
 } 

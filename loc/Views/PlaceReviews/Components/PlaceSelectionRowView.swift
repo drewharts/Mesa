@@ -10,6 +10,22 @@ struct PlaceSelectionRowView: View {
     let place: NearbyPlaceFeature
     let onSelect: () -> Void
     
+    private func formatDistance(meters: Double) -> String {
+        let miles = meters * 0.000621371
+        
+        if miles < 0.1 {
+            // For very short distances, show in feet
+            let feet = meters * 3.28084
+            return String(format: "%.0f ft", feet)
+        } else if miles < 1.0 {
+            // For distances less than 1 mile, show with 2 decimal places
+            return String(format: "%.2f mi", miles)
+        } else {
+            // For distances 1 mile or more, show with 1 decimal place
+            return String(format: "%.1f mi", miles)
+        }
+    }
+    
     var body: some View {
         Button(action: onSelect) {
             HStack(spacing: 12) {
@@ -47,7 +63,7 @@ struct PlaceSelectionRowView: View {
                         // Distance
                         HStack(spacing: 4) {
                             Image(systemName: "location")
-                            Text("\(Int(place.properties.distanceMeters))m")
+                            Text(formatDistance(meters: place.properties.distanceMeters ?? 0))
                         }
                         .font(.caption)
                         .foregroundColor(.blue)

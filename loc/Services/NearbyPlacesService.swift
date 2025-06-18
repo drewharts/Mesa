@@ -9,8 +9,8 @@ import Foundation
 class NearbyPlacesService {
     private let baseURL = "https://mesa-backend-production.up.railway.app"
     
-    func fetchNearbyPlaces(latitude: Double, longitude: Double) async throws -> NearbyPlacesResponse {
-        let urlString = "\(baseURL)/nearby-places?latitude=\(latitude)&longitude=\(longitude)"
+    func fetchNearbyPlaces(latitude: Double, longitude: Double, radiusMeters: Int = 50) async throws -> NearbyPlacesResponse {
+        let urlString = "\(baseURL)/nearby-places?latitude=\(latitude)&longitude=\(longitude)&radius=\(radiusMeters)"
         
         guard let url = URL(string: urlString) else {
             throw NearbyPlacesError.invalidURL
@@ -24,10 +24,23 @@ class NearbyPlacesService {
         }
         
         do {
+            // Print raw response for debugging
+            if let rawString = String(data: data, encoding: .utf8) {
+                print("🔍 Raw API Response:")
+                print(rawString)
+            }
+            
             let nearbyPlacesResponse = try JSONDecoder().decode(NearbyPlacesResponse.self, from: data)
             return nearbyPlacesResponse
         } catch {
             print("❌ Decoding error: \(error)")
+            
+            // Additional debugging - try to parse as generic JSON to see structure
+            if let json = try? JSONSerialization.jsonObject(with: data) {
+                print("🔍 JSON structure that failed to decode:")
+                print(json)
+            }
+            
             throw NearbyPlacesError.decodingError(error)
         }
     }

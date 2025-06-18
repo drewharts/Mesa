@@ -42,7 +42,9 @@ class DetailPlaceViewModel: ObservableObject {
             guard let self = self else { return }
             print("DetailPlaceViewModel received map refresh notification")
             // Force a refresh by triggering objectWillChange
-            self.objectWillChange.send()
+            DispatchQueue.main.async {
+                self.objectWillChange.send()
+            }
         }
     }
     

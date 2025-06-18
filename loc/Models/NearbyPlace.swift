@@ -42,7 +42,7 @@ struct NearbyPlaceGeometry: Codable {
 struct NearbyPlaceProperties: Codable {
     // Common fields (present in both Google Places and Firestore)
     let address: String
-    let distanceMeters: Double
+    let distanceMeters: Double?  // Made optional to handle missing values
     let name: String
     let source: String?
     
