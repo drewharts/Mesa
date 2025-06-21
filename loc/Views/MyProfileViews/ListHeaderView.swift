@@ -8,23 +8,40 @@ import SwiftUI
 
 struct ListHeaderView: View {
     var onAddList: () -> Void
+    @Binding var searchText: String
+    @Binding var isSearchActive: Bool
     
     var body: some View {
-        HStack {
-            Text("LISTS")
-                .font(.subheadline)
-                .fontWeight(.medium)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .foregroundStyle(.black)
-            
-            Button(action: onAddList) {
-                Image(systemName: "plus.circle")
-                    .foregroundColor(.gray)
+        VStack(spacing: 12) {
+            HStack {
+                Text("LISTS")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundStyle(.black)
+                
+                Spacer()
+                
+                HStack(spacing: 12) {
+                    Button(action: {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            isSearchActive.toggle()
+                            if !isSearchActive {
+                                searchText = ""
+                            }
+                        }
+                    }) {
+                        Image(systemName: isSearchActive ? "xmark" : "magnifyingglass")
+                            .foregroundColor(.gray)
+                    }
+                    
+                    Button(action: onAddList) {
+                        Image(systemName: "plus.circle")
+                            .foregroundColor(.gray)
+                    }
+                }
             }
+            .padding(.horizontal, 20)
         }
-        .padding(.leading, 20)
-        .padding(.trailing, 20)
-        .padding(.vertical, -25)
-        .padding(.horizontal, 10)
+        .padding(.vertical, -15)
     }
 }

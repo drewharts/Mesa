@@ -271,7 +271,8 @@ struct ProfileView: View {
     
     private func convertToDetailPlace(_ nearbyPlace: NearbyPlaceFeature) -> DetailPlace {
         var detailPlace = DetailPlace()
-        detailPlace.id = UUID(uuidString: nearbyPlace.properties.actualId) ?? UUID()
+        // Create a consistent UUID from the actualId by hashing it
+        detailPlace.id = createConsistentUUID(from: nearbyPlace.properties.actualId)
         detailPlace.name = nearbyPlace.properties.name
         detailPlace.address = nearbyPlace.properties.address
         detailPlace.coordinate = GeoPoint(
@@ -282,6 +283,23 @@ struct ProfileView: View {
         detailPlace.categories = nearbyPlace.properties.types
         detailPlace.phone = nearbyPlace.properties.photoReference // This might not be correct mapping
         return detailPlace
+    }
+    
+    private func createConsistentUUID(from string: String) -> UUID {
+        // Try to parse as UUID first (for existing UUID-based places)
+        if let uuid = UUID(uuidString: string) {
+            return uuid
+        }
+        
+        // For non-UUID strings (like Google Place IDs), create a consistent UUID by hashing
+        // This ensures the same string always produces the same UUID
+        let hash = abs(string.hashValue)
+        
+        // Create a deterministic UUID from the hash
+        // We'll use the hash to seed the UUID generation
+        let uuidString = String(format: "%08x-0000-0000-0000-%012x", hash, hash)
+        
+        return UUID(uuidString: uuidString) ?? UUID()
     }
 }
 
