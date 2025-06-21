@@ -122,26 +122,6 @@ struct UserProfileView: View {
                                 ))
                         }
                     }
-                    .gesture(
-                        DragGesture()
-                            .onEnded { gesture in
-                                let horizontalMovement = gesture.translation.width
-                                let verticalMovement = abs(gesture.translation.height)
-                                
-                                // Only respond to primarily horizontal swipes
-                                if abs(horizontalMovement) > 50 && abs(horizontalMovement) > verticalMovement {
-                                    withAnimation(.easeInOut(duration: 0.3)) {
-                                        if horizontalMovement > 0 && selectedTab == 1 {
-                                            // Swipe right: go to Profile
-                                            selectedTab = 0
-                                        } else if horizontalMovement < 0 && selectedTab == 0 {
-                                            // Swipe left: go to Reviews
-                                            selectedTab = 1
-                                        }
-                                    }
-                                }
-                            }
-                    )
                 }
             }
             .environmentObject(UserProfileVM)

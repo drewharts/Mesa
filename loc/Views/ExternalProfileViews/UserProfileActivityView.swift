@@ -22,19 +22,16 @@ struct UserProfileActivityView: View {
         GridItem(.flexible(), spacing: 15)
     ]
     
+    // Computed property to get hasMoreReviews for current user
+    private var hasMoreReviews: Bool {
+        guard let userId = UserProfileVM.selectedUser?.id else { return false }
+        return UserProfileVM.hasMoreReviews(for: userId)
+    }
+    
     var body: some View {
         VStack(spacing: 20) {
             VStack(alignment: .leading, spacing: 16) {
-                Text("PLACES REVIEWED")
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.leading, 20)
-                    .foregroundStyle(.black)
-                    .padding(.top, 20)
-                    .padding(.bottom, 10)
-                
-                if UserProfileVM.isLoadingReviewedPlaces {
+                if UserProfileVM.isLoadingReviewedPlaces || (UserProfileVM.getReviewedPlaces().isEmpty && !UserProfileVM.isLoadingReviewedPlaces) {
                     VStack {
                         ProgressView()
                             .scaleEffect(1.2)
@@ -46,16 +43,41 @@ struct UserProfileActivityView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 50)
                 } else if !UserProfileVM.getReviewedPlaces().isEmpty {
-                    LazyVGrid(columns: columns, spacing: 15) {
-                        ForEach(UserProfileVM.getReviewedPlaces(), id: \.id) { place in
-                            UserReviewedPlaceGridCell(
-                                place: place,
-                                cardWidth: cardWidth,
-                                cardHeight: cardHeight
-                            )
+                    ScrollViewReader { proxy in
+                        ScrollView {
+                            LazyVGrid(columns: columns, spacing: 15) {
+                                ForEach(Array(UserProfileVM.getReviewedPlaces().enumerated()), id: \.element.id) { index, place in
+                                    UserReviewedPlaceGridCell(
+                                        place: place,
+                                        cardWidth: cardWidth,
+                                        cardHeight: cardHeight
+                                    )
+                                    .onAppear {
+                                        // Load more reviews when user reaches the very last item
+                                        let lastIndex = UserProfileVM.getReviewedPlaces().count - 1
+                                        if index == lastIndex && hasMoreReviews && !UserProfileVM.isLoadingMoreReviews {
+                                            UserProfileVM.loadMoreReviews()
+                                        }
+                                    }
+                                }
+                                
+                                // Loading indicator for pagination
+                                if UserProfileVM.isLoadingMoreReviews {
+                                    HStack {
+                                        ProgressView()
+                                            .scaleEffect(0.8)
+                                        Text("Loading more...")
+                                            .font(.caption)
+                                            .foregroundColor(.gray)
+                                    }
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 20)
+                                    .gridCellColumns(2)
+                                }
+                            }
+                            .padding(.horizontal, 20)
                         }
                     }
-                    .padding(.horizontal, 20)
                 } else {
                     Text("No places reviewed yet")
                         .foregroundColor(.gray)
@@ -69,12 +91,12 @@ struct UserProfileActivityView: View {
         }
         .padding(.bottom, 20)
         .onAppear {
-            UserProfileVM.loadUserReviewedPlacesIfNeeded()
+            UserProfileVM.loadUserReviewedPlacesWithPagination()
         }
         .onChange(of: UserProfileVM.selectedUser?.id) {
             // Reset loading state when user changes and load new data
             UserProfileVM.resetReviewedPlacesLoadingState()
-            UserProfileVM.loadUserReviewedPlacesIfNeeded()
+            UserProfileVM.loadUserReviewedPlacesWithPagination()
         }
         .onChange(of: detailPlaceViewModel.placeSavers) {
             // Stop loading when new data comes in
