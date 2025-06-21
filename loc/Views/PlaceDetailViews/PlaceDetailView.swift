@@ -11,7 +11,9 @@ struct PlaceDetailView: View {
     @Binding var sheetHeight: CGFloat
     let minSheetHeight: CGFloat
 
-    @State private var selectedImage: UIImage?
+    @State private var selectedImageIndex: Int?
+    @State private var showPhotoGallery = false
+    @State private var galleryPhotos: [UIImage] = []
     @State private var showNoPhoneNumberAlert = false
     @State private var showListSelection = false
     @State private var showCreateReview = false
@@ -40,7 +42,11 @@ struct PlaceDetailView: View {
                     MinPlaceDetailView(
                         viewModel: viewModel,
                         showNoPhoneNumberAlert: $showNoPhoneNumberAlert,
-                        selectedImage: $selectedImage
+                        onPhotoTapped: { photos, index in
+                            galleryPhotos = photos
+                            selectedImageIndex = index
+                            showPhotoGallery = true
+                        }
                     )
                     .environmentObject(userProfileViewModel)
                     .scrollDisabled(!isScrollingEnabled) // Disable scrolling based on sheet height
@@ -48,7 +54,7 @@ struct PlaceDetailView: View {
             }
             .padding(.vertical)
             .frame(maxWidth: .infinity)
-            .blur(radius: selectedImage != nil ? 10 : 0)
+            .blur(radius: showPhotoGallery ? 10 : 0)
             .alert(isPresented: $viewModel.showAlert) {
                 Alert(title: Text("Success"),
                       message: Text(viewModel.alertMessage),
@@ -117,31 +123,15 @@ struct PlaceDetailView: View {
                 Spacer()
             }
 
-            // Overlay for enlarged photo
-            if let selectedImage {
-                Color.clear
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        self.selectedImage = nil
-                    }
-                    .ignoresSafeArea()
-
-                VStack {
-                    Image(uiImage: selectedImage)
-                        .resizable()
-                        .scaledToFit()
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 10)
-                                .stroke(Color.gray, lineWidth: 1)
-                        )
-                        .padding()
-                        .onTapGesture {
-                            self.selectedImage = nil
-                        }
-                }
+            // Photo Gallery Overlay
+            if showPhotoGallery, let selectedIndex = selectedImageIndex {
+                PhotoGalleryView(
+                    photos: galleryPhotos,
+                    initialIndex: selectedIndex,
+                    isPresented: $showPhotoGallery
+                )
                 .transition(.opacity)
-                .animation(.easeInOut, value: selectedImage)
+                .animation(.easeInOut, value: showPhotoGallery)
             }
         }
     }

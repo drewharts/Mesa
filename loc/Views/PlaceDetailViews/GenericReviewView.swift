@@ -2,7 +2,7 @@ import SwiftUI
 
 struct GenericReviewView: View {
     let review: GenericReview
-    @Binding var selectedImage: UIImage?
+    let onPhotoTapped: ([UIImage], Int) -> Void
     @Binding var isActiveKeyboard: Bool
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var profile: ProfileViewModel
@@ -56,7 +56,7 @@ struct GenericReviewView: View {
                 if !reviewPhotos.isEmpty {
                     ScrollView(.horizontal, showsIndicators: false) {
                         LazyHStack(spacing: 16) {
-                            ForEach(reviewPhotos, id: \.self) { photo in
+                            ForEach(Array(reviewPhotos.enumerated()), id: \.offset) { index, photo in
                                 Image(uiImage: photo)
                                     .resizable()
                                     .scaledToFill()
@@ -68,7 +68,7 @@ struct GenericReviewView: View {
                                     )
                                     .shadow(radius: 2)
                                     .onTapGesture {
-                                        selectedImage = photo
+                                        onPhotoTapped(reviewPhotos, index)
                                     }
                             }
                         }
@@ -119,7 +119,7 @@ struct GenericReviewView: View {
                 // Show comments section when expanded
                 VStack(alignment: .leading, spacing: 10) {
                     // Embedded comments view
-                    InlineCommentsView(reviewId: review.id, selectedImage: $selectedImage, onKeyboardActive: { isActive in
+                    InlineCommentsView(reviewId: review.id, onPhotoTapped: onPhotoTapped, onKeyboardActive: { isActive in
                         isActiveKeyboard = isActive
                     })
                         .padding(Edge.Set.leading, 15) // Indentation for comments

@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct PlaceReviewsView: View {
-    @Binding var selectedImage: UIImage?
+    let onPhotoTapped: ([UIImage], Int) -> Void
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var userProfileViewModel: UserProfileViewModel
@@ -31,7 +31,7 @@ struct PlaceReviewsView: View {
                                     .padding(20)
                             } else {
                                 PlaceReviewsListView(reviews: reviews, 
-                                                   selectedImage: $selectedImage, 
+                                                   onPhotoTapped: onPhotoTapped, 
                                                    scrollProxy: scrollProxy)
                             }
                             

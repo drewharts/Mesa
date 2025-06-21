@@ -9,7 +9,7 @@ struct InlineCommentView: View {
     @EnvironmentObject var userSession: UserSession
     @State private var showFullText = false
     @State private var showProfileView = false
-    @Binding var selectedImage: UIImage?
+    let onPhotoTapped: ([UIImage], Int) -> Void
     
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -131,7 +131,7 @@ struct InlineCommentView: View {
                                         .stroke(Color.gray.opacity(0.3), lineWidth: 0.5)
                                 )
                                 .onTapGesture {
-                                    selectedImage = photos[index]
+                                    onPhotoTapped(photos, index)
                                 }
                                 .shadow(radius: 1)
                         }

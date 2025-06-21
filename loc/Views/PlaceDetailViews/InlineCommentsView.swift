@@ -12,14 +12,14 @@ struct InlineCommentsView: View {
     @State private var loadedCommentLimit = 5
     @State private var keyboardHeight: CGFloat = 0
     @FocusState private var isTextFieldFocused: Bool
-    @Binding var selectedImage: UIImage?
+    let onPhotoTapped: ([UIImage], Int) -> Void
     
     let reviewId: String
     let onKeyboardActive: (Bool) -> Void
     
-    init(reviewId: String, selectedImage: Binding<UIImage?>, onKeyboardActive: @escaping (Bool) -> Void) {
+    init(reviewId: String, onPhotoTapped: @escaping ([UIImage], Int) -> Void, onKeyboardActive: @escaping (Bool) -> Void) {
         self.reviewId = reviewId
-        self._selectedImage = selectedImage
+        self.onPhotoTapped = onPhotoTapped
         self.onKeyboardActive = onKeyboardActive
     }
     
@@ -170,7 +170,7 @@ struct InlineCommentsView: View {
                             ForEach(comments) { comment in
                                 HStack(alignment: .top, spacing: 5) {
                                     // Actual comment
-                                    InlineCommentView(comment: comment, selectedImage: $selectedImage)
+                                    InlineCommentView(comment: comment, onPhotoTapped: onPhotoTapped)
                                 }
                             }
                             

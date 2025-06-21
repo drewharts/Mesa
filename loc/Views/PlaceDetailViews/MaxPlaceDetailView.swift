@@ -11,8 +11,8 @@ struct MaxPlaceDetailView: View {
     @ObservedObject var viewModel: PlaceDetailViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     
-    // Accept the same binding
-    @Binding var selectedImage: UIImage?
+    // Accept callback for photo tapped
+    let onPhotoTapped: ([UIImage], Int) -> Void
     
     // 1) A state to track when we have no phone number
     @Binding var showNoPhoneNumberAlert: Bool
@@ -92,7 +92,9 @@ struct MaxPlaceDetailView: View {
                         case .loaded:
                             let photos = selectedPlaceVM.photos
                             if !photos.isEmpty {
-                                GridView(images: photos, selectedImage: $selectedImage)
+                                GridView(images: photos, onImageTapped: { index in
+                                    onPhotoTapped(photos, index)
+                                })
                             } else {
                                 Text("No Photos")
                                     .frame(maxWidth: .infinity)

@@ -8,7 +8,7 @@ struct PlaceReviewsListView : View {
     @EnvironmentObject var notificationManager: NotificationManager
     var reviews: [any ReviewProtocol]
     @State private var activeKeyboardReviewId: String? = nil
-    @Binding var selectedImage: UIImage?
+    let onPhotoTapped: ([UIImage], Int) -> Void
     let scrollProxy: ScrollViewProxy
     @State private var reviewToDelete: (any ReviewProtocol)? = nil
     @State private var showDeleteConfirmation = false
@@ -18,7 +18,7 @@ struct PlaceReviewsListView : View {
             Group {
                 if let restaurantReview = review as? RestaurantReview {
                     RestaurantReviewView(review: restaurantReview,
-                                       selectedImage: $selectedImage,
+                                       onPhotoTapped: onPhotoTapped,
                                        isActiveKeyboard: Binding(
                                           get: { activeKeyboardReviewId == review.id },
                                           set: { isActive in
@@ -40,7 +40,7 @@ struct PlaceReviewsListView : View {
                         .animation(.easeInOut(duration: 0.3), value: notificationManager.highlightedReviewId)
                 } else if let genericReview = review as? GenericReview {
                     GenericReviewView(review: genericReview,
-                                    selectedImage: $selectedImage,
+                                    onPhotoTapped: onPhotoTapped,
                                     isActiveKeyboard: Binding(
                                        get: { activeKeyboardReviewId == review.id },
                                        set: { isActive in

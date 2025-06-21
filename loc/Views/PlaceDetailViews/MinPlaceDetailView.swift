@@ -19,7 +19,7 @@ struct MinPlaceDetailView: View {
     @Environment(\.isScrollingEnabled) var isScrollingEnabled // Access scroll state
 
     @Binding var showNoPhoneNumberAlert: Bool
-    @Binding var selectedImage: UIImage?
+    let onPhotoTapped: ([UIImage], Int) -> Void
     
     @State private var selectedTab: DetailTab = .reviews
     
@@ -159,11 +159,11 @@ struct MinPlaceDetailView: View {
                     
                     MaxPlaceDetailView(
                         viewModel: viewModel,
-                        selectedImage: $selectedImage,
+                        onPhotoTapped: onPhotoTapped,
                         showNoPhoneNumberAlert: $showNoPhoneNumberAlert
                     )
                 case .reviews:
-                    PlaceReviewsView(selectedImage: $selectedImage)
+                    PlaceReviewsView(onPhotoTapped: onPhotoTapped)
                         .environmentObject(userProfileViewModel)
                 }
             }
