@@ -13,11 +13,15 @@ struct PlaceDetailView: View {
 
     @State private var selectedImage: UIImage?
     @State private var showNoPhoneNumberAlert = false
+    @State private var showListSelection = false
+    @State private var showCreateReview = false
 
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var locationManager: LocationManager
     @EnvironmentObject var userProfileViewModel: UserProfileViewModel
+    @EnvironmentObject var userSession: UserSession
+    @EnvironmentObject var serviceContainer: ServiceContainer
     @Environment(\.isScrollingEnabled) var isScrollingEnabled // Access scroll state
 
     @StateObject private var viewModel = PlaceDetailViewModel()
@@ -57,13 +61,27 @@ struct PlaceDetailView: View {
                     dismissButton: .default(Text("OK"))
                 )
             }
-            .sheet(isPresented: $viewModel.showListSelection) {
+            .sheet(isPresented: $showListSelection) {
                 if let selectedPlace = selectedPlaceVM.selectedPlace {
                     ListSelectionSheet(
                         place: selectedPlace,
-                        isPresented: $viewModel.showListSelection
+                        isPresented: $showListSelection
                     )
                     .environmentObject(profile)
+                } else {
+                    Text("No place selected")
+                }
+            }
+            .sheet(isPresented: $showCreateReview) {
+                if let selectedPlace = selectedPlaceVM.selectedPlace {
+                    CreatePlaceReviewView(
+                        isPresented: $showCreateReview,
+                        place: selectedPlace,
+                        userId: userSession.currentUserId!,
+                        profilePhotoUrl: profile.user?.profilePhotoURL?.absoluteString ?? "",
+                        userFirstName: profile.user!.firstName,
+                        userLastName: profile.user!.lastName
+                    )
                 } else {
                     Text("No place selected")
                 }
@@ -73,6 +91,30 @@ struct PlaceDetailView: View {
                    let currentLocation = locationManager.currentLocation {
                     viewModel.loadData(for: place, currentLocation: currentLocation.coordinate)
                 }
+            }
+
+            // Action button overlay - top right
+            VStack {
+                HStack {
+                    Spacer()
+                    if let place = selectedPlaceVM.selectedPlace {
+                        PlaceActionButton(
+                            place: place,
+                            onAddToList: {
+                                showListSelection = true
+                            },
+                            onAddReview: {
+                                showCreateReview = true
+                            }
+                        )
+                        .environmentObject(profile)
+                        .environmentObject(userSession)
+                        .environmentObject(serviceContainer)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+                Spacer()
             }
 
             // Overlay for enlarged photo

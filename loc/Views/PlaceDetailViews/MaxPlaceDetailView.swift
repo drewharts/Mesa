@@ -45,6 +45,14 @@ struct MaxPlaceDetailView: View {
                     .clipShape(Capsule())
                 }
 
+                // SHARE Bubble
+                PlaceShareButton(place: selectedPlaceVM.selectedPlace!)
+                    .environmentObject(ServiceContainer.shared)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(Color.gray.opacity(0.2))
+                    .clipShape(Capsule())
+
                 // MENU Bubble
                 HStack(spacing: 8) {
                     Image(systemName: "fork.knife.circle")

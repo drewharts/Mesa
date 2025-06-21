@@ -18,6 +18,7 @@ struct locApp: App {
     @StateObject private var userProfileViewModel: UserProfileViewModel
     @StateObject private var searchViewModel: SearchViewModel
     @StateObject private var notificationManager = NotificationManager.shared
+    @StateObject private var deepLinkViewModel: DeepLinkViewModel
     
     private let dataManager: DataManager
     private let serviceContainer = ServiceContainer.shared
@@ -84,7 +85,18 @@ struct locApp: App {
             placeService: services.placeService,
             userService: services.userService
         )
-
+        
+        // Create DeepLinkManager and DeepLinkViewModel
+        let deepLinkManager = DeepLinkManager(
+            placeService: services.placeService,
+            selectedPlaceViewModel: selectedPlaceVM
+        )
+        
+        let deepLinkVM = DeepLinkViewModel(
+            deepLinkManager: deepLinkManager,
+            selectedPlaceViewModel: selectedPlaceVM
+        )
+        
         self._locationManager = StateObject(wrappedValue: location)
         self._userSession = StateObject(wrappedValue: userSess)
         self._profileViewModel = StateObject(wrappedValue: profileVM)
@@ -93,9 +105,11 @@ struct locApp: App {
         self._selectedPlaceViewModel = StateObject(wrappedValue: selectedPlaceVM)
         self._userProfileViewModel = StateObject(wrappedValue: userProfileVM)
         self._searchViewModel = StateObject(wrappedValue: searchVM)
+        self._deepLinkViewModel = StateObject(wrappedValue: deepLinkVM)
         
         // Pass user service to AppDelegate
         appDelegate.userService = services.userService
+        appDelegate.deepLinkViewModel = deepLinkVM
     }
 
     var body: some Scene {
@@ -111,7 +125,17 @@ struct locApp: App {
                 .environmentObject(searchViewModel)
                 .environmentObject(notificationManager)
                 .environmentObject(serviceContainer)
+                .environmentObject(deepLinkViewModel)
                 .preferredColorScheme(.light)
+                .onOpenURL { url in
+                    // Handle deep links for places
+                    if url.scheme == "loc" {
+                        Task {
+                            print("🔗 Received deep link: \(url)")
+                            await deepLinkViewModel.processIncomingURL(url)
+                        }
+                    }
+                }
                 .task {
                     if let currentUser = Auth.auth().currentUser {
                         userSession.isUserLoggedIn = true
@@ -125,6 +149,7 @@ struct locApp: App {
 
 class AppDelegate: NSObject, UIApplicationDelegate {
     var userService: UserService?
+    var deepLinkViewModel: DeepLinkViewModel?
 
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
@@ -181,7 +206,22 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     func application(_ app: UIApplication,
                      open url: URL,
                      options: [UIApplication.OpenURLOptionsKey : Any] = [:]) -> Bool {
-        return GIDSignIn.sharedInstance.handle(url)
+        
+        // Handle Google Sign-In URLs
+        if GIDSignIn.sharedInstance.handle(url) {
+            return true
+        }
+        
+        // Handle deep links for places
+        if url.scheme == "loc" {
+            print("🔗 Received deep link in AppDelegate: \(url)")
+            Task {
+                await deepLinkViewModel?.processIncomingURL(url)
+            }
+            return true
+        }
+        
+        return false
     }
 }
 

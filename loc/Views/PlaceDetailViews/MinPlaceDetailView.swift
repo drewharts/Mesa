@@ -15,7 +15,6 @@ struct MinPlaceDetailView: View {
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var locationManager: LocationManager
     @EnvironmentObject var userProfileViewModel: UserProfileViewModel
-    @EnvironmentObject var userSession: UserSession
     @EnvironmentObject var notificationManager: NotificationManager
     @Environment(\.isScrollingEnabled) var isScrollingEnabled // Access scroll state
 
@@ -35,40 +34,6 @@ struct MinPlaceDetailView: View {
                         .foregroundColor(.black)
                     
                     Spacer()
-                    
-                    HStack(spacing: 16) {
-                        // Favorite star button
-                        Button(action: {
-                            guard let place = selectedPlaceVM.selectedPlace else { return }
-                            if profile.isPlaceFavorite(placeId: place.id.uuidString) {
-                                profile.removeFavoritePlace(place: place)
-                            } else {
-                                profile.addFavoritePlace(place: place)
-                            }
-                        }) {
-                            Image(systemName: {
-                                if let place = selectedPlaceVM.selectedPlace, profile.isPlaceFavorite(placeId: place.id.uuidString) {
-                                    return "star.fill"
-                                } else {
-                                    return "star"
-                                }
-                            }())
-                            .font(.title3)
-                            .foregroundColor(.yellow)
-                        }
-
-                        NavigationLink(destination: CreatePlaceReviewView(isPresented: .constant(false), place: selectedPlaceVM.selectedPlace!, userId: userSession.currentUserId!, profilePhotoUrl: profile.user?.profilePhotoURL?.absoluteString ?? "", userFirstName: profile.user!.firstName, userLastName: profile.user!.lastName)) {
-                            Image(systemName: "plus")
-                                .font(.title3)
-                        }
-                        
-                        Button(action: {
-                            viewModel.showListSelection = true
-                        }) {
-                            Image(systemName: profile.isPlaceInAnyList(placeId: selectedPlaceVM.selectedPlace?.id.uuidString ?? "") ? "bookmark.fill" : "bookmark")
-                                .font(.title3)
-                        }
-                    }
                 }
                 .padding(.bottom, 3)
                 
