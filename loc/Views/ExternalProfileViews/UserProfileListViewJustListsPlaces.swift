@@ -14,7 +14,14 @@ struct UserProfileListViewJustListsPlaces: View {
                 Button(action: {
                     selectedPlaceVM.selectedPlace = place
                     selectedPlaceVM.isDetailSheetPresented = true
-                    presentationMode.wrappedValue.dismiss()
+                    
+                    // Dismiss the user profile sheet properly
+                    viewModel.isUserDetailPresented = false
+                    
+                    // Also call presentationMode dismiss as backup
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        presentationMode.wrappedValue.dismiss()
+                    }
                 }) {
                     VStack(spacing: 4) {
                         if let image = viewModel.placeImages[place.id.uuidString] {

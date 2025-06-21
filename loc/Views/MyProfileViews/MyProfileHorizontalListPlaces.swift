@@ -83,6 +83,13 @@ struct MyProfileHorizontalListPlaces: View {
                     }
                     .padding(.trailing, 10)
                 }
+                .contextMenu {
+                    Button {
+                        ServiceContainer.shared.placeShareService.sharePlace(place)
+                    } label: {
+                        Label("Share place", systemImage: "square.and.arrow.up")
+                    }
+                }
             }
         }
         .padding(.horizontal, 20)

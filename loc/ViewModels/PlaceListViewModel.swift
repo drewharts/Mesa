@@ -13,15 +13,18 @@ import Combine
 class PlaceListViewModel: ObservableObject, Identifiable {
     @Published var placeList: PlaceList
     @Published var placeViewModels: [PlaceViewModel] = []
-    private let firestoreService: FirestoreService
+    
+    private let placeService: PlaceService
+    private let imageService: ImageService
     private let userId: String
     @Published var image: UIImage?
     private var cancellables = Set<AnyCancellable>()
 
 
-    init(placeList: PlaceList, firestoreService: FirestoreService, userId: String) {
+    init(placeList: PlaceList, placeService: PlaceService, imageService: ImageService, userId: String) {
         self.placeList = placeList
-        self.firestoreService = firestoreService
+        self.placeService = placeService
+        self.imageService = imageService
         self.userId = userId
         // Initialize placeViewModels directly from the provided placeList
         self.placeViewModels = placeList.places.map { place in
@@ -37,7 +40,7 @@ class PlaceListViewModel: ObservableObject, Identifiable {
     // Load the place lists from Firestore.
     func loadPlaceLists() {
         print("📋 Loading place list: \(placeList.name) for user: \(userId)")
-        firestoreService.fetchList(userId: userId, listName: placeList.name) { [weak self] result in
+        placeService.fetchList(userId: userId, listName: placeList.name) { [weak self] result in
             switch result {
             case .success(let fetchedPlaceList):
                 print("✅ Successfully loaded list: \(fetchedPlaceList.name) with \(fetchedPlaceList.places.count) places")
@@ -82,67 +85,11 @@ class PlaceListViewModel: ObservableObject, Identifiable {
         }.resume()
     }
 
-
-
-
-//    func addPlace(_ place: GMSPlace) {
-//        if let placeID = place.placeID {
-//            let newPlace = Place(
-//                id: placeID,
-//                name: place.name ?? "",
-//                address: place.formattedAddress ?? ""
-//            )
-//            placeViewModels.append(PlaceViewModel(place: newPlace))
-//            placeList.places.append(newPlace)
-//            firestoreService.addPlaceToList(userId: userId, listName: placeList.name, place: newPlace)
-//        }
-//    }
-
-//    func removePlace(_ place: GMSPlace) {
-//        if let placeID = place.placeID {
-//            // Remove from local view models
-//            if let index = placeViewModels.firstIndex(where: { $0.id == placeID }) {
-//                placeViewModels.remove(at: index)
-//            }
-//            
-//            // Remove from placeList.places
-//            placeList.places.removeAll { $0.id == placeID }
-//            
-//            // Remove from Firestore
-//            firestoreService.removePlaceFromList(userId: userId, listName: placeList.name, placeId: place.placeID!)
-//        } else {
-//            // Handle cases where placeID is nil
-//            print("Error: Cannot remove place. Invalid placeID.")
-//        }
-//    }
-//
-//    func fetchFullPlaces(completion: @escaping ([GMSPlace]) -> Void) {
-//        let placesClient = GMSPlacesClient.shared()
-//        var fullPlaces: [GMSPlace] = []
-//        let dispatchGroup = DispatchGroup()
-//
-//        for simplifiedPlace in placeList.places {
-//            dispatchGroup.enter()
-//            placesClient.lookUpPlaceID(simplifiedPlace.id) { place, error in
-//                if let place = place {
-//                    fullPlaces.append(place)
-//                } else if let error = error {
-//                    print("Error fetching place: \(error.localizedDescription)")
-//                }
-//                dispatchGroup.leave()
-//            }
-//        }
-//
-//        dispatchGroup.notify(queue: .main) {
-//            completion(fullPlaces)
-//        }
-//    }
-
     func addPhotoToList(image: UIImage) {
         self.image = image // Set the image in the view model
 
         // Upload image to Firestore
-        firestoreService.uploadImageAndUpdatePlaceList(userId: userId, placeList: placeList, image: image) { [weak self] error in
+        imageService.uploadImageAndUpdatePlaceList(userId: userId, placeList: placeList, image: image) { [weak self] error in
             if let error = error {
                 print("Error adding photo to list: \(error.localizedDescription)")
                 // Handle error (e.g., display an error message to the user)
