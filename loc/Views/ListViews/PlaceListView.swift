@@ -14,6 +14,7 @@ import MapboxSearch
 struct WidePlaceView: View {
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var places: DetailPlaceViewModel
+    @EnvironmentObject var serviceContainer: ServiceContainer
     let place: DetailPlace
     
     var body: some View {
@@ -44,6 +45,12 @@ struct WidePlaceView: View {
                     .font(.caption)
                     .foregroundColor(.gray)
             }
+            
+            Spacer()
+            
+            // Share button for individual place
+            PlaceShareButton(place: place)
+                .environmentObject(serviceContainer)
         }
         .padding(.vertical, 8)
         .padding(.horizontal, 16)
@@ -54,12 +61,13 @@ struct PlaceListView: View {
     var places: [DetailPlace]
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
+    @EnvironmentObject var serviceContainer: ServiceContainer
     @Environment(\.presentationMode) var presentationMode // For dismissing the sheet
 
     var body: some View {
         List {
             ForEach(places, id: \.id) { place in
-                // Wrap the row in a Button (or NavigationLink) so it’s tappable
+                // Wrap the row in a Button (or NavigationLink) so it's tappable
                 Button(action: {
                     selectedPlaceVM.selectedPlace = place
                     selectedPlaceVM.isDetailSheetPresented = true
@@ -90,7 +98,10 @@ struct PlaceListView: View {
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button(action: {
-                    // Share button placeholder action
+                    // Share the first place in the list, or show a message if empty
+                    if let firstPlace = places.first {
+                        serviceContainer.placeShareService.sharePlace(firstPlace)
+                    }
                 }) {
                     Image(systemName: "square.and.arrow.up")
                 }

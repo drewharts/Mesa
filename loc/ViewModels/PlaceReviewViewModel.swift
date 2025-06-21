@@ -29,7 +29,8 @@ class PlaceReviewViewModel: ObservableObject {
    private let userFirstName: String
    private let userLastName: String
    private let profilePhotoUrl: String
-   private let firestoreService: FirestoreService
+   private let reviewService: ReviewService
+   private let imageService: ImageService
 
    // MARK: - Init
    init(place: DetailPlace,
@@ -37,57 +38,51 @@ class PlaceReviewViewModel: ObservableObject {
         userFirstName: String,
         userLastName: String,
         profilePhotoUrl: String,
-        firestoreService: FirestoreService = FirestoreService()) {
+        reviewService: ReviewService = .shared,
+        imageService: ImageService = .shared) {
        self.place = place
        self.userId = userId
        self.userFirstName = userFirstName
        self.userLastName = userLastName
        self.profilePhotoUrl = profilePhotoUrl
-       self.firestoreService = firestoreService
+       self.reviewService = reviewService
+       self.imageService = imageService
    }
 
    func submitReview(completion: @escaping (Result<any ReviewProtocol, Error>) -> Void) {
        print("🎯 Starting review submission process")
+       isLoading = true
+       errorMessage = nil
+
        // Create the review object first
        let timestamp = Date()
        let reviewId = UUID().uuidString
        print("📝 Generated review ID: \(reviewId)")
-       
+
+       var review: any ReviewProtocol
+
        if reviewType == .restaurant {
            print("🍽️ Creating restaurant review")
-           let review = RestaurantReview(
+           review = RestaurantReview(
                id: reviewId,
                userId: userId,
                profilePhotoUrl: profilePhotoUrl,
                userFirstName: userFirstName,
                userLastName: userLastName,
                placeId: place.id.uuidString,
-               placeName: place.name ?? "Unnamed Place",
+               placeName: place.name,
                foodRating: foodRating,
                serviceRating: serviceRating,
                ambienceRating: ambienceRating,
                favoriteDishes: favoriteDishes,
                reviewText: reviewText,
                timestamp: timestamp,
-               images: [], // Will be updated by saveReviewWithImages
+               images: [], // Will be populated after upload
                likes: 0
            )
-           
-           print("🔄 Calling saveReviewWithImages for restaurant review")
-           // Use the saveReviewWithImages method to handle both image upload and review saving
-           firestoreService.saveReviewWithImages(review: review, images: images) { result in
-               switch result {
-               case .success(let savedReview):
-                   print("✅ Successfully saved restaurant review")
-                   completion(.success(savedReview))
-               case .failure(let error):
-                   print("❌ Error saving restaurant review: \(error.localizedDescription)")
-                   completion(.failure(error))
-               }
-           }
        } else {
            print("📝 Creating generic review")
-           let review = GenericReview(
+           review = GenericReview(
                id: reviewId,
                userId: userId,
                profilePhotoUrl: profilePhotoUrl,
@@ -97,19 +92,51 @@ class PlaceReviewViewModel: ObservableObject {
                placeName: place.name ?? "Unnamed Place",
                reviewText: reviewText,
                timestamp: timestamp,
-               images: [], // Will be updated by saveReviewWithImages
+               images: [], // Will be populated after upload
                likes: 0
            )
-           
-           print("🔄 Calling saveReviewWithImages for generic review")
-           // Use the saveReviewWithImages method to handle both image upload and review saving
-           firestoreService.saveReviewWithImages(review: review, images: images) { result in
+       }
+
+       // If there are images, upload them first
+       if !images.isEmpty {
+           print("🖼️ Starting image upload...")
+           imageService.uploadImagesForReview(review: review, images: images) { [weak self] result in
+               guard let self = self else { return }
+
                switch result {
-               case .success(let savedReview):
-                   print("✅ Successfully saved generic review")
-                   completion(.success(savedReview))
+               case .success(let imageUrls):
+                   print("✅ Image upload successful")
+                   var mutableReview = review
+                   mutableReview.images = imageUrls
+                   self.saveReview(mutableReview, completion: completion)
                case .failure(let error):
-                   print("❌ Error saving generic review: \(error.localizedDescription)")
+                   print("❌ Image upload failed: \(error.localizedDescription)")
+                   DispatchQueue.main.async {
+                       self.isLoading = false
+                       self.errorMessage = "Failed to upload images: \(error.localizedDescription)"
+                       completion(.failure(error))
+                   }
+               }
+           }
+       } else {
+           // If no images, just save the review
+           print("ℹ️ No images to upload, saving review directly.")
+           saveReview(review, completion: completion)
+       }
+   }
+
+   private func saveReview(_ review: any ReviewProtocol, completion: @escaping (Result<any ReviewProtocol, Error>) -> Void) {
+       print("🔄 Saving review...")
+       reviewService.saveReview(review) { [weak self] result in
+           DispatchQueue.main.async {
+               self?.isLoading = false
+               switch result {
+               case .success:
+                   print("✅ Successfully saved review")
+                   completion(.success(review))
+               case .failure(let error):
+                   print("❌ Error saving review: \(error.localizedDescription)")
+                   self?.errorMessage = "Failed to save review: \(error.localizedDescription)"
                    completion(.failure(error))
                }
            }
@@ -121,7 +148,7 @@ class PlaceReviewViewModel: ObservableObject {
        isLoading = true
        errorMessage = nil
        
-       firestoreService.deleteReview(reviewId: reviewId, placeId: place.id.uuidString, userId: userId) { [weak self] result in
+       reviewService.deleteReview(reviewId: reviewId, placeId: place.id.uuidString, userId: userId) { [weak self] result in
            DispatchQueue.main.async {
                self?.isLoading = false
                

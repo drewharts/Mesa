@@ -15,12 +15,12 @@ import FirebaseMessaging
 
 class LoginViewModel: ObservableObject {
     @Published var errorMessage: String?
-    private let firestoreService: FirestoreService
+    private let userService: UserService
     private let dataManager: DataManager
     
     
-    init(firestoreService: FirestoreService, dataManager: DataManager) {
-        self.firestoreService = firestoreService
+    init(userService: UserService, dataManager: DataManager) {
+        self.userService = userService
         self.dataManager = dataManager
     }
 
@@ -77,7 +77,7 @@ class LoginViewModel: ObservableObject {
         }
 
         // Check if profile exists first
-        firestoreService.fetchUserById(userId: uid) { [weak self] result in
+        userService.fetchUserById(userId: uid) { [weak self] result in
             switch result {
             case .success(_):
                 // Profile exists, update FCM token and proceed
@@ -103,7 +103,7 @@ class LoginViewModel: ObservableObject {
                             fullName: "\(user.profile?.givenName ?? "") \(user.profile?.familyName ?? "")",
                             fcmToken: token
                         )
-                        self?.firestoreService.saveUserProfile(uid: uid, profileData: profileData) { [weak self] error in
+                        self?.userService.saveUserProfile(uid: uid, profileData: profileData) { [weak self] error in
                             if let error = error {
                                 self?.errorMessage = "Error saving profile: \(error.localizedDescription)"
                             } else {

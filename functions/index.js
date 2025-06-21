@@ -1,9 +1,11 @@
 const { onDocumentCreated } = require('firebase-functions/v2/firestore');
 const { initializeApp } = require('firebase-admin/app');
-const { getFirestore } = require('firebase-admin/firestore');
+const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 const { getMessaging } = require('firebase-admin/messaging');
 
 initializeApp();
+
+const db = getFirestore();
 
 exports.notifyFriendsOnReview = onDocumentCreated('places/{placeId}/reviews/{reviewId}', async (event) => {
   const snap = event.data;
@@ -22,7 +24,6 @@ exports.notifyFriendsOnReview = onDocumentCreated('places/{placeId}/reviews/{rev
     console.log(`Processing review notification for user: ${userId}, review: ${reviewId}, place: ${placeId}`);
 
     // Get the user's profile to fetch reviewer name
-    const db = getFirestore();
     const userDoc = await db.collection('users').doc(userId).get();
     if (!userDoc.exists) {
       console.log(`User ${userId} not found`);
@@ -133,7 +134,7 @@ exports.notifyFriendsOnReview = onDocumentCreated('places/{placeId}/reviews/{rev
         fromUserName: reviewerName,
         reviewId: reviewId,
         placeId: placeId,
-        timestamp: db.FieldValue.serverTimestamp(),
+        timestamp: FieldValue.serverTimestamp(),
         read: false
       });
     });
@@ -163,8 +164,6 @@ exports.notifyReviewAuthorOnComment = onDocumentCreated('places/{placeId}/review
   console.log(`💬 New comment detected on review ${reviewId} by user ${commentData.userId}`);
   
   try {
-    const db = getFirestore();
-    
     // Get the original review to find its author
     const reviewRef = db.collection('places').doc(placeId).collection('reviews').doc(reviewId);
     const reviewDoc = await reviewRef.get();
@@ -243,6 +242,21 @@ exports.notifyReviewAuthorOnComment = onDocumentCreated('places/{placeId}/review
         console.log(`✅ Push notification sent successfully: ${response}`);
       } catch (error) {
         console.error(`❌ Error sending push notification: ${error}`);
+        console.error(`❌ Error details - Code: ${error.code}, Message: ${error.message}`);
+        console.error(`❌ FCM Token being used: ${fcmToken.substring(0, 20)}...`);
+        console.error(`❌ Target user ID: ${reviewAuthorId}`);
+        
+        // Check if it's a token-related error
+        if (error.code === 'messaging/registration-token-not-registered' || 
+            error.code === 'messaging/invalid-registration-token') {
+          console.error(`❌ Invalid or expired FCM token for user ${reviewAuthorId}, they may need to reopen the app`);
+          
+          // Optional: Clear the invalid token from Firestore
+          await db.collection('users').doc(reviewAuthorId).update({
+            fcmToken: null
+          });
+          console.log(`🧹 Cleared invalid FCM token for user ${reviewAuthorId}`);
+        }
       }
     }
     
@@ -252,7 +266,7 @@ exports.notifyReviewAuthorOnComment = onDocumentCreated('places/{placeId}/review
       type: 'comment',
       title: notificationTitle,
       message: notificationBody,
-      timestamp: db.FieldValue.serverTimestamp(),
+      timestamp: FieldValue.serverTimestamp(),
       read: false,
       data: {
         reviewId: reviewId,

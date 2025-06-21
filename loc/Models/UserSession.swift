@@ -15,12 +15,12 @@ class UserSession: ObservableObject {
     @Published var isUserLoggedIn: Bool = false
     @Published var profileViewModel: ProfileViewModel?
     @Published var currentUserId: String?
-    private let firestoreService: FirestoreService
+    private let userService: UserService
     private let locationManager: LocationManager
     private let detailPlaceVM: DetailPlaceViewModel
     
-    init(firestoreService: FirestoreService, locationManager: LocationManager, detailPlaceVM: DetailPlaceViewModel) {
-        self.firestoreService = firestoreService
+    init(userService: UserService, locationManager: LocationManager, detailPlaceVM: DetailPlaceViewModel) {
+        self.userService = userService
         self.locationManager = locationManager
         self.detailPlaceVM = detailPlaceVM
         if let currentUser = Auth.auth().currentUser {
@@ -56,7 +56,7 @@ class UserSession: ObservableObject {
                 print("Error fetching FCM registration token: \(error)")
             } else if let token = token {
                 print("FCM registration token: \(token)")
-                self?.firestoreService.updateFCMToken(userId: currentUserId, token: token) { error in
+                self?.userService.updateFCMToken(userId: currentUserId, token: token) { error in
                     if let error = error {
                         print("Error updating FCM token in Firestore: \(error)")
                     } else {

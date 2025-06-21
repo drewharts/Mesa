@@ -19,21 +19,30 @@ struct ProfileViewListsView: View {
     @State private var inputImage: [UIImage] = []
     @State private var selectedList: PlaceListViewModel?
     @State private var showingNewListSheet = false
+    @State private var searchText = ""
     @State private var placeColors: [UUID: Color] = [:]
     
-    // Precompute sorted lists
-    var sortedLists: [PlaceList] {
-        profile.userLists.sorted { $0.sortOrder < $1.sortOrder }
+    // Filtered and sorted lists based on search
+    var filteredLists: [PlaceList] {
+        let sorted = profile.userLists.sorted { $0.sortOrder < $1.sortOrder }
+        if searchText.isEmpty {
+            return sorted
+        } else {
+            return sorted.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
+        }
     }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            ListHeaderView(onAddList: {
-                showingNewListSheet = true
-            })
+            ListHeaderView(
+                onAddList: {
+                    showingNewListSheet = true
+                },
+                searchText: $searchText
+            )
 
-            if !sortedLists.isEmpty {
-                ForEach(sortedLists, id: \ .id) { list in
+            if !filteredLists.isEmpty {
+                ForEach(filteredLists, id: \ .id) { list in
                     ProfileListSection(
                         list: list,
                         placeIds: profile.userListsPlaces[list.id.uuidString],
@@ -42,9 +51,21 @@ struct ProfileViewListsView: View {
                     )
                 }
             } else {
-                Text("No lists available")
-                    .foregroundColor(.gray)
-                    .padding(.horizontal)
+                VStack(spacing: 8) {
+                    if searchText.isEmpty {
+                        Text("No lists available")
+                            .foregroundColor(.gray)
+                            .padding(.horizontal)
+                    } else {
+                        Text("No lists found")
+                            .foregroundColor(.gray)
+                            .padding(.horizontal)
+                        Text("No lists match '\(searchText)'")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                            .padding(.horizontal)
+                    }
+                }
             }
         }
         .padding(.vertical)

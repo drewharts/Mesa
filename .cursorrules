@@ -1,0 +1,81 @@
+# Cursor Rules for SwiftUI Project
+
+## File Organization Rules
+
+### View Structure
+- **ONE VIEW PER FILE**: Each SwiftUI View struct must be in its own separate file
+- **NO MULTIPLE VIEWS**: Never create multiple View structs in a single file
+- **FILE NAMING**: View files should be named exactly the same as the View struct they contain
+- **LOCATION**: Place views in appropriate subdirectories under `/Views/`
+
+### Function Organization
+- **NO FUNCTIONS IN VIEWS**: Never define functions inside SwiftUI View structs
+- **MOVE TO VIEWMODEL**: All business logic and functions should be moved to ViewModels
+- **COMPUTED PROPERTIES ONLY**: Views should only contain computed properties for simple data transformation
+- **VIEW BODY ONLY**: The view's body should focus purely on UI layout and presentation
+
+## Code Style Rules
+
+### ViewModels
+- **BUSINESS LOGIC HOME**: All business logic, data fetching, and state management belongs in ViewModels
+- **OBSERVABLE OBJECTS**: ViewModels should be `@MainActor class ViewModelName: ObservableObject`
+- **PUBLISHED PROPERTIES**: Use `@Published` for properties that trigger UI updates
+- **ASYNC FUNCTIONS**: Handle async operations in ViewModels, not Views
+
+### SwiftUI Views
+- **DECLARATIVE ONLY**: Views should be purely declarative UI descriptions
+- **NO SIDE EFFECTS**: No network calls, database operations, or complex logic in Views
+- **ENVIRONMENT OBJECTS**: Use `@EnvironmentObject` to access ViewModels
+- **SIMPLE BINDINGS**: Only simple `@State` for local UI state like animations or temporary states
+
+### Function Length Guidelines
+- **30-LINE LIMIT**: Functions should almost never exceed 30 lines of code
+- **BREAK INTO PARTS**: Long functions should be broken into smaller, focused functions that improve readability
+- **LOGICAL SEPARATION**: Split functions at natural logical boundaries (separate concerns, distinct operations)
+- **MEANINGFUL NAMES**: Each extracted function should have a clear, descriptive name that explains its purpose
+- **SINGLE RESPONSIBILITY**: Each function should have one clear responsibility or purpose
+
+### File Structure
+```
+Views/
+  ├── ComponentName/
+  │   ├── MainView.swift (contains MainView struct only)
+  │   ├── SubComponentView.swift (contains SubComponentView struct only)
+  │   └── AnotherComponentView.swift (contains AnotherComponentView struct only)
+  └── AnotherFeature/
+      └── FeatureView.swift (contains FeatureView struct only)
+
+ViewModels/
+  ├── MainViewModel.swift (contains business logic for MainView)
+  └── FeatureViewModel.swift (contains business logic for FeatureView)
+```
+
+## Error Prevention
+
+### Violations to Flag
+1. **Multiple struct View declarations in one file**
+2. **Functions defined inside View structs**
+3. **Business logic in View bodies**
+4. **Network calls or async operations in Views**
+5. **Complex data manipulation in Views**
+6. **Functions longer than 30 lines**
+
+### Acceptable in Views
+- `var body: some View { ... }`
+- Simple computed properties for formatting (e.g., `var formattedDate: String`)
+- `@State` for simple UI state
+- `@EnvironmentObject` and `@ObservedObject` property wrappers
+- View modifiers and layout code
+
+## Migration Strategy
+When finding violations:
+1. **Extract Views**: Move additional View structs to their own files
+2. **Extract Functions**: Move functions to appropriate ViewModels
+3. **Create ViewModels**: If no ViewModel exists, create one for the business logic
+4. **Update Dependencies**: Ensure proper `@EnvironmentObject` setup
+5. **Refactor Long Functions**: Break functions longer than 30 lines into smaller, focused functions
+
+## Enforcement
+- Every Pull Request should be checked against these rules
+- Use these rules during code review
+- Refactor existing code when making changes to follow these patterns 

@@ -22,14 +22,30 @@ class UserProfileViewModel: ObservableObject {
     @Published var placeImages: [String: UIImage] = [:]
     @Published var isFollowing: Bool = false
     @Published var followers: Int = 0
-    private let firestoreService = FirestoreService()
-    private let mapboxSearchService = MapboxSearchService()
+    
+    // Reviewed places loading state
+    @Published var isLoadingReviewedPlaces: Bool = false
+    private var hasAttemptedLoadReviewedPlaces: [String: Bool] = [:]
+    
+    private let placeService: PlaceService
+    private let userService: UserService
+    private let reviewService: ReviewService
+    
     private let dataManager: DataManager
     private let detailPlaceViewModel: DetailPlaceViewModel
     
-    init(dataManager: DataManager, detailPlaceViewModel: DetailPlaceViewModel) {
+    init(
+        dataManager: DataManager, 
+        detailPlaceViewModel: DetailPlaceViewModel,
+        placeService: PlaceService,
+        userService: UserService,
+        reviewService: ReviewService
+    ) {
         self.dataManager = dataManager
         self.detailPlaceViewModel = detailPlaceViewModel
+        self.placeService = placeService
+        self.userService = userService
+        self.reviewService = reviewService
     }
     
     func selectUser(_ user: ProfileData, currentUserId: String) {
@@ -42,8 +58,20 @@ class UserProfileViewModel: ObservableObject {
         self.fetchFavoritePlaceImages()
     }
     
+    func fetchAndSelectUser(userId: String, currentUserId: String) {
+        userService.fetchUserById(userId: userId) { [weak self] result in
+            switch result {
+            case .success(let profileData):
+                self?.selectUser(profileData, currentUserId: currentUserId)
+            case .failure(let error):
+                print("Error fetching user profile: \(error.localizedDescription)")
+                // Optionally handle error - could show an alert or set an error state
+            }
+        }
+    }
+    
     func fetchFollowers(userId: String) {
-        firestoreService.getNumberFollowers(forUserId: userId) { (count, error) in
+        userService.getNumberFollowers(forUserId: userId) { (count, error) in
             if let error = error {
                 print("Error fetching followers: \(error.localizedDescription)")
                 return
@@ -57,7 +85,7 @@ class UserProfileViewModel: ObservableObject {
             self.isFollowing = false
             return
         }
-        firestoreService.isFollowingUser(followerId: currentUserId, followingId: targetUserId) { [weak self] isFollowing in
+        userService.isFollowingUser(followerId: currentUserId, followingId: targetUserId) { [weak self] isFollowing in
             self?.isFollowing = isFollowing
         }
     }
@@ -65,7 +93,7 @@ class UserProfileViewModel: ObservableObject {
     func toggleFollowUser(currentUserId: String) {
         guard let targetUserId = selectedUser?.id else { return }
         if isFollowing {
-            firestoreService.unfollowUser(followerId: currentUserId, followingId: targetUserId) { success, error in
+            userService.unfollowUser(followerId: currentUserId, followingId: targetUserId) { success, error in
                 if success {
                     self.isFollowing = false
                     self.followers = max(0, self.followers - 1)
@@ -75,7 +103,7 @@ class UserProfileViewModel: ObservableObject {
                 }
             }
         } else {
-            firestoreService.followUser(followerId: currentUserId, followingId: targetUserId) { success, error in
+            userService.followUser(followerId: currentUserId, followingId: targetUserId) { success, error in
                 if success {
                     self.isFollowing = true
                     self.followers += 1
@@ -91,7 +119,7 @@ class UserProfileViewModel: ObservableObject {
     }
     
     func followUser(currentUserId: String, targetUserId: String) {
-        firestoreService.followUser(followerId: currentUserId, followingId: targetUserId) { success, error in
+        userService.followUser(followerId: currentUserId, followingId: targetUserId) { success, error in
             if let error = error {
                 print("Error following user: \(error.localizedDescription)")
             } else if success {
@@ -102,7 +130,7 @@ class UserProfileViewModel: ObservableObject {
     
     private func fetchProfileFavorites(userId: String) {
         print("Fetching favorites for userId: \(userId)")
-        firestoreService.fetchProfileFavorites(userId: userId) { [weak self] favorites in
+        placeService.fetchProfileFavorites(userId: userId) { [weak self] favorites in
             guard let self = self else { return }
             if favorites == nil {
                 print("Favorites fetch returned nil - possible error or no data")
@@ -133,7 +161,7 @@ class UserProfileViewModel: ObservableObject {
     }
     
     private func fetchLists(userId: String) {
-        firestoreService.fetchLists(userId: userId) { lists in
+        placeService.fetchLists(userId: userId) { lists in
             self.userLists = lists
             // Fetch places and images for each PlaceList
             for list in lists {
@@ -159,7 +187,7 @@ class UserProfileViewModel: ObservableObject {
             
             let documentId = place.id.uuidString
             
-            firestoreService.fetchPlace(withId: documentId) { result in
+            placeService.fetchPlace(withId: documentId) { result in
                 switch result {
                 case .success(let detailPlace):
                     fetchedPlaces.append(detailPlace)
@@ -233,7 +261,7 @@ class UserProfileViewModel: ObservableObject {
         }
         
         // Fetch reviews for this place
-        firestoreService.fetchReviews(placeId: placeId, latestOnly: false) { [weak self] (reviews: [ReviewProtocol]?, error) in
+        reviewService.fetchReviews(placeId: placeId, latestOnly: false) { [weak self] (reviews: [ReviewProtocol]?, error) in
             guard let self = self else { return }
             
             if let error = error {
@@ -290,5 +318,44 @@ class UserProfileViewModel: ObservableObject {
             //     detailPlaceViewModel.places.removeValue(forKey: placeId)
             // }
         }
+    }
+    
+    // MARK: - Reviewed Places Loading
+    
+    func loadUserReviewedPlacesIfNeeded() {
+        guard let userId = selectedUser?.id else { return }
+        
+        // Only load if we haven't attempted to load for this user yet
+        if hasAttemptedLoadReviewedPlaces[userId] != true {
+            isLoadingReviewedPlaces = true
+            hasAttemptedLoadReviewedPlaces[userId] = true
+            
+            Task {
+                await dataManager.loadUserReviewedPlaces(userId: userId)
+                
+                // Update loading state on main thread
+                await MainActor.run {
+                    isLoadingReviewedPlaces = false
+                }
+            }
+        }
+    }
+    
+    func resetReviewedPlacesLoadingState() {
+        isLoadingReviewedPlaces = false
+        hasAttemptedLoadReviewedPlaces.removeAll()
+    }
+    
+    // Get places that this user has reviewed
+    func getReviewedPlaces() -> [DetailPlace] {
+        guard let userId = selectedUser?.id else { return [] }
+        
+        // Find all places where this user is in the placeSavers array
+        let reviewedPlaceIds = detailPlaceViewModel.placeSavers.compactMap { (placeId, userIds) -> String? in
+            return userIds.contains(userId) ? placeId : nil
+        }
+        
+        // Get the actual DetailPlace objects for those IDs
+        return reviewedPlaceIds.compactMap { detailPlaceViewModel.places[$0] }
     }
 }

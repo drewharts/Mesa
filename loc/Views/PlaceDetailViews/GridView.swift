@@ -9,9 +9,7 @@ import SwiftUI
 
 struct GridView: View {
     let images: [UIImage]
-    
-    // NEW: Binding for the selected image
-    @Binding var selectedImage: UIImage?
+    let onImageTapped: (Int) -> Void
     
     // For a 3-column grid
     let columns = [
@@ -49,8 +47,7 @@ struct GridView: View {
                     }
                 }
                 .onTapGesture {
-                    // Assign the tapped image to selectedImage to show the overlay
-                    selectedImage = images[index]
+                    onImageTapped(index)
                 }
             }
         }

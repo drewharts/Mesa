@@ -79,6 +79,13 @@ struct ListPlaceGridCell: View {
             .shadow(color: Color.black.opacity(0.2), radius: 5, x: 0, y: 2)
         }
         .contextMenu {
+            Button {
+                // Share the place
+                ServiceContainer.shared.placeShareService.sharePlace(place)
+            } label: {
+                Label("Share place", systemImage: "square.and.arrow.up")
+            }
+            
             Button(role: .destructive) {
                 profile.removePlaceFromList(listId: list.id, place: place)
             } label: {

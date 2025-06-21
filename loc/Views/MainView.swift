@@ -17,7 +17,7 @@ struct MainView: View {
     @EnvironmentObject var userProfileViewModel: UserProfileViewModel
     @EnvironmentObject var locationManager: LocationManager
     @EnvironmentObject var notificationManager: NotificationManager
-    @StateObject private var viewModel = SearchViewModel()
+    @EnvironmentObject var viewModel: SearchViewModel
 
     @FocusState private var searchIsFocused: Bool
     @State private var isSearchBarMinimized = true
@@ -43,55 +43,16 @@ struct MainView: View {
                             Spacer()
                             VStack(spacing: 10) {
                                 Button(action: {
-                                    withAnimation {
-                                        if sheetHeight == maxSheetHeight {
-                                            sheetHeight = minSheetHeight
-                                        }
-                                        isSearchBarMinimized.toggle()
-                                    }
-                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                                        searchIsFocused = true
-                                    }
+                                    recenterMap = true
                                 }) {
-                                    Image(systemName: "magnifyingglass")
-                                        .foregroundColor(.blue)
-                                        .frame(width: 60, height: 60)
-                                        .background(Color.white)
+                                    Image(systemName: "location.fill")
+                                        .foregroundColor(.white)
+                                        .frame(width: 36, height: 36)
+                                        .background(Color.blue)
                                         .clipShape(Circle())
-                                        .overlay(Circle().stroke(Color.gray, lineWidth: 2))
                                         .shadow(radius: 4)
                                 }
                                 .padding(.top, 10)
-                                .padding(.trailing, 20)
-                                
-                                NavigationLink(
-                                    destination: ProfileView()
-                                        .environmentObject(userProfileViewModel),
-                                    isActive: $showProfileView
-                                ) {
-                                    Button(action: {
-                                        showProfileView = true
-                                        selectedPlaceVM.isDetailSheetPresented = false
-                                    }) {
-                                        if let profilePhoto = profileViewModel.userPicture {
-                                            Image(uiImage: profilePhoto)
-                                                .resizable()
-                                                .frame(width: 60, height: 60)
-                                                .clipShape(Circle())
-                                                .overlay(Circle().stroke(Color.gray, lineWidth: 2))
-                                                .shadow(radius: 4)
-                                        } else {
-                                            Image(systemName: "person.crop.circle")
-                                                .resizable()
-                                                .foregroundColor(.blue)
-                                                .frame(width: 60, height: 60)
-                                                .background(Color.white)
-                                                .clipShape(Circle())
-                                                .overlay(Circle().stroke(Color.gray, lineWidth: 2))
-                                                .shadow(radius: 4)
-                                        }
-                                    }
-                                }
                                 .padding(.trailing, 20)
                             }
                         }
@@ -154,21 +115,61 @@ struct MainView: View {
                     }
                 }
 
-                // Overlay recenter button (bottom right)
+                // Overlay profile and search buttons (bottom right)
                 if isSearchBarMinimized && !searchIsFocused && !selectedPlaceVM.isDetailSheetPresented {
                     VStack {
                         Spacer()
                         HStack {
                             Spacer()
-                            Button(action: {
-                                recenterMap = true
-                            }) {
-                                Image(systemName: "location.fill")
-                                    .foregroundColor(.white)
-                                    .frame(width: 36, height: 36)
-                                    .background(Color.blue)
-                                    .clipShape(Circle())
-                                    .shadow(radius: 4)
+                            VStack(spacing: 10) {
+                                Button(action: {
+                                    withAnimation {
+                                        if sheetHeight == maxSheetHeight {
+                                            sheetHeight = minSheetHeight
+                                        }
+                                        isSearchBarMinimized.toggle()
+                                    }
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                                        searchIsFocused = true
+                                    }
+                                }) {
+                                    Image(systemName: "magnifyingglass")
+                                        .foregroundColor(.blue)
+                                        .frame(width: 60, height: 60)
+                                        .background(Color.white)
+                                        .clipShape(Circle())
+                                        .overlay(Circle().stroke(Color.gray, lineWidth: 2))
+                                        .shadow(radius: 4)
+                                }
+                                
+                                NavigationLink(
+                                    destination: ProfileView()
+                                        .environmentObject(userProfileViewModel),
+                                    isActive: $showProfileView
+                                ) {
+                                    Button(action: {
+                                        showProfileView = true
+                                        selectedPlaceVM.isDetailSheetPresented = false
+                                    }) {
+                                        if let profilePhoto = profileViewModel.userPicture {
+                                            Image(uiImage: profilePhoto)
+                                                .resizable()
+                                                .frame(width: 60, height: 60)
+                                                .clipShape(Circle())
+                                                .overlay(Circle().stroke(Color.gray, lineWidth: 2))
+                                                .shadow(radius: 4)
+                                        } else {
+                                            Image(systemName: "person.crop.circle")
+                                                .resizable()
+                                                .foregroundColor(.blue)
+                                                .frame(width: 60, height: 60)
+                                                .background(Color.white)
+                                                .clipShape(Circle())
+                                                .overlay(Circle().stroke(Color.gray, lineWidth: 2))
+                                                .shadow(radius: 4)
+                                        }
+                                    }
+                                }
                             }
                             .padding(.bottom, 20)
                             .padding(.trailing, 20)
