@@ -43,6 +43,15 @@ class ProfileViewModel: ObservableObject {
     @Published var isFollowersListLoading: Bool = false
     @Published var isFollowingListLoading: Bool = false
     
+    // Pagination for reviewed places
+    @Published var isLoadingReviewedPlaces: Bool = false
+    @Published var isLoadingMoreReviews: Bool = false
+    private var _hasMoreReviews: Bool = true
+    private var currentReviewPage: Int = 0
+    private let reviewsPerPage: Int = 8
+    private var allReviewedPlaceIds: [String] = []
+    private var loadedReviewedPlaceIds: [String] = []
+    
     init(userSession: UserSession, userService: UserService, detailPlaceViewModel: DetailPlaceViewModel, imageService: ImageService, placeService: PlaceService, reviewService: ReviewService) {
          self.userService = userService
          self.detailPlaceViewModel = detailPlaceViewModel
@@ -279,4 +288,87 @@ class ProfileViewModel: ObservableObject {
         }
         await detailPlaceViewModel.refreshPlaces(detailPlaces: Array(allPlaceIds))
     }
+
+    func loadMyReviewedPlacesWithPagination() {
+        guard let userId = user?.id else { return }
+        if allReviewedPlaceIds.isEmpty {
+            isLoadingReviewedPlaces = true
+            Task {
+                do {
+                    let restaurantReviews: [RestaurantReview] = try await reviewService.fetchUserReviews(userId: userId)
+                    let genericReviews: [GenericReview] = try await reviewService.fetchUserReviews(userId: userId)
+                    let allReviews: [ReviewProtocol] = restaurantReviews + genericReviews
+                    allReviewedPlaceIds = Array(Set(allReviews.map { $0.placeId }))
+                } catch {
+                    isLoadingReviewedPlaces = false
+                    return
+                }
+                if allReviewedPlaceIds.isEmpty {
+                    isLoadingReviewedPlaces = false
+                    return
+                }
+                await self.loadNextBatchOfMyReviews()
+            }
+        } else {
+            Task { await self.loadNextBatchOfMyReviews() }
+        }
+    }
+
+    private func loadNextBatchOfMyReviews() async {
+        guard !isLoadingMoreReviews && _hasMoreReviews else {
+            isLoadingReviewedPlaces = false
+            return
+        }
+        isLoadingMoreReviews = true
+        let startIndex = currentReviewPage * reviewsPerPage
+        let endIndex = min(startIndex + reviewsPerPage, allReviewedPlaceIds.count)
+        guard startIndex < allReviewedPlaceIds.count else {
+            _hasMoreReviews = false
+            isLoadingMoreReviews = false
+            isLoadingReviewedPlaces = false
+            return
+        }
+        let placeIdsToLoad = Array(allReviewedPlaceIds[startIndex..<endIndex])
+        var successfullyLoadedPlaceIds: [String] = []
+        for placeId in placeIdsToLoad {
+            if detailPlaceViewModel.places[placeId] == nil {
+                do {
+                    let detailPlace = try await placeService.fetchPlace(withId: placeId)
+                    detailPlaceViewModel.places[placeId] = detailPlace
+                    detailPlaceViewModel.fetchPlaceImage(for: placeId)
+                    successfullyLoadedPlaceIds.append(placeId)
+                } catch {
+                    // Ignore failed loads
+                }
+            } else {
+                successfullyLoadedPlaceIds.append(placeId)
+            }
+        }
+        // Only add new place IDs
+        let newPlaceIds = successfullyLoadedPlaceIds.filter { !loadedReviewedPlaceIds.contains($0) }
+        loadedReviewedPlaceIds.append(contentsOf: newPlaceIds)
+        currentReviewPage += 1
+        _hasMoreReviews = endIndex < allReviewedPlaceIds.count
+        isLoadingMoreReviews = false
+        isLoadingReviewedPlaces = false
+    }
+
+    func loadMoreMyReviews() {
+        Task { await self.loadNextBatchOfMyReviews() }
+    }
+
+    func getMyReviewedPlaces() -> [DetailPlace] {
+        return loadedReviewedPlaceIds.compactMap { detailPlaceViewModel.places[$0] }
+    }
+
+    func resetMyReviewedPlacesPagination() {
+        isLoadingReviewedPlaces = false
+        isLoadingMoreReviews = false
+        _hasMoreReviews = true
+        currentReviewPage = 0
+        allReviewedPlaceIds = []
+        loadedReviewedPlaceIds = []
+    }
+
+    var hasMoreReviews: Bool { _hasMoreReviews }
 }
