@@ -10,6 +10,8 @@ import CoreLocation
 import ImageIO
 import UIKit
 import FirebaseAuth
+import FirebaseStorage
+import FirebaseFirestore
 
 @MainActor
 class PhotoImportViewModel: ObservableObject {
@@ -212,15 +214,17 @@ class PhotoImportViewModel: ObservableObject {
                 }
             }
             
-            // Save to user's myPlaces collection
-            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-                placeService.addToMyPlaces(userId: currentUserId, detailPlace: detailPlace) { error in
-                    if let error = error {
-                        print("❌ Error saving place to user's collection: \(error.localizedDescription)")
-                        continuation.resume(throwing: error)
-                    } else {
-                        print("✅ Successfully saved place to user's myPlaces collection")
-                        continuation.resume()
+            // Only save to user's myPlaces collection if this is a user-created place
+            if nearbyPlace.properties.source == "user_created" {
+                try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                    placeService.addToMyPlaces(userId: currentUserId, detailPlace: detailPlace) { error in
+                        if let error = error {
+                            print("❌ Error saving place to user's collection: \(error.localizedDescription)")
+                            continuation.resume(throwing: error)
+                        } else {
+                            print("✅ Successfully saved place to user's myPlaces collection")
+                            continuation.resume()
+                        }
                     }
                 }
             }
