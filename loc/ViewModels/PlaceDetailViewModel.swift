@@ -138,26 +138,16 @@ class PlaceDetailViewModel: ObservableObject {
     }
 
     func getRestaurantType(for place: DetailPlace) -> String? {
-        let recognizedTypes = [
-            "American", "Japanese", "Korean", "Mexican",
-            "Italian", "Chinese", "Greek", "Vietnamese",
-            "Barbecue", "Indian", "Grocery", "Hotel",
-            "Bookstore", "Pharmacy", "Library", "Bakery", "Convenience Store",
-            "Clothes", "Pizza", "Coffee Shop", "Steakhouse", "Venezuelan",
-            "Columbian", "Peruvian", "Salvadoran", "Argentinian", "Brazilian",
-            "Spanish", "French", "German", "Thai", "Turkish",
-            "Moroccan", "Lebanese", "Egyptian", "Home"
-        ]
         //TODO: this may need some revision at a later date
-        guard let placeTypes = place.categories else { return nil }
-        for recognizedType in recognizedTypes {
+        guard let placeTypes = place.categories else { return PlaceTypes.defaultType }
+        for recognizedType in PlaceTypes.recognizedTypes {
             if placeTypes.contains(where: {
                 $0.lowercased().contains(recognizedType.lowercased())
             }) {
                 return recognizedType
             }
         }
-        return nil
+        return PlaceTypes.defaultType
     }
 
     func openInGoogleMaps(latitude: Double, longitude: Double) {

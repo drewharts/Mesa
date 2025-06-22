@@ -39,7 +39,7 @@ struct MinPlaceDetailView: View {
                 
                 // MARK: - Row: Type / Google Maps / Drive Time
                 HStack(spacing: 10) {
-                    Text(viewModel.getRestaurantType(for: selectedPlaceVM.selectedPlace!) ?? "Restaurant")
+                    Text(viewModel.getRestaurantType(for: selectedPlaceVM.selectedPlace!) ?? "Place")
                         .font(.subheadline)
                         .foregroundColor(.gray)
                     
