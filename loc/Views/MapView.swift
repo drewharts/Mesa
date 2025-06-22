@@ -16,10 +16,6 @@ struct MapView: View {
     @Binding var recenterMap: Bool
     
     private let defaultCenter = CLLocationCoordinate2D(latitude: 39.5, longitude: -98.0)
-    @State private var region: MKCoordinateRegion = MKCoordinateRegion(
-        center: CLLocationCoordinate2D(latitude: 39.5, longitude: -98.0),
-        span: MKCoordinateSpan(latitudeDelta: 0.1, longitudeDelta: 0.1)
-    )
     @State private var showCreatePlacePopup = false
     @State private var newPlaceName = ""
     @State private var newPlaceDescription = ""
@@ -33,81 +29,74 @@ struct MapView: View {
         let currentCoords = locationManager.currentLocation?.coordinate ?? defaultCenter
         
         ZStack {
-            Map(position: $mapPosition) {
-                ForEach(detailPlaceVM.savedDetailPlaces.compactMap { place -> PlaceAnnotationItem? in
-                    return PlaceAnnotationItem(
-                        id: place.id,
-                        coordinate: CLLocationCoordinate2D(latitude: place.coordinate!.latitude, longitude: place.coordinate!.longitude),
-                        place: place
-                    )
-                }) { place in
-                    Annotation(
-                        "",
-                        coordinate: place.coordinate,
-                        anchor: .bottom
-                    ) {
-                        PlaceAnnotationView(
-                            place: place.place,
-                            image: detailPlaceVM.placeAnnotations[place.place.id.uuidString],
-                            annotationImage: detailPlaceVM.placeAnnotations[place.place.id.uuidString]
+            MapReader { mapProxy in
+                Map(position: $mapPosition) {
+                    ForEach(detailPlaceVM.savedDetailPlaces.compactMap { place -> PlaceAnnotationItem? in
+                        return PlaceAnnotationItem(
+                            id: place.id,
+                            coordinate: CLLocationCoordinate2D(latitude: place.coordinate!.latitude, longitude: place.coordinate!.longitude),
+                            place: place
                         )
-                        .onTapGesture {
-                            selectedPlaceVM.selectedPlace = place.place
-                        }
-                    }
-                }
-                // Current location dot
-                if let userLocation = locationManager.currentLocation?.coordinate {
-                    Annotation(
-                        "",
-                        coordinate: userLocation,
-                        anchor: .center
-                    ) {
-                        Circle()
-                            .fill(Color.blue)
-                            .frame(width: 18, height: 18)
-                            .overlay(
-                                Circle()
-                                    .stroke(Color.white, lineWidth: 4)
-                                    .frame(width: 18, height: 18)
+                    }) { place in
+                        Annotation(
+                            "",
+                            coordinate: place.coordinate,
+                            anchor: .bottom
+                        ) {
+                            PlaceAnnotationView(
+                                place: place.place,
+                                image: detailPlaceVM.placeAnnotations[place.place.id.uuidString],
+                                annotationImage: detailPlaceVM.placeAnnotations[place.place.id.uuidString]
                             )
-                            .shadow(radius: 4)
-                    }
-                }
-            }
-            .mapControlVisibility(.hidden)
-            .ignoresSafeArea()
-            .gesture(
-                LongPressGesture(minimumDuration: 0.7)
-                    .sequenced(before: DragGesture(minimumDistance: 0))
-                    .onEnded { value in
-                        switch value {
-                        case .second(true, let drag?):
-                            // Use the drag location to get the coordinate
-                            if let window = UIApplication.shared.windows.first {
-                                let location = drag.location
-                                // Use MapProxy if available (iOS 17+), otherwise fallback to center
-                                if #available(iOS 17.0, *) {
-                                    // Use MapProxy to convert point to coordinate
-                                    // This requires .mapOverlay, so we use a workaround here
-                                    // For now, fallback to center
-                                    newPlaceCoordinate = region.center
-                                } else {
-                                    newPlaceCoordinate = region.center
-                                }
+                            .onTapGesture {
+                                selectedPlaceVM.selectedPlace = place.place
                             }
-                            showCreatePlacePopup = true
-                        default:
-                            break
                         }
                     }
-            )
-            .simultaneousGesture(
-                TapGesture()
-                    .onEnded {
-                        onMapTap?()
+                    // Current location dot
+                    if let userLocation = locationManager.currentLocation?.coordinate {
+                        Annotation(
+                            "",
+                            coordinate: userLocation,
+                            anchor: .center
+                        ) {
+                            Circle()
+                                .fill(Color.blue)
+                                .frame(width: 18, height: 18)
+                                .overlay(
+                                    Circle()
+                                        .stroke(Color.white, lineWidth: 4)
+                                        .frame(width: 18, height: 18)
+                                )
+                                .shadow(radius: 4)
+                        }
                     }
-            )
+                }
+                .mapControlVisibility(.hidden)
+                .ignoresSafeArea()
+                .gesture(
+                    LongPressGesture(minimumDuration: 0.7)
+                        .sequenced(before: DragGesture(minimumDistance: 0))
+                        .onEnded { value in
+                            switch value {
+                            case .second(true, let drag?):
+                                // Convert the tap location to map coordinates using MapProxy
+                                if let coordinate = mapProxy.convert(drag.location, from: .local) {
+                                    newPlaceCoordinate = coordinate
+                                    showCreatePlacePopup = true
+                                }
+                            default:
+                                break
+                            }
+                        }
+                )
+                .simultaneousGesture(
+                    TapGesture()
+                        .onEnded {
+                            onMapTap?()
+                        }
+                )
+            }
             .onChange(of: selectedPlaceVM.selectedPlace) { oldValue, newValue in
                 guard let place = newValue, let geoPoint = place.coordinate else {
                     // Reset to default if no place is selected
@@ -168,7 +157,7 @@ struct MapView: View {
                     coordinate: coordinate
                 ) { name, description in
                     if let userId = profile.user?.id {
-                        selectedPlaceVM.createNewPlace(name: name, description: description, coordinate: coordinate, userId: userId)
+                        selectedPlaceVM.createNewPlace(name: name, description: description, coordinate: coordinate, userId: userId, profileVM: profile, detailPlaceVM: detailPlaceVM)
                         // Reset fields
                         newPlaceName = ""
                         newPlaceDescription = ""

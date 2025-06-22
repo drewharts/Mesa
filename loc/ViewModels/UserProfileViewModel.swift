@@ -22,14 +22,38 @@ class UserProfileViewModel: ObservableObject {
     @Published var placeImages: [String: UIImage] = [:]
     @Published var isFollowing: Bool = false
     @Published var followers: Int = 0
-    private let firestoreService = FirestoreService()
-    private let mapboxSearchService = MapboxSearchService()
+    
+    // Reviewed places loading state
+    @Published var isLoadingReviewedPlaces: Bool = false
+    private var hasAttemptedLoadReviewedPlaces: [String: Bool] = [:]
+    
+    // Pagination properties for user reviews
+    @Published var isLoadingMoreReviews: Bool = false
+    private var hasMoreReviews: [String: Bool] = [:] // userId -> hasMoreReviews
+    private var currentReviewPage: [String: Int] = [:] // userId -> page number
+    private let reviewsPerPage: Int = 8
+    private var allReviewedPlaceIds: [String: [String]] = [:] // userId -> [placeIds]
+    private var loadedReviewedPlaceIds: [String: [String]] = [:] // userId -> [loaded placeIds]
+    
+    private let placeService: PlaceService
+    private let userService: UserService
+    private let reviewService: ReviewService
+    
     private let dataManager: DataManager
     private let detailPlaceViewModel: DetailPlaceViewModel
     
-    init(dataManager: DataManager, detailPlaceViewModel: DetailPlaceViewModel) {
+    init(
+        dataManager: DataManager, 
+        detailPlaceViewModel: DetailPlaceViewModel,
+        placeService: PlaceService,
+        userService: UserService,
+        reviewService: ReviewService
+    ) {
         self.dataManager = dataManager
         self.detailPlaceViewModel = detailPlaceViewModel
+        self.placeService = placeService
+        self.userService = userService
+        self.reviewService = reviewService
     }
     
     func selectUser(_ user: ProfileData, currentUserId: String) {
@@ -42,8 +66,20 @@ class UserProfileViewModel: ObservableObject {
         self.fetchFavoritePlaceImages()
     }
     
+    func fetchAndSelectUser(userId: String, currentUserId: String) {
+        userService.fetchUserById(userId: userId) { [weak self] result in
+            switch result {
+            case .success(let profileData):
+                self?.selectUser(profileData, currentUserId: currentUserId)
+            case .failure(let error):
+                print("Error fetching user profile: \(error.localizedDescription)")
+                // Optionally handle error - could show an alert or set an error state
+            }
+        }
+    }
+    
     func fetchFollowers(userId: String) {
-        firestoreService.getNumberFollowers(forUserId: userId) { (count, error) in
+        userService.getNumberFollowers(forUserId: userId) { (count, error) in
             if let error = error {
                 print("Error fetching followers: \(error.localizedDescription)")
                 return
@@ -57,7 +93,7 @@ class UserProfileViewModel: ObservableObject {
             self.isFollowing = false
             return
         }
-        firestoreService.isFollowingUser(followerId: currentUserId, followingId: targetUserId) { [weak self] isFollowing in
+        userService.isFollowingUser(followerId: currentUserId, followingId: targetUserId) { [weak self] isFollowing in
             self?.isFollowing = isFollowing
         }
     }
@@ -65,7 +101,7 @@ class UserProfileViewModel: ObservableObject {
     func toggleFollowUser(currentUserId: String) {
         guard let targetUserId = selectedUser?.id else { return }
         if isFollowing {
-            firestoreService.unfollowUser(followerId: currentUserId, followingId: targetUserId) { success, error in
+            userService.unfollowUser(followerId: currentUserId, followingId: targetUserId) { success, error in
                 if success {
                     self.isFollowing = false
                     self.followers = max(0, self.followers - 1)
@@ -75,7 +111,7 @@ class UserProfileViewModel: ObservableObject {
                 }
             }
         } else {
-            firestoreService.followUser(followerId: currentUserId, followingId: targetUserId) { success, error in
+            userService.followUser(followerId: currentUserId, followingId: targetUserId) { success, error in
                 if success {
                     self.isFollowing = true
                     self.followers += 1
@@ -91,7 +127,7 @@ class UserProfileViewModel: ObservableObject {
     }
     
     func followUser(currentUserId: String, targetUserId: String) {
-        firestoreService.followUser(followerId: currentUserId, followingId: targetUserId) { success, error in
+        userService.followUser(followerId: currentUserId, followingId: targetUserId) { success, error in
             if let error = error {
                 print("Error following user: \(error.localizedDescription)")
             } else if success {
@@ -102,7 +138,7 @@ class UserProfileViewModel: ObservableObject {
     
     private func fetchProfileFavorites(userId: String) {
         print("Fetching favorites for userId: \(userId)")
-        firestoreService.fetchProfileFavorites(userId: userId) { [weak self] favorites in
+        placeService.fetchProfileFavorites(userId: userId) { [weak self] favorites in
             guard let self = self else { return }
             if favorites == nil {
                 print("Favorites fetch returned nil - possible error or no data")
@@ -133,7 +169,7 @@ class UserProfileViewModel: ObservableObject {
     }
     
     private func fetchLists(userId: String) {
-        firestoreService.fetchLists(userId: userId) { lists in
+        placeService.fetchLists(userId: userId) { lists in
             self.userLists = lists
             // Fetch places and images for each PlaceList
             for list in lists {
@@ -159,7 +195,7 @@ class UserProfileViewModel: ObservableObject {
             
             let documentId = place.id.uuidString
             
-            firestoreService.fetchPlace(withId: documentId) { result in
+            placeService.fetchPlace(withId: documentId) { result in
                 switch result {
                 case .success(let detailPlace):
                     fetchedPlaces.append(detailPlace)
@@ -233,7 +269,7 @@ class UserProfileViewModel: ObservableObject {
         }
         
         // Fetch reviews for this place
-        firestoreService.fetchReviews(placeId: placeId, latestOnly: false) { [weak self] (reviews: [ReviewProtocol]?, error) in
+        reviewService.fetchReviews(placeId: placeId, latestOnly: false) { [weak self] (reviews: [ReviewProtocol]?, error) in
             guard let self = self else { return }
             
             if let error = error {
@@ -290,5 +326,198 @@ class UserProfileViewModel: ObservableObject {
             //     detailPlaceViewModel.places.removeValue(forKey: placeId)
             // }
         }
+    }
+    
+    // MARK: - Reviewed Places Loading
+    
+    func loadUserReviewedPlacesIfNeeded() {
+        guard let userId = selectedUser?.id else { return }
+        
+        // Only load if we haven't attempted to load for this user yet
+        if hasAttemptedLoadReviewedPlaces[userId] != true {
+            isLoadingReviewedPlaces = true
+            hasAttemptedLoadReviewedPlaces[userId] = true
+            
+            Task {
+                await dataManager.loadUserReviewedPlaces(userId: userId)
+                
+                // Update loading state on main thread
+                await MainActor.run {
+                    isLoadingReviewedPlaces = false
+                }
+            }
+        }
+    }
+    
+    func resetReviewedPlacesLoadingState() {
+        isLoadingReviewedPlaces = false
+        hasAttemptedLoadReviewedPlaces.removeAll()
+        resetPaginationState()
+    }
+    
+    // MARK: - Pagination for User Reviews
+    
+    func loadUserReviewedPlacesWithPagination() {
+        guard let userId = selectedUser?.id else { return }
+        
+        // Reset pagination state for new user
+        if hasAttemptedLoadReviewedPlaces[userId] != true {
+            resetPaginationState()
+            hasAttemptedLoadReviewedPlaces[userId] = true
+        }
+        
+        Task {
+            await loadUserReviewedPlacesPaginated(userId: userId)
+        }
+    }
+    
+    private func resetPaginationState() {
+        currentReviewPage.removeAll()
+        allReviewedPlaceIds.removeAll()
+        loadedReviewedPlaceIds.removeAll()
+        hasMoreReviews.removeAll()
+        isLoadingMoreReviews = false
+    }
+    
+    private func loadUserReviewedPlacesPaginated(userId: String) async {
+        // If this is the first load, get all review place IDs
+        if allReviewedPlaceIds[userId] == nil {
+            await MainActor.run {
+                isLoadingReviewedPlaces = true
+            }
+            
+            do {
+                let restaurantReviews: [RestaurantReview] = try await reviewService.fetchUserReviews(userId: userId)
+                let genericReviews: [GenericReview] = try await reviewService.fetchUserReviews(userId: userId)
+                let allReviews: [ReviewProtocol] = restaurantReviews + genericReviews
+                
+                await MainActor.run {
+                    allReviewedPlaceIds[userId] = Array(Set(allReviews.map { $0.placeId }))
+                    // Initialize hasMoreReviews for this user
+                    hasMoreReviews[userId] = !allReviewedPlaceIds[userId]!.isEmpty
+                }
+            } catch {
+                print("Error fetching user reviews for pagination: \(error.localizedDescription)")
+                await MainActor.run {
+                    isLoadingReviewedPlaces = false
+                }
+                return
+            }
+        }
+        
+        // If there are no reviews at all, ensure loading state is reset
+        if allReviewedPlaceIds[userId]?.isEmpty == true {
+            await MainActor.run {
+                isLoadingReviewedPlaces = false
+            }
+            return
+        }
+        
+        // Load the next batch of reviews
+        await loadNextBatchOfReviews(userId: userId)
+    }
+    
+    private func loadNextBatchOfReviews(userId: String) async {
+        guard !isLoadingMoreReviews && hasMoreReviews[userId] != false else { 
+            // Safety check: if we can't load more, ensure initial loading is complete
+            await MainActor.run {
+                isLoadingReviewedPlaces = false
+            }
+            return 
+        }
+        
+        await MainActor.run {
+            isLoadingMoreReviews = true
+        }
+        
+        let startIndex = currentReviewPage[userId] ?? 0
+        let endIndex = min(startIndex + reviewsPerPage, allReviewedPlaceIds[userId]?.count ?? 0)
+        
+        guard startIndex < (allReviewedPlaceIds[userId]?.count ?? 0) else {
+            await MainActor.run {
+                hasMoreReviews[userId] = false
+                isLoadingMoreReviews = false
+                isLoadingReviewedPlaces = false
+            }
+            return
+        }
+        
+        let placeIdsToLoad = Array(allReviewedPlaceIds[userId]![startIndex..<endIndex])
+        
+        // Load places and their details
+        var successfullyLoadedPlaceIds: [String] = []
+        
+        for placeId in placeIdsToLoad {
+            // Add userId to placeSavers if not already present
+            if detailPlaceViewModel.placeSavers[placeId] == nil {
+                detailPlaceViewModel.placeSavers[placeId] = [userId]
+            } else if !detailPlaceViewModel.placeSavers[placeId]!.contains(userId) {
+                detailPlaceViewModel.placeSavers[placeId]!.append(userId)
+            }
+            
+            // Fetch and store the place if not already present
+            if detailPlaceViewModel.places[placeId] == nil {
+                do {
+                    let detailPlace = try await placeService.fetchPlace(withId: placeId)
+                    detailPlaceViewModel.places[placeId] = detailPlace
+                    detailPlaceViewModel.fetchPlaceImage(for: placeId)
+                    // Only add to successfully loaded places if we got the data
+                    successfullyLoadedPlaceIds.append(placeId)
+                } catch {
+                    print("Error fetching place for reviewed placeId \(placeId): \(error.localizedDescription)")
+                }
+            } else {
+                // Place already exists, add to successfully loaded
+                successfullyLoadedPlaceIds.append(placeId)
+            }
+        }
+        
+        await MainActor.run {
+            if loadedReviewedPlaceIds[userId] == nil {
+                loadedReviewedPlaceIds[userId] = []
+            }
+            // Only add place IDs that aren't already in the list
+            let newPlaceIds = successfullyLoadedPlaceIds.filter { placeId in
+                !loadedReviewedPlaceIds[userId]!.contains(placeId)
+            }
+            loadedReviewedPlaceIds[userId]?.append(contentsOf: newPlaceIds)
+            currentReviewPage[userId] = (currentReviewPage[userId] ?? 0) + 1
+            hasMoreReviews[userId] = endIndex < (allReviewedPlaceIds[userId]?.count ?? 0)
+            isLoadingMoreReviews = false
+            isLoadingReviewedPlaces = false
+        }
+    }
+    
+    func loadMoreReviews() {
+        guard let userId = selectedUser?.id else { return }
+        Task {
+            await loadNextBatchOfReviews(userId: userId)
+        }
+    }
+    
+    // Get places that this user has reviewed (with pagination)
+    func getReviewedPlaces() -> [DetailPlace] {
+        guard let userId = selectedUser?.id else { return [] }
+        
+        // Return only the loaded places for pagination
+        return loadedReviewedPlaceIds[userId]?.compactMap { detailPlaceViewModel.places[$0] } ?? []
+    }
+    
+    // Get all reviewed places (for backward compatibility)
+    func getAllReviewedPlaces() -> [DetailPlace] {
+        guard let userId = selectedUser?.id else { return [] }
+        
+        // Find all places where this user is in the placeSavers array
+        let reviewedPlaceIds = detailPlaceViewModel.placeSavers.compactMap { (placeId, userIds) -> String? in
+            return userIds.contains(userId) ? placeId : nil
+        }
+        
+        // Get the actual DetailPlace objects for those IDs
+        return reviewedPlaceIds.compactMap { detailPlaceViewModel.places[$0] }
+    }
+    
+    // Get hasMoreReviews for a specific user
+    func hasMoreReviews(for userId: String) -> Bool {
+        return hasMoreReviews[userId] ?? true
     }
 }

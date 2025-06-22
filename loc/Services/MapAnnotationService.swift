@@ -17,15 +17,11 @@ class MapAnnotationService: ObservableObject {
     // Cache for user profile images to avoid redundant fetching/processing
     private var userProfilePhotos: [String: UIImage] = [:] // User ID -> Profile Image
     
-    // Dependencies
-    private let firestoreService: FirestoreService
     private weak var detailPlaceViewModel: DetailPlaceViewModel? // Use weak to avoid retain cycles
     private var currentUserId: String? // To be set later
     
-    init(firestoreService: FirestoreService, detailPlaceViewModel: DetailPlaceViewModel) {
-        self.firestoreService = firestoreService
+    init(detailPlaceViewModel: DetailPlaceViewModel) {
         self.detailPlaceViewModel = detailPlaceViewModel
-        print("MapAnnotationService initialized")
     }
     
     //what needs to be done to build all annotations
@@ -149,14 +145,4 @@ class MapAnnotationService: ObservableObject {
             if image1 != nil { drawCircularImage(image1, in: firstRect) }
         }
     }
-    
-    // MARK: - Potential Dependencies (Example)
-    // private let firestoreService: FirestoreService // If fetching photos here
-    // private weak var detailPlaceViewModel: DetailPlaceViewModel // To get savers
 }
-
-// Placeholder User struct if not globally available
-// struct User: Identifiable {
-//    let id: String
-//    var profilePhotoURL: URL?
-// } 

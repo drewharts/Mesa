@@ -23,7 +23,10 @@ class ProfileViewModel: ObservableObject {
     //TODO: Implement my places
     @Published var myPlaces: [String] = []
     
-     private let firestoreService: FirestoreService
+     private let userService: UserService
+    private let imageService: ImageService
+    private let placeService: PlaceService
+    private let reviewService: ReviewService
      internal let detailPlaceViewModel: DetailPlaceViewModel
      private let userSession: UserSession
      @Published var showMaxFavoritesAlert: Bool = false
@@ -40,17 +43,29 @@ class ProfileViewModel: ObservableObject {
     @Published var isFollowersListLoading: Bool = false
     @Published var isFollowingListLoading: Bool = false
     
-    init(userSession: UserSession, firestoreService: FirestoreService, detailPlaceViewModel: DetailPlaceViewModel) {
-         self.firestoreService = firestoreService
+    // Pagination for reviewed places
+    @Published var isLoadingReviewedPlaces: Bool = false
+    @Published var isLoadingMoreReviews: Bool = false
+    private var _hasMoreReviews: Bool = true
+    private var currentReviewPage: Int = 0
+    private let reviewsPerPage: Int = 8
+    private var allReviewedPlaceIds: [String] = []
+    private var loadedReviewedPlaceIds: [String] = []
+    
+    init(userSession: UserSession, userService: UserService, detailPlaceViewModel: DetailPlaceViewModel, imageService: ImageService, placeService: PlaceService, reviewService: ReviewService) {
+         self.userService = userService
          self.detailPlaceViewModel = detailPlaceViewModel
         self.userSession = userSession
+        self.imageService = imageService
+        self.placeService = placeService
+        self.reviewService = reviewService
      }
     
      func changeProfilePhoto(_ newImage: UIImage) async {
         guard let userId = user?.id else { return }
         let croppedImage = cropToSquare(newImage)
         do {
-            let url = try await firestoreService.updateProfilePhoto(userId: userId, image: croppedImage)
+            let url = try await imageService.updateProfilePhoto(userId: userId, image: croppedImage)
             // Update local user and userPicture
             DispatchQueue.main.async {
                 self.user?.profilePhotoURL = url
@@ -89,7 +104,7 @@ class ProfileViewModel: ObservableObject {
         guard let currentUserId = user?.id else { return }
         if userFollowing.contains(where: { $0.id == userId }) {
             // Unfollow
-            firestoreService.unfollowUser(followerId: currentUserId, followingId: userId) { [weak self] success, error in
+            userService.unfollowUser(followerId: currentUserId, followingId: userId) { [weak self] success, error in
                 if success {
                     self?.userFollowing.removeAll { $0.id == userId }
                     self?.followingCount = max(0, (self?.followingCount ?? 1) - 1)
@@ -97,10 +112,10 @@ class ProfileViewModel: ObservableObject {
             }
         } else {
             // Follow
-            firestoreService.followUser(followerId: currentUserId, followingId: userId) { [weak self] success, error in
+            userService.followUser(followerId: currentUserId, followingId: userId) { [weak self] success, error in
                 if success {
                     // Fetch the ProfileData for the followed user and add to userFollowing
-                    self?.firestoreService.fetchUserById(userId: userId) { result in
+                    self?.userService.fetchUserById(userId: userId) { result in
                         if case .success(let profileData) = result {
                             self?.userFollowing.append(profileData)
                         }
@@ -139,10 +154,6 @@ class ProfileViewModel: ObservableObject {
          }
      }
     
-    func addFavoriteFromSuggestion(place: MesaPlaceSuggestion) {
-        //get rid of this in the future
-    }
-    
      func isPlaceInList(listId: UUID, placeId: String) -> Bool {
          return false
      }
@@ -165,7 +176,7 @@ class ProfileViewModel: ObservableObject {
             userLists[listIndex].places.append(placeForList)
         }
         // Persist to Firestore
-        firestoreService.addPlaceToList(userId: userId, listName: listIdString, place: placeForList)
+        placeService.addPlaceToList(userId: userId, listName: listIdString, place: placeForList)
         // Update DetailPlaceViewModel's places dictionary for immediate UI update
         if detailPlaceViewModel.places[place.id.uuidString] == nil {
             detailPlaceViewModel.places[place.id.uuidString] = place
@@ -189,7 +200,7 @@ class ProfileViewModel: ObservableObject {
          let placeForList = Place(id: place.id, name: place.name, address: place.address ?? "")
 
 
-         firestoreService.removePlaceFromList(userId: userId, listId: list.id, place: placeForList)
+         placeService.removePlaceFromList(userId: userId, listId: list.id, place: placeForList)
      }
     
      func addFavoritePlace(place: DetailPlace) {
@@ -201,7 +212,7 @@ class ProfileViewModel: ObservableObject {
         }
         if !userFavorites.contains(place.id.uuidString) {
             userFavorites.append(place.id.uuidString)
-            firestoreService.addProfileFavorite(userId: userId, place: place)
+            userService.addProfileFavorite(userId: userId, place: place)
         }
     }
     
@@ -209,7 +220,7 @@ class ProfileViewModel: ObservableObject {
         guard let userId = userSession.currentUserId else { return }
         if let index = userFavorites.firstIndex(of: place.id.uuidString) {
             userFavorites.remove(at: index)
-            firestoreService.removeProfileFavorite(userId: userId, placeId: place.id.uuidString)
+            userService.removeProfileFavorite(userId: userId, placeId: place.id.uuidString)
         }
     }
     
@@ -221,13 +232,13 @@ class ProfileViewModel: ObservableObject {
          let newPlaceList = PlaceList(name: name, city: city, emoji: emoji, image: image)
          userLists.append(newPlaceList)
          guard let userId = user?.id else { return }
-         firestoreService.createNewList(placeList: newPlaceList, userID: userId)
+         placeService.createNewList(placeList: newPlaceList, userID: userId)
      }
     
      func removePlaceList(placeList: PlaceList) {
          if let index = userLists.firstIndex(where: { $0.id == placeList.id }) {
              userLists.remove(at: index)
-             firestoreService.deleteList(userId: userSession.currentUserId!,listId: placeList.id.uuidString) { error in
+             placeService.deleteList(userId: userSession.currentUserId!,listId: placeList.id.uuidString) { error in
                  if error == nil, let index = self.userLists.firstIndex(where: { $0.id == placeList.id }) {
                      self.userLists.remove(at: index)
                  }
@@ -277,4 +288,87 @@ class ProfileViewModel: ObservableObject {
         }
         await detailPlaceViewModel.refreshPlaces(detailPlaces: Array(allPlaceIds))
     }
+
+    func loadMyReviewedPlacesWithPagination() {
+        guard let userId = user?.id else { return }
+        if allReviewedPlaceIds.isEmpty {
+            isLoadingReviewedPlaces = true
+            Task {
+                do {
+                    let restaurantReviews: [RestaurantReview] = try await reviewService.fetchUserReviews(userId: userId)
+                    let genericReviews: [GenericReview] = try await reviewService.fetchUserReviews(userId: userId)
+                    let allReviews: [ReviewProtocol] = restaurantReviews + genericReviews
+                    allReviewedPlaceIds = Array(Set(allReviews.map { $0.placeId }))
+                } catch {
+                    isLoadingReviewedPlaces = false
+                    return
+                }
+                if allReviewedPlaceIds.isEmpty {
+                    isLoadingReviewedPlaces = false
+                    return
+                }
+                await self.loadNextBatchOfMyReviews()
+            }
+        } else {
+            Task { await self.loadNextBatchOfMyReviews() }
+        }
+    }
+
+    private func loadNextBatchOfMyReviews() async {
+        guard !isLoadingMoreReviews && _hasMoreReviews else {
+            isLoadingReviewedPlaces = false
+            return
+        }
+        isLoadingMoreReviews = true
+        let startIndex = currentReviewPage * reviewsPerPage
+        let endIndex = min(startIndex + reviewsPerPage, allReviewedPlaceIds.count)
+        guard startIndex < allReviewedPlaceIds.count else {
+            _hasMoreReviews = false
+            isLoadingMoreReviews = false
+            isLoadingReviewedPlaces = false
+            return
+        }
+        let placeIdsToLoad = Array(allReviewedPlaceIds[startIndex..<endIndex])
+        var successfullyLoadedPlaceIds: [String] = []
+        for placeId in placeIdsToLoad {
+            if detailPlaceViewModel.places[placeId] == nil {
+                do {
+                    let detailPlace = try await placeService.fetchPlace(withId: placeId)
+                    detailPlaceViewModel.places[placeId] = detailPlace
+                    detailPlaceViewModel.fetchPlaceImage(for: placeId)
+                    successfullyLoadedPlaceIds.append(placeId)
+                } catch {
+                    // Ignore failed loads
+                }
+            } else {
+                successfullyLoadedPlaceIds.append(placeId)
+            }
+        }
+        // Only add new place IDs
+        let newPlaceIds = successfullyLoadedPlaceIds.filter { !loadedReviewedPlaceIds.contains($0) }
+        loadedReviewedPlaceIds.append(contentsOf: newPlaceIds)
+        currentReviewPage += 1
+        _hasMoreReviews = endIndex < allReviewedPlaceIds.count
+        isLoadingMoreReviews = false
+        isLoadingReviewedPlaces = false
+    }
+
+    func loadMoreMyReviews() {
+        Task { await self.loadNextBatchOfMyReviews() }
+    }
+
+    func getMyReviewedPlaces() -> [DetailPlace] {
+        return loadedReviewedPlaceIds.compactMap { detailPlaceViewModel.places[$0] }
+    }
+
+    func resetMyReviewedPlacesPagination() {
+        isLoadingReviewedPlaces = false
+        isLoadingMoreReviews = false
+        _hasMoreReviews = true
+        currentReviewPage = 0
+        allReviewedPlaceIds = []
+        loadedReviewedPlaceIds = []
+    }
+
+    var hasMoreReviews: Bool { _hasMoreReviews }
 }

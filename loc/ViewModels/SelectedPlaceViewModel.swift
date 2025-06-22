@@ -13,7 +13,11 @@ import FirebaseAuth
 import FirebaseFirestore
 
 class SelectedPlaceViewModel: ObservableObject {
-    private let firestoreService: FirestoreService
+    private let reviewService: ReviewService
+    private let userService: UserService
+    private let placeService: PlaceService
+    private let imageService: ImageService
+    
     private let locationManager: LocationManager
     
     @Published var selectedPlace: DetailPlace? {
@@ -52,6 +56,14 @@ class SelectedPlaceViewModel: ObservableObject {
     private var commentLoadingStates: [String: LoadingState] = [:] // reviewId -> loading state
     private var commentPhotos: [String: [UIImage]] = [:] // commentId -> photos
     private var reviewCommentCounts: [String: Int] = [:] // reviewId -> comment count
+    
+    init(locationManager: LocationManager, reviewService: ReviewService, placeService: PlaceService, userService: UserService, imageService: ImageService) {
+        self.locationManager = locationManager
+        self.reviewService = reviewService
+        self.placeService = placeService
+        self.userService = userService
+        self.imageService = imageService
+    }
 
     // MARK: - Loading State Enum
     enum LoadingState: Equatable {
@@ -71,12 +83,7 @@ class SelectedPlaceViewModel: ObservableObject {
             }
         }
     }
-    
-    // MARK: - Initialization
-    init(locationManager: LocationManager, firestoreService: FirestoreService) {
-        self.locationManager = locationManager
-        self.firestoreService = firestoreService
-    }
+
     
     // Get restaurant type for a place
     func getRestaurantType(for placeId: String) -> String? {
@@ -168,7 +175,7 @@ class SelectedPlaceViewModel: ObservableObject {
         }
         
         // Use the new method to fetch reviews from friends and the current user (both restaurant and generic)
-        firestoreService.fetchFriendsReviews(placeId: placeId, currentUserId: currentUserId) { [weak self] reviews, error in
+        userService.fetchFriendsReviews(placeId: placeId, currentUserId: currentUserId) { [weak self] reviews, error in
             guard let self = self else { return }
             
             DispatchQueue.main.async {
@@ -226,7 +233,7 @@ class SelectedPlaceViewModel: ObservableObject {
         }
         
         // First fetch all reviews for this place
-        firestoreService.fetchFriendsReviews(placeId: placeId, currentUserId: Auth.auth().currentUser?.uid ?? "") { [weak self] reviews, error in
+        userService.fetchFriendsReviews(placeId: placeId, currentUserId: Auth.auth().currentUser?.uid ?? "") { [weak self] reviews, error in
             guard let self = self else { return }
             
             if let error = error {
@@ -254,7 +261,7 @@ class SelectedPlaceViewModel: ObservableObject {
             }
             
             // Fetch the actual images using the URLs
-            firestoreService.fetchPhotosFromStorage(urls: photoURLs) { [weak self] images, error in
+            imageService.fetchPhotosFromStorage(urls: photoURLs) { [weak self] images, error in
                 guard let self = self else { return }
                 
                 DispatchQueue.main.async {
@@ -285,7 +292,7 @@ class SelectedPlaceViewModel: ObservableObject {
             self.reviewPhotoLoadingStates[reviewId] = .loading
         }
         
-        firestoreService.fetchPhotosFromStorage(urls: review.images) { [weak self] images, error in
+        imageService.fetchPhotosFromStorage(urls: review.images) { [weak self] images, error in
             guard let self = self else { return }
             
             DispatchQueue.main.async {
@@ -362,7 +369,7 @@ class SelectedPlaceViewModel: ObservableObject {
         likedReviews.removeAll()
         
         reviews.forEach { review in
-            firestoreService.hasUserLikedReview(userId: userId, reviewId: review.id) { [weak self] isLiked in
+            reviewService.hasUserLikedReview(userId: userId, reviewId: review.id) { [weak self] isLiked in
                 DispatchQueue.main.async {
                     if isLiked {
                         self?.likedReviews.insert(review.id)
@@ -382,7 +389,7 @@ class SelectedPlaceViewModel: ObservableObject {
         }
         
         // Add limit and order by timestamp to get only the most recent 5 comments
-        firestoreService.fetchComments(placeId: placeId, reviewId: reviewId, limit: 5) { [weak self] comments, error in
+        reviewService.fetchComments(placeId: placeId, reviewId: reviewId, limit: 5) { [weak self] comments, error in
             guard let self = self else { return }
             
             DispatchQueue.main.async {
@@ -415,7 +422,7 @@ class SelectedPlaceViewModel: ObservableObject {
         
         let commentId = UUID().uuidString
         
-        let comment = Comment(
+        var comment = Comment(
             id: commentId,
             reviewId: reviewId,
             userId: userId,
@@ -428,32 +435,43 @@ class SelectedPlaceViewModel: ObservableObject {
             likes: 0
         )
         
-        firestoreService.addComment(placeId: placeId, reviewId: reviewId, comment: comment, images: images) { [weak self] result in
+        ImageService.shared.uploadImagesForComment(comment: comment, images: images) { [weak self] result in
             guard let self = self else { return }
             
-            DispatchQueue.main.async {
-                switch result {
-                case .success(let savedComment):
-                    // Add the comment to our local collection
-                    var currentComments = self.placeReviewComments[reviewId] ?? []
-                    currentComments.insert(savedComment, at: 0) // Add at the top
-                    self.placeReviewComments[reviewId] = currentComments
+            switch result {
+            case .success(let downloadURLs):
+                comment.images = downloadURLs
+                
+                ReviewService.shared.addComment(placeId: placeId, reviewId: reviewId, comment: comment) { [weak self] result in
+                    guard let self = self else { return }
                     
-                    // Update the comment count
-                    let currentCount = self.reviewCommentCounts[reviewId] ?? 0
-                    self.reviewCommentCounts[reviewId] = currentCount + 1
-                    
-                    // Ensure loading state is set to loaded
-                    self.commentLoadingStates[reviewId] = .loaded
-                    
-                    // Load comment photos if any
-                    if !savedComment.images.isEmpty {
-                        self.loadCommentPhotos(for: savedComment)
+                    DispatchQueue.main.async {
+                        switch result {
+                        case .success(let savedComment):
+                            // Add the comment to our local collection
+                            var currentComments = self.placeReviewComments[reviewId] ?? []
+                            currentComments.insert(savedComment, at: 0) // Add at the top
+                            self.placeReviewComments[reviewId] = currentComments
+                            
+                            // Update the comment count
+                            let currentCount = self.reviewCommentCounts[reviewId] ?? 0
+                            self.reviewCommentCounts[reviewId] = currentCount + 1
+                            
+                            // Ensure loading state is set to loaded
+                            self.commentLoadingStates[reviewId] = .loaded
+                            
+                            // Load comment photos if any
+                            if !savedComment.images.isEmpty {
+                                self.loadCommentPhotos(for: savedComment)
+                            }
+                            
+                        case .failure(let error):
+                            print("Error adding comment: \(error.localizedDescription)")
+                        }
                     }
-                    
-                case .failure(let error):
-                    print("Error adding comment: \(error.localizedDescription)")
                 }
+            case .failure(let error):
+                print("Error uploading comment images: \(error.localizedDescription)")
             }
         }
     }
@@ -465,7 +483,7 @@ class SelectedPlaceViewModel: ObservableObject {
         }
         print("Loading \(comment.images.count) photos for comment ID: \(comment.id)")
         
-        firestoreService.fetchPhotosFromStorage(urls: comment.images) { [weak self] images, error in
+        imageService.fetchPhotosFromStorage(urls: comment.images) { [weak self] images, error in
             guard let self = self else { return }
             
             DispatchQueue.main.async {
@@ -532,7 +550,7 @@ class SelectedPlaceViewModel: ObservableObject {
         
         print("🗑️ Deleting review \(reviewId) from SelectedPlaceViewModel")
         
-        firestoreService.deleteReview(reviewId: reviewId, placeId: placeId, userId: review.userId) { [weak self] result in
+        reviewService.deleteReview(reviewId: reviewId, placeId: placeId, userId: review.userId) { [weak self] result in
             guard let self = self else { return }
             
             switch result {
@@ -637,12 +655,12 @@ class SelectedPlaceViewModel: ObservableObject {
             return
         }
         
-        firestoreService.hasUserLikedReview(userId: userId, reviewId: review.id) { [weak self] isLiked in
+        reviewService.hasUserLikedReview(userId: userId, reviewId: review.id) { [weak self] isLiked in
             guard let self = self else { return }
             
             if isLiked {
                 // Unlike the review
-                self.firestoreService.unlikeReview(userId: userId, placeId: placeId, reviewId: review.id) { [weak self] result in
+                reviewService.unlikeReview(userId: userId, placeId: placeId, reviewId: review.id) { [weak self] result in
                     guard let self = self else { return }
                     
                     switch result {
@@ -665,7 +683,7 @@ class SelectedPlaceViewModel: ObservableObject {
                 }
             } else {
                 // Like the review
-                self.firestoreService.likeReview(userId: userId, placeId: placeId, reviewId: review.id) { [weak self] result in
+                reviewService.likeReview(userId: userId, placeId: placeId, reviewId: review.id) { [weak self] result in
                     guard let self = self else { return }
                     
                     switch result {
@@ -697,7 +715,7 @@ class SelectedPlaceViewModel: ObservableObject {
 
     // Load comment count for a review (without loading all comments)
     private func loadCommentCountForReview(placeId: String, reviewId: String) {
-        firestoreService.fetchCommentCount(placeId: placeId, reviewId: reviewId) { [weak self] count, error in
+        reviewService.fetchCommentCount(placeId: placeId, reviewId: reviewId) { [weak self] count, error in
             guard let self = self else { return }
             
             DispatchQueue.main.async {
@@ -734,7 +752,7 @@ class SelectedPlaceViewModel: ObservableObject {
             // Just keep the existing comments visible while loading more
         }
         
-        firestoreService.fetchComments(placeId: placeId, reviewId: reviewId, limit: limit) { [weak self] comments, error in
+        reviewService.fetchComments(placeId: placeId, reviewId: reviewId, limit: limit) { [weak self] comments, error in
             guard let self = self else { return }
             
             DispatchQueue.main.async {
@@ -759,7 +777,7 @@ class SelectedPlaceViewModel: ObservableObject {
         }
     }
 
-    func createNewPlace(name: String, description: String?, coordinate: CLLocationCoordinate2D, userId: String) {
+    func createNewPlace(name: String, description: String?, coordinate: CLLocationCoordinate2D, userId: String, profileVM: ProfileViewModel? = nil, detailPlaceVM: DetailPlaceViewModel? = nil) {
         // Create a new place
         var newPlace = DetailPlace()
         newPlace.name = name
@@ -769,22 +787,40 @@ class SelectedPlaceViewModel: ObservableObject {
             longitude: coordinate.longitude
         )
         
+        // Immediately update local state for instant UI feedback
+        DispatchQueue.main.async {
+            // Add to DetailPlaceViewModel's places dictionary
+            if let detailPlaceVM = detailPlaceVM {
+                detailPlaceVM.places[newPlace.id.uuidString] = newPlace
+                
+                // Add current user to placeSavers for this place
+                detailPlaceVM.placeSavers[newPlace.id.uuidString] = [userId]
+                
+                // Trigger annotation calculation for immediate display
+                detailPlaceVM.calculateAnnotationPlaces()
+            }
+            
+            // Update ProfileViewModel's myPlaces list
+            if let profileVM = profileVM {
+                if !profileVM.myPlaces.contains(newPlace.id.uuidString) {
+                    profileVM.myPlaces.append(newPlace.id.uuidString)
+                }
+            }
+        }
+        
         // Save to main places collection
-        firestoreService.addToAllPlaces(detailPlace: newPlace) { error in
+        placeService.addToAllPlaces(detailPlace: newPlace) { error in
             if let error = error {
                 print("Error saving place to main collection: \(error.localizedDescription)")
             } else {
                 print("Successfully saved place to main collection")
                 
                 // Save to user's myPlaces collection
-                self.firestoreService.addToMyPlaces(userId: userId, detailPlace: newPlace) { error in
+                self.placeService.addToMyPlaces(userId: userId, detailPlace: newPlace) { error in
                     if let error = error {
                         print("Error saving place to user's collection: \(error.localizedDescription)")
                     } else {
-                        // Notify that a new place was created to refresh map annotations
-                        DispatchQueue.main.async {
-                            NotificationCenter.default.post(name: NSNotification.Name("RefreshMapAnnotations"), object: nil)
-                        }
+                        print("Successfully saved place to user's myPlaces collection")
                     }
                 }
             }

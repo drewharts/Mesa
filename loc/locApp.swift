@@ -10,46 +10,106 @@ import UserNotifications
 struct locApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     
-    @StateObject private var firestoreService: FirestoreService
     @StateObject private var locationManager: LocationManager
     @StateObject private var userSession: UserSession
     @StateObject private var profileViewModel: ProfileViewModel
     @StateObject private var detailPlaceViewModel: DetailPlaceViewModel
     @StateObject private var selectedPlaceViewModel: SelectedPlaceViewModel
     @StateObject private var userProfileViewModel: UserProfileViewModel
+    @StateObject private var searchViewModel: SearchViewModel
     @StateObject private var notificationManager = NotificationManager.shared
+    @StateObject private var deepLinkViewModel: DeepLinkViewModel
+    
     private let dataManager: DataManager
+    private let serviceContainer = ServiceContainer.shared
 
     init() {
         FirebaseApp.configure()
         let providerFactory = AppAttestProviderFactory()
         AppCheck.setAppCheckProviderFactory(providerFactory)
 
-        let firestore = FirestoreService()
-        let location = LocationManager()
-        let detailVM = DetailPlaceViewModel(firestoreService: firestore)
-        let userSess = UserSession(firestoreService: firestore, locationManager: location, detailPlaceVM: detailVM)
-        let profileVM = ProfileViewModel(userSession: userSess, firestoreService: firestore, detailPlaceViewModel: detailVM)
-        let selectedPlaceVM = SelectedPlaceViewModel(locationManager: location, firestoreService: firestore)
+        // Get services from container
+        let services = ServiceContainer.shared
+        services.setupServices()
         
-        // Initialize DataManager with all required parameters
+        let location = services.locationManager
+        
+        // Pass individual services to view models (keeps current pattern)
+        let detailVM = DetailPlaceViewModel(
+            placeService: services.placeService, 
+            userService: services.userService
+        )
+        
+        let userSess = UserSession(
+            userService: services.userService, 
+            locationManager: location, 
+            detailPlaceVM: detailVM
+        )
+        
+        let profileVM = ProfileViewModel(
+            userSession: userSess, 
+            userService: services.userService, 
+            detailPlaceViewModel: detailVM, 
+            imageService: services.imageService, 
+            placeService: services.placeService, 
+            reviewService: services.reviewService
+        )
+        
+        let selectedPlaceVM = SelectedPlaceViewModel(
+            locationManager: location,
+            reviewService: services.reviewService,
+            placeService: services.placeService,
+            userService: services.userService,
+            imageService: services.imageService
+        )
+        
         let dataMgr = DataManager(
-            fireStoreService: firestore,
+            userService: services.userService,
+            placeService: services.placeService,
+            reviewService: services.reviewService,
             userSession: userSess,
             locationManager: location,
             profileViewModel: profileVM,
             detailPlaceViewModel: detailVM
         )
 
-        self._firestoreService = StateObject(wrappedValue: firestore)
+        let userProfileVM = UserProfileViewModel(
+            dataManager: dataMgr, 
+            detailPlaceViewModel: detailVM,
+            placeService: services.placeService,
+            userService: services.userService,
+            reviewService: services.reviewService
+        )
+
+        let searchVM = SearchViewModel(
+            placeService: services.placeService,
+            userService: services.userService
+        )
+        
+        // Create DeepLinkManager and DeepLinkViewModel
+        let deepLinkManager = DeepLinkManager(
+            placeService: services.placeService,
+            selectedPlaceViewModel: selectedPlaceVM
+        )
+        
+        let deepLinkVM = DeepLinkViewModel(
+            deepLinkManager: deepLinkManager,
+            selectedPlaceViewModel: selectedPlaceVM
+        )
+        
         self._locationManager = StateObject(wrappedValue: location)
         self._userSession = StateObject(wrappedValue: userSess)
         self._profileViewModel = StateObject(wrappedValue: profileVM)
         self._detailPlaceViewModel = StateObject(wrappedValue: detailVM)
         self.dataManager = dataMgr
         self._selectedPlaceViewModel = StateObject(wrappedValue: selectedPlaceVM)
-        let userProfileVM = UserProfileViewModel(dataManager: dataMgr, detailPlaceViewModel: detailVM)
         self._userProfileViewModel = StateObject(wrappedValue: userProfileVM)
+        self._searchViewModel = StateObject(wrappedValue: searchVM)
+        self._deepLinkViewModel = StateObject(wrappedValue: deepLinkVM)
+        
+        // Pass user service to AppDelegate
+        appDelegate.userService = services.userService
+        appDelegate.deepLinkViewModel = deepLinkVM
     }
 
     var body: some Scene {
@@ -60,11 +120,22 @@ struct locApp: App {
                 .environmentObject(profileViewModel)
                 .environmentObject(detailPlaceViewModel)
                 .environmentObject(selectedPlaceViewModel)
-                .environmentObject(firestoreService)
                 .environmentObject(dataManager)
                 .environmentObject(userProfileViewModel)
+                .environmentObject(searchViewModel)
                 .environmentObject(notificationManager)
+                .environmentObject(serviceContainer)
+                .environmentObject(deepLinkViewModel)
                 .preferredColorScheme(.light)
+                .onOpenURL { url in
+                    // Handle deep links for places
+                    if url.scheme == "loc" {
+                        Task {
+                            print("🔗 Received deep link: \(url)")
+                            await deepLinkViewModel.processIncomingURL(url)
+                        }
+                    }
+                }
                 .task {
                     if let currentUser = Auth.auth().currentUser {
                         userSession.isUserLoggedIn = true
@@ -77,6 +148,9 @@ struct locApp: App {
 }
 
 class AppDelegate: NSObject, UIApplicationDelegate {
+    var userService: UserService?
+    var deepLinkViewModel: DeepLinkViewModel?
+
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         
@@ -132,7 +206,22 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     func application(_ app: UIApplication,
                      open url: URL,
                      options: [UIApplication.OpenURLOptionsKey : Any] = [:]) -> Bool {
-        return GIDSignIn.sharedInstance.handle(url)
+        
+        // Handle Google Sign-In URLs
+        if GIDSignIn.sharedInstance.handle(url) {
+            return true
+        }
+        
+        // Handle deep links for places
+        if url.scheme == "loc" {
+            print("🔗 Received deep link in AppDelegate: \(url)")
+            Task {
+                await deepLinkViewModel?.processIncomingURL(url)
+            }
+            return true
+        }
+        
+        return false
     }
 }
 
@@ -143,8 +232,7 @@ extension AppDelegate: MessagingDelegate {
         
         // Save the FCM token to Firestore if user is logged in
         if let fcmToken = fcmToken, let currentUserId = Auth.auth().currentUser?.uid {
-            let firestoreService = FirestoreService()
-            firestoreService.updateFCMToken(userId: currentUserId, token: fcmToken) { error in
+            userService?.updateFCMToken(userId: currentUserId, token: fcmToken) { error in
                 if let error = error {
                     print("❌ Error updating FCM token: \(error)")
                 } else {

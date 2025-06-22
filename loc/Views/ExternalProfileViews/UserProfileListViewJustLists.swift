@@ -8,17 +8,15 @@ struct UserProfileListViewJustLists: View {
     @State private var showingPlacesPopup = false
 
     var body: some View {
-        ScrollView {
-            LazyVStack(spacing: 16) {
-                ForEach(placeLists.sorted(by: { $0.sortOrder < $1.sortOrder })) { list in
-                    UserProfileListRow(
-                        viewModel: viewModel,
-                        list: list,
-                        placeColors: $placeColors,
-                        selectedList: $selectedList,
-                        showingPlacesPopup: $showingPlacesPopup
-                    )
-                }
+        LazyVStack(spacing: 16) {
+            ForEach(placeLists.sorted(by: { $0.sortOrder < $1.sortOrder })) { list in
+                UserProfileListRow(
+                    viewModel: viewModel,
+                    list: list,
+                    placeColors: $placeColors,
+                    selectedList: $selectedList,
+                    showingPlacesPopup: $showingPlacesPopup
+                )
             }
         }
         .sheet(isPresented: $showingPlacesPopup) {

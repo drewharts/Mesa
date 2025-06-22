@@ -11,6 +11,7 @@ struct UserProfileFavoritesView: View {
     var userFavorites: [DetailPlace]
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
+    @EnvironmentObject var userProfileViewModel: UserProfileViewModel
     @Environment(\.presentationMode) var presentationMode
     @State private var placeColors: [UUID: Color] = [:]
     @State private var emptyCircleColors: [Int: Color] = [:]
@@ -73,7 +74,14 @@ struct UserProfileFavoritesView: View {
                             .onTapGesture {
                                 selectedPlaceVM.selectedPlace = userFavorites[index]
                                 selectedPlaceVM.isDetailSheetPresented = true
-                                presentationMode.wrappedValue.dismiss()
+                                
+                                // Dismiss the user profile sheet properly
+                                userProfileViewModel.isUserDetailPresented = false
+                                
+                                // Also call presentationMode dismiss as backup
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                    presentationMode.wrappedValue.dismiss()
+                                }
                             }
                         } else {
                             VStack(spacing: 4) {

@@ -33,9 +33,13 @@ struct CreatePlaceReviewView: View {
         case generic = "Generic"
     }
     
-    init(isPresented: Binding<Bool>, place: DetailPlace, userId: String, profilePhotoUrl: String, userFirstName: String, userLastName: String) {
+    let onReviewSubmitted: ((DetailPlace) -> Void)?
+    
+    init(isPresented: Binding<Bool>, place: DetailPlace, userId: String, profilePhotoUrl: String, userFirstName: String, userLastName: String, preselectedImages: [UIImage] = [], reviewType: ReviewType = .restaurant, onReviewSubmitted: ((DetailPlace) -> Void)? = nil) {
         self._isPresented = isPresented
         self.place = place
+        self._reviewType = State(initialValue: reviewType)
+        self.onReviewSubmitted = onReviewSubmitted
 
         // Initialize the ViewModel with place/user info
         _viewModel = StateObject(
@@ -47,6 +51,9 @@ struct CreatePlaceReviewView: View {
                 profilePhotoUrl: profilePhotoUrl
             )
         )
+        
+        // Set preselected images if provided
+        self._inputImages = State(initialValue: preselectedImages)
     }
     
     var btnBack : some View { Button(action: {
@@ -128,6 +135,9 @@ struct CreatePlaceReviewView: View {
                                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                                     showButtonHighlight = false
                                     presentationMode.wrappedValue.dismiss()
+                                    
+                                    // Call the callback to navigate to place detail
+                                    onReviewSubmitted?(place)
                                 }
                                 
                             case .failure(let error):

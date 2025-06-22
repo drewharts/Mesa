@@ -11,8 +11,8 @@ struct MaxPlaceDetailView: View {
     @ObservedObject var viewModel: PlaceDetailViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     
-    // Accept the same binding
-    @Binding var selectedImage: UIImage?
+    // Accept callback for photo tapped
+    let onPhotoTapped: ([UIImage], Int) -> Void
     
     // 1) A state to track when we have no phone number
     @Binding var showNoPhoneNumberAlert: Bool
@@ -44,6 +44,14 @@ struct MaxPlaceDetailView: View {
                     .background(Color.gray.opacity(0.2))
                     .clipShape(Capsule())
                 }
+
+                // SHARE Bubble
+                PlaceShareButton(place: selectedPlaceVM.selectedPlace!)
+                    .environmentObject(ServiceContainer.shared)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(Color.gray.opacity(0.2))
+                    .clipShape(Capsule())
 
                 // MENU Bubble
                 HStack(spacing: 8) {
@@ -84,7 +92,9 @@ struct MaxPlaceDetailView: View {
                         case .loaded:
                             let photos = selectedPlaceVM.photos
                             if !photos.isEmpty {
-                                GridView(images: photos, selectedImage: $selectedImage)
+                                GridView(images: photos, onImageTapped: { index in
+                                    onPhotoTapped(photos, index)
+                                })
                             } else {
                                 Text("No Photos")
                                     .frame(maxWidth: .infinity)
