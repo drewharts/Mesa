@@ -106,9 +106,8 @@ struct MyPlacesListView: View {
                             removal: .move(edge: .trailing).combined(with: .opacity)
                         ))
                     } else {
-                        // Reviewed Places
-                        ReviewedPlacesView(
-                            reviewedPlaces: reviewedPlaces,
+                        // Reviewed Places (with pagination)
+                        PaginatedReviewedPlacesView(
                             columns: columns,
                             cardWidth: cardWidth,
                             cardHeight: cardHeight,
@@ -260,22 +259,33 @@ struct CreatedPlacesView: View {
 }
 
 // MARK: - Reviewed Places View
-struct ReviewedPlacesView: View {
-    let reviewedPlaces: [DetailPlace]
+struct PaginatedReviewedPlacesView: View {
     let columns: [GridItem]
     let cardWidth: CGFloat
     let cardHeight: CGFloat
     let colorForPlace: (DetailPlace) -> Color
     
+    @EnvironmentObject var profile: ProfileViewModel
+    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
+    @Environment(\.presentationMode) var presentationMode
+    
     var body: some View {
-        if reviewedPlaces.isEmpty {
+        if profile.isLoadingReviewedPlaces || (profile.getMyReviewedPlaces().isEmpty && !profile.isLoadingReviewedPlaces) {
+            VStack {
+                Spacer()
+                ProgressView()
+                Spacer()
+            }
+            .onAppear {
+                profile.loadMyReviewedPlacesWithPagination()
+            }
+        } else if profile.getMyReviewedPlaces().isEmpty {
             VStack(spacing: 16) {
                 Spacer()
                 Text("No Places Reviewed Yet")
                     .font(.title3)
                     .fontWeight(.medium)
                     .foregroundColor(.gray)
-                
                 Text("When you review a place, it'll appear here.")
                     .font(.body)
                     .foregroundColor(.gray)
@@ -283,20 +293,44 @@ struct ReviewedPlacesView: View {
                     .padding(.horizontal)
                 Spacer()
             }
+            .onAppear {
+                profile.loadMyReviewedPlacesWithPagination()
+            }
         } else {
             ScrollView {
                 LazyVGrid(columns: columns, spacing: 15) {
-                    ForEach(reviewedPlaces) { place in
+                    ForEach(Array(profile.getMyReviewedPlaces().enumerated()), id: \.element.id) { index, place in
                         PlaceGridCell(
                             place: place,
                             cardWidth: cardWidth,
                             cardHeight: cardHeight,
                             colorForPlace: colorForPlace
                         )
+                        .onAppear {
+                            let lastIndex = profile.getMyReviewedPlaces().count - 1
+                            if index == lastIndex && profile.hasMoreReviews {
+                                profile.loadMoreMyReviews()
+                            }
+                        }
+                    }
+                    if profile.isLoadingMoreReviews {
+                        HStack {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                            Text("Loading more...")
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 20)
+                        .gridCellColumns(2)
                     }
                 }
                 .padding(.horizontal, 20)
                 .padding(.vertical, 10)
+            }
+            .onAppear {
+                profile.loadMyReviewedPlacesWithPagination()
             }
         }
     }

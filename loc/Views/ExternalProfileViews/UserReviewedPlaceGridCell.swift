@@ -43,7 +43,7 @@ struct UserReviewedPlaceGridCell: View {
                 )
                 .frame(width: cardWidth, height: cardHeight)
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(place.name)
+                    Text(place.name.isEmpty ? "Loading..." : place.name)
                         .font(.headline)
                         .foregroundColor(.white)
                         .lineLimit(1)
@@ -52,8 +52,13 @@ struct UserReviewedPlaceGridCell: View {
                             .font(.subheadline)
                             .foregroundColor(.white.opacity(0.7))
                             .lineLimit(1)
-                    } else if let city = place.city {
+                    } else if let city = place.city, !city.isEmpty {
                         Text(city)
+                            .font(.subheadline)
+                            .foregroundColor(.white.opacity(0.7))
+                            .lineLimit(1)
+                    } else {
+                        Text("Loading details...")
                             .font(.subheadline)
                             .foregroundColor(.white.opacity(0.7))
                             .lineLimit(1)
