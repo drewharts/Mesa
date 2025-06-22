@@ -141,8 +141,20 @@ class PlaceDetailViewModel: ObservableObject {
         //TODO: this may need some revision at a later date
         guard let placeTypes = place.categories else { return PlaceTypes.defaultType }
         for recognizedType in PlaceTypes.recognizedTypes {
-            if placeTypes.contains(where: {
-                $0.lowercased().contains(recognizedType.lowercased())
+            if placeTypes.contains(where: { placeType in
+                // Normalize both strings for better matching
+                let normalizedPlaceType = placeType.lowercased()
+                    .replacingOccurrences(of: "_", with: " ")
+                    .replacingOccurrences(of: "-", with: " ")
+                    .replacingOccurrences(of: ".", with: " ")
+                
+                let normalizedRecognizedType = recognizedType.lowercased()
+                    .replacingOccurrences(of: "_", with: " ")
+                    .replacingOccurrences(of: "-", with: " ")
+                    .replacingOccurrences(of: ".", with: " ")
+                
+                // Check if the normalized place type contains the normalized recognized type
+                return normalizedPlaceType.contains(normalizedRecognizedType)
             }) {
                 return recognizedType
             }
