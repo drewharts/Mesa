@@ -148,7 +148,6 @@
 		B054DC5F2C42F5DA00C98088 /* loc */ = {
 			isa = PBXGroup;
 			children = (
-				B0FE79382DEE9AD0006600D0 /* loc.entitlements */,
 				B0E659872D39D54300F8527E /* Extensions */,
 				B00311FF2CDACE01002AE03B /* Managers */,
 				B00311FE2CDACD8B002AE03B /* Services */,
@@ -549,7 +548,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 3.1;
+				MARKETING_VERSION = 3.11;
 				PRODUCT_BUNDLE_IDENTIFIER = drewharts.locc;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -589,7 +588,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 3.1;
+				MARKETING_VERSION = 3.11;
 				PRODUCT_BUNDLE_IDENTIFIER = drewharts.locc;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
