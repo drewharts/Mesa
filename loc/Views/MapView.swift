@@ -49,6 +49,7 @@ struct MapView: View {
                                 annotationImage: detailPlaceVM.placeAnnotations[place.place.id.uuidString]
                             )
                             .onTapGesture {
+                                print("Place ID: \(place.place.id.uuidString)")
                                 selectedPlaceVM.selectedPlace = place.place
                             }
                         }
