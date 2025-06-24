@@ -52,7 +52,8 @@ struct locApp: App {
             detailPlaceViewModel: detailVM, 
             imageService: services.imageService, 
             placeService: services.placeService, 
-            reviewService: services.reviewService
+            reviewService: services.reviewService,
+            locationManager: location
         )
         
         let selectedPlaceVM = SelectedPlaceViewModel(

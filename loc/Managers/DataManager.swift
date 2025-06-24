@@ -158,6 +158,8 @@ class DataManager: ObservableObject {
                 self.profileViewModel.userListsPlaces = lists.reduce(into: [String: [String]]()) { result, list in
                     result[list.id.uuidString] = list.places.map { $0.id.uuidString }
                 }
+                // Sort lists by distance after loading
+                self.profileViewModel.sortListsByDistance()
             }
             // Process places in each list
             for list in lists {

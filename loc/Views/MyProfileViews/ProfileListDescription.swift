@@ -22,9 +22,12 @@ struct ProfileListDescription: View {
                     .fontWeight(.medium)
                     .foregroundColor(.black)
                     .padding(.leading, 20)
+                
                 Text("\(profile.userListsPlaces[list.id.uuidString]?.count ?? 0) \(profile.userListsPlaces[list.id.uuidString]?.count == 1 ? "place" : "places")")
                     .font(.caption)
                     .foregroundStyle(.black)
+                
+                Spacer()
             }
         }
         .sheet(isPresented: $showingPlacesPopup) {
