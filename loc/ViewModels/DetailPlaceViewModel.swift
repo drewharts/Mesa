@@ -89,7 +89,7 @@ class DetailPlaceViewModel: ObservableObject {
     }
 
     // Calculate and store restaurant type
-    private func calculateRestaurantType(for place: DetailPlace) {
+    func calculateRestaurantType(for place: DetailPlace) {
         let placeId = place.id.uuidString
         if let type = placeDetailVM.getRestaurantType(for: place) {
             placeTypes[placeId] = type
@@ -262,6 +262,11 @@ class DetailPlaceViewModel: ObservableObject {
             places[placeId]
         }
     }
+    
+    // Add filtered places property
+    var filteredDetailPlaces: [DetailPlace] {
+        savedDetailPlaces
+    }
 
     // Refresh all places data asynchronously
     @MainActor
@@ -272,13 +277,24 @@ class DetailPlaceViewModel: ObservableObject {
                 if self.placeImages[place] == nil {
                     fetchPlaceImage(for: place)
                 }
-//                calculateRestaurantType(for: places[place]!)
+                // Calculate restaurant type if not already calculated
+                if let detailPlace = self.places[place], self.placeTypes[place] == nil {
+                    calculateRestaurantType(for: detailPlace)
+                }
             }
             
             // Notify UI that data has changed
             self.objectWillChange.send()
             print("Successfully refreshed \(detailPlaces.count) places")
         }
+    }
+
+    // Recalculate place types for all places
+    func recalculateAllPlaceTypes() {
+        for (placeId, place) in places {
+            calculateRestaurantType(for: place)
+        }
+        objectWillChange.send()
     }
 
     // Add this method to get or generate a color for a place
