@@ -235,6 +235,73 @@ class ImageService {
         return UIImage(cgImage: downsampledImage)
     }
 
+    /// Compresses an image to 1MB or less while maintaining reasonable quality
+    private func compressImageTo1MB(_ image: UIImage) -> Data? {
+        let maxFileSize = 1024 * 1024 // 1MB in bytes
+        
+        // Start with high quality and gradually reduce if needed
+        var compressionQuality: CGFloat = 0.9
+        let compressionStep: CGFloat = 0.1
+        
+        // First, try to resize the image if it's very large
+        var workingImage = image
+        let maxDimension: CGFloat = 1920 // Max width or height in pixels
+        
+        if max(image.size.width, image.size.height) > maxDimension {
+            let scale = maxDimension / max(image.size.width, image.size.height)
+            let newSize = CGSize(width: image.size.width * scale, height: image.size.height * scale)
+            
+            UIGraphicsBeginImageContextWithOptions(newSize, false, 1.0)
+            image.draw(in: CGRect(origin: .zero, size: newSize))
+            workingImage = UIGraphicsGetImageFromCurrentImageContext() ?? image
+            UIGraphicsEndImageContext()
+        }
+        
+        // Now compress the image data
+        guard var imageData = workingImage.jpegData(compressionQuality: compressionQuality) else {
+            return nil
+        }
+        
+        // Gradually reduce quality until we reach 1MB or less
+        while imageData.count > maxFileSize && compressionQuality > 0.1 {
+            compressionQuality -= compressionStep
+            guard let newData = workingImage.jpegData(compressionQuality: compressionQuality) else {
+                break
+            }
+            imageData = newData
+        }
+        
+        // If still too large, try more aggressive resizing
+        if imageData.count > maxFileSize {
+            let aggressiveScale: CGFloat = 0.8
+            let newSize = CGSize(
+                width: workingImage.size.width * aggressiveScale,
+                height: workingImage.size.height * aggressiveScale
+            )
+            
+            UIGraphicsBeginImageContextWithOptions(newSize, false, 1.0)
+            workingImage.draw(in: CGRect(origin: .zero, size: newSize))
+            if let smallerImage = UIGraphicsGetImageFromCurrentImageContext() {
+                workingImage = smallerImage
+            }
+            UIGraphicsEndImageContext()
+            
+            // Try compression again with the smaller image
+            compressionQuality = 0.8
+            while compressionQuality > 0.1 {
+                if let newData = workingImage.jpegData(compressionQuality: compressionQuality),
+                   newData.count <= maxFileSize {
+                    imageData = newData
+                    break
+                }
+                compressionQuality -= compressionStep
+            }
+        }
+        
+        print("📸 Compressed image from original to \(imageData.count) bytes (target: \(maxFileSize) bytes)")
+        return imageData
+    }
+
     func fetchPhotosFromStorage(placeId: String, returnFirstImageOnly: Bool = false, completion: @escaping ([UIImage]?, Error?) -> Void) {
             let storageRef = storage.reference().child("reviews/\(placeId)")
             
@@ -315,11 +382,11 @@ class ImageService {
             let storageRef = storage.reference()
                 .child("reviews/\(review.id)/\(imageName).jpg")
             
-            // 3. Convert the UIImage to JPEG data
-            guard let imageData = image.jpegData(compressionQuality: 0.5) else {
+            // 3. Compress the UIImage to 1MB or less
+            guard let imageData = compressImageTo1MB(image) else {
                 errors.append(
                     NSError(domain: "FirestoreService", code: 0, userInfo: [
-                        NSLocalizedDescriptionKey: "Could not convert image to data"
+                        NSLocalizedDescriptionKey: "Could not compress image to required size"
                     ])
                 )
                 dispatchGroup.leave()
@@ -421,11 +488,11 @@ class ImageService {
             let storageRef = storage.reference()
                 .child("comments/\(comment.id)/\(imageName).jpg")
             
-            // 3. Convert the UIImage to JPEG data
-            guard let imageData = image.jpegData(compressionQuality: 0.5) else {
+            // 3. Compress the UIImage to 1MB or less
+            guard let imageData = compressImageTo1MB(image) else {
                 errors.append(
                     NSError(domain: "ImageService", code: 0, userInfo: [
-                        NSLocalizedDescriptionKey: "Could not convert image to data"
+                        NSLocalizedDescriptionKey: "Could not compress image to required size"
                     ])
                 )
                 dispatchGroup.leave()
