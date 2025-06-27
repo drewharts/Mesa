@@ -141,43 +141,42 @@ class DetailPlaceViewModel: ObservableObject {
                 return
             }
             if let reviews = reviews {
-                var imageURLs: [URL] = []
+                // Collect all image URLs from all reviews as strings (same as review images)
+                var imageURLStrings: [String] = []
                 for review in reviews {
-                    for urlString in review.images {
-                        if let url = URL(string: urlString) {
-                            imageURLs.append(url)
+                    imageURLStrings.append(contentsOf: review.images)
+                }
+                
+                // If no images found, set to nil
+                guard !imageURLStrings.isEmpty else {
+                    DispatchQueue.main.async {
+                        self.placeImages[placeId] = nil
+                    }
+                    return
+                }
+                
+                // Use the same ImageService method that review images use for consistent processing
+                ImageService.shared.fetchPhotosFromStorage(urls: imageURLStrings) { [weak self] images, error in
+                    guard let self = self else { return }
+                    
+                    DispatchQueue.main.async {
+                        if let error = error {
+                            print("Error fetching place image for \(placeId): \(error.localizedDescription)")
+                            self.placeImages[placeId] = nil
+                        } else if let images = images, !images.isEmpty {
+                            // Use the first successfully loaded image as the place cover image
+                            self.placeImages[placeId] = images[0]
+                        } else {
+                            self.placeImages[placeId] = nil
                         }
                     }
                 }
-                self.downloadFirstSuccessfulImage(from: imageURLs, for: placeId)
             } else {
                 DispatchQueue.main.async {
                     self.placeImages[placeId] = nil
                 }
             }
         }
-    }
-
-    private func downloadFirstSuccessfulImage(from urls: [URL], for placeId: String) {
-        guard !urls.isEmpty else {
-            DispatchQueue.main.async {
-                self.placeImages[placeId] = nil
-            }
-            return
-        }
-        let url = urls[0]
-        URLSession.shared.dataTask(with: url) { [weak self] data, _, error in
-            guard let self = self else { return }
-            if let data = data, let image = UIImage(data: data) {
-                DispatchQueue.main.async {
-                    self.placeImages[placeId] = image
-                }
-            } else {
-                // Try the next URL if this one fails
-                let remainingURLs = Array(urls.dropFirst())
-                self.downloadFirstSuccessfulImage(from: remainingURLs, for: placeId)
-            }
-        }.resume()
     }
 
     // Update placeSavers when a user saves a place
