@@ -147,24 +147,40 @@ class PhotoImportViewModel: ObservableObject {
             nearbyPlaces = response.features
             print("🏢 Found \(nearbyPlaces.count) places within 50m")
             
-            // If no places found, try with larger radius (100m)
+            // If no places found, try with larger radius (250m)
             if nearbyPlaces.isEmpty {
-                print("🔍 No places found within 50m, expanding search to 100m...")
+                print("🔍 No places found within 50m, expanding search to 250m...")
                 response = try await nearbyPlacesService.fetchNearbyPlaces(
                     latitude: latitude,
                     longitude: longitude,
-                    radiusMeters: 100
+                    radiusMeters: 250
                 )
                 
                 nearbyPlaces = response.features
-                print("🏢 Found \(nearbyPlaces.count) places within 100m")
+                print("🏢 Found \(nearbyPlaces.count) places within 250m")
                 
+                // If still no places found, try with even larger radius (1000m)
                 if nearbyPlaces.isEmpty {
-                    print("❌ No nearby places found even within 100m - user can create new place")
-                    searchRadiusUsed = 100
+                    print("🔍 No places found within 250m, expanding search to 1000m...")
+                    response = try await nearbyPlacesService.fetchNearbyPlaces(
+                        latitude: latitude,
+                        longitude: longitude,
+                        radiusMeters: 1000
+                    )
+                    
+                    nearbyPlaces = response.features
+                    print("🏢 Found \(nearbyPlaces.count) places within 1000m")
+                    
+                    if nearbyPlaces.isEmpty {
+                        print("❌ No nearby places found even within 1000m - user can create new place")
+                        searchRadiusUsed = 1000
+                    } else {
+                        print("✅ Expanded search successful - found places within 1000m")
+                        searchRadiusUsed = 1000
+                    }
                 } else {
-                    print("✅ Expanded search successful - found places within 100m")
-                    searchRadiusUsed = 100
+                    print("✅ Expanded search successful - found places within 250m")
+                    searchRadiusUsed = 250
                 }
             } else {
                 searchRadiusUsed = 50
