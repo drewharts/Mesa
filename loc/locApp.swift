@@ -19,6 +19,7 @@ struct locApp: App {
     @StateObject private var searchViewModel: SearchViewModel
     @StateObject private var notificationManager = NotificationManager.shared
     @StateObject private var deepLinkViewModel: DeepLinkViewModel
+    @StateObject private var placeTypeFilterViewModel: PlaceTypeFilterViewModel
     
     private let dataManager: DataManager
     private let serviceContainer = ServiceContainer.shared
@@ -52,7 +53,8 @@ struct locApp: App {
             detailPlaceViewModel: detailVM, 
             imageService: services.imageService, 
             placeService: services.placeService, 
-            reviewService: services.reviewService
+            reviewService: services.reviewService,
+            locationManager: location
         )
         
         let selectedPlaceVM = SelectedPlaceViewModel(
@@ -97,6 +99,11 @@ struct locApp: App {
             selectedPlaceViewModel: selectedPlaceVM
         )
         
+        let placeTypeFilterVM = PlaceTypeFilterViewModel(
+            detailPlaceVM: detailVM,
+            profileVM: profileVM
+        )
+        
         self._locationManager = StateObject(wrappedValue: location)
         self._userSession = StateObject(wrappedValue: userSess)
         self._profileViewModel = StateObject(wrappedValue: profileVM)
@@ -106,6 +113,7 @@ struct locApp: App {
         self._userProfileViewModel = StateObject(wrappedValue: userProfileVM)
         self._searchViewModel = StateObject(wrappedValue: searchVM)
         self._deepLinkViewModel = StateObject(wrappedValue: deepLinkVM)
+        self._placeTypeFilterViewModel = StateObject(wrappedValue: placeTypeFilterVM)
         
         // Pass user service to AppDelegate
         appDelegate.userService = services.userService
@@ -126,6 +134,7 @@ struct locApp: App {
                 .environmentObject(notificationManager)
                 .environmentObject(serviceContainer)
                 .environmentObject(deepLinkViewModel)
+                .environmentObject(placeTypeFilterViewModel)
                 .preferredColorScheme(.light)
                 .onOpenURL { url in
                     // Handle deep links for places

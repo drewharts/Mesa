@@ -19,9 +19,12 @@ struct UserProfileListRow: View {
                         .fontWeight(.medium)
                         .foregroundColor(.black)
                         .padding(.leading, 20)
+                    
                     Text("\(viewModel.placeListMapboxPlaces[list.id]?.count ?? 0) \(viewModel.placeListMapboxPlaces[list.id]?.count == 1 ? "place" : "places")")
                         .font(.caption)
                         .foregroundStyle(.black)
+                    
+                    Spacer()
                 }
             }
 

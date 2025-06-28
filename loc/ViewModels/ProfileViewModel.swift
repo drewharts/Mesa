@@ -52,14 +52,28 @@ class ProfileViewModel: ObservableObject {
     private var allReviewedPlaceIds: [String] = []
     private var loadedReviewedPlaceIds: [String] = []
     
-    init(userSession: UserSession, userService: UserService, detailPlaceViewModel: DetailPlaceViewModel, imageService: ImageService, placeService: PlaceService, reviewService: ReviewService) {
+    // Location manager for distance calculations
+    private let locationManager: LocationManager
+    private var cancellables = Set<AnyCancellable>()
+    
+    init(userSession: UserSession, userService: UserService, detailPlaceViewModel: DetailPlaceViewModel, imageService: ImageService, placeService: PlaceService, reviewService: ReviewService, locationManager: LocationManager) {
          self.userService = userService
          self.detailPlaceViewModel = detailPlaceViewModel
         self.userSession = userSession
         self.imageService = imageService
         self.placeService = placeService
         self.reviewService = reviewService
+        self.locationManager = locationManager
+        
+        // Observe location changes using Combine
+        setupLocationObserver()
      }
+    
+    private func setupLocationObserver() {
+        // Location observer removed - lists are sorted once on app startup
+        // and then only when lists are modified (add/remove lists or places)
+        // No need to re-sort on every location change
+    }
     
      func changeProfilePhoto(_ newImage: UIImage) async {
         guard let userId = user?.id else { return }
@@ -181,6 +195,7 @@ class ProfileViewModel: ObservableObject {
         if detailPlaceViewModel.places[place.id.uuidString] == nil {
             detailPlaceViewModel.places[place.id.uuidString] = place
         }
+        // Skip sorting for individual place additions to avoid frequent re-sorting
     }
     
      func removePlaceFromList(listId: UUID, place: DetailPlace) {
@@ -199,8 +214,9 @@ class ProfileViewModel: ObservableObject {
          
          let placeForList = Place(id: place.id, name: place.name, address: place.address ?? "")
 
-
          placeService.removePlaceFromList(userId: userId, listId: list.id, place: placeForList)
+         
+         // Skip sorting for individual place removals to avoid frequent re-sorting
      }
     
      func addFavoritePlace(place: DetailPlace) {
@@ -231,6 +247,7 @@ class ProfileViewModel: ObservableObject {
      func addNewPlaceList(named name: String, city: String, emoji: String, image: String) {
          let newPlaceList = PlaceList(name: name, city: city, emoji: emoji, image: image)
          userLists.append(newPlaceList)
+         sortListsByDistance() // Sort lists by distance after adding new list
          guard let userId = user?.id else { return }
          placeService.createNewList(placeList: newPlaceList, userID: userId)
      }
@@ -238,10 +255,14 @@ class ProfileViewModel: ObservableObject {
      func removePlaceList(placeList: PlaceList) {
          if let index = userLists.firstIndex(where: { $0.id == placeList.id }) {
              userLists.remove(at: index)
+             sortListsByDistance() // Sort lists by distance after removing list
              placeService.deleteList(userId: userSession.currentUserId!,listId: placeList.id.uuidString) { error in
-                 if error == nil, let index = self.userLists.firstIndex(where: { $0.id == placeList.id }) {
-                     self.userLists.remove(at: index)
+                 if error != nil {
+                     // Re-add the list if deletion failed
+                     self.userLists.append(placeList)
+                     self.sortListsByDistance()
                  }
+                 // No need to sort on success - already sorted above
              }
          }
      }
@@ -371,4 +392,93 @@ class ProfileViewModel: ObservableObject {
     }
 
     var hasMoreReviews: Bool { _hasMoreReviews }
+    
+    // MARK: - List Sorting by Distance
+    
+    private var hasPerformedInitialSort = false
+    
+    /// Calculates the average distance of all places in a list from the user's current location
+    private func calculateAverageDistanceForList(_ list: PlaceList) -> Double {
+        guard let currentLocation = locationManager.currentLocation else { 
+            // If no location available, return infinity to sort these lists last
+            return Double.infinity 
+        }
+        
+        let listPlaceIds = userListsPlaces[list.id.uuidString] ?? []
+        guard !listPlaceIds.isEmpty else { return Double.infinity }
+        
+        var totalDistance: Double = 0
+        var validPlaceCount: Int = 0
+        
+        for placeId in listPlaceIds {
+            if let detailPlace = detailPlaceViewModel.places[placeId],
+               let placeCoordinate = detailPlace.coordinate {
+                
+                let placeLocation = CLLocation(
+                    latitude: placeCoordinate.latitude,
+                    longitude: placeCoordinate.longitude
+                )
+                
+                let distance = currentLocation.distance(from: placeLocation)
+                totalDistance += distance
+                validPlaceCount += 1
+            }
+        }
+        
+        return validPlaceCount > 0 ? totalDistance / Double(validPlaceCount) : Double.infinity
+    }
+    
+    /// Sorts userLists by their average distance from the user's current location (closest first)
+    /// Only sorts on app startup and when lists are modified
+    func sortListsByDistance() {
+        guard locationManager.currentLocation != nil else { return }
+        
+        userLists.sort { list1, list2 in
+            let distance1 = calculateAverageDistanceForList(list1)
+            let distance2 = calculateAverageDistanceForList(list2)
+            return distance1 < distance2
+        }
+        
+        hasPerformedInitialSort = true
+    }
+
+    /// Public method for manual refresh (if needed) - should only be called by user actions like pull-to-refresh
+    func refreshListSorting() {
+        sortListsByDistance()
+    }
+    
+    /// Returns whether the initial sort has been performed
+    var hasCompletedInitialSort: Bool {
+        hasPerformedInitialSort
+    }
+    
+    /// Formats distance for display (meters to miles/kilometers)
+    private func formatDistance(_ distanceInMeters: Double) -> String {
+        if distanceInMeters == Double.infinity {
+            return "Unknown"
+        }
+        
+        let miles = distanceInMeters * 0.000621371 // Convert meters to miles
+        if miles < 1 {
+            let feet = distanceInMeters * 3.28084 // Convert meters to feet
+            return String(format: "%.0f ft", feet)
+        } else if miles < 10 {
+            return String(format: "%.1f mi", miles)
+        } else {
+            return String(format: "%.0f mi", miles)
+        }
+    }
+    
+    /// Returns the formatted average distance for a list
+    func getAverageDistanceForList(_ list: PlaceList) -> String {
+        let distance = calculateAverageDistanceForList(list)
+        return formatDistance(distance)
+    }
+
+    /// Returns true if location is available for distance calculations
+    var isLocationAvailable: Bool {
+        return locationManager.currentLocation != nil
+    }
+    
+
 }

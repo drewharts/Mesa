@@ -213,49 +213,6 @@ class UserProfileViewModel: ObservableObject {
         }
     }
     
-    private func downloadFirstSuccessfulImage(from urls: [URL], for placeId: String, completion: @escaping (UIImage?) -> Void) {
-        let group = DispatchGroup()
-        var downloadedImage: UIImage?
-        
-        print("Attempting to download image for place \(placeId) from \(urls.count) URLs")
-        
-        for url in urls {
-            group.enter()
-            print("Trying URL: \(url.absoluteString)")
-            
-            URLSession.shared.dataTask(with: url) { data, response, error in
-                defer { group.leave() }
-                
-                if let error = error {
-                    print("Error downloading image from \(url.absoluteString): \(error.localizedDescription)")
-                    return
-                }
-                
-                if let data = data, let image = UIImage(data: data) {
-                    print("Successfully downloaded image from \(url.absoluteString)")
-                    downloadedImage = image
-                } else {
-                    print("Failed to create image from data for URL: \(url.absoluteString)")
-                }
-            }.resume()
-            
-            // If we got an image, we can stop trying other URLs
-            if downloadedImage != nil {
-                break
-            }
-        }
-        
-        group.notify(queue: .main) {
-            if let image = downloadedImage {
-                print("Successfully cached image for place \(placeId)")
-                self.placeImages[placeId] = image
-            } else {
-                print("Failed to download any image for place \(placeId)")
-            }
-            completion(downloadedImage)
-        }
-    }
-    
     // Helper method to fetch images with completion handler
     private func fetchImage(for place: DetailPlace, completion: @escaping (String, UIImage?) -> Void) {
         let placeId = place.id.uuidString
@@ -282,22 +239,33 @@ class UserProfileViewModel: ObservableObject {
             
             print("Found \(reviews?.count ?? 0) reviews for place \(placeId)")
             
-            // Collect all image URLs from all reviews
-            var imageURLs: [URL] = []
+            // Collect all image URLs from all reviews as strings (same as review images)
+            var imageURLStrings: [String] = []
             for review in reviews ?? [] {
-                for urlString in review.images {
-                    if let url = URL(string: urlString) {
-                        imageURLs.append(url)
-                    }
-                }
+                imageURLStrings.append(contentsOf: review.images)
             }
             
-            print("Found \(imageURLs.count) image URLs for place \(placeId)")
+            print("Found \(imageURLStrings.count) image URLs for place \(placeId)")
             
-            if !imageURLs.isEmpty {
-                self.downloadFirstSuccessfulImage(from: imageURLs, for: placeId) { image in
+            if !imageURLStrings.isEmpty {
+                // Use the same ImageService method that review images use for consistent processing
+                ImageService.shared.fetchPhotosFromStorage(urls: imageURLStrings) { [weak self] images, error in
+                    guard let self = self else { return }
+                    
                     DispatchQueue.main.async {
-                        completion(placeId, image)
+                        if let error = error {
+                            print("Error fetching place image for \(placeId): \(error.localizedDescription)")
+                            completion(placeId, nil)
+                        } else if let images = images, !images.isEmpty {
+                            // Use the first successfully loaded image as the place cover image
+                            let image = images[0]
+                            print("Successfully cached image for place \(placeId)")
+                            self.placeImages[placeId] = image
+                            completion(placeId, image)
+                        } else {
+                            print("No images returned for place \(placeId)")
+                            completion(placeId, nil)
+                        }
                     }
                 }
             } else {

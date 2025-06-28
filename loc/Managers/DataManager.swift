@@ -41,15 +41,61 @@ class DataManager: ObservableObject {
 
     func initializeProfileData(userId: String) async {
         startDataLoadingFlags()
-        await loadProfileData(userId: userId)
-        await fetchFollowerAndFollowingCountsAsync(userId: userId)
-        await loadUserMyPlaces(userId: userId)
-        await loadUserFavoritePlaces(userId: userId)
-        await loadUserPlaceLists(userId: userId)
-        await loadFollowing(userId: userId)
-        await loadFollowers(userId: userId)
-        await loadReviewedPlacesForUserAndFollowing(userId: userId)
+        
+        // PHASE 1: Load critical user data in parallel (fastest to show something to user)
+        await loadCriticalUserData(userId: userId)
+        
+        // PHASE 2: Load remaining user data in parallel
+        await loadRemainingUserData(userId: userId)
+        
+        // PHASE 3: Load social data in background (non-blocking)
+        Task.detached { [weak self] in
+            await self?.loadSocialDataInBackground(userId: userId)
+        }
+        
         calculateMapAnnotations()
+    }
+    
+    // PHASE 1: Load most important user data first (parallel)
+    private func loadCriticalUserData(userId: String) async {
+        async let profileData = loadProfileData(userId: userId)
+        async let myPlaces = loadUserMyPlaces(userId: userId)
+        async let favorites = loadUserFavoritePlaces(userId: userId)
+        
+        // Wait for critical data to complete
+        await profileData
+        await myPlaces
+        await favorites
+    }
+    
+    // PHASE 2: Load remaining user data (parallel)
+    private func loadRemainingUserData(userId: String) async {
+        async let placeLists = loadUserPlaceLists(userId: userId)
+        async let reviewedPlaces = loadUserReviewedPlaces(userId: userId)
+        async let followCounts = fetchFollowerAndFollowingCountsAsync(userId: userId)
+        
+        // Wait for remaining user data
+        await placeLists
+        await reviewedPlaces
+        await followCounts
+    }
+    
+    // PHASE 3: Load social data without blocking UI
+    private func loadSocialDataInBackground(userId: String) async {
+        async let following = loadFollowing(userId: userId)
+        async let followers = loadFollowers(userId: userId)
+        
+        // Wait for social connections
+        await following
+        await followers
+        
+        // Load reviewed places for following users
+        await loadReviewedPlacesForFollowing(userId: userId)
+        
+        // Update annotations after social data loads
+        await MainActor.run {
+            calculateMapAnnotations()
+        }
     }
 
     // Sets all relevant loading flags to true before data loading begins
@@ -158,13 +204,53 @@ class DataManager: ObservableObject {
                 self.profileViewModel.userListsPlaces = lists.reduce(into: [String: [String]]()) { result, list in
                     result[list.id.uuidString] = list.places.map { $0.id.uuidString }
                 }
+                // Sort lists by distance after loading
+                self.profileViewModel.sortListsByDistance()
             }
-            // Process places in each list
-            for list in lists {
-                await self.processPlacesInList(list: list, userId: userId)
-            }
+            // Process places in each list with limited concurrency
+            await processPlacesInListsOptimized(lists: lists, userId: userId)
         } catch {
             print("Error loading user place lists: \(error.localizedDescription)")
+        }
+    }
+    
+    // Optimized to process multiple places concurrently but with limits
+    private func processPlacesInListsOptimized(lists: [PlaceList], userId: String) async {
+        // Process all places across all lists, but limit concurrency
+        var allPlaceIds: [(placeId: String, listId: String)] = []
+        for list in lists {
+            for place in list.places {
+                allPlaceIds.append((place.id.uuidString, list.id.uuidString))
+            }
+        }
+        
+        // Process in batches to avoid overwhelming Firebase
+        let batchSize = 10
+        for batch in allPlaceIds.chunked(into: batchSize) {
+            await withTaskGroup(of: Void.self) { group in
+                for (placeId, listId) in batch {
+                    group.addTask {
+                        await self.fetchAndStorePlaceDetails(placeId: placeId, userId: userId, listId: listId)
+                    }
+                }
+            }
+        }
+    }
+    
+    private func fetchAndStorePlaceDetails(placeId: String, userId: String, listId: String) async {
+        do {
+            let detailPlace = try await placeService.fetchPlace(withId: placeId)
+            await MainActor.run {
+                self.detailPlaceViewModel.places[placeId] = detailPlace
+                // Update place savers
+                if self.detailPlaceViewModel.placeSavers[placeId] == nil {
+                    self.detailPlaceViewModel.placeSavers[placeId] = [userId]
+                } else if !self.detailPlaceViewModel.placeSavers[placeId]!.contains(userId) {
+                    self.detailPlaceViewModel.placeSavers[placeId]!.append(userId)
+                }
+            }
+        } catch {
+            print("Error fetching place details: \(error.localizedDescription) (listId: \(listId), placeId: \(placeId))")
         }
     }
 
@@ -192,17 +278,38 @@ class DataManager: ObservableObject {
             let profiles = try await userService.fetchFollowingProfilesData(for: userId)
             // Store the profiles in the profileViewModel
             self.profileViewModel.userFollowing = profiles
+            
+            // Load profile pictures first (quick)
             for profile in profiles {
-                await self.loadUserFavoritePlaces(userId: profile.id, forUser: profile)
-                await self.loadUserPlaceLists(userId: profile.id, forUser: profile)
                 if let profilePhotoURL = profile.profilePhotoURL {
                     self.AddProfilePicture(userId: profile.id, profilePhotoUrl: profilePhotoURL)
                 }
             }
+            
+            // Load places data for following users in background with limited concurrency
+            await loadFollowingPlacesDataOptimized(profiles: profiles)
         } catch {
             print("Error loading following profiles: \(error.localizedDescription)")
         }
         profileViewModel.isFollowingListLoading = false
+    }
+    
+    // Optimized loading for following users' place data
+    private func loadFollowingPlacesDataOptimized(profiles: [ProfileData]) async {
+        // Process in smaller batches to avoid overwhelming the system
+        let batchSize = 5
+        for batch in profiles.chunked(into: batchSize) {
+            await withTaskGroup(of: Void.self) { group in
+                for profile in batch {
+                    group.addTask {
+                        async let favorites = self.loadUserFavoritePlaces(userId: profile.id, forUser: profile)
+                        async let lists = self.loadUserPlaceLists(userId: profile.id, forUser: profile)
+                        await favorites
+                        await lists
+                    }
+                }
+            }
+        }
     }
 
     
@@ -233,32 +340,68 @@ class DataManager: ObservableObject {
     // Loads all places the user has reviewed, even if not in favorites or lists
     func loadUserReviewedPlaces(userId: String) async {
         do {
-            // Fetch all reviews (RestaurantReview and GenericReview)
-            let restaurantReviews: [RestaurantReview] = try await reviewService.fetchUserReviews(userId: userId)
-            let genericReviews: [GenericReview] = try await reviewService.fetchUserReviews(userId: userId)
-            let allReviews: [ReviewProtocol] = restaurantReviews + genericReviews
+            // Fetch all reviews (RestaurantReview and GenericReview) in parallel
+            async let restaurantReviews: [RestaurantReview] = try await reviewService.fetchUserReviews(userId: userId)
+            async let genericReviews: [GenericReview] = try await reviewService.fetchUserReviews(userId: userId)
             
-            for review in allReviews {
-                let placeId = review.placeId
-                // Add userId to placeSavers if not already present
-                if self.detailPlaceViewModel.placeSavers[placeId] == nil {
-                    self.detailPlaceViewModel.placeSavers[placeId] = [userId]
-                } else if !self.detailPlaceViewModel.placeSavers[placeId]!.contains(userId) {
-                    self.detailPlaceViewModel.placeSavers[placeId]!.append(userId)
-                }
-                // Fetch and store the place if not already present
-                if self.detailPlaceViewModel.places[placeId] == nil {
-                    do {
-                        let detailPlace = try await placeService.fetchPlace(withId: placeId)
-                        self.detailPlaceViewModel.places[placeId] = detailPlace
-                        self.detailPlaceViewModel.fetchPlaceImage(for: placeId)
-                    } catch {
-                        print("Error fetching place for reviewed placeId \(placeId): \(error.localizedDescription)")
+            let allReviews: [ReviewProtocol] = (try await restaurantReviews) + (try await genericReviews)
+            
+            // Process place details in batches
+            let batchSize = 10
+            let placeIds = Array(Set(allReviews.map { $0.placeId }))
+            
+            for batch in placeIds.chunked(into: batchSize) {
+                await withTaskGroup(of: Void.self) { group in
+                    for placeId in batch {
+                        group.addTask {
+                            await self.processReviewedPlace(placeId: placeId, userId: userId)
+                        }
                     }
                 }
             }
         } catch {
             print("Error loading user reviewed places: \(error.localizedDescription)")
+        }
+    }
+    
+    private func processReviewedPlace(placeId: String, userId: String) async {
+        // Add userId to placeSavers if not already present
+        await MainActor.run {
+            if self.detailPlaceViewModel.placeSavers[placeId] == nil {
+                self.detailPlaceViewModel.placeSavers[placeId] = [userId]
+            } else if !self.detailPlaceViewModel.placeSavers[placeId]!.contains(userId) {
+                self.detailPlaceViewModel.placeSavers[placeId]!.append(userId)
+            }
+        }
+        
+        // Fetch and store the place if not already present
+        if await MainActor.run { self.detailPlaceViewModel.places[placeId] } == nil {
+            do {
+                let detailPlace = try await placeService.fetchPlace(withId: placeId)
+                await MainActor.run {
+                    self.detailPlaceViewModel.places[placeId] = detailPlace
+                    self.detailPlaceViewModel.fetchPlaceImage(for: placeId)
+                }
+            } catch {
+                print("Error fetching place for reviewed placeId \(placeId): \(error.localizedDescription)")
+            }
+        }
+    }
+    
+    // Loads reviewed places only for following users (separated from main user)
+    private func loadReviewedPlacesForFollowing(userId: String) async {
+        let followingIds = profileViewModel.userFollowing.map { $0.id }
+        
+        // Process following users in batches
+        let batchSize = 3
+        for batch in followingIds.chunked(into: batchSize) {
+            await withTaskGroup(of: Void.self) { group in
+                for uid in batch {
+                    group.addTask {
+                        await self.loadUserReviewedPlaces(userId: uid)
+                    }
+                }
+            }
         }
     }
     
