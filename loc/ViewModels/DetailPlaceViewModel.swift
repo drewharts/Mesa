@@ -90,10 +90,42 @@ class DetailPlaceViewModel: ObservableObject {
 
     // Calculate and store restaurant type
     func calculateRestaurantType(for place: DetailPlace) {
-        let placeId = place.id.uuidString
-        if let type = placeDetailVM.getRestaurantType(for: place) {
-            placeTypes[placeId] = type
+        // Ensure this runs on the main thread to avoid race conditions
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            
+            let placeId = place.id.uuidString
+            
+            // Check if we already have the type calculated
+            if self.placeTypes[placeId] != nil {
+                return
+            }
+            
+            // Safely get the restaurant type
+            if let type = self.placeDetailVM.getRestaurantType(for: place) {
+                self.placeTypes[placeId] = type
+            } else {
+                self.placeTypes[placeId] = PlaceTypes.defaultType
+            }
         }
+    }
+    
+    // Public method to calculate restaurant type synchronously (for on-demand filtering)
+    func calculateRestaurantTypeSync(for place: DetailPlace) -> String {
+        let placeId = place.id.uuidString
+        
+        // Check if we already have the type calculated
+        if let existingType = placeTypes[placeId] {
+            return existingType
+        }
+        
+        // Calculate the type synchronously
+        let type = placeDetailVM.getRestaurantType(for: place) ?? PlaceTypes.defaultType
+        
+        // Store it for future use
+        placeTypes[placeId] = type
+        
+        return type
     }
 
     // Fetch place data (e.g., from Firestore)

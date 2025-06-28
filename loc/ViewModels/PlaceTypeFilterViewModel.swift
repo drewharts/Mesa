@@ -7,20 +7,82 @@
 
 import Foundation
 import SwiftUI
+import Combine
 
 @MainActor
 class PlaceTypeFilterViewModel: ObservableObject {
     @Published var selectedPlaceTypes: Set<String> = []
     @Published var mostFrequentTypes: [String] = []
     @Published var availableTypes: [String] = []
+    @Published var isCalculatingTypes: Bool = false
     
     private let detailPlaceVM: DetailPlaceViewModel
     private let profileVM: ProfileViewModel
+    private var cancellables = Set<AnyCancellable>()
+    private var recalculationTimer: Timer?
     
     init(detailPlaceVM: DetailPlaceViewModel, profileVM: ProfileViewModel) {
         self.detailPlaceVM = detailPlaceVM
         self.profileVM = profileVM
         self.availableTypes = PlaceTypes.recognizedTypes
+        
+        // Set up observers to recalculate when profile data changes
+        setupProfileDataObservers()
+        
+        // Calculate immediately in case data is already available
+        calculateMostFrequentTypes()
+        
+        // Set up periodic recalculation for the first 10 seconds to handle async loading
+        startPeriodicRecalculation()
+    }
+    
+    private func setupProfileDataObservers() {
+        // Watch for changes to user favorites
+        profileVM.$userFavorites
+            .dropFirst() // Skip initial empty value
+            .sink { [weak self] favorites in
+                self?.calculateMostFrequentTypes()
+            }
+            .store(in: &cancellables)
+        
+        // Watch for changes to user lists places
+        profileVM.$userListsPlaces
+            .dropFirst() // Skip initial empty value
+            .sink { [weak self] listsPlaces in
+                self?.calculateMostFrequentTypes()
+            }
+            .store(in: &cancellables)
+        
+        // Watch for changes to detail places (when places are loaded)
+        detailPlaceVM.$places
+            .dropFirst()
+            .sink { [weak self] places in
+                self?.calculateMostFrequentTypes()
+            }
+            .store(in: &cancellables)
+        
+        // Watch for changes to place types (when place types are calculated)
+        detailPlaceVM.$placeTypes
+            .dropFirst() // Skip initial empty value
+            .sink { [weak self] placeTypes in
+                self?.calculateMostFrequentTypes()
+            }
+            .store(in: &cancellables)
+    }
+    
+    private func startPeriodicRecalculation() {
+        // Recalculate every 2 seconds for the first 10 seconds to handle async loading
+        var attempts = 0
+        recalculationTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] timer in
+            attempts += 1
+            self?.calculateMostFrequentTypes()
+            
+            // Stop after 5 attempts (10 seconds)
+            if attempts >= 5 {
+                timer.invalidate()
+                self?.recalculationTimer = nil
+            }
+        }
     }
     
     // MARK: - Type Selection Management
@@ -28,30 +90,36 @@ class PlaceTypeFilterViewModel: ObservableObject {
     func togglePlaceType(_ type: String) {
         if selectedPlaceTypes.contains(type) {
             selectedPlaceTypes.remove(type)
-            print("❌ Removed filter: \(type)")
         } else {
             selectedPlaceTypes.insert(type)
-            print("✅ Added filter: \(type)")
         }
     }
     
     func clearAllFilters() {
         selectedPlaceTypes.removeAll()
-        print("🧹 Cleared all filters")
     }
     
     func selectPlaceType(_ type: String) {
         selectedPlaceTypes.insert(type)
-        print("✅ Selected filter: \(type)")
     }
     
     // MARK: - Most Frequent Types Calculation
     
     func calculateMostFrequentTypes() {
+        guard !isCalculatingTypes else { 
+            return 
+        }
+        
+        isCalculatingTypes = true
+        
         let allPlaceIds = getAllUserPlaceIds()
         var typeCounts: [String: Int] = [:]
         
-        print("🔍 Calculating most frequent types from \(allPlaceIds.count) places")
+        // If we have no places yet, try again later
+        if allPlaceIds.isEmpty {
+            isCalculatingTypes = false
+            return
+        }
         
         // Ensure place types are calculated for all places
         for placeId in allPlaceIds {
@@ -62,18 +130,28 @@ class PlaceTypeFilterViewModel: ObservableObject {
                 }
                 
                 if let type = detailPlaceVM.placeTypes[placeId] {
-                    typeCounts[type, default: 0] += 1
+                    // Exclude "Place" from being counted as a filter option
+                    // since it should never be filtered out
+                    if type != "Place" {
+                        typeCounts[type, default: 0] += 1
+                    }
                 }
             }
         }
         
         // Sort by frequency and take top 8
+        let previousTypes = mostFrequentTypes
         mostFrequentTypes = typeCounts
             .sorted { $0.value > $1.value }
             .prefix(8)
             .map { $0.key }
         
-        print("📊 Most frequent types: \(mostFrequentTypes)")
+        // Only update if there are significant changes
+        if mostFrequentTypes != previousTypes {
+            // Types updated - no logging needed for production
+        }
+        
+        isCalculatingTypes = false
     }
     
     func refreshMostFrequentTypes() {
@@ -97,14 +175,48 @@ class PlaceTypeFilterViewModel: ObservableObject {
             return detailPlaceVM.savedDetailPlaces
         }
         
-        let filteredPlaces = detailPlaceVM.savedDetailPlaces.filter { place in
-            let placeId = place.id.uuidString
-            guard let placeType = detailPlaceVM.placeTypes[placeId] else { return false }
-            return selectedPlaceTypes.contains(placeType)
+        // First pass: Calculate missing place types on-demand for filtering
+        let placesToCalculate = detailPlaceVM.savedDetailPlaces.filter { place in
+            detailPlaceVM.placeTypes[place.id.uuidString] == nil
         }
         
-        print("🔍 Filtered \(detailPlaceVM.savedDetailPlaces.count) places to \(filteredPlaces.count) places")
+        if !placesToCalculate.isEmpty {
+            // Calculate types synchronously for immediate filtering results
+            for place in placesToCalculate {
+                detailPlaceVM.calculateRestaurantTypeSync(for: place)
+            }
+        }
+        
+        // Second pass: Apply filtering with all types calculated
+        let filteredPlaces = detailPlaceVM.savedDetailPlaces.filter { place in
+            let placeId = place.id.uuidString
+            
+            guard let placeType = detailPlaceVM.placeTypes[placeId] else { 
+                return false 
+            }
+            
+            return shouldIncludePlaceType(placeType)
+        }
+        
         return filteredPlaces
+    }
+    
+    // Helper method to determine if a place type should be included based on selected filters
+    private func shouldIncludePlaceType(_ placeType: String) -> Bool {
+        // Direct match - if the place type is directly selected
+        if selectedPlaceTypes.contains(placeType) {
+            return true
+        }
+        
+        // If "Restaurant" is selected, include all restaurant/cuisine types
+        if selectedPlaceTypes.contains("Restaurant") {
+            let isRestaurantType = PlaceTypes.restaurantTypes.contains(placeType)
+            if isRestaurantType {
+                return true
+            }
+        }
+        
+        return false
     }
     
     // MARK: - Search Integration
@@ -136,9 +248,18 @@ class PlaceTypeFilterViewModel: ObservableObject {
         if selectedPlaceTypes.isEmpty {
             return "All Places"
         } else if selectedPlaceTypes.count == 1 {
-            return selectedPlaceTypes.first ?? "All Places"
+            let selectedType = selectedPlaceTypes.first!
+            // Show more descriptive text for Restaurant filter
+            if selectedType == "Restaurant" {
+                return "Restaurants & Food"
+            }
+            return selectedType
         } else {
             return "\(selectedPlaceTypes.count) Types"
         }
+    }
+    
+    deinit {
+        recalculationTimer?.invalidate()
     }
 } 

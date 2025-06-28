@@ -28,20 +28,33 @@ struct PlaceTypeFilterButtonsView: View {
                 .padding(.horizontal, 20)
             }
             
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    // Most frequent type buttons
-                    ForEach(filterVM.mostFrequentTypes, id: \.self) { type in
-                        PlaceTypeButton(
-                            type: type,
-                            isSelected: filterVM.selectedPlaceTypes.contains(type),
-                            action: {
-                                filterVM.togglePlaceType(type)
-                            }
-                        )
-                    }
+            // Loading state or filter buttons
+            if filterVM.isCalculatingTypes && filterVM.mostFrequentTypes.isEmpty {
+                HStack {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                    Text("Loading filters...")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                 }
                 .padding(.horizontal, 20)
+                .padding(.vertical, 8)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        // Most frequent type buttons
+                        ForEach(filterVM.mostFrequentTypes, id: \.self) { type in
+                            PlaceTypeButton(
+                                type: type,
+                                isSelected: filterVM.selectedPlaceTypes.contains(type),
+                                action: {
+                                    filterVM.togglePlaceType(type)
+                                }
+                            )
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                }
             }
         }
     }

@@ -201,12 +201,23 @@ struct MainView: View {
             viewModel.selectedPlaceVM = selectedPlaceVM
             viewModel.placeTypeFilterVM = placeTypeFilterVM
             viewModel.searchText = ""
+            
+            // Trigger immediate calculation of most frequent types
+            placeTypeFilterVM.refreshMostFrequentTypes()
         }
         .onChange(of: selectedPlaceVM.isDetailSheetPresented) { newValue in
             if newValue {
                 isSearchBarMinimized = true
                 searchIsFocused = false
             }
+        }
+        .onChange(of: profileViewModel.userFavorites) { _ in
+            // Recalculate filters when user favorites change
+            placeTypeFilterVM.refreshMostFrequentTypes()
+        }
+        .onChange(of: profileViewModel.userListsPlaces) { _ in
+            // Recalculate filters when user lists change
+            placeTypeFilterVM.refreshMostFrequentTypes()
         }
     }
 

@@ -138,10 +138,28 @@ class PlaceDetailViewModel: ObservableObject {
     }
 
     func getRestaurantType(for place: DetailPlace) -> String? {
-        //TODO: this may need some revision at a later date
-        guard let placeTypes = place.categories else { return PlaceTypes.defaultType }
-        for recognizedType in PlaceTypes.recognizedTypes {
-            if placeTypes.contains(where: { placeType in
+        // Add safety guards to prevent crashes
+        guard let placeTypes = place.categories,
+              !placeTypes.isEmpty else { 
+            return PlaceTypes.defaultType 
+        }
+        
+        // Make a defensive copy to avoid potential race conditions
+        let placeTypesCopy = Array(placeTypes)
+        let recognizedTypesCopy = Array(PlaceTypes.recognizedTypes)
+        
+        // First pass: Look for specific cuisine types (prioritize over generic "Restaurant")
+        // Skip generic terms in first pass
+        let genericTerms = ["Restaurant", "Cafe", "Bar", "Place"]
+        for recognizedType in recognizedTypesCopy {
+            // Skip generic terms in first pass
+            if genericTerms.contains(recognizedType) { continue }
+            
+            guard !recognizedType.isEmpty else { continue }
+            
+            if placeTypesCopy.contains(where: { placeType in
+                guard !placeType.isEmpty else { return false }
+                
                 // Normalize both strings for better matching
                 let normalizedPlaceType = placeType.lowercased()
                     .replacingOccurrences(of: "_", with: " ")
@@ -153,12 +171,43 @@ class PlaceDetailViewModel: ObservableObject {
                     .replacingOccurrences(of: "-", with: " ")
                     .replacingOccurrences(of: ".", with: " ")
                 
-                // Check if the normalized place type contains the normalized recognized type
+                guard !normalizedPlaceType.isEmpty && !normalizedRecognizedType.isEmpty else {
+                    return false
+                }
+                
+                // Check if the place type contains the cuisine type
+                // e.g., "indian restaurant" contains "indian"
                 return normalizedPlaceType.contains(normalizedRecognizedType)
             }) {
                 return recognizedType
             }
         }
+        
+        // Second pass: Look for generic restaurant terms if no specific cuisine found
+        for recognizedType in genericTerms {
+            if placeTypesCopy.contains(where: { placeType in
+                guard !placeType.isEmpty else { return false }
+                
+                let normalizedPlaceType = placeType.lowercased()
+                    .replacingOccurrences(of: "_", with: " ")
+                    .replacingOccurrences(of: "-", with: " ")
+                    .replacingOccurrences(of: ".", with: " ")
+                
+                let normalizedRecognizedType = recognizedType.lowercased()
+                    .replacingOccurrences(of: "_", with: " ")
+                    .replacingOccurrences(of: "-", with: " ")
+                    .replacingOccurrences(of: ".", with: " ")
+                
+                guard !normalizedPlaceType.isEmpty && !normalizedRecognizedType.isEmpty else {
+                    return false
+                }
+                
+                return normalizedPlaceType.contains(normalizedRecognizedType)
+            }) {
+                return recognizedType
+            }
+        }
+        
         return PlaceTypes.defaultType
     }
 
