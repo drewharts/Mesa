@@ -9,7 +9,7 @@
 import SwiftUI
 
 struct SkinnySearchBar: View {
-    @State private var searchText: String = ""
+    @Binding var searchText: String
 
     var body: some View {
         HStack(alignment: .center) {

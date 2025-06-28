@@ -121,7 +121,8 @@ struct PlaceSelectionView: View {
                                     place: place,
                                     onSelect: {
                                         photoImportVM.selectPlace(place)
-                                    }
+                                    },
+                                    isLoading: photoImportVM.isSavingPlace
                                 )
                             }
                         }

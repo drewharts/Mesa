@@ -19,6 +19,7 @@ class SearchViewModel: ObservableObject {
     @Published var selectedUser: ProfileData?
 
     weak var selectedPlaceVM: SelectedPlaceViewModel?
+    weak var placeTypeFilterVM: PlaceTypeFilterViewModel?
 
     private let placeService: PlaceService
     private let userService: UserService
@@ -39,6 +40,10 @@ class SearchViewModel: ObservableObject {
             .sink { [weak self] text in
                 self?.searchPlaces(query: text)
                 self?.searchUsers(query: text)
+                // Update place type filters based on search text
+                Task { @MainActor in
+                    self?.placeTypeFilterVM?.filterBySearchText(text)
+                }
             }
             .store(in: &cancellables)
     }

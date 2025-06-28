@@ -209,6 +209,22 @@ struct ProfileView: View {
                 await photoImportVM.processSelectedPhotos()
             }
         }
+        .onAppear {
+            // Set up callback to refresh user places when a place is saved
+            photoImportVM.onPlaceSaved = {
+                Task {
+                    await profile.refreshUserPlaces()
+                }
+            }
+            
+            // Set up callback to update DetailPlaceViewModel when a place is saved
+            photoImportVM.onPlaceSavedWithDetail = { detailPlace in
+                // Add the place to DetailPlaceViewModel for immediate map display
+                placeVM.places[detailPlace.id.uuidString] = detailPlace
+                placeVM.placeSavers[detailPlace.id.uuidString] = [userSession.currentUserId ?? ""]
+                placeVM.calculateAnnotationPlaces()
+            }
+        }
         .sheet(isPresented: $photoImportVM.showPlaceSelection) {
             PlaceSelectionView(photoImportVM: photoImportVM)
         }

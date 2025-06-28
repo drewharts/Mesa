@@ -12,6 +12,7 @@ struct MapView: View {
     @EnvironmentObject var locationManager: LocationManager
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var detailPlaceVM: DetailPlaceViewModel
+    @EnvironmentObject var placeTypeFilterVM: PlaceTypeFilterViewModel
     
     @Binding var recenterMap: Bool
     
@@ -31,7 +32,7 @@ struct MapView: View {
         ZStack {
             MapReader { mapProxy in
                 Map(position: $mapPosition) {
-                    ForEach(detailPlaceVM.savedDetailPlaces.compactMap { place -> PlaceAnnotationItem? in
+                    ForEach(placeTypeFilterVM.getFilteredPlaces().compactMap { place -> PlaceAnnotationItem? in
                         return PlaceAnnotationItem(
                             id: place.id,
                             coordinate: CLLocationCoordinate2D(latitude: place.coordinate!.latitude, longitude: place.coordinate!.longitude),
@@ -49,6 +50,7 @@ struct MapView: View {
                                 annotationImage: detailPlaceVM.placeAnnotations[place.place.id.uuidString]
                             )
                             .onTapGesture {
+                                print("Place ID: \(place.place.id.uuidString)")
                                 selectedPlaceVM.selectedPlace = place.place
                             }
                         }
@@ -143,6 +145,9 @@ struct MapView: View {
                 
                 // Calculate annotation images
                 detailPlaceVM.calculateAnnotationPlaces()
+                
+                // Calculate most frequent types
+                placeTypeFilterVM.refreshMostFrequentTypes()
             }
             
             // Show the create place popup if needed
@@ -183,6 +188,7 @@ struct MapView: View {
             Task {
                 await profile.refreshUserPlaces()
                 await detailPlaceVM.calculateAnnotationPlaces()
+                placeTypeFilterVM.refreshMostFrequentTypes()
             }
         }
     }

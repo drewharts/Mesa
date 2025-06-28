@@ -24,7 +24,7 @@ struct ProfileViewListsView: View {
     
     // Filtered and sorted lists based on search
     var filteredLists: [PlaceList] {
-        let sorted = profile.userLists.sorted { $0.sortOrder < $1.sortOrder }
+        let sorted = profile.userLists
         if searchText.isEmpty {
             return sorted
         } else {

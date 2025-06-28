@@ -89,11 +89,43 @@ class DetailPlaceViewModel: ObservableObject {
     }
 
     // Calculate and store restaurant type
-    private func calculateRestaurantType(for place: DetailPlace) {
-        let placeId = place.id.uuidString
-        if let type = placeDetailVM.getRestaurantType(for: place) {
-            placeTypes[placeId] = type
+    func calculateRestaurantType(for place: DetailPlace) {
+        // Ensure this runs on the main thread to avoid race conditions
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            
+            let placeId = place.id.uuidString
+            
+            // Check if we already have the type calculated
+            if self.placeTypes[placeId] != nil {
+                return
+            }
+            
+            // Safely get the restaurant type
+            if let type = self.placeDetailVM.getRestaurantType(for: place) {
+                self.placeTypes[placeId] = type
+            } else {
+                self.placeTypes[placeId] = PlaceTypes.defaultType
+            }
         }
+    }
+    
+    // Public method to calculate restaurant type synchronously (for on-demand filtering)
+    func calculateRestaurantTypeSync(for place: DetailPlace) -> String {
+        let placeId = place.id.uuidString
+        
+        // Check if we already have the type calculated
+        if let existingType = placeTypes[placeId] {
+            return existingType
+        }
+        
+        // Calculate the type synchronously
+        let type = placeDetailVM.getRestaurantType(for: place) ?? PlaceTypes.defaultType
+        
+        // Store it for future use
+        placeTypes[placeId] = type
+        
+        return type
     }
 
     // Fetch place data (e.g., from Firestore)
@@ -141,43 +173,42 @@ class DetailPlaceViewModel: ObservableObject {
                 return
             }
             if let reviews = reviews {
-                var imageURLs: [URL] = []
+                // Collect all image URLs from all reviews as strings (same as review images)
+                var imageURLStrings: [String] = []
                 for review in reviews {
-                    for urlString in review.images {
-                        if let url = URL(string: urlString) {
-                            imageURLs.append(url)
+                    imageURLStrings.append(contentsOf: review.images)
+                }
+                
+                // If no images found, set to nil
+                guard !imageURLStrings.isEmpty else {
+                    DispatchQueue.main.async {
+                        self.placeImages[placeId] = nil
+                    }
+                    return
+                }
+                
+                // Use the same ImageService method that review images use for consistent processing
+                ImageService.shared.fetchPhotosFromStorage(urls: imageURLStrings) { [weak self] images, error in
+                    guard let self = self else { return }
+                    
+                    DispatchQueue.main.async {
+                        if let error = error {
+                            print("Error fetching place image for \(placeId): \(error.localizedDescription)")
+                            self.placeImages[placeId] = nil
+                        } else if let images = images, !images.isEmpty {
+                            // Use the first successfully loaded image as the place cover image
+                            self.placeImages[placeId] = images[0]
+                        } else {
+                            self.placeImages[placeId] = nil
                         }
                     }
                 }
-                self.downloadFirstSuccessfulImage(from: imageURLs, for: placeId)
             } else {
                 DispatchQueue.main.async {
                     self.placeImages[placeId] = nil
                 }
             }
         }
-    }
-
-    private func downloadFirstSuccessfulImage(from urls: [URL], for placeId: String) {
-        guard !urls.isEmpty else {
-            DispatchQueue.main.async {
-                self.placeImages[placeId] = nil
-            }
-            return
-        }
-        let url = urls[0]
-        URLSession.shared.dataTask(with: url) { [weak self] data, _, error in
-            guard let self = self else { return }
-            if let data = data, let image = UIImage(data: data) {
-                DispatchQueue.main.async {
-                    self.placeImages[placeId] = image
-                }
-            } else {
-                // Try the next URL if this one fails
-                let remainingURLs = Array(urls.dropFirst())
-                self.downloadFirstSuccessfulImage(from: remainingURLs, for: placeId)
-            }
-        }.resume()
     }
 
     // Update placeSavers when a user saves a place
@@ -262,6 +293,11 @@ class DetailPlaceViewModel: ObservableObject {
             places[placeId]
         }
     }
+    
+    // Add filtered places property
+    var filteredDetailPlaces: [DetailPlace] {
+        savedDetailPlaces
+    }
 
     // Refresh all places data asynchronously
     @MainActor
@@ -272,13 +308,24 @@ class DetailPlaceViewModel: ObservableObject {
                 if self.placeImages[place] == nil {
                     fetchPlaceImage(for: place)
                 }
-//                calculateRestaurantType(for: places[place]!)
+                // Calculate restaurant type if not already calculated
+                if let detailPlace = self.places[place], self.placeTypes[place] == nil {
+                    calculateRestaurantType(for: detailPlace)
+                }
             }
             
             // Notify UI that data has changed
             self.objectWillChange.send()
             print("Successfully refreshed \(detailPlaces.count) places")
         }
+    }
+
+    // Recalculate place types for all places
+    func recalculateAllPlaceTypes() {
+        for (placeId, place) in places {
+            calculateRestaurantType(for: place)
+        }
+        objectWillChange.send()
     }
 
     // Add this method to get or generate a color for a place

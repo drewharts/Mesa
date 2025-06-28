@@ -90,5 +90,21 @@ struct PlaceTypes {
         "Town", "Village", "City", "County", "State", "Country", "Region", "Territory"
     ]
     
+    // Restaurant and food-related types that should be included when filtering by "Restaurant"
+    static let restaurantTypes: Set<String> = [
+        // Cuisine types
+        "American", "Japanese", "Korean", "Mexican", "Italian", "Chinese", "Greek", "Vietnamese",
+        "Barbecue", "Indian", "Pizza", "Steakhouse", "Venezuelan", "Columbian", 
+        "Peruvian", "Salvadoran", "Argentinian", "Brazilian", "Spanish", "French", "German", 
+        "Thai", "Turkish", "Moroccan", "Lebanese", "Egyptian", "Restaurant",
+        "Seafood", "Sushi", "Burger", "Sandwich", "Deli", "BBQ", "Tex-Mex", 
+        "Mediterranean", "Middle Eastern", "Asian", "Fusion", "Vegetarian", "Vegan", 
+        "Gluten-Free", "Fast Food", "Fine Dining", "Buffet",
+        
+        // Food establishments
+        "Cafe", "Coffee Shop", "Bakery", "Bar", "Pub", "Food Truck", "Ice Cream", 
+        "Dessert", "Food Court"
+    ]
+    
     static let defaultType = "Place"
 } 

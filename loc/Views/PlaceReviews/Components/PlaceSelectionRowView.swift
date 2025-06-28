@@ -9,6 +9,13 @@ import SwiftUI
 struct PlaceSelectionRowView: View {
     let place: NearbyPlaceFeature
     let onSelect: () -> Void
+    let isLoading: Bool
+    
+    init(place: NearbyPlaceFeature, onSelect: @escaping () -> Void, isLoading: Bool = false) {
+        self.place = place
+        self.onSelect = onSelect
+        self.isLoading = isLoading
+    }
     
     private func formatDistance(meters: Double) -> String {
         let miles = meters * 0.000621371
@@ -84,10 +91,16 @@ struct PlaceSelectionRowView: View {
                 
                 Spacer()
                 
-                // Selection Arrow
-                Image(systemName: "chevron.right")
-                    .font(.caption)
-                    .foregroundColor(.gray)
+                // Selection Arrow or Loading Indicator
+                if isLoading {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                        .foregroundColor(.blue)
+                } else {
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                }
             }
             .padding(16)
             .background(Color.white)
@@ -95,5 +108,6 @@ struct PlaceSelectionRowView: View {
             .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
         }
         .buttonStyle(PlainButtonStyle())
+        .disabled(isLoading)
     }
 } 

@@ -18,6 +18,7 @@ struct MainView: View {
     @EnvironmentObject var locationManager: LocationManager
     @EnvironmentObject var notificationManager: NotificationManager
     @EnvironmentObject var viewModel: SearchViewModel
+    @EnvironmentObject var placeTypeFilterVM: PlaceTypeFilterViewModel
 
     @FocusState private var searchIsFocused: Bool
     @State private var isSearchBarMinimized = true
@@ -69,6 +70,17 @@ struct MainView: View {
                             .padding(.horizontal, 20)
                             .padding(.top, 10)
                             .padding(.bottom, -10)
+                            .onChange(of: viewModel.searchText) { oldValue, newValue in
+                                Task { @MainActor in
+                                    placeTypeFilterVM.filterBySearchText(newValue)
+                                }
+                            }
+                        
+                        // Place type filter buttons
+                        if !placeTypeFilterVM.mostFrequentTypes.isEmpty {
+                            PlaceTypeFilterButtonsView(filterVM: placeTypeFilterVM)
+                                .padding(.top, 10)
+                        }
                         
                         if !viewModel.searchResults.isEmpty || !viewModel.userResults.isEmpty {
                             SearchResultsView(
@@ -187,13 +199,25 @@ struct MainView: View {
         .onAppear {
             locationManager.requestLocationPermission()
             viewModel.selectedPlaceVM = selectedPlaceVM
+            viewModel.placeTypeFilterVM = placeTypeFilterVM
             viewModel.searchText = ""
+            
+            // Trigger immediate calculation of most frequent types
+            placeTypeFilterVM.refreshMostFrequentTypes()
         }
         .onChange(of: selectedPlaceVM.isDetailSheetPresented) { newValue in
             if newValue {
                 isSearchBarMinimized = true
                 searchIsFocused = false
             }
+        }
+        .onChange(of: profileViewModel.userFavorites) { _ in
+            // Recalculate filters when user favorites change
+            placeTypeFilterVM.refreshMostFrequentTypes()
+        }
+        .onChange(of: profileViewModel.userListsPlaces) { _ in
+            // Recalculate filters when user lists change
+            placeTypeFilterVM.refreshMostFrequentTypes()
         }
     }
 

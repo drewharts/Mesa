@@ -9,6 +9,9 @@ import PhotosUI
 import CoreLocation
 import ImageIO
 import UIKit
+import FirebaseAuth
+import FirebaseStorage
+import FirebaseFirestore
 
 @MainActor
 class PhotoImportViewModel: ObservableObject {
@@ -25,8 +28,15 @@ class PhotoImportViewModel: ObservableObject {
     @Published var shouldNavigateToPlaceDetail: Bool = false
     @Published var createdPlaceForDetail: DetailPlace?
     @Published var searchRadiusUsed: Int = 50
+    @Published var isSavingPlace: Bool = false
     
     private let nearbyPlacesService = NearbyPlacesService()
+    private let placeService = PlaceService.shared
+    private let userService = UserService.shared
+    
+    // Callback for when a place is successfully saved
+    var onPlaceSaved: (() -> Void)?
+    var onPlaceSavedWithDetail: ((DetailPlace) -> Void)?
     
     func processSelectedPhotos() async {
         guard !selectedItems.isEmpty else { return }
@@ -137,24 +147,40 @@ class PhotoImportViewModel: ObservableObject {
             nearbyPlaces = response.features
             print("🏢 Found \(nearbyPlaces.count) places within 50m")
             
-            // If no places found, try with larger radius (100m)
+            // If no places found, try with larger radius (250m)
             if nearbyPlaces.isEmpty {
-                print("🔍 No places found within 50m, expanding search to 100m...")
+                print("🔍 No places found within 50m, expanding search to 250m...")
                 response = try await nearbyPlacesService.fetchNearbyPlaces(
                     latitude: latitude,
                     longitude: longitude,
-                    radiusMeters: 100
+                    radiusMeters: 250
                 )
                 
                 nearbyPlaces = response.features
-                print("🏢 Found \(nearbyPlaces.count) places within 100m")
+                print("🏢 Found \(nearbyPlaces.count) places within 250m")
                 
+                // If still no places found, try with even larger radius (1000m)
                 if nearbyPlaces.isEmpty {
-                    print("❌ No nearby places found even within 100m - user can create new place")
-                    searchRadiusUsed = 100
+                    print("🔍 No places found within 250m, expanding search to 1000m...")
+                    response = try await nearbyPlacesService.fetchNearbyPlaces(
+                        latitude: latitude,
+                        longitude: longitude,
+                        radiusMeters: 1000
+                    )
+                    
+                    nearbyPlaces = response.features
+                    print("🏢 Found \(nearbyPlaces.count) places within 1000m")
+                    
+                    if nearbyPlaces.isEmpty {
+                        print("❌ No nearby places found even within 1000m - user can create new place")
+                        searchRadiusUsed = 1000
+                    } else {
+                        print("✅ Expanded search successful - found places within 1000m")
+                        searchRadiusUsed = 1000
+                    }
                 } else {
-                    print("✅ Expanded search successful - found places within 100m")
-                    searchRadiusUsed = 100
+                    print("✅ Expanded search successful - found places within 250m")
+                    searchRadiusUsed = 250
                 }
             } else {
                 searchRadiusUsed = 50
@@ -172,6 +198,115 @@ class PhotoImportViewModel: ObservableObject {
         showPlaceSelection = false
         showReviewTypeSelection = true
         print("✅ Selected place: \(place.properties.name)")
+        
+        // Automatically save the selected place to Firestore
+        Task {
+            await saveSelectedPlaceToFirestore(place)
+        }
+    }
+    
+    private func saveSelectedPlaceToFirestore(_ nearbyPlace: NearbyPlaceFeature) async {
+        guard let currentUserId = Auth.auth().currentUser?.uid else {
+            print("❌ No authenticated user found")
+            return
+        }
+        
+        isSavingPlace = true
+        
+        do {
+            // Convert NearbyPlaceFeature to DetailPlace
+            let detailPlace = convertToDetailPlace(nearbyPlace)
+            
+            // Save to main places collection
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                placeService.addToAllPlaces(detailPlace: detailPlace) { error in
+                    if let error = error {
+                        print("❌ Error saving place to main collection: \(error.localizedDescription)")
+                        continuation.resume(throwing: error)
+                    } else {
+                        print("✅ Successfully saved place to main collection")
+                        continuation.resume()
+                    }
+                }
+            }
+            
+            // Only save to user's myPlaces collection if this is a user-created place
+            if nearbyPlace.properties.source == "user_created" {
+                try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                    placeService.addToMyPlaces(userId: currentUserId, detailPlace: detailPlace) { error in
+                        if let error = error {
+                            print("❌ Error saving place to user's collection: \(error.localizedDescription)")
+                            continuation.resume(throwing: error)
+                        } else {
+                            print("✅ Successfully saved place to user's myPlaces collection")
+                            continuation.resume()
+                        }
+                    }
+                }
+            }
+            
+            // Add to user's map places for tracking
+            userService.addOrUpdateMapPlace(for: currentUserId, place: detailPlace, type: "selected")
+            
+            // Notify other components to refresh map annotations
+            NotificationCenter.default.post(name: NSNotification.Name("RefreshMapAnnotations"), object: nil)
+            
+            print("✅ Place '\(detailPlace.name)' successfully saved to Firestore")
+            
+            // Notify parent view that a place is successfully saved
+            onPlaceSaved?()
+            onPlaceSavedWithDetail?(detailPlace)
+            
+        } catch {
+            print("❌ Failed to save place to Firestore: \(error.localizedDescription)")
+        }
+        
+        isSavingPlace = false
+    }
+    
+    private func convertToDetailPlace(_ nearbyPlace: NearbyPlaceFeature) -> DetailPlace {
+        var detailPlace = DetailPlace()
+        
+        // Create a consistent UUID from the actualId by hashing it
+        detailPlace.id = createConsistentUUID(from: nearbyPlace.properties.actualId)
+        detailPlace.name = nearbyPlace.properties.name
+        detailPlace.address = nearbyPlace.properties.address
+        detailPlace.coordinate = GeoPoint(
+            latitude: nearbyPlace.geometry.latitude,
+            longitude: nearbyPlace.geometry.longitude
+        )
+        detailPlace.rating = nearbyPlace.properties.rating
+        detailPlace.categories = nearbyPlace.properties.types
+        detailPlace.description = nearbyPlace.properties.description
+        
+        // Handle Google Places specific data
+        if let placeId = nearbyPlace.properties.placeId {
+            detailPlace.mapboxId = placeId // Using mapboxId field for Google Place ID
+        }
+        
+        // Handle price level
+        if let priceLevel = nearbyPlace.properties.priceLevel {
+            detailPlace.priceLevel = String(priceLevel)
+        }
+        
+        return detailPlace
+    }
+    
+    private func createConsistentUUID(from string: String) -> UUID {
+        // Try to parse as UUID first (for existing UUID-based places)
+        if let uuid = UUID(uuidString: string) {
+            return uuid
+        }
+        
+        // For non-UUID strings (like Google Place IDs), create a consistent UUID by hashing
+        // This ensures the same string always produces the same UUID
+        let hash = abs(string.hashValue)
+        
+        // Create a deterministic UUID from the hash
+        // We'll use the hash to seed the UUID generation
+        let uuidString = String(format: "%08x-0000-0000-0000-%012x", hash, hash)
+        
+        return UUID(uuidString: uuidString) ?? UUID()
     }
     
     func navigateToPlaceDetail(place: DetailPlace) {
