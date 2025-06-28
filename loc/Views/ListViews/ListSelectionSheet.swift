@@ -92,17 +92,39 @@ struct ListsInSelectionSheet: View {
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
     let place: DetailPlace
+    @Binding var searchText: String
+    
+    // Filtered lists based on search text
+    var filteredLists: [PlaceList] {
+        if searchText.isEmpty {
+            return profile.userLists
+        } else {
+            return profile.userLists.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
+        }
+    }
 
     var body: some View {
         ScrollView {
-            if !profile.userLists.isEmpty {
-                ForEach(profile.userLists) { list in
+            if !filteredLists.isEmpty {
+                ForEach(filteredLists) { list in
                     ListSelectionRowView(list: list, place: place)
                 }
             } else {
-                Text("No lists available")
-                    .foregroundColor(.gray)
-                    .padding(.horizontal)
+                VStack(spacing: 8) {
+                    if searchText.isEmpty {
+                        Text("No lists available")
+                            .foregroundColor(.gray)
+                            .padding(.horizontal)
+                    } else {
+                        Text("No lists found")
+                            .foregroundColor(.gray)
+                            .padding(.horizontal)
+                        Text("No lists match '\(searchText)'")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                            .padding(.horizontal)
+                    }
+                }
             }
         }
     }
@@ -148,9 +170,9 @@ struct ListSelectionSheet: View {
             .padding(.horizontal, 20)
             .padding(.top, 10)
 
-            SkinnySearchBar()
+            SkinnySearchBar(searchText: $searchText)
 
-            ListsInSelectionSheet(place: place)
+            ListsInSelectionSheet(place: place, searchText: $searchText)
 
             Spacer()
         }
