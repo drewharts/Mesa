@@ -15,7 +15,8 @@ struct UserRow: View {
     
     var body: some View {
         Button(action: {
-            userProfileVM.selectUser(user, currentUserId: userSession.currentUserId!)
+            guard let currentUserId = userSession.currentUserId else { return }
+            userProfileVM.selectUser(user, currentUserId: currentUserId)
         }) {
             HStack(spacing: 12) {
                 // User profile photo

@@ -82,7 +82,9 @@ struct PlaceReviewsView: View {
         }
         .onAppear {
             // Check like statuses when view appears
-            selectedPlaceVM.checkLikeStatuses(userId: userSession.currentUserId! )
+            if let currentUserId = userSession.currentUserId {
+                selectedPlaceVM.checkLikeStatuses(userId: currentUserId)
+            }
         }
     }
     

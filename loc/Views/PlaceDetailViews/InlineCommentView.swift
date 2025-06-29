@@ -24,12 +24,14 @@ struct InlineCommentView: View {
                         .clipShape(Circle())
                         .onTapGesture {
                             // Check if this is the logged-in user's profile
-                            if comment.userId == userSession.currentUserId {
+                            guard let currentUserId = userSession.currentUserId else { return }
+                            
+                            if comment.userId == currentUserId {
                                 // Show the user's own profile page directly
                                 showProfileView = true
                             } else {
                                 // For other users, fetch and show their profile
-                                userProfileViewModel.fetchAndSelectUser(userId: comment.userId, currentUserId: userSession.currentUserId!)
+                                userProfileViewModel.fetchAndSelectUser(userId: comment.userId, currentUserId: currentUserId)
                             }
                         }
                         .background(
@@ -55,12 +57,14 @@ struct InlineCommentView: View {
                                 .clipShape(Circle())
                                 .onTapGesture {
                                     // Check if this is the logged-in user's profile
-                                    if comment.userId == userSession.currentUserId! {
+                                    guard let currentUserId = userSession.currentUserId else { return }
+                                    
+                                    if comment.userId == currentUserId {
                                         // Show the user's own profile page directly
                                         showProfileView = true
                                     } else {
                                         // For other users, fetch and show their profile
-                                        userProfileViewModel.fetchAndSelectUser(userId: comment.userId, currentUserId: userSession.currentUserId!)
+                                        userProfileViewModel.fetchAndSelectUser(userId: comment.userId, currentUserId: currentUserId)
                                     }
                                 }
                                 .background(
@@ -84,6 +88,18 @@ struct InlineCommentView: View {
                         .scaledToFit()
                         .frame(width: 34, height: 34)
                         .foregroundColor(.gray)
+                        .onTapGesture {
+                            // Check if this is the logged-in user's profile
+                            guard let currentUserId = userSession.currentUserId else { return }
+                            
+                            if comment.userId == currentUserId {
+                                // Show the user's own profile page directly  
+                                showProfileView = true
+                            } else {
+                                // For other users, fetch and show their profile
+                                userProfileViewModel.fetchAndSelectUser(userId: comment.userId, currentUserId: currentUserId)
+                            }
+                        }
                 }
                 
                 VStack(alignment: .leading, spacing: 2) {

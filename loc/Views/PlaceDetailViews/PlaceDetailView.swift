@@ -83,10 +83,10 @@ struct PlaceDetailView: View {
                     CreatePlaceReviewView(
                         isPresented: $showCreateReview,
                         place: selectedPlace,
-                        userId: userSession.currentUserId!,
+                        userId: userSession.currentUserId ?? "",
                         profilePhotoUrl: profile.user?.profilePhotoURL?.absoluteString ?? "",
-                        userFirstName: profile.user!.firstName,
-                        userLastName: profile.user!.lastName
+                        userFirstName: profile.user?.firstName ?? "",
+                        userLastName: profile.user?.lastName ?? ""
                     )
                 } else {
                     Text("No place selected")

@@ -20,12 +20,14 @@ struct RestaruantReviewViewProfileInformation: View {
                     .clipShape(Circle())
                     .onTapGesture {
                         // Check if this is the logged-in user's profile
-                        if review.userId == userSession.currentUserId! {
+                        guard let currentUserId = userSession.currentUserId else { return }
+                        
+                        if review.userId == currentUserId {
                             // Show the user's own profile page directly
                             showProfileView = true
                         } else {
                             // For other users, fetch and show their profile
-                            userProfileViewModel.fetchAndSelectUser(userId: review.userId, currentUserId: userSession.currentUserId!)
+                            userProfileViewModel.fetchAndSelectUser(userId: review.userId, currentUserId: currentUserId)
                         }
                     }
                     .background(
@@ -56,13 +58,14 @@ struct RestaruantReviewViewProfileInformation: View {
                 // Add likes button and count
                 HStack(spacing: 4) {
                     Button(action: {
-                        selectedPlaceVM.likeReview(review, userId: userSession.currentUserId!)
+                        guard let currentUserId = userSession.currentUserId else { return }
+                        selectedPlaceVM.likeReview(review, userId: currentUserId)
                     }) {
-                        Image(systemName: selectedPlaceVM.isReviewLiked(review.id) ? "heart.fill" : "heart")
-                            .foregroundColor(review.userId == userSession.currentUserId! ? .gray : (selectedPlaceVM.isReviewLiked(review.id) ? .red : .gray))
-                            .opacity(review.userId == userSession.currentUserId! ? 0.3 : 0.7)
-                    }
-                    .disabled(review.userId == userSession.currentUserId!)
+                                            Image(systemName: "heart.fill")
+                        .foregroundColor((userSession.currentUserId != nil && review.userId == userSession.currentUserId) ? .gray : (selectedPlaceVM.isReviewLiked(review.id) ? .red : .gray))
+                        .opacity((userSession.currentUserId != nil && review.userId == userSession.currentUserId) ? 0.3 : 0.7)
+                }
+                .disabled(userSession.currentUserId != nil && review.userId == userSession.currentUserId)
                     
                     Text("\(review.likes)")
                         .font(.footnote)
