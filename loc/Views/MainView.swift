@@ -94,7 +94,8 @@ struct MainView: View {
                                     }
                                 },
                                 onSelectUser: { user in
-                                    userProfileViewModel.selectUser(user, currentUserId: userSession.currentUserId!)
+                                    guard let currentUserId = userSession.currentUserId else { return }
+                                    userProfileViewModel.selectUser(user, currentUserId: currentUserId)
                                     withAnimation {
                                         isSearchBarMinimized = true
                                         searchIsFocused = false
@@ -190,8 +191,8 @@ struct MainView: View {
                 }
             }
             .sheet(isPresented: $userProfileViewModel.isUserDetailPresented) {
-                if let user = userProfileViewModel.selectedUser {
-                    UserProfileView(userId: userSession.currentUserId!, UserProfileVM: userProfileViewModel)
+                if let currentUserId = userSession.currentUserId {
+                    UserProfileView(userId: currentUserId, UserProfileVM: userProfileViewModel)
                 }
             }
         }

@@ -166,7 +166,9 @@ struct GenericReviewView: View {
         .padding(.vertical)
         .onAppear {
             // Check like statuses using the proper userId from profile
-            selectedPlaceVM.checkLikeStatuses(userId: userSession.currentUserId!)
+            if let currentUserId = userSession.currentUserId {
+                selectedPlaceVM.checkLikeStatuses(userId: currentUserId)
+            }
             
             // Listen for the hide comments notification
             NotificationCenter.default.addObserver(forName: Foundation.Notification.Name("HideCommentsFor-\(review.id)"), object: nil, queue: .main) { _ in

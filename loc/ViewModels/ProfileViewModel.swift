@@ -256,7 +256,8 @@ class ProfileViewModel: ObservableObject {
          if let index = userLists.firstIndex(where: { $0.id == placeList.id }) {
              userLists.remove(at: index)
              sortListsByDistance() // Sort lists by distance after removing list
-             placeService.deleteList(userId: userSession.currentUserId!,listId: placeList.id.uuidString) { error in
+             guard let currentUserId = userSession.currentUserId else { return }
+             placeService.deleteList(userId: currentUserId, listId: placeList.id.uuidString) { error in
                  if error != nil {
                      // Re-add the list if deletion failed
                      self.userLists.append(placeList)

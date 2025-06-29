@@ -15,9 +15,7 @@ struct ContentView: View {
     @EnvironmentObject var locationManager: LocationManager
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     
-    // TODO: not sure if this is how we want to do it with env vars for specific services?
-    @EnvironmentObject var userService: UserService
-    @EnvironmentObject var placeService: PlaceService
+    @EnvironmentObject var serviceContainer: ServiceContainer
     
     @EnvironmentObject var detailPlaceVM: DetailPlaceViewModel
     @EnvironmentObject var profileViewModel: ProfileViewModel
@@ -44,17 +42,25 @@ struct ContentView: View {
                     Text(navigationErrorMessage)
                 }
         } else {
-            LoginView(viewModel: LoginViewModel(userService: userService, dataManager: dataManager))
+            LoginView(viewModel: LoginViewModel(userService: serviceContainer.userService, dataManager: dataManager))
         }
     }
     
     private func handleNotificationNavigation(_ pendingNavigation: PendingNavigation?) {
         guard let navigation = pendingNavigation else { return }
         
+        // Ensure user is properly logged in before processing notification
+        guard userSession.isUserLoggedIn, userSession.currentUserId != nil else {
+            print("⚠️ Cannot process notification - user not logged in")
+            notificationManager.clearPendingNavigation()
+            notificationManager.clearHighlightedReview()
+            return
+        }
+        
         print("🚀 Processing notification navigation to place: \(navigation.placeId), review: \(navigation.reviewId)")
         
         // Fetch the place details first
-        placeService.getDetailPlace(placeId: navigation.placeId) { place, error in
+        serviceContainer.placeService.getDetailPlace(placeId: navigation.placeId) { place, error in
             DispatchQueue.main.async {
                 if let place = place {
                     print("✅ Found place: \(place.name ?? "Unknown")")
