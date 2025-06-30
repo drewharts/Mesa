@@ -227,7 +227,7 @@ class MesaBackendService {
         // Extract location data
         var latitude: Double = 0
         var longitude: Double = 0
-        if let geometry = additionalData["geometry"] as? [String: Any],
+        if let geometry = data["geometry"] as? [String: Any],
            let location = geometry["location"] as? [String: Any] {
             latitude = location["lat"] as? Double ?? 0
             longitude = location["lng"] as? Double ?? 0
@@ -277,21 +277,12 @@ class MesaBackendService {
                 detailPlace.coordinate = GeoPoint(latitude: latitude, longitude: longitude)
             }
             
-            // Set metadata fields if available
-            if let metadata = additionalData["metadata"] as? [String: Any] {
-                // Handle any specific metadata fields that might be relevant
-                // For example, if there's a rating or phone number in metadata
-            }
-            
-            // Set feature type and operational status
-            let featureType = additionalData["feature_type"] as? String
-            let operationalStatus = additionalData["operational_status"] as? String
-            
-            // Set maki (icon type) which might be useful for UI
-            let maki = additionalData["maki"] as? String
-            
-            // Set language
-            let language = additionalData["language"] as? String
+            // Additional metadata fields are available but not currently used:
+            // - metadata: additionalData["metadata"] as? [String: Any]
+            // - feature_type: additionalData["feature_type"] as? String
+            // - operational_status: additionalData["operational_status"] as? String
+            // - maki: additionalData["maki"] as? String
+            // - language: additionalData["language"] as? String
         }
         
         return detailPlace

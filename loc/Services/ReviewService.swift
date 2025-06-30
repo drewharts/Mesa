@@ -39,15 +39,6 @@ class ReviewService: ObservableObject {
             
             for document in snapshot.documents {
                 let data = document.data()
-                let ts = data["timestamp"]
-                var dateString = "(unparsed)"
-                if let ts = ts as? Timestamp {
-                    dateString = "\(ts.dateValue())"
-                } else if let date = ts as? Date {
-                    dateString = "\(date)"
-                } else {
-                    dateString = String(describing: ts)
-                }
                 // Check the type field to determine how to decode
                 if let typeString = data["type"] as? String,
                    let type = ReviewType(rawValue: typeString) {
@@ -579,9 +570,7 @@ class ReviewService: ObservableObject {
         batch.deleteDocument(userReviewRef)
         
         // Also delete any associated likes
-        deleteReviewLikes(reviewId: reviewId) { [weak self] _ in
-            guard let self = self else { return }
-            
+        deleteReviewLikes(reviewId: reviewId) { _ in
             // Commit the batch deletion
             batch.commit { error in
                 if let error = error {

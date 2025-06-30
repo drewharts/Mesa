@@ -9,7 +9,7 @@ import Foundation
 
 import UIKit
 
-extension UINavigationController: UIGestureRecognizerDelegate {
+extension UINavigationController: @retroactive UIGestureRecognizerDelegate {
     open override func viewDidLoad() {
         super.viewDidLoad()
         interactivePopGestureRecognizer?.delegate = self
@@ -21,5 +21,4 @@ extension UINavigationController: UIGestureRecognizerDelegate {
     ) -> Bool {
         return gestureRecognizer == self.interactivePopGestureRecognizer
     }
-}
-
+} 

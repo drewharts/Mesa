@@ -306,7 +306,7 @@ class ImageService {
             let storageRef = storage.reference().child("reviews/\(placeId)")
             
             storageRef.listAll { [weak self] (result, error) in
-                guard let self = self else { return }
+                guard self != nil else { return }
                 
                 if let error = error {
                     print("Error listing files in storage for place \(placeId): \(error.localizedDescription)")
