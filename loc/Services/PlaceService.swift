@@ -75,9 +75,14 @@ class PlaceService: ObservableObject {
 
         func addPlaceToList(userId: String, listName: String, place: Place) {
         do {
-            try db.collection("users").document(userId)
+            let encodedPlace = try Firestore.Encoder().encode(place)
+            db.collection("users").document(userId)
                 .collection("placeLists").document(listName)
-                .updateData(["places": FieldValue.arrayUnion([try Firestore.Encoder().encode(place)])])
+                .updateData(["places": FieldValue.arrayUnion([encodedPlace])]) { error in
+                    if let error = error {
+                        print("Error updating place list: \(error.localizedDescription)")
+                    }
+                }
         } catch {
             print("Error encoding place: \(error.localizedDescription)")
         }

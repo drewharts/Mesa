@@ -72,8 +72,8 @@ struct BottomSheetView<Content: View>: View {
                         }
                     }
             )
-            .onChange(of: dragTranslation) { value in
-                let newHeight = sheetHeight - value
+            .onChange(of: dragTranslation) {
+                let newHeight = sheetHeight - dragTranslation
                 if newHeight <= maxSheetHeight && newHeight >= minSheetHeight {
                     sheetHeight = newHeight
                 } else if newHeight > maxSheetHeight {

@@ -77,8 +77,8 @@ struct ProfileViewListsView: View {
                 profile.addNewPlaceList(named: listName, city: "", emoji: "", image: "")
             })
         }
-        .onChange(of: selectedPlaceVM.isDetailSheetPresented) { newValue in
-            if newValue == true {
+        .onChange(of: selectedPlaceVM.isDetailSheetPresented) {
+            if selectedPlaceVM.isDetailSheetPresented == true {
                 presentationMode.wrappedValue.dismiss()
             }
         }

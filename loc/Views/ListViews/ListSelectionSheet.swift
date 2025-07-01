@@ -94,12 +94,14 @@ struct ListsInSelectionSheet: View {
     let place: DetailPlace
     @Binding var searchText: String
     
-    // Filtered lists based on search text
+    // Filtered lists based on search text and sorted by proximity to the place
     var filteredLists: [PlaceList] {
+        let sortedLists = profile.sortListsByDistanceFromPlace(place)
+        
         if searchText.isEmpty {
-            return profile.userLists
+            return sortedLists
         } else {
-            return profile.userLists.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
+            return sortedLists.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
         }
     }
 

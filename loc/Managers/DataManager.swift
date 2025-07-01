@@ -58,9 +58,9 @@ class DataManager: ObservableObject {
     
     // PHASE 1: Load most important user data first (parallel)
     private func loadCriticalUserData(userId: String) async {
-        async let profileData = loadProfileData(userId: userId)
-        async let myPlaces = loadUserMyPlaces(userId: userId)
-        async let favorites = loadUserFavoritePlaces(userId: userId)
+        async let profileData: () = loadProfileData(userId: userId)
+        async let myPlaces: () = loadUserMyPlaces(userId: userId)
+        async let favorites: () = loadUserFavoritePlaces(userId: userId)
         
         // Wait for critical data to complete
         await profileData
@@ -70,9 +70,9 @@ class DataManager: ObservableObject {
     
     // PHASE 2: Load remaining user data (parallel)
     private func loadRemainingUserData(userId: String) async {
-        async let placeLists = loadUserPlaceLists(userId: userId)
-        async let reviewedPlaces = loadUserReviewedPlaces(userId: userId)
-        async let followCounts = fetchFollowerAndFollowingCountsAsync(userId: userId)
+        async let placeLists: () = loadUserPlaceLists(userId: userId)
+        async let reviewedPlaces: () = loadUserReviewedPlaces(userId: userId)
+        async let followCounts: () = fetchFollowerAndFollowingCountsAsync(userId: userId)
         
         // Wait for remaining user data
         await placeLists
@@ -82,8 +82,8 @@ class DataManager: ObservableObject {
     
     // PHASE 3: Load social data without blocking UI
     private func loadSocialDataInBackground(userId: String) async {
-        async let following = loadFollowing(userId: userId)
-        async let followers = loadFollowers(userId: userId)
+        async let following: () = loadFollowing(userId: userId)
+        async let followers: () = loadFollowers(userId: userId)
         
         // Wait for social connections
         await following
@@ -242,6 +242,8 @@ class DataManager: ObservableObject {
             let detailPlace = try await placeService.fetchPlace(withId: placeId)
             await MainActor.run {
                 self.detailPlaceViewModel.places[placeId] = detailPlace
+                // Generate color for the place
+                self.detailPlaceViewModel.generateColorForPlace(placeId)
                 // Update place savers
                 if self.detailPlaceViewModel.placeSavers[placeId] == nil {
                     self.detailPlaceViewModel.placeSavers[placeId] = [userId]
@@ -260,6 +262,8 @@ class DataManager: ObservableObject {
             do {
                 let detailPlace = try await placeService.fetchPlace(withId: placeId)
                 self.detailPlaceViewModel.places[placeId] = detailPlace
+                // Generate color for the place
+                self.detailPlaceViewModel.generateColorForPlace(placeId)
                 // If we have a user object, update the place savers
                 if self.detailPlaceViewModel.placeSavers[placeId] == nil {
                     self.detailPlaceViewModel.placeSavers[placeId] = [userId]
@@ -302,8 +306,8 @@ class DataManager: ObservableObject {
             await withTaskGroup(of: Void.self) { group in
                 for profile in batch {
                     group.addTask {
-                        async let favorites = self.loadUserFavoritePlaces(userId: profile.id, forUser: profile)
-                        async let lists = self.loadUserPlaceLists(userId: profile.id, forUser: profile)
+                        async let favorites: () = self.loadUserFavoritePlaces(userId: profile.id, forUser: profile)
+                        async let lists: () = self.loadUserPlaceLists(userId: profile.id, forUser: profile)
                         await favorites
                         await lists
                     }
@@ -375,7 +379,10 @@ class DataManager: ObservableObject {
         }
         
         // Fetch and store the place if not already present
-        if await MainActor.run { self.detailPlaceViewModel.places[placeId] } == nil {
+        let existingPlace = await MainActor.run {
+            return self.detailPlaceViewModel.places[placeId]
+        }
+        if existingPlace == nil {
             do {
                 let detailPlace = try await placeService.fetchPlace(withId: placeId)
                 await MainActor.run {

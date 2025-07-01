@@ -89,7 +89,7 @@ class PlaceReviewViewModel: ObservableObject {
                userFirstName: userFirstName,
                userLastName: userLastName,
                placeId: place.id.uuidString,
-               placeName: place.name ?? "Unnamed Place",
+               placeName: place.name,
                reviewText: reviewText,
                timestamp: timestamp,
                images: [], // Will be populated after upload

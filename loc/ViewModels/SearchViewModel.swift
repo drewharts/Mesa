@@ -52,10 +52,8 @@ class SearchViewModel: ObservableObject {
         searchService.searchPlaces(
             query: query,
             onResultsUpdated: { [weak self] results in
-                if let mesaSuggestions = results as? [MesaPlaceSuggestion] {
-                    DispatchQueue.main.async {
-                        self?.searchResults = mesaSuggestions
-                    }
+                DispatchQueue.main.async {
+                    self?.searchResults = results
                 }
             },
             onError: { [weak self] error in
@@ -93,7 +91,7 @@ class SearchViewModel: ObservableObject {
             }
             
             // If no existing place is found, create a new DetailPlace using the initializer
-            var detailPlace = DetailPlace(from: place)
+            let detailPlace = DetailPlace(from: place)
             
             // Return the newly created DetailPlace
             completion(detailPlace)
@@ -113,7 +111,7 @@ class SearchViewModel: ObservableObject {
                     print("✅ Place Details Result:")
                     print("  ID: \(result.id)")
                     print("  Name: \(result.name)")
-                    print("  Address: \(result.address)")
+                    print("  Address: \(result.address ?? "Not available")")
                     print("  Location: (\(result.coordinate?.latitude ?? 0), \(result.coordinate?.longitude ?? 0))")
                     print("  Source: local")
                     print("  Open Hours: \(result.openHours?.joined(separator: ", ") ?? "Not available")")

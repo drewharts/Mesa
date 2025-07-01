@@ -55,14 +55,7 @@ class DeepLinkManager: ObservableObject {
             isProcessingDeepLink = true
         }
         
-        do {
-            await loadPlaceDetails(shareablePlace)
-        } catch {
-            print("❌ Error loading place details: \(error)")
-            await MainActor.run {
-                pendingPlace = shareablePlace
-            }
-        }
+        await loadPlaceDetails(shareablePlace)
         
         await MainActor.run {
             isProcessingDeepLink = false

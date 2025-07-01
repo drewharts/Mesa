@@ -71,7 +71,7 @@ struct CreatePlaceReviewView: View {
         NavigationView {
             ScrollView {
                 VStack(spacing: 16) {
-                    PlaceReviewHeaderView(placeName: place.name ?? "Unnamed Place")
+                    PlaceReviewHeaderView(placeName: place.name)
                     
                     // Add review type picker
                     Picker("Review Type", selection: $reviewType) {

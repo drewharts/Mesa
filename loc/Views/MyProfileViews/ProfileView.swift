@@ -204,7 +204,7 @@ struct ProfileView: View {
         .task {
             await profile.refreshUserPlaces()
         }
-        .onChange(of: photoImportVM.selectedItems) { _ in
+        .onChange(of: photoImportVM.selectedItems) {
             Task {
                 await photoImportVM.processSelectedPhotos()
             }
@@ -260,8 +260,8 @@ struct ProfileView: View {
                 )
             }
         }
-        .onChange(of: photoImportVM.shouldNavigateToPlaceDetail) { shouldNavigate in
-            if shouldNavigate, let place = photoImportVM.createdPlaceForDetail {
+        .onChange(of: photoImportVM.shouldNavigateToPlaceDetail) {
+            if photoImportVM.shouldNavigateToPlaceDetail, let place = photoImportVM.createdPlaceForDetail {
                 // Set the selected place and show detail sheet
                 selectedPlaceVM.selectedPlace = place
                 selectedPlaceVM.isDetailSheetPresented = true

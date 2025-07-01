@@ -7,7 +7,7 @@ struct RestaruantReviewViewProfileInformation: View {
     @EnvironmentObject var detailPlaceVM: DetailPlaceViewModel
     @EnvironmentObject var userSession: UserSession
     @EnvironmentObject var userProfileViewModel: UserProfileViewModel
-    @State private var showProfileView = false
+    @State private var shouldNavigateToProfile = false
 
     var body: some View {
         HStack(alignment: .center, spacing: 16) { // Increased spacing between photo and text
@@ -24,17 +24,12 @@ struct RestaruantReviewViewProfileInformation: View {
                         
                         if review.userId == currentUserId {
                             // Show the user's own profile page directly
-                            showProfileView = true
+                            shouldNavigateToProfile = true
                         } else {
                             // For other users, fetch and show their profile
                             userProfileViewModel.fetchAndSelectUser(userId: review.userId, currentUserId: currentUserId)
                         }
                     }
-                    .background(
-                        NavigationLink(destination: ProfileView(), isActive: $showProfileView) {
-                            EmptyView()
-                        }
-                    )
             } else if selectedPlaceVM.profilePhotoLoadingState(forUserId: review.userId) == .loading {
                 ProgressView()
                     .frame(width: 50, height: 50)
@@ -76,6 +71,9 @@ struct RestaruantReviewViewProfileInformation: View {
         }
         .padding(.horizontal)
         .padding(.bottom, 15)
+        .navigationDestination(isPresented: $shouldNavigateToProfile) {
+            ProfileView()
+        }
     }
 
     // Helper function to format timestamp

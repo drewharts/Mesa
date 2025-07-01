@@ -615,12 +615,7 @@ class UserService: ObservableObject {
                              .document(placeId)
                              .collection("reviews")
             
-            reviewsRef.order(by: "timestamp", descending: true).getDocuments { [weak self] snapshot, error in
-                guard let self = self else {
-                    completion(nil, NSError(domain: "FirestoreService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Self was deallocated"]))
-                    return
-                }
-                
+            reviewsRef.order(by: "timestamp", descending: true).getDocuments { snapshot, error in
                 if let error = error {
                     completion(nil, error)
                     return
@@ -638,15 +633,7 @@ class UserService: ObservableObject {
                 
                 for document in snapshot.documents {
                     let data = document.data()
-                    let ts = data["timestamp"]
-                    var dateString = "(unparsed)"
-                    if let ts = ts as? Timestamp {
-                        dateString = "\(ts.dateValue())"
-                    } else if let date = ts as? Date {
-                        dateString = "\(date)"
-                    } else {
-                        dateString = String(describing: ts)
-                    }
+                    
                     // First check if the review is from a user we want to include
                     guard let userId = data["userId"] as? String,
                           userIdsToFetch.contains(userId) else {
