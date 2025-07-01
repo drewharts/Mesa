@@ -10,6 +10,7 @@ import MapboxSearch
 import Foundation
 import FirebaseFirestore
 import UIKit
+import CoreLocation
 
 @MainActor
 class ProfileViewModel: ObservableObject {
@@ -479,6 +480,53 @@ class ProfileViewModel: ObservableObject {
     /// Returns true if location is available for distance calculations
     var isLocationAvailable: Bool {
         return locationManager.currentLocation != nil
+    }
+    
+    // MARK: - Place-Specific List Sorting
+    
+    /// Calculates the average distance of all places in a list from a specific place
+    func calculateAverageDistanceForListFromPlace(_ list: PlaceList, place: DetailPlace) -> Double {
+        guard let placeCoordinate = place.coordinate else { 
+            // If no coordinate available for the place, return infinity to sort these lists last
+            return Double.infinity 
+        }
+        
+        let listPlaceIds = userListsPlaces[list.id.uuidString] ?? []
+        guard !listPlaceIds.isEmpty else { return Double.infinity }
+        
+        let targetLocation = CLLocation(
+            latitude: placeCoordinate.latitude,
+            longitude: placeCoordinate.longitude
+        )
+        
+        var totalDistance: Double = 0
+        var validPlaceCount: Int = 0
+        
+        for placeId in listPlaceIds {
+            if let detailPlace = detailPlaceViewModel.places[placeId],
+               let listPlaceCoordinate = detailPlace.coordinate {
+                
+                let listPlaceLocation = CLLocation(
+                    latitude: listPlaceCoordinate.latitude,
+                    longitude: listPlaceCoordinate.longitude
+                )
+                
+                let distance = targetLocation.distance(from: listPlaceLocation)
+                totalDistance += distance
+                validPlaceCount += 1
+            }
+        }
+        
+        return validPlaceCount > 0 ? totalDistance / Double(validPlaceCount) : Double.infinity
+    }
+    
+    /// Sorts lists by their proximity to a specific place (closest first)
+    func sortListsByDistanceFromPlace(_ place: DetailPlace) -> [PlaceList] {
+        return userLists.sorted { list1, list2 in
+            let distance1 = calculateAverageDistanceForListFromPlace(list1, place: place)
+            let distance2 = calculateAverageDistanceForListFromPlace(list2, place: place)
+            return distance1 < distance2
+        }
     }
     
 
