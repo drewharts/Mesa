@@ -242,6 +242,8 @@ class DataManager: ObservableObject {
             let detailPlace = try await placeService.fetchPlace(withId: placeId)
             await MainActor.run {
                 self.detailPlaceViewModel.places[placeId] = detailPlace
+                // Generate color for the place
+                self.detailPlaceViewModel.generateColorForPlace(placeId)
                 // Update place savers
                 if self.detailPlaceViewModel.placeSavers[placeId] == nil {
                     self.detailPlaceViewModel.placeSavers[placeId] = [userId]
@@ -260,6 +262,8 @@ class DataManager: ObservableObject {
             do {
                 let detailPlace = try await placeService.fetchPlace(withId: placeId)
                 self.detailPlaceViewModel.places[placeId] = detailPlace
+                // Generate color for the place
+                self.detailPlaceViewModel.generateColorForPlace(placeId)
                 // If we have a user object, update the place savers
                 if self.detailPlaceViewModel.placeSavers[placeId] == nil {
                     self.detailPlaceViewModel.placeSavers[placeId] = [userId]

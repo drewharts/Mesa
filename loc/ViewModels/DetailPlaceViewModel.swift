@@ -141,6 +141,7 @@ class DetailPlaceViewModel: ObservableObject {
                     self.places[placeId] = detailPlace
                     self.fetchPlaceImage(for: placeId) // Fetch image if not already present
                     self.calculateRestaurantType(for: detailPlace) // Calculate restaurant type
+                    self.generateColorForPlace(placeId) // Generate color for fetched place
                     completion(detailPlace)
                 }
             case .failure(let error):
@@ -255,6 +256,7 @@ class DetailPlaceViewModel: ObservableObject {
                 self.places[detailPlace.id.uuidString] = detailPlace
                 self.fetchPlaceImage(for: detailPlace.id.uuidString)
                 self.calculateRestaurantType(for: detailPlace) // Calculate restaurant type
+                self.generateColorForPlace(detailPlace.id.uuidString) // Generate color for new place
                 completion(detailPlace)
             }
         }
@@ -312,6 +314,8 @@ class DetailPlaceViewModel: ObservableObject {
                 if let detailPlace = self.places[place], self.placeTypes[place] == nil {
                     calculateRestaurantType(for: detailPlace)
                 }
+                // Generate color if not already generated
+                generateColorForPlace(place)
             }
             
             // Notify UI that data has changed
@@ -328,18 +332,33 @@ class DetailPlaceViewModel: ObservableObject {
         objectWillChange.send()
     }
 
-    // Add this method to get or generate a color for a place
+    // Method to generate and store a color for a place
+    func generateColorForPlace(_ placeId: String) {
+        guard placeColors[placeId] == nil else { return }
+        
+        let color = Color(
+            red: Double.random(in: 0...1),
+            green: Double.random(in: 0...1),
+            blue: Double.random(in: 0...1)
+        )
+        placeColors[placeId] = color
+    }
+    
+    // Public method to get a color for a place (read-only, no side effects)
     func colorForPlace(placeId: String) -> Color {
         if let color = placeColors[placeId] {
             return color
         } else {
-            let color = Color(
-                red: Double.random(in: 0...1),
-                green: Double.random(in: 0...1),
-                blue: Double.random(in: 0...1)
-            )
-            placeColors[placeId] = color
-            return color
+            // Return a default color if not found
+            // This should rarely happen as colors should be pre-generated
+            return Color.gray
+        }
+    }
+    
+    // Initialize colors for all existing places
+    func initializePlaceColors() {
+        for placeId in places.keys {
+            generateColorForPlace(placeId)
         }
     }
 }
