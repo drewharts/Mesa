@@ -148,12 +148,30 @@ class PlaceDetailViewModel: ObservableObject {
         let placeTypesCopy = Array(placeTypes)
         let recognizedTypesCopy = Array(PlaceTypes.recognizedTypes)
         
-        // First pass: Look for specific cuisine types (prioritize over generic "Restaurant")
-        // Skip generic terms in first pass
-        let genericTerms = ["Restaurant", "Cafe", "Bar", "Place"]
+        // First pass: Look for specific cuisine types (prioritize over generic terms)
+        // Skip generic terms in first pass - these will be checked in second pass only
+        let genericTerms = [
+            "Restaurant", "Cafe", "Bar", "Place",
+            "Point of Interest", "Point Of Interest", "Point_of_Interest", 
+            "POI", "Establishment", "Store", "Business", "Location",
+            "Venue", "Site", "Spot", "Destination"
+        ]
         for recognizedType in recognizedTypesCopy {
-            // Skip generic terms in first pass
-            if genericTerms.contains(recognizedType) { continue }
+            // Skip generic terms in first pass (normalize for comparison)
+            let normalizedRecognizedType = recognizedType.lowercased()
+                .replacingOccurrences(of: "_", with: " ")
+                .replacingOccurrences(of: "-", with: " ")
+                .replacingOccurrences(of: ".", with: " ")
+            
+            let isGenericTerm = genericTerms.contains { genericTerm in
+                let normalizedGenericTerm = genericTerm.lowercased()
+                    .replacingOccurrences(of: "_", with: " ")
+                    .replacingOccurrences(of: "-", with: " ")
+                    .replacingOccurrences(of: ".", with: " ")
+                return normalizedRecognizedType == normalizedGenericTerm
+            }
+            
+            if isGenericTerm { continue }
             
             guard !recognizedType.isEmpty else { continue }
             
@@ -183,8 +201,31 @@ class PlaceDetailViewModel: ObservableObject {
             }
         }
         
-        // Second pass: Look for generic restaurant terms if no specific cuisine found
-        for recognizedType in genericTerms {
+        // Second pass: Look for generic terms if no specific type found
+        // Check both our generic terms and any generic terms from the recognized types
+        var allGenericTermsToCheck = genericTerms
+        
+        // Add any generic terms from recognized types that we skipped in first pass
+        for recognizedType in recognizedTypesCopy {
+            let normalizedRecognizedType = recognizedType.lowercased()
+                .replacingOccurrences(of: "_", with: " ")
+                .replacingOccurrences(of: "-", with: " ")
+                .replacingOccurrences(of: ".", with: " ")
+            
+            let isGenericTerm = genericTerms.contains { genericTerm in
+                let normalizedGenericTerm = genericTerm.lowercased()
+                    .replacingOccurrences(of: "_", with: " ")
+                    .replacingOccurrences(of: "-", with: " ")
+                    .replacingOccurrences(of: ".", with: " ")
+                return normalizedRecognizedType == normalizedGenericTerm
+            }
+            
+            if isGenericTerm && !allGenericTermsToCheck.contains(recognizedType) {
+                allGenericTermsToCheck.append(recognizedType)
+            }
+        }
+        
+        for genericTerm in allGenericTermsToCheck {
             if placeTypesCopy.contains(where: { placeType in
                 guard !placeType.isEmpty else { return false }
                 
@@ -193,18 +234,19 @@ class PlaceDetailViewModel: ObservableObject {
                     .replacingOccurrences(of: "-", with: " ")
                     .replacingOccurrences(of: ".", with: " ")
                 
-                let normalizedRecognizedType = recognizedType.lowercased()
+                let normalizedGenericTerm = genericTerm.lowercased()
                     .replacingOccurrences(of: "_", with: " ")
                     .replacingOccurrences(of: "-", with: " ")
                     .replacingOccurrences(of: ".", with: " ")
                 
-                guard !normalizedPlaceType.isEmpty && !normalizedRecognizedType.isEmpty else {
+                guard !normalizedPlaceType.isEmpty && !normalizedGenericTerm.isEmpty else {
                     return false
                 }
                 
-                return normalizedPlaceType.contains(normalizedRecognizedType)
+                return normalizedPlaceType.contains(normalizedGenericTerm)
             }) {
-                return recognizedType
+                // Return the original generic term from our list if found, not the recognized type variant
+                return genericTerm
             }
         }
         
