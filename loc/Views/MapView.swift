@@ -188,7 +188,7 @@ struct MapView: View {
             Task {
                 await profile.refreshUserPlaces()
                 await detailPlaceVM.calculateAnnotationPlaces()
-                placeTypeFilterVM.refreshMostFrequentTypes()
+                await placeTypeFilterVM.refreshMostFrequentTypes()
             }
         }
     }

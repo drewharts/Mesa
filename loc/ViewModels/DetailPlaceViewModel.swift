@@ -123,7 +123,9 @@ class DetailPlaceViewModel: ObservableObject {
         let type = placeDetailVM.getRestaurantType(for: place) ?? PlaceTypes.defaultType
         
         // Store it for future use
-        placeTypes[placeId] = type
+        DispatchQueue.main.async {
+            self.placeTypes[placeId] = type
+        }
         
         return type
     }
@@ -326,7 +328,7 @@ class DetailPlaceViewModel: ObservableObject {
 
     // Recalculate place types for all places
     func recalculateAllPlaceTypes() {
-        for (placeId, place) in places {
+        for (_, place) in places {
             calculateRestaurantType(for: place)
         }
         objectWillChange.send()

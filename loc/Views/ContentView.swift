@@ -63,7 +63,7 @@ struct ContentView: View {
         serviceContainer.placeService.getDetailPlace(placeId: navigation.placeId) { place, error in
             DispatchQueue.main.async {
                 if let place = place {
-                    print("✅ Found place: \(place.name ?? "Unknown")")
+                    print("✅ Found place: \(place.name)")
                     
                     // Set the selected place and show the detail sheet
                     selectedPlaceVM.selectedPlace = place
@@ -74,7 +74,7 @@ struct ContentView: View {
                     
                     print("📍 Navigated to place detail view, highlighting review: \(navigation.reviewId)")
                 } else {
-                    let errorMsg = error?.localizedDescription ?? "Place not found"
+                    let errorMsg = error!.localizedDescription
                     print("❌ Failed to fetch place details: \(errorMsg)")
                     
                     // Show user-friendly error

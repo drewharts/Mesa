@@ -28,7 +28,7 @@ struct MinPlaceDetailView: View {
             VStack(alignment: .leading, spacing: 5) {
                 // MARK: - Top Row: Title + Icons
                 HStack(alignment: .center) {
-                    Text(selectedPlaceVM.selectedPlace?.name ?? "Unnamed Place")
+                    Text(selectedPlaceVM.selectedPlace!.name)
                         .font(.largeTitle)
                         .fontWeight(.bold)
                         .foregroundColor(.black)
@@ -39,13 +39,13 @@ struct MinPlaceDetailView: View {
                 
                 // MARK: - Row: Type / Google Maps / Drive Time
                 HStack(spacing: 10) {
-                    Text(viewModel.getRestaurantType(for: selectedPlaceVM.selectedPlace!) ?? "Place")
+                    Text(viewModel.getRestaurantType(for: selectedPlaceVM.selectedPlace!)!)
                         .font(.subheadline)
                         .foregroundColor(.gray)
                     
                     Button(action: {
                         if let place = selectedPlaceVM.selectedPlace {
-                            let name = place.name ?? "Unknown Place"
+                            let name = place.name
                             // If we have an address, include it for more accurate search
                             if let address = place.address {
                                 viewModel.openGoogleMapsWithPlace(query: "\(name), \(address)")
@@ -110,8 +110,8 @@ struct MinPlaceDetailView: View {
                             )
                     }
                     
-                    if !selectedPlaceVM.reviews.isEmpty && (selectedPlaceVM.placeRating ?? 0.0) > 0 {
-                        Text(String(format: "%.1f", selectedPlaceVM.placeRating ?? 0.0))
+                    if !selectedPlaceVM.reviews.isEmpty && selectedPlaceVM.placeRating > 0 {
+                        Text(String(format: "%.1f", selectedPlaceVM.placeRating))
                             .font(.caption)
                             .foregroundColor(.black)
                             .padding(.horizontal, 6)
@@ -148,7 +148,7 @@ struct MinPlaceDetailView: View {
                 // MARK: - Tab-Specific Content
                 switch selectedTab {
                 case .about:
-                    Text(selectedPlaceVM.selectedPlace?.description ?? "No description available")
+                    Text(selectedPlaceVM.selectedPlace!.description ?? "No description available")
                         .font(.footnote)
                         .foregroundColor(.black)
                         .fixedSize(horizontal: false, vertical: true)

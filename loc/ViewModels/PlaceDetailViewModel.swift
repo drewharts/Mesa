@@ -36,7 +36,7 @@ class PlaceDetailViewModel: ObservableObject {
         
         self.currentPlaceID = place.id.uuidString
         
-        self.placeName = place.name ?? "Restaurant"
+        self.placeName = place.name
         self.updateTravelTime(for: place, from: currentLocation)
     }
     

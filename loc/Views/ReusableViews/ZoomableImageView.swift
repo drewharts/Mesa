@@ -96,7 +96,7 @@ struct ZoomableImageView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .clipped()
-        .onChange(of: image) { _ in
+        .onChange(of: image) {
             // Reset zoom when image changes
             resetZoom()
         }

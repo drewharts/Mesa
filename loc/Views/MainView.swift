@@ -25,12 +25,12 @@ struct MainView: View {
     @State private var sheetHeight: CGFloat = 200
     @State private var minSheetHeight: CGFloat = 250
     @State private var maxSheetHeight: CGFloat = UIScreen.main.bounds.height * 0.85
-    @State private var showProfileView = false
+    @State private var shouldNavigateToProfile = false
     @State private var triggerFocus = false
     @State private var recenterMap = false
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ZStack {
                 // Map layer
                 MapView(recenterMap: $recenterMap, onMapTap: handleMapTap)
@@ -155,32 +155,26 @@ struct MainView: View {
                                         .shadow(radius: 4)
                                 }
                                 
-                                NavigationLink(
-                                    destination: ProfileView()
-                                        .environmentObject(userProfileViewModel),
-                                    isActive: $showProfileView
-                                ) {
-                                    Button(action: {
-                                        showProfileView = true
-                                        selectedPlaceVM.isDetailSheetPresented = false
-                                    }) {
-                                        if let profilePhoto = profileViewModel.userPicture {
-                                            Image(uiImage: profilePhoto)
-                                                .resizable()
-                                                .frame(width: 60, height: 60)
-                                                .clipShape(Circle())
-                                                .overlay(Circle().stroke(Color.gray, lineWidth: 2))
-                                                .shadow(radius: 4)
-                                        } else {
-                                            Image(systemName: "person.crop.circle")
-                                                .resizable()
-                                                .foregroundColor(.blue)
-                                                .frame(width: 60, height: 60)
-                                                .background(Color.white)
-                                                .clipShape(Circle())
-                                                .overlay(Circle().stroke(Color.gray, lineWidth: 2))
-                                                .shadow(radius: 4)
-                                        }
+                                Button(action: {
+                                    shouldNavigateToProfile = true
+                                    selectedPlaceVM.isDetailSheetPresented = false
+                                }) {
+                                    if let profilePhoto = profileViewModel.userPicture {
+                                        Image(uiImage: profilePhoto)
+                                            .resizable()
+                                            .frame(width: 60, height: 60)
+                                            .clipShape(Circle())
+                                            .overlay(Circle().stroke(Color.gray, lineWidth: 2))
+                                            .shadow(radius: 4)
+                                    } else {
+                                        Image(systemName: "person.crop.circle")
+                                            .resizable()
+                                            .foregroundColor(.blue)
+                                            .frame(width: 60, height: 60)
+                                            .background(Color.white)
+                                            .clipShape(Circle())
+                                            .overlay(Circle().stroke(Color.gray, lineWidth: 2))
+                                            .shadow(radius: 4)
                                     }
                                 }
                             }
@@ -195,8 +189,11 @@ struct MainView: View {
                     UserProfileView(userId: currentUserId, UserProfileVM: userProfileViewModel)
                 }
             }
+            .navigationDestination(isPresented: $shouldNavigateToProfile) {
+                ProfileView()
+                    .environmentObject(userProfileViewModel)
+            }
         }
-        .navigationViewStyle(StackNavigationViewStyle())
         .onAppear {
             locationManager.requestLocationPermission()
             viewModel.selectedPlaceVM = selectedPlaceVM
@@ -206,17 +203,17 @@ struct MainView: View {
             // Trigger immediate calculation of most frequent types
             placeTypeFilterVM.refreshMostFrequentTypes()
         }
-        .onChange(of: selectedPlaceVM.isDetailSheetPresented) { newValue in
+        .onChange(of: selectedPlaceVM.isDetailSheetPresented) { _, newValue in
             if newValue {
                 isSearchBarMinimized = true
                 searchIsFocused = false
             }
         }
-        .onChange(of: profileViewModel.userFavorites) { _ in
+        .onChange(of: profileViewModel.userFavorites) {
             // Recalculate filters when user favorites change
             placeTypeFilterVM.refreshMostFrequentTypes()
         }
-        .onChange(of: profileViewModel.userListsPlaces) { _ in
+        .onChange(of: profileViewModel.userListsPlaces) {
             // Recalculate filters when user lists change
             placeTypeFilterVM.refreshMostFrequentTypes()
         }
