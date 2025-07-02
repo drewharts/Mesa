@@ -112,8 +112,6 @@ struct SwipeableListPopupHeaderView: View {
                 }
             }
             .padding(.horizontal, 20)
-            
-            Divider()
         }
         .background(Color(.systemBackground))
     }
