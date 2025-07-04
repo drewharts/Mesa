@@ -19,6 +19,7 @@ struct ProfileView: View {
     
     @State private var showCreateReview = false
     @State private var selectedReviewType: CreatePlaceReviewView.ReviewType = .restaurant
+    @StateObject private var tikTokService = TikTokService()
     
 
 
@@ -29,8 +30,9 @@ struct ProfileView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 20) {
+        ZStack {
+            ScrollView {
+                VStack(spacing: 20) {
                 // Profile Picture
                 ProfilePictureView()
 
@@ -156,7 +158,7 @@ struct ProfileView: View {
 
                 // Logout Button
                 Button(action: {
-                    userSession.logout()
+                    profile.logout()
                 }) {
                     Text("Log Out")
                         .fontWeight(.semibold)
@@ -167,9 +169,33 @@ struct ProfileView: View {
                         .cornerRadius(8)
                 }
                 .padding(.horizontal, 40)
+                }
+                .padding(.bottom, 40)
+                .padding(.top, 10)
             }
-            .padding(.bottom, 40)
-            .padding(.top, 10)
+            
+            // TikTok Processing Overlay
+            if profile.isProcessingTikTok {
+                Color.black.opacity(0.4)
+                    .ignoresSafeArea()
+                
+                VStack(spacing: 16) {
+                    ProgressView()
+                        .scaleEffect(1.5)
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                    
+                    Text("Processing TikTok Video...")
+                        .font(.headline)
+                        .foregroundColor(.white)
+                    
+                    Text("Extracting location and saving place")
+                        .font(.subheadline)
+                        .foregroundColor(.white.opacity(0.8))
+                }
+                .padding(30)
+                .background(Color.black.opacity(0.8))
+                .cornerRadius(20)
+            }
         }
         .navigationBarBackButtonHidden(true)
         .preferredColorScheme(.light)
@@ -246,7 +272,7 @@ struct ProfileView: View {
                !photoImportVM.selectedImages.isEmpty {
                 CreatePlaceReviewView(
                     isPresented: $showCreateReview,
-                    place: convertToDetailPlace(selectedPlace),
+                    place: profile.convertToDetailPlace(selectedPlace),
                     userId: userSession.currentUserId ?? "",
                     profilePhotoUrl: profile.user?.profilePhotoURL?.absoluteString ?? "",
                     userFirstName: profile.user?.firstName ?? "",
@@ -271,6 +297,19 @@ struct ProfileView: View {
                 photoImportVM.createdPlaceForDetail = nil
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ProcessSharedTikTok"))) { notification in
+            if let url = notification.userInfo?["url"] as? String {
+                profile.handleTikTokNotification(url: url,
+                                               tikTokService: tikTokService,
+                                               selectedPlaceVM: selectedPlaceVM,
+                                               placeVM: placeVM)
+            }
+        }
+        .onAppear {
+            profile.checkPendingTikTokURL(tikTokService: tikTokService,
+                                        selectedPlaceVM: selectedPlaceVM,
+                                        placeVM: placeVM)
+        }
     }
     
     private func navigateToRestaurantReview() {
@@ -283,39 +322,6 @@ struct ProfileView: View {
         selectedReviewType = .generic
         photoImportVM.showReviewTypeSelection = false
         showCreateReview = true
-    }
-    
-    private func convertToDetailPlace(_ nearbyPlace: NearbyPlaceFeature) -> DetailPlace {
-        var detailPlace = DetailPlace()
-        // Create a consistent UUID from the actualId by hashing it
-        detailPlace.id = createConsistentUUID(from: nearbyPlace.properties.actualId)
-        detailPlace.name = nearbyPlace.properties.name
-        detailPlace.address = nearbyPlace.properties.address
-        detailPlace.coordinate = GeoPoint(
-            latitude: nearbyPlace.geometry.latitude,
-            longitude: nearbyPlace.geometry.longitude
-        )
-        detailPlace.rating = nearbyPlace.properties.rating
-        detailPlace.categories = nearbyPlace.properties.types
-        detailPlace.phone = nearbyPlace.properties.photoReference // This might not be correct mapping
-        return detailPlace
-    }
-    
-    private func createConsistentUUID(from string: String) -> UUID {
-        // Try to parse as UUID first (for existing UUID-based places)
-        if let uuid = UUID(uuidString: string) {
-            return uuid
-        }
-        
-        // For non-UUID strings (like Google Place IDs), create a consistent UUID by hashing
-        // This ensures the same string always produces the same UUID
-        let hash = abs(string.hashValue)
-        
-        // Create a deterministic UUID from the hash
-        // We'll use the hash to seed the UUID generation
-        let uuidString = String(format: "%08x-0000-0000-0000-%012x", hash, hash)
-        
-        return UUID(uuidString: uuidString) ?? UUID()
     }
 }
 

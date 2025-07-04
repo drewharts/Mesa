@@ -182,11 +182,9 @@ class DetailPlaceViewModel: ObservableObject {
                     imageURLStrings.append(contentsOf: review.images)
                 }
                 
-                // If no images found, set to nil
+                // If no images found, try TikTok thumbnail as fallback
                 guard !imageURLStrings.isEmpty else {
-                    DispatchQueue.main.async {
-                        self.placeImages[placeId] = nil
-                    }
+                    self.tryTikTokThumbnailAsCover(placeId: placeId)
                     return
                 }
                 
@@ -207,11 +205,48 @@ class DetailPlaceViewModel: ObservableObject {
                     }
                 }
             } else {
-                DispatchQueue.main.async {
+                tryTikTokThumbnailAsCover(placeId: placeId)
+            }
+        }
+    }
+    
+    private func tryTikTokThumbnailAsCover(placeId: String) {
+        // Look for place in our cached places
+        guard let place = places[placeId],
+              let tikTokVideos = place.tikTokVideos,
+              !tikTokVideos.isEmpty,
+              let firstThumbnailURL = tikTokVideos.first?.thumbnailURL else {
+            DispatchQueue.main.async {
+                self.placeImages[placeId] = nil
+            }
+            return
+        }
+        
+        fetchTikTokThumbnailAsImage(thumbnailURL: firstThumbnailURL, placeId: placeId)
+    }
+    
+    private func fetchTikTokThumbnailAsImage(thumbnailURL: String, placeId: String) {
+        guard let url = URL(string: thumbnailURL) else {
+            DispatchQueue.main.async {
+                self.placeImages[placeId] = nil
+            }
+            return
+        }
+        
+        URLSession.shared.dataTask(with: url) { [weak self] data, _, error in
+            guard let self = self else { return }
+            
+            DispatchQueue.main.async {
+                if let error = error {
+                    print("Error fetching TikTok thumbnail for \(placeId): \(error.localizedDescription)")
+                    self.placeImages[placeId] = nil
+                } else if let data = data, let image = UIImage(data: data) {
+                    self.placeImages[placeId] = image
+                } else {
                     self.placeImages[placeId] = nil
                 }
             }
-        }
+        }.resume()
     }
 
     // Update placeSavers when a user saves a place

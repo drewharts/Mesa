@@ -259,20 +259,41 @@ class DataManager: ObservableObject {
     func processPlacesInList(list: PlaceList, userId: String) async {
         for place in list.places {
             let placeId = place.id.uuidString
-            do {
-                let detailPlace = try await placeService.fetchPlace(withId: placeId)
-                self.detailPlaceViewModel.places[placeId] = detailPlace
-                // Generate color for the place
-                self.detailPlaceViewModel.generateColorForPlace(placeId)
-                // If we have a user object, update the place savers
-                if self.detailPlaceViewModel.placeSavers[placeId] == nil {
-                    self.detailPlaceViewModel.placeSavers[placeId] = [userId]
-                } else if !self.detailPlaceViewModel.placeSavers[placeId]!.contains(userId) {
-                    self.detailPlaceViewModel.placeSavers[placeId]!.append(userId)
-                }
-            } catch {
-                print("Error fetching place details: \(error.localizedDescription) (listId: \(list.id.uuidString), placeId: \(placeId))")
+            
+            if let existingPlace = self.detailPlaceViewModel.places[placeId] {
+                updateCachedPlace(placeId: placeId, userId: userId)
+                continue
             }
+            
+            await fetchAndUpdatePlace(place: place, userId: userId)
+        }
+    }
+    
+    private func updateCachedPlace(placeId: String, userId: String) {
+        detailPlaceViewModel.generateColorForPlace(placeId)
+        updatePlaceSavers(placeId: placeId, userId: userId)
+    }
+    
+    private func updatePlaceSavers(placeId: String, userId: String) {
+        if detailPlaceViewModel.placeSavers[placeId] == nil {
+            detailPlaceViewModel.placeSavers[placeId] = [userId]
+        } else if !detailPlaceViewModel.placeSavers[placeId]!.contains(userId) {
+            detailPlaceViewModel.placeSavers[placeId]!.append(userId)
+        }
+    }
+    
+    private func fetchAndUpdatePlace(place: Place, userId: String) async {
+        let placeId = place.id.uuidString
+        
+        do {
+            let detailPlace = try await placeService.fetchPlace(withId: placeId)
+            detailPlaceViewModel.places[placeId] = detailPlace
+            detailPlaceViewModel.generateColorForPlace(placeId)
+            updatePlaceSavers(placeId: placeId, userId: userId)
+        } catch {
+            // Create minimal DetailPlace for missing places
+            let detailPlace = DetailPlace(id: place.id, name: place.name, address: place.address, city: nil)
+            detailPlaceViewModel.places[placeId] = detailPlace
         }
     }
     

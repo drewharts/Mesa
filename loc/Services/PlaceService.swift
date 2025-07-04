@@ -93,7 +93,6 @@ class PlaceService: ObservableObject {
         
         placeRef.getDocument { documentSnapshot, error in
             if let error = error {
-                print("Error fetching place: \(error.localizedDescription)")
                 completion(.failure(error))
                 return
             }
@@ -110,7 +109,6 @@ class PlaceService: ObservableObject {
                 let detailPlace = try documentSnapshot.data(as: DetailPlace.self)
                 completion(.success(detailPlace))
             } catch {
-                print("Error decoding place: \(error.localizedDescription)")
                 completion(.failure(error))
             }
         }

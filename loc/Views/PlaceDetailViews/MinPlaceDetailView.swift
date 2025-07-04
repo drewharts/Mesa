@@ -21,7 +21,11 @@ struct MinPlaceDetailView: View {
     @Binding var showNoPhoneNumberAlert: Bool
     let onPhotoTapped: ([UIImage], Int) -> Void
     
-    @State private var selectedTab: DetailTab = .reviews
+    @State private var selectedTab: DetailTab = .about
+    
+    private var defaultTab: DetailTab {
+        return selectedPlaceVM.reviews.isEmpty ? .about : .reviews
+    }
     
     var body: some View {
         ScrollView {
@@ -153,6 +157,33 @@ struct MinPlaceDetailView: View {
                         .foregroundColor(.black)
                         .fixedSize(horizontal: false, vertical: true)
                     
+                    // TikTok Videos Section
+                    if let tikTokVideos = selectedPlaceVM.selectedPlace?.tikTokVideos,
+                       !tikTokVideos.isEmpty {
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack {
+                                Text("TikTok Videos")
+                                    .font(.headline)
+                                    .fontWeight(.bold)
+                                
+                                Spacer()
+                                
+                                Text("\(tikTokVideos.count)")
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(Color.gray.opacity(0.2))
+                                    .cornerRadius(12)
+                            }
+                            
+                            ForEach(tikTokVideos, id: \.id) { video in
+                                TikTokVideoView(tikTokVideo: video)
+                            }
+                        }
+                        .padding(.top, 15)
+                    }
+                    
                     Divider()
                         .padding(.top, 15)
                         .padding(.bottom, 15)
@@ -171,6 +202,9 @@ struct MinPlaceDetailView: View {
         }
         .scrollDisabled(!isScrollingEnabled) // Disable scrolling based on sheet height
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            selectedTab = defaultTab
+        }
         .onReceive(notificationManager.$highlightedReviewId) { reviewId in
             if reviewId != nil {
                 // Switch to reviews tab when there's a highlighted review

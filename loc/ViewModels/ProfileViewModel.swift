@@ -44,6 +44,9 @@ class ProfileViewModel: ObservableObject {
     @Published var isFollowersListLoading: Bool = false
     @Published var isFollowingListLoading: Bool = false
     
+    // TikTok processing state
+    @Published var isProcessingTikTok: Bool = false
+    
     // Pagination for reviewed places
     @Published var isLoadingReviewedPlaces: Bool = false
     @Published var isLoadingMoreReviews: Bool = false
@@ -170,28 +173,38 @@ class ProfileViewModel: ObservableObject {
      }
     
      func isPlaceInList(listId: UUID, placeId: String) -> Bool {
-         return false
+         let listIdString = listId.uuidString
+         let places = userListsPlaces[listIdString] ?? []
+         return places.contains(placeId)
      }
     
      func addPlaceToList(listId: UUID, place: DetailPlace) {
         let listIdString = listId.uuidString
-        guard let userId = userSession.currentUserId else { return }
+        guard let userId = userSession.currentUserId else { 
+            return 
+        }
         // Find the list in userLists
-        guard let listIndex = userLists.firstIndex(where: { $0.id == listId }) else { return }
+        guard let listIndex = userLists.firstIndex(where: { $0.id == listId }) else { 
+            return 
+        }
         // Convert DetailPlace to Place for FirestoreService
-        let placeForList = Place(id: place.id, name: place.name, address: place.address ?? "")
+        let placeForList = place.toPlace()
+        
         // Update local userListsPlaces
         var places = userListsPlaces[listIdString] ?? []
         if !places.contains(place.id.uuidString) {
             places.append(place.id.uuidString)
             userListsPlaces[listIdString] = places
         }
+        
         // Update the places array in the PlaceList
         if !userLists[listIndex].places.contains(where: { $0.id == place.id }) {
             userLists[listIndex].places.append(placeForList)
         }
+        
         // Persist to Firestore
         placeService.addPlaceToList(userId: userId, listName: listIdString, place: placeForList)
+        
         // Update DetailPlaceViewModel's places dictionary for immediate UI update
         if detailPlaceViewModel.places[place.id.uuidString] == nil {
             detailPlaceViewModel.places[place.id.uuidString] = place
@@ -213,7 +226,7 @@ class ProfileViewModel: ObservableObject {
          places.remove(at: index)
          userListsPlaces[listIdString] = places
          
-         let placeForList = Place(id: place.id, name: place.name, address: place.address ?? "")
+         let placeForList = place.toPlace()
 
          placeService.removePlaceFromList(userId: userId, listId: list.id, place: placeForList)
          
@@ -452,6 +465,115 @@ class ProfileViewModel: ObservableObject {
     /// Returns whether the initial sort has been performed
     var hasCompletedInitialSort: Bool {
         hasPerformedInitialSort
+    }
+    
+    // MARK: - TikTok Processing
+    
+    func processSharedTikTokURL(_ urlString: String, 
+                               tikTokService: TikTokService,
+                               selectedPlaceVM: SelectedPlaceViewModel,
+                               placeVM: DetailPlaceViewModel) async -> Bool {
+        await MainActor.run {
+            isProcessingTikTok = true
+        }
+        
+        let result = await tikTokService.processTikTokURL(urlString)
+        
+        await MainActor.run {
+            isProcessingTikTok = false
+        }
+        
+        switch result {
+        case .success(let response):
+            let place = createPlaceFromTikTok(response, tikTokService: tikTokService)
+            
+            // Add to DetailPlaceViewModel for immediate display
+            await MainActor.run {
+                placeVM.places[place.id.uuidString] = place
+                selectedPlaceVM.selectedPlace = place
+                selectedPlaceVM.isDetailSheetPresented = true
+            }
+            
+            // Save to Firestore
+            await saveTikTokPlaceToFirestore(place, tikTokService: tikTokService)
+            return true
+            
+        case .failure(let error):
+            print("Failed to process TikTok video: \(error.localizedDescription)")
+            return false
+        }
+    }
+    
+    private func createPlaceFromTikTok(_ response: TikTokProcessorResponse, 
+                                     tikTokService: TikTokService) -> DetailPlace {
+        return tikTokService.createPlaceFromTikTok(response)
+    }
+    
+    private func saveTikTokPlaceToFirestore(_ place: DetailPlace, 
+                                          tikTokService: TikTokService) async {
+        let saveResult = await tikTokService.savePlaceToFirestore(place)
+        if case .failure(let error) = saveResult {
+            print("Failed to save TikTok place: \(error.localizedDescription)")
+        }
+    }
+    
+    // MARK: - Place Conversion
+    
+    func convertToDetailPlace(_ nearbyPlace: NearbyPlaceFeature) -> DetailPlace {
+        var detailPlace = DetailPlace()
+        detailPlace.id = createConsistentUUID(from: nearbyPlace.properties.actualId)
+        detailPlace.name = nearbyPlace.properties.name
+        detailPlace.address = nearbyPlace.properties.address
+        detailPlace.coordinate = GeoPoint(
+            latitude: nearbyPlace.geometry.latitude,
+            longitude: nearbyPlace.geometry.longitude
+        )
+        detailPlace.rating = nearbyPlace.properties.rating
+        detailPlace.categories = nearbyPlace.properties.types
+        detailPlace.phone = nearbyPlace.properties.photoReference
+        return detailPlace
+    }
+    
+    private func createConsistentUUID(from string: String) -> UUID {
+        if let uuid = UUID(uuidString: string) {
+            return uuid
+        }
+        
+        let hash = abs(string.hashValue)
+        let uuidString = String(format: "%08x-0000-0000-0000-%012x", hash, hash)
+        return UUID(uuidString: uuidString) ?? UUID()
+    }
+    
+    // MARK: - User Actions
+    
+    func logout() {
+        userSession.logout()
+    }
+    
+    func handleTikTokNotification(url: String, 
+                                 tikTokService: TikTokService,
+                                 selectedPlaceVM: SelectedPlaceViewModel,
+                                 placeVM: DetailPlaceViewModel) {
+        Task {
+            await processSharedTikTokURL(url, 
+                                       tikTokService: tikTokService,
+                                       selectedPlaceVM: selectedPlaceVM,
+                                       placeVM: placeVM)
+        }
+    }
+    
+    func checkPendingTikTokURL(tikTokService: TikTokService,
+                              selectedPlaceVM: SelectedPlaceViewModel,
+                              placeVM: DetailPlaceViewModel) {
+        if let pendingURL = UserDefaults.standard.string(forKey: "pendingTikTokURL") {
+            Task {
+                await processSharedTikTokURL(pendingURL,
+                                           tikTokService: tikTokService,
+                                           selectedPlaceVM: selectedPlaceVM,
+                                           placeVM: placeVM)
+            }
+            UserDefaults.standard.removeObject(forKey: "pendingTikTokURL")
+        }
     }
     
     /// Formats distance for display (meters to miles/kilometers)

@@ -139,9 +139,15 @@ struct locApp: App {
                 .onOpenURL { url in
                     // Handle deep links for places
                     if url.scheme == "loc" {
-                        Task {
-                            print("🔗 Received deep link: \(url)")
-                            await deepLinkViewModel.processIncomingURL(url)
+                        // Handle TikTok share extension URLs
+                        if url.host == "share" && url.path == "/tiktok" {
+                            handleSharedTikTokURL(from: url)
+                        } else {
+                            // Handle regular place deep links
+                            Task {
+                                print("🔗 Received deep link: \(url)")
+                                await deepLinkViewModel.processIncomingURL(url)
+                            }
                         }
                     }
                 }
@@ -223,11 +229,17 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         
         // Handle deep links for places
         if url.scheme == "loc" {
-            print("🔗 Received deep link in AppDelegate: \(url)")
-            Task {
-                await deepLinkViewModel?.processIncomingURL(url)
+            // Handle TikTok share extension URLs
+            if url.host == "share" && url.path == "/tiktok" {
+                handleSharedTikTokURL(from: url)
+                return true
+            } else {
+                print("🔗 Received deep link in AppDelegate: \(url)")
+                Task {
+                    await deepLinkViewModel?.processIncomingURL(url)
+                }
+                return true
             }
-            return true
         }
         
         return false
@@ -303,4 +315,26 @@ class AppAttestProviderFactory: NSObject, AppCheckProviderFactory {
     func createProvider(with app: FirebaseApp) -> AppCheckProvider? {
         return AppAttestProvider(app: app)
     }
+}
+
+// MARK: - TikTok Share Extension Handler
+private func handleSharedTikTokURL(from url: URL) {
+    guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+          let urlItem = components.queryItems?.first(where: { $0.name == "url" }),
+          let tiktokURLString = urlItem.value else {
+        print("❌ Failed to extract TikTok URL from share extension")
+        return
+    }
+    
+    print("🎵 Received TikTok URL from share extension: \(tiktokURLString)")
+    
+    // Save the shared URL and trigger automatic processing
+    UserDefaults.standard.set(tiktokURLString, forKey: "pendingTikTokURL")
+    
+    // Post a notification to trigger automatic TikTok processing
+    NotificationCenter.default.post(
+        name: Notification.Name("ProcessSharedTikTok"),
+        object: nil,
+        userInfo: ["url": tiktokURLString]
+    )
 }
