@@ -12,21 +12,40 @@ import UniformTypeIdentifiers
 
 class ShareViewController: SLComposeServiceViewController {
 
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        print("🔍 ShareExtension: viewDidLoad called")
+    }
+
     override func isContentValid() -> Bool {
+        print("🔍 ShareExtension: isContentValid called")
         return true
     }
 
     override func didSelectPost() {
+        print("🔍 ShareExtension: didSelectPost called")
         // Process the shared content
         if let item = extensionContext?.inputItems.first as? NSExtensionItem {
+            print("🔍 ShareExtension: Found input item")
             if let attachments = item.attachments {
-                for attachment in attachments {
+                print("🔍 ShareExtension: Found \(attachments.count) attachments")
+                for (index, attachment) in attachments.enumerated() {
+                    print("🔍 ShareExtension: Processing attachment \(index)")
+                    
                     // Handle URL sharing (TikTok shares video URLs)
                     if attachment.hasItemConformingToTypeIdentifier(UTType.url.identifier) {
+                        print("🔍 ShareExtension: Found URL attachment")
                         attachment.loadItem(forTypeIdentifier: UTType.url.identifier, options: nil) { [weak self] (item, error) in
+                            if let error = error {
+                                print("❌ ShareExtension: Error loading URL: \(error)")
+                                self?.completeRequest()
+                                return
+                            }
                             if let url = item as? URL {
+                                print("🔍 ShareExtension: Loaded URL: \(url)")
                                 self?.handleTikTokURL(url)
                             } else {
+                                print("🔍 ShareExtension: URL item is not a URL")
                                 self?.completeRequest()
                             }
                         }
@@ -34,21 +53,36 @@ class ShareViewController: SLComposeServiceViewController {
                     }
                     // Handle text sharing (TikTok sometimes shares as text)
                     else if attachment.hasItemConformingToTypeIdentifier(UTType.plainText.identifier) {
+                        print("🔍 ShareExtension: Found text attachment")
                         attachment.loadItem(forTypeIdentifier: UTType.plainText.identifier, options: nil) { [weak self] (item, error) in
+                            if let error = error {
+                                print("❌ ShareExtension: Error loading text: \(error)")
+                                self?.completeRequest()
+                                return
+                            }
                             if let text = item as? String {
+                                print("🔍 ShareExtension: Loaded text: \(text)")
                                 if let url = self?.extractTikTokURL(from: text) {
                                     self?.handleTikTokURL(url)
                                 } else {
+                                    print("🔍 ShareExtension: No TikTok URL found in text")
                                     self?.completeRequest()
                                 }
                             } else {
+                                print("🔍 ShareExtension: Text item is not a string")
                                 self?.completeRequest()
                             }
                         }
                         return
+                    } else {
+                        print("🔍 ShareExtension: Attachment \(index) has no matching type identifier")
                     }
                 }
+            } else {
+                print("🔍 ShareExtension: No attachments found")
             }
+        } else {
+            print("🔍 ShareExtension: No input items found")
         }
         
         // If no URL found, just complete
@@ -111,22 +145,14 @@ class ShareViewController: SLComposeServiceViewController {
     }
     
     private func openURL(_ url: URL, completion: @escaping (Bool) -> Void) {
-        var responder: UIResponder? = self
-        while responder != nil {
-            if let application = responder as? UIApplication {
-                if #available(iOS 10.0, *) {
-                    application.open(url, options: [:]) { success in
-                        completion(success)
-                    }
-                } else {
-                    let success = application.openURL(url)
-                    completion(success)
-                }
-                return
+        // Use the extension context to open the URL
+        if let context = self.extensionContext {
+            context.open(url) { success in
+                completion(success)
             }
-            responder = responder?.next
+        } else {
+            completion(false)
         }
-        completion(false)
     }
     
     private func completeRequest() {

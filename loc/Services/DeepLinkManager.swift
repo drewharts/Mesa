@@ -15,10 +15,12 @@ class DeepLinkManager: ObservableObject {
     
     private let placeService: PlaceService
     private let selectedPlaceViewModel: SelectedPlaceViewModel
+    private let tikTokService: TikTokService
     
-    init(placeService: PlaceService, selectedPlaceViewModel: SelectedPlaceViewModel) {
+    init(placeService: PlaceService, selectedPlaceViewModel: SelectedPlaceViewModel, tikTokService: TikTokService = TikTokService()) {
         self.placeService = placeService
         self.selectedPlaceViewModel = selectedPlaceViewModel
+        self.tikTokService = tikTokService
     }
     
     // MARK: - Deep Link Processing
@@ -34,6 +36,12 @@ class DeepLinkManager: ObservableObject {
         switch url.host {
         case "place":
             await handlePlaceDeepLink(url)
+        case "share":
+            if url.path == "/tiktok" {
+                await handleTikTokDeepLink(url)
+            } else {
+                print("❌ Unknown share path: \(url.path)")
+            }
         default:
             print("❌ Unknown deep link host: \(url.host ?? "nil")")
         }
@@ -60,6 +68,46 @@ class DeepLinkManager: ObservableObject {
         await MainActor.run {
             isProcessingDeepLink = false
         }
+    }
+    
+    private func handleTikTokDeepLink(_ url: URL) async {
+        print("🎵 Starting to handle TikTok deep link: \(url)")
+        
+        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              let urlItem = components.queryItems?.first(where: { $0.name == "url" }),
+              let tiktokURLString = urlItem.value else {
+            print("❌ Failed to extract TikTok URL from deep link")
+            return
+        }
+        
+        print("🎵 Processing TikTok URL: \(tiktokURLString)")
+        
+        await MainActor.run {
+            isProcessingDeepLink = true
+        }
+        
+        await processTikTokURL(tiktokURLString)
+        
+        await MainActor.run {
+            isProcessingDeepLink = false
+        }
+    }
+    
+    private func processTikTokURL(_ urlString: String) async {
+        let result = await tikTokService.processTikTokURL(urlString)
+        
+        switch result {
+        case .success(let response):
+            let place = createPlaceFromTikTokResponse(response)
+            await navigateToPlace(place)
+            
+        case .failure(let error):
+            print("❌ Failed to process TikTok URL: \(error.localizedDescription)")
+        }
+    }
+    
+    private func createPlaceFromTikTokResponse(_ response: TikTokProcessorResponse) -> DetailPlace {
+        return tikTokService.createPlaceFromTikTok(response)
     }
     
     private func loadPlaceDetails(_ shareablePlace: ShareablePlace) async {

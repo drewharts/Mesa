@@ -10,6 +10,7 @@ class ServiceContainer: ObservableObject {
     lazy var reviewService = ReviewService.shared
     lazy var imageService = ImageService.shared
     lazy var placeShareService = PlaceShareService()
+    lazy var tikTokService = TikTokService()
     
     // MARK: - Managers
     lazy var locationManager = LocationManager()

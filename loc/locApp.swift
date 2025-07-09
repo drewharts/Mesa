@@ -91,7 +91,8 @@ struct locApp: App {
         // Create DeepLinkManager and DeepLinkViewModel
         let deepLinkManager = DeepLinkManager(
             placeService: services.placeService,
-            selectedPlaceViewModel: selectedPlaceVM
+            selectedPlaceViewModel: selectedPlaceVM,
+            tikTokService: services.tikTokService
         )
         
         let deepLinkVM = DeepLinkViewModel(
@@ -139,15 +140,20 @@ struct locApp: App {
                 .onOpenURL { url in
                     // Handle deep links for places
                     if url.scheme == "loc" {
-                        // Handle TikTok share extension URLs
-                        if url.host == "share" && url.path == "/tiktok" {
-                            handleSharedTikTokURL(from: url)
-                        } else {
-                            // Handle regular place deep links
-                            Task {
-                                print("🔗 Received deep link: \(url)")
-                                await deepLinkViewModel.processIncomingURL(url)
-                            }
+                        // Handle all deep links through DeepLinkViewModel
+                        Task {
+                            print("🔗 Received deep link: \(url)")
+                            await deepLinkViewModel.processIncomingURL(url)
+                        }
+                    }
+                }
+                .onContinueUserActivity("com.mesa.share.tiktok") { userActivity in
+                    // Handle TikTok share via NSUserActivity
+                    if let tikTokURL = userActivity.userInfo?["tikTokURL"] as? String {
+                        print("🎵 Received TikTok URL via NSUserActivity: \(tikTokURL)")
+                        let deepLinkURL = URL(string: "loc://share/tiktok?url=\(tikTokURL.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")")!
+                        Task {
+                            await deepLinkViewModel.processIncomingURL(deepLinkURL)
                         }
                     }
                 }
@@ -157,7 +163,40 @@ struct locApp: App {
                         userSession.currentUserId = currentUser.uid
                         await dataManager.initializeProfileData(userId: currentUser.uid)
                     }
+                    
+                    // Check for shared TikTok URLs
+                    checkForSharedTikTokURL()
                 }
+                .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+                    // Check again when app becomes active
+                    checkForSharedTikTokURL()
+                }
+        }
+    }
+    
+    private func checkForSharedTikTokURL() {
+        // Check shared UserDefaults first
+        if let sharedDefaults = UserDefaults(suiteName: "group.com.mesa.loc"),
+           let sharedURL = sharedDefaults.string(forKey: "sharedTikTokURL") {
+            print("🎵 Found shared TikTok URL: \(sharedURL)")
+            sharedDefaults.removeObject(forKey: "sharedTikTokURL")
+            sharedDefaults.synchronize()
+            
+            let deepLinkURL = URL(string: "loc://share/tiktok?url=\(sharedURL.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")")!
+            Task {
+                await deepLinkViewModel.processIncomingURL(deepLinkURL)
+            }
+        }
+        // Check regular UserDefaults as fallback
+        else if let sharedURL = UserDefaults.standard.string(forKey: "sharedTikTokURL") {
+            print("🎵 Found TikTok URL in regular UserDefaults: \(sharedURL)")
+            UserDefaults.standard.removeObject(forKey: "sharedTikTokURL")
+            UserDefaults.standard.synchronize()
+            
+            let deepLinkURL = URL(string: "loc://share/tiktok?url=\(sharedURL.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")")!
+            Task {
+                await deepLinkViewModel.processIncomingURL(deepLinkURL)
+            }
         }
     }
 }
@@ -229,17 +268,11 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         
         // Handle deep links for places
         if url.scheme == "loc" {
-            // Handle TikTok share extension URLs
-            if url.host == "share" && url.path == "/tiktok" {
-                handleSharedTikTokURL(from: url)
-                return true
-            } else {
-                print("🔗 Received deep link in AppDelegate: \(url)")
-                Task {
-                    await deepLinkViewModel?.processIncomingURL(url)
-                }
-                return true
+            print("🔗 Received deep link in AppDelegate: \(url)")
+            Task {
+                await deepLinkViewModel?.processIncomingURL(url)
             }
+            return true
         }
         
         return false
@@ -317,24 +350,3 @@ class AppAttestProviderFactory: NSObject, AppCheckProviderFactory {
     }
 }
 
-// MARK: - TikTok Share Extension Handler
-private func handleSharedTikTokURL(from url: URL) {
-    guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
-          let urlItem = components.queryItems?.first(where: { $0.name == "url" }),
-          let tiktokURLString = urlItem.value else {
-        print("❌ Failed to extract TikTok URL from share extension")
-        return
-    }
-    
-    print("🎵 Received TikTok URL from share extension: \(tiktokURLString)")
-    
-    // Save the shared URL and trigger automatic processing
-    UserDefaults.standard.set(tiktokURLString, forKey: "pendingTikTokURL")
-    
-    // Post a notification to trigger automatic TikTok processing
-    NotificationCenter.default.post(
-        name: Notification.Name("ProcessSharedTikTok"),
-        object: nil,
-        userInfo: ["url": tiktokURLString]
-    )
-}
