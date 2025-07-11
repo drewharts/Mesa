@@ -10,49 +10,9 @@ import FirebaseFirestore
 import FirebaseAuth
 
 // MARK: - TikTok Data Models
-struct TikTokProcessorResponse: Codable {
-    let data: TikTokData
-    let locationInfo: TikTokLocationInfo
-    let processorType: String
-    let placeSaved: Bool?
-    let placeId: String?
-    let externalPlaceId: String?
-    let placeAlreadyExisted: Bool?
-    
-    enum CodingKeys: String, CodingKey {
-        case data
-        case locationInfo = "location_info"
-        case processorType = "processor_type"
-        case placeSaved = "place_saved"
-        case placeId = "place_id"
-        case externalPlaceId = "external_place_id"
-        case placeAlreadyExisted = "place_already_existed"
-    }
-}
-
-struct TikTokData: Codable {
-    let author: TikTokAuthor
-    let caption: String
-    let embedHTML: String
-    let hashtags: [String]
-    let location: String?
-    let thumbnailURL: String
-    let title: String
-    let url: String
-    let videoID: String
-    
-    enum CodingKeys: String, CodingKey {
-        case author
-        case caption
-        case embedHTML = "embed_html"
-        case hashtags
-        case location
-        case thumbnailURL = "thumbnail_url"
-        case title
-        case url
-        case videoID = "video_id"
-    }
-}
+// NOTE: Most TikTok-specific data models are no longer needed since the backend 
+// now returns DetailPlace format directly. Only keeping TikTokAuthor and TikTokVideo
+// since they're still used in the DetailPlace model.
 
 struct TikTokAuthor: Codable, Equatable {
     let displayName: String
@@ -63,38 +23,6 @@ struct TikTokAuthor: Codable, Equatable {
         case displayName = "display_name"
         case url
         case username
-    }
-}
-
-struct TikTokLocationInfo: Codable {
-    let addressComponents: TikTokAddressComponents
-    let coordinates: [Double]
-    let formattedAddress: String
-    let locationName: String
-    let placeID: String
-    let rawText: String
-    
-    enum CodingKeys: String, CodingKey {
-        case addressComponents = "address_components"
-        case coordinates
-        case formattedAddress = "formatted_address"
-        case locationName = "location_name"
-        case placeID = "place_id"
-        case rawText = "raw_text"
-    }
-}
-
-struct TikTokAddressComponents: Codable {
-    let city: String
-    let country: String
-    let postalCode: String
-    let state: String
-    
-    enum CodingKeys: String, CodingKey {
-        case city
-        case country
-        case postalCode = "postal_code"
-        case state
     }
 }
 
@@ -173,10 +101,14 @@ class TikTokService: ObservableObject {
     @Published var isProcessing = false
     @Published var errorMessage: String?
     
-    func processTikTokURL(_ url: String) async -> Result<TikTokProcessorResponse, Error> {
+    func processTikTokURL(_ url: String) async -> Result<DetailPlace, Error> {
         guard let requestURL = URL(string: "\(baseURL)/process-url") else {
+            print("❌ [TikTokService] Invalid base URL: \(baseURL)/process-url")
             return .failure(TikTokError.invalidURL)
         }
+        
+        print("🌐 [TikTokService] Making request to: \(requestURL)")
+        print("📝 [TikTokService] Request body: {\"url\": \"\(url)\"}")
         
         isProcessing = true
         defer { isProcessing = false }
@@ -186,14 +118,77 @@ class TikTokService: ObservableObject {
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
             
+            print("📡 [TikTokService] Received response")
+            if let httpResponse = response as? HTTPURLResponse {
+                print("📊 [TikTokService] Status code: \(httpResponse.statusCode)")
+            }
+            
+            if let responseString = String(data: data, encoding: .utf8) {
+                print("📄 [TikTokService] Response data: \(responseString)")
+            } else {
+                print("❌ [TikTokService] Could not decode response data as string")
+            }
+            
             if let error = validateResponse(response) {
+                print("❌ [TikTokService] Response validation failed: \(error)")
                 return .failure(error)
             }
             
-            let processorResponse = try JSONDecoder().decode(TikTokProcessorResponse.self, from: data)
-            return .success(processorResponse)
+            // Parse the response as DetailPlace directly
+            do {
+                // First try to parse as a direct DetailPlace
+                let detailPlace = try JSONDecoder().decode(DetailPlace.self, from: data)
+                print("✅ [TikTokService] Successfully decoded DetailPlace: \(detailPlace.name)")
+                return .success(detailPlace)
+            } catch {
+                print("❌ [TikTokService] Failed to decode as DetailPlace directly, trying wrapped format...")
+                
+                // If that fails, try to parse as wrapped format like other backend responses
+                do {
+                    let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+                    
+                    // Check if it's the TikTok response format with saved_place
+                    if let savedPlaceDict = json?["saved_place"] as? [String: Any] {
+                        print("🔍 [TikTokService] Found TikTok saved_place object, parsing...")
+                        var detailPlace = try parseDetailPlaceFromDictionary(savedPlaceDict)
+                        
+                        // Also extract TikTok video data from the response
+                        if let tikTokData = json?["data"] as? [String: Any] {
+                            print("🔍 [TikTokService] Found TikTok video data, adding to place...")
+                            if let tikTokVideo = createTikTokVideoFromResponseData(tikTokData) {
+                                detailPlace.tikTokVideos = [tikTokVideo]
+                                print("✅ [TikTokService] Added TikTok video to place")
+                            }
+                        }
+                        
+                        print("✅ [TikTokService] Successfully parsed TikTok DetailPlace: \(detailPlace.name)")
+                        return .success(detailPlace)
+                    }
+                    
+                    // Check if it's wrapped in a "place" object
+                    if let placeDict = json?["place"] as? [String: Any] {
+                        print("🔍 [TikTokService] Found wrapped place object, parsing manually...")
+                        let detailPlace = try parseDetailPlaceFromDictionary(placeDict)
+                        print("✅ [TikTokService] Successfully parsed wrapped DetailPlace: \(detailPlace.name)")
+                        return .success(detailPlace)
+                    }
+                    
+                    // If no wrapper, try direct parsing from the dictionary
+                    if let json = json {
+                        let detailPlace = try parseDetailPlaceFromDictionary(json)
+                        print("✅ [TikTokService] Successfully parsed DetailPlace from dictionary: \(detailPlace.name)")
+                        return .success(detailPlace)
+                    }
+                    
+                    throw NSError(domain: "TikTokService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Unable to parse response as DetailPlace"])
+                } catch {
+                    print("❌ [TikTokService] Failed to parse response: \(error)")
+                    return .failure(error)
+                }
+            }
             
         } catch {
+            print("❌ [TikTokService] Network error: \(error)")
             return .failure(error)
         }
     }
@@ -241,64 +236,169 @@ class TikTokService: ObservableObject {
         return nil
     }
     
-    func createPlaceFromTikTok(_ response: TikTokProcessorResponse) -> DetailPlace {
-        // Determine the place ID to use
-        let placeId: UUID
-        if let backendPlaceId = response.placeId, let uuid = UUID(uuidString: backendPlaceId) {
-            placeId = uuid
-        } else {
-            placeId = UUID(uuidString: response.locationInfo.placeID) ?? UUID()
+    // NOTE: The old createPlaceFromTikTok method is no longer needed since the backend 
+    // now returns DetailPlace format directly instead of TikTokProcessorResponse
+    
+    /// Parse DetailPlace from dictionary (for handling backend responses that might be wrapped)
+    private func parseDetailPlaceFromDictionary(_ dict: [String: Any]) throws -> DetailPlace {
+        var detailPlace = DetailPlace()
+        
+        // Basic fields
+        detailPlace.id = UUID(uuidString: dict["id"] as? String ?? "") ?? UUID()
+        detailPlace.name = dict["name"] as? String ?? ""
+        detailPlace.address = dict["address"] as? String
+        detailPlace.city = dict["city"] as? String
+        detailPlace.description = dict["description"] as? String
+        detailPlace.mapboxId = dict["mapboxId"] as? String
+        detailPlace.googlePlaceId = dict["googlePlaceId"] as? String
+        detailPlace.source = dict["source"] as? String
+        
+        // Categories
+        detailPlace.categories = dict["categories"] as? [String]
+        
+        // Hours and contact
+        detailPlace.openHours = dict["openHours"] as? [String]
+        detailPlace.phone = dict["phone"] as? String
+        
+        // Rating and price
+        detailPlace.rating = dict["rating"] as? Double
+        detailPlace.priceLevel = dict["priceLevel"] as? String
+        
+        // Service flags
+        detailPlace.reservable = dict["reservable"] as? Bool
+        detailPlace.servesBreakfast = dict["servesBreakfast"] as? Bool
+        detailPlace.serversLunch = dict["servesLunch"] as? Bool
+        detailPlace.serversDinner = dict["serversDinner"] as? Bool
+        
+        // Social media
+        detailPlace.Instagram = dict["instagram"] as? String
+        detailPlace.X = dict["twitter"] as? String
+        
+        // Handle coordinates
+        if let coordinateDict = dict["coordinate"] as? [String: Any],
+           let latitude = coordinateDict["latitude"] as? Double,
+           let longitude = coordinateDict["longitude"] as? Double {
+            detailPlace.coordinate = GeoPoint(latitude: latitude, longitude: longitude)
+        } else if let locationDict = dict["location"] as? [String: Any],
+                  let latitude = locationDict["latitude"] as? Double,
+                  let longitude = locationDict["longitude"] as? Double {
+            detailPlace.coordinate = GeoPoint(latitude: latitude, longitude: longitude)
         }
         
-        var place = DetailPlace()
-        place.id = placeId
-        place.name = response.locationInfo.locationName
-        place.address = response.locationInfo.formattedAddress
-        place.city = response.locationInfo.addressComponents.city
-        place.coordinate = GeoPoint(
-            latitude: response.locationInfo.coordinates[0],
-            longitude: response.locationInfo.coordinates[1]
-        )
-        
-        // Create TikTok video object
-        let formatter = ISO8601DateFormatter()
-        let tikTokVideo = TikTokVideo(
-            id: UUID(),
-            videoID: response.data.videoID,
-            url: response.data.url,
-            title: response.data.title,
-            caption: response.data.caption,
-            embedHTML: response.data.embedHTML,
-            thumbnailURL: response.data.thumbnailURL,
-            author: response.data.author,
-            hashtags: response.data.hashtags,
-            createdAt: formatter.string(from: Date())
-        )
-        
-        // Add TikTok video to place
-        place.tikTokVideos = [tikTokVideo]
-        
-        // Set categories based on hashtags
-        place.categories = response.data.hashtags.filter { foodCategories.contains($0.lowercased()) }
-        
-        return place
-    }
-    
-    func savePlaceToFirestore(_ place: DetailPlace) async -> Result<Void, Error> {
-        return await withCheckedContinuation { continuation in
-            do {
-                try Firestore.firestore().collection("places").document(place.id.uuidString).setData(from: place) { error in
-                    if let error = error {
-                        continuation.resume(returning: .failure(error))
-                    } else {
-                        continuation.resume(returning: .success(()))
-                    }
+        // Handle TikTok videos if present
+        if let tikTokVideosArray = dict["tikTokVideos"] as? [[String: Any]] {
+            detailPlace.tikTokVideos = tikTokVideosArray.compactMap { videoDict in
+                guard let videoID = videoDict["videoID"] as? String,
+                      let url = videoDict["url"] as? String else {
+                    return nil
                 }
-            } catch {
-                continuation.resume(returning: .failure(error))
+                
+                let author = TikTokAuthor(
+                    displayName: videoDict["author_display_name"] as? String ?? "",
+                    url: videoDict["author_url"] as? String ?? "",
+                    username: videoDict["author_username"] as? String ?? ""
+                )
+                
+                return TikTokVideo(
+                    videoID: videoID,
+                    url: url,
+                    title: videoDict["title"] as? String,
+                    caption: videoDict["caption"] as? String,
+                    embedHTML: videoDict["embedHTML"] as? String ?? "",
+                    thumbnailURL: videoDict["thumbnailURL"] as? String ?? "",
+                    author: author,
+                    hashtags: videoDict["hashtags"] as? [String] ?? [],
+                    createdAt: videoDict["createdAt"] as? String ?? ISO8601DateFormatter().string(from: Date())
+                )
             }
         }
+        
+        // Handle creation date
+        if let createdAtString = dict["createdAt"] as? String {
+            detailPlace.createdAt = createdAtString
+        } else {
+            // Default to current date string if not provided
+            let formatter = ISO8601DateFormatter()
+            detailPlace.createdAt = formatter.string(from: Date())
+        }
+        
+        return detailPlace
     }
+    
+    /// Create TikTok video from response data
+    private func createTikTokVideoFromResponseData(_ data: [String: Any]) -> TikTokVideo? {
+        guard let url = data["url"] as? String else {
+            print("❌ [TikTokService] Missing URL in TikTok data")
+            return nil
+        }
+        
+        // Extract video ID from URL or photo ID
+        let videoID: String
+        if let photoId = data["photo_id"] as? String {
+            videoID = photoId
+        } else if let extractedId = extractVideoIdFromURL(url) {
+            videoID = extractedId
+        } else {
+            videoID = UUID().uuidString // Fallback
+        }
+        
+        // Create author
+        let author = TikTokAuthor(
+            displayName: data["author_name"] as? String ?? "",
+            url: data["author_url"] as? String ?? "",
+            username: extractUsernameFromURL(data["author_url"] as? String)
+        )
+        
+        // Create video
+        return TikTokVideo(
+            videoID: videoID,
+            url: url,
+            title: data["title"] as? String,
+            caption: data["title"] as? String, // Use title as caption if no separate caption
+            embedHTML: "", // Not provided in this format
+            thumbnailURL: data["thumbnail_url"] as? String ?? "",
+            author: author,
+            hashtags: data["hashtags"] as? [String] ?? [],
+            createdAt: ISO8601DateFormatter().string(from: Date())
+        )
+    }
+    
+    /// Extract video ID from TikTok URL
+    private func extractVideoIdFromURL(_ url: String) -> String? {
+        // Try to extract from various TikTok URL formats
+        let patterns = [
+            "/photo/([0-9]+)",
+            "/video/([0-9]+)",
+            "@[^/]+/video/([0-9]+)"
+        ]
+        
+        for pattern in patterns {
+            if let regex = try? NSRegularExpression(pattern: pattern),
+               let match = regex.firstMatch(in: url, range: NSRange(location: 0, length: url.count)),
+               let range = Range(match.range(at: 1), in: url) {
+                return String(url[range])
+            }
+        }
+        
+        return nil
+    }
+    
+    /// Extract username from TikTok author URL
+    private func extractUsernameFromURL(_ url: String?) -> String {
+        guard let url = url else { return "" }
+        
+        // Extract @username from URL like https://www.tiktok.com/@username
+        if let regex = try? NSRegularExpression(pattern: "@([^/?]+)"),
+           let match = regex.firstMatch(in: url, range: NSRange(location: 0, length: url.count)),
+           let range = Range(match.range(at: 1), in: url) {
+            return String(url[range])
+        }
+        
+        return ""
+    }
+    
+    // NOTE: Frontend does NOT save to Firestore - backend handles all writes
+    // Places are created/saved via backend API calls only
     
     private let foodCategories = [
         "restaurant", "food", "foodie", "coffee", "cafe", "bar", "pizza", "sushi", 

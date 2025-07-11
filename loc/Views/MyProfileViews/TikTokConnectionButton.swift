@@ -11,6 +11,9 @@ struct TikTokConnectionButton: View {
     @EnvironmentObject var tikTokAuthService: TikTokAuthService
     @State private var showDisconnectAlert = false
     @State private var isDisconnecting = false
+    @State private var showSuccessMessage = false
+    @State private var showErrorMessage = false
+    @State private var messageText = ""
     
     var body: some View {
         VStack(spacing: 8) {
@@ -23,7 +26,7 @@ struct TikTokConnectionButton: View {
                         .foregroundColor(.gray)
                 }
                 .padding(.vertical, 8)
-            } else if !tikTokAuthService.isConnected {
+            } else {
                 Button(action: handleTikTokAction) {
                     HStack(spacing: 12) {
                         Image(systemName: "music.note")
@@ -68,11 +71,22 @@ struct TikTokConnectionButton: View {
                 }
                 .buttonStyle(PlainButtonStyle())
                 
-                if let expiresAt = tikTokAuthService.expiresAt {
-                    Text("Expires: \(expiresAt, formatter: dateFormatter)")
+                if let connectedAt = tikTokAuthService.connectedAt {
+                    Text("Connected: \(connectedAt, formatter: dateFormatter)")
                         .font(.caption2)
                         .foregroundColor(.gray)
                         .padding(.top, 2)
+                }
+                
+                if tikTokAuthService.isCompletingConnection {
+                    HStack {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                        Text("Completing connection...")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                    }
+                    .padding(.top, 4)
                 }
             }
         }
@@ -85,6 +99,40 @@ struct TikTokConnectionButton: View {
             }
         } message: {
             Text("This will remove TikTok authorization. You can reconnect anytime.")
+        }
+        .alert("Success", isPresented: $showSuccessMessage) {
+            Button("OK") { }
+        } message: {
+            Text(messageText)
+        }
+        .alert("Error", isPresented: $showErrorMessage) {
+            Button("OK") { }
+        } message: {
+            Text(messageText)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("TikTokAuthSuccess"))) { notification in
+            if let message = notification.userInfo?["message"] as? String {
+                messageText = message
+                showSuccessMessage = true
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("TikTokAuthError"))) { notification in
+            if let message = notification.userInfo?["message"] as? String {
+                messageText = message
+                showErrorMessage = true
+            }
+        }
+        .onAppear {
+            // Refresh status when view appears (e.g., returning from Safari)
+            Task {
+                await tikTokAuthService.checkConnectionStatus()
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+            // Also refresh when app becomes active (returning from Safari)
+            Task {
+                await tikTokAuthService.checkConnectionStatus()
+            }
         }
     }
     
@@ -123,7 +171,7 @@ struct TikTokConnectionButton_Previews: PreviewProvider {
                 .environmentObject({
                     let service = TikTokAuthService()
                     service.isConnected = true
-                    service.expiresAt = Date().addingTimeInterval(86400 * 7)
+                    service.connectedAt = Date().addingTimeInterval(-86400 * 7)
                     return service
                 }())
             

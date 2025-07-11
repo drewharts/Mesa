@@ -11,6 +11,7 @@ class ServiceContainer: ObservableObject {
     lazy var imageService = ImageService.shared
     lazy var placeShareService = PlaceShareService()
     lazy var tikTokService = TikTokService()
+    lazy var tikTokAuthService = TikTokAuthService()
     
     // MARK: - Managers
     lazy var locationManager = LocationManager()
@@ -31,10 +32,13 @@ class ServiceContainer: ObservableObject {
     }
     
     // MARK: - Deep Link Setup
-    func setupDeepLinkManager(selectedPlaceViewModel: SelectedPlaceViewModel) {
+    func setupDeepLinkManager(selectedPlaceViewModel: SelectedPlaceViewModel, detailPlaceViewModel: DetailPlaceViewModel) {
         let deepLinkManager = DeepLinkManager(
             placeService: placeService,
-            selectedPlaceViewModel: selectedPlaceViewModel
+            selectedPlaceViewModel: selectedPlaceViewModel,
+            tikTokService: tikTokService,
+            detailPlaceViewModel: detailPlaceViewModel,
+            tikTokAuthService: tikTokAuthService
         )
         
         // Use reflection to set the lazy property

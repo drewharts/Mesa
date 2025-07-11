@@ -484,38 +484,28 @@ class ProfileViewModel: ObservableObject {
         }
         
         switch result {
-        case .success(let response):
-            let place = createPlaceFromTikTok(response, tikTokService: tikTokService)
+        case .success(let detailPlace):
+            print("✅ [ProfileViewModel] Successfully processed TikTok URL, received place: \(detailPlace.name)")
             
             // Add to DetailPlaceViewModel for immediate display
             await MainActor.run {
-                placeVM.places[place.id.uuidString] = place
-                selectedPlaceVM.selectedPlace = place
+                placeVM.places[detailPlace.id.uuidString] = detailPlace
+                selectedPlaceVM.selectedPlace = detailPlace
                 selectedPlaceVM.isDetailSheetPresented = true
             }
             
-            // Save to Firestore
-            await saveTikTokPlaceToFirestore(place, tikTokService: tikTokService)
+            // NOTE: Place is saved by backend during URL processing
+            // Frontend only displays the place
             return true
             
         case .failure(let error):
-            print("Failed to process TikTok video: \(error.localizedDescription)")
+            print("❌ [ProfileViewModel] Failed to process TikTok video: \(error.localizedDescription)")
             return false
         }
     }
     
-    private func createPlaceFromTikTok(_ response: TikTokProcessorResponse, 
-                                     tikTokService: TikTokService) -> DetailPlace {
-        return tikTokService.createPlaceFromTikTok(response)
-    }
-    
-    private func saveTikTokPlaceToFirestore(_ place: DetailPlace, 
-                                          tikTokService: TikTokService) async {
-        let saveResult = await tikTokService.savePlaceToFirestore(place)
-        if case .failure(let error) = saveResult {
-            print("Failed to save TikTok place: \(error.localizedDescription)")
-        }
-    }
+    // NOTE: Place saving is handled by backend during URL processing
+    // Frontend does not save to Firestore - removed saveTikTokPlaceToFirestore method
     
     // MARK: - Place Conversion
     
