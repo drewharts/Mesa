@@ -19,6 +19,7 @@ struct MainView: View {
     @EnvironmentObject var notificationManager: NotificationManager
     @EnvironmentObject var viewModel: SearchViewModel
     @EnvironmentObject var placeTypeFilterVM: PlaceTypeFilterViewModel
+    @EnvironmentObject var deepLinkViewModel: DeepLinkViewModel
 
     @FocusState private var searchIsFocused: Bool
     @State private var isSearchBarMinimized = true
@@ -182,6 +183,29 @@ struct MainView: View {
                             .padding(.trailing, 20)
                         }
                     }
+                }
+                
+                // TikTok Deeplink Processing Overlay
+                if deepLinkViewModel.isProcessingDeepLink {
+                    Color.black.opacity(0.4)
+                        .ignoresSafeArea()
+                    
+                    VStack(spacing: 16) {
+                        ProgressView()
+                            .scaleEffect(1.5)
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        
+                        Text("Processing TikTok...")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                        
+                        Text("Extracting place information")
+                            .font(.subheadline)
+                            .foregroundColor(.white.opacity(0.8))
+                    }
+                    .padding(30)
+                    .background(Color.black.opacity(0.8))
+                    .cornerRadius(20)
                 }
             }
             .sheet(isPresented: $userProfileViewModel.isUserDetailPresented) {
