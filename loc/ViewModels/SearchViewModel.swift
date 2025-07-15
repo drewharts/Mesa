@@ -17,6 +17,7 @@ class SearchViewModel: ObservableObject {
     @Published var userResults: [ProfileData] = []
     @Published var searchError: String?
     @Published var selectedUser: ProfileData?
+    @Published var showNoPlaceFound: Bool = false  // Track when search returns no results
 
     weak var selectedPlaceVM: SelectedPlaceViewModel?
     weak var placeTypeFilterVM: PlaceTypeFilterViewModel?
@@ -55,6 +56,7 @@ class SearchViewModel: ObservableObject {
         // Clear previous results first
         searchResults = []
         searchError = nil
+        showNoPlaceFound = false
         
         guard !query.isEmpty else {
             print("🔍 [SearchViewModel] Query is empty, clearing results")
@@ -71,13 +73,17 @@ class SearchViewModel: ObservableObject {
                 }
                 DispatchQueue.main.async {
                     self?.searchResults = results
+                    // Show "no place found" message if search was performed but no results found
+                    self?.showNoPlaceFound = results.isEmpty && !query.isEmpty
                     print("🔍 [SearchViewModel] Updated searchResults with \(results.count) items")
+                    print("🔍 [SearchViewModel] showNoPlaceFound: \(self?.showNoPlaceFound ?? false)")
                 }
             },
             onError: { [weak self] error in
                 print("❌ [SearchViewModel] Search error: \(error)")
                 DispatchQueue.main.async {
                     self?.searchError = error
+                    self?.showNoPlaceFound = false  // Don't show "no place found" on error
                     print("❌ [SearchViewModel] Updated searchError: \(error)")
                 }
             }

@@ -83,10 +83,12 @@ struct MainView: View {
                                 .padding(.top, 10)
                         }
                         
-                        if !viewModel.searchResults.isEmpty || !viewModel.userResults.isEmpty {
+                        if !viewModel.searchResults.isEmpty || !viewModel.userResults.isEmpty || viewModel.showNoPlaceFound {
                             SearchResultsView(
                                 placeResults: viewModel.searchResults,
                                 userResults: viewModel.userResults,
+                                showNoPlaceFound: viewModel.showNoPlaceFound,
+                                searchText: viewModel.searchText,
                                 onSelectPlace: { prediction in
                                     viewModel.selectSuggestion(prediction)
                                     withAnimation {
@@ -185,8 +187,8 @@ struct MainView: View {
                     }
                 }
                 
-                // TikTok Deeplink Processing Overlay
-                if deepLinkViewModel.isProcessingDeepLink {
+                // TikTok Processing Overlay (both deeplink and profile processing)
+                if deepLinkViewModel.isProcessingDeepLink || profileViewModel.isProcessingTikTok {
                     Color.black.opacity(0.4)
                         .ignoresSafeArea()
                     
@@ -216,6 +218,7 @@ struct MainView: View {
             .navigationDestination(isPresented: $shouldNavigateToProfile) {
                 ProfileView()
                     .environmentObject(userProfileViewModel)
+                    .environmentObject(deepLinkViewModel)
             }
         }
         .onAppear {

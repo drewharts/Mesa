@@ -105,7 +105,7 @@ struct CreatePlaceReviewView: View {
                     
                     // Display selected images
                     if !inputImages.isEmpty {
-                        SelectedImagesView(images: inputImages)
+                        SelectedImagesView(images: $inputImages)
                     }
                     
                     Divider()

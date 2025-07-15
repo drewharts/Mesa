@@ -27,6 +27,12 @@ struct MinPlaceDetailView: View {
         return selectedPlaceVM.reviews.isEmpty ? .about : .reviews
     }
     
+    private var tikTokVideos: [TikTokVideo] {
+        let placeTikTokVideos = selectedPlaceVM.selectedPlace?.tikTokVideos ?? []
+        let userTikTokVideos = profile.getTikTokVideos(for: selectedPlaceVM.selectedPlace?.id.uuidString ?? "")
+        return placeTikTokVideos + userTikTokVideos
+    }
+    
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 5) {
@@ -158,8 +164,7 @@ struct MinPlaceDetailView: View {
                         .fixedSize(horizontal: false, vertical: true)
                     
                     // TikTok Videos Section
-                    if let tikTokVideos = selectedPlaceVM.selectedPlace?.tikTokVideos,
-                       !tikTokVideos.isEmpty {
+                    if !tikTokVideos.isEmpty {
                         VStack(alignment: .leading, spacing: 12) {
                             HStack {
                                 Text("TikTok Videos")
@@ -177,8 +182,9 @@ struct MinPlaceDetailView: View {
                                     .cornerRadius(12)
                             }
                             
-                            ForEach(tikTokVideos, id: \.id) { video in
+                            ForEach(tikTokVideos, id: \.videoID) { video in
                                 TikTokVideoView(tikTokVideo: video)
+                                    .id("tiktok_\(video.videoID)")
                             }
                         }
                         .padding(.top, 15)

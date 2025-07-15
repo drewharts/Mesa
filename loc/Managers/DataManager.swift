@@ -73,11 +73,13 @@ class DataManager: ObservableObject {
         async let placeLists: () = loadUserPlaceLists(userId: userId)
         async let reviewedPlaces: () = loadUserReviewedPlaces(userId: userId)
         async let followCounts: () = fetchFollowerAndFollowingCountsAsync(userId: userId)
+        async let externalPlaces: () = loadUserExternalPlaces(userId: userId)
         
         // Wait for remaining user data
         await placeLists
         await reviewedPlaces
         await followCounts
+        await externalPlaces
     }
     
     // PHASE 3: Load social data without blocking UI
@@ -141,6 +143,18 @@ class DataManager: ObservableObject {
             }
         } catch {
             print("Error loading profile data: \(error.localizedDescription)")
+        }
+    }
+    
+    // Load user's external places (TikTok-sourced places)
+    func loadUserExternalPlaces(userId: String) async {
+        print("🔍 [DataManager] Loading external places for user: \(userId)")
+        do {
+            let externalPlaces = try await userService.fetchUserExternalPlaces(userId: userId)
+            profileViewModel.userExternalPlaces = externalPlaces
+            print("✅ [DataManager] Successfully loaded \(externalPlaces.count) external places")
+        } catch {
+            print("❌ [DataManager] Error loading external places: \(error.localizedDescription)")
         }
     }
 
@@ -440,6 +454,18 @@ class DataManager: ObservableObject {
         for uid in allUserIds {
             await loadUserReviewedPlaces(userId: uid)
         }
+    }
+    
+    // MARK: - Public Accessors
+    
+    /// Get external places for a specific place ID
+    func getExternalPlace(for placeId: String) -> ExternalPlace? {
+        return profileViewModel.userExternalPlaces[placeId]
+    }
+    
+    /// Get all external places
+    func getAllExternalPlaces() -> [String: ExternalPlace] {
+        return profileViewModel.userExternalPlaces
     }
 }
 

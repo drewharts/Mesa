@@ -16,6 +16,7 @@ struct ProfileView: View {
     @EnvironmentObject var placeVM: DetailPlaceViewModel
     @EnvironmentObject var userProfileViewModel: UserProfileViewModel
     @EnvironmentObject var tikTokAuthService: TikTokAuthService
+    @EnvironmentObject var deepLinkViewModel: DeepLinkViewModel
     @StateObject private var photoImportVM = PhotoImportViewModel()
     
     @State private var showCreateReview = false
@@ -180,8 +181,8 @@ struct ProfileView: View {
                 .padding(.top, 10)
             }
             
-            // TikTok Processing Overlay
-            if profile.isProcessingTikTok {
+            // TikTok Processing Overlay (both profile and deeplink processing)
+            if profile.isProcessingTikTok || deepLinkViewModel.isProcessingDeepLink {
                 Color.black.opacity(0.4)
                     .ignoresSafeArea()
                 

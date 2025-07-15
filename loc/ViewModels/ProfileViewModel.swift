@@ -23,6 +23,7 @@ class ProfileViewModel: ObservableObject {
     @Published var userFollowers: [ProfileData] = []
     //TODO: Implement my places
     @Published var myPlaces: [String] = []
+    @Published var userExternalPlaces: [String: ExternalPlace] = [:] // PlaceId -> ExternalPlace
     
      private let userService: UserService
     private let imageService: ImageService
@@ -641,5 +642,96 @@ class ProfileViewModel: ObservableObject {
         }
     }
     
+    // MARK: - External Places (TikTok-sourced places)
+    
+    /// Fetch user's external places and populate the dictionary
+    func fetchUserExternalPlaces() {
+        guard let userId = user?.id else { return }
+        
+        print("🔍 [ProfileViewModel] Fetching external places for user: \(userId)")
+        
+        userService.fetchUserExternalPlaces(userId: userId) { [weak self] externalPlaces, error in
+            guard let self = self else { return }
+            
+            if let error = error {
+                print("❌ [ProfileViewModel] Error fetching external places: \(error.localizedDescription)")
+                return
+            }
+            
+            guard let externalPlaces = externalPlaces else {
+                print("⚠️ [ProfileViewModel] No external places returned")
+                return
+            }
+            
+            print("✅ [ProfileViewModel] Successfully fetched \(externalPlaces.count) external places")
+            self.userExternalPlaces = externalPlaces
+            
+            // Load TikTok thumbnail images for external places
+            for (placeId, externalPlace) in externalPlaces {
+                // Get the first TikTok video's thumbnail as the place image
+                if let firstTikTokVideo = externalPlace.tiktokVideos.first,
+                   !firstTikTokVideo.thumbnailUrl.isEmpty {
+                    self.loadTikTokThumbnailAsPlaceImage(
+                        placeId: placeId,
+                        thumbnailURL: firstTikTokVideo.thumbnailUrl
+                    )
+                }
+            }
+        }
+    }
+    
+    /// Load TikTok thumbnail as place image for external places
+    private func loadTikTokThumbnailAsPlaceImage(placeId: String, thumbnailURL: String) {
+        // Skip if image already exists
+        if detailPlaceViewModel.placeImages[placeId] != nil {
+            return
+        }
+        
+        guard let url = URL(string: thumbnailURL) else {
+            print("❌ [ProfileViewModel] Invalid thumbnail URL for place \(placeId): \(thumbnailURL)")
+            return
+        }
+        
+        print("🖼️ [ProfileViewModel] Loading TikTok thumbnail for place \(placeId)")
+        
+        URLSession.shared.dataTask(with: url) { [weak self] data, response, error in
+            guard let self = self else { return }
+            
+            DispatchQueue.main.async {
+                if let error = error {
+                    print("❌ [ProfileViewModel] Error loading TikTok thumbnail for \(placeId): \(error.localizedDescription)")
+                } else if let data = data, let image = UIImage(data: data) {
+                    print("✅ [ProfileViewModel] Successfully loaded TikTok thumbnail for place \(placeId)")
+                    // Store in DetailPlaceViewModel for popup views to access
+                    self.detailPlaceViewModel.placeImages[placeId] = image
+                } else {
+                    print("⚠️ [ProfileViewModel] No image data returned for TikTok thumbnail \(placeId)")
+                }
+            }
+        }.resume()
+    }
+    
+    /// Get TikTok videos for a specific place ID
+    func getTikTokVideos(for placeId: String) -> [TikTokVideo] {
+        guard let externalPlace = userExternalPlaces[placeId] else {
+            return []
+        }
+        
+        // Convert ExternalTikTokVideos to TikTokVideos for compatibility
+        return externalPlace.tiktokVideos.map { $0.toTikTokVideo() }
+    }
+    
+    /// Check if user has TikTok videos for a specific place
+    func hasTikTokVideos(for placeId: String) -> Bool {
+        guard let externalPlace = userExternalPlaces[placeId] else {
+            return false
+        }
+        return !externalPlace.tiktokVideos.isEmpty
+    }
+    
+    /// Get the external place data for a specific place ID
+    func getExternalPlace(for placeId: String) -> ExternalPlace? {
+        return userExternalPlaces[placeId]
+    }
 
 }

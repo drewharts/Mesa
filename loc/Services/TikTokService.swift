@@ -26,73 +26,6 @@ struct TikTokAuthor: Codable, Equatable {
     }
 }
 
-// MARK: - TikTok Video Model for Firebase
-struct TikTokVideo: Codable, Identifiable, Equatable {
-    var id = UUID()
-    let videoID: String
-    let url: String
-    let title: String?
-    let caption: String?
-    let embedHTML: String
-    let thumbnailURL: String
-    let author: TikTokAuthor
-    let hashtags: [String]
-    let createdAt: String  // Changed from Date to String to match backend
-    
-    enum CodingKeys: String, CodingKey {
-        case id
-        case videoID = "video_id"
-        case url
-        case title
-        case caption
-        case embedHTML = "embed_html"
-        case thumbnailURL = "thumbnail_url"
-        case author
-        case hashtags
-        case createdAt = "created_at"
-    }
-    
-    // Manual initializer
-    init(id: UUID = UUID(), videoID: String, url: String, title: String?, caption: String?, embedHTML: String, thumbnailURL: String, author: TikTokAuthor, hashtags: [String], createdAt: String) {
-        self.id = id
-        self.videoID = videoID
-        self.url = url
-        self.title = title
-        self.caption = caption
-        self.embedHTML = embedHTML
-        self.thumbnailURL = thumbnailURL
-        self.author = author
-        self.hashtags = hashtags
-        self.createdAt = createdAt
-    }
-    
-    // Custom decoder to handle the backend format
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        
-        // Generate a UUID for the id if not present
-        self.id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
-        
-        self.videoID = try container.decode(String.self, forKey: .videoID)
-        self.url = try container.decode(String.self, forKey: .url)
-        self.title = try container.decodeIfPresent(String.self, forKey: .title) ?? ""
-        self.caption = try container.decodeIfPresent(String.self, forKey: .caption) ?? ""
-        self.embedHTML = try container.decodeIfPresent(String.self, forKey: .embedHTML) ?? ""
-        self.thumbnailURL = try container.decodeIfPresent(String.self, forKey: .thumbnailURL) ?? ""
-        self.author = try container.decode(TikTokAuthor.self, forKey: .author)
-        self.hashtags = try container.decodeIfPresent([String].self, forKey: .hashtags) ?? []
-        
-        // Handle date as string
-        if let dateString = try container.decodeIfPresent(String.self, forKey: .createdAt) {
-            self.createdAt = dateString
-        } else {
-            // Default to current date string if not provided
-            let formatter = ISO8601DateFormatter()
-            self.createdAt = formatter.string(from: Date())
-        }
-    }
-}
-
 // MARK: - TikTok Service
 class TikTokService: ObservableObject {
     private let baseURL = "https://mesa-backend-production.up.railway.app"
@@ -189,6 +122,89 @@ class TikTokService: ObservableObject {
             
         } catch {
             print("❌ [TikTokService] Network error: \(error)")
+            return .failure(error)
+        }
+    }
+    
+    func refreshTikTokThumbnail(for url: String, userId: String?) async -> Result<String, Error> {
+        print("🌐 [TikTokService] refreshTikTokThumbnail called")
+        print("🌐 [TikTokService] Input URL: \(url)")
+        print("🌐 [TikTokService] User ID: \(userId ?? "nil")")
+        
+        guard let requestURL = URL(string: "\(baseURL)/refresh-thumbnail") else {
+            print("❌ [TikTokService] Failed to create request URL: \(baseURL)/refresh-thumbnail")
+            return .failure(TikTokError.invalidURL)
+        }
+        
+        print("🌐 [TikTokService] Request URL: \(requestURL)")
+        
+        var request = URLRequest(url: requestURL)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        var body: [String: String] = ["url": url]
+        if let userId = userId {
+            body["user_id"] = userId
+        }
+        
+        print("🌐 [TikTokService] Request body: \(body)")
+        
+        guard let httpBody = try? JSONSerialization.data(withJSONObject: body) else {
+            print("❌ [TikTokService] Failed to serialize request body")
+            return .failure(TikTokError.invalidURL)
+        }
+        
+        request.httpBody = httpBody
+        
+        print("🌐 [TikTokService] Request headers: \(request.allHTTPHeaderFields ?? [:])")
+        print("🌐 [TikTokService] Request body string: \(String(data: httpBody, encoding: .utf8) ?? "nil")")
+        
+        do {
+            print("🌐 [TikTokService] Making HTTP request...")
+            let (data, response) = try await URLSession.shared.data(for: request)
+            
+            print("🌐 [TikTokService] Received response")
+            
+            if let httpResponse = response as? HTTPURLResponse {
+                print("🌐 [TikTokService] HTTP Status Code: \(httpResponse.statusCode)")
+                print("🌐 [TikTokService] Response headers: \(httpResponse.allHeaderFields)")
+            }
+            
+            let responseString = String(data: data, encoding: .utf8) ?? "Unable to decode response"
+            print("🌐 [TikTokService] Raw response data: \(responseString)")
+            
+            guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                print("❌ [TikTokService] Failed to parse JSON response")
+                return .failure(TikTokError.invalidResponse)
+            }
+            
+            print("🌐 [TikTokService] Parsed JSON: \(json)")
+            
+            if let thumbnailURL = json["thumbnailURL"] as? String {
+                print("✅ [TikTokService] SUCCESS: Extracted thumbnail URL: \(thumbnailURL)")
+                
+                // Test if the URL is valid
+                if let testURL = URL(string: thumbnailURL) {
+                    print("✅ [TikTokService] URL is valid: \(testURL)")
+                } else {
+                    print("⚠️ [TikTokService] Warning: thumbnailURL is not a valid URL")
+                }
+                
+                return .success(thumbnailURL)
+            } else if let errorMsg = json["error"] as? String {
+                print("❌ [TikTokService] Backend error: \(errorMsg)")
+                return .failure(NSError(domain: "TikTokService", code: 1, userInfo: [NSLocalizedDescriptionKey: errorMsg]))
+            } else {
+                print("❌ [TikTokService] No thumbnailURL or error in response")
+                return .failure(TikTokError.invalidResponse)
+            }
+        } catch {
+            print("❌ [TikTokService] HTTP request failed: \(error)")
+            if let nsError = error as NSError? {
+                print("❌ [TikTokService] Error domain: \(nsError.domain)")
+                print("❌ [TikTokService] Error code: \(nsError.code)")
+                print("❌ [TikTokService] Error userInfo: \(nsError.userInfo)")
+            }
             return .failure(error)
         }
     }
@@ -412,6 +428,7 @@ enum TikTokError: Error, LocalizedError {
     case serverError(Int)
     case processingFailed
     case authenticationRequired
+    case invalidResponse
     
     var errorDescription: String? {
         switch self {
@@ -423,6 +440,8 @@ enum TikTokError: Error, LocalizedError {
             return "Failed to process TikTok video"
         case .authenticationRequired:
             return "Authentication required to save place"
+        case .invalidResponse:
+            return "Invalid response received from backend"
         }
     }
 }

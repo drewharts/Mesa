@@ -796,4 +796,72 @@ class UserService: ObservableObject {
             completion(allTokens)
         }
     }
+    
+    // MARK: - External Places (TikTok-sourced places)
+    
+    /// Fetch user's external places and return them as a dictionary keyed by placeId
+    func fetchUserExternalPlaces(userId: String, completion: @escaping ([String: ExternalPlace]?, Error?) -> Void) {
+        print("🔍 Fetching external places for user: \(userId)")
+        
+        let externalPlacesRef = db.collection("users")
+            .document(userId)
+            .collection("externalPlaces")
+        
+        externalPlacesRef.getDocuments { snapshot, error in
+            if let error = error {
+                print("❌ Error fetching external places for user \(userId): \(error.localizedDescription)")
+                completion(nil, error)
+                return
+            }
+            
+            guard let snapshot = snapshot else {
+                print("⚠️ No snapshot returned for external places of user \(userId)")
+                completion([:], nil)
+                return
+            }
+            
+            var externalPlacesDictionary: [String: ExternalPlace] = [:]
+            
+            for document in snapshot.documents {
+                do {
+                    var externalPlace = try document.data(as: ExternalPlace.self)
+                    
+                    // Set the document ID manually since it won't be in the document data
+                    externalPlace = ExternalPlace(
+                        id: document.documentID,
+                        addedAt: externalPlace.addedAt,
+                        address: externalPlace.address,
+                        coordinates: externalPlace.coordinates,
+                        name: externalPlace.name,
+                        placeId: externalPlace.placeId,
+                        source: externalPlace.source,
+                        tiktokVideos: externalPlace.tiktokVideos
+                    )
+                    
+                    // Use placeId as the key for the dictionary
+                    externalPlacesDictionary[externalPlace.placeId] = externalPlace
+                    
+                } catch {
+                    print("❌ Error decoding external place document \(document.documentID): \(error.localizedDescription)")
+                    // Continue processing other documents even if one fails
+                }
+            }
+            
+            print("✅ Successfully fetched \(externalPlacesDictionary.count) external places for user \(userId)")
+            completion(externalPlacesDictionary, nil)
+        }
+    }
+    
+    /// Async version of fetchUserExternalPlaces
+    func fetchUserExternalPlaces(userId: String) async throws -> [String: ExternalPlace] {
+        try await withCheckedThrowingContinuation { continuation in
+            fetchUserExternalPlaces(userId: userId) { externalPlaces, error in
+                if let error = error {
+                    continuation.resume(throwing: error)
+                } else {
+                    continuation.resume(returning: externalPlaces ?? [:])
+                }
+            }
+        }
+    }
 } 

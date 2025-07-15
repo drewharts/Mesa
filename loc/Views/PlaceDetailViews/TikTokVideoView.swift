@@ -9,8 +9,13 @@ import SwiftUI
 import WebKit
 
 struct TikTokVideoView: View {
-    let tikTokVideo: TikTokVideo
+    @StateObject private var viewModel: TikTokVideoViewModel
     @State private var showingFullVideo = false
+    @State private var refreshAttempted: Bool = false
+    
+    init(tikTokVideo: TikTokVideo) {
+        _viewModel = StateObject(wrappedValue: TikTokVideoViewModel(tikTokVideo: tikTokVideo))
+    }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -18,21 +23,29 @@ struct TikTokVideoView: View {
             Button(action: {
                 openTikTokVideo()
             }) {
-                AsyncImage(url: URL(string: tikTokVideo.thumbnailURL)) { image in
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .frame(width: 150, height: 150)
-                        .clipped()
-                        .cornerRadius(12)
-                } placeholder: {
-                    Rectangle()
-                        .fill(Color.gray.opacity(0.3))
-                        .frame(width: 150, height: 150)
-                        .cornerRadius(12)
-                }
+                CustomImageLoader(
+                    urlString: viewModel.tikTokVideo.thumbnailURL,
+                    contentMode: .fill,
+                    frameSize: CGSize(width: 150, height: 150),
+                    cornerRadius: 12,
+                    onFailure: {
+                        if !refreshAttempted {
+                            refreshAttempted = true
+                            Task {
+                                await viewModel.refreshThumbnail()
+                            }
+                        }
+                    }
+                )
+                .id("\(viewModel.tikTokVideo.thumbnailURL)_\(viewModel.tikTokVideo.id)")
             }
             .buttonStyle(PlainButtonStyle())
+            .onChange(of: viewModel.tikTokVideo.thumbnailURL) { oldValue, newValue in
+                // Reset refresh state when URL changes (successful refresh)
+                if oldValue != newValue {
+                    refreshAttempted = false
+                }
+            }
             
             // Compact header with TikTok branding and author
             HStack {
@@ -40,7 +53,7 @@ struct TikTokVideoView: View {
                     .foregroundColor(.pink)
                     .font(.caption)
                 
-                Text("@\(tikTokVideo.author.username)")
+                Text("@\(viewModel.tikTokVideo.author.username)")
                     .font(.caption)
                     .foregroundColor(.gray)
                 
@@ -52,10 +65,13 @@ struct TikTokVideoView: View {
         .cornerRadius(16)
         .fullScreenCover(isPresented: $showingFullVideo) {
             NavigationView {
-                TikTokWebView(embedHTML: tikTokVideo.embedHTML, videoURL: tikTokVideo.url)
+                TikTokWebView(embedHTML: viewModel.tikTokVideo.embedHTML, videoURL: viewModel.tikTokVideo.url)
                     .navigationBarHidden(true)
                     .ignoresSafeArea()
             }
+        }
+        .onAppear {
+            // View appeared - no action needed
         }
     }
     
@@ -89,12 +105,12 @@ struct TikTokVideoView: View {
         var urls: [URL] = []
         
         // Try the original URL first
-        if let originalURL = URL(string: tikTokVideo.url) {
+        if let originalURL = URL(string: viewModel.tikTokVideo.url) {
             urls.append(originalURL)
         }
         
         // Try with different URL schemes if we can extract video ID
-        if let videoId = extractVideoId(from: tikTokVideo.url) {
+        if let videoId = extractVideoId(from: viewModel.tikTokVideo.url) {
             // Try the tiktok:// scheme with video ID
             if let schemeURL = URL(string: "tiktok://video/\(videoId)") {
                 urls.append(schemeURL)
@@ -110,7 +126,7 @@ struct TikTokVideoView: View {
     }
     
     private func tryOpenInBrowser() -> Bool {
-        guard let webURL = URL(string: tikTokVideo.url),
+        guard let webURL = URL(string: viewModel.tikTokVideo.url),
               UIApplication.shared.canOpenURL(webURL) else {
             return false
         }
@@ -120,7 +136,7 @@ struct TikTokVideoView: View {
     
     private func createTikTokAppURL() -> URL? {
         // This method is no longer used but keeping for potential future use
-        guard let videoId = extractVideoId(from: tikTokVideo.url) else {
+        guard let videoId = extractVideoId(from: viewModel.tikTokVideo.url) else {
             return nil
         }
         return URL(string: "tiktok://video/\(videoId)")
