@@ -412,6 +412,13 @@ class ProfileViewModel: ObservableObject {
 
     var hasMoreReviews: Bool { _hasMoreReviews }
     
+    // MARK: - Reviewed Places Access
+    
+    /// Check if the current user has reviewed a specific place
+    func hasReviewedPlace(placeId: String) -> Bool {
+        return allReviewedPlaceIds.contains(placeId)
+    }
+    
     // MARK: - List Sorting by Distance
     
     private var hasPerformedInitialSort = false
