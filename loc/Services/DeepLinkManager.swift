@@ -17,14 +17,16 @@ class DeepLinkManager: ObservableObject {
     private let selectedPlaceViewModel: SelectedPlaceViewModel
     private let tikTokService: TikTokService
     private let detailPlaceViewModel: DetailPlaceViewModel
-    private let tikTokAuthService: TikTokAuthService
     
-    init(placeService: PlaceService, selectedPlaceViewModel: SelectedPlaceViewModel, tikTokService: TikTokService = TikTokService(), detailPlaceViewModel: DetailPlaceViewModel, tikTokAuthService: TikTokAuthService) {
+    // Deduplication mechanism for TikTok URLs
+    private static var recentlyProcessedURLs: Set<String> = []
+    private static var urlProcessingQueue = DispatchQueue(label: "url-processing", qos: .userInitiated)
+    
+    init(placeService: PlaceService, selectedPlaceViewModel: SelectedPlaceViewModel, tikTokService: TikTokService = TikTokService(), detailPlaceViewModel: DetailPlaceViewModel) {
         self.placeService = placeService
         self.selectedPlaceViewModel = selectedPlaceViewModel
         self.tikTokService = tikTokService
         self.detailPlaceViewModel = detailPlaceViewModel
-        self.tikTokAuthService = tikTokAuthService
     }
     
     // MARK: - Deep Link Processing
@@ -46,12 +48,6 @@ class DeepLinkManager: ObservableObject {
             } else {
                 print("❌ Unknown share path: \(url.path)")
             }
-        case "auth":
-            if url.path.hasPrefix("/tiktok") {
-                await handleTikTokAuthDeepLink(url)
-            } else {
-                print("❌ Unknown auth path: \(url.path)")
-            }
         default:
             print("❌ Unknown deep link host: \(url.host ?? "nil")")
         }
@@ -69,15 +65,8 @@ class DeepLinkManager: ObservableObject {
         print("✅ Successfully parsed shareable place: \(shareablePlace.name)")
         print("✅ Place details: id=\(shareablePlace.id), address=\(shareablePlace.address ?? "nil"), city=\(shareablePlace.city ?? "nil")")
         
-        await MainActor.run {
-            isProcessingDeepLink = true
-        }
-        
+        // Place deep links should navigate immediately without processing UI
         await loadPlaceDetails(shareablePlace)
-        
-        await MainActor.run {
-            isProcessingDeepLink = false
-        }
     }
     
     private func handleTikTokDeepLink(_ url: URL) async {
@@ -92,6 +81,7 @@ class DeepLinkManager: ObservableObject {
         
         print("🎵 Processing TikTok URL: \(tiktokURLString)")
         
+        // Always show processing UI, even for duplicates
         await MainActor.run {
             isProcessingDeepLink = true
         }
@@ -104,6 +94,36 @@ class DeepLinkManager: ObservableObject {
     }
     
     private func processTikTokURL(_ urlString: String) async {
+        // Check for duplicate processing
+        let shouldProcess = await withCheckedContinuation { continuation in
+            Self.urlProcessingQueue.async {
+                if Self.recentlyProcessedURLs.contains(urlString) {
+                    print("⏭️ [DeepLinkManager] Skipping duplicate TikTok URL: \(urlString)")
+                    continuation.resume(returning: false)
+                } else {
+                    print("🔄 [DeepLinkManager] Processing TikTok URL: \(urlString)")
+                    Self.recentlyProcessedURLs.insert(urlString)
+                    
+                    // Clean up old URLs after 30 seconds to prevent memory buildup
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 30) {
+                        Self.urlProcessingQueue.async {
+                            Self.recentlyProcessedURLs.remove(urlString)
+                        }
+                    }
+                    
+                    continuation.resume(returning: true)
+                }
+            }
+        }
+        
+        // If duplicate, show brief processing message then return
+        guard shouldProcess else { 
+            print("💫 [DeepLinkManager] Showing brief processing message for duplicate URL")
+            // Show processing UI for a brief moment to give user feedback
+            try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
+            return 
+        }
+        
         print("🔄 [DeepLinkManager] Calling TikTok backend for URL: \(urlString)")
         let result = await tikTokService.processTikTokURL(urlString)
         
@@ -231,95 +251,5 @@ class DeepLinkManager: ObservableObject {
     
     func hasPendingPlace() -> Bool {
         return pendingPlace != nil
-    }
-    
-    // MARK: - TikTok Auth Deep Link Handling
-    
-    private func handleTikTokAuthDeepLink(_ url: URL) async {
-        print("🎵 TikTokAuth: Handling auth deep link: \(url)")
-        
-        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
-            print("❌ TikTokAuth: Failed to parse URL components")
-            return
-        }
-        
-        switch url.path {
-        case "/tiktok/success":
-            await handleTikTokAuthSuccess(components: components)
-        case "/tiktok/failure":
-            await handleTikTokAuthFailure(components: components)
-        default:
-            print("❌ TikTokAuth: Unknown auth path: \(url.path)")
-        }
-    }
-    
-    private func handleTikTokAuthSuccess(components: URLComponents) async {
-        print("🎵 TikTokAuth: Handling success deep link")
-        print("🎵 TikTokAuth: Query items: \(components.queryItems ?? [])")
-        
-        guard let connectionId = components.queryItems?.first(where: { $0.name == "connection_id" })?.value else {
-            print("❌ TikTokAuth: Missing connection_id in success URL")
-            await showTikTokAuthError("Missing connection information")
-            return
-        }
-        
-        print("🎵 TikTokAuth: Found connection_id: \(connectionId)")
-        
-        await MainActor.run {
-            isProcessingDeepLink = true
-        }
-        
-        let success = await tikTokAuthService.completeTikTokConnection(connectionId: connectionId)
-        
-        await MainActor.run {
-            isProcessingDeepLink = false
-            
-            if success {
-                print("✅ TikTokAuth: Connection completed successfully")
-                showTikTokAuthSuccess("TikTok account connected!")
-            } else {
-                print("❌ TikTokAuth: Failed to complete connection")
-                showTikTokAuthError("Failed to complete TikTok connection")
-            }
-        }
-    }
-    
-    private func handleTikTokAuthFailure(components: URLComponents) async {
-        print("🎵 TikTokAuth: Handling failure deep link")
-        
-        let error = components.queryItems?.first(where: { $0.name == "error" })?.value ?? "unknown"
-        print("❌ TikTokAuth: OAuth failed with error: \(error)")
-        
-        await MainActor.run {
-            let message: String
-            switch error {
-            case "access_denied":
-                message = "TikTok authorization was cancelled"
-            case "invalid_state":
-                message = "Security error. Please try again."
-            default:
-                message = "Failed to connect TikTok account"
-            }
-            
-            showTikTokAuthError(message)
-        }
-    }
-    
-    private func showTikTokAuthSuccess(_ message: String) {
-        // Post notification that can be picked up by the UI
-        NotificationCenter.default.post(
-            name: Notification.Name("TikTokAuthSuccess"),
-            object: nil,
-            userInfo: ["message": message]
-        )
-    }
-    
-    private func showTikTokAuthError(_ message: String) {
-        // Post notification that can be picked up by the UI
-        NotificationCenter.default.post(
-            name: Notification.Name("TikTokAuthError"),
-            object: nil,
-            userInfo: ["message": message]
-        )
     }
 } 

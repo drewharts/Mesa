@@ -20,7 +20,22 @@ struct ListPlaceGridCell: View {
     private var tikTokVideos: [TikTokVideo] {
         let placeTikTokVideos = place.tikTokVideos ?? []
         let userTikTokVideos = profile.getTikTokVideos(for: place.id.uuidString)
-        return placeTikTokVideos + userTikTokVideos
+        
+        // Combine and deduplicate based on videoID or URL
+        var allVideos = placeTikTokVideos
+        
+        for userVideo in userTikTokVideos {
+            // Check if this video already exists (by videoID or URL)
+            let alreadyExists = allVideos.contains { existingVideo in
+                existingVideo.videoID == userVideo.videoID || existingVideo.url == userVideo.url
+            }
+            
+            if !alreadyExists {
+                allVideos.append(userVideo)
+            }
+        }
+        
+        return allVideos
     }
     
     private var firstTikTokThumbnail: String? {

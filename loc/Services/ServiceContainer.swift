@@ -11,7 +11,6 @@ class ServiceContainer: ObservableObject {
     lazy var imageService = ImageService.shared
     lazy var placeShareService = PlaceShareService()
     lazy var tikTokService = TikTokService()
-    lazy var tikTokAuthService = TikTokAuthService()
     
     // MARK: - Managers
     lazy var locationManager = LocationManager()
@@ -37,8 +36,7 @@ class ServiceContainer: ObservableObject {
             placeService: placeService,
             selectedPlaceViewModel: selectedPlaceViewModel,
             tikTokService: tikTokService,
-            detailPlaceViewModel: detailPlaceViewModel,
-            tikTokAuthService: tikTokAuthService
+            detailPlaceViewModel: detailPlaceViewModel
         )
         
         // Use reflection to set the lazy property

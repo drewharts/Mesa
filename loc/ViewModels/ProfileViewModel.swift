@@ -48,6 +48,9 @@ class ProfileViewModel: ObservableObject {
     // TikTok processing state
     @Published var isProcessingTikTok: Bool = false
     
+    // Add deduplication mechanism for TikTok URLs
+    private var recentlyProcessedURLs: Set<String> = []
+    
     // Pagination for reviewed places
     @Published var isLoadingReviewedPlaces: Bool = false
     @Published var isLoadingMoreReviews: Bool = false
@@ -474,14 +477,34 @@ class ProfileViewModel: ObservableObject {
                                tikTokService: TikTokService,
                                selectedPlaceVM: SelectedPlaceViewModel,
                                placeVM: DetailPlaceViewModel) async -> Bool {
+        
+        // Check if this URL was recently processed
+        if recentlyProcessedURLs.contains(urlString) {
+            print("⚠️ [ProfileViewModel] URL already processed recently, skipping: \(urlString)")
+            return false
+        }
+        
+        // Check if already processing
+        if isProcessingTikTok {
+            print("⚠️ [ProfileViewModel] Already processing a TikTok URL, skipping: \(urlString)")
+            return false
+        }
+        
+        // Mark as processing and add to recently processed
         await MainActor.run {
             isProcessingTikTok = true
+            recentlyProcessedURLs.insert(urlString)
         }
         
         let result = await tikTokService.processTikTokURL(urlString)
         
         await MainActor.run {
             isProcessingTikTok = false
+        }
+        
+        // Clear from recently processed after 30 seconds
+        DispatchQueue.main.asyncAfter(deadline: .now() + 30.0) {
+            self.recentlyProcessedURLs.remove(urlString)
         }
         
         switch result {

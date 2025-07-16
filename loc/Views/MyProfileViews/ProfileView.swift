@@ -15,7 +15,6 @@ struct ProfileView: View {
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var placeVM: DetailPlaceViewModel
     @EnvironmentObject var userProfileViewModel: UserProfileViewModel
-    @EnvironmentObject var tikTokAuthService: TikTokAuthService
     @EnvironmentObject var deepLinkViewModel: DeepLinkViewModel
     @StateObject private var photoImportVM = PhotoImportViewModel()
     
@@ -48,11 +47,6 @@ struct ProfileView: View {
                 
                 // Follow Counts
                 ProfileFollowCountsView()
-                
-                // TikTok Connection Button
-                TikTokConnectionButton()
-                    .padding(.horizontal, 20)
-                    .padding(.top, 10)
 
                 Divider()
                     .padding(.top, 15)
@@ -316,11 +310,6 @@ struct ProfileView: View {
             profile.checkPendingTikTokURL(tikTokService: tikTokService,
                                         selectedPlaceVM: selectedPlaceVM,
                                         placeVM: placeVM)
-            
-            // Check TikTok connection status
-            Task {
-                await tikTokAuthService.checkConnectionStatus()
-            }
         }
     }
     

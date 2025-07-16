@@ -20,11 +20,10 @@ struct locApp: App {
     @StateObject private var notificationManager = NotificationManager.shared
     @StateObject private var deepLinkViewModel: DeepLinkViewModel
     @StateObject private var placeTypeFilterViewModel: PlaceTypeFilterViewModel
-    @StateObject private var tikTokAuthService: TikTokAuthService
     
     private let dataManager: DataManager
     private let serviceContainer = ServiceContainer.shared
-
+    
     init() {
         FirebaseApp.configure()
         let providerFactory = AppAttestProviderFactory()
@@ -94,8 +93,7 @@ struct locApp: App {
             placeService: services.placeService,
             selectedPlaceViewModel: selectedPlaceVM,
             tikTokService: services.tikTokService,
-            detailPlaceViewModel: detailVM,
-            tikTokAuthService: services.tikTokAuthService
+            detailPlaceViewModel: detailVM
         )
         
         let deepLinkVM = DeepLinkViewModel(
@@ -118,7 +116,6 @@ struct locApp: App {
         self._searchViewModel = StateObject(wrappedValue: searchVM)
         self._deepLinkViewModel = StateObject(wrappedValue: deepLinkVM)
         self._placeTypeFilterViewModel = StateObject(wrappedValue: placeTypeFilterVM)
-        self._tikTokAuthService = StateObject(wrappedValue: services.tikTokAuthService)
         
         // Pass user service to AppDelegate
         appDelegate.userService = services.userService
@@ -140,7 +137,6 @@ struct locApp: App {
                 .environmentObject(serviceContainer)
                 .environmentObject(deepLinkViewModel)
                 .environmentObject(placeTypeFilterViewModel)
-                .environmentObject(tikTokAuthService)
                 .preferredColorScheme(.light)
                 .onOpenURL { url in
                     // Handle deep links for places
@@ -198,28 +194,24 @@ struct locApp: App {
                 }
                 return
             } else {
-                print("🔍 No URL found in shared UserDefaults")
+                print("🔍 No shared TikTok URL found in shared UserDefaults")
             }
         } else {
-            print("❌ Could not access shared UserDefaults")
+            print("❌ Failed to access shared UserDefaults")
         }
         
         // Check regular UserDefaults as fallback
-        print("🔍 Checking regular UserDefaults...")
-        if let sharedURL = UserDefaults.standard.string(forKey: "sharedTikTokURL") {
-            print("🎵 Found TikTok URL in regular UserDefaults: \(sharedURL)")
+        if let regularURL = UserDefaults.standard.string(forKey: "sharedTikTokURL") {
+            print("🎵 Found TikTok URL in regular UserDefaults: \(regularURL)")
             UserDefaults.standard.removeObject(forKey: "sharedTikTokURL")
-            UserDefaults.standard.synchronize()
             
-            let deepLinkURL = URL(string: "loc://share/tiktok?url=\(sharedURL.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")")!
+            let deepLinkURL = URL(string: "loc://share/tiktok?url=\(regularURL.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")")!
             Task {
                 await deepLinkViewModel.processIncomingURL(deepLinkURL)
             }
         } else {
-            print("🔍 No URL found in regular UserDefaults")
+            print("🔍 No TikTok URL found in regular UserDefaults")
         }
-        
-        print("🔍 Finished checking for shared TikTok URLs")
     }
 }
 
