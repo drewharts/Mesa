@@ -11,9 +11,11 @@ import FirebaseFirestore
 
 class DeepLinkManager: ObservableObject {
     @Published var pendingPlace: ShareablePlace?
+    @Published var pendingList: (lists: [PlaceList], initialIndex: Int)?
     @Published var isProcessingDeepLink = false
     
     private let placeService: PlaceService
+    private let userService: UserService
     private let selectedPlaceViewModel: SelectedPlaceViewModel
     private let tikTokService: TikTokService
     private let detailPlaceViewModel: DetailPlaceViewModel
@@ -22,8 +24,9 @@ class DeepLinkManager: ObservableObject {
     private static var recentlyProcessedURLs: Set<String> = []
     private static var urlProcessingQueue = DispatchQueue(label: "url-processing", qos: .userInitiated)
     
-    init(placeService: PlaceService, selectedPlaceViewModel: SelectedPlaceViewModel, tikTokService: TikTokService = TikTokService(), detailPlaceViewModel: DetailPlaceViewModel) {
+    init(placeService: PlaceService, userService: UserService, selectedPlaceViewModel: SelectedPlaceViewModel, tikTokService: TikTokService = TikTokService(), detailPlaceViewModel: DetailPlaceViewModel) {
         self.placeService = placeService
+        self.userService = userService
         self.selectedPlaceViewModel = selectedPlaceViewModel
         self.tikTokService = tikTokService
         self.detailPlaceViewModel = detailPlaceViewModel
@@ -42,6 +45,8 @@ class DeepLinkManager: ObservableObject {
         switch url.host {
         case "place":
             await handlePlaceDeepLink(url)
+        case "list":
+            await handleListDeepLink(url)
         case "share":
             if url.path == "/tiktok" {
                 await handleTikTokDeepLink(url)
@@ -50,6 +55,39 @@ class DeepLinkManager: ObservableObject {
             }
         default:
             print("❌ Unknown deep link host: \(url.host ?? "nil")")
+        }
+    }
+    
+    private func handleListDeepLink(_ url: URL) async {
+        print("🔗 Starting to handle list deep link: \(url)")
+        
+        guard let shareableList = ShareableList.from(url: url) else {
+            print("❌ Failed to parse shareable list from URL: \(url)")
+            return
+        }
+        
+        print("✅ Successfully parsed shareable list: \(shareableList.name)")
+        
+        userService.fetchUserLists(userId: shareableList.userId) { [weak self] lists, error in
+            guard let self = self else { return }
+            
+            if let error = error {
+                print("❌ Error fetching user lists: \(error.localizedDescription)")
+                return
+            }
+            
+            guard let lists = lists, !lists.isEmpty else {
+                print("❌ No lists found for user: \(shareableList.userId)")
+                return
+            }
+            
+            if let initialIndex = lists.firstIndex(where: { $0.id.uuidString == shareableList.id }) {
+                DispatchQueue.main.async {
+                    self.pendingList = (lists: lists, initialIndex: initialIndex)
+                }
+            } else {
+                print("❌ Shared list not found in user's lists.")
+            }
         }
     }
     
@@ -249,7 +287,17 @@ class DeepLinkManager: ObservableObject {
         }
     }
     
+    func clearPendingList() {
+        Task { @MainActor in
+            pendingList = nil
+        }
+    }
+    
     func hasPendingPlace() -> Bool {
         return pendingPlace != nil
+    }
+    
+    func hasPendingList() -> Bool {
+        return pendingList != nil
     }
 } 

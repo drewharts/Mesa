@@ -18,6 +18,7 @@ struct locApp: App {
     @StateObject private var userProfileViewModel: UserProfileViewModel
     @StateObject private var searchViewModel: SearchViewModel
     @StateObject private var notificationManager = NotificationManager.shared
+    @StateObject private var deepLinkManager: DeepLinkManager
     @StateObject private var deepLinkViewModel: DeepLinkViewModel
     @StateObject private var placeTypeFilterViewModel: PlaceTypeFilterViewModel
     
@@ -89,15 +90,16 @@ struct locApp: App {
         )
         
         // Create DeepLinkManager and DeepLinkViewModel
-        let deepLinkManager = DeepLinkManager(
+        let deepLinkMgr = DeepLinkManager(
             placeService: services.placeService,
+            userService: services.userService,
             selectedPlaceViewModel: selectedPlaceVM,
             tikTokService: services.tikTokService,
             detailPlaceViewModel: detailVM
         )
         
         let deepLinkVM = DeepLinkViewModel(
-            deepLinkManager: deepLinkManager,
+            deepLinkManager: deepLinkMgr,
             selectedPlaceViewModel: selectedPlaceVM
         )
         
@@ -114,6 +116,7 @@ struct locApp: App {
         self._selectedPlaceViewModel = StateObject(wrappedValue: selectedPlaceVM)
         self._userProfileViewModel = StateObject(wrappedValue: userProfileVM)
         self._searchViewModel = StateObject(wrappedValue: searchVM)
+        self._deepLinkManager = StateObject(wrappedValue: deepLinkMgr)
         self._deepLinkViewModel = StateObject(wrappedValue: deepLinkVM)
         self._placeTypeFilterViewModel = StateObject(wrappedValue: placeTypeFilterVM)
         
@@ -135,6 +138,7 @@ struct locApp: App {
                 .environmentObject(searchViewModel)
                 .environmentObject(notificationManager)
                 .environmentObject(serviceContainer)
+                .environmentObject(deepLinkManager)
                 .environmentObject(deepLinkViewModel)
                 .environmentObject(placeTypeFilterViewModel)
                 .preferredColorScheme(.light)

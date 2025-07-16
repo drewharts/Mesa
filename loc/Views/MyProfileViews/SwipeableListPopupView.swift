@@ -33,7 +33,7 @@ struct SwipeableListPopupView: View {
         NavigationView {
             VStack(spacing: 0) {
                 SwipeableListPopupHeaderView(
-                    listName: viewModel.currentList.name,
+                    list: viewModel.currentList,
                     currentIndex: viewModel.currentListIndex,
                     totalLists: viewModel.lists.count,
                     onDelete: { viewModel.showDeleteConfirmation() }
@@ -79,20 +79,26 @@ struct SwipeableListPopupView: View {
 }
 
 struct SwipeableListPopupHeaderView: View {
-    let listName: String
+    let list: PlaceList
     let currentIndex: Int
     let totalLists: Int
     let onDelete: () -> Void
     
+    @EnvironmentObject private var profile: ProfileViewModel
+    
     var body: some View {
         VStack(spacing: 12) {
-            // Top bar with delete button only
+            // Top bar with delete button and share button
             HStack {
-                Spacer()
-                
                 Button(action: onDelete) {
                     Image(systemName: "trash")
                         .foregroundColor(.red)
+                }
+                
+                Spacer()
+                
+                if let userId = profile.user?.id {
+                    ListShareButton(placeList: list, userId: userId)
                 }
             }
             .padding(.horizontal, 20)
@@ -100,7 +106,7 @@ struct SwipeableListPopupHeaderView: View {
             
             // List name and simple counter
             VStack(spacing: 4) {
-                Text(listName)
+                Text(list.name)
                     .font(.title2)
                     .fontWeight(.bold)
                     .foregroundColor(.black)

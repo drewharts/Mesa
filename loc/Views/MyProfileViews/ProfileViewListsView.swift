@@ -13,6 +13,7 @@ struct ProfileViewListsView: View {
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
+    @EnvironmentObject var deepLinkManager: DeepLinkManager
     @Environment(\.presentationMode) private var presentationMode
 
     @State private var showingImagePicker = false
@@ -76,6 +77,17 @@ struct ProfileViewListsView: View {
             NewListView(isPresented: $showingNewListSheet, onSave: { listName in
                 profile.addNewPlaceList(named: listName, city: "", emoji: "", image: "")
             })
+        }
+        .sheet(isPresented: .constant(deepLinkManager.hasPendingList()), onDismiss: {
+            deepLinkManager.clearPendingList()
+        }) {
+            if let pendingList = deepLinkManager.pendingList {
+                SwipeableListPopupView(
+                    lists: pendingList.lists,
+                    initialListIndex: pendingList.initialIndex,
+                    placeColors: $placeColors
+                )
+            }
         }
         .onChange(of: selectedPlaceVM.isDetailSheetPresented) {
             if selectedPlaceVM.isDetailSheetPresented == true {

@@ -89,6 +89,7 @@ struct ListPlacesPopUpListView: View {
                     }
                 } else {
                     VStack(spacing: 8) {
+                        Spacer()
                         if showOnlyUnvisited {
                             Text("No unvisited places in this list")
                                 .foregroundColor(.gray)
@@ -99,6 +100,7 @@ struct ListPlacesPopUpListView: View {
                             Text("No places in this list")
                                 .foregroundColor(.gray)
                         }
+                        Spacer()
                     }
                     .padding(.vertical, 30)
                 }

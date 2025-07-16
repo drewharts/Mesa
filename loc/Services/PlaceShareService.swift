@@ -38,6 +38,23 @@ class PlaceShareService: ObservableObject {
         presentShareSheet(with: activityItems)
     }
     
+    // MARK: - Share List Methods
+    
+    @MainActor
+    func shareList(_ placeList: PlaceList, userId: String) {
+        let shareableList = ShareableList(from: placeList, userId: userId)
+        
+        guard let deepLinkURL = shareableList.deepLinkURL else {
+            print("❌ Failed to generate deep link URL for list: \(shareableList.name)")
+            return
+        }
+        
+        let shareText = createShareText(for: shareableList)
+        let activityItems: [Any] = [shareText, deepLinkURL]
+        
+        presentShareSheet(with: activityItems)
+    }
+
     // MARK: - Share Text Generation
     
     private func createShareText(for place: ShareablePlace) -> String {
@@ -47,6 +64,17 @@ class PlaceShareService: ObservableObject {
             shareText += " at \(address)"
         } else if let city = place.city, !city.isEmpty {
             shareText += " in \(city)"
+        }
+        
+        shareText += " on Loc!"
+        return shareText
+    }
+    
+    private func createShareText(for list: ShareableList) -> String {
+        var shareText = "Check out my list \"\(list.name)\""
+        
+        if !list.city.isEmpty {
+            shareText += " in \(list.city)"
         }
         
         shareText += " on Loc!"

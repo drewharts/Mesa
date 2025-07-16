@@ -586,6 +586,30 @@ class UserService: ObservableObject {
         }
     }
 
+    func fetchUserLists(userId: String, completion: @escaping ([PlaceList]?, Error?) -> Void) {
+        db.collection("users").document(userId).collection("placeLists")
+            .getDocuments { snapshot, error in
+                if let error = error {
+                    completion(nil, error)
+                    return
+                }
+
+                guard let documents = snapshot?.documents else {
+                    completion([], nil)
+                    return
+                }
+
+                var lists = documents.compactMap { doc -> PlaceList? in
+                    try? doc.data(as: PlaceList.self)
+                }
+                
+                // Sort on the client side to handle documents that may be missing the sortOrder field
+                lists.sort { $0.sortOrder < $1.sortOrder }
+                
+                completion(lists, nil)
+            }
+    }
+
     // New implementation that avoids EXC_BAD_ACCESS
     func fetchFriendsReviews(placeId: String, currentUserId: String, completion: @escaping ([ReviewProtocol]?, Error?) -> Void) {
         // Step 1: Get list of users the current user follows
