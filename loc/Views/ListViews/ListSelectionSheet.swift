@@ -94,9 +94,9 @@ struct ListsInSelectionSheet: View {
     let place: DetailPlace
     @Binding var searchText: String
     
-    // Filtered lists based on search text and sorted by proximity to the place
+    // Filtered lists based on search text and sorted with recently created list first, then by proximity to the place
     var filteredLists: [PlaceList] {
-        let sortedLists = profile.sortListsByDistanceFromPlace(place)
+        let sortedLists = profile.sortListsWithRecentFirstFromPlace(place)
         
         if searchText.isEmpty {
             return sortedLists

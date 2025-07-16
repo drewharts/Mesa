@@ -24,8 +24,9 @@ class ProfileViewModel: ObservableObject {
     //TODO: Implement my places
     @Published var myPlaces: [String] = []
     @Published var userExternalPlaces: [String: ExternalPlace] = [:] // PlaceId -> ExternalPlace
+    @Published var recentlyCreatedListId: UUID?
     
-     private let userService: UserService
+    private let userService: UserService
     private let imageService: ImageService
     private let placeService: PlaceService
     private let reviewService: ReviewService
@@ -268,6 +269,14 @@ class ProfileViewModel: ObservableObject {
          sortListsByDistance() // Sort lists by distance after adding new list
          guard let userId = user?.id else { return }
          placeService.createNewList(placeList: newPlaceList, userID: userId)
+         recentlyCreatedListId = newPlaceList.id
+         
+         // Clear the recently created list ID after a short delay
+         DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
+             if self.recentlyCreatedListId == newPlaceList.id {
+                 self.recentlyCreatedListId = nil
+             }
+         }
      }
     
      func removePlaceList(placeList: PlaceList) {
@@ -666,6 +675,24 @@ class ProfileViewModel: ObservableObject {
     /// Sorts lists by their proximity to a specific place (closest first)
     func sortListsByDistanceFromPlace(_ place: DetailPlace) -> [PlaceList] {
         return userLists.sorted { list1, list2 in
+            let distance1 = calculateAverageDistanceForListFromPlace(list1, place: place)
+            let distance2 = calculateAverageDistanceForListFromPlace(list2, place: place)
+            return distance1 < distance2
+        }
+    }
+    
+    /// Sorts lists with recently created list at the top, then by proximity to a specific place
+    func sortListsWithRecentFirstFromPlace(_ place: DetailPlace) -> [PlaceList] {
+        return userLists.sorted { list1, list2 in
+            // If one of the lists is recently created, prioritize it
+            if list1.id == recentlyCreatedListId {
+                return true
+            }
+            if list2.id == recentlyCreatedListId {
+                return false
+            }
+            
+            // Otherwise, sort by distance
             let distance1 = calculateAverageDistanceForListFromPlace(list1, place: place)
             let distance2 = calculateAverageDistanceForListFromPlace(list2, place: place)
             return distance1 < distance2
