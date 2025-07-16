@@ -197,9 +197,14 @@ struct MinPlaceDetailView: View {
                                     .cornerRadius(12)
                             }
                             
-                            ForEach(tikTokVideos, id: \.videoID) { video in
-                                TikTokVideoView(tikTokVideo: video)
-                                    .id("tiktok_\(video.videoID)")
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 12) {
+                                    ForEach(tikTokVideos, id: \.videoID) { video in
+                                        TikTokVideoView(tikTokVideo: video)
+                                            .id("tiktok_\(video.videoID)")
+                                    }
+                                }
+                                .padding(.horizontal, 1)
                             }
                         }
                         .padding(.top, 15)
