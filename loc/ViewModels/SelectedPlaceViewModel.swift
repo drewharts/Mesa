@@ -26,6 +26,9 @@ class SelectedPlaceViewModel: ObservableObject {
                let currentLocation = locationManager.currentLocation {
                 loadData(for: place, currentLocation: currentLocation.coordinate)
                 loadReviews(for: place)
+                
+                // Reset photo loading state for new place
+                resetPhotoLoading()
                 getPlacePhotos(for: place)
                 
                 // Clear previous likes when loading a new place
@@ -48,6 +51,11 @@ class SelectedPlaceViewModel: ObservableObject {
     @Published private var profilePhotoLoadingStates: [String: LoadingState] = [:] // Loading states for profile photos
     @Published private var reviewLoadingStates: [String: LoadingState] = [:] // Loading states for reviews
 
+    // Add pagination properties for photos
+    @Published private var photoPageLimit = 9
+    @Published private var lastPhotoDocument: DocumentSnapshot?
+    @Published private var allPhotosLoaded = false
+    
     // Add new property to track liked reviews
     @Published private var likedReviews: Set<String> = []
 
@@ -226,13 +234,38 @@ class SelectedPlaceViewModel: ObservableObject {
         return 0.0
     }
     
-    private func getPlacePhotos(for place: DetailPlace) {
+    // MARK: - Photo Loading
+    
+    private func resetPhotoLoading() {
+        if let placeId = selectedPlace?.id.uuidString {
+            placePhotos[placeId]?.removeAll()
+            photoLoadingStates[placeId] = .idle
+            lastPhotoDocument = nil
+            allPhotosLoaded = false
+        }
+    }
+    
+    func loadMorePhotos() {
+        guard let place = selectedPlace, !allPhotosLoaded else {
+            return
+        }
+        
+        getPlacePhotos(for: place, loadMore: true)
+    }
+
+    private func getPlacePhotos(for place: DetailPlace, loadMore: Bool = false) {
         let placeId = place.id.uuidString
+        
+        // Don't fetch if already loading
+        if photoLoadingStates[placeId] == .loading && !loadMore {
+            return
+        }
+        
         DispatchQueue.main.async {
             self.photoLoadingStates[placeId] = .loading
         }
         
-        // First fetch all reviews for this place
+        // Use the same review fetching logic to get photo URLs
         userService.fetchFriendsReviews(placeId: placeId, currentUserId: Auth.auth().currentUser?.uid ?? "") { [weak self] reviews, error in
             guard let self = self else { return }
             
@@ -240,38 +273,55 @@ class SelectedPlaceViewModel: ObservableObject {
                 print("Error fetching reviews for place \(placeId): \(error.localizedDescription)")
                 DispatchQueue.main.async {
                     self.photoLoadingStates[placeId] = .error(error)
-                    self.placePhotos[placeId] = []
                 }
                 return
             }
             
-            // Collect all photo URLs from all reviews
             var photoURLs: [String] = []
             for review in reviews ?? [] {
                 photoURLs.append(contentsOf: review.images)
             }
             
-            // If no photos found, update state and return
+            // If no photos found in any reviews, mark as loaded
             if photoURLs.isEmpty {
                 DispatchQueue.main.async {
                     self.photoLoadingStates[placeId] = .loaded
                     self.placePhotos[placeId] = []
+                    self.allPhotosLoaded = true
                 }
                 return
             }
             
-            // Fetch the actual images using the URLs
-            imageService.fetchPhotosFromStorage(urls: photoURLs) { [weak self] images, error in
+            // Paginate the photo URLs
+            let startIndex = self.placePhotos[placeId]?.count ?? 0
+            let endIndex = min(startIndex + self.photoPageLimit, photoURLs.count)
+            
+            guard startIndex < endIndex else {
+                // No more photos to load
+                self.allPhotosLoaded = true
+                self.photoLoadingStates[placeId] = .loaded
+                return
+            }
+            
+            let urlsToFetch = Array(photoURLs[startIndex..<endIndex])
+            
+            imageService.fetchPhotosFromStorage(urls: urlsToFetch) { [weak self] images, error in
                 guard let self = self else { return }
                 
                 DispatchQueue.main.async {
                     if let error = error {
                         print("Error fetching photos for place \(placeId): \(error.localizedDescription)")
                         self.photoLoadingStates[placeId] = .error(error)
-                        self.placePhotos[placeId] = []
                     } else {
-                        self.placePhotos[placeId] = images ?? []
+                        var currentPhotos = self.placePhotos[placeId] ?? []
+                        currentPhotos.append(contentsOf: images ?? [])
+                        self.placePhotos[placeId] = currentPhotos
                         self.photoLoadingStates[placeId] = .loaded
+                        
+                        // Check if all photos have been loaded
+                        if currentPhotos.count >= photoURLs.count {
+                            self.allPhotosLoaded = true
+                        }
                     }
                 }
             }
@@ -646,6 +696,10 @@ class SelectedPlaceViewModel: ObservableObject {
         return reviewLoadingStates[placeId] ?? .idle
     }
     
+    var allPhotosLoadedForCurrentPlace: Bool {
+        return allPhotosLoaded
+    }
+    
     func likeReview<T: ReviewProtocol>(_ review: T, userId: String) {
         guard let placeId = selectedPlace?.id.uuidString else { return }
         
@@ -831,3 +885,4 @@ class SelectedPlaceViewModel: ObservableObject {
         isDetailSheetPresented = true
     }
 }
+

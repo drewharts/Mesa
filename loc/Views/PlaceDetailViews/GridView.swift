@@ -10,6 +10,8 @@ import SwiftUI
 struct GridView: View {
     let images: [UIImage]
     let onImageTapped: (Int) -> Void
+
+    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     
     // For a 3-column grid
     let columns = [
@@ -20,36 +22,32 @@ struct GridView: View {
 
     var body: some View {
         LazyVGrid(columns: columns, spacing: 10) {
-            // Loop only up to 9 items or images.count, whichever is smaller
-            ForEach(0 ..< min(9, images.count), id: \.self) { index in
-                ZStack {
-                    GeometryReader { geo in
-                        Image(uiImage: images[index])
-                            .resizable()
-                            .scaledToFill()
-                            // Make the image square by using its width
-                            .frame(width: geo.size.width, height: geo.size.width)
-                            .clipped()
-                            .cornerRadius(4)
-                    }
-                    .aspectRatio(1, contentMode: .fill)
-
-                    // If it's the 9th image and there are more images left
-                    if index == 8 && images.count > 9 {
-                        // Dark semi-transparent overlay
-                        Color.black.opacity(0.4)
-                            .cornerRadius(4)
-                        
-                        // Display how many images remain
-                        Text("+\(images.count - 9)")
-                            .foregroundColor(.white)
-                            .font(.headline)
-                    }
+            ForEach(images.indices, id: \.self) { index in
+                GeometryReader { geo in
+                    Image(uiImage: images[index])
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: geo.size.width, height: geo.size.width)
+                        .clipped()
+                        .cornerRadius(4)
                 }
+                .aspectRatio(1, contentMode: .fill)
                 .onTapGesture {
                     onImageTapped(index)
                 }
+                .onAppear {
+                    // If this is the last image, load more
+                    if index == images.count - 1 && !selectedPlaceVM.allPhotosLoadedForCurrentPlace {
+                        selectedPlaceVM.loadMorePhotos()
+                    }
+                }
             }
+        }
+        
+        // Show a progress indicator if more photos are being loaded
+        if selectedPlaceVM.photoLoadingState == .loading && !images.isEmpty {
+            ProgressView()
+                .padding()
         }
     }
 }

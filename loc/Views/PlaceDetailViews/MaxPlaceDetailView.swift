@@ -87,6 +87,7 @@ struct MaxPlaceDetailView: View {
                                 GridView(images: photos, onImageTapped: { index in
                                     onPhotoTapped(photos, index)
                                 })
+                                .environmentObject(selectedPlaceVM)
                             } else {
                                 Text("No Photos")
                                     .frame(maxWidth: .infinity)
