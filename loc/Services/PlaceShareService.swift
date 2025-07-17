@@ -66,7 +66,7 @@ class PlaceShareService: ObservableObject {
             shareText += " in \(city)"
         }
         
-        shareText += " on Loc!"
+        shareText += " on Mesa!"
         return shareText
     }
     
@@ -77,7 +77,7 @@ class PlaceShareService: ObservableObject {
             shareText += " in \(list.city)"
         }
         
-        shareText += " on Loc!"
+        shareText += " on Mesa!"
         return shareText
     }
     
