@@ -91,6 +91,8 @@ class PlaceShareService: ObservableObject {
             print("❌ Could not find root view controller for share sheet")
             return
         }
+
+        let topViewController = rootViewController.topMostViewController()
         
         let activityViewController = UIActivityViewController(
             activityItems: items,
@@ -99,17 +101,17 @@ class PlaceShareService: ObservableObject {
         
         // Configure for iPad
         if let popover = activityViewController.popoverPresentationController {
-            popover.sourceView = rootViewController.view
+            popover.sourceView = topViewController.view
             popover.sourceRect = CGRect(
-                x: rootViewController.view.bounds.midX,
-                y: rootViewController.view.bounds.midY,
+                x: topViewController.view.bounds.midX,
+                y: topViewController.view.bounds.midY,
                 width: 0,
                 height: 0
             )
             popover.permittedArrowDirections = []
         }
         
-        rootViewController.present(activityViewController, animated: true)
+        topViewController.present(activityViewController, animated: true)
     }
     
     // MARK: - URL Generation

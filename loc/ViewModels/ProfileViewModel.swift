@@ -791,4 +791,32 @@ class ProfileViewModel: ObservableObject {
         return userExternalPlaces[placeId]
     }
 
+    func deleteMyPlace(_ place: DetailPlace, completion: @escaping (Bool) -> Void) {
+        guard let userId = user?.id else {
+            completion(false)
+            return
+        }
+
+        // Optimistically remove from local array
+        myPlaces.removeAll { $0 == place.id.uuidString }
+
+        // Asynchronously delete from backend
+        Task {
+            do {
+                try await placeService.deletePlaceFromMyPlaces(userId: userId, placeId: place.id.uuidString)
+                try await placeService.deletePlaceFromAllPlaces(placeId: place.id.uuidString)
+                
+                // On success, call completion on main thread
+                await MainActor.run {
+                    completion(true)
+                }
+            } catch {
+                // If deletion fails, add it back to the local array
+                await MainActor.run {
+                    myPlaces.append(place.id.uuidString)
+                    completion(false)
+                }
+            }
+        }
+    }
 }

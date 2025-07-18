@@ -29,6 +29,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
     var Instagram: String?
     var X: String?
     var tikTokVideos: [TikTokVideo]?
+    var photoUrls: [String]? = []
     
     // Backend-specific fields (ignored by iOS but needed for decoding)
     var googlePlaceId: String?
@@ -59,6 +60,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         case googlePlaceId = "google_place_id"
         case source
         case createdAt = "created_at"
+        case photoUrls
     }
     
     // Custom decoding to handle backend's coordinates format
@@ -87,6 +89,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         self.Instagram = nil
         self.X = nil
         self.tikTokVideos = nil
+        self.photoUrls = nil
         self.googlePlaceId = nil
         self.source = nil
         self.createdAt = nil
@@ -124,6 +127,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         self.googlePlaceId = try container.decodeIfPresent(String.self, forKey: .googlePlaceId)
         self.source = try container.decodeIfPresent(String.self, forKey: .source)
         self.createdAt = try container.decodeIfPresent(String.self, forKey: .createdAt)
+        self.photoUrls = try container.decodeIfPresent([String].self, forKey: .photoUrls)
     }
     
     private static func decodeID(from container: KeyedDecodingContainer<CodingKeys>) throws -> UUID {
@@ -167,6 +171,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         try container.encodeIfPresent(googlePlaceId, forKey: .googlePlaceId)
         try container.encodeIfPresent(source, forKey: .source)
         try container.encodeIfPresent(createdAt, forKey: .createdAt)
+        try container.encodeIfPresent(photoUrls, forKey: .photoUrls)
     }
 
     // Existing initializers unchanged
@@ -189,6 +194,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         self.Instagram = nil
         self.X = nil
         self.tikTokVideos = nil
+        self.photoUrls = nil
         self.googlePlaceId = nil
         self.source = nil
         self.createdAt = nil
@@ -213,6 +219,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         self.Instagram = nil
         self.X = nil
         self.tikTokVideos = nil
+        self.photoUrls = nil
         self.googlePlaceId = nil
         self.source = nil
         self.createdAt = nil
@@ -238,6 +245,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         self.Instagram = nil
         self.X = nil
         self.tikTokVideos = nil
+        self.photoUrls = nil
         self.googlePlaceId = nil
         self.source = nil
         self.createdAt = nil
@@ -273,6 +281,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         self.Instagram = searchResult.metadata?.instagram
         self.X = searchResult.metadata?.twitter
         self.tikTokVideos = nil
+        self.photoUrls = nil
         self.googlePlaceId = nil
         self.source = nil
         self.createdAt = nil

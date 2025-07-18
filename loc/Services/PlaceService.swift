@@ -282,6 +282,27 @@ class PlaceService: ObservableObject {
         }
     }
 
+    func addPhotosToPlace(placeId: String, photoUrls: [String], completion: @escaping (Error?) -> Void) {
+        getDetailPlace(placeId: placeId) { [weak self] (detailPlace, error) in
+            if let error = error {
+                completion(error)
+                return
+            }
+            
+            guard var placeToUpdate = detailPlace else {
+                completion(NSError(domain: "PlaceService", code: 404, userInfo: [NSLocalizedDescriptionKey: "Place not found"]))
+                return
+            }
+            
+            if placeToUpdate.photoUrls == nil {
+                placeToUpdate.photoUrls = []
+            }
+            placeToUpdate.photoUrls?.append(contentsOf: photoUrls)
+            
+            self?.updatePlace(detailPlace: placeToUpdate, completion: completion)
+        }
+    }
+
     func updatePlace(detailPlace: DetailPlace, completion: @escaping (Error?) -> Void) {
         let placeRef = db.collection("places").document(detailPlace.id.uuidString)
         
@@ -386,5 +407,15 @@ class PlaceService: ObservableObject {
                 continuation.resume(returning: places ?? [])
             }
         }
+    }
+    
+    func deletePlaceFromMyPlaces(userId: String, placeId: String) async throws {
+        let placeRef = db.collection("users").document(userId).collection("myPlaces").document(placeId)
+        try await placeRef.delete()
+    }
+
+    func deletePlaceFromAllPlaces(placeId: String) async throws {
+        let placeRef = db.collection("places").document(placeId)
+        try await placeRef.delete()
     }
 } 

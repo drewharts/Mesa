@@ -31,6 +31,7 @@ class PlaceReviewViewModel: ObservableObject {
    private let profilePhotoUrl: String
    private let reviewService: ReviewService
    private let imageService: ImageService
+   private let placeService: PlaceService
 
    // MARK: - Init
    init(place: DetailPlace,
@@ -39,7 +40,8 @@ class PlaceReviewViewModel: ObservableObject {
         userLastName: String,
         profilePhotoUrl: String,
         reviewService: ReviewService = .shared,
-        imageService: ImageService = .shared) {
+        imageService: ImageService = .shared,
+        placeService: PlaceService = .shared) {
        self.place = place
        self.userId = userId
        self.userFirstName = userFirstName
@@ -47,6 +49,7 @@ class PlaceReviewViewModel: ObservableObject {
        self.profilePhotoUrl = profilePhotoUrl
        self.reviewService = reviewService
        self.imageService = imageService
+       self.placeService = placeService
    }
 
    func submitReview(completion: @escaping (Result<any ReviewProtocol, Error>) -> Void) {
@@ -133,6 +136,7 @@ class PlaceReviewViewModel: ObservableObject {
                switch result {
                case .success:
                    print("✅ Successfully saved review")
+                   self?.addPhotosToPlace(from: review)
                    completion(.success(review))
                case .failure(let error):
                    print("❌ Error saving review: \(error.localizedDescription)")
@@ -142,6 +146,21 @@ class PlaceReviewViewModel: ObservableObject {
            }
        }
    }
+
+   private func addPhotosToPlace(from review: any ReviewProtocol) {
+        let placeId = review.placeId
+        guard !review.images.isEmpty else {
+            return
+        }
+        
+        placeService.addPhotosToPlace(placeId: placeId, photoUrls: review.images) { error in
+            if let error = error {
+                print("❌ Failed to add photos to place: \(error.localizedDescription)")
+            } else {
+                print("✅ Successfully added photos to place")
+            }
+        }
+    }
 
    func deleteReview(reviewId: String, completion: @escaping (Result<Void, Error>) -> Void) {
        print("🗑️ Starting review deletion process for ID: \(reviewId)")
