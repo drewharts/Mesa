@@ -48,6 +48,10 @@ class ProfileViewModel: ObservableObject {
     
     // TikTok processing state
     @Published var isProcessingTikTok: Bool = false
+    @Published var isWaitingForPlaceDetail: Bool = false
+    @Published var tikTokImportError: String? = nil
+    @Published var importedPlaces: [DetailPlace] = []
+    @Published var isShowingPlaceSelection: Bool = false
     
     // Add deduplication mechanism for TikTok URLs
     private var recentlyProcessedURLs: Set<String> = []
@@ -76,6 +80,17 @@ class ProfileViewModel: ObservableObject {
         
         // Observe location changes using Combine
         setupLocationObserver()
+        
+        // Observe TikTok multiple places notifications
+        NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("TikTokMultiplePlacesFound"),
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            if let places = notification.userInfo?["places"] as? [DetailPlace] {
+                self?.handleMultiplePlaces(places)
+            }
+        }
      }
     
     private func setupLocationObserver() {
@@ -524,28 +539,144 @@ class ProfileViewModel: ObservableObject {
         }
         
         switch result {
-        case .success(let detailPlace):
-            print("✅ [ProfileViewModel] Successfully processed TikTok URL, received place: \(detailPlace.name)")
+        case .success(let detailPlaces):
+            print("✅ [ProfileViewModel] Successfully processed TikTok URL, received \(detailPlaces.count) place(s)")
             
-            // Add to DetailPlaceViewModel for immediate display
-            await MainActor.run {
-                placeVM.places[detailPlace.id.uuidString] = detailPlace
-                selectedPlaceVM.selectedPlace = detailPlace
-                selectedPlaceVM.isDetailSheetPresented = true
+            // Debug: Log each place name
+            for (index, place) in detailPlaces.enumerated() {
+                print("🏢 [ProfileViewModel] Place \(index + 1): \(place.name) (ID: \(place.id))")
             }
             
-            // NOTE: Place is saved by backend during URL processing
-            // Frontend only displays the place
+            // Clear any previous errors
+            tikTokImportError = nil
+            
+            await MainActor.run {
+                if detailPlaces.count == 1 {
+                    // Single place - show detail directly
+                    let detailPlace = detailPlaces[0]
+                    
+                    // Validate place has a name
+                    if detailPlace.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        tikTokImportError = "Could not find a valid place from this TikTok video"
+                        return
+                    }
+                    
+                    print("✅ [ProfileViewModel] Single place found: \(detailPlace.name)")
+                    placeVM.places[detailPlace.id.uuidString] = detailPlace
+                    selectedPlaceVM.selectedPlace = detailPlace
+                    selectedPlaceVM.isDetailSheetPresented = true
+                    
+                    // Set waiting state to keep loading screen until place detail is ready
+                    isWaitingForPlaceDetail = true
+                } else if detailPlaces.count > 1 {
+                    // Multiple places - show selection screen
+                    print("🎯 [ProfileViewModel] MULTIPLE PLACES DETECTED: \(detailPlaces.count) places - SHOULD SHOW SELECTION SCREEN")
+                    
+                    // Validate all places have names
+                    let validPlaces = detailPlaces.filter { !$0.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+                    
+                    print("🔍 [ProfileViewModel] Valid places after filtering: \(validPlaces.count)")
+                    for place in validPlaces {
+                        print("   ✓ \(place.name)")
+                    }
+                    
+                    if validPlaces.isEmpty {
+                        print("❌ [ProfileViewModel] No valid places found after filtering")
+                        tikTokImportError = "Could not find any valid places from this TikTok video"
+                        return
+                    }
+                    
+                    // Add all valid places to place manager
+                    for place in validPlaces {
+                        placeVM.places[place.id.uuidString] = place
+                    }
+                    
+                    importedPlaces = validPlaces
+                    isShowingPlaceSelection = true
+                    print("🎯 [ProfileViewModel] Set isShowingPlaceSelection = true, importedPlaces count = \(validPlaces.count)")
+                } else {
+                    // No places found
+                    print("❌ [ProfileViewModel] No places found: count = \(detailPlaces.count)")
+                    tikTokImportError = "No places were found in this TikTok video"
+                }
+            }
+            
+            // NOTE: Place saving is handled by backend during URL processing
             return true
             
         case .failure(let error):
-            print("❌ [ProfileViewModel] Failed to process TikTok video: \(error.localizedDescription)")
+            print("❌ [ProfileViewModel] TikTok processing failed: \(error.localizedDescription)")
+            
+            await MainActor.run {
+                // Set user-friendly error message based on error type
+                if error.localizedDescription.contains("network") || error.localizedDescription.contains("Internet") {
+                    tikTokImportError = "Please check your internet connection and try again"
+                } else if error.localizedDescription.contains("invalid") || error.localizedDescription.contains("URL") {
+                    tikTokImportError = "This doesn't appear to be a valid TikTok URL"
+                } else {
+                    tikTokImportError = "We couldn't find any places in this TikTok video. Try sharing a different video that shows specific locations"
+                }
+            }
+            
             return false
         }
     }
     
     // NOTE: Place saving is handled by backend during URL processing
     // Frontend does not save to Firestore - removed saveTikTokPlaceToFirestore method
+    
+    /// Called when the place detail view is fully loaded and ready
+    func placeDetailViewReady() {
+        isWaitingForPlaceDetail = false
+    }
+    
+    /// Clear TikTok import error
+    func clearTikTokImportError() {
+        tikTokImportError = nil
+    }
+    
+    /// Clear place selection state
+    func clearPlaceSelection() {
+        importedPlaces = []
+        isShowingPlaceSelection = false
+    }
+    
+    func placeSelectionViewAppeared() {
+        isWaitingForPlaceDetail = false
+    }
+    
+    func ensureListsLoaded() {
+        guard userLists.isEmpty, let userId = user?.id else { return }
+        
+        Task {
+            do {
+                let lists = try await placeService.fetchLists(userId: userId)
+                await MainActor.run {
+                    self.userLists = lists
+                    self.userListsPlaces = lists.reduce(into: [String: [String]]()) { result, list in
+                        result[list.id.uuidString] = list.places.map { $0.id.uuidString }
+                    }
+                }
+            } catch {
+                print("Error loading user lists: \(error.localizedDescription)")
+            }
+        }
+    }
+    
+    private func handleMultiplePlaces(_ places: [DetailPlace]) {
+        print("🎯 [ProfileViewModel] Received \(places.count) places from DeepLinkManager")
+        for place in places {
+            print("   - \(place.name) (ID: \(place.id))")
+        }
+        
+        importedPlaces = places
+        isShowingPlaceSelection = true
+        // Keep isWaitingForPlaceDetail = true until the sheet actually appears
+        
+        print("🎯 [ProfileViewModel] Set isShowingPlaceSelection = true")
+    }
+    
+
     
     // MARK: - Place Conversion
     

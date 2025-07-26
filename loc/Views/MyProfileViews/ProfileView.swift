@@ -176,26 +176,55 @@ struct ProfileView: View {
             }
             
             // TikTok Processing Overlay (both profile and deeplink processing)
-            if profile.isProcessingTikTok || deepLinkViewModel.isProcessingDeepLink {
+            if profile.isProcessingTikTok || profile.isWaitingForPlaceDetail || deepLinkViewModel.isProcessingDeepLink {
                 Color.black.opacity(0.4)
                     .ignoresSafeArea()
                 
                 VStack(spacing: 16) {
-                    ProgressView()
-                        .scaleEffect(1.5)
-                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                    
-                    Text("Processing TikTok Video...")
-                        .font(.headline)
-                        .foregroundColor(.white)
-                    
-                    Text("Extracting location and saving place")
-                        .font(.subheadline)
-                        .foregroundColor(.white.opacity(0.8))
+                    if profile.tikTokImportError != nil {
+                        // Show error message
+                        VStack(spacing: 12) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .font(.system(size: 40))
+                                .foregroundColor(.orange)
+                            
+                            Text("Import Failed")
+                                .font(.headline)
+                                .foregroundColor(.white)
+                            
+                            Text(profile.tikTokImportError ?? "")
+                                .font(.subheadline)
+                                .foregroundColor(.white.opacity(0.8))
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal)
+                            
+                            Button("OK") {
+                                profile.clearTikTokImportError()
+                            }
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 24)
+                            .padding(.vertical, 8)
+                            .background(Color.blue)
+                            .cornerRadius(8)
+                        }
+                    } else {
+                        // Show loading spinner
+                        ProgressView()
+                            .scaleEffect(1.5)
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        
+                        Text("Processing TikTok Video...")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                        
+                        Text("Extracting location and saving place")
+                            .font(.subheadline)
+                            .foregroundColor(.white.opacity(0.8))
+                    }
                 }
-                .padding(30)
+                .padding(24)
                 .background(Color.black.opacity(0.8))
-                .cornerRadius(20)
+                .cornerRadius(16)
             }
         }
         .navigationBarBackButtonHidden(true)
@@ -265,6 +294,12 @@ struct ProfileView: View {
                     navigateToRestaurantReview()
                 }
             )
+        }
+        .sheet(isPresented: $profile.isShowingPlaceSelection) {
+            TikTokPlaceSelectionView()
+                .environmentObject(profile)
+                .environmentObject(selectedPlaceVM)
+                .presentationDragIndicator(.visible)
         }
 
         .navigationBarTitleDisplayMode(.inline)

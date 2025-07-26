@@ -104,10 +104,23 @@ struct ListsInSelectionSheet: View {
             return sortedLists.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
         }
     }
+    
+    var isLoading: Bool {
+        profile.userLists.isEmpty && profile.isLoading
+    }
 
     var body: some View {
         ScrollView {
-            if !filteredLists.isEmpty {
+            if isLoading {
+                VStack(spacing: 12) {
+                    ProgressView()
+                        .frame(width: 20, height: 20)
+                    Text("Loading your lists...")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .padding()
+            } else if !filteredLists.isEmpty {
                 ForEach(filteredLists) { list in
                     ListSelectionRowView(list: list, place: place)
                 }
@@ -135,7 +148,6 @@ struct ListsInSelectionSheet: View {
 // MARK: - ListSelectionSheet
 struct ListSelectionSheet: View {
     @EnvironmentObject var profile: ProfileViewModel
-    @EnvironmentObject var lists: PlaceListViewModel
     @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
     let place: DetailPlace
     @Binding var isPresented: Bool
@@ -180,5 +192,8 @@ struct ListSelectionSheet: View {
         }
         .cornerRadius(20)
         .padding()
+        .onAppear {
+            profile.ensureListsLoaded()
+        }
     }
 }

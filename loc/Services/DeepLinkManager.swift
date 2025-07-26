@@ -166,8 +166,17 @@ class DeepLinkManager: ObservableObject {
         let result = await tikTokService.processTikTokURL(urlString)
         
         switch result {
-        case .success(let detailPlace):
+        case .success(let detailPlaces):
             print("✅ [DeepLinkManager] Backend response received")
+            
+            if detailPlaces.isEmpty {
+                print("❌ [DeepLinkManager] No places found in TikTok video")
+                return
+            }
+            
+            if detailPlaces.count == 1 {
+                // Single place - navigate directly
+                let detailPlace = detailPlaces[0]
             print("📍 Place name: \(detailPlace.name)")
             print("🏢 Address: \(detailPlace.address ?? "No address")")
             print("🏙️ City: \(detailPlace.city ?? "No city")")
@@ -179,6 +188,26 @@ class DeepLinkManager: ObservableObject {
             print("✅ [DeepLinkManager] Place processed, navigating to details")
             
             await navigateToPlace(detailPlace)
+            } else {
+                // Multiple places - let ProfileViewModel handle the selection
+                print("📍 Multiple places found (\(detailPlaces.count))")
+                
+                // Set the places in ProfileViewModel to show the selection screen
+                await MainActor.run {
+                    // Find ProfileViewModel from the environment or view hierarchy
+                    // For now, we'll set the places directly and trigger the selection screen
+                    print("🎯 [DeepLinkManager] Setting multiple places for selection")
+                    print("Places: \(detailPlaces.map { "\($0.name) (ID: \($0.id))" }.joined(separator: ", "))")
+                    
+                    // We need to trigger the ProfileViewModel's multiple place handling
+                    // This should be done by calling the ProfileViewModel method
+                    NotificationCenter.default.post(
+                        name: NSNotification.Name("TikTokMultiplePlacesFound"),
+                        object: nil,
+                        userInfo: ["places": detailPlaces]
+                    )
+                }
+            }
             
         case .failure(let error):
             print("❌ [DeepLinkManager] Failed to process TikTok URL: \(error.localizedDescription)")

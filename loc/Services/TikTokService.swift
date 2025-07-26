@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import CoreLocation
 import FirebaseFirestore
 import FirebaseAuth
 
@@ -34,7 +35,7 @@ class TikTokService: ObservableObject {
     @Published var isProcessing = false
     @Published var errorMessage: String?
     
-    func processTikTokURL(_ url: String) async -> Result<DetailPlace, Error> {
+    func processTikTokURL(_ url: String) async -> Result<[DetailPlace], Error> {
         guard let requestURL = URL(string: "\(baseURL)/process-url") else {
             print("❌ [TikTokService] Invalid base URL: \(baseURL)/process-url")
             return .failure(TikTokError.invalidURL)
@@ -67,56 +68,101 @@ class TikTokService: ObservableObject {
                 return .failure(error)
             }
             
-            // Parse the response as DetailPlace directly
+            // Parse the response - could be single place or array of places
             do {
-                // First try to parse as a direct DetailPlace
-                let detailPlace = try JSONDecoder().decode(DetailPlace.self, from: data)
-                print("✅ [TikTokService] Successfully decoded DetailPlace: \(detailPlace.name)")
-                return .success(detailPlace)
+                // First try to parse as an array of DetailPlace objects
+                let detailPlaces = try JSONDecoder().decode([DetailPlace].self, from: data)
+                print("✅ [TikTokService] Successfully decoded array of DetailPlaces: \(detailPlaces.count) places")
+                return .success(detailPlaces)
             } catch {
-                print("❌ [TikTokService] Failed to decode as DetailPlace directly, trying wrapped format...")
+                print("❌ [TikTokService] Failed to decode as array, trying single DetailPlace...")
                 
-                // If that fails, try to parse as wrapped format like other backend responses
+                // Try to parse as a single DetailPlace
                 do {
-                    let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+                    let detailPlace = try JSONDecoder().decode(DetailPlace.self, from: data)
+                    print("✅ [TikTokService] Successfully decoded single DetailPlace: \(detailPlace.name)")
+                    return .success([detailPlace]) // Wrap in array
+                } catch {
+                    print("❌ [TikTokService] Failed to decode as single DetailPlace, trying wrapped format...")
                     
-                    // Check if it's the TikTok response format with saved_place
-                    if let savedPlaceDict = json?["saved_place"] as? [String: Any] {
-                        print("🔍 [TikTokService] Found TikTok saved_place object, parsing...")
-                        var detailPlace = try parseDetailPlaceFromDictionary(savedPlaceDict)
+                    // If that fails, try to parse as wrapped format like other backend responses
+                    do {
+                        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
                         
-                        // Also extract TikTok video data from the response
-                        if let tikTokData = json?["data"] as? [String: Any] {
-                            print("🔍 [TikTokService] Found TikTok video data, adding to place...")
-                            if let tikTokVideo = createTikTokVideoFromResponseData(tikTokData) {
-                                detailPlace.tikTokVideos = [tikTokVideo]
-                                print("✅ [TikTokService] Added TikTok video to place")
+                        // First check if it's the TikTok response format with location_info array (all detected places)
+                        if let locationInfoArray = json?["location_info"] as? [[String: Any]], locationInfoArray.count > 0 {
+                            print("🔍 [TikTokService] Found TikTok location_info array with \(locationInfoArray.count) places")
+                            var detailPlaces: [DetailPlace] = []
+                            
+                            for locationDict in locationInfoArray {
+                                let detailPlace = try parseLocationInfoToDetailPlace(locationDict, tikTokData: json?["data"] as? [String: Any])
+                                detailPlaces.append(detailPlace)
                             }
+                            
+                            print("✅ [TikTokService] Successfully parsed \(detailPlaces.count) DetailPlaces from location_info array")
+                            return .success(detailPlaces)
                         }
                         
-                        print("✅ [TikTokService] Successfully parsed TikTok DetailPlace: \(detailPlace.name)")
-                        return .success(detailPlace)
+                        // Check if it's the TikTok response format with saved_places array (multiple places)
+                        if let savedPlacesArray = json?["saved_places"] as? [[String: Any]] {
+                            print("🔍 [TikTokService] Found TikTok saved_places array with \(savedPlacesArray.count) places")
+                            var detailPlaces: [DetailPlace] = []
+                            
+                            for placeDict in savedPlacesArray {
+                                var detailPlace = try parseDetailPlaceFromDictionary(placeDict)
+                                
+                                // Also extract TikTok video data from the response
+                                if let tikTokData = json?["data"] as? [String: Any] {
+                                    if let tikTokVideo = createTikTokVideoFromResponseData(tikTokData) {
+                                        detailPlace.tikTokVideos = [tikTokVideo]
+                                    }
+                                }
+                                
+                                detailPlaces.append(detailPlace)
+                            }
+                            
+                            print("✅ [TikTokService] Successfully parsed \(detailPlaces.count) DetailPlaces from saved_places array")
+                            return .success(detailPlaces)
+                        }
+                        
+                        // Check if it's the TikTok response format with saved_place (single place)
+                        if let savedPlaceDict = json?["saved_place"] as? [String: Any] {
+                            print("🔍 [TikTokService] Found TikTok saved_place object, parsing...")
+                            var detailPlace = try parseDetailPlaceFromDictionary(savedPlaceDict)
+                            
+                            // Also extract TikTok video data from the response
+                            if let tikTokData = json?["data"] as? [String: Any] {
+                                print("🔍 [TikTokService] Found TikTok video data, adding to place...")
+                                if let tikTokVideo = createTikTokVideoFromResponseData(tikTokData) {
+                                    detailPlace.tikTokVideos = [tikTokVideo]
+                                    print("✅ [TikTokService] Added TikTok video to place")
+                                }
+                            }
+                            
+                            print("✅ [TikTokService] Successfully parsed TikTok DetailPlace: \(detailPlace.name)")
+                            return .success([detailPlace]) // Wrap in array
+                        }
+                        
+                        // Check if it's wrapped in a "place" object
+                        if let placeDict = json?["place"] as? [String: Any] {
+                            print("🔍 [TikTokService] Found wrapped place object, parsing manually...")
+                            let detailPlace = try parseDetailPlaceFromDictionary(placeDict)
+                            print("✅ [TikTokService] Successfully parsed wrapped DetailPlace: \(detailPlace.name)")
+                            return .success([detailPlace]) // Wrap in array
+                        }
+                        
+                        // If no wrapper, try direct parsing from the dictionary
+                        if let json = json {
+                            let detailPlace = try parseDetailPlaceFromDictionary(json)
+                            print("✅ [TikTokService] Successfully parsed DetailPlace from dictionary: \(detailPlace.name)")
+                            return .success([detailPlace]) // Wrap in array
+                        }
+                        
+                        throw NSError(domain: "TikTokService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Unable to parse response as DetailPlace"])
+                    } catch {
+                        print("❌ [TikTokService] Failed to parse response: \(error)")
+                        return .failure(error)
                     }
-                    
-                    // Check if it's wrapped in a "place" object
-                    if let placeDict = json?["place"] as? [String: Any] {
-                        print("🔍 [TikTokService] Found wrapped place object, parsing manually...")
-                        let detailPlace = try parseDetailPlaceFromDictionary(placeDict)
-                        print("✅ [TikTokService] Successfully parsed wrapped DetailPlace: \(detailPlace.name)")
-                        return .success(detailPlace)
-                    }
-                    
-                    // If no wrapper, try direct parsing from the dictionary
-                    if let json = json {
-                        let detailPlace = try parseDetailPlaceFromDictionary(json)
-                        print("✅ [TikTokService] Successfully parsed DetailPlace from dictionary: \(detailPlace.name)")
-                        return .success(detailPlace)
-                    }
-                    
-                    throw NSError(domain: "TikTokService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Unable to parse response as DetailPlace"])
-                } catch {
-                    print("❌ [TikTokService] Failed to parse response: \(error)")
-                    return .failure(error)
                 }
             }
             
@@ -252,8 +298,37 @@ class TikTokService: ObservableObject {
         return nil
     }
     
-    // NOTE: The old createPlaceFromTikTok method is no longer needed since the backend 
-    // now returns DetailPlace format directly instead of TikTokProcessorResponse
+    // MARK: - Helper Methods
+    
+    private func parseLocationInfoToDetailPlace(_ locationDict: [String: Any], tikTokData: [String: Any]?) throws -> DetailPlace {
+        // Extract basic info from location_info format
+        let name = locationDict["business_name"] as? String ?? locationDict["location_name"] as? String ?? ""
+        let placeIdString = locationDict["place_id"] as? String ?? UUID().uuidString
+        let placeId = UUID(uuidString: placeIdString) ?? UUID()
+        
+        // Extract address
+        let address = locationDict["formatted_address"] as? String
+        
+        // Create DetailPlace with basic initializer
+        var detailPlace = DetailPlace(
+            id: placeId,
+            name: name,
+            address: address,
+            city: nil
+        )
+        
+        // Set coordinate separately
+        if let coordinatesArray = locationDict["coordinates"] as? [Double], coordinatesArray.count >= 2 {
+            detailPlace.coordinate = GeoPoint(latitude: coordinatesArray[0], longitude: coordinatesArray[1])
+        }
+        
+        // Add TikTok video data if available
+        if let tikTokData = tikTokData, let tikTokVideo = createTikTokVideoFromResponseData(tikTokData) {
+            detailPlace.tikTokVideos = [tikTokVideo]
+        }
+        
+        return detailPlace
+    }
     
     /// Parse DetailPlace from dictionary (for handling backend responses that might be wrapped)
     private func parseDetailPlaceFromDictionary(_ dict: [String: Any]) throws -> DetailPlace {

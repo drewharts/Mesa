@@ -50,6 +50,7 @@ class SelectedPlaceViewModel: ObservableObject {
     @Published private var reviewPhotoLoadingStates: [String: LoadingState] = [:] // Loading states for review photos
     @Published private var profilePhotoLoadingStates: [String: LoadingState] = [:] // Loading states for profile photos
     @Published private var reviewLoadingStates: [String: LoadingState] = [:] // Loading states for reviews
+    @Published var isCurrentPlaceFullyLoaded: Bool = false
 
     // Add pagination properties for photos
     @Published private var photoPageLimit = 9
@@ -91,11 +92,41 @@ class SelectedPlaceViewModel: ObservableObject {
             }
         }
     }
-
     
     // Get restaurant type for a place
     func getRestaurantType(for placeId: String) -> String? {
         return restaurantTypes[placeId]
+    }
+    
+    /// Update the isCurrentPlaceFullyLoaded property based on current loading states
+    private func updateCurrentPlaceFullyLoaded() {
+        guard let placeId = selectedPlace?.id.uuidString else {
+            isCurrentPlaceFullyLoaded = false
+            return
+        }
+        
+        let photoState = photoLoadingStates[placeId] ?? .idle
+        let reviewState = reviewLoadingStates[placeId] ?? .idle
+        
+        // Consider loaded if both photos and reviews are either loaded or in error state
+        // (we don't want to wait forever if there's an error)
+        let photosReady: Bool
+        switch photoState {
+        case .loaded, .error:
+            photosReady = true
+        case .idle, .loading:
+            photosReady = false
+        }
+        
+        let reviewsReady: Bool
+        switch reviewState {
+        case .loaded, .error:
+            reviewsReady = true
+        case .idle, .loading:
+            reviewsReady = false
+        }
+        
+        isCurrentPlaceFullyLoaded = photosReady && reviewsReady
     }
     
     // Calculate restaurant type and store in dictionary
@@ -120,6 +151,7 @@ class SelectedPlaceViewModel: ObservableObject {
         DispatchQueue.main.async {
             self.isRestaurantOpen = openNow
             self.isDetailSheetPresented = true
+            self.updateCurrentPlaceFullyLoaded()
         }
     }
     
@@ -178,6 +210,7 @@ class SelectedPlaceViewModel: ObservableObject {
             DispatchQueue.main.async {
                 self.reviewLoadingStates[placeId] = .error(NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "User not logged in"]))
                 self.placeReviews[placeId] = []
+                self.updateCurrentPlaceFullyLoaded()
             }
             return
         }
@@ -191,6 +224,7 @@ class SelectedPlaceViewModel: ObservableObject {
                     print("Error fetching reviews for place \(place.name): \(error.localizedDescription)")
                     self.reviewLoadingStates[placeId] = .error(error)
                     self.placeReviews[placeId] = []
+                    self.updateCurrentPlaceFullyLoaded()
                 } else {
                     let fetchedReviews = reviews ?? []
                     self.placeReviews[placeId] = fetchedReviews
@@ -204,6 +238,7 @@ class SelectedPlaceViewModel: ObservableObject {
                         self.loadCommentCountForReview(placeId: placeId, reviewId: review.id)
                     }
                     self.reviewLoadingStates[placeId] = .loaded
+                    self.updateCurrentPlaceFullyLoaded()
                 }
             }
         }
@@ -273,6 +308,7 @@ class SelectedPlaceViewModel: ObservableObject {
                 print("Error fetching reviews for place \(placeId): \(error.localizedDescription)")
                 DispatchQueue.main.async {
                     self.photoLoadingStates[placeId] = .error(error)
+                    self.updateCurrentPlaceFullyLoaded()
                 }
                 return
             }
@@ -288,6 +324,7 @@ class SelectedPlaceViewModel: ObservableObject {
                     self.photoLoadingStates[placeId] = .loaded
                     self.placePhotos[placeId] = []
                     self.allPhotosLoaded = true
+                    self.updateCurrentPlaceFullyLoaded()
                 }
                 return
             }
@@ -300,6 +337,7 @@ class SelectedPlaceViewModel: ObservableObject {
                 // No more photos to load
                 self.allPhotosLoaded = true
                 self.photoLoadingStates[placeId] = .loaded
+                self.updateCurrentPlaceFullyLoaded()
                 return
             }
             
@@ -312,6 +350,7 @@ class SelectedPlaceViewModel: ObservableObject {
                     if let error = error {
                         print("Error fetching photos for place \(placeId): \(error.localizedDescription)")
                         self.photoLoadingStates[placeId] = .error(error)
+                        self.updateCurrentPlaceFullyLoaded()
                     } else {
                         var currentPhotos = self.placePhotos[placeId] ?? []
                         currentPhotos.append(contentsOf: images ?? [])
@@ -322,6 +361,7 @@ class SelectedPlaceViewModel: ObservableObject {
                         if currentPhotos.count >= photoURLs.count {
                             self.allPhotosLoaded = true
                         }
+                        self.updateCurrentPlaceFullyLoaded()
                     }
                 }
             }
