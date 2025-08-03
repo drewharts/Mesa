@@ -126,7 +126,13 @@ class SelectedPlaceViewModel: ObservableObject {
             reviewsReady = false
         }
         
+        let wasLoaded = isCurrentPlaceFullyLoaded
         isCurrentPlaceFullyLoaded = photosReady && reviewsReady
+        
+        // Debug logging when the state changes
+        if !wasLoaded && isCurrentPlaceFullyLoaded {
+            print("🎯 [SelectedPlaceViewModel] Place \(placeId) is now fully loaded (photos: \(photoState), reviews: \(reviewState))")
+        }
     }
     
     // Calculate restaurant type and store in dictionary
@@ -140,7 +146,7 @@ class SelectedPlaceViewModel: ObservableObject {
     
     // MARK: - Private Methods
     private func loadData(for place: DetailPlace, currentLocation: CLLocationCoordinate2D) {
-        print("Loading data for \(place.name) at location \(currentLocation)")
+        print("🔄 [SelectedPlaceViewModel] Starting to load data for \(place.name) at location \(currentLocation)")
         
         // Compute whether the restaurant is open now
         let openNow = isRestaurantOpenNow(place)
@@ -152,6 +158,7 @@ class SelectedPlaceViewModel: ObservableObject {
             self.isRestaurantOpen = openNow
             self.isDetailSheetPresented = true
             self.updateCurrentPlaceFullyLoaded()
+            print("🔄 [SelectedPlaceViewModel] Initial place data loaded for \(place.name)")
         }
     }
     
@@ -200,6 +207,7 @@ class SelectedPlaceViewModel: ObservableObject {
     
     private func loadReviews(for place: DetailPlace) {
         let placeId = place.id.uuidString
+        print("📝 [SelectedPlaceViewModel] Starting to load reviews for place: \(place.name)")
         DispatchQueue.main.async {
             self.reviewLoadingStates[placeId] = .loading
         }

@@ -49,6 +49,14 @@ struct MainView: View {
                     .environmentObject(userProfileViewModel)
                     .environmentObject(deepLinkViewModel)
             }
+            // Present external user profiles
+            .sheet(isPresented: $userProfileViewModel.isUserDetailPresented) {
+                UserProfileView(
+                    userId: userSession.currentUserId ?? "",
+                    UserProfileVM: userProfileViewModel
+                )
+                .environmentObject(profileViewModel)
+            }
         }
         .onAppear {
             locationManager.requestLocationPermission()
@@ -77,7 +85,12 @@ struct MainView: View {
     
     // MARK: - Map Layer
     private var mapLayer: some View {
-        MapView(recenterMap: $recenterMap, onMapTap: handleMapTap)
+        MapView(recenterMap: $recenterMap, onMapTap: {
+            withAnimation {
+                isSearchBarMinimized = true
+                searchIsFocused = false
+            }
+        })
             .ignoresSafeArea()
             .edgesIgnoringSafeArea(.all)
     }
@@ -298,14 +311,6 @@ struct MainView: View {
             Text("Extracting place information")
                 .font(.subheadline)
                 .foregroundColor(.white.opacity(0.8))
-        }
-    }
-
-    // MARK: - Helper Functions
-    private func handleMapTap() {
-        withAnimation {
-            isSearchBarMinimized = true
-            searchIsFocused = false
         }
     }
 }

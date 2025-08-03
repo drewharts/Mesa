@@ -568,6 +568,11 @@ class ProfileViewModel: ObservableObject {
                     
                     // Set waiting state to keep loading screen until place detail is ready
                     isWaitingForPlaceDetail = true
+                    print("⏳ [ProfileViewModel] Set isWaitingForPlaceDetail = true, waiting for DetailPlaceView to load...")
+                    
+                    // Don't clear isWaitingForPlaceDetail here - let the DetailPlaceView control when it's ready
+                    // The DetailPlaceView will call placeDetailViewReady() when fully loaded
+                
                 } else if detailPlaces.count > 1 {
                     // Multiple places - show selection screen
                     print("🎯 [ProfileViewModel] MULTIPLE PLACES DETECTED: \(detailPlaces.count) places - SHOULD SHOW SELECTION SCREEN")
@@ -601,6 +606,14 @@ class ProfileViewModel: ObservableObject {
                 }
             }
             
+            // Add a small delay after setting the place to ensure the DetailPlaceView has time to start loading
+            // This prevents the race condition where TikTok processing completes before DetailPlaceView starts
+            if detailPlaces.count == 1 {
+                print("⏳ [ProfileViewModel] Adding delay to ensure DetailPlaceView has time to start loading...")
+                try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+                print("⏳ [ProfileViewModel] Delay completed, TikTok processing will now finish")
+            }
+            
             // NOTE: Place saving is handled by backend during URL processing
             return true
             
@@ -627,6 +640,7 @@ class ProfileViewModel: ObservableObject {
     
     /// Called when the place detail view is fully loaded and ready
     func placeDetailViewReady() {
+        print("✅ [ProfileViewModel] DetailPlaceView is fully loaded, clearing waiting state")
         isWaitingForPlaceDetail = false
     }
     

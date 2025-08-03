@@ -624,15 +624,14 @@ class UserService: ObservableObject {
                 return
             }
             
-            // Handle case where user doesn't follow anyone or error occurred
-            guard let followingIds = followingIds, !followingIds.isEmpty else {
-                completion([], nil)
-                return
-            }
-            
-            // Always include the current user's own reviews
-            var userIdsToFetch = Set(followingIds)
+            // Always include the current user's own reviews first
+            var userIdsToFetch = Set<String>()
             userIdsToFetch.insert(currentUserId)
+            
+            // Add followed users if any exist
+            if let followingIds = followingIds, !followingIds.isEmpty {
+                userIdsToFetch.formUnion(followingIds)
+            }
             
             // Step 2: Fetch all reviews for the place
             let reviewsRef = self.db.collection("places")
