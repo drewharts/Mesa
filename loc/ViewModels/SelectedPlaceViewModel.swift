@@ -38,6 +38,7 @@ class SelectedPlaceViewModel: ObservableObject {
     }
     @Published var isDetailSheetPresented: Bool = false
     @Published var isRestaurantOpen: Bool = false // New property to track open status
+    @Published var allowAutoPresent: Bool = true
     @Published private var placePhotos: [String: [UIImage]] = [:] // Cache for place-level photos by placeId
     @Published private var placeReviews: [String: [any ReviewProtocol]] = [:] // Cache for reviews by placeId
     @Published private var reviewPhotos: [String: [UIImage]] = [:] // Cache for review photos by reviewId
@@ -156,7 +157,9 @@ class SelectedPlaceViewModel: ObservableObject {
         
         DispatchQueue.main.async {
             self.isRestaurantOpen = openNow
-            self.isDetailSheetPresented = true
+            if self.allowAutoPresent {
+                self.isDetailSheetPresented = true
+            }
             self.updateCurrentPlaceFullyLoaded()
             print("🔄 [SelectedPlaceViewModel] Initial place data loaded for \(place.name)")
         }
@@ -930,7 +933,9 @@ class SelectedPlaceViewModel: ObservableObject {
         
         // Update the UI
         selectedPlace = newPlace
-        isDetailSheetPresented = true
+        if allowAutoPresent {
+            isDetailSheetPresented = true
+        }
     }
 }
 

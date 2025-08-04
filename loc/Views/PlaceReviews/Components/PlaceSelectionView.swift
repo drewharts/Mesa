@@ -120,6 +120,7 @@ struct PlaceSelectionView: View {
                                 PlaceSelectionRowView(
                                     place: place,
                                     onSelect: {
+                                        selectedPlaceVM.allowAutoPresent = false
                                         photoImportVM.selectPlace(place)
                                     },
                                     isLoading: photoImportVM.isSavingPlace
@@ -153,6 +154,8 @@ struct PlaceSelectionView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") {
+                        // Clear the selection since user cancelled the flow
+                        photoImportVM.clearSelection()
                         presentationMode.wrappedValue.dismiss()
                     }
                 }
@@ -192,6 +195,7 @@ struct PlaceSelectionView: View {
                 longitude: coordinate.longitude
             )
             
+                        selectedPlaceVM.allowAutoPresent = false
             // Use the existing createNewPlace method from SelectedPlaceViewModel
             selectedPlaceVM.createNewPlace(
                 name: name,

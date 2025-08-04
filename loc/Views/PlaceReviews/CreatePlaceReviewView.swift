@@ -10,7 +10,6 @@ import PhotosUI
 import MapboxSearch
 
 struct CreatePlaceReviewView: View {
-    @Environment(\.presentationMode) var presentationMode: Binding<PresentationMode>
     @Binding var isPresented: Bool
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var selectedPlace: SelectedPlaceViewModel
@@ -57,7 +56,8 @@ struct CreatePlaceReviewView: View {
     }
     
     var btnBack : some View { Button(action: {
-        self.presentationMode.wrappedValue.dismiss()
+        // Close the review screen
+        isPresented = false
         }) {
             HStack {
             Image(systemName: "chevron.left") // set image here
@@ -134,9 +134,8 @@ struct CreatePlaceReviewView: View {
                                 // Wait briefly so user sees the highlight
                                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                                     showButtonHighlight = false
-                                    presentationMode.wrappedValue.dismiss()
                                     
-                                    // Call the callback to navigate to place detail
+                                    // Let the parent handle dismissal via binding
                                     onReviewSubmitted?(place)
                                 }
                                 

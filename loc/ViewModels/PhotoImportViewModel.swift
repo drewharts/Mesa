@@ -29,6 +29,8 @@ class PhotoImportViewModel: ObservableObject {
     @Published var createdPlaceForDetail: DetailPlace?
     @Published var searchRadiusUsed: Int = 50
     @Published var isSavingPlace: Bool = false
+    @Published var isUserCreatedPlace: Bool = false
+    @Published var isInPhotoImportFlow: Bool = false
     
     private let nearbyPlacesService = NearbyPlacesService()
     private let placeService = PlaceService.shared
@@ -39,6 +41,7 @@ class PhotoImportViewModel: ObservableObject {
     var onPlaceSavedWithDetail: ((DetailPlace) -> Void)?
     
     func processSelectedPhotos() async {
+        isInPhotoImportFlow = true
         guard !selectedItems.isEmpty else { return }
         
         isProcessingPhoto = true
@@ -80,6 +83,7 @@ class PhotoImportViewModel: ObservableObject {
                 await MainActor.run {
                     noLocationDataError = true
                     showPlaceSelection = false // Hide place selection on error
+                    isInPhotoImportFlow = false
                 }
             }
             
@@ -87,6 +91,7 @@ class PhotoImportViewModel: ObservableObject {
             print("Failed to load photos: \(error.localizedDescription)")
             await MainActor.run {
                 showPlaceSelection = false
+                isInPhotoImportFlow = false
             }
         }
         
@@ -197,12 +202,14 @@ class PhotoImportViewModel: ObservableObject {
         selectedPlace = place
         showPlaceSelection = false
         showReviewTypeSelection = true
-        print("✅ Selected place: \(place.properties.name)")
         
-        // Automatically save the selected place to Firestore
-        Task {
-            await saveSelectedPlaceToFirestore(place)
-        }
+        // Track if this is a user-created place (will be saved later when review is submitted)
+        isUserCreatedPlace = place.properties.source == "user_created"
+        
+        print("✅ Selected place: \(place.properties.name)")
+        print("📝 User-created place: \(isUserCreatedPlace)")
+        
+        // Note: Place will be saved to Firestore only when review is submitted
     }
     
     private func saveSelectedPlaceToFirestore(_ nearbyPlace: NearbyPlaceFeature) async {
@@ -318,6 +325,22 @@ class PhotoImportViewModel: ObservableObject {
         showPlaceSelection = false
     }
     
+    // Called when a review is submitted to save the place to Firestore
+    func saveSelectedPlaceAfterReview() async {
+        guard let place = selectedPlace else {
+            print("❌ No selected place to save")
+            return
+        }
+        
+        // Only save if this is a user-created place (existing places are already in Firestore)
+        if isUserCreatedPlace {
+            print("💾 Saving user-created place after review submission: \(place.properties.name)")
+            await saveSelectedPlaceToFirestore(place)
+        } else {
+            print("ℹ️ Skipping save for existing place: \(place.properties.name)")
+        }
+    }
+    
     func clearSelection() {
         selectedItems = []
         selectedImages = []
@@ -330,5 +353,7 @@ class PhotoImportViewModel: ObservableObject {
         shouldNavigateToPlaceDetail = false
         createdPlaceForDetail = nil
         searchRadiusUsed = 50
+        isUserCreatedPlace = false
+        isInPhotoImportFlow = false
     }
 } 
