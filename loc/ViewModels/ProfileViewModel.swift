@@ -9,6 +9,7 @@ import Combine
 import MapboxSearch
 import Foundation
 import FirebaseFirestore
+import FirebaseAuth
 import UIKit
 import CoreLocation
 
@@ -563,6 +564,11 @@ class ProfileViewModel: ObservableObject {
                     
                     print("✅ [ProfileViewModel] Single place found: \(detailPlace.name)")
                     placeVM.places[detailPlace.id.uuidString] = detailPlace
+                    // Add current user as saver so pin shows with profile
+                    if let uid = Auth.auth().currentUser?.uid {
+                        placeVM.placeSavers[detailPlace.id.uuidString] = [uid]
+                    }
+                    placeVM.calculateAnnotationPlaces()
                     selectedPlaceVM.selectedPlace = detailPlace
                     selectedPlaceVM.isDetailSheetPresented = true
                     

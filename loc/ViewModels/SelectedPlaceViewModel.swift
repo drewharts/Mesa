@@ -882,9 +882,12 @@ class SelectedPlaceViewModel: ObservableObject {
         }
     }
 
-    func createNewPlace(name: String, description: String?, coordinate: CLLocationCoordinate2D, userId: String, profileVM: ProfileViewModel? = nil, detailPlaceVM: DetailPlaceViewModel? = nil) {
+    func createNewPlace(idString: String?, name: String, description: String?, coordinate: CLLocationCoordinate2D, userId: String, profileVM: ProfileViewModel? = nil, detailPlaceVM: DetailPlaceViewModel? = nil) {
         // Create a new place
         var newPlace = DetailPlace()
+        if let idString = idString, let uuid = UUID(uuidString: idString) {
+            newPlace.id = uuid
+        }
         newPlace.name = name
         newPlace.description = description
         newPlace.coordinate = GeoPoint(

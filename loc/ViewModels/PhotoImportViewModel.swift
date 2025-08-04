@@ -333,11 +333,12 @@ class PhotoImportViewModel: ObservableObject {
         }
         
         // Only save if this is a user-created place (existing places are already in Firestore)
-        if isUserCreatedPlace {
-            print("💾 Saving user-created place after review submission: \(place.properties.name)")
+        if !isUserCreatedPlace {
+            // Existing place selected from API – ensure it's in Firestore & user collections
+            print("💾 Saving existing selected place after review submission: \(place.properties.name)")
             await saveSelectedPlaceToFirestore(place)
         } else {
-            print("ℹ️ Skipping save for existing place: \(place.properties.name)")
+            print("ℹ️ Skipping extra save for newly-created place: \(place.properties.name)")
         }
     }
     

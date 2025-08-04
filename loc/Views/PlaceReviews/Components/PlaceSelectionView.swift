@@ -188,6 +188,7 @@ struct PlaceSelectionView: View {
     }
     
     private func createNewPlace(name: String, description: String?, coordinate: (latitude: Double, longitude: Double)) {
+        let generatedId = UUID().uuidString
         if let userId = profile.user?.id {
             // Create the coordinate
             let clCoordinate = CLLocationCoordinate2D(
@@ -198,6 +199,7 @@ struct PlaceSelectionView: View {
                         selectedPlaceVM.allowAutoPresent = false
             // Use the existing createNewPlace method from SelectedPlaceViewModel
             selectedPlaceVM.createNewPlace(
+                idString: generatedId,
                 name: name,
                 description: description,
                 coordinate: clCoordinate,
@@ -207,7 +209,7 @@ struct PlaceSelectionView: View {
             )
             
             // Create a temporary NearbyPlaceFeature from the new place
-            let newNearbyPlace = createNearbyPlaceFeature(name: name, description: description, coordinate: coordinate)
+            let newNearbyPlace = createNearbyPlaceFeature(id: generatedId, name: name, description: description, coordinate: coordinate)
             
             // Select the newly created place
             photoImportVM.selectPlace(newNearbyPlace)
@@ -218,7 +220,7 @@ struct PlaceSelectionView: View {
         }
     }
     
-    private func createNearbyPlaceFeature(name: String, description: String?, coordinate: (latitude: Double, longitude: Double)) -> NearbyPlaceFeature {
+    private func createNearbyPlaceFeature(id: String, name: String, description: String?, coordinate: (latitude: Double, longitude: Double)) -> NearbyPlaceFeature {
         // Create a temporary NearbyPlaceFeature for the newly created place
         let properties = NearbyPlaceProperties(
             address: description ?? "User created location",
@@ -236,7 +238,7 @@ struct PlaceSelectionView: View {
             updatedAt: nil,
             userRatingsTotal: nil,
             description: description,
-            id: UUID().uuidString,
+            id: id,
             placeId: nil
         )
         
