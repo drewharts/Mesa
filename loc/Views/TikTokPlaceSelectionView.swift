@@ -3,15 +3,9 @@ import SwiftUI
 struct TikTokPlaceSelectionView: View {
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
+    @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
     @State private var selectedPlaceForList: DetailPlace?
     @State private var showingListSelection = false
-    
-    private var detailPlaceViewModel: DetailPlaceViewModel {
-        DetailPlaceViewModel(
-            placeService: ServiceContainer.shared.placeService,
-            userService: ServiceContainer.shared.userService
-        )
-    }
     
     var body: some View {
         NavigationView {
@@ -97,6 +91,8 @@ struct TikTokPlaceSelectionView: View {
             .navigationBarTitleDisplayMode(.inline)
             .navigationBarBackButtonHidden(true)
             .onAppear {
+                // Ensure user's lists are loaded before showing list selection sheets
+                profile.ensureListsLoaded()
                 profile.placeSelectionViewAppeared()
             }
         }
@@ -108,6 +104,11 @@ struct TikTokPlaceSelectionView: View {
                 )
                 .environmentObject(profile)
                 .environmentObject(detailPlaceViewModel)
+                .onAppear {
+                    print("🔍 [TikTokPlaceSelectionView] ListSelectionSheet appeared")
+                    // Force ensure lists are loaded when sheet appears
+                    profile.ensureListsLoaded()
+                }
             }
         }
     }

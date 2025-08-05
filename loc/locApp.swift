@@ -48,6 +48,22 @@ struct locApp: App {
             detailPlaceVM: detailVM
         )
         
+        let selectedPlaceVM = SelectedPlaceViewModel(
+            locationManager: location,
+            reviewService: services.reviewService,
+            placeService: services.placeService,
+            userService: services.userService,
+            imageService: services.imageService
+        )
+        
+        let deepLinkMgr = DeepLinkManager(
+            placeService: services.placeService,
+            userService: services.userService,
+            selectedPlaceViewModel: selectedPlaceVM,
+            tikTokService: services.tikTokService,
+            detailPlaceViewModel: detailVM
+        )
+        
         let profileVM = ProfileViewModel(
             userSession: userSess, 
             userService: services.userService, 
@@ -55,15 +71,8 @@ struct locApp: App {
             imageService: services.imageService, 
             placeService: services.placeService, 
             reviewService: services.reviewService,
-            locationManager: location
-        )
-        
-        let selectedPlaceVM = SelectedPlaceViewModel(
             locationManager: location,
-            reviewService: services.reviewService,
-            placeService: services.placeService,
-            userService: services.userService,
-            imageService: services.imageService
+            deepLinkManager: deepLinkMgr
         )
         
         let dataMgr = DataManager(
@@ -87,15 +96,6 @@ struct locApp: App {
         let searchVM = SearchViewModel(
             placeService: services.placeService,
             userService: services.userService
-        )
-        
-        // Create DeepLinkManager and DeepLinkViewModel
-        let deepLinkMgr = DeepLinkManager(
-            placeService: services.placeService,
-            userService: services.userService,
-            selectedPlaceViewModel: selectedPlaceVM,
-            tikTokService: services.tikTokService,
-            detailPlaceViewModel: detailVM
         )
         
         let deepLinkVM = DeepLinkViewModel(

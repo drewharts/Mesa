@@ -89,6 +89,14 @@ class TikTokService: ObservableObject {
                     do {
                         let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
                         
+                        // Check if this is a response indicating no location was found
+                        if let processingStatus = json?["processing_status"] as? [String: Any],
+                           let locationFound = processingStatus["location_found"] as? Bool,
+                           !locationFound {
+                            print("❌ [TikTokService] No location found in TikTok video")
+                            return .success([]) // Return empty array to indicate no places found
+                        }
+                        
                         // First check if it's the TikTok response format with location_info array (all detected places)
                         if let locationInfoArray = json?["location_info"] as? [[String: Any]], locationInfoArray.count > 0 {
                             print("🔍 [TikTokService] Found TikTok location_info array with \(locationInfoArray.count) places")

@@ -142,6 +142,11 @@ struct ListsInSelectionSheet: View {
                 }
             }
         }
+        .onAppear {
+            print("🔍 [ListSelectionSheet] Lists count: \(profile.userLists.count)")
+            print("🔍 [ListSelectionSheet] Filtered lists count: \(filteredLists.count)")
+            print("🔍 [ListSelectionSheet] Is loading: \(isLoading)")
+        }
     }
 }
 

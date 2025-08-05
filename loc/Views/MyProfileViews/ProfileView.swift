@@ -41,6 +41,7 @@ struct ProfileView: View {
             .modifier(SheetsModifier(
                 photoImportVM: photoImportVM,
                 profile: profile,
+                placeVM: placeVM,
                 showCreateReview: $showCreateReview,
                 selectedReviewType: selectedReviewType,
                 reviewWasSubmitted: $reviewWasSubmitted,
@@ -55,6 +56,13 @@ struct ProfileView: View {
                 reviewWasSubmitted: $reviewWasSubmitted,
                 tikTokService: tikTokService
             ))
+            .alert("No Location Found", isPresented: $deepLinkViewModel.showNoLocationAlert) {
+                Button("OK") {
+                    deepLinkViewModel.dismissNoLocationAlert()
+                }
+            } message: {
+                Text(deepLinkViewModel.noLocationAlertMessage)
+            }
     }
     
     private var mainContent: some View {
@@ -186,6 +194,7 @@ struct ToolbarModifier: ViewModifier {
 struct SheetsModifier: ViewModifier {
     @ObservedObject var photoImportVM: PhotoImportViewModel
     @ObservedObject var profile: ProfileViewModel
+    @ObservedObject var placeVM: DetailPlaceViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @Binding var showCreateReview: Bool
     let selectedReviewType: CreatePlaceReviewView.ReviewType
@@ -210,6 +219,7 @@ struct SheetsModifier: ViewModifier {
                 TikTokPlaceSelectionView()
                     .environmentObject(profile)
                     .environmentObject(selectedPlaceVM)
+                    .environmentObject(placeVM)
                     .presentationDragIndicator(.visible)
             }
             .fullScreenCover(isPresented: $showCreateReview) {

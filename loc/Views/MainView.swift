@@ -20,6 +20,7 @@ struct MainView: View {
     @EnvironmentObject var viewModel: SearchViewModel
     @EnvironmentObject var placeTypeFilterVM: PlaceTypeFilterViewModel
     @EnvironmentObject var deepLinkViewModel: DeepLinkViewModel
+    @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
 
     @FocusState private var searchIsFocused: Bool
     @State private var isSearchBarMinimized = true
@@ -36,12 +37,14 @@ struct MainView: View {
                 mapLayer
                 uiOverlayLayer
                 loadingOverlay
+                noLocationAlert
             }
             .navigationBarHidden(true)
             .sheet(isPresented: $profileViewModel.isShowingPlaceSelection) {
                 TikTokPlaceSelectionView()
                     .environmentObject(profileViewModel)
                     .environmentObject(selectedPlaceVM)
+                    .environmentObject(detailPlaceViewModel)
                     .presentationDragIndicator(.visible)
             }
             .navigationDestination(isPresented: $shouldNavigateToProfile) {
@@ -56,6 +59,13 @@ struct MainView: View {
                     UserProfileVM: userProfileViewModel
                 )
                 .environmentObject(profileViewModel)
+            }
+            .alert("No Location Found", isPresented: $deepLinkViewModel.showNoLocationAlert) {
+                Button("OK") {
+                    deepLinkViewModel.dismissNoLocationAlert()
+                }
+            } message: {
+                Text(deepLinkViewModel.noLocationAlertMessage)
             }
         }
         .onAppear {
@@ -266,6 +276,11 @@ struct MainView: View {
                 }
             }
         }
+    }
+    
+    // MARK: - No Location Alert
+    private var noLocationAlert: some View {
+        EmptyView()
     }
     
     // MARK: - Error View

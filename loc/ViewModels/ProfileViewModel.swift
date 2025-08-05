@@ -33,6 +33,8 @@ class ProfileViewModel: ObservableObject {
     private let reviewService: ReviewService
      internal let detailPlaceViewModel: DetailPlaceViewModel
      private let userSession: UserSession
+    private var deepLinkManager: DeepLinkManager?
+
      @Published var showMaxFavoritesAlert: Bool = false
      @Published var isLoading: Bool = true
      private var loadingTasks: Int = 0
@@ -70,7 +72,7 @@ class ProfileViewModel: ObservableObject {
     private let locationManager: LocationManager
     private var cancellables = Set<AnyCancellable>()
     
-    init(userSession: UserSession, userService: UserService, detailPlaceViewModel: DetailPlaceViewModel, imageService: ImageService, placeService: PlaceService, reviewService: ReviewService, locationManager: LocationManager) {
+    init(userSession: UserSession, userService: UserService, detailPlaceViewModel: DetailPlaceViewModel, imageService: ImageService, placeService: PlaceService, reviewService: ReviewService, locationManager: LocationManager, deepLinkManager: DeepLinkManager? = nil) {
          self.userService = userService
          self.detailPlaceViewModel = detailPlaceViewModel
         self.userSession = userSession
@@ -78,6 +80,7 @@ class ProfileViewModel: ObservableObject {
         self.placeService = placeService
         self.reviewService = reviewService
         self.locationManager = locationManager
+        self.deepLinkManager = deepLinkManager
         
         // Observe location changes using Combine
         setupLocationObserver()
@@ -530,9 +533,8 @@ class ProfileViewModel: ObservableObject {
         
         let result = await tikTokService.processTikTokURL(urlString)
         
-        await MainActor.run {
-            isProcessingTikTok = false
-        }
+        // Don't set isProcessingTikTok = false here - let it persist until place detail is ready
+        // The loading screen will be dismissed when placeDetailViewReady() is called
         
         // Clear from recently processed after 30 seconds
         DispatchQueue.main.asyncAfter(deadline: .now() + 30.0) {
@@ -559,6 +561,8 @@ class ProfileViewModel: ObservableObject {
                     // Validate place has a name
                     if detailPlace.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                         tikTokImportError = "Could not find a valid place from this TikTok video"
+                        deepLinkManager?.isProcessingDeepLink = false
+                        // The loading state is now managed by the view's readiness
                         return
                     }
                     
@@ -594,6 +598,8 @@ class ProfileViewModel: ObservableObject {
                     if validPlaces.isEmpty {
                         print("❌ [ProfileViewModel] No valid places found after filtering")
                         tikTokImportError = "Could not find any valid places from this TikTok video"
+                        deepLinkManager?.isProcessingDeepLink = false
+                        // The loading state is now managed by the view's readiness
                         return
                     }
                     
@@ -609,6 +615,8 @@ class ProfileViewModel: ObservableObject {
                     // No places found
                     print("❌ [ProfileViewModel] No places found: count = \(detailPlaces.count)")
                     tikTokImportError = "No places were found in this TikTok video"
+                    deepLinkManager?.isProcessingDeepLink = false
+                    // The loading state is now managed by the view's readiness
                 }
             }
             
@@ -635,6 +643,7 @@ class ProfileViewModel: ObservableObject {
                 } else {
                     tikTokImportError = "We couldn't find any places in this TikTok video. Try sharing a different video that shows specific locations"
                 }
+                deepLinkManager?.isProcessingDeepLink = false
             }
             
             return false
@@ -648,6 +657,8 @@ class ProfileViewModel: ObservableObject {
     func placeDetailViewReady() {
         print("✅ [ProfileViewModel] DetailPlaceView is fully loaded, clearing waiting state")
         isWaitingForPlaceDetail = false
+        isProcessingTikTok = false
+        deepLinkManager?.isProcessingDeepLink = false
     }
     
     /// Clear TikTok import error
@@ -663,22 +674,43 @@ class ProfileViewModel: ObservableObject {
     
     func placeSelectionViewAppeared() {
         isWaitingForPlaceDetail = false
+        isProcessingTikTok = false
+        deepLinkManager?.isProcessingDeepLink = false
     }
     
     func ensureListsLoaded() {
-        guard userLists.isEmpty, let userId = user?.id else { return }
+        guard userLists.isEmpty, let userId = user?.id else { 
+            print("🔍 [ProfileViewModel] ensureListsLoaded: Lists not empty or no user ID")
+            return 
+        }
+        
+        print("🔍 [ProfileViewModel] ensureListsLoaded: Starting to load lists for user \(userId)")
+        // Indicate loading state so UI can show a spinner
+        isLoading = true
         
         Task {
             do {
+                print("🔍 [ProfileViewModel] ensureListsLoaded: Making API call to fetch lists")
                 let lists = try await placeService.fetchLists(userId: userId)
+                print("🔍 [ProfileViewModel] ensureListsLoaded: Received \(lists.count) lists from API")
+                
+                // Small delay to ensure loading state is visible
+                try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+                
                 await MainActor.run {
+                    print("🔍 [ProfileViewModel] ensureListsLoaded: Updating UI with \(lists.count) lists")
                     self.userLists = lists
                     self.userListsPlaces = lists.reduce(into: [String: [String]]()) { result, list in
                         result[list.id.uuidString] = list.places.map { $0.id.uuidString }
                     }
+                    self.isLoading = false
+                    print("🔍 [ProfileViewModel] ensureListsLoaded: Updated userListsPlaces with \(self.userListsPlaces.count) entries")
                 }
             } catch {
-                print("Error loading user lists: \(error.localizedDescription)")
+                print("❌ [ProfileViewModel] ensureListsLoaded: Error loading user lists: \(error.localizedDescription)")
+                await MainActor.run {
+                    self.isLoading = false
+                }
             }
         }
     }

@@ -14,6 +14,9 @@ class DeepLinkManager: ObservableObject {
     @Published var pendingList: (lists: [PlaceList], initialIndex: Int)?
     @Published var isProcessingDeepLink = false
     
+    // Callback for showing no location alerts
+    var onNoLocationFound: ((String) -> Void)?
+    
     private let placeService: PlaceService
     private let userService: UserService
     private let selectedPlaceViewModel: SelectedPlaceViewModel
@@ -119,16 +122,18 @@ class DeepLinkManager: ObservableObject {
         
         print("🎵 Processing TikTok URL: \(tiktokURLString)")
         
-        // Always show processing UI, even for duplicates
+        
         await MainActor.run {
             isProcessingDeepLink = true
         }
         
         await processTikTokURL(tiktokURLString)
         
-        await MainActor.run {
-            isProcessingDeepLink = false
-        }
+        // The isProcessingDeepLink state will be managed by the ProfileViewModel
+        // based on the presentation of the single place or multiple place selection view.
+        // await MainActor.run {
+        //     isProcessingDeepLink = false
+        // }
     }
     
     private func processTikTokURL(_ urlString: String) async {
@@ -171,6 +176,12 @@ class DeepLinkManager: ObservableObject {
             
             if detailPlaces.isEmpty {
                 print("❌ [DeepLinkManager] No places found in TikTok video")
+                
+                // Show user-friendly message
+                await MainActor.run {
+                    let message = "We couldn't figure out what place is associated with this video."
+                    self.onNoLocationFound?(message)
+                }
                 return
             }
             
