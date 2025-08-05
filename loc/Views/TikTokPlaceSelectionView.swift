@@ -59,6 +59,13 @@ struct TikTokPlaceSelectionView: View {
                             PlaceRowView(
                                 place: place,
                                 onBookmarkTapped: {
+                                    print("🔍 [TikTokPlaceSelectionView] Bookmark tapped for place: \(place.name)")
+                                    // First, ensure the lists are loaded and the loading state is correct.
+                                    profile.ensureListsLoaded()
+                                    
+                                    // Now, trigger the sheet.
+                                    print("   - Current userLists count: \(profile.userLists.count)")
+                                    print("   - Current isLoading state: \(profile.isLoading)")
                                     selectedPlaceForList = place
                                     showingListSelection = true
                                 }
@@ -104,11 +111,6 @@ struct TikTokPlaceSelectionView: View {
                 )
                 .environmentObject(profile)
                 .environmentObject(detailPlaceViewModel)
-                .onAppear {
-                    print("🔍 [TikTokPlaceSelectionView] ListSelectionSheet appeared")
-                    // Force ensure lists are loaded when sheet appears
-                    profile.ensureListsLoaded()
-                }
             }
         }
     }

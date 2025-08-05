@@ -106,7 +106,7 @@ struct ListsInSelectionSheet: View {
     }
     
     var isLoading: Bool {
-        profile.userLists.isEmpty && profile.isLoading
+        profile.userLists.isEmpty || profile.isLoading
     }
 
     var body: some View {

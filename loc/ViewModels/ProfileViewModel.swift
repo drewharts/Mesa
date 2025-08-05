@@ -620,8 +620,7 @@ class ProfileViewModel: ObservableObject {
                 }
             }
             
-            // Add a small delay after setting the place to ensure the DetailPlaceView has time to start loading
-            // This prevents the race condition where TikTok processing completes before DetailPlaceView starts
+            
             if detailPlaces.count == 1 {
                 print("⏳ [ProfileViewModel] Adding delay to ensure DetailPlaceView has time to start loading...")
                 try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
@@ -681,6 +680,10 @@ class ProfileViewModel: ObservableObject {
     func ensureListsLoaded() {
         guard userLists.isEmpty, let userId = user?.id else { 
             print("🔍 [ProfileViewModel] ensureListsLoaded: Lists not empty or no user ID")
+            if !userLists.isEmpty {
+                // If lists are already loaded, ensure the loading state is false.
+                self.isLoading = false
+            }
             return 
         }
         
@@ -693,9 +696,6 @@ class ProfileViewModel: ObservableObject {
                 print("🔍 [ProfileViewModel] ensureListsLoaded: Making API call to fetch lists")
                 let lists = try await placeService.fetchLists(userId: userId)
                 print("🔍 [ProfileViewModel] ensureListsLoaded: Received \(lists.count) lists from API")
-                
-                // Small delay to ensure loading state is visible
-                try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
                 
                 await MainActor.run {
                     print("🔍 [ProfileViewModel] ensureListsLoaded: Updating UI with \(lists.count) lists")
