@@ -23,6 +23,17 @@ struct UserProfileListPlacesPopupView: View {
     private let cardWidth: CGFloat = UIScreen.main.bounds.width / 2 - 35
     private let cardHeight: CGFloat = 180
     
+    private func getFirstTikTokThumbnail(for place: DetailPlace) -> String? {
+        // Check place's own TikTok videos first
+        if let placeTikTokVideos = place.tikTokVideos,
+           let firstVideo = placeTikTokVideos.first {
+            return firstVideo.thumbnailURL
+        }
+        
+        // Check external places (user's TikTok videos for this place)
+        return viewModel.getFirstTikTokThumbnailURL(for: place.id.uuidString)
+    }
+    
     var body: some View {
         VStack(spacing: 10) {
             HStack {
@@ -59,7 +70,20 @@ struct UserProfileListPlacesPopupView: View {
                                 }) {
                                     VStack(alignment: .leading, spacing: 0) {
                                         ZStack(alignment: .bottom) {
-                                            if let image = viewModel.placeImages[place.id.uuidString] {
+                                            // Check for TikTok thumbnails first
+                                            if let firstTikTokThumbnail = getFirstTikTokThumbnail(for: place) {
+                                                AsyncImage(url: URL(string: firstTikTokThumbnail)) { image in
+                                                    image
+                                                        .resizable()
+                                                        .aspectRatio(contentMode: .fill)
+                                                        .frame(width: cardWidth, height: cardHeight)
+                                                        .clipped()
+                                                } placeholder: {
+                                                    Rectangle()
+                                                        .foregroundColor(.gray.opacity(0.3))
+                                                        .frame(width: cardWidth, height: cardHeight)
+                                                }
+                                            } else if let image = viewModel.placeImages[place.id.uuidString] {
                                                 Image(uiImage: image)
                                                     .resizable()
                                                     .aspectRatio(contentMode: .fill)

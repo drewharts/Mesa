@@ -74,6 +74,7 @@ struct PlaceDetailView: View {
                         isPresented: $showListSelection
                     )
                     .environmentObject(profile)
+                    .environmentObject(viewModel)
                 } else {
                     Text("No place selected")
                 }
@@ -93,9 +94,17 @@ struct PlaceDetailView: View {
                 }
             }
             .onAppear {
+                print("📱 [PlaceDetailView] View appeared, starting to load place data...")
                 if let place = selectedPlaceVM.selectedPlace,
                    let currentLocation = locationManager.currentLocation {
                     viewModel.loadData(for: place, currentLocation: currentLocation.coordinate)
+                }
+            }
+            .onChange(of: selectedPlaceVM.isCurrentPlaceFullyLoaded) { _, isLoaded in
+                if isLoaded {
+                    // Clear the waiting state when the place detail is fully loaded
+                    print("✅ [PlaceDetailView] Place is fully loaded, calling placeDetailViewReady()")
+                    profile.placeDetailViewReady()
                 }
             }
 

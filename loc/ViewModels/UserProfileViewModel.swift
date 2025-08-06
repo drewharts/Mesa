@@ -225,6 +225,16 @@ class UserProfileViewModel: ObservableObject {
             return
         }
         
+        // First check if this place has TikTok videos from external places
+        if let externalPlace = dataManager.getExternalPlace(for: placeId),
+           let firstTikTokVideo = externalPlace.tiktokVideos.first,
+           !firstTikTokVideo.thumbnailUrl.isEmpty {
+            
+            print("Found TikTok thumbnail for place \(placeId), loading...")
+            self.loadTikTokThumbnailAsPlaceImage(placeId: placeId, thumbnailURL: firstTikTokVideo.thumbnailUrl, completion: completion)
+            return
+        }
+        
         // Fetch reviews for this place
         reviewService.fetchReviews(placeId: placeId, latestOnly: false) { [weak self] (reviews: [ReviewProtocol]?, error) in
             guard let self = self else { return }
@@ -275,6 +285,56 @@ class UserProfileViewModel: ObservableObject {
                 }
             }
         }
+    }
+    
+    /// Get TikTok videos for a specific place
+    func getTikTokVideos(for placeId: String) -> [TikTokVideo] {
+        if let externalPlace = dataManager.getExternalPlace(for: placeId) {
+            return externalPlace.tiktokVideos.map { $0.toTikTokVideo() }
+        }
+        return []
+    }
+    
+    /// Get first TikTok thumbnail URL for a place
+    func getFirstTikTokThumbnailURL(for placeId: String) -> String? {
+        if let externalPlace = dataManager.getExternalPlace(for: placeId),
+           let firstTikTokVideo = externalPlace.tiktokVideos.first,
+           !firstTikTokVideo.thumbnailUrl.isEmpty {
+            return firstTikTokVideo.thumbnailUrl
+        }
+        return nil
+    }
+    
+    /// Load TikTok thumbnail as place image for external places
+    public func loadTikTokThumbnailAsPlaceImage(placeId: String, thumbnailURL: String, completion: @escaping (String, UIImage?) -> Void) {
+        guard let url = URL(string: thumbnailURL) else {
+            print("❌ [UserProfileViewModel] Invalid thumbnail URL for place \(placeId): \(thumbnailURL)")
+            DispatchQueue.main.async {
+                completion(placeId, nil)
+            }
+            return
+        }
+        
+        print("🖼️ [UserProfileViewModel] Loading TikTok thumbnail for place \(placeId)")
+        
+        URLSession.shared.dataTask(with: url) { [weak self] data, response, error in
+            guard let self = self else { return }
+            
+            DispatchQueue.main.async {
+                if let error = error {
+                    print("❌ [UserProfileViewModel] Error loading TikTok thumbnail for \(placeId): \(error.localizedDescription)")
+                    completion(placeId, nil)
+                } else if let data = data, let image = UIImage(data: data) {
+                    print("✅ [UserProfileViewModel] Successfully loaded TikTok thumbnail for place \(placeId)")
+                    // Store in both dictionaries to ensure consistency
+                    self.placeImages[placeId] = image
+                    completion(placeId, image)
+                } else {
+                    print("⚠️ [UserProfileViewModel] No image data returned for TikTok thumbnail \(placeId)")
+                    completion(placeId, nil)
+                }
+            }
+        }.resume()
     }
     
     func downloadImage(from url: URL) async throws -> UIImage {

@@ -18,12 +18,13 @@ struct locApp: App {
     @StateObject private var userProfileViewModel: UserProfileViewModel
     @StateObject private var searchViewModel: SearchViewModel
     @StateObject private var notificationManager = NotificationManager.shared
+    @StateObject private var deepLinkManager: DeepLinkManager
     @StateObject private var deepLinkViewModel: DeepLinkViewModel
     @StateObject private var placeTypeFilterViewModel: PlaceTypeFilterViewModel
     
     private let dataManager: DataManager
     private let serviceContainer = ServiceContainer.shared
-
+    
     init() {
         FirebaseApp.configure()
         let providerFactory = AppAttestProviderFactory()
@@ -47,6 +48,22 @@ struct locApp: App {
             detailPlaceVM: detailVM
         )
         
+        let selectedPlaceVM = SelectedPlaceViewModel(
+            locationManager: location,
+            reviewService: services.reviewService,
+            placeService: services.placeService,
+            userService: services.userService,
+            imageService: services.imageService
+        )
+        
+        let deepLinkMgr = DeepLinkManager(
+            placeService: services.placeService,
+            userService: services.userService,
+            selectedPlaceViewModel: selectedPlaceVM,
+            tikTokService: services.tikTokService,
+            detailPlaceViewModel: detailVM
+        )
+        
         let profileVM = ProfileViewModel(
             userSession: userSess, 
             userService: services.userService, 
@@ -54,15 +71,8 @@ struct locApp: App {
             imageService: services.imageService, 
             placeService: services.placeService, 
             reviewService: services.reviewService,
-            locationManager: location
-        )
-        
-        let selectedPlaceVM = SelectedPlaceViewModel(
             locationManager: location,
-            reviewService: services.reviewService,
-            placeService: services.placeService,
-            userService: services.userService,
-            imageService: services.imageService
+            deepLinkManager: deepLinkMgr
         )
         
         let dataMgr = DataManager(
@@ -82,20 +92,16 @@ struct locApp: App {
             userService: services.userService,
             reviewService: services.reviewService
         )
+        
+        profileVM.userProfileViewModel = userProfileVM
 
         let searchVM = SearchViewModel(
             placeService: services.placeService,
             userService: services.userService
         )
         
-        // Create DeepLinkManager and DeepLinkViewModel
-        let deepLinkManager = DeepLinkManager(
-            placeService: services.placeService,
-            selectedPlaceViewModel: selectedPlaceVM
-        )
-        
         let deepLinkVM = DeepLinkViewModel(
-            deepLinkManager: deepLinkManager,
+            deepLinkManager: deepLinkMgr,
             selectedPlaceViewModel: selectedPlaceVM
         )
         
@@ -112,6 +118,7 @@ struct locApp: App {
         self._selectedPlaceViewModel = StateObject(wrappedValue: selectedPlaceVM)
         self._userProfileViewModel = StateObject(wrappedValue: userProfileVM)
         self._searchViewModel = StateObject(wrappedValue: searchVM)
+        self._deepLinkManager = StateObject(wrappedValue: deepLinkMgr)
         self._deepLinkViewModel = StateObject(wrappedValue: deepLinkVM)
         self._placeTypeFilterViewModel = StateObject(wrappedValue: placeTypeFilterVM)
         
@@ -133,15 +140,29 @@ struct locApp: App {
                 .environmentObject(searchViewModel)
                 .environmentObject(notificationManager)
                 .environmentObject(serviceContainer)
+                .environmentObject(deepLinkManager)
                 .environmentObject(deepLinkViewModel)
                 .environmentObject(placeTypeFilterViewModel)
                 .preferredColorScheme(.light)
                 .onOpenURL { url in
                     // Handle deep links for places
                     if url.scheme == "loc" {
+                        // Handle all deep links through DeepLinkViewModel
                         Task {
-                            print("🔗 Received deep link: \(url)")
+                            print("🔗 Received deep link in onOpenURL: \(url)")
                             await deepLinkViewModel.processIncomingURL(url)
+                        }
+                    } else {
+                        print("🔗 Received non-loc deep link: \(url)")
+                    }
+                }
+                .onContinueUserActivity("com.mesa.share.tiktok") { userActivity in
+                    // Handle TikTok share via NSUserActivity
+                    if let tikTokURL = userActivity.userInfo?["tikTokURL"] as? String {
+                        print("🎵 Received TikTok URL via NSUserActivity: \(tikTokURL)")
+                        let deepLinkURL = URL(string: "loc://share/tiktok?url=\(tikTokURL.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")")!
+                        Task {
+                            await deepLinkViewModel.processIncomingURL(deepLinkURL)
                         }
                     }
                 }
@@ -151,7 +172,51 @@ struct locApp: App {
                         userSession.currentUserId = currentUser.uid
                         await dataManager.initializeProfileData(userId: currentUser.uid)
                     }
+                    
+                    // Check for shared TikTok URLs
+                    checkForSharedTikTokURL()
                 }
+                .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+                    // Check again when app becomes active
+                    checkForSharedTikTokURL()
+                }
+        }
+    }
+    
+    private func checkForSharedTikTokURL() {
+        print("🔍 Checking for shared TikTok URLs...")
+        
+        // Check shared UserDefaults first
+        if let sharedDefaults = UserDefaults(suiteName: "group.com.drewhartsfield.mesa") {
+            print("🔍 Checking shared UserDefaults...")
+            if let sharedURL = sharedDefaults.string(forKey: "sharedTikTokURL") {
+                print("🎵 Found shared TikTok URL: \(sharedURL)")
+                sharedDefaults.removeObject(forKey: "sharedTikTokURL")
+                sharedDefaults.synchronize()
+                
+                let deepLinkURL = URL(string: "loc://share/tiktok?url=\(sharedURL.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")")!
+                Task {
+                    await deepLinkViewModel.processIncomingURL(deepLinkURL)
+                }
+                return
+            } else {
+                print("🔍 No shared TikTok URL found in shared UserDefaults")
+            }
+        } else {
+            print("❌ Failed to access shared UserDefaults")
+        }
+        
+        // Check regular UserDefaults as fallback
+        if let regularURL = UserDefaults.standard.string(forKey: "sharedTikTokURL") {
+            print("🎵 Found TikTok URL in regular UserDefaults: \(regularURL)")
+            UserDefaults.standard.removeObject(forKey: "sharedTikTokURL")
+            
+            let deepLinkURL = URL(string: "loc://share/tiktok?url=\(regularURL.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")")!
+            Task {
+                await deepLinkViewModel.processIncomingURL(deepLinkURL)
+            }
+        } else {
+            print("🔍 No TikTok URL found in regular UserDefaults")
         }
     }
 }
@@ -228,6 +293,8 @@ class AppDelegate: NSObject, UIApplicationDelegate {
                 await deepLinkViewModel?.processIncomingURL(url)
             }
             return true
+        } else {
+            print("🔗 Received non-loc deep link in AppDelegate: \(url)")
         }
         
         return false
@@ -304,3 +371,4 @@ class AppAttestProviderFactory: NSObject, AppCheckProviderFactory {
         return AppAttestProvider(app: app)
     }
 }
+

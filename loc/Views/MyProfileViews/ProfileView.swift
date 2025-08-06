@@ -15,12 +15,13 @@ struct ProfileView: View {
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var placeVM: DetailPlaceViewModel
     @EnvironmentObject var userProfileViewModel: UserProfileViewModel
+    @EnvironmentObject var deepLinkViewModel: DeepLinkViewModel
     @StateObject private var photoImportVM = PhotoImportViewModel()
     
     @State private var showCreateReview = false
     @State private var selectedReviewType: CreatePlaceReviewView.ReviewType = .restaurant
-    
-
+    @State private var reviewWasSubmitted = false
+    @StateObject private var tikTokService = TikTokService()
 
     init() {
         // Configure navigation bar appearance to remove the bottom border
@@ -29,247 +30,111 @@ struct ProfileView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 20) {
-                // Profile Picture
-                ProfilePictureView()
-
-                // Name
-                let firstName = profile.user?.firstName ?? ""
-                let lastName = profile.user?.lastName ?? ""
-                Text("\(firstName) \(lastName)")
-                    .font(.title2)
-                    .fontWeight(.bold)
-                    .foregroundColor(.black)
-                
-                // Follow Counts
-                ProfileFollowCountsView()
-
-                Divider()
-                    .padding(.top, 15)
-                    .padding(.horizontal, 20)
-                
-                // Favorites & Lists
-                ProfileFavoriteListView()
-                ProfileViewListsView()
-
-                // No Location Data Error
-                if photoImportVM.noLocationDataError {
-                    VStack(spacing: 12) {
-                        Text("📍 NO LOCATION DATA")
-                            .font(.title2)
-                            .fontWeight(.bold)
-                            .foregroundColor(.white)
-                        
-                        VStack(spacing: 8) {
-                            Text("None of the selected photos contain GPS coordinates")
-                                .font(.title3)
-                                .fontWeight(.semibold)
-                                .foregroundColor(.white)
-                                .multilineTextAlignment(.center)
-                            
-                            Text("To create a review, please select photos taken with location services enabled")
-                                .font(.subheadline)
-                                .foregroundColor(.white.opacity(0.9))
-                                .multilineTextAlignment(.center)
-                        }
-                        
-                        Button("TRY AGAIN") {
-                            photoImportVM.clearSelection()
-                        }
-                        .font(.headline)
-                        .fontWeight(.bold)
-                        .foregroundColor(.red)
-                        .padding(.vertical, 8)
-                        .padding(.horizontal, 16)
-                        .background(Color.white)
-                        .cornerRadius(8)
-                    }
-                    .padding(20)
-                    .background(Color.red)
-                    .cornerRadius(15)
-                    .padding(.horizontal, 20)
-                    .shadow(radius: 10)
-                }
-                
-                // Photo Processing Display
-                else if let coordinates = photoImportVM.detectedCoordinates {
-                    VStack(spacing: 12) {
-                        Text("📍 PHOTO COORDINATES")
-                            .font(.title2)
-                            .fontWeight(.bold)
-                            .foregroundColor(.white)
-                        
-                        VStack(spacing: 8) {
-                            Text("Latitude: \(coordinates.latitude, specifier: "%.6f")")
-                                .font(.title3)
-                                .fontWeight(.semibold)
-                                .foregroundColor(.white)
-                            
-                            Text("Longitude: \(coordinates.longitude, specifier: "%.6f")")
-                                .font(.title3)
-                                .fontWeight(.semibold)
-                                .foregroundColor(.white)
-                        }
-                        
-                        // Loading nearby places indicator
-                        if photoImportVM.isLoadingNearbyPlaces {
-                            HStack {
-                                ProgressView()
-                                    .scaleEffect(0.8)
-                                Text("Finding nearby places...")
-                                    .font(.subheadline)
-                            }
-                            .foregroundColor(.white)
-                        }
-                        
-                        // Selected place display
-                        if let selectedPlace = photoImportVM.selectedPlace {
-                            VStack(spacing: 4) {
-                                Text("✅ Selected Place:")
-                                    .font(.caption)
-                                    .foregroundColor(.green)
-                                Text(selectedPlace.properties.name)
-                                    .font(.headline)
-                                    .fontWeight(.bold)
-                                    .foregroundColor(.white)
-                            }
-                        }
-                        
-                        Button("CLEAR ALL") {
-                            photoImportVM.clearSelection()
-                        }
-                        .font(.headline)
-                        .fontWeight(.bold)
-                        .foregroundColor(.red)
-                        .padding(.vertical, 8)
-                        .padding(.horizontal, 16)
-                        .background(Color.white)
-                        .cornerRadius(8)
-                    }
-                    .padding(20)
-                    .background(Color.blue)
-                    .cornerRadius(15)
-                    .padding(.horizontal, 20)
-                    .shadow(radius: 10)
-                }
-
-                // Logout Button
-                Button(action: {
-                    userSession.logout()
-                }) {
-                    Text("Log Out")
-                        .fontWeight(.semibold)
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.red)
-                        .cornerRadius(8)
-                }
-                .padding(.horizontal, 40)
-            }
-            .padding(.bottom, 40)
-            .padding(.top, 10)
-        }
-        .navigationBarBackButtonHidden(true)
-        .preferredColorScheme(.light)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
-                Button(action: {
-                    self.presentationMode.wrappedValue.dismiss()
-                }) {
-                    HStack {
-                        Image(systemName: "chevron.left")
-                            .foregroundColor(.black)
-                        Text("Back")
-                            .foregroundColor(.black)
-                    }
-                }
-            }
-            
-            ToolbarItem(placement: .navigationBarTrailing) {
-                PhotosPicker(
-                    selection: $photoImportVM.selectedItems,
-                    maxSelectionCount: 10,
-                    matching: .images,
-                    photoLibrary: .shared()
-                ) {
-                    Image(systemName: "photo.badge.plus")
-                        .foregroundColor(.black)
-                        .font(.body)
-                }
-                .padding(.trailing, 10)
-            }
-        }
-        .task {
-            await profile.refreshUserPlaces()
-        }
-        .onChange(of: photoImportVM.selectedItems) {
-            Task {
-                await photoImportVM.processSelectedPhotos()
-            }
-        }
-        .onAppear {
-            // Set up callback to refresh user places when a place is saved
-            photoImportVM.onPlaceSaved = {
-                Task {
-                    await profile.refreshUserPlaces()
-                }
-            }
-            
-            // Set up callback to update DetailPlaceViewModel when a place is saved
-            photoImportVM.onPlaceSavedWithDetail = { detailPlace in
-                // Add the place to DetailPlaceViewModel for immediate map display
-                placeVM.places[detailPlace.id.uuidString] = detailPlace
-                placeVM.placeSavers[detailPlace.id.uuidString] = [userSession.currentUserId ?? ""]
-                placeVM.calculateAnnotationPlaces()
-            }
-        }
-        .sheet(isPresented: $photoImportVM.showPlaceSelection) {
-            PlaceSelectionView(photoImportVM: photoImportVM)
-        }
-        .sheet(isPresented: $photoImportVM.showReviewTypeSelection) {
-            ReviewTypeSelectionView(
+        mainContent
+            .navigationBarBackButtonHidden(true)
+            .preferredColorScheme(.light)
+            .navigationBarTitleDisplayMode(.inline)
+            .modifier(ToolbarModifier(
+                presentationMode: presentationMode,
+                photoImportVM: photoImportVM
+            ))
+            .modifier(SheetsModifier(
                 photoImportVM: photoImportVM,
-                onGenericReview: {
-                    navigateToGenericReview()
-                },
-                onRestaurantReview: {
-                    navigateToRestaurantReview()
+                profile: profile,
+                placeVM: placeVM,
+                showCreateReview: $showCreateReview,
+                selectedReviewType: selectedReviewType,
+                reviewWasSubmitted: $reviewWasSubmitted,
+                onGenericReview: navigateToGenericReview,
+                onRestaurantReview: navigateToRestaurantReview
+            ))
+            .modifier(StateChangesModifier(
+                photoImportVM: photoImportVM,
+                profile: profile,
+                placeVM: placeVM,
+                showCreateReview: $showCreateReview,
+                reviewWasSubmitted: $reviewWasSubmitted,
+                tikTokService: tikTokService
+            ))
+            .alert("No Location Found", isPresented: $deepLinkViewModel.showNoLocationAlert) {
+                Button("OK") {
+                    deepLinkViewModel.dismissNoLocationAlert()
                 }
-            )
-        }
-
-        .navigationBarTitleDisplayMode(.inline)
-        .fullScreenCover(isPresented: $showCreateReview) {
-            if let selectedPlace = photoImportVM.selectedPlace,
-               !photoImportVM.selectedImages.isEmpty {
-                CreatePlaceReviewView(
-                    isPresented: $showCreateReview,
-                    place: convertToDetailPlace(selectedPlace),
-                    userId: userSession.currentUserId ?? "",
-                    profilePhotoUrl: profile.user?.profilePhotoURL?.absoluteString ?? "",
-                    userFirstName: profile.user?.firstName ?? "",
-                    userLastName: profile.user?.lastName ?? "",
-                    preselectedImages: photoImportVM.selectedImages,
-                    reviewType: selectedReviewType,
-                    onReviewSubmitted: { place in
-                        // Navigate to place detail view after review creation
-                        photoImportVM.navigateToPlaceDetail(place: place)
-                    }
-                )
+            } message: {
+                Text(deepLinkViewModel.noLocationAlertMessage)
+            }
+    }
+    
+    private var mainContent: some View {
+        ZStack {
+            // Main Content
+            ProfileContentView(photoImportVM: photoImportVM)
+            
+            // TikTok Processing Overlay
+            if profile.isProcessingTikTok || profile.isWaitingForPlaceDetail || deepLinkViewModel.isProcessingDeepLink {
+                tikTokOverlay
             }
         }
-        .onChange(of: photoImportVM.shouldNavigateToPlaceDetail) {
-            if photoImportVM.shouldNavigateToPlaceDetail, let place = photoImportVM.createdPlaceForDetail {
-                // Set the selected place and show detail sheet
-                selectedPlaceVM.selectedPlace = place
-                selectedPlaceVM.isDetailSheetPresented = true
-                
-                // Reset the navigation flag
-                photoImportVM.shouldNavigateToPlaceDetail = false
-                photoImportVM.createdPlaceForDetail = nil
+    }
+    
+    private var tikTokOverlay: some View {
+        ZStack {
+            Color.black.opacity(0.4)
+                .ignoresSafeArea()
+            
+            VStack(spacing: 16) {
+                if profile.tikTokImportError != nil {
+                    errorContent
+                } else {
+                    loadingContent
+                }
             }
+            .padding(24)
+            .background(Color.black.opacity(0.8))
+            .cornerRadius(16)
+        }
+    }
+    
+    private var errorContent: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 40))
+                .foregroundColor(.orange)
+            
+            Text("Import Failed")
+                .font(.headline)
+                .foregroundColor(.white)
+            
+            Text(profile.tikTokImportError ?? "")
+                .font(.subheadline)
+                .foregroundColor(.white.opacity(0.8))
+                .multilineTextAlignment(.center)
+                .padding(.horizontal)
+            
+            Button("OK") {
+                profile.clearTikTokImportError()
+            }
+            .foregroundColor(.white)
+            .padding(.horizontal, 24)
+            .padding(.vertical, 8)
+            .background(Color.blue)
+            .cornerRadius(8)
+        }
+    }
+    
+    private var loadingContent: some View {
+        VStack(spacing: 16) {
+            ProgressView()
+                .scaleEffect(1.5)
+                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+            
+            Text("Processing TikTok Video...")
+                .font(.headline)
+                .foregroundColor(.white)
+            
+            Text("Extracting location and saving place")
+                .font(.subheadline)
+                .foregroundColor(.white.opacity(0.8))
         }
     }
     
@@ -284,38 +149,220 @@ struct ProfileView: View {
         photoImportVM.showReviewTypeSelection = false
         showCreateReview = true
     }
+}
+
+// MARK: - View Modifiers
+
+struct ToolbarModifier: ViewModifier {
+    @Binding var presentationMode: PresentationMode
+    @ObservedObject var photoImportVM: PhotoImportViewModel
     
-    private func convertToDetailPlace(_ nearbyPlace: NearbyPlaceFeature) -> DetailPlace {
-        var detailPlace = DetailPlace()
-        // Create a consistent UUID from the actualId by hashing it
-        detailPlace.id = createConsistentUUID(from: nearbyPlace.properties.actualId)
-        detailPlace.name = nearbyPlace.properties.name
-        detailPlace.address = nearbyPlace.properties.address
-        detailPlace.coordinate = GeoPoint(
-            latitude: nearbyPlace.geometry.latitude,
-            longitude: nearbyPlace.geometry.longitude
-        )
-        detailPlace.rating = nearbyPlace.properties.rating
-        detailPlace.categories = nearbyPlace.properties.types
-        detailPlace.phone = nearbyPlace.properties.photoReference // This might not be correct mapping
-        return detailPlace
-    }
-    
-    private func createConsistentUUID(from string: String) -> UUID {
-        // Try to parse as UUID first (for existing UUID-based places)
-        if let uuid = UUID(uuidString: string) {
-            return uuid
-        }
-        
-        // For non-UUID strings (like Google Place IDs), create a consistent UUID by hashing
-        // This ensures the same string always produces the same UUID
-        let hash = abs(string.hashValue)
-        
-        // Create a deterministic UUID from the hash
-        // We'll use the hash to seed the UUID generation
-        let uuidString = String(format: "%08x-0000-0000-0000-%012x", hash, hash)
-        
-        return UUID(uuidString: uuidString) ?? UUID()
+    func body(content: Content) -> some View {
+        content
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button(action: {
+                        presentationMode.dismiss()
+                    }) {
+                        HStack {
+                            Image(systemName: "chevron.left")
+                                .foregroundColor(.black)
+                            Text("Back")
+                                .foregroundColor(.black)
+                        }
+                    }
+                }
+            }
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    PhotosPicker(
+                        selection: $photoImportVM.selectedItems,
+                        maxSelectionCount: 10,
+                        matching: .images,
+                        photoLibrary: .shared()
+                    ) {
+                        Image(systemName: "photo.badge.plus")
+                            .foregroundColor(.black)
+                            .font(.body)
+                    }
+                    .padding(.trailing, 10)
+                }
+            }
     }
 }
 
+struct SheetsModifier: ViewModifier {
+    @ObservedObject var photoImportVM: PhotoImportViewModel
+    @ObservedObject var profile: ProfileViewModel
+    @ObservedObject var placeVM: DetailPlaceViewModel
+    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
+    @Binding var showCreateReview: Bool
+    let selectedReviewType: CreatePlaceReviewView.ReviewType
+    @EnvironmentObject var userSession: UserSession
+    @Binding var reviewWasSubmitted: Bool
+    let onGenericReview: () -> Void
+    let onRestaurantReview: () -> Void
+    
+    func body(content: Content) -> some View {
+        content
+            .sheet(isPresented: $photoImportVM.showPlaceSelection) {
+                PlaceSelectionView(photoImportVM: photoImportVM)
+            }
+            .sheet(isPresented: $photoImportVM.showReviewTypeSelection) {
+                ReviewTypeSelectionView(
+                    photoImportVM: photoImportVM,
+                    onGenericReview: onGenericReview,
+                    onRestaurantReview: onRestaurantReview
+                )
+            }
+            .sheet(isPresented: $profile.isShowingPlaceSelection) {
+                TikTokPlaceSelectionView()
+                    .environmentObject(profile)
+                    .environmentObject(selectedPlaceVM)
+                    .environmentObject(placeVM)
+                    .presentationDragIndicator(.visible)
+            }
+            .fullScreenCover(isPresented: $showCreateReview) {
+                reviewScreen
+            }
+    }
+    
+    private var reviewScreen: some View {
+        Group {
+            if let selectedPlace = photoImportVM.selectedPlace,
+               !photoImportVM.selectedImages.isEmpty {
+                CreatePlaceReviewView(
+                    isPresented: $showCreateReview,
+                    place: profile.convertToDetailPlace(selectedPlace),
+                    userId: userSession.currentUserId ?? "",
+                    profilePhotoUrl: profile.user?.profilePhotoURL?.absoluteString ?? "",
+                    userFirstName: profile.user?.firstName ?? "",
+                    userLastName: profile.user?.lastName ?? "",
+                    preselectedImages: photoImportVM.selectedImages,
+                    reviewType: selectedReviewType,
+                    onReviewSubmitted: { place in
+                        handleReviewSubmission(place: place)
+                    }
+                )
+            } else {
+                EmptyView()
+            }
+        }
+    }
+    
+    private func handleReviewSubmission(place: DetailPlace) {
+        reviewWasSubmitted = true
+        
+        Task {
+            await photoImportVM.saveSelectedPlaceAfterReview()
+            
+            // End the photo import flow before navigating
+            await MainActor.run {
+                photoImportVM.isInPhotoImportFlow = false
+                showCreateReview = false
+            }
+            
+            // Allow time for the sheet to dismiss before navigating
+            try? await Task.sleep(nanoseconds: 300_000_000) // 0.3 seconds
+            
+            await MainActor.run {
+                selectedPlaceVM.allowAutoPresent = true
+                photoImportVM.navigateToPlaceDetail(place: place)
+            }
+        }
+    }
+    
+
+}
+
+struct StateChangesModifier: ViewModifier {
+    @ObservedObject var photoImportVM: PhotoImportViewModel
+    @ObservedObject var profile: ProfileViewModel
+    @ObservedObject var placeVM: DetailPlaceViewModel
+    @EnvironmentObject var userSession: UserSession
+    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
+    @EnvironmentObject var deepLinkViewModel: DeepLinkViewModel
+    @Binding var showCreateReview: Bool
+    @Binding var reviewWasSubmitted: Bool
+    @ObservedObject var tikTokService: TikTokService
+    
+    func body(content: Content) -> some View {
+        content
+            .task {
+                await profile.refreshUserPlaces()
+            }
+            .onChange(of: photoImportVM.selectedItems) {
+                Task {
+                    await photoImportVM.processSelectedPhotos()
+                }
+            }
+            .onAppear {
+                setupCallbacks()
+                profile.checkPendingTikTokURL(
+                    tikTokService: tikTokService,
+                    selectedPlaceVM: selectedPlaceVM,
+                    placeVM: placeVM
+                )
+            }
+            .onChange(of: showCreateReview) {
+                handleCreateReviewChange()
+            }
+            .onChange(of: photoImportVM.shouldNavigateToPlaceDetail) {
+                handlePlaceDetailNavigation()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ProcessSharedTikTok"))) { notification in
+                handleTikTokNotification(notification)
+            }
+    }
+    
+    private func setupCallbacks() {
+        photoImportVM.onPlaceSaved = {
+            Task {
+                await profile.refreshUserPlaces()
+            }
+        }
+        
+        photoImportVM.onPlaceSavedWithDetail = { detailPlace in
+            placeVM.places[detailPlace.id.uuidString] = detailPlace
+            placeVM.placeSavers[detailPlace.id.uuidString] = [userSession.currentUserId ?? ""]
+            placeVM.calculateAnnotationPlaces()
+        }
+    }
+    
+    private func handleCreateReviewChange() {
+        if !showCreateReview {
+            if reviewWasSubmitted {
+                reviewWasSubmitted = false
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                    photoImportVM.clearSelection()
+                }
+            } else {
+                photoImportVM.clearSelection()
+            }
+        }
+    }
+    
+    private func handlePlaceDetailNavigation() {
+        if photoImportVM.shouldNavigateToPlaceDetail,
+           let place = photoImportVM.createdPlaceForDetail,
+           !photoImportVM.isInPhotoImportFlow {
+            
+            selectedPlaceVM.selectedPlace = place
+            selectedPlaceVM.isDetailSheetPresented = true
+            
+            photoImportVM.shouldNavigateToPlaceDetail = false
+            photoImportVM.createdPlaceForDetail = nil
+        }
+    }
+    
+    private func handleTikTokNotification(_ notification: Notification) {
+        if let url = notification.userInfo?["url"] as? String {
+            profile.handleTikTokNotification(
+                url: url,
+                tikTokService: tikTokService,
+                selectedPlaceVM: selectedPlaceVM,
+                placeVM: placeVM
+            )
+        }
+    }
+}

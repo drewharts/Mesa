@@ -11,7 +11,7 @@ import UIKit
 struct BottomSheetView<Content: View>: View {
     @Binding var sheetHeight: CGFloat
     @Binding var isPresented: Bool
-    let minSheetHeight: CGFloat = 200
+    let minSheetHeight: CGFloat
     let maxSheetHeight: CGFloat
     @GestureState private var dragTranslation: CGFloat = 0
     let content: Content
@@ -19,11 +19,13 @@ struct BottomSheetView<Content: View>: View {
     init(
         isPresented: Binding<Bool>,
         sheetHeight: Binding<CGFloat>,
+        minSheetHeight: CGFloat = 200,
         maxSheetHeight: CGFloat,
         @ViewBuilder content: () -> Content
     ) {
         self._isPresented = isPresented
         self._sheetHeight = sheetHeight
+        self.minSheetHeight = minSheetHeight
         self.maxSheetHeight = maxSheetHeight
         self.content = content()
     }
@@ -34,56 +36,60 @@ struct BottomSheetView<Content: View>: View {
     }
 
     var body: some View {
-        VStack {
-            Spacer()
+        GeometryReader { geometry in
             VStack(spacing: 0) {
-                Capsule()
-                    .fill(Color.gray.opacity(0.5))
-                    .frame(width: 40, height: 6)
-                    .padding(.top, 8)
+                Spacer()
                 
-                // Pass isScrollingEnabled to content
-                content.environment(\.isScrollingEnabled, isScrollingEnabled)
-                    .padding(.top, 8)
-                    .frame(maxWidth: .infinity)
-                    .frame(maxHeight: .infinity, alignment: .top)
-            }
-            .frame(height: sheetHeight)
-            .frame(maxWidth: .infinity)
-            .background(Color.white)
-            .cornerRadius(16, corners: [.topLeft, .topRight])
-            .clipped()
-            .gesture(
-                DragGesture()
-                    .updating($dragTranslation) { value, state, _ in
-                        state = value.translation.height
-                    }
-                    .onEnded { value in
-                        let newHeight = sheetHeight - value.translation.height
-                        let dismissalThreshold: CGFloat = 100
-                        withAnimation {
-                            if value.translation.height > dismissalThreshold {
-                                isPresented = false
-                            } else if newHeight > (maxSheetHeight + minSheetHeight) / 2 {
-                                sheetHeight = maxSheetHeight
-                            } else {
-                                sheetHeight = minSheetHeight
+                VStack(spacing: 0) {
+                    Capsule()
+                        .fill(Color.gray.opacity(0.5))
+                        .frame(width: 40, height: 6)
+                        .padding(.top, 8)
+                    
+                    // Pass isScrollingEnabled to content
+                    content.environment(\.isScrollingEnabled, isScrollingEnabled)
+                        .padding(.top, 8)
+                        .frame(maxWidth: .infinity)
+                        .frame(maxHeight: .infinity, alignment: .top)
+                }
+                .frame(height: sheetHeight)
+                .frame(maxWidth: .infinity)
+                .background(Color.white)
+                .cornerRadius(16, corners: [.topLeft, .topRight])
+                .clipped()
+                .gesture(
+                    DragGesture()
+                        .updating($dragTranslation) { value, state, _ in
+                            state = value.translation.height
+                        }
+                        .onEnded { value in
+                            let newHeight = sheetHeight - value.translation.height
+                            let dismissalThreshold: CGFloat = 100
+                            withAnimation {
+                                if value.translation.height > dismissalThreshold {
+                                    isPresented = false
+                                } else if newHeight > (maxSheetHeight + minSheetHeight) / 2 {
+                                    sheetHeight = maxSheetHeight
+                                } else {
+                                    sheetHeight = minSheetHeight
+                                }
                             }
                         }
+                )
+                .onChange(of: dragTranslation) {
+                    let newHeight = sheetHeight - dragTranslation
+                    if newHeight <= maxSheetHeight && newHeight >= minSheetHeight {
+                        sheetHeight = newHeight
+                    } else if newHeight > maxSheetHeight {
+                        sheetHeight = maxSheetHeight
+                    } else if newHeight < minSheetHeight {
+                        sheetHeight = minSheetHeight
                     }
-            )
-            .onChange(of: dragTranslation) {
-                let newHeight = sheetHeight - dragTranslation
-                if newHeight <= maxSheetHeight && newHeight >= minSheetHeight {
-                    sheetHeight = newHeight
-                } else if newHeight > maxSheetHeight {
-                    sheetHeight = maxSheetHeight
-                } else if newHeight < minSheetHeight {
-                    sheetHeight = minSheetHeight
                 }
             }
+            .frame(width: geometry.size.width, height: geometry.size.height)
         }
-        .edgesIgnoringSafeArea(.bottom)
+        .ignoresSafeArea(.all)
     }
 }
 

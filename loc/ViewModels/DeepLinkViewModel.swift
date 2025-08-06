@@ -10,10 +10,13 @@ import SwiftUI
 import Combine
 import FirebaseFirestore
 
+@MainActor
 class DeepLinkViewModel: ObservableObject {
     @Published var isShowingPlaceFromDeepLink = false
     @Published var deepLinkedPlace: DetailPlace?
     @Published var isProcessingDeepLink = false
+    @Published var showNoLocationAlert = false
+    @Published var noLocationAlertMessage = ""
     
     private let deepLinkManager: DeepLinkManager
     private let selectedPlaceViewModel: SelectedPlaceViewModel
@@ -24,6 +27,7 @@ class DeepLinkViewModel: ObservableObject {
         self.selectedPlaceViewModel = selectedPlaceViewModel
         
         setupObservers()
+        setupCallbacks()
     }
     
     // MARK: - Setup
@@ -39,8 +43,18 @@ class DeepLinkViewModel: ObservableObject {
             }
             .store(in: &cancellables)
         
+        // Since both classes are @MainActor, we can directly assign
         deepLinkManager.$isProcessingDeepLink
             .assign(to: &$isProcessingDeepLink)
+    }
+    
+    private func setupCallbacks() {
+        // Set up callback for no location found alerts
+        deepLinkManager.onNoLocationFound = { [weak self] message in
+            Task { @MainActor in
+                self?.showNoLocationFoundAlert(message: message)
+            }
+        }
     }
     
     // MARK: - Deep Link Handling
@@ -92,6 +106,19 @@ class DeepLinkViewModel: ObservableObject {
         deepLinkedPlace = nil
     }
     
+    @MainActor
+    func showNoLocationFoundAlert(message: String) {
+        noLocationAlertMessage = message
+        showNoLocationAlert = true
+    }
+    
+    @MainActor
+    func dismissNoLocationAlert() {
+        showNoLocationAlert = false
+        noLocationAlertMessage = ""
+    }
+    
+    @MainActor
     func hasDeepLinkedPlace() -> Bool {
         return deepLinkedPlace != nil
     }

@@ -45,14 +45,6 @@ struct MaxPlaceDetailView: View {
                     .clipShape(Capsule())
                 }
 
-                // SHARE Bubble
-                PlaceShareButton(place: selectedPlaceVM.selectedPlace!)
-                    .environmentObject(ServiceContainer.shared)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
-                    .background(Color.gray.opacity(0.2))
-                    .clipShape(Capsule())
-
                 // MENU Bubble
                 HStack(spacing: 8) {
                     Image(systemName: "fork.knife.circle")
@@ -95,6 +87,7 @@ struct MaxPlaceDetailView: View {
                                 GridView(images: photos, onImageTapped: { index in
                                     onPhotoTapped(photos, index)
                                 })
+                                .environmentObject(selectedPlaceVM)
                             } else {
                                 Text("No Photos")
                                     .frame(maxWidth: .infinity)

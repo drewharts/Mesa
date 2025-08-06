@@ -162,7 +162,9 @@ struct MapView: View {
                     coordinate: coordinate
                 ) { name, description in
                     if let userId = profile.user?.id {
-                        selectedPlaceVM.createNewPlace(name: name, description: description, coordinate: coordinate, userId: userId, profileVM: profile, detailPlaceVM: detailPlaceVM)
+                        let generatedId = UUID().uuidString
+                        selectedPlaceVM.allowAutoPresent = false
+                        selectedPlaceVM.createNewPlace(idString: generatedId, name: name, description: description, coordinate: coordinate, userId: userId, profileVM: profile, detailPlaceVM: detailPlaceVM)
                         // Reset fields
                         newPlaceName = ""
                         newPlaceDescription = ""

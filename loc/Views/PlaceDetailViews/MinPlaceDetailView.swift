@@ -21,7 +21,32 @@ struct MinPlaceDetailView: View {
     @Binding var showNoPhoneNumberAlert: Bool
     let onPhotoTapped: ([UIImage], Int) -> Void
     
-    @State private var selectedTab: DetailTab = .reviews
+    @State private var selectedTab: DetailTab = .about
+    
+    private var defaultTab: DetailTab {
+        return selectedPlaceVM.reviews.isEmpty ? .about : .reviews
+    }
+    
+    private var tikTokVideos: [TikTokVideo] {
+        let placeTikTokVideos = selectedPlaceVM.selectedPlace?.tikTokVideos ?? []
+        let userTikTokVideos = profile.getTikTokVideos(for: selectedPlaceVM.selectedPlace?.id.uuidString ?? "")
+        
+        // Combine and deduplicate based on videoID or URL
+        var allVideos = placeTikTokVideos
+        
+        for userVideo in userTikTokVideos {
+            // Check if this video already exists (by videoID or URL)
+            let alreadyExists = allVideos.contains { existingVideo in
+                existingVideo.videoID == userVideo.videoID || existingVideo.url == userVideo.url
+            }
+            
+            if !alreadyExists {
+                allVideos.append(userVideo)
+            }
+        }
+        
+        return allVideos
+    }
     
     var body: some View {
         ScrollView {
@@ -153,6 +178,38 @@ struct MinPlaceDetailView: View {
                         .foregroundColor(.black)
                         .fixedSize(horizontal: false, vertical: true)
                     
+                    // TikTok Videos Section
+                    if !tikTokVideos.isEmpty {
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack {
+                                Text("TikTok Videos")
+                                    .font(.headline)
+                                    .fontWeight(.bold)
+                                
+                                Spacer()
+                                
+                                Text("\(tikTokVideos.count)")
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(Color.gray.opacity(0.2))
+                                    .cornerRadius(12)
+                            }
+                            
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 12) {
+                                    ForEach(tikTokVideos, id: \.videoID) { video in
+                                        TikTokVideoView(tikTokVideo: video)
+                                            .id("tiktok_\(video.videoID)")
+                                    }
+                                }
+                                .padding(.horizontal, 1)
+                            }
+                        }
+                        .padding(.top, 15)
+                    }
+                    
                     Divider()
                         .padding(.top, 15)
                         .padding(.bottom, 15)
@@ -171,6 +228,9 @@ struct MinPlaceDetailView: View {
         }
         .scrollDisabled(!isScrollingEnabled) // Disable scrolling based on sheet height
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            selectedTab = defaultTab
+        }
         .onReceive(notificationManager.$highlightedReviewId) { reviewId in
             if reviewId != nil {
                 // Switch to reviews tab when there's a highlighted review

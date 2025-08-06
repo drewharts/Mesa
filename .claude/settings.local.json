@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rg:*)",
+      "Bash(git add:*)",
+      "Bash(grep:*)",
+      "Bash(sed:*)",
+      "Bash(git checkout:*)",
+      "Bash(find:*)",
+      "Bash(mkdir:*)",
+      "Bash(rm:*)",
+      "Bash(ls:*)",
+      "Bash(xcrun simctl openurl:*)"
+    ],
+    "deny": []
+  }
+}
