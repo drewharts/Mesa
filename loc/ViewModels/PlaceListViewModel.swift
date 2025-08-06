@@ -59,7 +59,7 @@ class PlaceListViewModel: ObservableObject, Identifiable {
 
     
     func loadImage() {
-        guard let imageURLString = placeList.image as? String,
+        guard let imageURLString = placeList.image,
               let imageURL = URL(string: imageURLString) else {
             self.image = nil
             return

@@ -123,7 +123,9 @@ class DetailPlaceViewModel: ObservableObject {
         let type = placeDetailVM.getRestaurantType(for: place) ?? PlaceTypes.defaultType
         
         // Store it for future use
-        placeTypes[placeId] = type
+        DispatchQueue.main.async {
+            self.placeTypes[placeId] = type
+        }
         
         return type
     }
@@ -141,6 +143,7 @@ class DetailPlaceViewModel: ObservableObject {
                     self.places[placeId] = detailPlace
                     self.fetchPlaceImage(for: placeId) // Fetch image if not already present
                     self.calculateRestaurantType(for: detailPlace) // Calculate restaurant type
+                    self.generateColorForPlace(placeId) // Generate color for fetched place
                     completion(detailPlace)
                 }
             case .failure(let error):
@@ -179,11 +182,9 @@ class DetailPlaceViewModel: ObservableObject {
                     imageURLStrings.append(contentsOf: review.images)
                 }
                 
-                // If no images found, set to nil
+                // If no images found, try TikTok thumbnail as fallback
                 guard !imageURLStrings.isEmpty else {
-                    DispatchQueue.main.async {
-                        self.placeImages[placeId] = nil
-                    }
+                    self.tryTikTokThumbnailAsCover(placeId: placeId)
                     return
                 }
                 
@@ -204,11 +205,48 @@ class DetailPlaceViewModel: ObservableObject {
                     }
                 }
             } else {
-                DispatchQueue.main.async {
+                tryTikTokThumbnailAsCover(placeId: placeId)
+            }
+        }
+    }
+    
+    private func tryTikTokThumbnailAsCover(placeId: String) {
+        // Look for place in our cached places
+        guard let place = places[placeId],
+              let tikTokVideos = place.tikTokVideos,
+              !tikTokVideos.isEmpty,
+              let firstThumbnailURL = tikTokVideos.first?.thumbnailURL else {
+            DispatchQueue.main.async {
+                self.placeImages[placeId] = nil
+            }
+            return
+        }
+        
+        fetchTikTokThumbnailAsImage(thumbnailURL: firstThumbnailURL, placeId: placeId)
+    }
+    
+    private func fetchTikTokThumbnailAsImage(thumbnailURL: String, placeId: String) {
+        guard let url = URL(string: thumbnailURL) else {
+            DispatchQueue.main.async {
+                self.placeImages[placeId] = nil
+            }
+            return
+        }
+        
+        URLSession.shared.dataTask(with: url) { [weak self] data, _, error in
+            guard let self = self else { return }
+            
+            DispatchQueue.main.async {
+                if let error = error {
+                    print("Error fetching TikTok thumbnail for \(placeId): \(error.localizedDescription)")
+                    self.placeImages[placeId] = nil
+                } else if let data = data, let image = UIImage(data: data) {
+                    self.placeImages[placeId] = image
+                } else {
                     self.placeImages[placeId] = nil
                 }
             }
-        }
+        }.resume()
     }
 
     // Update placeSavers when a user saves a place
@@ -255,6 +293,7 @@ class DetailPlaceViewModel: ObservableObject {
                 self.places[detailPlace.id.uuidString] = detailPlace
                 self.fetchPlaceImage(for: detailPlace.id.uuidString)
                 self.calculateRestaurantType(for: detailPlace) // Calculate restaurant type
+                self.generateColorForPlace(detailPlace.id.uuidString) // Generate color for new place
                 completion(detailPlace)
             }
         }
@@ -312,6 +351,8 @@ class DetailPlaceViewModel: ObservableObject {
                 if let detailPlace = self.places[place], self.placeTypes[place] == nil {
                     calculateRestaurantType(for: detailPlace)
                 }
+                // Generate color if not already generated
+                generateColorForPlace(place)
             }
             
             // Notify UI that data has changed
@@ -322,24 +363,39 @@ class DetailPlaceViewModel: ObservableObject {
 
     // Recalculate place types for all places
     func recalculateAllPlaceTypes() {
-        for (placeId, place) in places {
+        for (_, place) in places {
             calculateRestaurantType(for: place)
         }
         objectWillChange.send()
     }
 
-    // Add this method to get or generate a color for a place
+    // Method to generate and store a color for a place
+    func generateColorForPlace(_ placeId: String) {
+        guard placeColors[placeId] == nil else { return }
+        
+        let color = Color(
+            red: Double.random(in: 0...1),
+            green: Double.random(in: 0...1),
+            blue: Double.random(in: 0...1)
+        )
+        placeColors[placeId] = color
+    }
+    
+    // Public method to get a color for a place (read-only, no side effects)
     func colorForPlace(placeId: String) -> Color {
         if let color = placeColors[placeId] {
             return color
         } else {
-            let color = Color(
-                red: Double.random(in: 0...1),
-                green: Double.random(in: 0...1),
-                blue: Double.random(in: 0...1)
-            )
-            placeColors[placeId] = color
-            return color
+            // Return a default color if not found
+            // This should rarely happen as colors should be pre-generated
+            return Color.gray
+        }
+    }
+    
+    // Initialize colors for all existing places
+    func initializePlaceColors() {
+        for placeId in places.keys {
+            generateColorForPlace(placeId)
         }
     }
 }

@@ -129,6 +129,8 @@ struct ReviewTypeSelectionView: View {
                 // Cancel Button
                 Button("Cancel") {
                     photoImportVM.showReviewTypeSelection = false
+                    // Clear the selection since user cancelled the flow
+                    photoImportVM.clearSelection()
                 }
                 .font(.headline)
                 .foregroundColor(.gray)

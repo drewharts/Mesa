@@ -17,16 +17,42 @@ struct UserReviewedPlaceGridCell: View {
     @EnvironmentObject var userProfileViewModel: UserProfileViewModel
     @Environment(\.presentationMode) var presentationMode
 
+    private func getFirstTikTokThumbnail(for place: DetailPlace) -> String? {
+        // Check place's own TikTok videos first
+        if let placeTikTokVideos = place.tikTokVideos,
+           let firstVideo = placeTikTokVideos.first {
+            return firstVideo.thumbnailURL
+        }
+        
+        // Check external places (user's TikTok videos for this place)
+        return userProfileViewModel.getFirstTikTokThumbnailURL(for: place.id.uuidString)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             ZStack(alignment: .bottom) {
-                if let image = detailPlaceViewModel.placeImages[place.id.uuidString] {
+                if let thumbnailURL = getFirstTikTokThumbnail(for: place) {
+                    // Show TikTok thumbnail
+                    AsyncImage(url: URL(string: thumbnailURL)) { image in
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(width: cardWidth, height: cardHeight)
+                            .clipped()
+                    } placeholder: {
+                        Rectangle()
+                            .foregroundColor(.gray.opacity(0.3))
+                            .frame(width: cardWidth, height: cardHeight)
+                    }
+                } else if let image = detailPlaceViewModel.placeImages[place.id.uuidString] {
+                    // Show place review image
                     Image(uiImage: image)
                         .resizable()
                         .aspectRatio(contentMode: .fill)
                         .frame(width: cardWidth, height: cardHeight)
                         .clipped()
                 } else {
+                    // Show colored rectangle fallback
                     Rectangle()
                         .foregroundColor(detailPlaceViewModel.colorForPlace(placeId: place.id.uuidString))
                         .frame(width: cardWidth, height: cardHeight)

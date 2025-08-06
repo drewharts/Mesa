@@ -35,14 +35,31 @@ class PlaceSearchService {
         onResultsUpdated: @escaping SuggestionsCallback,
         onError: @escaping ErrorCallback
     ) {
+        print("🔍 [PlaceSearchService] searchPlaces called with query: '\(query)'")
+        
+        guard !query.isEmpty else {
+            print("🔍 [PlaceSearchService] Query is empty, returning empty results")
+            onResultsUpdated([])
+            return
+        }
+        
+        print("🔍 [PlaceSearchService] Calling mesaBackendService.fetchSuggestions...")
         mesaBackendService.fetchSuggestions(query: query) { result in
+            print("🔍 [PlaceSearchService] Received response from mesaBackendService")
             switch result {
             case .success(let suggestions):
+                print("✅ [PlaceSearchService] Successfully received \(suggestions.count) suggestions")
+                for (index, suggestion) in suggestions.enumerated() {
+                    print("🔍 [PlaceSearchService] Suggestion \(index + 1): \(suggestion.name) (ID: \(suggestion.id), Source: \(suggestion.source))")
+                }
                 DispatchQueue.main.async {
+                    print("🔍 [PlaceSearchService] Calling onResultsUpdated with \(suggestions.count) suggestions")
                     onResultsUpdated(suggestions)
                 }
             case .failure(let error):
+                print("❌ [PlaceSearchService] Error from mesaBackendService: \(error.localizedDescription)")
                 DispatchQueue.main.async {
+                    print("❌ [PlaceSearchService] Calling onError with: \(error.localizedDescription)")
                     onError(error.localizedDescription)
                 }
             }
@@ -57,14 +74,20 @@ class PlaceSearchService {
         _ suggestion: MesaPlaceSuggestion,
         onResultResolved: @escaping DetailCallback
     ) {
+        print("📍 [PlaceSearchService] selectSuggestion called for: \(suggestion.name) (ID: \(suggestion.id), Source: \(suggestion.source))")
+        
+        print("📍 [PlaceSearchService] Calling mesaBackendService.fetchPlaceDetails...")
         mesaBackendService.fetchPlaceDetails(placeId: suggestion.id, source: suggestion.source) { result in
+            print("📍 [PlaceSearchService] Received response from mesaBackendService.fetchPlaceDetails")
             switch result {
             case .success(let details):
+                print("✅ [PlaceSearchService] Successfully received place details for: \(details.name)")
                 DispatchQueue.main.async {
+                    print("📍 [PlaceSearchService] Calling onResultResolved with details for: \(details.name)")
                     onResultResolved(details)
                 }
             case .failure(let error):
-                print("Error fetching place details: \(error.localizedDescription)")
+                print("❌ [PlaceSearchService] Error fetching place details: \(error.localizedDescription)")
             }
         }
     }

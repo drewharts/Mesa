@@ -1,6 +1,7 @@
 import Foundation
 
 /// Container for all app services - provides centralized service management
+@MainActor
 class ServiceContainer: ObservableObject {
     static let shared = ServiceContainer()
     
@@ -10,13 +11,32 @@ class ServiceContainer: ObservableObject {
     lazy var reviewService = ReviewService.shared
     lazy var imageService = ImageService.shared
     lazy var placeShareService = PlaceShareService()
+    lazy var tikTokService = TikTokService()
     
     // MARK: - Managers
     lazy var locationManager = LocationManager()
     lazy var notificationManager = NotificationManager.shared
     lazy var deepLinkManager: DeepLinkManager = {
-        // This will be initialized after selectedPlaceViewModel is available
-        fatalError("DeepLinkManager must be initialized with selectedPlaceViewModel")
+        let dummyLocationManager = LocationManager()
+        let dummySelectedPlaceVM = SelectedPlaceViewModel(
+            locationManager: dummyLocationManager,
+            reviewService: self.reviewService,
+            placeService: self.placeService,
+            userService: self.userService,
+            imageService: self.imageService
+        )
+        let dummyDetailPlaceVM = DetailPlaceViewModel(
+            placeService: self.placeService,
+            userService: self.userService
+        )
+
+        return DeepLinkManager(
+            placeService: self.placeService,
+            userService: self.userService,
+            selectedPlaceViewModel: dummySelectedPlaceVM,
+            tikTokService: self.tikTokService,
+            detailPlaceViewModel: dummyDetailPlaceVM
+        )
     }()
     
     private init() {
@@ -27,29 +47,5 @@ class ServiceContainer: ObservableObject {
     func setupServices() {
         // Any cross-service setup can go here
         // For example, if services need references to each other
-    }
-    
-    // MARK: - Deep Link Setup
-    func setupDeepLinkManager(selectedPlaceViewModel: SelectedPlaceViewModel) {
-        let deepLinkManager = DeepLinkManager(
-            placeService: placeService,
-            selectedPlaceViewModel: selectedPlaceViewModel
-        )
-        
-        // Use reflection to set the lazy property
-        let mirror = Mirror(reflecting: self)
-        for child in mirror.children {
-            if child.label == "deepLinkManager" {
-                // This is a workaround since we can't directly set a lazy property
-                // We'll handle this differently
-            }
-        }
-        
-        // Store the deep link manager in a different way
-        objc_setAssociatedObject(self, "deepLinkManager", deepLinkManager, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
-    }
-    
-    var deepLinkManagerInstance: DeepLinkManager? {
-        return objc_getAssociatedObject(self, "deepLinkManager") as? DeepLinkManager
     }
 } 

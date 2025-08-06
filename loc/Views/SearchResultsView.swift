@@ -4,6 +4,8 @@ import MapboxSearch
 struct SearchResultsView: View {
     let placeResults: [MesaPlaceSuggestion]
     let userResults: [ProfileData]
+    let showNoPlaceFound: Bool
+    let searchText: String
     let onSelectPlace: (MesaPlaceSuggestion) -> Void
     let onSelectUser: (ProfileData) -> Void
 
@@ -12,21 +14,28 @@ struct SearchResultsView: View {
             ScrollView {
                 VStack(spacing: 10) {
                     UserResultsView(userResults: userResults, onSelectUser: onSelectUser)
-                    PlaceResultsView(placeResults: placeResults, onSelectPlace: onSelectPlace)
+                    PlaceResultsView(
+                        placeResults: placeResults,
+                        showNoPlaceFound: showNoPlaceFound,
+                        searchText: searchText,
+                        onSelectPlace: onSelectPlace
+                    )
                 }
             }
-            .frame(height: CGFloat((userResults.count + placeResults.count) * 120))
+            .frame(height: CGFloat((userResults.count + placeResults.count) * 120 + (showNoPlaceFound ? 120 : 0)))
         }
     }
 }
 
 struct PlaceResultsView: View {
     let placeResults: [MesaPlaceSuggestion]
+    let showNoPlaceFound: Bool
+    let searchText: String
     let onSelectPlace: (MesaPlaceSuggestion) -> Void
 
     var body: some View {
-        if !placeResults.isEmpty {
-            VStack(alignment: .leading, spacing: 5) {
+        VStack(alignment: .leading, spacing: 5) {
+            if !placeResults.isEmpty {
                 Text("Places")
                     .font(.headline)
                     .foregroundColor(.gray)
@@ -56,6 +65,36 @@ struct PlaceResultsView: View {
                     }
                     .padding(.horizontal, 20)
                 }
+            } else if showNoPlaceFound {
+                Text("Places")
+                    .font(.headline)
+                    .foregroundColor(.gray)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 10)
+                
+                VStack(spacing: 12) {
+                    Image(systemName: "location.slash")
+                        .font(.system(size: 40))
+                        .foregroundColor(.gray.opacity(0.6))
+                    
+                    VStack(spacing: 4) {
+                        Text("No place found")
+                            .font(.headline)
+                            .fontWeight(.medium)
+                            .foregroundColor(.gray)
+                        
+                        Text("We couldn't find '\(searchText)' in our database")
+                            .font(.subheadline)
+                            .foregroundColor(.gray)
+                            .multilineTextAlignment(.center)
+                    }
+                }
+                .padding()
+                .background(Color.white)
+                .cornerRadius(10)
+                .shadow(color: .black.opacity(0.1), radius: 3, x: 0, y: 2)
+                .padding(.horizontal, 20)
             }
         }
     }

@@ -58,9 +58,9 @@ class DataManager: ObservableObject {
     
     // PHASE 1: Load most important user data first (parallel)
     private func loadCriticalUserData(userId: String) async {
-        async let profileData = loadProfileData(userId: userId)
-        async let myPlaces = loadUserMyPlaces(userId: userId)
-        async let favorites = loadUserFavoritePlaces(userId: userId)
+        async let profileData: () = loadProfileData(userId: userId)
+        async let myPlaces: () = loadUserMyPlaces(userId: userId)
+        async let favorites: () = loadUserFavoritePlaces(userId: userId)
         
         // Wait for critical data to complete
         await profileData
@@ -70,20 +70,22 @@ class DataManager: ObservableObject {
     
     // PHASE 2: Load remaining user data (parallel)
     private func loadRemainingUserData(userId: String) async {
-        async let placeLists = loadUserPlaceLists(userId: userId)
-        async let reviewedPlaces = loadUserReviewedPlaces(userId: userId)
-        async let followCounts = fetchFollowerAndFollowingCountsAsync(userId: userId)
+        async let placeLists: () = loadUserPlaceLists(userId: userId)
+        async let reviewedPlaces: () = loadUserReviewedPlaces(userId: userId)
+        async let followCounts: () = fetchFollowerAndFollowingCountsAsync(userId: userId)
+        async let externalPlaces: () = loadUserExternalPlaces(userId: userId)
         
         // Wait for remaining user data
         await placeLists
         await reviewedPlaces
         await followCounts
+        await externalPlaces
     }
     
     // PHASE 3: Load social data without blocking UI
     private func loadSocialDataInBackground(userId: String) async {
-        async let following = loadFollowing(userId: userId)
-        async let followers = loadFollowers(userId: userId)
+        async let following: () = loadFollowing(userId: userId)
+        async let followers: () = loadFollowers(userId: userId)
         
         // Wait for social connections
         await following
@@ -141,6 +143,18 @@ class DataManager: ObservableObject {
             }
         } catch {
             print("Error loading profile data: \(error.localizedDescription)")
+        }
+    }
+    
+    // Load user's external places (TikTok-sourced places)
+    func loadUserExternalPlaces(userId: String) async {
+        print("🔍 [DataManager] Loading external places for user: \(userId)")
+        do {
+            let externalPlaces = try await userService.fetchUserExternalPlaces(userId: userId)
+            profileViewModel.userExternalPlaces = externalPlaces
+            print("✅ [DataManager] Successfully loaded \(externalPlaces.count) external places")
+        } catch {
+            print("❌ [DataManager] Error loading external places: \(error.localizedDescription)")
         }
     }
 
@@ -242,6 +256,8 @@ class DataManager: ObservableObject {
             let detailPlace = try await placeService.fetchPlace(withId: placeId)
             await MainActor.run {
                 self.detailPlaceViewModel.places[placeId] = detailPlace
+                // Generate color for the place
+                self.detailPlaceViewModel.generateColorForPlace(placeId)
                 // Update place savers
                 if self.detailPlaceViewModel.placeSavers[placeId] == nil {
                     self.detailPlaceViewModel.placeSavers[placeId] = [userId]
@@ -257,18 +273,41 @@ class DataManager: ObservableObject {
     func processPlacesInList(list: PlaceList, userId: String) async {
         for place in list.places {
             let placeId = place.id.uuidString
-            do {
-                let detailPlace = try await placeService.fetchPlace(withId: placeId)
-                self.detailPlaceViewModel.places[placeId] = detailPlace
-                // If we have a user object, update the place savers
-                if self.detailPlaceViewModel.placeSavers[placeId] == nil {
-                    self.detailPlaceViewModel.placeSavers[placeId] = [userId]
-                } else if !self.detailPlaceViewModel.placeSavers[placeId]!.contains(userId) {
-                    self.detailPlaceViewModel.placeSavers[placeId]!.append(userId)
-                }
-            } catch {
-                print("Error fetching place details: \(error.localizedDescription) (listId: \(list.id.uuidString), placeId: \(placeId))")
+            
+            if self.detailPlaceViewModel.places[placeId] != nil {
+                updateCachedPlace(placeId: placeId, userId: userId)
+                continue
             }
+            
+            await fetchAndUpdatePlace(place: place, userId: userId)
+        }
+    }
+    
+    private func updateCachedPlace(placeId: String, userId: String) {
+        detailPlaceViewModel.generateColorForPlace(placeId)
+        updatePlaceSavers(placeId: placeId, userId: userId)
+    }
+    
+    private func updatePlaceSavers(placeId: String, userId: String) {
+        if detailPlaceViewModel.placeSavers[placeId] == nil {
+            detailPlaceViewModel.placeSavers[placeId] = [userId]
+        } else if !detailPlaceViewModel.placeSavers[placeId]!.contains(userId) {
+            detailPlaceViewModel.placeSavers[placeId]!.append(userId)
+        }
+    }
+    
+    private func fetchAndUpdatePlace(place: Place, userId: String) async {
+        let placeId = place.id.uuidString
+        
+        do {
+            let detailPlace = try await placeService.fetchPlace(withId: placeId)
+            detailPlaceViewModel.places[placeId] = detailPlace
+            detailPlaceViewModel.generateColorForPlace(placeId)
+            updatePlaceSavers(placeId: placeId, userId: userId)
+        } catch {
+            // Create minimal DetailPlace for missing places
+            let detailPlace = DetailPlace(id: place.id, name: place.name, address: place.address, city: nil)
+            detailPlaceViewModel.places[placeId] = detailPlace
         }
     }
     
@@ -302,8 +341,8 @@ class DataManager: ObservableObject {
             await withTaskGroup(of: Void.self) { group in
                 for profile in batch {
                     group.addTask {
-                        async let favorites = self.loadUserFavoritePlaces(userId: profile.id, forUser: profile)
-                        async let lists = self.loadUserPlaceLists(userId: profile.id, forUser: profile)
+                        async let favorites: () = self.loadUserFavoritePlaces(userId: profile.id, forUser: profile)
+                        async let lists: () = self.loadUserPlaceLists(userId: profile.id, forUser: profile)
                         await favorites
                         await lists
                     }
@@ -375,7 +414,10 @@ class DataManager: ObservableObject {
         }
         
         // Fetch and store the place if not already present
-        if await MainActor.run { self.detailPlaceViewModel.places[placeId] } == nil {
+        let hasExistingPlace = await MainActor.run {
+            return self.detailPlaceViewModel.places[placeId] != nil
+        }
+        if !hasExistingPlace {
             do {
                 let detailPlace = try await placeService.fetchPlace(withId: placeId)
                 await MainActor.run {
@@ -412,6 +454,18 @@ class DataManager: ObservableObject {
         for uid in allUserIds {
             await loadUserReviewedPlaces(userId: uid)
         }
+    }
+    
+    // MARK: - Public Accessors
+    
+    /// Get external places for a specific place ID
+    func getExternalPlace(for placeId: String) -> ExternalPlace? {
+        return profileViewModel.userExternalPlaces[placeId]
+    }
+    
+    /// Get all external places
+    func getAllExternalPlaces() -> [String: ExternalPlace] {
+        return profileViewModel.userExternalPlaces
     }
 }
 

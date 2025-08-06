@@ -217,6 +217,8 @@ struct CreatedPlacesView: View {
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @Environment(\.presentationMode) var presentationMode
     
+    @State private var placeToDelete: DetailPlace?
+    
     var body: some View {
         if isLoading {
             VStack {
@@ -247,12 +249,29 @@ struct CreatedPlacesView: View {
                             place: place,
                             cardWidth: cardWidth,
                             cardHeight: cardHeight,
-                            colorForPlace: colorForPlace
+                            colorForPlace: colorForPlace,
+                            onLongPress: {
+                                placeToDelete = place
+                            }
                         )
                     }
                 }
                 .padding(.horizontal, 20)
                 .padding(.vertical, 10)
+            }
+            .alert(item: $placeToDelete) { place in
+                Alert(
+                    title: Text("Delete Place"),
+                    message: Text("Are you sure you want to delete this place?"),
+                    primaryButton: .destructive(Text("Delete")) {
+                        profile.deleteMyPlace(place) { success in
+                            if !success {
+                                // Handle error if needed, e.g., show an error alert
+                            }
+                        }
+                    },
+                    secondaryButton: .cancel()
+                )
             }
         }
     }
@@ -342,69 +361,72 @@ struct PlaceGridCell: View {
     let cardWidth: CGFloat
     let cardHeight: CGFloat
     let colorForPlace: (DetailPlace) -> Color
+    var onLongPress: (() -> Void)? = nil
     
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @Environment(\.presentationMode) var presentationMode
     
     var body: some View {
-        Button(action: {
+        VStack(alignment: .leading, spacing: 0) {
+            ZStack(alignment: .bottom) {
+                if let image = profile.detailPlaceViewModel.placeImages[place.id.uuidString] {
+                    Image(uiImage: image)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: cardWidth, height: cardHeight)
+                        .clipped()
+                } else {
+                    Rectangle()
+                        .foregroundColor(colorForPlace(place))
+                        .frame(width: cardWidth, height: cardHeight)
+                }
+                
+                // Gradient overlay
+                LinearGradient(
+                    gradient: Gradient(colors: [.clear, .black.opacity(0.7)]),
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: 60)
+                
+                // Place name and address
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(place.name)
+                        .font(.headline)
+                        .foregroundColor(.white)
+                        .lineLimit(1)
+                    if let type = profile.detailPlaceViewModel.placeTypes[place.id.uuidString] {
+                        Text(type)
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.8))
+                            .lineLimit(1)
+                    } else if let address = place.address {
+                        Text(address)
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.8))
+                            .lineLimit(1)
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.bottom, 8)
+            }
+        }
+        .frame(width: cardWidth, height: cardHeight)
+        .background(Color.white)
+        .cornerRadius(20)
+        .overlay(
+            RoundedRectangle(cornerRadius: 20)
+                .stroke(Color.white, lineWidth: 2)
+        )
+        .shadow(color: Color.black.opacity(0.2), radius: 5, x: 0, y: 2)
+        .onTapGesture {
             selectedPlaceVM.selectedPlace = place
             selectedPlaceVM.isDetailSheetPresented = true
             presentationMode.wrappedValue.dismiss()
-        }) {
-            VStack(alignment: .leading, spacing: 0) {
-                ZStack(alignment: .bottom) {
-                    if let image = profile.detailPlaceViewModel.placeImages[place.id.uuidString] {
-                        Image(uiImage: image)
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .frame(width: cardWidth, height: cardHeight)
-                            .clipped()
-                    } else {
-                        Rectangle()
-                            .foregroundColor(colorForPlace(place))
-                            .frame(width: cardWidth, height: cardHeight)
-                    }
-                    
-                    // Gradient overlay
-                    LinearGradient(
-                        gradient: Gradient(colors: [.clear, .black.opacity(0.7)]),
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                    .frame(height: 60)
-                    
-                    // Place name and address
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(place.name)
-                            .font(.headline)
-                            .foregroundColor(.white)
-                            .lineLimit(1)
-                        if let type = profile.detailPlaceViewModel.placeTypes[place.id.uuidString] {
-                            Text(type)
-                                .font(.caption)
-                                .foregroundColor(.white.opacity(0.8))
-                                .lineLimit(1)
-                        } else if let address = place.address {
-                            Text(address)
-                                .font(.caption)
-                                .foregroundColor(.white.opacity(0.8))
-                                .lineLimit(1)
-                        }
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.bottom, 8)
-                }
-            }
-            .frame(width: cardWidth, height: cardHeight)
-            .background(Color.white)
-            .cornerRadius(20)
-            .overlay(
-                RoundedRectangle(cornerRadius: 20)
-                    .stroke(Color.white, lineWidth: 2)
-            )
-            .shadow(color: Color.black.opacity(0.2), radius: 5, x: 0, y: 2)
+        }
+        .onLongPressGesture {
+            onLongPress?()
         }
     }
 } 

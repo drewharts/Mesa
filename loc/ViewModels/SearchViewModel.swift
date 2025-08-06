@@ -17,6 +17,7 @@ class SearchViewModel: ObservableObject {
     @Published var userResults: [ProfileData] = []
     @Published var searchError: String?
     @Published var selectedUser: ProfileData?
+    @Published var showNoPlaceFound: Bool = false  // Track when search returns no results
 
     weak var selectedPlaceVM: SelectedPlaceViewModel?
     weak var placeTypeFilterVM: PlaceTypeFilterViewModel?
@@ -38,6 +39,7 @@ class SearchViewModel: ObservableObject {
             .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main) // 300ms delay
             .removeDuplicates() // Avoid duplicate searches
             .sink { [weak self] text in
+                print("🔍 [SearchViewModel] Search text changed: '\(text)'")
                 self?.searchPlaces(query: text)
                 self?.searchUsers(query: text)
                 // Update place type filters based on search text
@@ -49,18 +51,40 @@ class SearchViewModel: ObservableObject {
     }
 
     func searchPlaces(query: String) {
+        print("🔍 [SearchViewModel] searchPlaces called with query: '\(query)'")
+        
+        // Clear previous results first
+        searchResults = []
+        searchError = nil
+        showNoPlaceFound = false
+        
+        guard !query.isEmpty else {
+            print("🔍 [SearchViewModel] Query is empty, clearing results")
+            return
+        }
+        
+        print("🔍 [SearchViewModel] Calling searchService.searchPlaces...")
         searchService.searchPlaces(
             query: query,
             onResultsUpdated: { [weak self] results in
-                if let mesaSuggestions = results as? [MesaPlaceSuggestion] {
-                    DispatchQueue.main.async {
-                        self?.searchResults = mesaSuggestions
-                    }
+                print("🔍 [SearchViewModel] Received \(results.count) place results")
+                for (index, result) in results.enumerated() {
+                    print("🔍 [SearchViewModel] Result \(index + 1): \(result.name) - \(result.address ?? "No address")")
+                }
+                DispatchQueue.main.async {
+                    self?.searchResults = results
+                    // Show "no place found" message if search was performed but no results found
+                    self?.showNoPlaceFound = results.isEmpty && !query.isEmpty
+                    print("🔍 [SearchViewModel] Updated searchResults with \(results.count) items")
+                    print("🔍 [SearchViewModel] showNoPlaceFound: \(self?.showNoPlaceFound ?? false)")
                 }
             },
             onError: { [weak self] error in
+                print("❌ [SearchViewModel] Search error: \(error)")
                 DispatchQueue.main.async {
                     self?.searchError = error
+                    self?.showNoPlaceFound = false  // Don't show "no place found" on error
+                    print("❌ [SearchViewModel] Updated searchError: \(error)")
                 }
             }
         )
@@ -93,7 +117,7 @@ class SearchViewModel: ObservableObject {
             }
             
             // If no existing place is found, create a new DetailPlace using the initializer
-            var detailPlace = DetailPlace(from: place)
+            let detailPlace = DetailPlace(from: place)
             
             // Return the newly created DetailPlace
             completion(detailPlace)
@@ -113,7 +137,7 @@ class SearchViewModel: ObservableObject {
                     print("✅ Place Details Result:")
                     print("  ID: \(result.id)")
                     print("  Name: \(result.name)")
-                    print("  Address: \(result.address)")
+                    print("  Address: \(result.address ?? "Not available")")
                     print("  Location: (\(result.coordinate?.latitude ?? 0), \(result.coordinate?.longitude ?? 0))")
                     print("  Source: local")
                     print("  Open Hours: \(result.openHours?.joined(separator: ", ") ?? "Not available")")
@@ -128,18 +152,24 @@ class SearchViewModel: ObservableObject {
     }
     
     private func searchUsers(query: String) {
+        print("👥 [SearchViewModel] searchUsers called with query: '\(query)'")
+        
         guard !query.isEmpty else {
+            print("👥 [SearchViewModel] Query is empty, clearing user results")
             userResults = []
             return
         }
 
+        print("👥 [SearchViewModel] Calling userService.searchUsers...")
         userService.searchUsers(query: query) { [weak self] users, error in
             if let error = error {
-                print("Error searching users: \(error.localizedDescription)")
+                print("❌ [SearchViewModel] User search error: \(error.localizedDescription)")
                 return
             }
+            print("👥 [SearchViewModel] Received \(users?.count ?? 0) user results")
             DispatchQueue.main.async {
                 self?.userResults = users ?? []
+                print("👥 [SearchViewModel] Updated userResults with \(users?.count ?? 0) items")
             }
         }
     }

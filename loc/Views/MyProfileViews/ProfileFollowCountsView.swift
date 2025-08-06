@@ -92,13 +92,13 @@ struct ProfileFollowCountsView: View {
             }
         }
         .padding(.vertical, 10)
-        .onChange(of: profile.userFollowing.count) { _ in
+        .onChange(of: profile.userFollowing.count) {
             refreshToggle.toggle()
         }
-        .onChange(of: profile.userFollowers.count) { _ in
+        .onChange(of: profile.userFollowers.count) {
             refreshToggle.toggle()
         }
-        .onChange(of: profile.myPlaces.count) { _ in
+        .onChange(of: profile.myPlaces.count) {
             refreshToggle.toggle()
         }
     }

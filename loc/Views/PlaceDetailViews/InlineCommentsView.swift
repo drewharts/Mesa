@@ -211,8 +211,8 @@ struct InlineCommentsView: View {
                                             .stroke(Color.gray.opacity(0.3), lineWidth: 1)
                                     )
                                     .focused($isTextFieldFocused)
-                                    .onChange(of: isTextFieldFocused) { focused in
-                                        if focused {
+                                    .onChange(of: isTextFieldFocused) {
+                                        if isTextFieldFocused {
                                             // Small delay to ensure UI is updated
                                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                                                 withAnimation {
@@ -355,8 +355,8 @@ struct InlineCommentsView: View {
             }
             .padding(.bottom, showingReplyField ? keyboardHeight : 0)
             .animation(.easeOut(duration: 0.25), value: keyboardHeight)
-            .onChange(of: showingReplyField) { show in
-                if show {
+            .onChange(of: showingReplyField) {
+                if showingReplyField {
                     // When reply field is shown, scroll to it
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                         withAnimation {
@@ -365,9 +365,9 @@ struct InlineCommentsView: View {
                     }
                 }
             }
-            .onChange(of: isTextFieldFocused) { focused in
+            .onChange(of: isTextFieldFocused) {
                 // Report keyboard state to parent
-                onKeyboardActive(focused)
+                onKeyboardActive(isTextFieldFocused)
             }
         }
         .sheet(isPresented: $isPickerPresented) {

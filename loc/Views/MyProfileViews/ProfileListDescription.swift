@@ -31,7 +31,13 @@ struct ProfileListDescription: View {
             }
         }
         .sheet(isPresented: $showingPlacesPopup) {
-            ListPlacesPopupView(list: list, placeColors: $placeColors)
+            let lists = profile.userLists
+            let initialIndex = lists.firstIndex(where: { $0.id == list.id }) ?? 0
+            SwipeableListPopupView(
+                lists: lists,
+                initialListIndex: initialIndex,
+                placeColors: $placeColors
+            )
         }
     }
 }

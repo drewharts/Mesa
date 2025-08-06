@@ -8,7 +8,7 @@ struct InlineCommentView: View {
     @EnvironmentObject var detailplaceVM: DetailPlaceViewModel
     @EnvironmentObject var userSession: UserSession
     @State private var showFullText = false
-    @State private var showProfileView = false
+    @State private var shouldNavigateToProfile = false
     let onPhotoTapped: ([UIImage], Int) -> Void
     
     var body: some View {
@@ -28,17 +28,12 @@ struct InlineCommentView: View {
                             
                             if comment.userId == currentUserId {
                                 // Show the user's own profile page directly
-                                showProfileView = true
+                                shouldNavigateToProfile = true
                             } else {
                                 // For other users, fetch and show their profile
                                 userProfileViewModel.fetchAndSelectUser(userId: comment.userId, currentUserId: currentUserId)
                             }
                         }
-                        .background(
-                            NavigationLink(destination: ProfileView(), isActive: $showProfileView) {
-                                EmptyView()
-                            }
-                        )
                 // If not in cache, use AsyncImage as fallback
                 } else if let url = URL(string: comment.profilePhotoUrl) {
                     AsyncImage(url: url) { phase in
@@ -61,17 +56,12 @@ struct InlineCommentView: View {
                                     
                                     if comment.userId == currentUserId {
                                         // Show the user's own profile page directly
-                                        showProfileView = true
+                                        shouldNavigateToProfile = true
                                     } else {
                                         // For other users, fetch and show their profile
                                         userProfileViewModel.fetchAndSelectUser(userId: comment.userId, currentUserId: currentUserId)
                                     }
                                 }
-                                .background(
-                                    NavigationLink(destination: ProfileView(), isActive: $showProfileView) {
-                                        EmptyView()
-                                    }
-                                )
                         case .failure:
                             Image(systemName: "person.circle")
                                 .resizable()
@@ -94,7 +84,7 @@ struct InlineCommentView: View {
                             
                             if comment.userId == currentUserId {
                                 // Show the user's own profile page directly  
-                                showProfileView = true
+                                shouldNavigateToProfile = true
                             } else {
                                 // For other users, fetch and show their profile
                                 userProfileViewModel.fetchAndSelectUser(userId: comment.userId, currentUserId: currentUserId)
@@ -156,6 +146,9 @@ struct InlineCommentView: View {
                 .frame(height: 60)
                 .padding(.leading, 32) // Aligns with the text
             }
+        }
+        .navigationDestination(isPresented: $shouldNavigateToProfile) {
+            ProfileView()
         }
     }
     

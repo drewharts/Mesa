@@ -75,12 +75,16 @@ class PlaceTypeFilterViewModel: ObservableObject {
         var attempts = 0
         recalculationTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] timer in
             attempts += 1
-            self?.calculateMostFrequentTypes()
             
-            // Stop after 5 attempts (10 seconds)
-            if attempts >= 5 {
-                timer.invalidate()
-                self?.recalculationTimer = nil
+            // Use Task to call main actor method from timer closure
+            Task { @MainActor in
+                self?.calculateMostFrequentTypes()
+                
+                // Stop after 5 attempts (10 seconds)
+                if attempts >= 5 {
+                    timer.invalidate()
+                    self?.recalculationTimer = nil
+                }
             }
         }
     }
@@ -110,14 +114,18 @@ class PlaceTypeFilterViewModel: ObservableObject {
             return 
         }
         
-        isCalculatingTypes = true
+        DispatchQueue.main.async {
+            self.isCalculatingTypes = true
+        }
         
         let allPlaceIds = getAllUserPlaceIds()
         var typeCounts: [String: Int] = [:]
         
         // If we have no places yet, try again later
         if allPlaceIds.isEmpty {
-            isCalculatingTypes = false
+            DispatchQueue.main.async {
+                self.isCalculatingTypes = false
+            }
             return
         }
         
@@ -141,17 +149,23 @@ class PlaceTypeFilterViewModel: ObservableObject {
         
         // Sort by frequency and take top 8
         let previousTypes = mostFrequentTypes
-        mostFrequentTypes = typeCounts
+        let newTypes = typeCounts
             .sorted { $0.value > $1.value }
             .prefix(8)
             .map { $0.key }
         
+        DispatchQueue.main.async {
+            self.mostFrequentTypes = newTypes
+        }
+        
         // Only update if there are significant changes
-        if mostFrequentTypes != previousTypes {
+        if newTypes != previousTypes {
             // Types updated - no logging needed for production
         }
         
-        isCalculatingTypes = false
+        DispatchQueue.main.async {
+            self.isCalculatingTypes = false
+        }
     }
     
     func refreshMostFrequentTypes() {
@@ -183,7 +197,7 @@ class PlaceTypeFilterViewModel: ObservableObject {
         if !placesToCalculate.isEmpty {
             // Calculate types synchronously for immediate filtering results
             for place in placesToCalculate {
-                detailPlaceVM.calculateRestaurantTypeSync(for: place)
+                _ = detailPlaceVM.calculateRestaurantTypeSync(for: place)
             }
         }
         

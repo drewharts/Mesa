@@ -21,14 +21,39 @@ struct MinPlaceDetailView: View {
     @Binding var showNoPhoneNumberAlert: Bool
     let onPhotoTapped: ([UIImage], Int) -> Void
     
-    @State private var selectedTab: DetailTab = .reviews
+    @State private var selectedTab: DetailTab = .about
+    
+    private var defaultTab: DetailTab {
+        return selectedPlaceVM.reviews.isEmpty ? .about : .reviews
+    }
+    
+    private var tikTokVideos: [TikTokVideo] {
+        let placeTikTokVideos = selectedPlaceVM.selectedPlace?.tikTokVideos ?? []
+        let userTikTokVideos = profile.getTikTokVideos(for: selectedPlaceVM.selectedPlace?.id.uuidString ?? "")
+        
+        // Combine and deduplicate based on videoID or URL
+        var allVideos = placeTikTokVideos
+        
+        for userVideo in userTikTokVideos {
+            // Check if this video already exists (by videoID or URL)
+            let alreadyExists = allVideos.contains { existingVideo in
+                existingVideo.videoID == userVideo.videoID || existingVideo.url == userVideo.url
+            }
+            
+            if !alreadyExists {
+                allVideos.append(userVideo)
+            }
+        }
+        
+        return allVideos
+    }
     
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 5) {
                 // MARK: - Top Row: Title + Icons
                 HStack(alignment: .center) {
-                    Text(selectedPlaceVM.selectedPlace?.name ?? "Unnamed Place")
+                    Text(selectedPlaceVM.selectedPlace!.name)
                         .font(.largeTitle)
                         .fontWeight(.bold)
                         .foregroundColor(.black)
@@ -39,13 +64,13 @@ struct MinPlaceDetailView: View {
                 
                 // MARK: - Row: Type / Google Maps / Drive Time
                 HStack(spacing: 10) {
-                    Text(viewModel.getRestaurantType(for: selectedPlaceVM.selectedPlace!) ?? "Place")
+                    Text(viewModel.getRestaurantType(for: selectedPlaceVM.selectedPlace!)!)
                         .font(.subheadline)
                         .foregroundColor(.gray)
                     
                     Button(action: {
                         if let place = selectedPlaceVM.selectedPlace {
-                            let name = place.name ?? "Unknown Place"
+                            let name = place.name
                             // If we have an address, include it for more accurate search
                             if let address = place.address {
                                 viewModel.openGoogleMapsWithPlace(query: "\(name), \(address)")
@@ -110,8 +135,8 @@ struct MinPlaceDetailView: View {
                             )
                     }
                     
-                    if !selectedPlaceVM.reviews.isEmpty && (selectedPlaceVM.placeRating ?? 0.0) > 0 {
-                        Text(String(format: "%.1f", selectedPlaceVM.placeRating ?? 0.0))
+                    if !selectedPlaceVM.reviews.isEmpty && selectedPlaceVM.placeRating > 0 {
+                        Text(String(format: "%.1f", selectedPlaceVM.placeRating))
                             .font(.caption)
                             .foregroundColor(.black)
                             .padding(.horizontal, 6)
@@ -148,10 +173,42 @@ struct MinPlaceDetailView: View {
                 // MARK: - Tab-Specific Content
                 switch selectedTab {
                 case .about:
-                    Text(selectedPlaceVM.selectedPlace?.description ?? "No description available")
+                    Text(selectedPlaceVM.selectedPlace!.description ?? "No description available")
                         .font(.footnote)
                         .foregroundColor(.black)
                         .fixedSize(horizontal: false, vertical: true)
+                    
+                    // TikTok Videos Section
+                    if !tikTokVideos.isEmpty {
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack {
+                                Text("TikTok Videos")
+                                    .font(.headline)
+                                    .fontWeight(.bold)
+                                
+                                Spacer()
+                                
+                                Text("\(tikTokVideos.count)")
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(Color.gray.opacity(0.2))
+                                    .cornerRadius(12)
+                            }
+                            
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 12) {
+                                    ForEach(tikTokVideos, id: \.videoID) { video in
+                                        TikTokVideoView(tikTokVideo: video)
+                                            .id("tiktok_\(video.videoID)")
+                                    }
+                                }
+                                .padding(.horizontal, 1)
+                            }
+                        }
+                        .padding(.top, 15)
+                    }
                     
                     Divider()
                         .padding(.top, 15)
@@ -171,6 +228,9 @@ struct MinPlaceDetailView: View {
         }
         .scrollDisabled(!isScrollingEnabled) // Disable scrolling based on sheet height
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            selectedTab = defaultTab
+        }
         .onReceive(notificationManager.$highlightedReviewId) { reviewId in
             if reviewId != nil {
                 // Switch to reviews tab when there's a highlighted review

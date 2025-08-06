@@ -50,7 +50,7 @@ struct ProfilePictureView: View {
         .sheet(isPresented: $showingImagePicker) {
             ImagePicker(images: $inputImage, selectionLimit: 1)
         }
-        .onChange(of: inputImage) { _ in
+        .onChange(of: inputImage) { _, _ in
             if let newImage = inputImage.first {
                 Task {
                     await profile.changeProfilePhoto(newImage)

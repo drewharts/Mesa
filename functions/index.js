@@ -1,11 +1,170 @@
 const { onDocumentCreated } = require('firebase-functions/v2/firestore');
+const { https } = require('firebase-functions/v2');
 const { initializeApp } = require('firebase-admin/app');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 const { getMessaging } = require('firebase-admin/messaging');
+const fs = require('fs');
+const path = require('path');
 
 initializeApp();
 
 const db = getFirestore();
+
+// Helper function to get a place's image
+async function getPlaceImage(placeId) {
+  try {
+    // Validate input
+    if (!placeId) {
+      console.log('❌ Missing placeId for place image fetch');
+      return null;
+    }
+    
+    const placeDoc = await db.collection('places').doc(placeId).get();
+    if (!placeDoc.exists) {
+      console.log(`❌ Place document not found: ${placeId}`);
+      return null;
+    }
+    
+    const placeData = placeDoc.data();
+    
+    // Try to get the first photo URL from the place
+    if (placeData.photoUrls && placeData.photoUrls.length > 0) {
+      return placeData.photoUrls[0];
+    }
+    
+    // Try to get TikTok video thumbnail
+    if (placeData.tikTokVideos && placeData.tikTokVideos.length > 0) {
+      const firstVideo = placeData.tikTokVideos[0];
+      if (firstVideo.thumbnailUrl) {
+        return firstVideo.thumbnailUrl;
+      }
+    }
+    
+    // Try to get image from the latest review
+    const reviewsSnapshot = await db.collection('places').doc(placeId).collection('reviews')
+      .orderBy('timestamp', 'desc')
+      .limit(1)
+      .get();
+    
+    if (!reviewsSnapshot.empty) {
+      const reviewData = reviewsSnapshot.docs[0].data();
+      if (reviewData.photoUrls && reviewData.photoUrls.length > 0) {
+        return reviewData.photoUrls[0];
+      }
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Error fetching place image:', error);
+    return null;
+  }
+}
+
+// Helper function to get an image from a list's places
+async function getListImage(listId, userId) {
+  try {
+    // Validate inputs
+    if (!userId || !listId) {
+      console.log('❌ Missing userId or listId for list image fetch');
+      return null;
+    }
+    
+    // Get the list's places
+    const listDoc = await db.collection('users').doc(userId).collection('lists').doc(listId).get();
+    if (!listDoc.exists) return null;
+    
+    const listData = listDoc.data();
+    const placeIds = listData.placeIds || [];
+    
+    if (placeIds.length === 0) return null;
+    
+    // Try to get an image from the first few places in the list (limit to 3 for performance)
+    const placesToCheck = placeIds.slice(0, 3);
+    for (const placeId of placesToCheck) {
+      const image = await getPlaceImage(placeId);
+      if (image) return image;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Error fetching list image:', error);
+    return null;
+  }
+}
+
+// Serve web preview page for shared content
+exports.serveWebPreview = https.onRequest(async (req, res) => {
+  // Set CORS headers
+  res.set('Access-Control-Allow-Origin', '*');
+  res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.set('Access-Control-Allow-Headers', 'Content-Type');
+  
+  if (req.method === 'OPTIONS') {
+    res.status(204).send('');
+    return;
+  }
+  
+  try {
+    // Read the HTML template
+    const htmlPath = path.join(__dirname, 'public', 'index.html');
+    let html = fs.readFileSync(htmlPath, 'utf8');
+    
+    // Parse URL parameters
+    const { type, id, name, address, city, userId } = req.query;
+    
+    // Generate dynamic meta tags based on content type
+    let title = 'Mesa - Discover Amazing Places';
+    let description = 'Join Mesa to discover and share the best places around you.';
+    let image = 'https://mesa-backend-production.up.railway.app/static/images/mesa-logo.png';
+    let url = req.url;
+    
+    if (type === 'place') {
+      title = `${name || 'Amazing Place'} on Mesa`;
+      description = address ? `${address}${city ? `, ${city}` : ''}` : 'Check out this place on Mesa!';
+      
+      // Try to get the place's actual image
+      console.log(`🔍 Fetching image for place: ${id}`);
+      const placeImage = await getPlaceImage(id);
+      console.log(`📸 Place image result: ${placeImage ? 'Found' : 'Not found'}`);
+      image = placeImage || 'https://mesa-backend-production.up.railway.app/static/images/mesa-logo.png';
+      
+    } else if (type === 'list') {
+      title = `${name || 'Amazing List'} - Mesa List`;
+      description = city ? `A curated list of places in ${city}` : 'A curated list of amazing places';
+      
+      // Try to get an image from the list's places
+      console.log(`🔍 Fetching image for list: ${id}, userId: ${userId}`);
+      const listImage = await getListImage(id, userId);
+      console.log(`📸 List image result: ${listImage ? 'Found' : 'Not found'}`);
+      image = listImage || 'https://mesa-backend-production.up.railway.app/static/images/mesa-logo.png';
+    }
+    
+    // Add image parameter to URL for the web page
+    const imageParam = image !== 'https://mesa-backend-production.up.railway.app/static/images/mesa-logo.png' ? 
+      `&image=${encodeURIComponent(image)}` : '';
+    
+    // Replace meta tags in the HTML
+    html = html.replace(/<meta property="og:title" content="[^"]*">/g, `<meta property="og:title" content="${title}">`);
+    html = html.replace(/<meta property="og:description" content="[^"]*">/g, `<meta property="og:description" content="${description}">`);
+    html = html.replace(/<meta property="og:image" content="[^"]*">/g, `<meta property="og:image" content="${image}">`);
+    html = html.replace(/<meta property="og:url" content="[^"]*">/g, `<meta property="og:url" content="${url}">`);
+    
+    html = html.replace(/<meta name="twitter:title" content="[^"]*">/g, `<meta name="twitter:title" content="${title}">`);
+    html = html.replace(/<meta name="twitter:description" content="[^"]*">/g, `<meta name="twitter:description" content="${description}">`);
+    html = html.replace(/<meta name="twitter:image" content="[^"]*">/g, `<meta name="twitter:image" content="${image}">`);
+    
+    // Update the page title
+    html = html.replace(/<title>[^<]*<\/title>/g, `<title>${title}</title>`);
+    
+    // Set content type and send response
+    res.set('Content-Type', 'text/html');
+    res.status(200).send(html);
+    
+  } catch (error) {
+    console.error('Error serving web preview:', error);
+    res.status(500).send('Error loading preview page');
+  }
+});
 
 exports.notifyFriendsOnReview = onDocumentCreated('places/{placeId}/reviews/{reviewId}', async (event) => {
   const snap = event.data;

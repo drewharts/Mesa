@@ -586,6 +586,30 @@ class UserService: ObservableObject {
         }
     }
 
+    func fetchUserLists(userId: String, completion: @escaping ([PlaceList]?, Error?) -> Void) {
+        db.collection("users").document(userId).collection("placeLists")
+            .getDocuments { snapshot, error in
+                if let error = error {
+                    completion(nil, error)
+                    return
+                }
+
+                guard let documents = snapshot?.documents else {
+                    completion([], nil)
+                    return
+                }
+
+                var lists = documents.compactMap { doc -> PlaceList? in
+                    try? doc.data(as: PlaceList.self)
+                }
+                
+                // Sort on the client side to handle documents that may be missing the sortOrder field
+                lists.sort { $0.sortOrder < $1.sortOrder }
+                
+                completion(lists, nil)
+            }
+    }
+
     // New implementation that avoids EXC_BAD_ACCESS
     func fetchFriendsReviews(placeId: String, currentUserId: String, completion: @escaping ([ReviewProtocol]?, Error?) -> Void) {
         // Step 1: Get list of users the current user follows
@@ -600,27 +624,21 @@ class UserService: ObservableObject {
                 return
             }
             
-            // Handle case where user doesn't follow anyone or error occurred
-            guard let followingIds = followingIds, !followingIds.isEmpty else {
-                completion([], nil)
-                return
-            }
-            
-            // Always include the current user's own reviews
-            var userIdsToFetch = Set(followingIds)
+            // Always include the current user's own reviews first
+            var userIdsToFetch = Set<String>()
             userIdsToFetch.insert(currentUserId)
+            
+            // Add followed users if any exist
+            if let followingIds = followingIds, !followingIds.isEmpty {
+                userIdsToFetch.formUnion(followingIds)
+            }
             
             // Step 2: Fetch all reviews for the place
             let reviewsRef = self.db.collection("places")
                              .document(placeId)
                              .collection("reviews")
             
-            reviewsRef.order(by: "timestamp", descending: true).getDocuments { [weak self] snapshot, error in
-                guard let self = self else {
-                    completion(nil, NSError(domain: "FirestoreService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Self was deallocated"]))
-                    return
-                }
-                
+            reviewsRef.order(by: "timestamp", descending: true).getDocuments { snapshot, error in
                 if let error = error {
                     completion(nil, error)
                     return
@@ -638,15 +656,7 @@ class UserService: ObservableObject {
                 
                 for document in snapshot.documents {
                     let data = document.data()
-                    let ts = data["timestamp"]
-                    var dateString = "(unparsed)"
-                    if let ts = ts as? Timestamp {
-                        dateString = "\(ts.dateValue())"
-                    } else if let date = ts as? Date {
-                        dateString = "\(date)"
-                    } else {
-                        dateString = String(describing: ts)
-                    }
+                    
                     // First check if the review is from a user we want to include
                     guard let userId = data["userId"] as? String,
                           userIdsToFetch.contains(userId) else {
@@ -807,6 +817,74 @@ class UserService: ObservableObject {
         
         dispatchGroup.notify(queue: .main) {
             completion(allTokens)
+        }
+    }
+    
+    // MARK: - External Places (TikTok-sourced places)
+    
+    /// Fetch user's external places and return them as a dictionary keyed by placeId
+    func fetchUserExternalPlaces(userId: String, completion: @escaping ([String: ExternalPlace]?, Error?) -> Void) {
+        print("🔍 Fetching external places for user: \(userId)")
+        
+        let externalPlacesRef = db.collection("users")
+            .document(userId)
+            .collection("externalPlaces")
+        
+        externalPlacesRef.getDocuments { snapshot, error in
+            if let error = error {
+                print("❌ Error fetching external places for user \(userId): \(error.localizedDescription)")
+                completion(nil, error)
+                return
+            }
+            
+            guard let snapshot = snapshot else {
+                print("⚠️ No snapshot returned for external places of user \(userId)")
+                completion([:], nil)
+                return
+            }
+            
+            var externalPlacesDictionary: [String: ExternalPlace] = [:]
+            
+            for document in snapshot.documents {
+                do {
+                    var externalPlace = try document.data(as: ExternalPlace.self)
+                    
+                    // Set the document ID manually since it won't be in the document data
+                    externalPlace = ExternalPlace(
+                        id: document.documentID,
+                        addedAt: externalPlace.addedAt,
+                        address: externalPlace.address,
+                        coordinates: externalPlace.coordinates,
+                        name: externalPlace.name,
+                        placeId: externalPlace.placeId,
+                        source: externalPlace.source,
+                        tiktokVideos: externalPlace.tiktokVideos
+                    )
+                    
+                    // Use placeId as the key for the dictionary
+                    externalPlacesDictionary[externalPlace.placeId] = externalPlace
+                    
+                } catch {
+                    print("❌ Error decoding external place document \(document.documentID): \(error.localizedDescription)")
+                    // Continue processing other documents even if one fails
+                }
+            }
+            
+            print("✅ Successfully fetched \(externalPlacesDictionary.count) external places for user \(userId)")
+            completion(externalPlacesDictionary, nil)
+        }
+    }
+    
+    /// Async version of fetchUserExternalPlaces
+    func fetchUserExternalPlaces(userId: String) async throws -> [String: ExternalPlace] {
+        try await withCheckedThrowingContinuation { continuation in
+            fetchUserExternalPlaces(userId: userId) { externalPlaces, error in
+                if let error = error {
+                    continuation.resume(throwing: error)
+                } else {
+                    continuation.resume(returning: externalPlaces ?? [:])
+                }
+            }
         }
     }
 } 

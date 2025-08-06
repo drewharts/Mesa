@@ -17,6 +17,31 @@ struct ListPlaceGridCell: View {
     @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
     @Environment(\.presentationMode) var presentationMode
 
+    private var tikTokVideos: [TikTokVideo] {
+        let placeTikTokVideos = place.tikTokVideos ?? []
+        let userTikTokVideos = profile.getTikTokVideos(for: place.id.uuidString)
+        
+        // Combine and deduplicate based on videoID or URL
+        var allVideos = placeTikTokVideos
+        
+        for userVideo in userTikTokVideos {
+            // Check if this video already exists (by videoID or URL)
+            let alreadyExists = allVideos.contains { existingVideo in
+                existingVideo.videoID == userVideo.videoID || existingVideo.url == userVideo.url
+            }
+            
+            if !alreadyExists {
+                allVideos.append(userVideo)
+            }
+        }
+        
+        return allVideos
+    }
+    
+    private var firstTikTokThumbnail: String? {
+        return tikTokVideos.first?.thumbnailURL
+    }
+
     var body: some View {
         Button(action: {
             selectedPlaceVM.selectedPlace = place
@@ -25,16 +50,34 @@ struct ListPlaceGridCell: View {
         }) {
             VStack(alignment: .leading, spacing: 0) {
                 ZStack(alignment: .bottom) {
-                    if let image = detailPlaceViewModel.placeImages[place.id.uuidString] {
+                    if let thumbnailURL = firstTikTokThumbnail {
+                        // Show TikTok thumbnail
+                        AsyncImage(url: URL(string: thumbnailURL)) { image in
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .frame(width: cardWidth, height: cardHeight)
+                                .clipped()
+                        } placeholder: {
+                            Rectangle()
+                                .foregroundColor(.gray.opacity(0.3))
+                                .frame(width: cardWidth, height: cardHeight)
+                        }
+                    } else if let image = detailPlaceViewModel.placeImages[place.id.uuidString] {
+                        // Show place review image
                         Image(uiImage: image)
                             .resizable()
                             .aspectRatio(contentMode: .fill)
                             .frame(width: cardWidth, height: cardHeight)
                             .clipped()
                     } else {
+                        // Show colored rectangle fallback
                         Rectangle()
                             .foregroundColor(detailPlaceViewModel.colorForPlace(placeId: place.id.uuidString))
                             .frame(width: cardWidth, height: cardHeight)
+                            .onAppear {
+                                profile.loadPlaceImageWithFallback(for: place)
+                            }
                     }
                     LinearGradient(
                         gradient: Gradient(colors: [

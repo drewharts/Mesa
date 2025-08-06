@@ -1,0 +1,68 @@
+import Foundation
+import SwiftUI
+
+struct TikTokVideo: Codable, Identifiable, Equatable {
+    var id = UUID()
+    let videoID: String
+    let url: String
+    let title: String?
+    let caption: String?
+    let embedHTML: String
+    var thumbnailURL: String
+    let author: TikTokAuthor
+    let hashtags: [String]
+    let createdAt: String  // Changed from Date to String to match backend
+    
+    enum CodingKeys: String, CodingKey {
+        case id
+        case videoID = "video_id"
+        case url
+        case title
+        case caption
+        case embedHTML = "embed_html"
+        case thumbnailURL = "thumbnail_url"
+        case author
+        case hashtags
+        case createdAt = "created_at"
+    }
+    
+    // Manual initializer
+    init(id: UUID = UUID(), videoID: String, url: String, title: String?, caption: String?, embedHTML: String, thumbnailURL: String, author: TikTokAuthor, hashtags: [String], createdAt: String) {
+        self.id = id
+        self.videoID = videoID
+        self.url = url
+        self.title = title
+        self.caption = caption
+        self.embedHTML = embedHTML
+        self.thumbnailURL = thumbnailURL
+        self.author = author
+        self.hashtags = hashtags
+        self.createdAt = createdAt
+    }
+    
+    // Custom decoder to handle the backend format
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        
+        // Generate a UUID for the id if not present
+        self.id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        
+        self.videoID = try container.decode(String.self, forKey: .videoID)
+        self.url = try container.decode(String.self, forKey: .url)
+        self.title = try container.decodeIfPresent(String.self, forKey: .title) ?? ""
+        self.caption = try container.decodeIfPresent(String.self, forKey: .caption) ?? ""
+        self.embedHTML = try container.decodeIfPresent(String.self, forKey: .embedHTML) ?? ""
+        self.thumbnailURL = try container.decodeIfPresent(String.self, forKey: .thumbnailURL) ?? ""
+        self.author = try container.decode(TikTokAuthor.self, forKey: .author)
+        self.hashtags = try container.decodeIfPresent([String].self, forKey: .hashtags) ?? []
+        
+        // Handle date as string
+        if let dateString = try container.decodeIfPresent(String.self, forKey: .createdAt) {
+            self.createdAt = dateString
+        } else {
+            // Default to current date string if not provided
+            let formatter = ISO8601DateFormatter()
+            self.createdAt = formatter.string(from: Date())
+        }
+    }
+} 

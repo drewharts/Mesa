@@ -10,7 +10,6 @@ import PhotosUI
 import MapboxSearch
 
 struct CreatePlaceReviewView: View {
-    @Environment(\.presentationMode) var presentationMode: Binding<PresentationMode>
     @Binding var isPresented: Bool
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var selectedPlace: SelectedPlaceViewModel
@@ -57,7 +56,8 @@ struct CreatePlaceReviewView: View {
     }
     
     var btnBack : some View { Button(action: {
-        self.presentationMode.wrappedValue.dismiss()
+        // Close the review screen
+        isPresented = false
         }) {
             HStack {
             Image(systemName: "chevron.left") // set image here
@@ -71,7 +71,7 @@ struct CreatePlaceReviewView: View {
         NavigationView {
             ScrollView {
                 VStack(spacing: 16) {
-                    PlaceReviewHeaderView(placeName: place.name ?? "Unnamed Place")
+                    PlaceReviewHeaderView(placeName: place.name)
                     
                     // Add review type picker
                     Picker("Review Type", selection: $reviewType) {
@@ -105,7 +105,7 @@ struct CreatePlaceReviewView: View {
                     
                     // Display selected images
                     if !inputImages.isEmpty {
-                        SelectedImagesView(images: inputImages)
+                        SelectedImagesView(images: $inputImages)
                     }
                     
                     Divider()
@@ -134,9 +134,8 @@ struct CreatePlaceReviewView: View {
                                 // Wait briefly so user sees the highlight
                                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                                     showButtonHighlight = false
-                                    presentationMode.wrappedValue.dismiss()
                                     
-                                    // Call the callback to navigate to place detail
+                                    // Let the parent handle dismissal via binding
                                     onReviewSubmitted?(place)
                                 }
                                 
