@@ -10,6 +10,7 @@ import SwiftUI
 import Combine
 import FirebaseFirestore
 
+@MainActor
 class DeepLinkViewModel: ObservableObject {
     @Published var isShowingPlaceFromDeepLink = false
     @Published var deepLinkedPlace: DetailPlace?
@@ -42,6 +43,7 @@ class DeepLinkViewModel: ObservableObject {
             }
             .store(in: &cancellables)
         
+        // Since both classes are @MainActor, we can directly assign
         deepLinkManager.$isProcessingDeepLink
             .assign(to: &$isProcessingDeepLink)
     }
@@ -116,6 +118,7 @@ class DeepLinkViewModel: ObservableObject {
         noLocationAlertMessage = ""
     }
     
+    @MainActor
     func hasDeepLinkedPlace() -> Bool {
         return deepLinkedPlace != nil
     }
