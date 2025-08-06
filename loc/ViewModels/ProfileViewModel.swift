@@ -34,6 +34,7 @@ class ProfileViewModel: ObservableObject {
      internal let detailPlaceViewModel: DetailPlaceViewModel
      private let userSession: UserSession
     private var deepLinkManager: DeepLinkManager?
+    var userProfileViewModel: UserProfileViewModel?
 
      @Published var showMaxFavoritesAlert: Bool = false
      @Published var isLoading: Bool = true
@@ -72,7 +73,7 @@ class ProfileViewModel: ObservableObject {
     private let locationManager: LocationManager
     private var cancellables = Set<AnyCancellable>()
     
-    init(userSession: UserSession, userService: UserService, detailPlaceViewModel: DetailPlaceViewModel, imageService: ImageService, placeService: PlaceService, reviewService: ReviewService, locationManager: LocationManager, deepLinkManager: DeepLinkManager? = nil) {
+    init(userSession: UserSession, userService: UserService, detailPlaceViewModel: DetailPlaceViewModel, imageService: ImageService, placeService: PlaceService, reviewService: ReviewService, locationManager: LocationManager, deepLinkManager: DeepLinkManager? = nil, userProfileViewModel: UserProfileViewModel? = nil) {
          self.userService = userService
          self.detailPlaceViewModel = detailPlaceViewModel
         self.userSession = userSession
@@ -81,6 +82,7 @@ class ProfileViewModel: ObservableObject {
         self.reviewService = reviewService
         self.locationManager = locationManager
         self.deepLinkManager = deepLinkManager
+        self.userProfileViewModel = userProfileViewModel
         
         // Observe location changes using Combine
         setupLocationObserver()
@@ -92,7 +94,9 @@ class ProfileViewModel: ObservableObject {
             queue: .main
         ) { [weak self] notification in
             if let places = notification.userInfo?["places"] as? [DetailPlace] {
-                self?.handleMultiplePlaces(places)
+                Task { @MainActor in
+                    self?.handleMultiplePlaces(places)
+                }
             }
         }
      }
@@ -972,6 +976,27 @@ class ProfileViewModel: ObservableObject {
     /// Get the external place data for a specific place ID
     func getExternalPlace(for placeId: String) -> ExternalPlace? {
         return userExternalPlaces[placeId]
+    }
+
+    func loadPlaceImageWithFallback(for place: DetailPlace) {
+        let placeId = place.id.uuidString
+        
+        // If image already exists, no need to do anything
+        if detailPlaceViewModel.placeImages[placeId] != nil {
+            return
+        }
+        
+        // If there's no review image, try to load a TikTok thumbnail
+        if let externalPlace = getExternalPlace(for: placeId),
+           let firstTikTokVideo = externalPlace.tiktokVideos.first,
+           !firstTikTokVideo.thumbnailUrl.isEmpty {
+            
+            userProfileViewModel?.loadTikTokThumbnailAsPlaceImage(placeId: placeId, thumbnailURL: firstTikTokVideo.thumbnailUrl) { [weak self] placeId, image in
+                if let image = image {
+                    self?.detailPlaceViewModel.placeImages[placeId] = image
+                }
+            }
+        }
     }
 
     func deleteMyPlace(_ place: DetailPlace, completion: @escaping (Bool) -> Void) {

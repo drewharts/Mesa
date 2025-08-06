@@ -92,6 +92,8 @@ struct locApp: App {
             userService: services.userService,
             reviewService: services.reviewService
         )
+        
+        profileVM.userProfileViewModel = userProfileVM
 
         let searchVM = SearchViewModel(
             placeService: services.placeService,

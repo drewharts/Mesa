@@ -40,7 +40,7 @@ class PlaceShareService: ObservableObject {
     
     @MainActor
     private func sharePlace(_ shareablePlace: ShareablePlace) {
-        guard let deepLinkURL = shareablePlace.deepLinkURL else {
+        guard shareablePlace.deepLinkURL != nil else {
             print("❌ Failed to generate deep link URL for place: \(shareablePlace.name)")
             return
         }
@@ -56,7 +56,7 @@ class PlaceShareService: ObservableObject {
     
     @MainActor
     private func sharePlace(_ shareablePlace: ShareablePlace, withImage imageURL: String?) {
-        guard let deepLinkURL = shareablePlace.deepLinkURL else {
+        guard shareablePlace.deepLinkURL != nil else {
             print("❌ Failed to generate deep link URL for place: \(shareablePlace.name)")
             return
         }
@@ -76,7 +76,7 @@ class PlaceShareService: ObservableObject {
     func shareList(_ placeList: PlaceList, userId: String) {
         let shareableList = ShareableList(from: placeList, userId: userId)
         
-        guard let deepLinkURL = shareableList.deepLinkURL else {
+        guard shareableList.deepLinkURL != nil else {
             print("❌ Failed to generate deep link URL for list: \(shareableList.name)")
             return
         }

@@ -306,7 +306,7 @@ class UserProfileViewModel: ObservableObject {
     }
     
     /// Load TikTok thumbnail as place image for external places
-    private func loadTikTokThumbnailAsPlaceImage(placeId: String, thumbnailURL: String, completion: @escaping (String, UIImage?) -> Void) {
+    public func loadTikTokThumbnailAsPlaceImage(placeId: String, thumbnailURL: String, completion: @escaping (String, UIImage?) -> Void) {
         guard let url = URL(string: thumbnailURL) else {
             print("❌ [UserProfileViewModel] Invalid thumbnail URL for place \(placeId): \(thumbnailURL)")
             DispatchQueue.main.async {

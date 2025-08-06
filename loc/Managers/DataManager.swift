@@ -274,7 +274,7 @@ class DataManager: ObservableObject {
         for place in list.places {
             let placeId = place.id.uuidString
             
-            if let existingPlace = self.detailPlaceViewModel.places[placeId] {
+            if self.detailPlaceViewModel.places[placeId] != nil {
                 updateCachedPlace(placeId: placeId, userId: userId)
                 continue
             }
@@ -414,10 +414,10 @@ class DataManager: ObservableObject {
         }
         
         // Fetch and store the place if not already present
-        let existingPlace = await MainActor.run {
-            return self.detailPlaceViewModel.places[placeId]
+        let hasExistingPlace = await MainActor.run {
+            return self.detailPlaceViewModel.places[placeId] != nil
         }
-        if existingPlace == nil {
+        if !hasExistingPlace {
             do {
                 let detailPlace = try await placeService.fetchPlace(withId: placeId)
                 await MainActor.run {

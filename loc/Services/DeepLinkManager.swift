@@ -9,6 +9,7 @@ import Foundation
 import SwiftUI
 import FirebaseFirestore
 
+@MainActor
 class DeepLinkManager: ObservableObject {
     @Published var pendingPlace: ShareablePlace?
     @Published var pendingList: (lists: [PlaceList], initialIndex: Int)?

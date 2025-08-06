@@ -66,7 +66,7 @@ struct SelectedImagesView: View {
     }
     
     private func removeImage(at index: Int) {
-        withAnimation(.easeInOut(duration: 0.2)) {
+        _ = withAnimation(.easeInOut(duration: 0.2)) {
             images.remove(at: index)
         }
     }

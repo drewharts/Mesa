@@ -75,6 +75,9 @@ struct ListPlaceGridCell: View {
                         Rectangle()
                             .foregroundColor(detailPlaceViewModel.colorForPlace(placeId: place.id.uuidString))
                             .frame(width: cardWidth, height: cardHeight)
+                            .onAppear {
+                                profile.loadPlaceImageWithFallback(for: place)
+                            }
                     }
                     LinearGradient(
                         gradient: Gradient(colors: [
