@@ -750,7 +750,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				GENERATE_INFOPLIST_FILE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "Mesa Share/Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "Mesa Share";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -777,7 +777,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				GENERATE_INFOPLIST_FILE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "Mesa Share/Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "Mesa Share";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
