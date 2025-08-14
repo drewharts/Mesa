@@ -6,6 +6,7 @@
 
 import SwiftUI
 import GoogleSignInSwift
+import AuthenticationServices
 
 struct LoginView: View {
     @ObservedObject var viewModel: LoginViewModel
@@ -24,6 +25,14 @@ struct LoginView: View {
                         .scaledToFit()
                         .frame(width: 200, height: 200)
                 })
+                SignInWithAppleButton(.signIn, onRequest: { request in
+                    viewModel.prepareAppleSignIn(request: request)
+                }, onCompletion: { result in
+                    viewModel.handleAppleSignIn(result: result, userSession: userSession)
+                })
+                .signInWithAppleButtonStyle(.black)
+                .frame(height: 45)
+                .padding(.horizontal, 24)
                 if let errorMessage = viewModel.errorMessage {
                     Text(errorMessage)
                         .foregroundColor(.red)
