@@ -496,7 +496,10 @@ class ProfileViewModel: ObservableObject {
             }
         }
         
-        return validPlaceCount > 0 ? totalDistance / Double(validPlaceCount) : Double.infinity
+        let averageDistance = validPlaceCount > 0 ? totalDistance / Double(validPlaceCount) : Double.infinity
+        print("📍 [ProfileViewModel] List '\(list.name)': \(validPlaceCount) places, avg distance: \(averageDistance > 1000000 ? "∞" : String(format: "%.1f km", averageDistance/1000))")
+        
+        return averageDistance
     }
     
     /// Sorts userLists by their average distance from the user's current location (closest first)
@@ -518,7 +521,13 @@ class ProfileViewModel: ObservableObject {
             return
         }
         
-        print("📍 [ProfileViewModel] sortListsByDistance: Sorting \(userLists.count) lists by distance")
+        // Only sort if we have at least 3 lists with places loaded for meaningful sorting
+        guard listsWithPlaces.count >= 3 else {
+            print("📍 [ProfileViewModel] sortListsByDistance: Only \(listsWithPlaces.count) lists with places loaded, waiting for more data")
+            return
+        }
+        
+        print("📍 [ProfileViewModel] sortListsByDistance: Sorting \(userLists.count) lists by distance (with \(listsWithPlaces.count) lists having places)")
         
         userLists.sort { list1, list2 in
             let distance1 = calculateAverageDistanceForList(list1)
@@ -769,8 +778,10 @@ class ProfileViewModel: ObservableObject {
                 self.loadingListIds.remove(listId)
                 print("✅ [ProfileViewModel] loadListDataIfNeeded: Successfully loaded places for list \(listId)")
                 
-                // Try to sort lists by distance now that we have places loaded
-                self.sortListsByDistance()
+                // Only sort once when we have enough data, not every time a list loads
+                if !self.hasPerformedInitialSort {
+                    self.sortListsByDistance()
+                }
             }
         }
     }
