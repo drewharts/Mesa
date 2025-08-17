@@ -57,6 +57,10 @@ class ProfileViewModel: ObservableObject {
     @Published var importedPlaces: [DetailPlace] = []
     @Published var isShowingPlaceSelection: Bool = false
     
+    // Lazy loading state for lists
+    @Published var loadedListIds: Set<UUID> = []
+    @Published var loadingListIds: Set<UUID> = []
+    
     // Add deduplication mechanism for TikTok URLs
     private var recentlyProcessedURLs: Set<String> = []
     
@@ -704,8 +708,9 @@ class ProfileViewModel: ObservableObject {
                 await MainActor.run {
                     print("🔍 [ProfileViewModel] ensureListsLoaded: Updating UI with \(lists.count) lists")
                     self.userLists = lists
+                    // Initialize with empty place arrays for lazy loading
                     self.userListsPlaces = lists.reduce(into: [String: [String]]()) { result, list in
-                        result[list.id.uuidString] = list.places.map { $0.id.uuidString }
+                        result[list.id.uuidString] = []
                     }
                     self.isLoading = false
                     print("🔍 [ProfileViewModel] ensureListsLoaded: Updated userListsPlaces with \(self.userListsPlaces.count) entries")
@@ -715,6 +720,28 @@ class ProfileViewModel: ObservableObject {
                 await MainActor.run {
                     self.isLoading = false
                 }
+            }
+        }
+    }
+    
+    func loadListDataIfNeeded(listId: UUID) {
+        guard !loadedListIds.contains(listId) && !loadingListIds.contains(listId),
+              let userId = user?.id else { 
+            print("🔍 [ProfileViewModel] loadListDataIfNeeded: List \(listId) already loaded or loading")
+            return 
+        }
+        
+        print("🔍 [ProfileViewModel] loadListDataIfNeeded: Loading data for list \(listId)")
+        loadingListIds.insert(listId)
+        
+        Task {
+            // Use DataManager to load places for this list
+            await detailPlaceViewModel.dataManager?.loadPlacesForList(listId: listId, userId: userId)
+            
+            await MainActor.run {
+                self.loadedListIds.insert(listId)
+                self.loadingListIds.remove(listId)
+                print("✅ [ProfileViewModel] loadListDataIfNeeded: Successfully loaded places for list \(listId)")
             }
         }
     }

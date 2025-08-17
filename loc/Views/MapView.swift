@@ -6,8 +6,6 @@
 
 import SwiftUI
 import MapKit
-import MapboxMaps
-import CoreLocation
 
 struct MapView: View {
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
@@ -15,8 +13,6 @@ struct MapView: View {
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var detailPlaceVM: DetailPlaceViewModel
     @EnvironmentObject var placeTypeFilterVM: PlaceTypeFilterViewModel
-    @EnvironmentObject var dataManager: DataManager
-    @EnvironmentObject var userSession: UserSession
     
     @Binding var recenterMap: Bool
     
@@ -27,9 +23,6 @@ struct MapView: View {
     @State private var newPlaceCoordinate: CLLocationCoordinate2D?
     @State private var mapPosition = MapCameraPosition.automatic
     @State private var mapRefreshToggle = false
-    @State private var isMapLoaded = false
-    @State private var lastLoadedBounds: MapBounds?
-    @State private var isLoadingPlaces = false
     
     var onMapTap: (() -> Void)?
     
@@ -105,82 +98,56 @@ struct MapView: View {
                             onMapTap?()
                         }
                 )
-                .onMapCameraChange { context in
-                    handleMapCameraChange(context: context, mapProxy: mapProxy)
-                }
-                .onAppear {
-                    isMapLoaded = true
-                    // Load initial places in bounds
-                    if let userId = userSession.currentUserId {
-                        loadInitialPlacesInBounds(userId: userId, mapProxy: mapProxy)
+            }
+            .onChange(of: selectedPlaceVM.selectedPlace) { oldValue, newValue in
+                guard let place = newValue, let geoPoint = place.coordinate else {
+                    // Reset to default if no place is selected
+                    withAnimation(.easeOut) {
+                        mapPosition = .camera(MapCamera(centerCoordinate: defaultCenter, distance: 100))
                     }
+                    return
                 }
-                .onChange(of: selectedPlaceVM.selectedPlace) { oldValue, newValue in
-                    guard let place = newValue, let geoPoint = place.coordinate else {
-                        // Reset to default if no place is selected
-                        withAnimation(.easeOut) {
-                            mapPosition = .camera(MapCamera(centerCoordinate: defaultCenter, distance: 100))
-                        }
-                        return
-                    }
-                    let newCenter = CLLocationCoordinate2D(latitude: geoPoint.latitude, longitude: geoPoint.longitude)
-                    withAnimation(.easeInOut) {
-                        mapPosition = .camera(MapCamera(centerCoordinate: newCenter, distance: 500))
-                    }
-                }
-                .onChange(of: recenterMap) { oldValue, newValue in
-                    if newValue {
-                        let coords = locationManager.currentLocation?.coordinate ?? defaultCenter
-                        withAnimation(.easeInOut) {
-                            mapPosition = .camera(MapCamera(centerCoordinate: coords, distance: 1000))
-                        }
-                        recenterMap = false
-                    }
-                }
-                .onAppear {
-                    // Set initial position when the view appears
-                    if let place = selectedPlaceVM.selectedPlace, let geoPoint = place.coordinate {
-                        let newCenter = CLLocationCoordinate2D(latitude: geoPoint.latitude, longitude: geoPoint.longitude)
-                        let camera = MapCamera(centerCoordinate: newCenter, distance: 500)
-                        mapPosition = .camera(camera)
-                    } else {
-                        let camera = MapCamera(centerCoordinate: currentCoords, distance: 1000)
-                        mapPosition = .camera(camera)
-                    }
-                    
-                    // Setup notification observer for place updates
-                    setupNotificationObservers()
-                }
-                 .onDisappear {
-                     // Remove notification observers
-                     removeNotificationObservers()
-                 }
-                .task {
-                    // Refresh places whenever the view appears
-                    await profile.refreshUserPlaces()
-                    
-                    // Calculate annotation images
-                    detailPlaceVM.calculateAnnotationPlaces()
-                    
-                    // Calculate most frequent types
-                    placeTypeFilterVM.refreshMostFrequentTypes()
+                let newCenter = CLLocationCoordinate2D(latitude: geoPoint.latitude, longitude: geoPoint.longitude)
+                withAnimation(.easeInOut) {
+                    mapPosition = .camera(MapCamera(centerCoordinate: newCenter, distance: 500))
                 }
             }
-            
-            // Loading indicator
-            if isLoadingPlaces {
-                VStack {
-                    Spacer()
-                    HStack {
-                        Spacer()
-                        ProgressView("Loading places...")
-                            .padding()
-                            .background(.ultraThinMaterial)
-                            .cornerRadius(10)
-                        Spacer()
+            .onChange(of: recenterMap) { oldValue, newValue in
+                if newValue {
+                    let coords = locationManager.currentLocation?.coordinate ?? defaultCenter
+                    withAnimation(.easeInOut) {
+                        mapPosition = .camera(MapCamera(centerCoordinate: coords, distance: 1000))
                     }
-                    Spacer()
+                    recenterMap = false
                 }
+            }
+            .onAppear {
+                // Set initial position when the view appears
+                if let place = selectedPlaceVM.selectedPlace, let geoPoint = place.coordinate {
+                    let newCenter = CLLocationCoordinate2D(latitude: geoPoint.latitude, longitude: geoPoint.longitude)
+                    let camera = MapCamera(centerCoordinate: newCenter, distance: 500)
+                    mapPosition = .camera(camera)
+                } else {
+                    let camera = MapCamera(centerCoordinate: currentCoords, distance: 1000)
+                    mapPosition = .camera(camera)
+                }
+                
+                // Setup notification observer for place updates
+                setupNotificationObservers()
+            }
+             .onDisappear {
+                 // Remove notification observers
+                 removeNotificationObservers()
+             }
+            .task {
+                // Refresh places whenever the view appears
+                await profile.refreshUserPlaces()
+                
+                // Calculate annotation images
+                detailPlaceVM.calculateAnnotationPlaces()
+                
+                // Calculate most frequent types
+                placeTypeFilterVM.refreshMostFrequentTypes()
             }
             
             // Show the create place popup if needed
@@ -208,82 +175,6 @@ struct MapView: View {
                 .zIndex(2)
             }
         }
-    }
-    
-    // MARK: - Bounds-based Loading
-    
-    private func handleMapCameraChange(context: MapCameraChangeContext, mapProxy: MapProxy) {
-        guard isMapLoaded,
-              let userId = userSession.currentUserId,
-              !isLoadingPlaces else { return }
-        
-        // Get current map bounds
-        let currentBounds = getMapBounds(mapProxy: mapProxy)
-        
-        // Check if bounds have changed significantly (to avoid excessive loading)
-        if let lastBounds = lastLoadedBounds,
-           !hasBoundsChangedSignificantly(current: currentBounds, previous: lastBounds) {
-            return
-        }
-        
-        // Load places in new bounds
-        loadPlacesInBounds(bounds: currentBounds, userId: userId)
-        lastLoadedBounds = currentBounds
-    }
-    
-    private func loadInitialPlacesInBounds(userId: String, mapProxy: MapProxy) {
-        let bounds = getMapBounds(mapProxy: mapProxy)
-        loadPlacesInBounds(bounds: bounds, userId: userId)
-        lastLoadedBounds = bounds
-    }
-    
-    private func loadPlacesInBounds(bounds: MapBounds, userId: String) {
-        guard !isLoadingPlaces else { return }
-        
-        isLoadingPlaces = true
-        
-        Task {
-            await dataManager.loadPlacesInBounds(
-                northEast: bounds.northEast,
-                southWest: bounds.southWest,
-                userId: userId
-            )
-            
-            DispatchQueue.main.async {
-                self.isLoadingPlaces = false
-            }
-        }
-    }
-    
-    private func getMapBounds(mapProxy: MapProxy) -> MapBounds {
-        // Get the visible region bounds
-        let cameraOptions = mapProxy.cameraOptions
-        let center = cameraOptions.center ?? defaultCenter
-        let zoom = cameraOptions.zoom ?? 10
-        
-        // Calculate bounds based on zoom level
-        let latDelta = 360.0 / pow(2.0, zoom)
-        let lonDelta = latDelta * 1.5 // Approximate aspect ratio
-        
-        let northEast = CLLocationCoordinate2D(
-            latitude: center.latitude + latDelta / 2,
-            longitude: center.longitude + lonDelta / 2
-        )
-        let southWest = CLLocationCoordinate2D(
-            latitude: center.latitude - latDelta / 2,
-            longitude: center.longitude - lonDelta / 2
-        )
-        
-        return MapBounds(northEast: northEast, southWest: southWest)
-    }
-    
-    private func hasBoundsChangedSignificantly(current: MapBounds, previous: MapBounds) -> Bool {
-        // Check if the bounds have changed by more than 20%
-        let latChange = abs(current.northEast.latitude - previous.northEast.latitude)
-        let lonChange = abs(current.northEast.longitude - previous.northEast.longitude)
-        
-        let threshold = 0.01 // About 1km change
-        return latChange > threshold || lonChange > threshold
     }
     
     // MARK: - Private Methods
@@ -331,11 +222,4 @@ struct PlaceAnnotationView: View {
             }
         }
     }
-}
-
-// MARK: - Supporting Types
-
-struct MapBounds {
-    let northEast: CLLocationCoordinate2D
-    let southWest: CLLocationCoordinate2D
 }

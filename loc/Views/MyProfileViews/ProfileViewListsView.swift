@@ -43,13 +43,20 @@ struct ProfileViewListsView: View {
             )
 
             if !filteredLists.isEmpty {
-                ForEach(filteredLists, id: \ .id) { list in
-                    ProfileListSection(
-                        list: list,
-                        placeIds: profile.userListsPlaces[list.id.uuidString],
-                        detailPlaceViewModel: detailPlaceViewModel,
-                        placeColors: $placeColors
-                    )
+                LazyVStack(spacing: 16) {
+                    ForEach(filteredLists, id: \.id) { list in
+                        ProfileListSection(
+                            list: list,
+                            placeIds: profile.userListsPlaces[list.id.uuidString],
+                            detailPlaceViewModel: detailPlaceViewModel,
+                            placeColors: $placeColors,
+                            isLoading: profile.loadingListIds.contains(list.id)
+                        )
+                        .onAppear {
+                            // Load list data only when it becomes visible
+                            profile.loadListDataIfNeeded(listId: list.id)
+                        }
+                    }
                 }
             } else {
                 VStack(spacing: 8) {

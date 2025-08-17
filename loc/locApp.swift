@@ -84,6 +84,9 @@ struct locApp: App {
             profileViewModel: profileVM,
             detailPlaceViewModel: detailVM
         )
+        
+        // Set DataManager reference in DetailPlaceViewModel for lazy loading
+        detailVM.dataManager = dataMgr
 
         let userProfileVM = UserProfileViewModel(
             dataManager: dataMgr, 
