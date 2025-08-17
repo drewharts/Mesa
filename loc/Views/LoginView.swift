@@ -16,15 +16,22 @@ struct LoginView: View {
         ZStack {
             Color.white
                 .ignoresSafeArea(.all)
-            VStack {
+            VStack(spacing: 20) {
+                Spacer()
+                
+                // Google Sign In Button
                 Button(action: {
                     viewModel.signInWithGoogle(userSession: userSession)
                 }, label: {
                     Image("ios_light_sq_SI")
                         .resizable()
                         .scaledToFit()
-                        .frame(width: 200, height: 200)
+                        .frame(height: 45)
                 })
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, 24)
+                
+                // Apple Sign In Button
                 SignInWithAppleButton(.signIn, onRequest: { request in
                     viewModel.prepareAppleSignIn(request: request)
                 }, onCompletion: { result in
@@ -32,11 +39,18 @@ struct LoginView: View {
                 })
                 .signInWithAppleButtonStyle(.black)
                 .frame(height: 45)
+                .frame(maxWidth: .infinity)
                 .padding(.horizontal, 24)
+                
+                // Error Message
                 if let errorMessage = viewModel.errorMessage {
                     Text(errorMessage)
                         .foregroundColor(.red)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 24)
                 }
+                
+                Spacer()
             }
         }
     }
