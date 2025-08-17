@@ -493,8 +493,14 @@ class ProfileViewModel: ObservableObject {
                     totalDistance += distance
                     validPlaceCount += 1
                 } else {
-                    print("📍 [ProfileViewModel] Place '\(detailPlace.name)' has no coordinates")
+                    print("📍 [ProfileViewModel] Place '\(detailPlace.name)' (ID: \(placeId)) has no coordinates")
+                    // Debug: Check if this place has a mapboxId that could be used to get coordinates
+                    if let mapboxId = detailPlace.mapboxId {
+                        print("📍 [ProfileViewModel] Place '\(detailPlace.name)' has mapboxId: \(mapboxId) but no coordinates")
+                    }
                 }
+            } else {
+                print("📍 [ProfileViewModel] Place with ID \(placeId) not found in detailPlaceViewModel.places")
             }
         }
         

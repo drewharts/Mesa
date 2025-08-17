@@ -268,6 +268,22 @@ class DataManager: ObservableObject {
             }
         } catch {
             print("Error fetching place details: \(error.localizedDescription) (listId: \(listId), placeId: \(placeId))")
+            
+            // Create fallback DetailPlace from the list data
+            if let list = profileViewModel.userLists.first(where: { $0.id.uuidString == listId }),
+               let place = list.places.first(where: { $0.id.uuidString == placeId }) {
+                let fallbackDetailPlace = DetailPlace(id: place.id, name: place.name, address: place.address, city: nil)
+                await MainActor.run {
+                    self.detailPlaceViewModel.places[placeId] = fallbackDetailPlace
+                    self.detailPlaceViewModel.generateColorForPlace(placeId)
+                    // Update place savers
+                    if self.detailPlaceViewModel.placeSavers[placeId] == nil {
+                        self.detailPlaceViewModel.placeSavers[placeId] = [userId]
+                    } else if !self.detailPlaceViewModel.placeSavers[placeId]!.contains(userId) {
+                        self.detailPlaceViewModel.placeSavers[placeId]!.append(userId)
+                    }
+                }
+            }
         }
     }
     
