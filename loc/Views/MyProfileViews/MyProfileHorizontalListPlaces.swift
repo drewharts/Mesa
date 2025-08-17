@@ -33,55 +33,46 @@ struct MyProfileHorizontalListPlaces: View {
                             Image(uiImage: image)
                                 .resizable()
                                 .scaledToFill()
-                                .frame(width: 85, height: 85)
-                                .cornerRadius(50)
+                                .frame(width: 120, height: 80)
+                                .cornerRadius(8)
                                 .clipped()
-                                .overlay(
-                                    Circle()
-                                        .stroke(Color.white, lineWidth: 1)
-                                        .frame(width: 85, height: 85)
-                                )
                                 .shadow(color: .black.opacity(0.2), radius: 3, x: 0, y: 2)
                         } else {
-                            Circle()
-                                .frame(width: 85, height: 85)
+                            Rectangle()
+                                .frame(width: 120, height: 80)
                                 .foregroundColor(detailPlaceViewModel.colorForPlace(placeId: place.id.uuidString))
-                                .overlay(
-                                    Circle()
-                                        .stroke(Color.white, lineWidth: 1)
-                                        .frame(width: 85, height: 85)
-                                )
+                                .cornerRadius(8)
                                 .shadow(color: .black.opacity(0.2), radius: 3, x: 0, y: 2)
                         }
                         
-                        Text(place.name.prefix(15))
+                        Text(place.name.prefix(20))
                             .foregroundColor(.black)
                             .fontWeight(.semibold)
                             .font(.footnote)
                             .multilineTextAlignment(.center)
                             .lineLimit(1)
-                            .frame(width: 85)
+                            .frame(width: 120)
                         
                         // Display restaurant type instead of city
                         if let type = detailPlaceViewModel.placeTypes[place.id.uuidString] {
-                            Text(type.prefix(15))
+                            Text(type.prefix(20))
                                 .foregroundColor(.black)
                                 .font(.caption)
                                 .fontWeight(.light)
                                 .multilineTextAlignment(.center)
                                 .lineLimit(1)
-                                .frame(width: 85)
+                                .frame(width: 120)
                         } else if let city = place.city {
-                            Text(city.prefix(15))
+                            Text(city.prefix(20))
                                 .foregroundColor(.black)
                                 .font(.caption)
                                 .fontWeight(.light)
                                 .multilineTextAlignment(.center)
                                 .lineLimit(1)
-                                .frame(width: 85)
+                                .frame(width: 120)
                         }
                     }
-                    .padding(.trailing, 10)
+                    .padding(.trailing, 8)
                 }
                 .contextMenu {
                     Button {
