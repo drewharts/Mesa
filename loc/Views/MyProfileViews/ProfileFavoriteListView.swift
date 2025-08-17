@@ -23,13 +23,11 @@ struct ProfileFavoriteListView: View {
                 Text("FAVORITES")
                     .font(.subheadline)
                     .fontWeight(.medium)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.leading, 20)
                     .foregroundStyle(.black)
-                    .padding(.top, -10)
             }
             .buttonStyle(.plain)
-            .padding(.horizontal, 10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 20)
 
             // 2) Favorite places or placeholders
             HStack(spacing: 10) {
