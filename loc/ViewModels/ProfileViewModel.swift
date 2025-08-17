@@ -106,12 +106,12 @@ class ProfileViewModel: ObservableObject {
      }
     
     private func setupLocationObserver() {
-        // Observe location changes to trigger sorting when location becomes available
+        // Only sort once when location first becomes available
         locationManager.$currentLocation
             .dropFirst() // Skip the initial nil value
             .sink { [weak self] location in
-                if location != nil {
-                    print("📍 [ProfileViewModel] Location updated, attempting to sort lists")
+                if location != nil && !(self?.hasPerformedInitialSort ?? false) {
+                    print("📍 [ProfileViewModel] Location first available, performing initial sort")
                     Task { @MainActor in
                         self?.sortListsByDistance()
                     }
