@@ -15,7 +15,7 @@ struct ProfileContentView: View {
     var body: some View {
         ZStack {
             ScrollView {
-                VStack(spacing: 20) {
+                VStack(spacing: 12) {
                     // Profile Picture
                     ProfilePictureView()
 

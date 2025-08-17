@@ -34,7 +34,7 @@ struct ProfileViewListsView: View {
     }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 8) {
             ListHeaderView(
                 onAddList: {
                     showingNewListSheet = true
@@ -76,7 +76,7 @@ struct ProfileViewListsView: View {
                 }
             }
         }
-        .padding(.vertical)
+        .padding(.vertical, 8)
         .sheet(isPresented: $showingImagePicker) {
             ImagePicker(images: $inputImage, selectionLimit: 1)
         }

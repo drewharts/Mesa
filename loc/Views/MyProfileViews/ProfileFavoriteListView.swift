@@ -15,7 +15,7 @@ struct ProfileFavoriteListView: View {
     @State private var showSearch = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
+        VStack(alignment: .leading, spacing: 8) {
             // 1) "FAVORITES" button
             Button {
                 showSearch = true
