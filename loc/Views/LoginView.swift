@@ -16,7 +16,7 @@ struct LoginView: View {
         ZStack {
             Color.white
                 .ignoresSafeArea(.all)
-            VStack(spacing: 20) {
+            VStack(spacing: 32) {
                 Spacer()
                 
                 // Google Sign In Button
@@ -29,6 +29,7 @@ struct LoginView: View {
                         .frame(height: 45)
                 })
                 .frame(maxWidth: .infinity)
+                .frame(height: 50)
                 .padding(.horizontal, 24)
                 
                 // Apple Sign In Button
@@ -38,8 +39,8 @@ struct LoginView: View {
                     viewModel.handleAppleSignIn(result: result, userSession: userSession)
                 })
                 .signInWithAppleButtonStyle(.black)
-                .frame(height: 45)
                 .frame(maxWidth: .infinity)
+                .frame(height: 50)
                 .padding(.horizontal, 24)
                 
                 // Error Message
