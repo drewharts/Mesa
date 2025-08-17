@@ -482,22 +482,24 @@ class ProfileViewModel: ObservableObject {
         var validPlaceCount: Int = 0
         
         for placeId in listPlaceIds {
-            if let detailPlace = detailPlaceViewModel.places[placeId],
-               let placeCoordinate = detailPlace.coordinate {
-                
-                let placeLocation = CLLocation(
-                    latitude: placeCoordinate.latitude,
-                    longitude: placeCoordinate.longitude
-                )
-                
-                let distance = currentLocation.distance(from: placeLocation)
-                totalDistance += distance
-                validPlaceCount += 1
+            if let detailPlace = detailPlaceViewModel.places[placeId] {
+                if let placeCoordinate = detailPlace.coordinate {
+                    let placeLocation = CLLocation(
+                        latitude: placeCoordinate.latitude,
+                        longitude: placeCoordinate.longitude
+                    )
+                    
+                    let distance = currentLocation.distance(from: placeLocation)
+                    totalDistance += distance
+                    validPlaceCount += 1
+                } else {
+                    print("📍 [ProfileViewModel] Place '\(detailPlace.name)' has no coordinates")
+                }
             }
         }
         
         let averageDistance = validPlaceCount > 0 ? totalDistance / Double(validPlaceCount) : Double.infinity
-        print("📍 [ProfileViewModel] List '\(list.name)': \(validPlaceCount) places, avg distance: \(averageDistance > 1000000 ? "∞" : String(format: "%.1f km", averageDistance/1000))")
+        print("📍 [ProfileViewModel] List '\(list.name)': \(validPlaceCount)/\(listPlaceIds.count) places with coordinates, avg distance: \(averageDistance > 1000000 ? "∞" : String(format: "%.1f km", averageDistance/1000))")
         
         return averageDistance
     }
@@ -532,7 +534,22 @@ class ProfileViewModel: ObservableObject {
         userLists.sort { list1, list2 in
             let distance1 = calculateAverageDistanceForList(list1)
             let distance2 = calculateAverageDistanceForList(list2)
-            return distance1 < distance2
+            
+            // If both lists have valid distances, sort by distance
+            if distance1 != Double.infinity && distance2 != Double.infinity {
+                return distance1 < distance2
+            }
+            // If only one has valid distance, prioritize it
+            else if distance1 != Double.infinity {
+                return true
+            }
+            else if distance2 != Double.infinity {
+                return false
+            }
+            // If neither has valid distance, sort alphabetically
+            else {
+                return list1.name < list2.name
+            }
         }
         
         hasPerformedInitialSort = true
