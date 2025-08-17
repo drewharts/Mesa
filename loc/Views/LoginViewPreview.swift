@@ -26,7 +26,7 @@ struct LoginViewPreview: View {
                     Image("ios_light_sq_SI")
                         .resizable()
                         .scaledToFit()
-                        .frame(height: 45)
+                        .frame(height: 50)
                 })
                 .frame(maxWidth: .infinity)
                 .frame(height: 50)
@@ -39,7 +39,7 @@ struct LoginViewPreview: View {
                     print("Apple Sign In completed")
                 })
                 .signInWithAppleButtonStyle(.black)
-                .frame(width: 180, height: 50)
+                .frame(width: 210, height: 50)
                 .padding(.horizontal, 24)
                 
                 // Error Message (for testing)
