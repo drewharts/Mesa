@@ -42,42 +42,32 @@ struct ProfileFavoriteListView: View {
                                 Image(uiImage: image)
                                     .resizable()
                                     .scaledToFill()
-                                    .frame(width: 85, height: 85)
-                                    .cornerRadius(50)
+                                    .frame(width: 120, height: 80)
+                                    .cornerRadius(8)
                                     .clipped()
-                                    .overlay(
-                                        Circle()
-                                            .stroke(Color.white, lineWidth: 1)
-                                            .frame(width: 85, height: 85)
-                                    )
                                     .shadow(color: .black.opacity(0.2), radius: 3, x: 0, y: 2)
                             } else {
                                 Rectangle()
                                     .fill(Color.blue.opacity(0.3))
-                                    .frame(width: 85, height: 85)
-                                    .cornerRadius(50)
-                                    .overlay(
-                                        Circle()
-                                            .stroke(Color.white, lineWidth: 1)
-                                            .frame(width: 85, height: 85)
-                                    )
+                                    .frame(width: 120, height: 80)
+                                    .cornerRadius(8)
                                     .shadow(color: .black.opacity(0.2), radius: 3, x: 0, y: 2)
                             }
                         }
-                        Text(detailPlace?.name.prefix(15) ?? " ")
+                        Text(detailPlace?.name.prefix(20) ?? " ")
                             .foregroundColor(.black)
                             .fontWeight(.semibold)
                             .font(.footnote)
                             .multilineTextAlignment(.center)
                             .lineLimit(1)
-                            .frame(width: 85, height: 18)
-                        Text(detailPlace?.city?.prefix(15) ?? " ")
+                            .frame(width: 120, height: 18)
+                        Text(detailPlace?.city?.prefix(20) ?? " ")
                             .foregroundColor(.black)
                             .font(.caption)
                             .fontWeight(.light)
                             .multilineTextAlignment(.center)
                             .lineLimit(1)
-                            .frame(width: 85, height: 15)
+                            .frame(width: 120, height: 15)
                     }
                     .onTapGesture {
                         selectedPlaceVM.selectedPlace = detailPlace
@@ -91,17 +81,18 @@ struct ProfileFavoriteListView: View {
                     ForEach(profile.userFavorites.count..<4, id: \.self) { _ in
                         VStack {
                             ZStack {
-                                Circle()
+                                Rectangle()
                                     .fill(Color.gray.opacity(0.2))
-                                    .frame(width: 85, height: 85)
+                                    .frame(width: 120, height: 80)
+                                    .cornerRadius(8)
                                 Image(systemName: "plus")
                                     .font(.system(size: 20))
                                     .foregroundColor(.gray)
                             }
                             Text(" ")
-                                .frame(width: 85, height: 18)
+                                .frame(width: 120, height: 18)
                             Text(" ")
-                                .frame(width: 85, height: 15)
+                                .frame(width: 120, height: 15)
                         }
                         .onTapGesture {
                             showSearch = true
