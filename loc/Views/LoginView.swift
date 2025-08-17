@@ -39,8 +39,7 @@ struct LoginView: View {
                     viewModel.handleAppleSignIn(result: result, userSession: userSession)
                 })
                 .signInWithAppleButtonStyle(.black)
-                .frame(maxWidth: .infinity)
-                .frame(height: 50)
+                .frame(width: 280, height: 50)
                 .padding(.horizontal, 24)
                 
                 // Error Message
