@@ -69,6 +69,38 @@ class LoginViewModel: ObservableObject {
             if let error = error {
                 self?.errorMessage = error.localizedDescription
             } else {
+                if let firebaseUser = authResult?.user {
+                    print("👤 Google Sign In - Firebase user UID: \(firebaseUser.uid)")
+                    print("👤 Google Sign In - Firebase user email: \(firebaseUser.email ?? "nil")")
+                    print("👤 Google Sign In - Firebase user provider data:")
+                    for profile in firebaseUser.providerData {
+                        print("   - Provider: \(profile.providerID), UID: \(profile.uid), Email: \(profile.email ?? "nil")")
+                    }
+                    
+                    // SECURITY CHECK: Ensure user is actually signed in with Google, not linked to Apple
+                    let hasGoogleProvider = firebaseUser.providerData.contains { $0.providerID == "google.com" }
+                    let hasAppleProvider = firebaseUser.providerData.contains { $0.providerID == "apple.com" }
+                    
+                    if hasAppleProvider && !hasGoogleProvider {
+                        print("🚨 SECURITY ISSUE: User signed in with Google but got linked to Apple account!")
+                        print("🚨 Signing out for security...")
+                        
+                        // Sign out immediately for security
+                        do {
+                            try Auth.auth().signOut()
+                            self?.errorMessage = "Security issue: Account linking detected. Please use a different email or contact support."
+                        } catch {
+                            print("❌ Error signing out: \(error)")
+                            self?.errorMessage = "Security error occurred. Please try again."
+                        }
+                        return
+                    }
+                    
+                    if hasGoogleProvider {
+                        print("✅ User properly signed in with Google")
+                    }
+                }
+                
                 self?.fetchGoogleUserProfile(user: user, userSession: userSession)
             }
         }
@@ -85,8 +117,7 @@ class LoginViewModel: ObservableObject {
             switch result {
             case .success(_):
                 // Profile exists, update FCM token and proceed
-                userSession.isUserLoggedIn = true
-                userSession.currentUserId = uid
+                userSession.setUserLoggedIn(uid: uid)
                 userSession.registerForFCMToken()
                 Task {
                     await self?.dataManager.initializeProfileData(userId: uid)
@@ -111,8 +142,7 @@ class LoginViewModel: ObservableObject {
                             if let error = error {
                                 self?.errorMessage = "Error saving profile: \(error.localizedDescription)"
                             } else {
-                                userSession.isUserLoggedIn = true
-                                userSession.currentUserId = uid
+                                userSession.setUserLoggedIn(uid: uid)
                                 userSession.registerForFCMToken()
                             }
                         }
@@ -127,86 +157,188 @@ class LoginViewModel: ObservableObject {
     // MARK: - Sign in with Apple
 
     func prepareAppleSignIn(request: ASAuthorizationAppleIDRequest) {
+        print("🍎 Preparing Apple Sign In request...")
         let nonce = randomNonceString()
         currentNonce = nonce
         request.requestedScopes = [.fullName, .email]
         request.nonce = sha256(nonce)
+        print("🍎 Apple Sign In request prepared with nonce")
     }
 
     func handleAppleSignIn(result: Result<ASAuthorization, Error>, userSession: UserSession) {
+        print("🍎 Apple Sign In result received")
+        
         switch result {
         case .failure(let error):
+            print("❌ Apple Sign In failed: \(error.localizedDescription)")
             errorMessage = error.localizedDescription
         case .success(let authResults):
+            print("✅ Apple Sign In successful, processing credential...")
+            
             guard let appleIDCredential = authResults.credential as? ASAuthorizationAppleIDCredential else {
+                print("❌ Invalid Apple ID credential type")
                 errorMessage = "Invalid Apple ID credential"
                 return
             }
 
             guard let nonce = currentNonce else {
+                print("❌ No nonce found - invalid state")
                 errorMessage = "Invalid state: A login callback was received, but no login request was sent."
                 return
             }
 
             guard let appleIDToken = appleIDCredential.identityToken,
                   let idTokenString = String(data: appleIDToken, encoding: .utf8) else {
+                print("❌ Unable to get identity token from Apple")
                 errorMessage = "Unable to fetch identity token"
                 return
             }
 
+            print("🍎 Got Apple ID token, creating Firebase credential...")
             let credential = OAuthProvider.credential(withProviderID: "apple.com", idToken: idTokenString, rawNonce: nonce)
 
-            Auth.auth().signIn(with: credential) { [weak self] _, error in
+            print("🔥 Signing in with Firebase...")
+            print("🍎 Apple email: \(appleIDCredential.email ?? "nil")")
+            print("🍎 Apple user ID: \(appleIDCredential.user)")
+            
+            Auth.auth().signIn(with: credential) { [weak self] authResult, error in
                 if let error = error {
+                    print("❌ Firebase sign in failed: \(error.localizedDescription)")
                     self?.errorMessage = error.localizedDescription
                     return
                 }
 
+                print("✅ Firebase sign in successful!")
+                if let user = authResult?.user {
+                    print("👤 Firebase user UID: \(user.uid)")
+                    print("👤 Firebase user email: \(user.email ?? "nil")")
+                    print("👤 Firebase user provider data:")
+                    for profile in user.providerData {
+                        print("   - Provider: \(profile.providerID), UID: \(profile.uid), Email: \(profile.email ?? "nil")")
+                    }
+                    
+                    // SECURITY CHECK: Ensure user is actually signed in with Apple, not linked to Google
+                    let hasAppleProvider = user.providerData.contains { $0.providerID == "apple.com" }
+                    let hasGoogleProvider = user.providerData.contains { $0.providerID == "google.com" }
+                    
+                    print("🔍 Security check - Apple provider: \(hasAppleProvider), Google provider: \(hasGoogleProvider)")
+                    print("🔍 Provider count: \(user.providerData.count)")
+                    
+                    // STRICT SECURITY: Only allow pure Apple authentication
+                    if !hasAppleProvider {
+                        print("🚨 SECURITY ISSUE: User signed in with Apple but no Apple provider found!")
+                        print("🚨 Signing out for security...")
+                        
+                        // Sign out immediately for security
+                        do {
+                            try Auth.auth().signOut()
+                            self?.errorMessage = "Security issue: Invalid authentication method. Please try again."
+                        } catch {
+                            print("❌ Error signing out: \(error)")
+                            self?.errorMessage = "Security error occurred. Please try again."
+                        }
+                        return
+                    }
+                    
+                    // Check for any other providers (Google, etc.)
+                    let otherProviders = user.providerData.filter { $0.providerID != "apple.com" }
+                    if !otherProviders.isEmpty {
+                        print("🚨 SECURITY ISSUE: User signed in with Apple but has other providers: \(otherProviders.map { $0.providerID })")
+                        print("🚨 Signing out for security...")
+                        
+                        // Sign out immediately for security
+                        do {
+                            try Auth.auth().signOut()
+                            self?.errorMessage = "Security issue: Account linking detected. Please use a different email or contact support."
+                        } catch {
+                            print("❌ Error signing out: \(error)")
+                            self?.errorMessage = "Security error occurred. Please try again."
+                        }
+                        return
+                    }
+                    
+                    if hasAppleProvider && otherProviders.isEmpty {
+                        print("✅ User properly signed in with Apple (no other providers)")
+                    }
+                }
+                
                 self?.fetchAppleUserProfile(fullName: appleIDCredential.fullName, email: appleIDCredential.email, userSession: userSession)
             }
         }
     }
 
     private func fetchAppleUserProfile(fullName: PersonNameComponents?, email: String?, userSession: UserSession) {
+        print("👤 Fetching Apple user profile...")
+        
         guard let uid = Auth.auth().currentUser?.uid else {
+            print("❌ Failed to get user UID from Firebase")
             errorMessage = "Failed to get user UID"
             return
         }
+        
+        print("👤 User UID: \(uid)")
 
         userService.fetchUserById(userId: uid) { [weak self] result in
             switch result {
-            case .success(_):
-                userSession.isUserLoggedIn = true
-                userSession.currentUserId = uid
+            case .success(let existingUser):
+                print("✅ User already exists in database")
+                print("🔍 Existing user email: \(existingUser.email)")
+                print("🔍 Existing user name: \(existingUser.fullName)")
+                
+                // SECURITY CHECK: Ensure this is actually an Apple user
+                if !existingUser.email.contains("privaterelay.appleid.com") && !existingUser.email.isEmpty {
+                    print("🚨 SECURITY ISSUE: Existing user found but not an Apple private relay email!")
+                    print("🚨 This suggests account linking. Signing out for security...")
+                    
+                    // Sign out immediately for security
+                    do {
+                        try Auth.auth().signOut()
+                        self?.errorMessage = "Security issue: Account linking detected. Please use a different email or contact support."
+                    } catch {
+                        print("❌ Error signing out: \(error)")
+                        self?.errorMessage = "Security error occurred. Please try again."
+                    }
+                    return
+                }
+                
+                userSession.setUserLoggedIn(uid: uid)
                 userSession.registerForFCMToken()
                 Task { await self?.dataManager.initializeProfileData(userId: uid) }
+                print("🎉 User successfully logged in!")
             case .failure(let error):
+                print("❌ Error fetching user: \(error.localizedDescription)")
                 if (error as NSError).code == 404 {
+                    print("👤 User not found, creating new profile...")
                     Messaging.messaging().token { [weak self] token, _ in
                         let givenName = fullName?.givenName ?? ""
                         let familyName = fullName?.familyName ?? ""
+                        // SECURITY: Ensure no profile photo URL for Apple users (they don't get one from Apple)
                         let profileData = ProfileData(
                             id: uid,
                             firstName: givenName,
                             lastName: familyName,
                             email: email ?? "",
-                            profilePhotoURL: nil,
+                            profilePhotoURL: nil, // Apple doesn't provide profile photos
                             phoneNumber: "",
                             fullNameLower: "\(givenName) \(familyName)".lowercased(),
                             fullName: "\(givenName) \(familyName)",
                             fcmToken: token
                         )
+                        print("💾 Saving new user profile...")
                         self?.userService.saveUserProfile(uid: uid, profileData: profileData) { [weak self] error in
                             if let error = error {
+                                print("❌ Error saving profile: \(error.localizedDescription)")
                                 self?.errorMessage = "Error saving profile: \(error.localizedDescription)"
                             } else {
-                                userSession.isUserLoggedIn = true
-                                userSession.currentUserId = uid
+                                print("✅ Profile saved successfully!")
+                                userSession.setUserLoggedIn(uid: uid)
                                 userSession.registerForFCMToken()
+                                print("🎉 New user successfully logged in!")
                             }
                         }
                     }
                 } else {
+                    print("❌ Unexpected error: \(error.localizedDescription)")
                     self?.errorMessage = "Error fetching profile: \(error.localizedDescription)"
                 }
             }

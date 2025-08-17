@@ -131,19 +131,10 @@ class ShareViewController: SLComposeServiceViewController {
     }
     
     private func storeSharedTikTokURL(_ urlString: String) {
-        // Always store in regular UserDefaults since app groups might not be configured
+        // Only use regular UserDefaults to avoid App Group errors
         UserDefaults.standard.set(urlString, forKey: "sharedTikTokURL")
         UserDefaults.standard.synchronize()
         print("💾 Stored TikTok URL in UserDefaults")
-        
-        // Also try shared storage if available
-        if let sharedDefaults = UserDefaults(suiteName: "group.com.drewhartsfield.mesa") {
-            sharedDefaults.set(urlString, forKey: "sharedTikTokURL")
-            sharedDefaults.synchronize()
-            print("💾 Also stored TikTok URL in shared storage")
-        } else {
-            print("⚠️ Shared storage not available, using regular UserDefaults only")
-        }
     }
     
     private func openAppWithUserActivity(tikTokURL: String) {
