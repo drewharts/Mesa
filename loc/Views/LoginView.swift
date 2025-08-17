@@ -39,7 +39,7 @@ struct LoginView: View {
                     viewModel.handleAppleSignIn(result: result, userSession: userSession)
                 })
                 .signInWithAppleButtonStyle(.black)
-                .frame(width: 280, height: 50)
+                .frame(width: 180, height: 50)
                 .padding(.horizontal, 24)
                 
                 // Error Message
@@ -54,6 +54,39 @@ struct LoginView: View {
             }
         }
     }
+}
+
+#Preview {
+    LoginView(viewModel: LoginViewModel(
+        userService: UserService(),
+        dataManager: DataManager(
+            userService: UserService(),
+            placeService: PlaceService(),
+            reviewService: ReviewService(),
+            locationManager: LocationManager(),
+            detailPlaceViewModel: DetailPlaceViewModel(),
+            profileViewModel: ProfileViewModel(
+                userService: UserService(),
+                imageService: ImageService(),
+                placeService: PlaceService(),
+                reviewService: ReviewService(),
+                locationManager: LocationManager(),
+                detailPlaceViewModel: DetailPlaceViewModel(),
+                userSession: UserSession(
+                    userService: UserService(),
+                    locationManager: LocationManager(),
+                    detailPlaceVM: DetailPlaceViewModel()
+                ),
+                userProfileViewModel: UserProfileViewModel()
+            ),
+            userProfileViewModel: UserProfileViewModel()
+        )
+    ))
+    .environmentObject(UserSession(
+        userService: UserService(),
+        locationManager: LocationManager(),
+        detailPlaceVM: DetailPlaceViewModel()
+    ))
 }
 
 
