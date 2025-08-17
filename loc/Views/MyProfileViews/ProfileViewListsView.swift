@@ -76,7 +76,6 @@ struct ProfileViewListsView: View {
                 }
             }
         }
-        .padding(.vertical, 8)
         .sheet(isPresented: $showingImagePicker) {
             ImagePicker(images: $inputImage, selectionLimit: 1)
         }
