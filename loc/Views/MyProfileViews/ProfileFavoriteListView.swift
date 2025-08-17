@@ -42,32 +42,32 @@ struct ProfileFavoriteListView: View {
                                 Image(uiImage: image)
                                     .resizable()
                                     .scaledToFill()
-                                    .frame(width: 120, height: 80)
+                                    .frame(width: 85, height: 60)
                                     .cornerRadius(8)
                                     .clipped()
                                     .shadow(color: .black.opacity(0.2), radius: 3, x: 0, y: 2)
                             } else {
                                 Rectangle()
                                     .fill(Color.blue.opacity(0.3))
-                                    .frame(width: 120, height: 80)
+                                    .frame(width: 85, height: 60)
                                     .cornerRadius(8)
                                     .shadow(color: .black.opacity(0.2), radius: 3, x: 0, y: 2)
                             }
                         }
-                        Text(detailPlace?.name.prefix(20) ?? " ")
+                        Text(detailPlace?.name.prefix(15) ?? " ")
                             .foregroundColor(.black)
                             .fontWeight(.semibold)
                             .font(.footnote)
                             .multilineTextAlignment(.center)
                             .lineLimit(1)
-                            .frame(width: 120, height: 18)
-                        Text(detailPlace?.city?.prefix(20) ?? " ")
+                            .frame(width: 85, height: 18)
+                        Text(detailPlace?.city?.prefix(15) ?? " ")
                             .foregroundColor(.black)
                             .font(.caption)
                             .fontWeight(.light)
                             .multilineTextAlignment(.center)
                             .lineLimit(1)
-                            .frame(width: 120, height: 15)
+                            .frame(width: 85, height: 15)
                     }
                     .onTapGesture {
                         selectedPlaceVM.selectedPlace = detailPlace
@@ -83,16 +83,16 @@ struct ProfileFavoriteListView: View {
                             ZStack {
                                 Rectangle()
                                     .fill(Color.gray.opacity(0.2))
-                                    .frame(width: 120, height: 80)
+                                    .frame(width: 85, height: 60)
                                     .cornerRadius(8)
                                 Image(systemName: "plus")
                                     .font(.system(size: 20))
                                     .foregroundColor(.gray)
                             }
                             Text(" ")
-                                .frame(width: 120, height: 18)
+                                .frame(width: 85, height: 18)
                             Text(" ")
-                                .frame(width: 120, height: 15)
+                                .frame(width: 85, height: 15)
                         }
                         .onTapGesture {
                             showSearch = true
