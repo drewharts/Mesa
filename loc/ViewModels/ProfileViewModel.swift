@@ -106,9 +106,18 @@ class ProfileViewModel: ObservableObject {
      }
     
     private func setupLocationObserver() {
-        // Location observer removed - lists are sorted once on app startup
-        // and then only when lists are modified (add/remove lists or places)
-        // No need to re-sort on every location change
+        // Observe location changes to trigger sorting when location becomes available
+        locationManager.$currentLocation
+            .dropFirst() // Skip the initial nil value
+            .sink { [weak self] location in
+                if location != nil {
+                    print("📍 [ProfileViewModel] Location updated, attempting to sort lists")
+                    Task { @MainActor in
+                        self?.sortListsByDistance()
+                    }
+                }
+            }
+            .store(in: &cancellables)
     }
     
      func changeProfilePhoto(_ newImage: UIImage) async {
@@ -491,9 +500,25 @@ class ProfileViewModel: ObservableObject {
     }
     
     /// Sorts userLists by their average distance from the user's current location (closest first)
-    /// Only sorts on app startup and when lists are modified
+    /// Only sorts when lists have places loaded and location is available
     func sortListsByDistance() {
-        guard locationManager.currentLocation != nil else { return }
+        guard locationManager.currentLocation != nil else { 
+            print("📍 [ProfileViewModel] sortListsByDistance: No location available, skipping sort")
+            return 
+        }
+        
+        // Check if we have any places loaded for distance calculation
+        let listsWithPlaces = userLists.filter { list in
+            let placeIds = userListsPlaces[list.id.uuidString] ?? []
+            return !placeIds.isEmpty
+        }
+        
+        guard !listsWithPlaces.isEmpty else {
+            print("📍 [ProfileViewModel] sortListsByDistance: No lists with places loaded yet, skipping sort")
+            return
+        }
+        
+        print("📍 [ProfileViewModel] sortListsByDistance: Sorting \(userLists.count) lists by distance")
         
         userLists.sort { list1, list2 in
             let distance1 = calculateAverageDistanceForList(list1)
@@ -502,6 +527,7 @@ class ProfileViewModel: ObservableObject {
         }
         
         hasPerformedInitialSort = true
+        print("✅ [ProfileViewModel] sortListsByDistance: Lists sorted successfully")
     }
 
     /// Public method for manual refresh (if needed) - should only be called by user actions like pull-to-refresh
@@ -742,6 +768,9 @@ class ProfileViewModel: ObservableObject {
                 self.loadedListIds.insert(listId)
                 self.loadingListIds.remove(listId)
                 print("✅ [ProfileViewModel] loadListDataIfNeeded: Successfully loaded places for list \(listId)")
+                
+                // Try to sort lists by distance now that we have places loaded
+                self.sortListsByDistance()
             }
         }
     }
