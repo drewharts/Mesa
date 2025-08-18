@@ -15,6 +15,18 @@ struct MyProfileHorizontalListPlaces: View {
     let listId: UUID
     @Binding var placeColors: [UUID: Color]
     
+    private func getFirstTikTokThumbnail(for place: DetailPlace) -> String? {
+        // Check place's own TikTok videos first
+        if let placeTikTokVideos = place.tikTokVideos,
+           let firstVideo = placeTikTokVideos.first {
+            return firstVideo.thumbnailURL
+        }
+        
+        // Check user's TikTok videos for this place
+        let userTikTokVideos = viewModel.getTikTokVideos(for: place.id.uuidString)
+        return userTikTokVideos.first?.thumbnailURL
+    }
+    
     var places: [DetailPlace] {
         guard let placeIds = viewModel.userListsPlaces[listId.uuidString] else { return [] }
         return placeIds.compactMap { detailPlaceViewModel.places[$0] }
@@ -29,7 +41,24 @@ struct MyProfileHorizontalListPlaces: View {
                     presentationMode.wrappedValue.dismiss()
                 }) {
                     VStack(spacing: 4) {
-                        if let image = detailPlaceViewModel.placeImages[place.id.uuidString] {
+                        // Check for TikTok thumbnail first, then review image, then colored rectangle
+                        if let firstTikTokThumbnail = getFirstTikTokThumbnail(for: place) {
+                            AsyncImage(url: URL(string: firstTikTokThumbnail)) { image in
+                                image
+                                    .resizable()
+                                    .scaledToFill()
+                                    .frame(width: 120, height: 80)
+                                    .cornerRadius(8)
+                                    .clipped()
+                                    .shadow(color: .black.opacity(0.2), radius: 3, x: 0, y: 2)
+                            } placeholder: {
+                                Rectangle()
+                                    .frame(width: 120, height: 80)
+                                    .foregroundColor(.gray.opacity(0.3))
+                                    .cornerRadius(8)
+                                    .shadow(color: .black.opacity(0.2), radius: 3, x: 0, y: 2)
+                            }
+                        } else if let image = detailPlaceViewModel.placeImages[place.id.uuidString] {
                             Image(uiImage: image)
                                 .resizable()
                                 .scaledToFill()

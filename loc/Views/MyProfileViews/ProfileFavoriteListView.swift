@@ -13,6 +13,20 @@ struct ProfileFavoriteListView: View {
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @Environment(\.presentationMode) var presentationMode // For dismissing the sheet
     @State private var showSearch = false
+    
+    private func getFirstTikTokThumbnail(for place: DetailPlace?) -> String? {
+        guard let place = place else { return nil }
+        
+        // Check place's own TikTok videos first
+        if let placeTikTokVideos = place.tikTokVideos,
+           let firstVideo = placeTikTokVideos.first {
+            return firstVideo.thumbnailURL
+        }
+        
+        // Check user's TikTok videos for this place
+        let userTikTokVideos = profile.getTikTokVideos(for: place.id.uuidString)
+        return userTikTokVideos.first?.thumbnailURL
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -36,7 +50,24 @@ struct ProfileFavoriteListView: View {
                     let detailPlace = places.places[place]
                     VStack {
                         ZStack {
-                            if let image = places.placeImages[place] {
+                            // Check for TikTok thumbnail first, then review image, then colored rectangle
+                            if let firstTikTokThumbnail = getFirstTikTokThumbnail(for: detailPlace) {
+                                AsyncImage(url: URL(string: firstTikTokThumbnail)) { image in
+                                    image
+                                        .resizable()
+                                        .scaledToFill()
+                                        .frame(width: 85, height: 60)
+                                        .cornerRadius(8)
+                                        .clipped()
+                                        .shadow(color: .black.opacity(0.2), radius: 3, x: 0, y: 2)
+                                } placeholder: {
+                                    Rectangle()
+                                        .fill(Color.gray.opacity(0.3))
+                                        .frame(width: 85, height: 60)
+                                        .cornerRadius(8)
+                                        .shadow(color: .black.opacity(0.2), radius: 3, x: 0, y: 2)
+                                }
+                            } else if let image = places.placeImages[place] {
                                 Image(uiImage: image)
                                     .resizable()
                                     .scaledToFill()
