@@ -628,8 +628,8 @@
 				INFOPLIST_FILE = loc/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Mesa;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.travel";
-				INFOPLIST_KEY_NSLocationAlwaysUsageDescription = "Access your location in the background";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Show your location on the map";
+				INFOPLIST_KEY_NSLocationAlwaysUsageDescription = "Mesa uses your location in the background to continuously update nearby places and provide real-time location-based recommendations. For example, when you're walking around, Mesa will show you restaurants and places that are close to your current location.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Mesa uses your location to show nearby restaurants and places on the map, help you discover new places around you, and automatically detect your location when you import photos. For example, when you take a photo of a restaurant, Mesa can find nearby places to help you create reviews.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -664,8 +664,8 @@
 				INFOPLIST_FILE = loc/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Mesa;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.travel";
-				INFOPLIST_KEY_NSLocationAlwaysUsageDescription = "Access your location in the background";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Show your location on the map";
+				INFOPLIST_KEY_NSLocationAlwaysUsageDescription = "Mesa uses your location in the background to continuously update nearby places and provide real-time location-based recommendations. For example, when you're walking around, Mesa will show you restaurants and places that are close to your current location.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Mesa uses your location to show nearby restaurants and places on the map, help you discover new places around you, and automatically detect your location when you import photos. For example, when you take a photo of a restaurant, Mesa can find nearby places to help you create reviews.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
