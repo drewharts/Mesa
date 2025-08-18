@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import FirebaseFirestore
 
 struct PlaceList: Codable, Identifiable {
     var id: UUID = UUID()
@@ -15,5 +16,9 @@ struct PlaceList: Codable, Identifiable {
     var emoji: String
     var image: String?
     var sortOrder: Int = 0 // Default to 0 for backward compatibility
+    
+    // NEW: Pre-calculated average coordinates for efficient sorting and map operations
+    var averageCoordinate: GeoPoint?
+    var lastCoordinateUpdate: Date?
 }
 

@@ -33,9 +33,13 @@ struct MapView: View {
             MapReader { mapProxy in
                 Map(position: $mapPosition) {
                     ForEach(placeTypeFilterVM.getFilteredPlaces().compactMap { place -> PlaceAnnotationItem? in
+                        guard let coordinate = place.coordinate else {
+                            print("⚠️ [MapView] Place '\(place.name)' has no coordinate, skipping annotation")
+                            return nil
+                        }
                         return PlaceAnnotationItem(
                             id: place.id,
-                            coordinate: CLLocationCoordinate2D(latitude: place.coordinate!.latitude, longitude: place.coordinate!.longitude),
+                            coordinate: CLLocationCoordinate2D(latitude: coordinate.latitude, longitude: coordinate.longitude),
                             place: place
                         )
                     }) { place in

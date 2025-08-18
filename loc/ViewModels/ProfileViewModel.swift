@@ -106,12 +106,12 @@ class ProfileViewModel: ObservableObject {
      }
     
     private func setupLocationObserver() {
-        // Only sort once when location first becomes available
+        // Sort immediately when location becomes available (no need to wait for places to load)
         locationManager.$currentLocation
             .dropFirst() // Skip the initial nil value
             .sink { [weak self] location in
                 if location != nil && !(self?.hasPerformedInitialSort ?? false) {
-                    print("📍 [ProfileViewModel] Location first available, performing initial sort")
+                    print("📍 [ProfileViewModel] Location first available, performing initial sort with pre-calculated coordinates")
                     Task { @MainActor in
                         self?.sortListsByDistance()
                     }
@@ -250,6 +250,10 @@ class ProfileViewModel: ObservableObject {
         if detailPlaceViewModel.places[place.id.uuidString] == nil {
             detailPlaceViewModel.places[place.id.uuidString] = place
         }
+        
+        // Recalculate average coordinates for this list
+        recalculateAverageCoordinates(for: listId)
+        
         // Skip sorting for individual place additions to avoid frequent re-sorting
     }
     
@@ -270,6 +274,9 @@ class ProfileViewModel: ObservableObject {
          let placeForList = place.toPlace()
 
          placeService.removePlaceFromList(userId: userId, listId: list.id, place: placeForList)
+         
+         // Recalculate average coordinates for this list
+         recalculateAverageCoordinates(for: listId)
          
          // Skip sorting for individual place removals to avoid frequent re-sorting
      }
@@ -468,13 +475,24 @@ class ProfileViewModel: ObservableObject {
     
     private var hasPerformedInitialSort = false
     
-    /// Calculates the average distance of all places in a list from the user's current location
-    private func calculateAverageDistanceForList(_ list: PlaceList) -> Double {
+    /// Calculates the distance from the user's current location to a list using pre-calculated average coordinates
+    private func calculateDistanceToList(_ list: PlaceList) -> Double {
         guard let currentLocation = locationManager.currentLocation else { 
-            // If no location available, return infinity to sort these lists last
             return Double.infinity 
         }
         
+        // Use pre-calculated average coordinates if available (much faster!)
+        if let averageCoordinate = list.averageCoordinate {
+            let listLocation = CLLocation(
+                latitude: averageCoordinate.latitude,
+                longitude: averageCoordinate.longitude
+            )
+            let distance = currentLocation.distance(from: listLocation)
+            print("📍 [ProfileViewModel] List '\(list.name)': Using pre-calculated average coordinates, distance: \(String(format: "%.1f km", distance/1000))")
+            return distance
+        }
+        
+        // Fallback to calculating average distance from individual places (slower)
         let listPlaceIds = userListsPlaces[list.id.uuidString] ?? []
         guard !listPlaceIds.isEmpty else { return Double.infinity }
         
@@ -494,10 +512,6 @@ class ProfileViewModel: ObservableObject {
                     validPlaceCount += 1
                 } else {
                     print("📍 [ProfileViewModel] Place '\(detailPlace.name)' (ID: \(placeId)) has no coordinates")
-                    // Debug: Check if this place has a mapboxId that could be used to get coordinates
-                    if let mapboxId = detailPlace.mapboxId {
-                        print("📍 [ProfileViewModel] Place '\(detailPlace.name)' has mapboxId: \(mapboxId) but no coordinates")
-                    }
                 }
             } else {
                 print("📍 [ProfileViewModel] Place with ID \(placeId) not found in detailPlaceViewModel.places")
@@ -505,41 +519,90 @@ class ProfileViewModel: ObservableObject {
         }
         
         let averageDistance = validPlaceCount > 0 ? totalDistance / Double(validPlaceCount) : Double.infinity
-        print("📍 [ProfileViewModel] List '\(list.name)': \(validPlaceCount)/\(listPlaceIds.count) places with coordinates, avg distance: \(averageDistance > 1000000 ? "∞" : String(format: "%.1f km", averageDistance/1000))")
+        print("📍 [ProfileViewModel] List '\(list.name)': Fallback calculation - \(validPlaceCount)/\(listPlaceIds.count) places with coordinates, avg distance: \(averageDistance > 1000000 ? "∞" : String(format: "%.1f km", averageDistance/1000))")
         
         return averageDistance
     }
     
-    /// Sorts userLists by their average distance from the user's current location (closest first)
-    /// Only sorts when lists have places loaded and location is available
+    /// Recalculates the average coordinates for a specific list
+    private func recalculateAverageCoordinates(for listId: UUID) {
+        guard let listIndex = userLists.firstIndex(where: { $0.id == listId }),
+              let placeIds = userListsPlaces[listId.uuidString] else {
+            return
+        }
+        
+        var totalLatitude: Double = 0
+        var totalLongitude: Double = 0
+        var validPlaceCount: Int = 0
+        
+        // Calculate average from all places in the list
+        for placeId in placeIds {
+            if let detailPlace = detailPlaceViewModel.places[placeId],
+               let coordinate = detailPlace.coordinate {
+                totalLatitude += coordinate.latitude
+                totalLongitude += coordinate.longitude
+                validPlaceCount += 1
+            }
+        }
+        
+        // Update the list's average coordinates
+        if validPlaceCount > 0 {
+            let averageLatitude = totalLatitude / Double(validPlaceCount)
+            let averageLongitude = totalLongitude / Double(validPlaceCount)
+            
+            userLists[listIndex].averageCoordinate = GeoPoint(
+                latitude: averageLatitude,
+                longitude: averageLongitude
+            )
+            userLists[listIndex].lastCoordinateUpdate = Date()
+            
+            print("📍 [ProfileViewModel] Updated average coordinates for list '\(userLists[listIndex].name)': (\(averageLatitude), \(averageLongitude)) from \(validPlaceCount) places")
+            
+            // Update in Firestore
+            if let userId = userSession.currentUserId {
+                Task {
+                    await updateListAverageCoordinates(userId: userId, listId: listId, averageCoordinate: userLists[listIndex].averageCoordinate!)
+                }
+            }
+        } else {
+            // No valid coordinates, clear the average
+            userLists[listIndex].averageCoordinate = nil
+            userLists[listIndex].lastCoordinateUpdate = Date()
+            print("📍 [ProfileViewModel] Cleared average coordinates for list '\(userLists[listIndex].name)' - no valid coordinates")
+        }
+    }
+    
+    /// Updates the average coordinates in Firestore
+    private func updateListAverageCoordinates(userId: String, listId: UUID, averageCoordinate: GeoPoint) async {
+        do {
+            let db = Firestore.firestore()
+            try await db.collection("users")
+                .document(userId)
+                .collection("placeLists")
+                .document(listId.uuidString)
+                .updateData([
+                    "averageCoordinate": averageCoordinate,
+                    "lastCoordinateUpdate": FieldValue.serverTimestamp()
+                ])
+            print("✅ [ProfileViewModel] Successfully updated average coordinates in Firestore for list \(listId)")
+        } catch {
+            print("❌ [ProfileViewModel] Failed to update average coordinates in Firestore: \(error.localizedDescription)")
+        }
+    }
+    
+    /// Sorts userLists by their distance from the user's current location (closest first)
+    /// Now uses pre-calculated average coordinates for much faster sorting
     func sortListsByDistance() {
         guard locationManager.currentLocation != nil else { 
             print("📍 [ProfileViewModel] sortListsByDistance: No location available, skipping sort")
             return 
         }
         
-        // Check if we have any places loaded for distance calculation
-        let listsWithPlaces = userLists.filter { list in
-            let placeIds = userListsPlaces[list.id.uuidString] ?? []
-            return !placeIds.isEmpty
-        }
-        
-        guard !listsWithPlaces.isEmpty else {
-            print("📍 [ProfileViewModel] sortListsByDistance: No lists with places loaded yet, skipping sort")
-            return
-        }
-        
-        // Only sort if we have at least 3 lists with places loaded for meaningful sorting
-        guard listsWithPlaces.count >= 3 else {
-            print("📍 [ProfileViewModel] sortListsByDistance: Only \(listsWithPlaces.count) lists with places loaded, waiting for more data")
-            return
-        }
-        
-        print("📍 [ProfileViewModel] sortListsByDistance: Sorting \(userLists.count) lists by distance (with \(listsWithPlaces.count) lists having places)")
+        print("📍 [ProfileViewModel] sortListsByDistance: Sorting \(userLists.count) lists by distance using pre-calculated coordinates")
         
         userLists.sort { list1, list2 in
-            let distance1 = calculateAverageDistanceForList(list1)
-            let distance2 = calculateAverageDistanceForList(list2)
+            let distance1 = calculateDistanceToList(list1)
+            let distance2 = calculateDistanceToList(list2)
             
             // If both lists have valid distances, sort by distance
             if distance1 != Double.infinity && distance2 != Double.infinity {
@@ -559,7 +622,7 @@ class ProfileViewModel: ObservableObject {
         }
         
         hasPerformedInitialSort = true
-        print("✅ [ProfileViewModel] sortListsByDistance: Lists sorted successfully")
+        print("✅ [ProfileViewModel] sortListsByDistance: Lists sorted successfully using pre-calculated coordinates")
     }
 
     /// Public method for manual refresh (if needed) - should only be called by user actions like pull-to-refresh
@@ -800,11 +863,6 @@ class ProfileViewModel: ObservableObject {
                 self.loadedListIds.insert(listId)
                 self.loadingListIds.remove(listId)
                 print("✅ [ProfileViewModel] loadListDataIfNeeded: Successfully loaded places for list \(listId)")
-                
-                // Only sort once when we have enough data, not every time a list loads
-                if !self.hasPerformedInitialSort {
-                    self.sortListsByDistance()
-                }
             }
         }
     }
@@ -902,7 +960,7 @@ class ProfileViewModel: ObservableObject {
     
     /// Returns the formatted average distance for a list
     func getAverageDistanceForList(_ list: PlaceList) -> String {
-        let distance = calculateAverageDistanceForList(list)
+        let distance = calculateDistanceToList(list)
         return formatDistance(distance)
     }
 
