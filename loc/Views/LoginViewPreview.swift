@@ -1,17 +1,17 @@
-//  LoginView.swift
+//
+//  LoginViewPreview.swift
 //  loc
 //
-//  Created by Andrew Hartsfield II on 11/11/24.
+//  Created for preview purposes only
 //
 
 import SwiftUI
 import GoogleSignInSwift
 import AuthenticationServices
 
-struct LoginView: View {
-    @ObservedObject var viewModel: LoginViewModel
-    @EnvironmentObject var userSession: UserSession
-
+struct LoginViewPreview: View {
+    @State private var errorMessage: String?
+    
     var body: some View {
         ZStack {
             Color.white
@@ -21,7 +21,7 @@ struct LoginView: View {
                 
                 // Google Sign In Button
                 Button(action: {
-                    viewModel.signInWithGoogle(userSession: userSession)
+                    print("Google Sign In tapped")
                 }, label: {
                     Image("ios_light_sq_SI")
                         .resizable()
@@ -34,21 +34,28 @@ struct LoginView: View {
                 
                 // Apple Sign In Button
                 SignInWithAppleButton(.signIn, onRequest: { request in
-                    viewModel.prepareAppleSignIn(request: request)
+                    print("Apple Sign In request prepared")
                 }, onCompletion: { result in
-                    viewModel.handleAppleSignIn(result: result, userSession: userSession)
+                    print("Apple Sign In completed")
                 })
                 .signInWithAppleButtonStyle(.black)
                 .frame(width: 210, height: 50)
                 .padding(.horizontal, 24)
                 
-                // Error Message
-                if let errorMessage = viewModel.errorMessage {
+                // Error Message (for testing)
+                if let errorMessage = errorMessage {
                     Text(errorMessage)
                         .foregroundColor(.red)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 24)
                 }
+                
+                // Test error button
+                Button("Show Test Error") {
+                    errorMessage = "This is a test error message to see how it looks"
+                }
+                .foregroundColor(.blue)
+                .padding(.top, 20)
                 
                 Spacer()
             }
@@ -60,4 +67,9 @@ struct LoginView: View {
     LoginViewPreview()
 }
 
-
+#Preview("With Error") {
+    LoginViewPreview()
+        .onAppear {
+            // Simulate error state
+        }
+}

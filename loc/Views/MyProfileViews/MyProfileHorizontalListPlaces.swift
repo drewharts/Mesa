@@ -15,6 +15,18 @@ struct MyProfileHorizontalListPlaces: View {
     let listId: UUID
     @Binding var placeColors: [UUID: Color]
     
+    private func getFirstTikTokThumbnail(for place: DetailPlace) -> String? {
+        // Check place's own TikTok videos first
+        if let placeTikTokVideos = place.tikTokVideos,
+           let firstVideo = placeTikTokVideos.first {
+            return firstVideo.thumbnailURL
+        }
+        
+        // Check user's TikTok videos for this place
+        let userTikTokVideos = viewModel.getTikTokVideos(for: place.id.uuidString)
+        return userTikTokVideos.first?.thumbnailURL
+    }
+    
     var places: [DetailPlace] {
         guard let placeIds = viewModel.userListsPlaces[listId.uuidString] else { return [] }
         return placeIds.compactMap { detailPlaceViewModel.places[$0] }
@@ -29,59 +41,67 @@ struct MyProfileHorizontalListPlaces: View {
                     presentationMode.wrappedValue.dismiss()
                 }) {
                     VStack(spacing: 4) {
-                        if let image = detailPlaceViewModel.placeImages[place.id.uuidString] {
+                        // Check for TikTok thumbnail first, then review image, then colored rectangle
+                        if let firstTikTokThumbnail = getFirstTikTokThumbnail(for: place) {
+                            AsyncImage(url: URL(string: firstTikTokThumbnail)) { image in
+                                image
+                                    .resizable()
+                                    .scaledToFill()
+                                    .frame(width: 120, height: 80)
+                                    .cornerRadius(8)
+                                    .clipped()
+                                    .shadow(color: .black.opacity(0.2), radius: 3, x: 0, y: 2)
+                            } placeholder: {
+                                Rectangle()
+                                    .frame(width: 120, height: 80)
+                                    .foregroundColor(.gray.opacity(0.3))
+                                    .cornerRadius(8)
+                                    .shadow(color: .black.opacity(0.2), radius: 3, x: 0, y: 2)
+                            }
+                        } else if let image = detailPlaceViewModel.placeImages[place.id.uuidString] {
                             Image(uiImage: image)
                                 .resizable()
                                 .scaledToFill()
-                                .frame(width: 85, height: 85)
-                                .cornerRadius(50)
+                                .frame(width: 120, height: 80)
+                                .cornerRadius(8)
                                 .clipped()
-                                .overlay(
-                                    Circle()
-                                        .stroke(Color.white, lineWidth: 1)
-                                        .frame(width: 85, height: 85)
-                                )
                                 .shadow(color: .black.opacity(0.2), radius: 3, x: 0, y: 2)
                         } else {
-                            Circle()
-                                .frame(width: 85, height: 85)
+                            Rectangle()
+                                .frame(width: 120, height: 80)
                                 .foregroundColor(detailPlaceViewModel.colorForPlace(placeId: place.id.uuidString))
-                                .overlay(
-                                    Circle()
-                                        .stroke(Color.white, lineWidth: 1)
-                                        .frame(width: 85, height: 85)
-                                )
+                                .cornerRadius(8)
                                 .shadow(color: .black.opacity(0.2), radius: 3, x: 0, y: 2)
                         }
                         
-                        Text(place.name.prefix(15))
+                        Text(place.name.prefix(20))
                             .foregroundColor(.black)
                             .fontWeight(.semibold)
                             .font(.footnote)
                             .multilineTextAlignment(.center)
                             .lineLimit(1)
-                            .frame(width: 85)
+                            .frame(width: 120)
                         
                         // Display restaurant type instead of city
                         if let type = detailPlaceViewModel.placeTypes[place.id.uuidString] {
-                            Text(type.prefix(15))
+                            Text(type.prefix(20))
                                 .foregroundColor(.black)
                                 .font(.caption)
                                 .fontWeight(.light)
                                 .multilineTextAlignment(.center)
                                 .lineLimit(1)
-                                .frame(width: 85)
+                                .frame(width: 120)
                         } else if let city = place.city {
-                            Text(city.prefix(15))
+                            Text(city.prefix(20))
                                 .foregroundColor(.black)
                                 .font(.caption)
                                 .fontWeight(.light)
                                 .multilineTextAlignment(.center)
                                 .lineLimit(1)
-                                .frame(width: 85)
+                                .frame(width: 120)
                         }
                     }
-                    .padding(.trailing, 10)
+                    .padding(.trailing, 8)
                 }
                 .contextMenu {
                     Button {

@@ -26,6 +26,7 @@ class DetailPlaceViewModel: ObservableObject {
 
     private let placeService: PlaceService
     private let userService: UserService
+    var dataManager: DataManager? // Reference to DataManager for lazy loading
     
     private var notificationObserver: NSObjectProtocol?
     private let placeDetailVM = PlaceDetailViewModel() // For restaurant type calculation

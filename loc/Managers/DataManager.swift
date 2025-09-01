@@ -215,14 +215,15 @@ class DataManager: ObservableObject {
             // If this is for the current user, update the ProfileViewModel
             if forUser == nil {
                 self.profileViewModel.userLists = lists
+                // Initialize with empty place arrays for lazy loading
                 self.profileViewModel.userListsPlaces = lists.reduce(into: [String: [String]]()) { result, list in
-                    result[list.id.uuidString] = list.places.map { $0.id.uuidString }
+                    result[list.id.uuidString] = []
                 }
                 // Sort lists by distance after loading
                 self.profileViewModel.sortListsByDistance()
             }
-            // Process places in each list with limited concurrency
-            await processPlacesInListsOptimized(lists: lists, userId: userId)
+            // Note: Places will be loaded lazily when lists become visible
+            // No need to process all places upfront
         } catch {
             print("Error loading user place lists: \(error.localizedDescription)")
         }
@@ -267,7 +268,65 @@ class DataManager: ObservableObject {
             }
         } catch {
             print("Error fetching place details: \(error.localizedDescription) (listId: \(listId), placeId: \(placeId))")
+            
+            // Create fallback DetailPlace from the list data
+            if let list = profileViewModel.userLists.first(where: { $0.id.uuidString == listId }),
+               let place = list.places.first(where: { $0.id.uuidString == placeId }) {
+                let fallbackDetailPlace = DetailPlace(id: place.id, name: place.name, address: place.address, city: nil)
+                await MainActor.run {
+                    self.detailPlaceViewModel.places[placeId] = fallbackDetailPlace
+                    self.detailPlaceViewModel.generateColorForPlace(placeId)
+                    // Update place savers
+                    if self.detailPlaceViewModel.placeSavers[placeId] == nil {
+                        self.detailPlaceViewModel.placeSavers[placeId] = [userId]
+                    } else if !self.detailPlaceViewModel.placeSavers[placeId]!.contains(userId) {
+                        self.detailPlaceViewModel.placeSavers[placeId]!.append(userId)
+                    }
+                }
+            }
         }
+    }
+    
+    // Load places for a specific list when it becomes visible
+    func loadPlacesForList(listId: UUID, userId: String) async {
+        guard let list = profileViewModel.userLists.first(where: { $0.id == listId }) else {
+            print("❌ [DataManager] loadPlacesForList: List not found for ID \(listId)")
+            return
+        }
+        
+        print("🔍 [DataManager] loadPlacesForList: Loading \(list.places.count) places for list '\(list.name)'")
+        
+        // Process places in batches for better performance
+        let batchSize = 10
+        var loadedPlaceIds: [String] = []
+        
+        for batch in list.places.chunked(into: batchSize) {
+            let batchPlaceIds = batch.map { $0.id.uuidString }
+            loadedPlaceIds.append(contentsOf: batchPlaceIds)
+            
+            // Update UI with current batch
+            await MainActor.run {
+                self.profileViewModel.userListsPlaces[listId.uuidString] = loadedPlaceIds
+            }
+            
+            // Process places in this batch
+            await withTaskGroup(of: Void.self) { group in
+                for place in batch {
+                    group.addTask {
+                        await self.fetchAndStorePlaceDetails(
+                            placeId: place.id.uuidString, 
+                            userId: userId, 
+                            listId: listId.uuidString
+                        )
+                    }
+                }
+            }
+            
+            // Small delay to prevent overwhelming the UI
+            try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+        }
+        
+        print("✅ [DataManager] loadPlacesForList: Successfully loaded \(loadedPlaceIds.count) places for list \(listId)")
     }
 
     func processPlacesInList(list: PlaceList, userId: String) async {

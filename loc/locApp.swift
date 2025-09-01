@@ -84,6 +84,9 @@ struct locApp: App {
             profileViewModel: profileVM,
             detailPlaceViewModel: detailVM
         )
+        
+        // Set DataManager reference in DetailPlaceViewModel for lazy loading
+        detailVM.dataManager = dataMgr
 
         let userProfileVM = UserProfileViewModel(
             dataManager: dataMgr, 
@@ -168,8 +171,7 @@ struct locApp: App {
                 }
                 .task {
                     if let currentUser = Auth.auth().currentUser {
-                        userSession.isUserLoggedIn = true
-                        userSession.currentUserId = currentUser.uid
+                        userSession.setUserLoggedIn(uid: currentUser.uid)
                         await dataManager.initializeProfileData(userId: currentUser.uid)
                     }
                     
@@ -186,27 +188,7 @@ struct locApp: App {
     private func checkForSharedTikTokURL() {
         print("🔍 Checking for shared TikTok URLs...")
         
-        // Check shared UserDefaults first
-        if let sharedDefaults = UserDefaults(suiteName: "group.com.drewhartsfield.mesa") {
-            print("🔍 Checking shared UserDefaults...")
-            if let sharedURL = sharedDefaults.string(forKey: "sharedTikTokURL") {
-                print("🎵 Found shared TikTok URL: \(sharedURL)")
-                sharedDefaults.removeObject(forKey: "sharedTikTokURL")
-                sharedDefaults.synchronize()
-                
-                let deepLinkURL = URL(string: "loc://share/tiktok?url=\(sharedURL.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")")!
-                Task {
-                    await deepLinkViewModel.processIncomingURL(deepLinkURL)
-                }
-                return
-            } else {
-                print("🔍 No shared TikTok URL found in shared UserDefaults")
-            }
-        } else {
-            print("❌ Failed to access shared UserDefaults")
-        }
-        
-        // Check regular UserDefaults as fallback
+        // Only use regular UserDefaults to avoid App Group errors
         if let regularURL = UserDefaults.standard.string(forKey: "sharedTikTokURL") {
             print("🎵 Found TikTok URL in regular UserDefaults: \(regularURL)")
             UserDefaults.standard.removeObject(forKey: "sharedTikTokURL")
@@ -216,7 +198,7 @@ struct locApp: App {
                 await deepLinkViewModel.processIncomingURL(deepLinkURL)
             }
         } else {
-            print("🔍 No TikTok URL found in regular UserDefaults")
+            print("🔍 No TikTok URL found in UserDefaults")
         }
     }
 }
@@ -283,6 +265,12 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         
         // Handle Google Sign-In URLs
         if GIDSignIn.sharedInstance.handle(url) {
+            return true
+        }
+        
+        // Handle Apple Sign-In URLs
+        if url.scheme == "drewharts.locc" {
+            print("🍎 Received Apple Sign-In URL in AppDelegate: \(url)")
             return true
         }
         
