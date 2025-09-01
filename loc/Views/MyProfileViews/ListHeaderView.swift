@@ -78,6 +78,5 @@ struct ListHeaderView: View {
                 ))
             }
         }
-        .padding(.vertical, -15)
     }
 }

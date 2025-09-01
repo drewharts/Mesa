@@ -42,25 +42,39 @@ class UserSession: ObservableObject {
             isUserLoggedIn = false
             profileViewModel = nil
             currentUserId = nil
+            print("👋 User logged out successfully")
         } catch let signOutError as NSError {
-            print("Error signing out: \(signOutError)")
+            print("❌ Error signing out: \(signOutError)")
+        }
+    }
+    
+    func setUserLoggedIn(uid: String) {
+        print("🔐 Setting user as logged in: \(uid)")
+        DispatchQueue.main.async {
+            self.isUserLoggedIn = true
+            self.currentUserId = uid
+            print("✅ User session updated - isUserLoggedIn: \(self.isUserLoggedIn), currentUserId: \(self.currentUserId ?? "nil")")
         }
     }
     
     // MARK: - FCM Token Management
     func registerForFCMToken() {
-        guard let currentUserId = self.currentUserId else { return }
+        guard let currentUserId = self.currentUserId else { 
+            print("⚠️ Cannot register FCM token - no current user ID")
+            return 
+        }
         
+        print("📱 Registering FCM token for user: \(currentUserId)")
         Messaging.messaging().token { [weak self] token, error in
             if let error = error {
-                print("Error fetching FCM registration token: \(error)")
+                print("❌ Error fetching FCM registration token: \(error)")
             } else if let token = token {
-                print("FCM registration token: \(token)")
+                print("📱 FCM registration token: \(token)")
                 self?.userService.updateFCMToken(userId: currentUserId, token: token) { error in
                     if let error = error {
-                        print("Error updating FCM token in Firestore: \(error)")
+                        print("❌ Error updating FCM token in Firestore: \(error)")
                     } else {
-                        print("FCM token successfully updated in Firestore")
+                        print("✅ FCM token successfully updated in Firestore")
                     }
                 }
             }
@@ -101,12 +115,11 @@ class UserSession: ObservableObject {
         Auth.auth().signIn(with: credential) { [weak self] authResult, error in
             guard let self = self else { return }
             if let error = error {
-                print("Firebase sign-in error: \(error.localizedDescription)")
+                print("❌ Firebase sign-in error: \(error.localizedDescription)")
                 return
             }
-            self.isUserLoggedIn = true
             if let currentUser = Auth.auth().currentUser {
-                self.currentUserId = currentUser.uid
+                self.setUserLoggedIn(uid: currentUser.uid)
                 // Register for FCM token after successful login
                 self.registerForFCMToken()
 //                self.fetchProfile(for: currentUser.uid)

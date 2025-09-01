@@ -13,9 +13,23 @@ struct ProfileFavoriteListView: View {
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @Environment(\.presentationMode) var presentationMode // For dismissing the sheet
     @State private var showSearch = false
+    
+    private func getFirstTikTokThumbnail(for place: DetailPlace?) -> String? {
+        guard let place = place else { return nil }
+        
+        // Check place's own TikTok videos first
+        if let placeTikTokVideos = place.tikTokVideos,
+           let firstVideo = placeTikTokVideos.first {
+            return firstVideo.thumbnailURL
+        }
+        
+        // Check user's TikTok videos for this place
+        let userTikTokVideos = profile.getTikTokVideos(for: place.id.uuidString)
+        return userTikTokVideos.first?.thumbnailURL
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
+        VStack(alignment: .leading, spacing: 8) {
             // 1) "FAVORITES" button
             Button {
                 showSearch = true
@@ -23,13 +37,11 @@ struct ProfileFavoriteListView: View {
                 Text("FAVORITES")
                     .font(.subheadline)
                     .fontWeight(.medium)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.leading, 20)
                     .foregroundStyle(.black)
-                    .padding(.top, -10)
             }
             .buttonStyle(.plain)
-            .padding(.horizontal, 10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 20)
 
             // 2) Favorite places or placeholders
             HStack(spacing: 10) {
@@ -38,29 +50,36 @@ struct ProfileFavoriteListView: View {
                     let detailPlace = places.places[place]
                     VStack {
                         ZStack {
-                            if let image = places.placeImages[place] {
+                            // Check for TikTok thumbnail first, then review image, then colored rectangle
+                            if let firstTikTokThumbnail = getFirstTikTokThumbnail(for: detailPlace) {
+                                AsyncImage(url: URL(string: firstTikTokThumbnail)) { image in
+                                    image
+                                        .resizable()
+                                        .scaledToFill()
+                                        .frame(width: 85, height: 60)
+                                        .cornerRadius(8)
+                                        .clipped()
+                                        .shadow(color: .black.opacity(0.2), radius: 3, x: 0, y: 2)
+                                } placeholder: {
+                                    Rectangle()
+                                        .fill(Color.gray.opacity(0.3))
+                                        .frame(width: 85, height: 60)
+                                        .cornerRadius(8)
+                                        .shadow(color: .black.opacity(0.2), radius: 3, x: 0, y: 2)
+                                }
+                            } else if let image = places.placeImages[place] {
                                 Image(uiImage: image)
                                     .resizable()
                                     .scaledToFill()
-                                    .frame(width: 85, height: 85)
-                                    .cornerRadius(50)
+                                    .frame(width: 85, height: 60)
+                                    .cornerRadius(8)
                                     .clipped()
-                                    .overlay(
-                                        Circle()
-                                            .stroke(Color.white, lineWidth: 1)
-                                            .frame(width: 85, height: 85)
-                                    )
                                     .shadow(color: .black.opacity(0.2), radius: 3, x: 0, y: 2)
                             } else {
                                 Rectangle()
                                     .fill(Color.blue.opacity(0.3))
-                                    .frame(width: 85, height: 85)
-                                    .cornerRadius(50)
-                                    .overlay(
-                                        Circle()
-                                            .stroke(Color.white, lineWidth: 1)
-                                            .frame(width: 85, height: 85)
-                                    )
+                                    .frame(width: 85, height: 60)
+                                    .cornerRadius(8)
                                     .shadow(color: .black.opacity(0.2), radius: 3, x: 0, y: 2)
                             }
                         }
@@ -91,9 +110,10 @@ struct ProfileFavoriteListView: View {
                     ForEach(profile.userFavorites.count..<4, id: \.self) { _ in
                         VStack {
                             ZStack {
-                                Circle()
+                                Rectangle()
                                     .fill(Color.gray.opacity(0.2))
-                                    .frame(width: 85, height: 85)
+                                    .frame(width: 85, height: 60)
+                                    .cornerRadius(8)
                                 Image(systemName: "plus")
                                     .font(.system(size: 20))
                                     .foregroundColor(.gray)

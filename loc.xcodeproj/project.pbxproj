@@ -92,13 +92,23 @@
 		B0C31A872D94CB6400E481F4 /* loc.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text; path = loc.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		B010DCB32E4D94A000E35032 /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = B05FEF2A2E1F28FB002436B7 /* Mesa Share */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		B00311FA2CDACD4B002AE03B /* Models */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Models; sourceTree = "<group>"; };
 		B00311FB2CDACD59002AE03B /* ViewModels */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = ViewModels; sourceTree = "<group>"; };
 		B00311FD2CDACD81002AE03B /* Views */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Views; sourceTree = "<group>"; };
 		B00311FE2CDACD8B002AE03B /* Services */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Services; sourceTree = "<group>"; };
 		B00311FF2CDACE01002AE03B /* Managers */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Managers; sourceTree = "<group>"; };
-		B05FEF2C2E1F28FB002436B7 /* Mesa Share */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = "Mesa Share"; sourceTree = "<group>"; };
+		B05FEF2C2E1F28FB002436B7 /* Mesa Share */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (B010DCB32E4D94A000E35032 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = "Mesa Share"; sourceTree = "<group>"; };
 		B0E659872D39D54300F8527E /* Extensions */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Extensions; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
@@ -533,6 +543,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.5;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
@@ -591,6 +602,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.5;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = NO;
@@ -616,8 +628,8 @@
 				INFOPLIST_FILE = loc/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Mesa;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.travel";
-				INFOPLIST_KEY_NSLocationAlwaysUsageDescription = "Access your location in the background";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Show your location on the map";
+				INFOPLIST_KEY_NSLocationAlwaysUsageDescription = "Mesa uses your location in the background to continuously update nearby places and provide real-time location-based recommendations. For example, when you're walking around, Mesa will show you restaurants and places that are close to your current location.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Mesa uses your location to show nearby restaurants and places on the map, help you discover new places around you, and automatically detect your location when you import photos. For example, when you take a photo of a restaurant, Mesa can find nearby places to help you create reviews.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -652,8 +664,8 @@
 				INFOPLIST_FILE = loc/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Mesa;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.travel";
-				INFOPLIST_KEY_NSLocationAlwaysUsageDescription = "Access your location in the background";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Show your location on the map";
+				INFOPLIST_KEY_NSLocationAlwaysUsageDescription = "Mesa uses your location in the background to continuously update nearby places and provide real-time location-based recommendations. For example, when you're walking around, Mesa will show you restaurants and places that are close to your current location.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Mesa uses your location to show nearby restaurants and places on the map, help you discover new places around you, and automatically detect your location when you import photos. For example, when you take a photo of a restaurant, Mesa can find nearby places to help you create reviews.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -682,7 +694,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.5;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = drewharts.locTests;
+				PRODUCT_BUNDLE_IDENTIFIER = drewharts.loccTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
@@ -700,7 +712,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.5;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = drewharts.locTests;
+				PRODUCT_BUNDLE_IDENTIFIER = drewharts.loccTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
@@ -717,7 +729,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = drewharts.locUITests;
+				PRODUCT_BUNDLE_IDENTIFIER = drewharts.loccUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
@@ -734,7 +746,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = drewharts.locUITests;
+				PRODUCT_BUNDLE_IDENTIFIER = drewharts.loccUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
@@ -750,7 +762,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				GENERATE_INFOPLIST_FILE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "Mesa Share/Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "Mesa Share";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -761,6 +773,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = 3.3;
+				NEW_SETTING = "";
 				PRODUCT_BUNDLE_IDENTIFIER = "drewharts.locc.Mesa-Share";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -777,7 +790,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				GENERATE_INFOPLIST_FILE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "Mesa Share/Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "Mesa Share";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -788,6 +801,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = 3.3;
+				NEW_SETTING = "";
 				PRODUCT_BUNDLE_IDENTIFIER = "drewharts.locc.Mesa-Share";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
