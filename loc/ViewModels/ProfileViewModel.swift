@@ -835,6 +835,9 @@ class ProfileViewModel: ObservableObject {
                     }
                     self.isLoading = false
                     print("🔍 [ProfileViewModel] ensureListsLoaded: Updated userListsPlaces with \(self.userListsPlaces.count) entries")
+                    
+                    // Bulk calculate average coordinates for fast proximity sorting
+                    self.bulkCalculateAverageCoordinates()
                 }
             } catch {
                 print("❌ [ProfileViewModel] ensureListsLoaded: Error loading user lists: \(error.localizedDescription)")
@@ -843,6 +846,30 @@ class ProfileViewModel: ObservableObject {
                 }
             }
         }
+    }
+    
+    /// Bulk calculates average coordinates for all lists that don't have them
+    /// This is much faster than calculating them one by one
+    private func bulkCalculateAverageCoordinates() {
+        print("🚀 [ProfileViewModel] Bulk calculating average coordinates for all lists")
+        
+        // Group lists by whether they need calculation
+        let listsNeedingCalculation = userLists.filter { $0.averageCoordinate == nil }
+        let listsWithCoordinates = userLists.filter { $0.averageCoordinate != nil }
+        
+        print("🚀 [ProfileViewModel] \(listsWithCoordinates.count) lists already have coordinates, \(listsNeedingCalculation.count) need calculation")
+        
+        if listsNeedingCalculation.isEmpty {
+            print("🚀 [ProfileViewModel] All lists already have average coordinates - fast sorting ready!")
+            return
+        }
+        
+        // Calculate for all lists that need it
+        for list in listsNeedingCalculation {
+            recalculateAverageCoordinates(for: list.id)
+        }
+        
+        print("🚀 [ProfileViewModel] Bulk calculation complete - all lists now have average coordinates")
     }
     
     func loadListDataIfNeeded(listId: UUID) {
@@ -972,14 +999,37 @@ class ProfileViewModel: ObservableObject {
     // MARK: - Place-Specific List Sorting
     
     /// Calculates the average distance of all places in a list from a specific place
+    /// FAST VERSION: Uses pre-calculated average coordinates when available
     func calculateAverageDistanceForListFromPlace(_ list: PlaceList, place: DetailPlace) -> Double {
         guard let placeCoordinate = place.coordinate else { 
-            // If no coordinate available for the place, return infinity to sort these lists last
+            print("⚠️ [ProfileViewModel] Place '\(place.name)' has no coordinate, returning infinity")
             return Double.infinity 
         }
         
+        // FAST PATH: Use pre-calculated average coordinates if available (much faster!)
+        if let averageCoordinate = list.averageCoordinate {
+            let targetLocation = CLLocation(
+                latitude: placeCoordinate.latitude,
+                longitude: placeCoordinate.longitude
+            )
+            let listLocation = CLLocation(
+                latitude: averageCoordinate.latitude,
+                longitude: averageCoordinate.longitude
+            )
+            
+            let distance = targetLocation.distance(from: listLocation)
+            print("🚀 [ProfileViewModel] FAST: List '\(list.name)' using pre-calculated average coordinates, distance: \(String(format: "%.1f km", distance/1000))")
+            return distance
+        }
+        
+        // SLOW PATH: Fallback to calculating from individual places (only if no average coordinate)
         let listPlaceIds = userListsPlaces[list.id.uuidString] ?? []
-        guard !listPlaceIds.isEmpty else { return Double.infinity }
+        guard !listPlaceIds.isEmpty else { 
+            print("⚠️ [ProfileViewModel] List '\(list.name)' has no places, returning infinity")
+            return Double.infinity 
+        }
+        
+        print("🐌 [ProfileViewModel] SLOW: Calculating distance for list '\(list.name)' with \(listPlaceIds.count) places (no average coordinate)")
         
         let targetLocation = CLLocation(
             latitude: placeCoordinate.latitude,
@@ -1001,10 +1051,17 @@ class ProfileViewModel: ObservableObject {
                 let distance = targetLocation.distance(from: listPlaceLocation)
                 totalDistance += distance
                 validPlaceCount += 1
+                
+                print("🔍 [ProfileViewModel] List place '\(detailPlace.name)' distance: \(String(format: "%.1f km", distance/1000))")
+            } else {
+                print("⚠️ [ProfileViewModel] Could not find place with ID \(placeId) or it has no coordinate")
             }
         }
         
-        return validPlaceCount > 0 ? totalDistance / Double(validPlaceCount) : Double.infinity
+        let averageDistance = validPlaceCount > 0 ? totalDistance / Double(validPlaceCount) : Double.infinity
+        print("🐌 [ProfileViewModel] SLOW: List '\(list.name)' average distance: \(averageDistance == Double.infinity ? "infinity" : String(format: "%.1f km", averageDistance/1000)) (valid places: \(validPlaceCount)/\(listPlaceIds.count))")
+        
+        return averageDistance
     }
     
     /// Sorts lists by their proximity to a specific place (closest first)
