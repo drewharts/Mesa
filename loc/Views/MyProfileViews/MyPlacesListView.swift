@@ -41,40 +41,9 @@ struct MyPlacesListView: View {
         }
     }
     
-    // Get places added from TikTok imports
+    // Get places added from TikTok imports (now uses pagination)
     var tikTokPlaces: [DetailPlace] {
-        // Get all external places (TikTok imports)
-        let externalPlaceIds = Array(profile.userExternalPlaces.keys)
-        
-        print("🔍 [TikTokPlaces] Found \(profile.userExternalPlaces.count) external places")
-        print("🔍 [TikTokPlaces] External place IDs: \(externalPlaceIds)")
-        print("🔍 [TikTokPlaces] Available DetailPlace IDs: \(Array(profile.detailPlaceViewModel.places.keys))")
-        
-        // Convert to DetailPlace objects if available
-        let foundPlaces = externalPlaceIds.compactMap { placeId in
-            let detailPlace = profile.detailPlaceViewModel.places[placeId]
-            if detailPlace != nil {
-                print("🔍 [TikTokPlaces] Found DetailPlace for ID: \(placeId)")
-            } else {
-                print("⚠️ [TikTokPlaces] No DetailPlace found for ID: \(placeId)")
-            }
-            return detailPlace
-        }
-        
-        print("🔍 [TikTokPlaces] Successfully converted \(foundPlaces.count) external places to DetailPlaces")
-        
-        return foundPlaces.sorted { place1, place2 in
-            // Sort by the addedAt date from external places (most recent first)
-            let externalPlace1 = profile.userExternalPlaces[place1.id.uuidString]
-            let externalPlace2 = profile.userExternalPlaces[place2.id.uuidString]
-            
-            guard let date1 = externalPlace1?.addedAt,
-                  let date2 = externalPlace2?.addedAt else {
-                return false
-            }
-            
-            return date1 > date2
-        }
+        return profile.getTikTokPlaces()
     }
     
     var body: some View {
@@ -174,22 +143,13 @@ struct MyPlacesListView: View {
                             removal: .move(edge: .leading).combined(with: .opacity)
                         ))
                     } else {
-                        // TikTok Places
-                        TikTokPlacesView(
-                            tikTokPlaces: tikTokPlaces,
-                            isLoading: false, // TikTok places are already loaded
+                        // TikTok Places (with pagination)
+                        PaginatedTikTokPlacesView(
                             columns: columns,
                             cardWidth: cardWidth,
                             cardHeight: cardHeight,
                             colorForPlace: colorForPlace
                         )
-                        .onAppear {
-                            // Ensure external places are loaded when TikTok tab is accessed
-                            if profile.userExternalPlaces.isEmpty {
-                                print("🔍 [TikTokTab] External places not loaded, fetching...")
-                                profile.fetchUserExternalPlaces()
-                            }
-                        }
                         .transition(.asymmetric(
                             insertion: .move(edge: .trailing).combined(with: .opacity),
                             removal: .move(edge: .leading).combined(with: .opacity)
@@ -516,52 +476,54 @@ struct PlaceGridCell: View {
     }
 }
 
-// MARK: - TikTokPlacesView
-struct TikTokPlacesView: View {
-    @EnvironmentObject var profile: ProfileViewModel
-    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
-    @Environment(\.presentationMode) var presentationMode
-    
-    let tikTokPlaces: [DetailPlace]
-    let isLoading: Bool
+// MARK: - Paginated TikTok Places View
+struct PaginatedTikTokPlacesView: View {
     let columns: [GridItem]
     let cardWidth: CGFloat
     let cardHeight: CGFloat
     let colorForPlace: (DetailPlace) -> Color
     
+    @EnvironmentObject var profile: ProfileViewModel
+    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
+    @Environment(\.presentationMode) var presentationMode
+    
     var body: some View {
-        ScrollView {
-            if isLoading {
-                VStack {
-                    ProgressView()
-                        .padding()
-                    Text("Loading TikTok places...")
-                        .foregroundColor(.gray)
-                        .font(.caption)
-                }
-            } else if tikTokPlaces.isEmpty {
-                VStack(spacing: 20) {
-                    Image(systemName: "video.slash")
-                        .font(.system(size: 50))
-                        .foregroundColor(.gray.opacity(0.5))
+        if profile.isLoadingTikTokPlaces || (profile.getTikTokPlaces().isEmpty && !profile.isLoadingTikTokPlaces) {
+            VStack {
+                Spacer()
+                ProgressView()
+                Spacer()
+            }
+            .onAppear {
+                profile.loadTikTokPlacesWithPagination()
+            }
+        } else if profile.getTikTokPlaces().isEmpty {
+            VStack(spacing: 20) {
+                Image(systemName: "video.slash")
+                    .font(.system(size: 50))
+                    .foregroundColor(.gray.opacity(0.5))
+                
+                VStack(spacing: 8) {
+                    Text("No TikTok Places")
+                        .font(.title3)
+                        .fontWeight(.medium)
+                        .foregroundColor(.primary)
                     
-                    VStack(spacing: 8) {
-                        Text("No TikTok Places")
-                            .font(.title3)
-                            .fontWeight(.medium)
-                            .foregroundColor(.primary)
-                        
-                        Text("Places you add from TikTok videos will appear here")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, 40)
-                    }
+                    Text("Places you add from TikTok videos will appear here")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 40)
                 }
-                .padding(.top, 100)
-            } else {
+            }
+            .padding(.top, 100)
+            .onAppear {
+                profile.loadTikTokPlacesWithPagination()
+            }
+        } else {
+            ScrollView {
                 LazyVGrid(columns: columns, spacing: 15) {
-                    ForEach(tikTokPlaces) { place in
+                    ForEach(Array(profile.getTikTokPlaces().enumerated()), id: \.element.id) { index, place in
                         TikTokPlaceGridCell(
                             place: place,
                             cardWidth: cardWidth,
@@ -569,10 +531,31 @@ struct TikTokPlacesView: View {
                             color: colorForPlace(place),
                             externalPlace: profile.userExternalPlaces[place.id.uuidString]
                         )
+                        .onAppear {
+                            let lastIndex = profile.getTikTokPlaces().count - 1
+                            if index == lastIndex && profile.hasMoreTikTokPlaces {
+                                profile.loadMoreTikTokPlaces()
+                            }
+                        }
+                    }
+                    if profile.isLoadingMoreTikTokPlaces {
+                        HStack {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                            Text("Loading more...")
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 20)
+                        .gridCellColumns(2)
                     }
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 10)
+            }
+            .onAppear {
+                profile.loadTikTokPlacesWithPagination()
             }
         }
     }
@@ -590,63 +573,74 @@ struct TikTokPlaceGridCell: View {
     let color: Color
     let externalPlace: ExternalPlace?
     
+    // Get first TikTok thumbnail URL for this place
+    private func getFirstTikTokThumbnail() -> String? {
+        return externalPlace?.tiktokVideos.first?.thumbnailUrl
+    }
+    
     var body: some View {
-        ZStack {
-            // Background color
-            color
-            
-            VStack(spacing: 0) {
-                // TikTok thumbnail or colored background
-                ZStack {
-                    color
-                    
-                    // Try to show TikTok thumbnail if available
-                    if let thumbnailImage = profile.detailPlaceViewModel.placeImages[place.id.uuidString] {
-                        Image(uiImage: thumbnailImage)
+        VStack(alignment: .leading, spacing: 0) {
+            ZStack(alignment: .bottom) {
+                // Check for TikTok thumbnails first, then review image, then colored rectangle
+                if let firstTikTokThumbnail = getFirstTikTokThumbnail() {
+                    AsyncImage(url: URL(string: firstTikTokThumbnail)) { image in
+                        image
                             .resizable()
                             .aspectRatio(contentMode: .fill)
-                            .frame(width: cardWidth, height: cardHeight * 0.65)
+                            .frame(width: cardWidth, height: cardHeight)
                             .clipped()
-                    } else {
-                        // Fallback with TikTok icon
-                        VStack {
-                            Image(systemName: "video.fill")
-                                .font(.system(size: 30))
-                                .foregroundColor(.white)
-                            Text("TikTok")
-                                .font(.caption)
-                                .fontWeight(.semibold)
-                                .foregroundColor(.white)
-                        }
+                    } placeholder: {
+                        Rectangle()
+                            .foregroundColor(color)
+                            .frame(width: cardWidth, height: cardHeight)
                     }
-                    
-                    // TikTok indicator
-                    VStack {
-                        HStack {
-                            Spacer()
-                            Image(systemName: "video.fill")
-                                .font(.system(size: 12))
-                                .foregroundColor(.white)
-                                .background(
-                                    Circle()
-                                        .fill(Color.black.opacity(0.6))
-                                        .frame(width: 20, height: 20)
-                                )
+                } else if let image = profile.detailPlaceViewModel.placeImages[place.id.uuidString] {
+                    Image(uiImage: image)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: cardWidth, height: cardHeight)
+                        .clipped()
+                } else {
+                    Rectangle()
+                        .foregroundColor(color)
+                        .frame(width: cardWidth, height: cardHeight)
+                        .onAppear {
+                            profile.loadPlaceImageWithFallback(for: place)
                         }
-                        Spacer()
-                    }
-                    .padding(8)
                 }
-                .frame(height: cardHeight * 0.65)
+                
+                // TikTok indicator badge
+                VStack {
+                    HStack {
+                        Spacer()
+                        Image(systemName: "video.fill")
+                            .font(.system(size: 12))
+                            .foregroundColor(.white)
+                            .padding(4)
+                            .background(
+                                Circle()
+                                    .fill(Color.black.opacity(0.7))
+                                    .frame(width: 24, height: 24)
+                            )
+                    }
+                    Spacer()
+                }
+                .padding(8)
+                
+                // Gradient overlay for text readability
+                LinearGradient(
+                    gradient: Gradient(colors: [.clear, .black.opacity(0.7)]),
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: 60)
                 
                 // Place info
                 VStack(alignment: .leading, spacing: 4) {
                     Text(place.name)
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
+                        .font(.headline)
                         .foregroundColor(.white)
-                        .lineLimit(2)
-                        .multilineTextAlignment(.leading)
+                        .lineLimit(1)
                     
                     if let address = place.address {
                         Text(address)
@@ -665,7 +659,6 @@ struct TikTokPlaceGridCell: View {
                 }
                 .padding(.horizontal, 12)
                 .padding(.bottom, 8)
-                .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
         .frame(width: cardWidth, height: cardHeight)

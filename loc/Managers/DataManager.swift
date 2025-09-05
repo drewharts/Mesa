@@ -154,41 +154,11 @@ class DataManager: ObservableObject {
             profileViewModel.userExternalPlaces = externalPlaces
             print("✅ [DataManager] Successfully loaded \(externalPlaces.count) external places")
             
-            // Load corresponding DetailPlace objects for each external place
-            await loadDetailPlacesForExternalPlaces(externalPlaces)
+            // Note: DetailPlace objects will be loaded via pagination when TikTok tab is accessed
             
         } catch {
             print("❌ [DataManager] Error loading external places: \(error.localizedDescription)")
         }
-    }
-    
-    /// Load DetailPlace objects for all external places to ensure they're available in the TikTok tab
-    private func loadDetailPlacesForExternalPlaces(_ externalPlaces: [String: ExternalPlace]) async {
-        print("🔍 [DataManager] Loading DetailPlace objects for \(externalPlaces.count) external places")
-        
-        for (placeId, externalPlace) in externalPlaces {
-            // Check if DetailPlace is already loaded
-            if detailPlaceViewModel.places[placeId] != nil {
-                print("🔍 [DataManager] DetailPlace already loaded for: \(externalPlace.name)")
-                continue
-            }
-            
-            // Fetch DetailPlace from Firestore
-            print("🔍 [DataManager] Fetching DetailPlace for external place: \(externalPlace.name) (ID: \(placeId))")
-            
-            await withCheckedContinuation { continuation in
-                detailPlaceViewModel.fetchPlaceDetails(placeId: placeId) { detailPlace in
-                    if let detailPlace = detailPlace {
-                        print("✅ [DataManager] Successfully loaded DetailPlace for: \(detailPlace.name)")
-                    } else {
-                        print("⚠️ [DataManager] Failed to load DetailPlace for ID: \(placeId)")
-                    }
-                    continuation.resume()
-                }
-            }
-        }
-        
-        print("✅ [DataManager] Finished loading DetailPlace objects for external places")
     }
 
     func downloadImage(from url: URL, completion: @escaping (UIImage?) -> Void) {

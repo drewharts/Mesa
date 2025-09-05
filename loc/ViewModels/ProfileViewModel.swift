@@ -73,6 +73,15 @@ class ProfileViewModel: ObservableObject {
     private var allReviewedPlaceIds: [String] = []
     private var loadedReviewedPlaceIds: [String] = []
     
+    // Pagination for TikTok places
+    @Published var isLoadingTikTokPlaces: Bool = false
+    @Published var isLoadingMoreTikTokPlaces: Bool = false
+    private var _hasMoreTikTokPlaces: Bool = true
+    private var currentTikTokPage: Int = 0
+    private let tikTokPlacesPerPage: Int = 10
+    private var allTikTokPlaceIds: [String] = []
+    private var loadedTikTokPlaceIds: [String] = []
+    
     // Location manager for distance calculations
     private let locationManager: LocationManager
     private var cancellables = Set<AnyCancellable>()
@@ -463,6 +472,92 @@ class ProfileViewModel: ObservableObject {
     }
 
     var hasMoreReviews: Bool { _hasMoreReviews }
+    
+    // MARK: - TikTok Places Pagination
+    
+    func loadTikTokPlacesWithPagination() {
+        guard let userId = user?.id else { return }
+        if allTikTokPlaceIds.isEmpty {
+            isLoadingTikTokPlaces = true
+            Task {
+                // Get all external places (TikTok imports) sorted by date
+                let externalPlaces = Array(userExternalPlaces.values)
+                    .sorted { $0.addedAt > $1.addedAt } // Most recent first
+                
+                allTikTokPlaceIds = externalPlaces.map { $0.placeId }
+                
+                if allTikTokPlaceIds.isEmpty {
+                    isLoadingTikTokPlaces = false
+                    return
+                }
+                await self.loadNextBatchOfTikTokPlaces()
+            }
+        } else {
+            Task { await self.loadNextBatchOfTikTokPlaces() }
+        }
+    }
+    
+    private func loadNextBatchOfTikTokPlaces() async {
+        guard !isLoadingMoreTikTokPlaces && _hasMoreTikTokPlaces else {
+            isLoadingTikTokPlaces = false
+            return
+        }
+        isLoadingMoreTikTokPlaces = true
+        let startIndex = currentTikTokPage * tikTokPlacesPerPage
+        let endIndex = min(startIndex + tikTokPlacesPerPage, allTikTokPlaceIds.count)
+        guard startIndex < allTikTokPlaceIds.count else {
+            _hasMoreTikTokPlaces = false
+            isLoadingMoreTikTokPlaces = false
+            isLoadingTikTokPlaces = false
+            return
+        }
+        let placeIdsToLoad = Array(allTikTokPlaceIds[startIndex..<endIndex])
+        var successfullyLoadedPlaceIds: [String] = []
+        for placeId in placeIdsToLoad {
+            if detailPlaceViewModel.places[placeId] == nil {
+                do {
+                    let detailPlace = try await placeService.fetchPlace(withId: placeId)
+                    detailPlaceViewModel.places[placeId] = detailPlace
+                    detailPlaceViewModel.fetchPlaceImage(for: placeId)
+                    successfullyLoadedPlaceIds.append(placeId)
+                } catch {
+                    print("❌ Failed to load TikTok place \(placeId): \(error.localizedDescription)")
+                    // Continue with next place
+                }
+            } else {
+                successfullyLoadedPlaceIds.append(placeId)
+            }
+        }
+        // Only add new place IDs
+        let newPlaceIds = successfullyLoadedPlaceIds.filter { !loadedTikTokPlaceIds.contains($0) }
+        loadedTikTokPlaceIds.append(contentsOf: newPlaceIds)
+        currentTikTokPage += 1
+        _hasMoreTikTokPlaces = endIndex < allTikTokPlaceIds.count
+        isLoadingMoreTikTokPlaces = false
+        isLoadingTikTokPlaces = false
+        
+        print("✅ [ProfileViewModel] Loaded \(newPlaceIds.count) new TikTok places, total: \(loadedTikTokPlaceIds.count)/\(allTikTokPlaceIds.count)")
+    }
+    
+    func loadMoreTikTokPlaces() {
+        Task { await self.loadNextBatchOfTikTokPlaces() }
+    }
+    
+    func getTikTokPlaces() -> [DetailPlace] {
+        // Return places in the order they were loaded (most recent first)
+        return loadedTikTokPlaceIds.compactMap { detailPlaceViewModel.places[$0] }
+    }
+    
+    func resetTikTokPlacesPagination() {
+        isLoadingTikTokPlaces = false
+        isLoadingMoreTikTokPlaces = false
+        _hasMoreTikTokPlaces = true
+        currentTikTokPage = 0
+        allTikTokPlaceIds = []
+        loadedTikTokPlaceIds = []
+    }
+    
+    var hasMoreTikTokPlaces: Bool { _hasMoreTikTokPlaces }
     
     // MARK: - Reviewed Places Access
     
