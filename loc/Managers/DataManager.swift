@@ -153,6 +153,9 @@ class DataManager: ObservableObject {
             let externalPlaces = try await userService.fetchUserExternalPlaces(userId: userId)
             profileViewModel.userExternalPlaces = externalPlaces
             print("✅ [DataManager] Successfully loaded \(externalPlaces.count) external places")
+            
+            // Note: DetailPlace objects will be loaded via pagination when TikTok tab is accessed
+            
         } catch {
             print("❌ [DataManager] Error loading external places: \(error.localizedDescription)")
         }

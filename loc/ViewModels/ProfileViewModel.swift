@@ -73,6 +73,15 @@ class ProfileViewModel: ObservableObject {
     private var allReviewedPlaceIds: [String] = []
     private var loadedReviewedPlaceIds: [String] = []
     
+    // Pagination for TikTok places
+    @Published var isLoadingTikTokPlaces: Bool = false
+    @Published var isLoadingMoreTikTokPlaces: Bool = false
+    private var _hasMoreTikTokPlaces: Bool = true
+    private var currentTikTokPage: Int = 0
+    private let tikTokPlacesPerPage: Int = 10
+    private var allTikTokPlaceIds: [String] = []
+    private var loadedTikTokPlaceIds: [String] = []
+    
     // Location manager for distance calculations
     private let locationManager: LocationManager
     private var cancellables = Set<AnyCancellable>()
@@ -464,6 +473,92 @@ class ProfileViewModel: ObservableObject {
 
     var hasMoreReviews: Bool { _hasMoreReviews }
     
+    // MARK: - TikTok Places Pagination
+    
+    func loadTikTokPlacesWithPagination() {
+        guard let userId = user?.id else { return }
+        if allTikTokPlaceIds.isEmpty {
+            isLoadingTikTokPlaces = true
+            Task {
+                // Get all external places (TikTok imports) sorted by date
+                let externalPlaces = Array(userExternalPlaces.values)
+                    .sorted { $0.addedAt > $1.addedAt } // Most recent first
+                
+                allTikTokPlaceIds = externalPlaces.map { $0.placeId }
+                
+                if allTikTokPlaceIds.isEmpty {
+                    isLoadingTikTokPlaces = false
+                    return
+                }
+                await self.loadNextBatchOfTikTokPlaces()
+            }
+        } else {
+            Task { await self.loadNextBatchOfTikTokPlaces() }
+        }
+    }
+    
+    private func loadNextBatchOfTikTokPlaces() async {
+        guard !isLoadingMoreTikTokPlaces && _hasMoreTikTokPlaces else {
+            isLoadingTikTokPlaces = false
+            return
+        }
+        isLoadingMoreTikTokPlaces = true
+        let startIndex = currentTikTokPage * tikTokPlacesPerPage
+        let endIndex = min(startIndex + tikTokPlacesPerPage, allTikTokPlaceIds.count)
+        guard startIndex < allTikTokPlaceIds.count else {
+            _hasMoreTikTokPlaces = false
+            isLoadingMoreTikTokPlaces = false
+            isLoadingTikTokPlaces = false
+            return
+        }
+        let placeIdsToLoad = Array(allTikTokPlaceIds[startIndex..<endIndex])
+        var successfullyLoadedPlaceIds: [String] = []
+        for placeId in placeIdsToLoad {
+            if detailPlaceViewModel.places[placeId] == nil {
+                do {
+                    let detailPlace = try await placeService.fetchPlace(withId: placeId)
+                    detailPlaceViewModel.places[placeId] = detailPlace
+                    detailPlaceViewModel.fetchPlaceImage(for: placeId)
+                    successfullyLoadedPlaceIds.append(placeId)
+                } catch {
+                    print("❌ Failed to load TikTok place \(placeId): \(error.localizedDescription)")
+                    // Continue with next place
+                }
+            } else {
+                successfullyLoadedPlaceIds.append(placeId)
+            }
+        }
+        // Only add new place IDs
+        let newPlaceIds = successfullyLoadedPlaceIds.filter { !loadedTikTokPlaceIds.contains($0) }
+        loadedTikTokPlaceIds.append(contentsOf: newPlaceIds)
+        currentTikTokPage += 1
+        _hasMoreTikTokPlaces = endIndex < allTikTokPlaceIds.count
+        isLoadingMoreTikTokPlaces = false
+        isLoadingTikTokPlaces = false
+        
+        print("✅ [ProfileViewModel] Loaded \(newPlaceIds.count) new TikTok places, total: \(loadedTikTokPlaceIds.count)/\(allTikTokPlaceIds.count)")
+    }
+    
+    func loadMoreTikTokPlaces() {
+        Task { await self.loadNextBatchOfTikTokPlaces() }
+    }
+    
+    func getTikTokPlaces() -> [DetailPlace] {
+        // Return places in the order they were loaded (most recent first)
+        return loadedTikTokPlaceIds.compactMap { detailPlaceViewModel.places[$0] }
+    }
+    
+    func resetTikTokPlacesPagination() {
+        isLoadingTikTokPlaces = false
+        isLoadingMoreTikTokPlaces = false
+        _hasMoreTikTokPlaces = true
+        currentTikTokPage = 0
+        allTikTokPlaceIds = []
+        loadedTikTokPlaceIds = []
+    }
+    
+    var hasMoreTikTokPlaces: Bool { _hasMoreTikTokPlaces }
+    
     // MARK: - Reviewed Places Access
     
     /// Check if the current user has reviewed a specific place
@@ -835,6 +930,9 @@ class ProfileViewModel: ObservableObject {
                     }
                     self.isLoading = false
                     print("🔍 [ProfileViewModel] ensureListsLoaded: Updated userListsPlaces with \(self.userListsPlaces.count) entries")
+                    
+                    // Bulk calculate average coordinates for fast proximity sorting
+                    self.bulkCalculateAverageCoordinates()
                 }
             } catch {
                 print("❌ [ProfileViewModel] ensureListsLoaded: Error loading user lists: \(error.localizedDescription)")
@@ -843,6 +941,30 @@ class ProfileViewModel: ObservableObject {
                 }
             }
         }
+    }
+    
+    /// Bulk calculates average coordinates for all lists that don't have them
+    /// This is much faster than calculating them one by one
+    private func bulkCalculateAverageCoordinates() {
+        print("🚀 [ProfileViewModel] Bulk calculating average coordinates for all lists")
+        
+        // Group lists by whether they need calculation
+        let listsNeedingCalculation = userLists.filter { $0.averageCoordinate == nil }
+        let listsWithCoordinates = userLists.filter { $0.averageCoordinate != nil }
+        
+        print("🚀 [ProfileViewModel] \(listsWithCoordinates.count) lists already have coordinates, \(listsNeedingCalculation.count) need calculation")
+        
+        if listsNeedingCalculation.isEmpty {
+            print("🚀 [ProfileViewModel] All lists already have average coordinates - fast sorting ready!")
+            return
+        }
+        
+        // Calculate for all lists that need it
+        for list in listsNeedingCalculation {
+            recalculateAverageCoordinates(for: list.id)
+        }
+        
+        print("🚀 [ProfileViewModel] Bulk calculation complete - all lists now have average coordinates")
     }
     
     func loadListDataIfNeeded(listId: UUID) {
@@ -972,14 +1094,37 @@ class ProfileViewModel: ObservableObject {
     // MARK: - Place-Specific List Sorting
     
     /// Calculates the average distance of all places in a list from a specific place
+    /// FAST VERSION: Uses pre-calculated average coordinates when available
     func calculateAverageDistanceForListFromPlace(_ list: PlaceList, place: DetailPlace) -> Double {
         guard let placeCoordinate = place.coordinate else { 
-            // If no coordinate available for the place, return infinity to sort these lists last
+            print("⚠️ [ProfileViewModel] Place '\(place.name)' has no coordinate, returning infinity")
             return Double.infinity 
         }
         
+        // FAST PATH: Use pre-calculated average coordinates if available (much faster!)
+        if let averageCoordinate = list.averageCoordinate {
+            let targetLocation = CLLocation(
+                latitude: placeCoordinate.latitude,
+                longitude: placeCoordinate.longitude
+            )
+            let listLocation = CLLocation(
+                latitude: averageCoordinate.latitude,
+                longitude: averageCoordinate.longitude
+            )
+            
+            let distance = targetLocation.distance(from: listLocation)
+            print("🚀 [ProfileViewModel] FAST: List '\(list.name)' using pre-calculated average coordinates, distance: \(String(format: "%.1f km", distance/1000))")
+            return distance
+        }
+        
+        // SLOW PATH: Fallback to calculating from individual places (only if no average coordinate)
         let listPlaceIds = userListsPlaces[list.id.uuidString] ?? []
-        guard !listPlaceIds.isEmpty else { return Double.infinity }
+        guard !listPlaceIds.isEmpty else { 
+            print("⚠️ [ProfileViewModel] List '\(list.name)' has no places, returning infinity")
+            return Double.infinity 
+        }
+        
+        print("🐌 [ProfileViewModel] SLOW: Calculating distance for list '\(list.name)' with \(listPlaceIds.count) places (no average coordinate)")
         
         let targetLocation = CLLocation(
             latitude: placeCoordinate.latitude,
@@ -1001,10 +1146,17 @@ class ProfileViewModel: ObservableObject {
                 let distance = targetLocation.distance(from: listPlaceLocation)
                 totalDistance += distance
                 validPlaceCount += 1
+                
+                print("🔍 [ProfileViewModel] List place '\(detailPlace.name)' distance: \(String(format: "%.1f km", distance/1000))")
+            } else {
+                print("⚠️ [ProfileViewModel] Could not find place with ID \(placeId) or it has no coordinate")
             }
         }
         
-        return validPlaceCount > 0 ? totalDistance / Double(validPlaceCount) : Double.infinity
+        let averageDistance = validPlaceCount > 0 ? totalDistance / Double(validPlaceCount) : Double.infinity
+        print("🐌 [ProfileViewModel] SLOW: List '\(list.name)' average distance: \(averageDistance == Double.infinity ? "infinity" : String(format: "%.1f km", averageDistance/1000)) (valid places: \(validPlaceCount)/\(listPlaceIds.count))")
+        
+        return averageDistance
     }
     
     /// Sorts lists by their proximity to a specific place (closest first)
