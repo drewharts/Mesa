@@ -468,6 +468,194 @@ class UserService: ObservableObject {
         }
     }
 
+    // MARK: - Account Deletion
+    
+    /// Delete user account and all associated data
+    func deleteUserAccount(userId: String, completion: @escaping (Bool, Error?) -> Void) {
+        print("🗑️ [UserService] Starting account deletion for user: \(userId)")
+        
+        // Use a batch write to delete all user data atomically
+        let batch = db.batch()
+        
+        // Delete main user document
+        let userRef = db.collection("users").document(userId)
+        batch.deleteDocument(userRef)
+        
+        // Delete user's favorites collection
+        let favoritesRef = db.collection("users").document(userId).collection("favorites")
+        // Note: We can't delete subcollections in batch, so we'll handle this separately
+        
+        // Delete user's reviews collection
+        let reviewsRef = db.collection("users").document(userId).collection("reviews")
+        // Note: We can't delete subcollections in batch, so we'll handle this separately
+        
+        // Delete user's myPlaces collection
+        let myPlacesRef = db.collection("users").document(userId).collection("myPlaces")
+        // Note: We can't delete subcollections in batch, so we'll handle this separately
+        
+        // Delete user's placeLists collection
+        let placeListsRef = db.collection("users").document(userId).collection("placeLists")
+        // Note: We can't delete subcollections in batch, so we'll handle this separately
+        
+        // Delete user's externalPlaces collection
+        let externalPlacesRef = db.collection("users").document(userId).collection("externalPlaces")
+        // Note: We can't delete subcollections in batch, so we'll handle this separately
+        
+        // Delete following relationships
+        let followingQuery = self.db.collection("following").whereField("followerId", isEqualTo: userId)
+        followingQuery.getDocuments { snapshot, error in
+            if let error = error {
+                print("❌ [UserService] Error fetching following relationships: \(error.localizedDescription)")
+                completion(false, error)
+                return
+            }
+            
+            snapshot?.documents.forEach { document in
+                batch.deleteDocument(document.reference)
+            }
+            
+            // Delete followers relationships
+            let followersQuery = self.db.collection("followers").whereField("followingId", isEqualTo: userId)
+            followersQuery.getDocuments { snapshot, error in
+                if let error = error {
+                    print("❌ [UserService] Error fetching followers relationships: \(error.localizedDescription)")
+                    completion(false, error)
+                    return
+                }
+                
+                snapshot?.documents.forEach { document in
+                    batch.deleteDocument(document.reference)
+                }
+                
+                // Commit the batch deletion
+                batch.commit { error in
+                    if let error = error {
+                        print("❌ [UserService] Error committing batch deletion: \(error.localizedDescription)")
+                        completion(false, error)
+                        return
+                    }
+                    
+                    print("✅ [UserService] Successfully deleted main user data")
+                    
+                    // Now delete subcollections (these can't be done in batch)
+                    self.deleteUserSubcollections(userId: userId) { success, error in
+                        if let error = error {
+                            print("❌ [UserService] Error deleting subcollections: \(error.localizedDescription)")
+                            completion(false, error)
+                        } else {
+                            print("✅ [UserService] Successfully deleted all user data")
+                            completion(true, nil)
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    /// Delete all user subcollections
+    private func deleteUserSubcollections(userId: String, completion: @escaping (Bool, Error?) -> Void) {
+        let dispatchGroup = DispatchGroup()
+        var hasError = false
+        var lastError: Error?
+        
+        // Delete favorites
+        dispatchGroup.enter()
+        deleteCollection(collection: self.db.collection("users").document(userId).collection("favorites")) { error in
+            if let error = error {
+                print("❌ [UserService] Error deleting favorites: \(error.localizedDescription)")
+                hasError = true
+                lastError = error
+            } else {
+                print("✅ [UserService] Successfully deleted favorites")
+            }
+            dispatchGroup.leave()
+        }
+        
+        // Delete reviews
+        dispatchGroup.enter()
+        deleteCollection(collection: self.db.collection("users").document(userId).collection("reviews")) { error in
+            if let error = error {
+                print("❌ [UserService] Error deleting reviews: \(error.localizedDescription)")
+                hasError = true
+                lastError = error
+            } else {
+                print("✅ [UserService] Successfully deleted reviews")
+            }
+            dispatchGroup.leave()
+        }
+        
+        // Delete myPlaces
+        dispatchGroup.enter()
+        deleteCollection(collection: self.db.collection("users").document(userId).collection("myPlaces")) { error in
+            if let error = error {
+                print("❌ [UserService] Error deleting myPlaces: \(error.localizedDescription)")
+                hasError = true
+                lastError = error
+            } else {
+                print("✅ [UserService] Successfully deleted myPlaces")
+            }
+            dispatchGroup.leave()
+        }
+        
+        // Delete placeLists
+        dispatchGroup.enter()
+        deleteCollection(collection: self.db.collection("users").document(userId).collection("placeLists")) { error in
+            if let error = error {
+                print("❌ [UserService] Error deleting placeLists: \(error.localizedDescription)")
+                hasError = true
+                lastError = error
+            } else {
+                print("✅ [UserService] Successfully deleted placeLists")
+            }
+            dispatchGroup.leave()
+        }
+        
+        // Delete externalPlaces
+        dispatchGroup.enter()
+        deleteCollection(collection: self.db.collection("users").document(userId).collection("externalPlaces")) { error in
+            if let error = error {
+                print("❌ [UserService] Error deleting externalPlaces: \(error.localizedDescription)")
+                hasError = true
+                lastError = error
+            } else {
+                print("✅ [UserService] Successfully deleted externalPlaces")
+            }
+            dispatchGroup.leave()
+        }
+        
+        dispatchGroup.notify(queue: .main) {
+            if hasError {
+                completion(false, lastError)
+            } else {
+                completion(true, nil)
+            }
+        }
+    }
+    
+    /// Helper method to delete all documents in a collection
+    private func deleteCollection(collection: CollectionReference, completion: @escaping (Error?) -> Void) {
+        collection.getDocuments { snapshot, error in
+            if let error = error {
+                completion(error)
+                return
+            }
+            
+            guard let snapshot = snapshot, !snapshot.documents.isEmpty else {
+                completion(nil) // Collection is already empty
+                return
+            }
+            
+            let batch = self.db.batch()
+            snapshot.documents.forEach { document in
+                batch.deleteDocument(document.reference)
+            }
+            
+            batch.commit { error in
+                completion(error)
+            }
+        }
+    }
+
     func fetchUserReviewPlaces(userId: String, user: User, completion: @escaping ([DetailPlace]?, Error?) -> Void) {
         // Reference to the user's reviews collection
         let reviewsRef = db.collection("users")

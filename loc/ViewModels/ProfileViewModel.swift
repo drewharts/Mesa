@@ -1327,4 +1327,51 @@ class ProfileViewModel: ObservableObject {
             }
         }
     }
+    
+    // MARK: - Account Deletion
+    
+    /// Delete user account and all associated data
+    func deleteAccount(completion: @escaping (Bool, String?) -> Void) {
+        guard let userId = user?.id else {
+            completion(false, "No user ID found")
+            return
+        }
+        
+        print("🗑️ [ProfileViewModel] Starting account deletion for user: \(userId)")
+        
+        // Delete user data from Firestore
+        userService.deleteUserAccount(userId: userId) { [weak self] success, error in
+            DispatchQueue.main.async {
+                if let error = error {
+                    print("❌ [ProfileViewModel] Error deleting account: \(error.localizedDescription)")
+                    completion(false, error.localizedDescription)
+                    return
+                }
+                
+                if success {
+                    print("✅ [ProfileViewModel] Successfully deleted user data from Firestore")
+                    
+                    // Delete Firebase Auth user
+                    Auth.auth().currentUser?.delete { authError in
+                        DispatchQueue.main.async {
+                            if let authError = authError {
+                                print("❌ [ProfileViewModel] Error deleting Firebase Auth user: \(authError.localizedDescription)")
+                                completion(false, "Failed to delete authentication account: \(authError.localizedDescription)")
+                                return
+                            }
+                            
+                            print("✅ [ProfileViewModel] Successfully deleted Firebase Auth user")
+                            
+                            // Log out the user
+                            self?.userSession.logout()
+                            
+                            completion(true, nil)
+                        }
+                    }
+                } else {
+                    completion(false, "Failed to delete user data")
+                }
+            }
+        }
+    }
 }
