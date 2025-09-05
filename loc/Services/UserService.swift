@@ -502,7 +502,7 @@ class UserService: ObservableObject {
         // Note: We can't delete subcollections in batch, so we'll handle this separately
         
         // Delete following relationships
-        let followingQuery = db.collection("following").whereField("followerId", isEqualTo: userId)
+        let followingQuery = self.db.collection("following").whereField("followerId", isEqualTo: userId)
         followingQuery.getDocuments { snapshot, error in
             if let error = error {
                 print("❌ [UserService] Error fetching following relationships: \(error.localizedDescription)")
@@ -515,7 +515,7 @@ class UserService: ObservableObject {
             }
             
             // Delete followers relationships
-            let followersQuery = db.collection("followers").whereField("followingId", isEqualTo: userId)
+            let followersQuery = self.db.collection("followers").whereField("followingId", isEqualTo: userId)
             followersQuery.getDocuments { snapshot, error in
                 if let error = error {
                     print("❌ [UserService] Error fetching followers relationships: \(error.localizedDescription)")
@@ -560,7 +560,7 @@ class UserService: ObservableObject {
         
         // Delete favorites
         dispatchGroup.enter()
-        deleteCollection(collection: db.collection("users").document(userId).collection("favorites")) { error in
+        deleteCollection(collection: self.db.collection("users").document(userId).collection("favorites")) { error in
             if let error = error {
                 print("❌ [UserService] Error deleting favorites: \(error.localizedDescription)")
                 hasError = true
@@ -573,7 +573,7 @@ class UserService: ObservableObject {
         
         // Delete reviews
         dispatchGroup.enter()
-        deleteCollection(collection: db.collection("users").document(userId).collection("reviews")) { error in
+        deleteCollection(collection: self.db.collection("users").document(userId).collection("reviews")) { error in
             if let error = error {
                 print("❌ [UserService] Error deleting reviews: \(error.localizedDescription)")
                 hasError = true
@@ -586,7 +586,7 @@ class UserService: ObservableObject {
         
         // Delete myPlaces
         dispatchGroup.enter()
-        deleteCollection(collection: db.collection("users").document(userId).collection("myPlaces")) { error in
+        deleteCollection(collection: self.db.collection("users").document(userId).collection("myPlaces")) { error in
             if let error = error {
                 print("❌ [UserService] Error deleting myPlaces: \(error.localizedDescription)")
                 hasError = true
@@ -599,7 +599,7 @@ class UserService: ObservableObject {
         
         // Delete placeLists
         dispatchGroup.enter()
-        deleteCollection(collection: db.collection("users").document(userId).collection("placeLists")) { error in
+        deleteCollection(collection: self.db.collection("users").document(userId).collection("placeLists")) { error in
             if let error = error {
                 print("❌ [UserService] Error deleting placeLists: \(error.localizedDescription)")
                 hasError = true
@@ -612,7 +612,7 @@ class UserService: ObservableObject {
         
         // Delete externalPlaces
         dispatchGroup.enter()
-        deleteCollection(collection: db.collection("users").document(userId).collection("externalPlaces")) { error in
+        deleteCollection(collection: self.db.collection("users").document(userId).collection("externalPlaces")) { error in
             if let error = error {
                 print("❌ [UserService] Error deleting externalPlaces: \(error.localizedDescription)")
                 hasError = true
