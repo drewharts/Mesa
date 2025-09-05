@@ -46,10 +46,24 @@ struct MyPlacesListView: View {
         // Get all external places (TikTok imports)
         let externalPlaceIds = Array(profile.userExternalPlaces.keys)
         
+        print("🔍 [TikTokPlaces] Found \(profile.userExternalPlaces.count) external places")
+        print("🔍 [TikTokPlaces] External place IDs: \(externalPlaceIds)")
+        print("🔍 [TikTokPlaces] Available DetailPlace IDs: \(Array(profile.detailPlaceViewModel.places.keys))")
+        
         // Convert to DetailPlace objects if available
-        return externalPlaceIds.compactMap { placeId in
-            profile.detailPlaceViewModel.places[placeId]
-        }.sorted { place1, place2 in
+        let foundPlaces = externalPlaceIds.compactMap { placeId in
+            let detailPlace = profile.detailPlaceViewModel.places[placeId]
+            if detailPlace != nil {
+                print("🔍 [TikTokPlaces] Found DetailPlace for ID: \(placeId)")
+            } else {
+                print("⚠️ [TikTokPlaces] No DetailPlace found for ID: \(placeId)")
+            }
+            return detailPlace
+        }
+        
+        print("🔍 [TikTokPlaces] Successfully converted \(foundPlaces.count) external places to DetailPlaces")
+        
+        return foundPlaces.sorted { place1, place2 in
             // Sort by the addedAt date from external places (most recent first)
             let externalPlace1 = profile.userExternalPlaces[place1.id.uuidString]
             let externalPlace2 = profile.userExternalPlaces[place2.id.uuidString]
@@ -169,6 +183,13 @@ struct MyPlacesListView: View {
                             cardHeight: cardHeight,
                             colorForPlace: colorForPlace
                         )
+                        .onAppear {
+                            // Ensure external places are loaded when TikTok tab is accessed
+                            if profile.userExternalPlaces.isEmpty {
+                                print("🔍 [TikTokTab] External places not loaded, fetching...")
+                                profile.fetchUserExternalPlaces()
+                            }
+                        }
                         .transition(.asymmetric(
                             insertion: .move(edge: .trailing).combined(with: .opacity),
                             removal: .move(edge: .leading).combined(with: .opacity)
