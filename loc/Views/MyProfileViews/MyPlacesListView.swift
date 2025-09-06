@@ -609,24 +609,6 @@ struct TikTokPlaceGridCell: View {
                         }
                 }
                 
-                // TikTok indicator badge
-                VStack {
-                    HStack {
-                        Spacer()
-                        Image(systemName: "video.fill")
-                            .font(.system(size: 12))
-                            .foregroundColor(.white)
-                            .padding(4)
-                            .background(
-                                Circle()
-                                    .fill(Color.black.opacity(0.7))
-                                    .frame(width: 24, height: 24)
-                            )
-                    }
-                    Spacer()
-                }
-                .padding(8)
-                
                 // Gradient overlay for text readability
                 LinearGradient(
                     gradient: Gradient(colors: [.clear, .black.opacity(0.7)]),
@@ -635,25 +617,17 @@ struct TikTokPlaceGridCell: View {
                 )
                 .frame(height: 60)
                 
-                // Place info
+                // Place info - only name and city
                 VStack(alignment: .leading, spacing: 4) {
                     Text(place.name)
                         .font(.headline)
                         .foregroundColor(.white)
                         .lineLimit(1)
                     
-                    if let address = place.address {
-                        Text(address)
+                    if let city = place.city {
+                        Text(city)
                             .font(.caption)
                             .foregroundColor(.white.opacity(0.8))
-                            .lineLimit(1)
-                    }
-                    
-                    // Show date added from external place
-                    if let externalPlace = externalPlace {
-                        Text("Added \(formatDate(externalPlace.addedAt))")
-                            .font(.caption)
-                            .foregroundColor(.white.opacity(0.7))
                             .lineLimit(1)
                     }
                 }
@@ -674,11 +648,5 @@ struct TikTokPlaceGridCell: View {
             selectedPlaceVM.isDetailSheetPresented = true
             presentationMode.wrappedValue.dismiss()
         }
-    }
-    
-    private func formatDate(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .short
-        return formatter.string(from: date)
     }
 } 
