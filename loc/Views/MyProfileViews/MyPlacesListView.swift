@@ -441,20 +441,24 @@ struct PlaceGridCell: View {
                         .font(.headline)
                         .foregroundColor(.white)
                         .lineLimit(1)
+                        .multilineTextAlignment(.leading)
                     if let type = profile.detailPlaceViewModel.placeTypes[place.id.uuidString] {
                         Text(type)
                             .font(.caption)
                             .foregroundColor(.white.opacity(0.8))
                             .lineLimit(1)
+                            .multilineTextAlignment(.leading)
                     } else if let address = place.address {
                         Text(address)
                             .font(.caption)
                             .foregroundColor(.white.opacity(0.8))
                             .lineLimit(1)
+                            .multilineTextAlignment(.leading)
                     }
                 }
                 .padding(.horizontal, 12)
                 .padding(.bottom, 8)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
         .frame(width: cardWidth, height: cardHeight)
@@ -623,16 +627,19 @@ struct TikTokPlaceGridCell: View {
                         .font(.headline)
                         .foregroundColor(.white)
                         .lineLimit(1)
+                        .multilineTextAlignment(.leading)
                     
                     if let city = place.city {
                         Text(city)
                             .font(.caption)
                             .foregroundColor(.white.opacity(0.8))
                             .lineLimit(1)
+                            .multilineTextAlignment(.leading)
                     }
                 }
                 .padding(.horizontal, 12)
                 .padding(.bottom, 8)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
         .frame(width: cardWidth, height: cardHeight)
