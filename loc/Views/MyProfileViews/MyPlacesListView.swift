@@ -435,21 +435,16 @@ struct PlaceGridCell: View {
                 )
                 .frame(height: 60)
                 
-                // Place name and address
+                // Place name and city
                 VStack(alignment: .leading, spacing: 4) {
                     Text(place.name)
                         .font(.headline)
                         .foregroundColor(.white)
                         .lineLimit(1)
                         .multilineTextAlignment(.leading)
-                    if let type = profile.detailPlaceViewModel.placeTypes[place.id.uuidString] {
-                        Text(type)
-                            .font(.caption)
-                            .foregroundColor(.white.opacity(0.8))
-                            .lineLimit(1)
-                            .multilineTextAlignment(.leading)
-                    } else if let address = place.address {
-                        Text(address)
+                    
+                    if let city = place.city {
+                        Text(city)
                             .font(.caption)
                             .foregroundColor(.white.opacity(0.8))
                             .lineLimit(1)
