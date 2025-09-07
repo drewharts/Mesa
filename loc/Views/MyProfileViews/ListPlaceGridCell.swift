@@ -95,16 +95,14 @@ struct ListPlaceGridCell: View {
                             .font(.headline)
                             .foregroundColor(.white)
                             .lineLimit(1)
-                        if let type = detailPlaceViewModel.placeTypes[place.id.uuidString] {
-                            Text(type)
-                                .font(.subheadline)
-                                .foregroundColor(.white.opacity(0.7))
-                                .lineLimit(1)
-                        } else if let city = place.city {
+                            .multilineTextAlignment(.leading)
+                        
+                        if let city = place.city {
                             Text(city)
                                 .font(.subheadline)
                                 .foregroundColor(.white.opacity(0.7))
                                 .lineLimit(1)
+                                .multilineTextAlignment(.leading)
                         }
                     }
                     .padding(.horizontal, 12)
