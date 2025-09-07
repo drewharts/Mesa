@@ -260,6 +260,16 @@ class ProfileViewModel: ObservableObject {
             detailPlaceViewModel.places[place.id.uuidString] = place
         }
         
+        // Add current user as saver so places appear on map with profile picture
+        if detailPlaceViewModel.placeSavers[place.id.uuidString] == nil {
+            detailPlaceViewModel.placeSavers[place.id.uuidString] = [userId]
+        } else if !detailPlaceViewModel.placeSavers[place.id.uuidString]!.contains(userId) {
+            detailPlaceViewModel.placeSavers[place.id.uuidString]!.append(userId)
+        }
+        
+        // Recalculate map annotations to include the new place
+        detailPlaceViewModel.calculateAnnotationPlaces()
+        
         // Recalculate average coordinates for this list
         recalculateAverageCoordinates(for: listId)
         
@@ -300,6 +310,16 @@ class ProfileViewModel: ObservableObject {
         if !userFavorites.contains(place.id.uuidString) {
             userFavorites.append(place.id.uuidString)
             userService.addProfileFavorite(userId: userId, place: place)
+            
+            // Add current user as saver so favorite places appear on map with profile picture
+            if detailPlaceViewModel.placeSavers[place.id.uuidString] == nil {
+                detailPlaceViewModel.placeSavers[place.id.uuidString] = [userId]
+            } else if !detailPlaceViewModel.placeSavers[place.id.uuidString]!.contains(userId) {
+                detailPlaceViewModel.placeSavers[place.id.uuidString]!.append(userId)
+            }
+            
+            // Recalculate map annotations to include the new favorite place
+            detailPlaceViewModel.calculateAnnotationPlaces()
         }
     }
     
@@ -431,6 +451,12 @@ class ProfileViewModel: ObservableObject {
         }
         let placeIdsToLoad = Array(allReviewedPlaceIds[startIndex..<endIndex])
         var successfullyLoadedPlaceIds: [String] = []
+        guard let currentUserId = user?.id else {
+            isLoadingMoreReviews = false
+            isLoadingReviewedPlaces = false
+            return
+        }
+        
         for placeId in placeIdsToLoad {
             if detailPlaceViewModel.places[placeId] == nil {
                 do {
@@ -444,7 +470,15 @@ class ProfileViewModel: ObservableObject {
             } else {
                 successfullyLoadedPlaceIds.append(placeId)
             }
+            
+            // Add current user as saver so reviewed places appear on map with profile picture
+            if detailPlaceViewModel.placeSavers[placeId] == nil {
+                detailPlaceViewModel.placeSavers[placeId] = [currentUserId]
+            } else if !detailPlaceViewModel.placeSavers[placeId]!.contains(currentUserId) {
+                detailPlaceViewModel.placeSavers[placeId]!.append(currentUserId)
+            }
         }
+        
         // Only add new place IDs
         let newPlaceIds = successfullyLoadedPlaceIds.filter { !loadedReviewedPlaceIds.contains($0) }
         loadedReviewedPlaceIds.append(contentsOf: newPlaceIds)
@@ -452,6 +486,9 @@ class ProfileViewModel: ObservableObject {
         _hasMoreReviews = endIndex < allReviewedPlaceIds.count
         isLoadingMoreReviews = false
         isLoadingReviewedPlaces = false
+        
+        // Recalculate map annotations to include new reviewed places
+        detailPlaceViewModel.calculateAnnotationPlaces()
     }
 
     func loadMoreMyReviews() {
@@ -513,6 +550,12 @@ class ProfileViewModel: ObservableObject {
         }
         let placeIdsToLoad = Array(allTikTokPlaceIds[startIndex..<endIndex])
         var successfullyLoadedPlaceIds: [String] = []
+        guard let currentUserId = user?.id else {
+            isLoadingMoreTikTokPlaces = false
+            isLoadingTikTokPlaces = false
+            return
+        }
+        
         for placeId in placeIdsToLoad {
             if detailPlaceViewModel.places[placeId] == nil {
                 do {
@@ -527,7 +570,15 @@ class ProfileViewModel: ObservableObject {
             } else {
                 successfullyLoadedPlaceIds.append(placeId)
             }
+            
+            // Add current user as saver so TikTok places appear on map with profile picture
+            if detailPlaceViewModel.placeSavers[placeId] == nil {
+                detailPlaceViewModel.placeSavers[placeId] = [currentUserId]
+            } else if !detailPlaceViewModel.placeSavers[placeId]!.contains(currentUserId) {
+                detailPlaceViewModel.placeSavers[placeId]!.append(currentUserId)
+            }
         }
+        
         // Only add new place IDs
         let newPlaceIds = successfullyLoadedPlaceIds.filter { !loadedTikTokPlaceIds.contains($0) }
         loadedTikTokPlaceIds.append(contentsOf: newPlaceIds)
@@ -535,6 +586,9 @@ class ProfileViewModel: ObservableObject {
         _hasMoreTikTokPlaces = endIndex < allTikTokPlaceIds.count
         isLoadingMoreTikTokPlaces = false
         isLoadingTikTokPlaces = false
+        
+        // Recalculate map annotations to include new TikTok places
+        detailPlaceViewModel.calculateAnnotationPlaces()
         
         print("✅ [ProfileViewModel] Loaded \(newPlaceIds.count) new TikTok places, total: \(loadedTikTokPlaceIds.count)/\(allTikTokPlaceIds.count)")
     }
