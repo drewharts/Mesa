@@ -73,21 +73,20 @@ struct UserReviewedPlaceGridCell: View {
                         .font(.headline)
                         .foregroundColor(.white)
                         .lineLimit(1)
-                    if let type = detailPlaceViewModel.placeTypes[place.id.uuidString] {
-                        Text(type)
-                            .font(.subheadline)
-                            .foregroundColor(.white.opacity(0.7))
-                            .lineLimit(1)
-                    } else if let city = place.city, !city.isEmpty {
+                        .multilineTextAlignment(.leading)
+                    
+                    if let city = place.city, !city.isEmpty {
                         Text(city)
                             .font(.subheadline)
                             .foregroundColor(.white.opacity(0.7))
                             .lineLimit(1)
-                    } else {
+                            .multilineTextAlignment(.leading)
+                    } else if place.name.isEmpty {
                         Text("Loading details...")
                             .font(.subheadline)
                             .foregroundColor(.white.opacity(0.7))
                             .lineLimit(1)
+                            .multilineTextAlignment(.leading)
                     }
                 }
                 .padding(.horizontal, 12)

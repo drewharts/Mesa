@@ -112,17 +112,14 @@ struct UserProfileListPlacesPopupView: View {
                                                     .font(.headline)
                                                     .foregroundColor(.white)
                                                     .lineLimit(1)
+                                                    .multilineTextAlignment(.leading)
                                                 
-                                                if let type = detailPlaceViewModel.placeTypes[place.id.uuidString] {
-                                                    Text(type)
-                                                        .font(.subheadline)
-                                                        .foregroundColor(.white.opacity(0.7))
-                                                        .lineLimit(1)
-                                                } else if let city = place.city {
+                                                if let city = place.city {
                                                     Text(city)
                                                         .font(.subheadline)
                                                         .foregroundColor(.white.opacity(0.7))
                                                         .lineLimit(1)
+                                                        .multilineTextAlignment(.leading)
                                                 }
                                             }
                                             .padding(.horizontal, 12)
