@@ -596,4 +596,9 @@ class UserProfileViewModel: ObservableObject {
     func hasMoreReviews(for userId: String) -> Bool {
         return hasMoreReviews[userId] ?? true
     }
+    
+    // Check if we've attempted to load reviews for a specific user
+    func hasAttemptedLoadReviews(for userId: String) -> Bool {
+        return hasAttemptedLoadReviewedPlaces[userId] ?? false
+    }
 }
