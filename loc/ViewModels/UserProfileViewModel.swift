@@ -23,6 +23,10 @@ class UserProfileViewModel: ObservableObject {
     @Published var isFollowing: Bool = false
     @Published var followers: Int = 0
     
+    // Follow error handling
+    @Published var showFollowError: Bool = false
+    @Published var followErrorMessage: String = ""
+    
     // Reviewed places loading state
     @Published var isLoadingReviewedPlaces: Bool = false
     private var hasAttemptedLoadReviewedPlaces: [String: Bool] = [:]
@@ -100,26 +104,57 @@ class UserProfileViewModel: ObservableObject {
     
     func toggleFollowUser(currentUserId: String) {
         guard let targetUserId = selectedUser?.id else { return }
+        
+        // Store original state for potential rollback
+        let originalFollowingState = isFollowing
+        let originalFollowersCount = followers
+        
         if isFollowing {
+            // Optimistic update: immediately change UI
+            self.isFollowing = false
+            self.followers = max(0, self.followers - 1)
+            // Remove user from placeSavers and recalculate annotations
+            self.removeUserFromPlaceSavers(userId: targetUserId)
+            self.detailPlaceViewModel.calculateAnnotationPlaces()
+            
+            // Make the actual API call
             userService.unfollowUser(followerId: currentUserId, followingId: targetUserId) { success, error in
-                if success {
-                    self.isFollowing = false
-                    self.followers = max(0, self.followers - 1)
-                    // Remove user from placeSavers and recalculate annotations
-                    self.removeUserFromPlaceSavers(userId: targetUserId)
-                    self.detailPlaceViewModel.calculateAnnotationPlaces()
+                if !success {
+                    // Revert on failure
+                    DispatchQueue.main.async {
+                        self.isFollowing = originalFollowingState
+                        self.followers = originalFollowersCount
+                        // Re-add user to placeSavers and recalculate annotations
+                        self.addUserToPlaceSavers(userId: targetUserId)
+                        self.detailPlaceViewModel.calculateAnnotationPlaces()
+                        // Show error alert
+                        self.showFollowError = true
+                        self.followErrorMessage = "Failed to unfollow user. Please try again."
+                    }
                 }
             }
         } else {
+            // Optimistic update: immediately change UI
+            self.isFollowing = true
+            self.followers += 1
+            
+            // Make the actual API call
             userService.followUser(followerId: currentUserId, followingId: targetUserId) { success, error in
                 if success {
-                    self.isFollowing = true
-                    self.followers += 1
-                    // Load new user's places and recalculate annotations
+                    // Load new user's places and recalculate annotations on success
                     Task {
                         await self.dataManager.loadUserFavoritePlaces(userId: targetUserId, forUser: self.selectedUser)
                         await self.dataManager.loadUserPlaceLists(userId: targetUserId, forUser: self.selectedUser)
                         self.detailPlaceViewModel.calculateAnnotationPlaces()
+                    }
+                } else {
+                    // Revert on failure
+                    DispatchQueue.main.async {
+                        self.isFollowing = originalFollowingState
+                        self.followers = originalFollowersCount
+                        // Show error alert
+                        self.showFollowError = true
+                        self.followErrorMessage = "Failed to follow user. Please try again."
                     }
                 }
             }
@@ -356,6 +391,19 @@ class UserProfileViewModel: ObservableObject {
         }
     }
     
+    // Helper to add a user back to all placeSavers (for rollback)
+    private func addUserToPlaceSavers(userId: String) {
+        // This method is used for rollback when unfollow fails
+        // We need to reload the user's places to restore them to placeSavers
+        guard let selectedUser = selectedUser else { return }
+        
+        Task {
+            await dataManager.loadUserFavoritePlaces(userId: userId, forUser: selectedUser)
+            await dataManager.loadUserPlaceLists(userId: userId, forUser: selectedUser)
+            detailPlaceViewModel.calculateAnnotationPlaces()
+        }
+    }
+    
     // MARK: - Reviewed Places Loading
     
     func loadUserReviewedPlacesIfNeeded() {
@@ -547,5 +595,10 @@ class UserProfileViewModel: ObservableObject {
     // Get hasMoreReviews for a specific user
     func hasMoreReviews(for userId: String) -> Bool {
         return hasMoreReviews[userId] ?? true
+    }
+    
+    // Check if we've attempted to load reviews for a specific user
+    func hasAttemptedLoadReviews(for userId: String) -> Bool {
+        return hasAttemptedLoadReviewedPlaces[userId] ?? false
     }
 }

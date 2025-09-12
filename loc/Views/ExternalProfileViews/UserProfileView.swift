@@ -173,6 +173,20 @@ struct UserProfileView: View {
                 }
             }
         }
+        .alert("Follow Error", isPresented: $UserProfileVM.showFollowError) {
+            Button("OK") {
+                UserProfileVM.showFollowError = false
+            }
+        } message: {
+            Text(UserProfileVM.followErrorMessage)
+        }
+        .alert("Follow Error", isPresented: $profileVM.showFollowError) {
+            Button("OK") {
+                profileVM.showFollowError = false
+            }
+        } message: {
+            Text(profileVM.followErrorMessage)
+        }
     }
     
     private func startFadeOutTimer() {
