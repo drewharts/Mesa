@@ -449,6 +449,34 @@ class UserService: ObservableObject {
             }
         }
     }
+    
+    func deleteTikTokPlace(userId: String, placeId: String, completion: @escaping (Bool, Error?) -> Void) {
+        // Reference to the user's external places collection (TikTok imports)
+        let externalPlacesRef = db.collection("users")
+            .document(userId)
+            .collection("externalPlaces")
+            .document(placeId)
+        
+        // Delete the document from the user's external places collection
+        externalPlacesRef.delete { error in
+            if let error = error {
+                print("❌ [UserService] Error deleting TikTok place from user's collection: \(error.localizedDescription)")
+                completion(false, error)
+            } else {
+                print("✅ [UserService] TikTok place successfully deleted from user's collection")
+                // Also remove the user's association from the aggregated mapPlaces document
+                self.removeUserFromMapPlace(userId: userId, placeId: placeId) { success, error in
+                    if let error = error {
+                        print("❌ [UserService] Error removing user from mapPlace after TikTok deletion: \(error.localizedDescription)")
+                        completion(false, error)
+                    } else {
+                        print("✅ [UserService] User successfully removed from mapPlace after TikTok deletion")
+                        completion(true, nil)
+                    }
+                }
+            }
+        }
+    }
 
     func removeUserFromMapPlace(userId: String, placeId: String, completion: @escaping (Bool, Error?) -> Void) {
         // Reference to the mapPlaces document for the given place.

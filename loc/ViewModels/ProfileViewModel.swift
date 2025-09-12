@@ -644,6 +644,94 @@ class ProfileViewModel: ObservableObject {
     
     var hasMoreTikTokPlaces: Bool { _hasMoreTikTokPlaces }
     
+    // MARK: - TikTok Place Deletion
+    
+    func deleteTikTokPlace(_ place: DetailPlace, completion: @escaping (Bool) -> Void) {
+        guard let userId = user?.id else {
+            completion(false)
+            return
+        }
+        
+        let placeId = place.id.uuidString
+        
+        // Remove from local state first (optimistic update)
+        if let index = allTikTokPlaceIds.firstIndex(of: placeId) {
+            allTikTokPlaceIds.remove(at: index)
+        }
+        if let index = loadedTikTokPlaceIds.firstIndex(of: placeId) {
+            loadedTikTokPlaceIds.remove(at: index)
+        }
+        
+        // Remove from userExternalPlaces
+        userExternalPlaces.removeValue(forKey: placeId)
+        
+        // Remove from placeSavers (so it doesn't appear on map)
+        if var savers = detailPlaceViewModel.placeSavers[placeId] {
+            savers.removeAll { $0 == userId }
+            if savers.isEmpty {
+                detailPlaceViewModel.placeSavers.removeValue(forKey: placeId)
+            } else {
+                detailPlaceViewModel.placeSavers[placeId] = savers
+            }
+        }
+        
+        // Remove from places dictionary
+        detailPlaceViewModel.places.removeValue(forKey: placeId)
+        
+        // Recalculate map annotations
+        detailPlaceViewModel.calculateAnnotationPlaces()
+        
+        // Call backend to delete the TikTok place
+        userService.deleteTikTokPlace(userId: userId, placeId: placeId) { [weak self] success, error in
+            DispatchQueue.main.async {
+                if success {
+                    print("✅ [ProfileViewModel] Successfully deleted TikTok place: \(place.name)")
+                    completion(true)
+                } else {
+                    print("❌ [ProfileViewModel] Failed to delete TikTok place: \(error?.localizedDescription ?? "Unknown error")")
+                    
+                    // Revert optimistic update on failure
+                    self?.revertTikTokPlaceDeletion(place)
+                    completion(false)
+                }
+            }
+        }
+    }
+    
+    private func revertTikTokPlaceDeletion(_ place: DetailPlace) {
+        let placeId = place.id.uuidString
+        
+        // Re-add to local state
+        if !allTikTokPlaceIds.contains(placeId) {
+            allTikTokPlaceIds.append(placeId)
+            allTikTokPlaceIds.sort { placeId1, placeId2 in
+                // Sort by date (most recent first)
+                let place1 = userExternalPlaces[placeId1]
+                let place2 = userExternalPlaces[placeId2]
+                return (place1?.addedAt ?? Date.distantPast) > (place2?.addedAt ?? Date.distantPast)
+            }
+        }
+        
+        if !loadedTikTokPlaceIds.contains(placeId) {
+            loadedTikTokPlaceIds.append(placeId)
+        }
+        
+        // Re-add to placeSavers
+        if let userId = user?.id {
+            if detailPlaceViewModel.placeSavers[placeId] == nil {
+                detailPlaceViewModel.placeSavers[placeId] = [userId]
+            } else if !detailPlaceViewModel.placeSavers[placeId]!.contains(userId) {
+                detailPlaceViewModel.placeSavers[placeId]!.append(userId)
+            }
+        }
+        
+        // Re-add to places dictionary
+        detailPlaceViewModel.places[placeId] = place
+        
+        // Recalculate map annotations
+        detailPlaceViewModel.calculateAnnotationPlaces()
+    }
+    
     // MARK: - Reviewed Places Access
     
     /// Check if the current user has reviewed a specific place
