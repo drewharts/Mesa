@@ -41,6 +41,10 @@ class ProfileViewModel: ObservableObject {
      private var loadingTasks: Int = 0
      @Published var followersCount: Int = 0
      @Published var followingCount: Int = 0
+     
+     // Follow error handling
+     @Published var showFollowError: Bool = false
+     @Published var followErrorMessage: String = ""
     
     // Separate loading states for counts
     @Published var isFollowersLoading: Bool = true
@@ -170,16 +174,35 @@ class ProfileViewModel: ObservableObject {
     
      func toggleFollowUser(userId: String) {
         guard let currentUserId = user?.id else { return }
+        
+        // Store original state for potential rollback
+        let originalFollowingState = userFollowing.contains(where: { $0.id == userId })
+        let originalFollowingCount = followingCount
+        let originalUserFollowing = userFollowing
+        
         if userFollowing.contains(where: { $0.id == userId }) {
-            // Unfollow
+            // Optimistic update: immediately change UI
+            self.userFollowing.removeAll { $0.id == userId }
+            self.followingCount = max(0, self.followingCount - 1)
+            
+            // Make the actual API call
             userService.unfollowUser(followerId: currentUserId, followingId: userId) { [weak self] success, error in
-                if success {
-                    self?.userFollowing.removeAll { $0.id == userId }
-                    self?.followingCount = max(0, (self?.followingCount ?? 1) - 1)
+                if !success {
+                    // Revert on failure
+                    DispatchQueue.main.async {
+                        self?.userFollowing = originalUserFollowing
+                        self?.followingCount = originalFollowingCount
+                        // Show error alert
+                        self?.showFollowError = true
+                        self?.followErrorMessage = "Failed to unfollow user. Please try again."
+                    }
                 }
             }
         } else {
-            // Follow
+            // Optimistic update: immediately change UI
+            self.followingCount += 1
+            
+            // Make the actual API call
             userService.followUser(followerId: currentUserId, followingId: userId) { [weak self] success, error in
                 if success {
                     // Fetch the ProfileData for the followed user and add to userFollowing
@@ -187,7 +210,15 @@ class ProfileViewModel: ObservableObject {
                         if case .success(let profileData) = result {
                             self?.userFollowing.append(profileData)
                         }
-                        self?.followingCount += 1
+                    }
+                } else {
+                    // Revert on failure
+                    DispatchQueue.main.async {
+                        self?.userFollowing = originalUserFollowing
+                        self?.followingCount = originalFollowingCount
+                        // Show error alert
+                        self?.showFollowError = true
+                        self?.followErrorMessage = "Failed to follow user. Please try again."
                     }
                 }
             }
