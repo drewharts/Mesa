@@ -572,6 +572,8 @@ struct TikTokPlaceGridCell: View {
     let color: Color
     let externalPlace: ExternalPlace?
     
+    @State private var showDeleteConfirmation = false
+    
     // Get first TikTok thumbnail URL for this place
     private func getFirstTikTokThumbnail() -> String? {
         return externalPlace?.tiktokVideos.first?.thumbnailUrl
@@ -649,6 +651,23 @@ struct TikTokPlaceGridCell: View {
             selectedPlaceVM.selectedPlace = place
             selectedPlaceVM.isDetailSheetPresented = true
             presentationMode.wrappedValue.dismiss()
+        }
+        .onLongPressGesture {
+            showDeleteConfirmation = true
+        }
+        .alert("Delete TikTok Place", isPresented: $showDeleteConfirmation) {
+            Button("Cancel", role: .cancel) { }
+            Button("Delete", role: .destructive) {
+                profile.deleteTikTokPlace(place) { success in
+                    if success {
+                        print("✅ Successfully deleted TikTok place: \(place.name)")
+                    } else {
+                        print("❌ Failed to delete TikTok place: \(place.name)")
+                    }
+                }
+            }
+        } message: {
+            Text("Are you sure you want to delete \"\(place.name)\"? This action cannot be undone.")
         }
     }
 } 
