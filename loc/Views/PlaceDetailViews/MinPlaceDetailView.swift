@@ -216,8 +216,7 @@ struct MinPlaceDetailView: View {
                     
                     MaxPlaceDetailView(
                         viewModel: viewModel,
-                        onPhotoTapped: onPhotoTapped,
-                        showNoPhoneNumberAlert: $showNoPhoneNumberAlert
+                        onPhotoTapped: onPhotoTapped
                     )
                 case .reviews:
                     PlaceReviewsView(onPhotoTapped: onPhotoTapped)
