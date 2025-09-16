@@ -60,6 +60,7 @@ class ProfileViewModel: ObservableObject {
     @Published var tikTokImportError: String? = nil
     @Published var importedPlaces: [DetailPlace] = []
     @Published var isShowingPlaceSelection: Bool = false
+    @Published var currentTikTokURL: String?
     
     // Lazy loading state for lists
     @Published var loadedListIds: Set<UUID> = []
@@ -925,10 +926,12 @@ class ProfileViewModel: ObservableObject {
         // Mark as processing and add to recently processed
         await MainActor.run {
             isProcessingTikTok = true
+            currentTikTokURL = urlString
             recentlyProcessedURLs.insert(urlString)
         }
         
-        let result = await tikTokService.processTikTokURL(urlString)
+        // Use new place selection workflow
+        let result = await tikTokService.processTikTokURLWithSelection(urlString)
         
         // Don't set isProcessingTikTok = false here - let it persist until place detail is ready
         // The loading screen will be dismissed when placeDetailViewReady() is called
@@ -939,31 +942,72 @@ class ProfileViewModel: ObservableObject {
         }
         
         switch result {
-        case .success(let detailPlaces):
-            print("✅ [ProfileViewModel] Successfully processed TikTok URL, received \(detailPlaces.count) place(s)")
-            
-            // Debug: Log each place name
-            for (index, place) in detailPlaces.enumerated() {
-                print("🏢 [ProfileViewModel] Place \(index + 1): \(place.name) (ID: \(place.id))")
-            }
-            
-            // Clear any previous errors
-            tikTokImportError = nil
-            
+        case .noPlacesFound:
+            print("❌ [ProfileViewModel] No places found in TikTok video")
             await MainActor.run {
-                if detailPlaces.count == 1 {
-                    // Single place - show detail directly
-                    let detailPlace = detailPlaces[0]
+                tikTokImportError = "No places were found in this TikTok video"
+                isProcessingTikTok = false
+                deepLinkManager?.isProcessingDeepLink = false
+            }
+            return false
+            
+        case .showPlaceSelection(let placeOptions):
+            print("🎯 [ProfileViewModel] Multiple places detected: \(placeOptions.count) options - showing selection screen")
+            await MainActor.run {
+                // Convert PlaceOptions to DetailPlaces for compatibility with existing UI
+                let detailPlaces = placeOptions.map { option in
+                    var detailPlace = DetailPlace()
+                    detailPlace.name = option.businessName ?? option.locationName
+                    detailPlace.address = option.locationContext
+                    detailPlace.id = UUID(uuidString: option.optionId) ?? UUID()
+                    return detailPlace
+                }
+                
+                // Add all places to place manager
+                for place in detailPlaces {
+                    placeVM.places[place.id.uuidString] = place
+                }
+                
+                importedPlaces = detailPlaces
+                isShowingPlaceSelection = true
+                isProcessingTikTok = false
+                print("🎯 [ProfileViewModel] Set isShowingPlaceSelection = true, importedPlaces count = \(detailPlaces.count)")
+            }
+            return true
+            
+        case .success(let processResponse):
+            print("✅ [ProfileViewModel] Successfully processed selected place")
+            await MainActor.run {
+                // Convert ProcessSelectedPlaceResponse to DetailPlace
+                if let locationInfo = processResponse.locationInfo {
+                    var detailPlace = DetailPlace()
+                    detailPlace.name = locationInfo.businessName ?? locationInfo.locationName
+                    detailPlace.address = locationInfo.formattedAddress
+                    detailPlace.id = UUID(uuidString: locationInfo.placeId ?? "") ?? UUID()
                     
-                    // Validate place has a name
-                    if detailPlace.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                        tikTokImportError = "Could not find a valid place from this TikTok video"
-                        deepLinkManager?.isProcessingDeepLink = false
-                        // The loading state is now managed by the view's readiness
-                        return
+                    // Set coordinates if available
+                    if let coordinates = locationInfo.coordinates, coordinates.count >= 2 {
+                        detailPlace.coordinate = GeoPoint(latitude: coordinates[0], longitude: coordinates[1])
                     }
                     
-                    print("✅ [ProfileViewModel] Single place found: \(detailPlace.name)")
+                    // Add TikTok video data
+                    let tikTokVideo = TikTokVideo(
+                        videoID: UUID().uuidString,
+                        url: processResponse.data.url,
+                        title: processResponse.data.title,
+                        caption: processResponse.data.caption,
+                        embedHTML: "",
+                        thumbnailURL: processResponse.data.thumbnailUrl ?? "",
+                        author: TikTokAuthor(
+                            displayName: processResponse.data.authorName ?? "",
+                            url: processResponse.data.authorUrl ?? "",
+                            username: ""
+                        ),
+                        hashtags: processResponse.data.hashtags ?? [],
+                        createdAt: ISO8601DateFormatter().string(from: Date())
+                    )
+                    detailPlace.tikTokVideos = [tikTokVideo]
+                    
                     placeVM.places[detailPlace.id.uuidString] = detailPlace
                     // Add current user as saver so pin shows with profile
                     if let uid = Auth.auth().currentUser?.uid {
@@ -976,72 +1020,29 @@ class ProfileViewModel: ObservableObject {
                     // Set waiting state to keep loading screen until place detail is ready
                     isWaitingForPlaceDetail = true
                     print("⏳ [ProfileViewModel] Set isWaitingForPlaceDetail = true, waiting for DetailPlaceView to load...")
-                    
-                    // Don't clear isWaitingForPlaceDetail here - let the DetailPlaceView control when it's ready
-                    // The DetailPlaceView will call placeDetailViewReady() when fully loaded
-                
-                } else if detailPlaces.count > 1 {
-                    // Multiple places - show selection screen
-                    print("🎯 [ProfileViewModel] MULTIPLE PLACES DETECTED: \(detailPlaces.count) places - SHOULD SHOW SELECTION SCREEN")
-                    
-                    // Validate all places have names
-                    let validPlaces = detailPlaces.filter { !$0.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-                    
-                    print("🔍 [ProfileViewModel] Valid places after filtering: \(validPlaces.count)")
-                    for place in validPlaces {
-                        print("   ✓ \(place.name)")
-                    }
-                    
-                    if validPlaces.isEmpty {
-                        print("❌ [ProfileViewModel] No valid places found after filtering")
-                        tikTokImportError = "Could not find any valid places from this TikTok video"
-                        deepLinkManager?.isProcessingDeepLink = false
-                        // The loading state is now managed by the view's readiness
-                        return
-                    }
-                    
-                    // Add all valid places to place manager
-                    for place in validPlaces {
-                        placeVM.places[place.id.uuidString] = place
-                    }
-                    
-                    importedPlaces = validPlaces
-                    isShowingPlaceSelection = true
-                    print("🎯 [ProfileViewModel] Set isShowingPlaceSelection = true, importedPlaces count = \(validPlaces.count)")
-                } else {
-                    // No places found
-                    print("❌ [ProfileViewModel] No places found: count = \(detailPlaces.count)")
-                    tikTokImportError = "No places were found in this TikTok video"
-                    deepLinkManager?.isProcessingDeepLink = false
-                    // The loading state is now managed by the view's readiness
                 }
             }
             
-            
-            if detailPlaces.count == 1 {
-                print("⏳ [ProfileViewModel] Adding delay to ensure DetailPlaceView has time to start loading...")
-                try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
-                print("⏳ [ProfileViewModel] Delay completed, TikTok processing will now finish")
-            }
-            
-            // NOTE: Place saving is handled by backend during URL processing
+            // Add delay to ensure DetailPlaceView has time to start loading
+            print("⏳ [ProfileViewModel] Adding delay to ensure DetailPlaceView has time to start loading...")
+            try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+            print("⏳ [ProfileViewModel] Delay completed, TikTok processing will now finish")
             return true
             
-        case .failure(let error):
-            print("❌ [ProfileViewModel] TikTok processing failed: \(error.localizedDescription)")
-            
+        case .error(let errorMessage):
+            print("❌ [ProfileViewModel] TikTok processing failed: \(errorMessage)")
             await MainActor.run {
                 // Set user-friendly error message based on error type
-                if error.localizedDescription.contains("network") || error.localizedDescription.contains("Internet") {
+                if errorMessage.contains("network") || errorMessage.contains("Internet") {
                     tikTokImportError = "Please check your internet connection and try again"
-                } else if error.localizedDescription.contains("invalid") || error.localizedDescription.contains("URL") {
+                } else if errorMessage.contains("invalid") || errorMessage.contains("URL") {
                     tikTokImportError = "This doesn't appear to be a valid TikTok URL"
                 } else {
                     tikTokImportError = "We couldn't find any places in this TikTok video. Try sharing a different video that shows specific locations"
                 }
+                isProcessingTikTok = false
                 deepLinkManager?.isProcessingDeepLink = false
             }
-            
             return false
         }
     }
@@ -1060,18 +1061,48 @@ class ProfileViewModel: ObservableObject {
     /// Clear TikTok import error
     func clearTikTokImportError() {
         tikTokImportError = nil
+        isProcessingTikTok = false
+        isWaitingForPlaceDetail = false
+        deepLinkManager?.isProcessingDeepLink = false
     }
     
     /// Clear place selection state
     func clearPlaceSelection() {
         importedPlaces = []
         isShowingPlaceSelection = false
+        currentTikTokURL = nil
+        isProcessingTikTok = false
+        deepLinkManager?.isProcessingDeepLink = false
     }
     
     func placeSelectionViewAppeared() {
         isWaitingForPlaceDetail = false
         isProcessingTikTok = false
         deepLinkManager?.isProcessingDeepLink = false
+    }
+    
+    func handleSelectedPlace(_ selectedPlace: DetailPlace, selectedPlaceVM: SelectedPlaceViewModel, placeVM: DetailPlaceViewModel) {
+        print("✅ [ProfileViewModel] Handling selected place: \(selectedPlace.name)")
+        
+        // Add place to place manager
+        placeVM.places[selectedPlace.id.uuidString] = selectedPlace
+        
+        // Add current user as saver so pin shows with profile
+        if let uid = Auth.auth().currentUser?.uid {
+            placeVM.placeSavers[selectedPlace.id.uuidString] = [uid]
+        }
+        
+        placeVM.calculateAnnotationPlaces()
+        selectedPlaceVM.selectedPlace = selectedPlace
+        selectedPlaceVM.isDetailSheetPresented = true
+        
+        // Clear place selection state
+        clearPlaceSelection()
+        currentTikTokURL = nil
+        
+        // Set waiting state to keep loading screen until place detail is ready
+        isWaitingForPlaceDetail = true
+        print("⏳ [ProfileViewModel] Set isWaitingForPlaceDetail = true, waiting for DetailPlaceView to load...")
     }
     
     func ensureListsLoaded() {

@@ -165,6 +165,9 @@ class DeepLinkManager: ObservableObject {
             print("💫 [DeepLinkManager] Showing brief processing message for duplicate URL")
             // Show processing UI for a brief moment to give user feedback
             try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
+            await MainActor.run {
+                self.isProcessingDeepLink = false
+            }
             return 
         }
         
@@ -178,10 +181,11 @@ class DeepLinkManager: ObservableObject {
             if detailPlaces.isEmpty {
                 print("❌ [DeepLinkManager] No places found in TikTok video")
                 
-                // Show user-friendly message
+                // Show user-friendly message and clear processing state
                 await MainActor.run {
                     let message = "We couldn't figure out what place is associated with this video."
                     self.onNoLocationFound?(message)
+                    self.isProcessingDeepLink = false
                 }
                 return
             }
@@ -223,6 +227,9 @@ class DeepLinkManager: ObservableObject {
             
         case .failure(let error):
             print("❌ [DeepLinkManager] Failed to process TikTok URL: \(error.localizedDescription)")
+            await MainActor.run {
+                self.isProcessingDeepLink = false
+            }
         }
     }
     
@@ -315,6 +322,9 @@ class DeepLinkManager: ObservableObject {
             
             print("🧹 DeepLinkManager: Clearing pending place")
             pendingPlace = nil
+            
+            print("🧹 DeepLinkManager: Clearing processing state")
+            isProcessingDeepLink = false
             
             print("✅ DeepLinkManager: Navigation completed successfully")
         }

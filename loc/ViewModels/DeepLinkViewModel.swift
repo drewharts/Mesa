@@ -116,6 +116,7 @@ class DeepLinkViewModel: ObservableObject {
     func dismissNoLocationAlert() {
         showNoLocationAlert = false
         noLocationAlertMessage = ""
+        isProcessingDeepLink = false
     }
     
     @MainActor
