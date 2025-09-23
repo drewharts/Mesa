@@ -46,6 +46,7 @@ struct MyProfileHorizontalListPlaces: View {
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
+                // Show loaded places
                 ForEach(places, id: \.id) { place in
                     Button(action: {
                         selectedPlaceVM.selectedPlace = place
@@ -129,6 +130,23 @@ struct MyProfileHorizontalListPlaces: View {
                             viewModel.loadNextPageForList(listId: listId)
                         }
                     }
+                }
+                
+                // Show grey outlines for remaining places that haven't been loaded yet
+                let totalPlaces = viewModel.getTotalPlaceCount(for: listId)
+                let loadedPlaces = places.count
+                let remainingPlaces = totalPlaces - loadedPlaces
+                
+                ForEach(0..<remainingPlaces, id: \.self) { index in
+                    Rectangle()
+                        .frame(width: 120, height: 80)
+                        .foregroundColor(.gray.opacity(0.2))
+                        .cornerRadius(8)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color.gray.opacity(0.4), lineWidth: 1)
+                        )
+                        .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
                 }
                 
                 // Show loading indicator if loading more places

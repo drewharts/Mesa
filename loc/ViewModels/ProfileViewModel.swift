@@ -1302,12 +1302,6 @@ class ProfileViewModel: ObservableObject {
         return listPlacePagination[listIdString]?.hasMorePlaces ?? false
     }
     
-    /// Check if a list is currently loading more places
-    func isLoadingMorePlaces(for listId: UUID) -> Bool {
-        let listIdString = listId.uuidString
-        return listPlacePagination[listIdString]?.isLoadingMore ?? false
-    }
-    
     /// Get the total number of places in a list
     func getTotalPlaceCount(for listId: UUID) -> Int {
         let listIdString = listId.uuidString
