@@ -28,91 +28,115 @@ struct MyProfileHorizontalListPlaces: View {
     }
     
     var places: [DetailPlace] {
-        guard let placeIds = viewModel.userListsPlaces[listId.uuidString] else { return [] }
+        // Use paginated place IDs instead of all place IDs
+        let placeIds = viewModel.getDisplayedPlaceIds(for: listId)
         return placeIds.compactMap { detailPlaceViewModel.places[$0] }
     }
 
     var body: some View {
-        HStack {
-            ForEach(places, id: \.id) { place in
-                Button(action: {
-                    selectedPlaceVM.selectedPlace = place
-                    selectedPlaceVM.isDetailSheetPresented = true
-                    presentationMode.wrappedValue.dismiss()
-                }) {
-                    VStack(spacing: 4) {
-                        // Check for TikTok thumbnail first, then review image, then colored rectangle
-                        if let firstTikTokThumbnail = getFirstTikTokThumbnail(for: place) {
-                            AsyncImage(url: URL(string: firstTikTokThumbnail)) { image in
-                                image
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(places, id: \.id) { place in
+                    Button(action: {
+                        selectedPlaceVM.selectedPlace = place
+                        selectedPlaceVM.isDetailSheetPresented = true
+                        presentationMode.wrappedValue.dismiss()
+                    }) {
+                        VStack(spacing: 4) {
+                            // Check for TikTok thumbnail first, then review image, then colored rectangle
+                            if let firstTikTokThumbnail = getFirstTikTokThumbnail(for: place) {
+                                AsyncImage(url: URL(string: firstTikTokThumbnail)) { image in
+                                    image
+                                        .resizable()
+                                        .scaledToFill()
+                                        .frame(width: 120, height: 80)
+                                        .cornerRadius(8)
+                                        .clipped()
+                                        .shadow(color: .black.opacity(0.2), radius: 3, x: 0, y: 2)
+                                } placeholder: {
+                                    Rectangle()
+                                        .frame(width: 120, height: 80)
+                                        .foregroundColor(.gray.opacity(0.3))
+                                        .cornerRadius(8)
+                                        .shadow(color: .black.opacity(0.2), radius: 3, x: 0, y: 2)
+                                }
+                            } else if let image = detailPlaceViewModel.placeImages[place.id.uuidString] {
+                                Image(uiImage: image)
                                     .resizable()
                                     .scaledToFill()
                                     .frame(width: 120, height: 80)
                                     .cornerRadius(8)
                                     .clipped()
                                     .shadow(color: .black.opacity(0.2), radius: 3, x: 0, y: 2)
-                            } placeholder: {
+                            } else {
                                 Rectangle()
                                     .frame(width: 120, height: 80)
-                                    .foregroundColor(.gray.opacity(0.3))
+                                    .foregroundColor(detailPlaceViewModel.colorForPlace(placeId: place.id.uuidString))
                                     .cornerRadius(8)
                                     .shadow(color: .black.opacity(0.2), radius: 3, x: 0, y: 2)
                             }
-                        } else if let image = detailPlaceViewModel.placeImages[place.id.uuidString] {
-                            Image(uiImage: image)
-                                .resizable()
-                                .scaledToFill()
-                                .frame(width: 120, height: 80)
-                                .cornerRadius(8)
-                                .clipped()
-                                .shadow(color: .black.opacity(0.2), radius: 3, x: 0, y: 2)
-                        } else {
-                            Rectangle()
-                                .frame(width: 120, height: 80)
-                                .foregroundColor(detailPlaceViewModel.colorForPlace(placeId: place.id.uuidString))
-                                .cornerRadius(8)
-                                .shadow(color: .black.opacity(0.2), radius: 3, x: 0, y: 2)
+                            
+                            Text(place.name.prefix(20))
+                                .foregroundColor(.black)
+                                .fontWeight(.semibold)
+                                .font(.footnote)
+                                .multilineTextAlignment(.center)
+                                .lineLimit(1)
+                                .frame(width: 120)
+                            
+                            // Display restaurant type instead of city
+                            if let type = detailPlaceViewModel.placeTypes[place.id.uuidString] {
+                                Text(type.prefix(20))
+                                    .foregroundColor(.black)
+                                    .font(.caption)
+                                    .fontWeight(.light)
+                                    .multilineTextAlignment(.center)
+                                    .lineLimit(1)
+                                    .frame(width: 120)
+                            } else if let city = place.city {
+                                Text(city.prefix(20))
+                                    .foregroundColor(.black)
+                                    .font(.caption)
+                                    .fontWeight(.light)
+                                    .multilineTextAlignment(.center)
+                                    .lineLimit(1)
+                                    .frame(width: 120)
+                            }
                         }
-                        
-                        Text(place.name.prefix(20))
-                            .foregroundColor(.black)
-                            .fontWeight(.semibold)
-                            .font(.footnote)
-                            .multilineTextAlignment(.center)
-                            .lineLimit(1)
-                            .frame(width: 120)
-                        
-                        // Display restaurant type instead of city
-                        if let type = detailPlaceViewModel.placeTypes[place.id.uuidString] {
-                            Text(type.prefix(20))
-                                .foregroundColor(.black)
-                                .font(.caption)
-                                .fontWeight(.light)
-                                .multilineTextAlignment(.center)
-                                .lineLimit(1)
-                                .frame(width: 120)
-                        } else if let city = place.city {
-                            Text(city.prefix(20))
-                                .foregroundColor(.black)
-                                .font(.caption)
-                                .fontWeight(.light)
-                                .multilineTextAlignment(.center)
-                                .lineLimit(1)
-                                .frame(width: 120)
+                        .padding(.trailing, 8)
+                    }
+                    .contextMenu {
+                        Button {
+                            ServiceContainer.shared.placeShareService.sharePlace(place)
+                        } label: {
+                            Label("Share place", systemImage: "square.and.arrow.up")
                         }
                     }
-                    .padding(.trailing, 8)
+                    .onAppear {
+                        // Load more places when we're near the end
+                        if place == places.last && viewModel.hasMorePlaces(for: listId) && !viewModel.isLoadingMorePlaces(for: listId) {
+                            print("🔍 [MyProfileHorizontalListPlaces] Loading more places for list \(listId)")
+                            viewModel.loadNextPageForList(listId: listId)
+                        }
+                    }
                 }
-                .contextMenu {
-                    Button {
-                        ServiceContainer.shared.placeShareService.sharePlace(place)
-                    } label: {
-                        Label("Share place", systemImage: "square.and.arrow.up")
+                
+                // Show loading indicator if loading more places
+                if viewModel.isLoadingMorePlaces(for: listId) {
+                    HStack {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                        Text("Loading...")
+                            .font(.caption)
+                            .foregroundColor(.gray)
                     }
+                    .frame(width: 120, height: 80)
+                    .background(Color.gray.opacity(0.1))
+                    .cornerRadius(8)
                 }
             }
+            .padding(.horizontal, 20)
         }
-        .padding(.horizontal, 20)
         .onAppear {
             for place in places {
                 if placeColors[place.id] == nil {

@@ -29,9 +29,7 @@ struct ProfileListSection: View {
                 }
                 .padding(.leading, 20)
             } else if let placeIds = placeIds, !placeIds.isEmpty {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    MyProfileHorizontalListPlaces(listId: list.id, placeColors: $placeColors)
-                }
+                MyProfileHorizontalListPlaces(listId: list.id, placeColors: $placeColors)
             } else {
                 Text("No places in this list")
                     .foregroundColor(.gray)
