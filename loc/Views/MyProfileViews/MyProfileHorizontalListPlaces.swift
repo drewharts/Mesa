@@ -33,6 +33,13 @@ struct MyProfileHorizontalListPlaces: View {
         let allPlaceIds = viewModel.userListsPlaces[listId.uuidString] ?? []
         print("🔍 [MyProfileHorizontalListPlaces] List \(listId): All place IDs: \(allPlaceIds.count), Displayed: \(placeIds.count)")
         
+        // If pagination hasn't loaded yet but we have places, show first 5
+        if placeIds.isEmpty && !allPlaceIds.isEmpty {
+            let firstFiveIds = Array(allPlaceIds.prefix(5))
+            print("🔍 [MyProfileHorizontalListPlaces] Pagination not ready, showing first 5 places: \(firstFiveIds.count)")
+            return firstFiveIds.compactMap { detailPlaceViewModel.places[$0] }
+        }
+        
         return placeIds.compactMap { detailPlaceViewModel.places[$0] }
     }
 
@@ -143,8 +150,10 @@ struct MyProfileHorizontalListPlaces: View {
         .onAppear {
             // Ensure pagination is initialized for this list
             let allPlaceIds = viewModel.userListsPlaces[listId.uuidString] ?? []
-            if !allPlaceIds.isEmpty && viewModel.getDisplayedPlaceIds(for: listId).isEmpty {
-                print("🔍 [MyProfileHorizontalListPlaces] Initializing pagination for list \(listId)")
+            print("🔍 [MyProfileHorizontalListPlaces] onAppear for list \(listId): \(allPlaceIds.count) total places")
+            
+            if !allPlaceIds.isEmpty {
+                // Always try to initialize pagination if we have places
                 viewModel.initializeListPaginationIfNeeded(listId: listId)
             }
             
