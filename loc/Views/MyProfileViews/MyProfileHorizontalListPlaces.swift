@@ -30,6 +30,15 @@ struct MyProfileHorizontalListPlaces: View {
     var places: [DetailPlace] {
         // Use paginated place IDs instead of all place IDs
         let placeIds = viewModel.getDisplayedPlaceIds(for: listId)
+        let allPlaceIds = viewModel.userListsPlaces[listId.uuidString] ?? []
+        print("🔍 [MyProfileHorizontalListPlaces] List \(listId): All place IDs: \(allPlaceIds.count), Displayed: \(placeIds.count)")
+        
+        // Fallback: if pagination hasn't loaded yet, show all places (for debugging)
+        if placeIds.isEmpty && !allPlaceIds.isEmpty {
+            print("⚠️ [MyProfileHorizontalListPlaces] Pagination not ready, showing all places as fallback")
+            return allPlaceIds.compactMap { detailPlaceViewModel.places[$0] }
+        }
+        
         return placeIds.compactMap { detailPlaceViewModel.places[$0] }
     }
 
