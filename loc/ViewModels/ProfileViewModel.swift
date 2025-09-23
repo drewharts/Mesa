@@ -1219,6 +1219,15 @@ class ProfileViewModel: ObservableObject {
         print("🔍 [ProfileViewModel] initializeListPagination: Initialized pagination for list \(listId) with \(allPlaceIds.count) total places")
     }
     
+    /// Public method to initialize pagination if needed (called from views)
+    func initializeListPaginationIfNeeded(listId: UUID) {
+        let listIdString = listId.uuidString
+        // Only initialize if not already initialized
+        if listPlacePagination[listIdString] == nil {
+            initializeListPagination(listId: listId)
+        }
+    }
+    
     /// Load the next page of places for a specific list
     func loadNextPageForList(listId: UUID) {
         let listIdString = listId.uuidString

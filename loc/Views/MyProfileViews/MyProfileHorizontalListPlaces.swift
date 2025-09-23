@@ -33,12 +33,6 @@ struct MyProfileHorizontalListPlaces: View {
         let allPlaceIds = viewModel.userListsPlaces[listId.uuidString] ?? []
         print("🔍 [MyProfileHorizontalListPlaces] List \(listId): All place IDs: \(allPlaceIds.count), Displayed: \(placeIds.count)")
         
-        // Fallback: if pagination hasn't loaded yet, show all places (for debugging)
-        if placeIds.isEmpty && !allPlaceIds.isEmpty {
-            print("⚠️ [MyProfileHorizontalListPlaces] Pagination not ready, showing all places as fallback")
-            return allPlaceIds.compactMap { detailPlaceViewModel.places[$0] }
-        }
-        
         return placeIds.compactMap { detailPlaceViewModel.places[$0] }
     }
 
@@ -147,6 +141,13 @@ struct MyProfileHorizontalListPlaces: View {
             .padding(.horizontal, 20)
         }
         .onAppear {
+            // Ensure pagination is initialized for this list
+            let allPlaceIds = viewModel.userListsPlaces[listId.uuidString] ?? []
+            if !allPlaceIds.isEmpty && viewModel.getDisplayedPlaceIds(for: listId).isEmpty {
+                print("🔍 [MyProfileHorizontalListPlaces] Initializing pagination for list \(listId)")
+                viewModel.initializeListPaginationIfNeeded(listId: listId)
+            }
+            
             for place in places {
                 if placeColors[place.id] == nil {
                     placeColors[place.id] = Color(
