@@ -132,21 +132,23 @@ struct MyProfileHorizontalListPlaces: View {
                     }
                 }
                 
-                // Show grey outlines for remaining places that haven't been loaded yet
-                let totalPlaces = viewModel.getTotalPlaceCount(for: listId)
-                let loadedPlaces = places.count
-                let remainingPlaces = totalPlaces - loadedPlaces
-                
-                ForEach(0..<remainingPlaces, id: \.self) { index in
-                    Rectangle()
-                        .frame(width: 120, height: 80)
-                        .foregroundColor(.gray.opacity(0.2))
-                        .cornerRadius(8)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(Color.gray.opacity(0.4), lineWidth: 1)
-                        )
-                        .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
+                // Show a simple "more places" indicator if there are more places to load
+                if viewModel.hasMorePlaces(for: listId) {
+                    VStack {
+                        Image(systemName: "ellipsis")
+                            .font(.title2)
+                            .foregroundColor(.gray)
+                        Text("More")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                    }
+                    .frame(width: 120, height: 80)
+                    .background(Color.gray.opacity(0.1))
+                    .cornerRadius(8)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+                    )
                 }
                 
                 // Show loading indicator if loading more places
