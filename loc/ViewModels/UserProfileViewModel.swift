@@ -467,8 +467,11 @@ class UserProfileViewModel: ObservableObject {
                 let genericReviews: [GenericReview] = try await reviewService.fetchUserReviews(userId: userId)
                 let allReviews: [ReviewProtocol] = restaurantReviews + genericReviews
                 
+                // Sort reviews by timestamp (most recent first) and get unique place IDs
+                let sortedReviews = allReviews.sorted { $0.timestamp > $1.timestamp }
+                
                 await MainActor.run {
-                    allReviewedPlaceIds[userId] = Array(Set(allReviews.map { $0.placeId }))
+                    allReviewedPlaceIds[userId] = Array(Set(sortedReviews.map { $0.placeId }))
                     // Initialize hasMoreReviews for this user
                     hasMoreReviews[userId] = !allReviewedPlaceIds[userId]!.isEmpty
                 }

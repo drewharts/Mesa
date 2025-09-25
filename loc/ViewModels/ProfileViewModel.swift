@@ -484,7 +484,10 @@ class ProfileViewModel: ObservableObject {
                     let restaurantReviews: [RestaurantReview] = try await reviewService.fetchUserReviews(userId: userId)
                     let genericReviews: [GenericReview] = try await reviewService.fetchUserReviews(userId: userId)
                     let allReviews: [ReviewProtocol] = restaurantReviews + genericReviews
-                    allReviewedPlaceIds = Array(Set(allReviews.map { $0.placeId }))
+                    
+                    // Sort reviews by timestamp (most recent first) and get unique place IDs
+                    let sortedReviews = allReviews.sorted { $0.timestamp > $1.timestamp }
+                    allReviewedPlaceIds = Array(Set(sortedReviews.map { $0.placeId }))
                 } catch {
                     isLoadingReviewedPlaces = false
                     return
@@ -497,7 +500,7 @@ class ProfileViewModel: ObservableObject {
             }
         } else {
             Task { await self.loadNextBatchOfMyReviews() }
-        }
+}
     }
 
     private func loadNextBatchOfMyReviews() async {
