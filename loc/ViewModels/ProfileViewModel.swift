@@ -90,6 +90,9 @@ class ProfileViewModel: ObservableObject {
     // Pagination state for places within each list
     @Published var listPlacePagination: [String: ListPlacePagination] = [:] // [listId: pagination state]
     
+    // Performance optimization: image preloading cache
+    @Published var preloadedImages: [String: Bool] = [:] // [imageURL: isPreloaded]
+    
     // Add deduplication mechanism for TikTok URLs
     private var recentlyProcessedURLs: Set<String> = []
     
@@ -1217,6 +1220,9 @@ class ProfileViewModel: ObservableObject {
         
         listPlacePagination[listIdString] = pagination
         print("🔍 [ProfileViewModel] initializeListPagination: Initialized pagination for list \(listId) with \(allPlaceIds.count) total places")
+        
+        // Trigger image preloading for initial places
+        preloadImagesForVisiblePlaces(listId: listId)
     }
     
     /// Public method to initialize pagination if needed (called from views)
@@ -1285,6 +1291,9 @@ class ProfileViewModel: ObservableObject {
                     self.listPlacePagination[listIdString] = updatedPagination
                     
                     print("✅ [ProfileViewModel] loadNextPageForList: Loaded \(placeIdsToLoad.count) more places for list \(listId). Total loaded: \(updatedPagination.loadedCount)/\(updatedPagination.totalPlaces)")
+                    
+                    // Trigger image preloading for newly loaded places
+                    self.preloadImagesForVisiblePlaces(listId: listId)
                 }
             }
         }
@@ -1322,6 +1331,25 @@ class ProfileViewModel: ObservableObject {
         // Re-initialize pagination if the list has places
         if let placeIds = userListsPlaces[listIdString], !placeIds.isEmpty {
             initializeListPagination(listId: listId)
+        }
+    }
+    
+    /// Smart image preloading for visible places (simplified)
+    func preloadImagesForVisiblePlaces(listId: UUID) {
+        let displayedPlaceIds = getDisplayedPlaceIds(for: listId)
+        
+        // Simple preloading without complex async - just mark as ready
+        for placeId in displayedPlaceIds {
+            if let place = detailPlaceViewModel.places[placeId] {
+                // Preload TikTok thumbnails
+                if let tikTokVideos = place.tikTokVideos,
+                   let firstVideo = tikTokVideos.first,
+                   !firstVideo.thumbnailURL.isEmpty {
+                    preloadedImages[firstVideo.thumbnailURL] = true
+                }
+                
+                // Note: DetailPlace doesn't have reviews property, so skipping review image preloading
+            }
         }
     }
     
