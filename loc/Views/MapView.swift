@@ -208,7 +208,6 @@ struct MapView: View {
         .sheet(isPresented: $showVisiblePlacesPopup) {
             VisiblePlacesPopupView()
                 .environmentObject(selectedPlaceVM)
-                .environmentObject(detailPlaceViewModel)
                 .environmentObject(placeTypeFilterVM)
                 .presentationDragIndicator(.visible)
         }
