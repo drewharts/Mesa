@@ -23,6 +23,7 @@ struct MapView: View {
     @State private var newPlaceCoordinate: CLLocationCoordinate2D?
     @State private var mapPosition = MapCameraPosition.automatic
     @State private var mapRefreshToggle = false
+    @State private var showVisiblePlacesPopup = false
     
     var onMapTap: (() -> Void)?
     
@@ -122,6 +123,34 @@ struct MapView: View {
                     recenterMap = false
                 }
             }
+            
+            // Visible Places Button
+            VStack {
+                Spacer()
+                HStack {
+                    Spacer()
+                    Button(action: {
+                        showVisiblePlacesPopup = true
+                    }) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "list.bullet")
+                                .font(.system(size: 16, weight: .medium))
+                            Text("Places")
+                                .font(.system(size: 16, weight: .medium))
+                        }
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                        .background(
+                            RoundedRectangle(cornerRadius: 25)
+                                .fill(Color.blue)
+                                .shadow(color: .black.opacity(0.2), radius: 4, x: 0, y: 2)
+                        )
+                    }
+                    .padding(.trailing, 20)
+                    .padding(.bottom, 100) // Position above bottom UI elements
+                }
+            }
             .onAppear {
                 // Set initial position when the view appears
                 if let place = selectedPlaceVM.selectedPlace, let geoPoint = place.coordinate {
@@ -175,6 +204,13 @@ struct MapView: View {
                 .frame(maxWidth: 400)
                 .zIndex(2)
             }
+        }
+        .sheet(isPresented: $showVisiblePlacesPopup) {
+            VisiblePlacesPopupView()
+                .environmentObject(selectedPlaceVM)
+                .environmentObject(detailPlaceViewModel)
+                .environmentObject(placeTypeFilterVM)
+                .presentationDragIndicator(.visible)
         }
     }
     
