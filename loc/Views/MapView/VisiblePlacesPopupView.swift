@@ -6,8 +6,11 @@
 //
 
 import SwiftUI
+import MapKit
 
 struct VisiblePlacesPopupView: View {
+    let mapRegion: MKCoordinateRegion?
+    
     @Environment(\.presentationMode) var presentationMode
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
@@ -15,9 +18,31 @@ struct VisiblePlacesPopupView: View {
     
     @State private var placeColors: [UUID: Color] = [:]
     
-    // Get all places currently visible on the map
+    // Get all places currently visible on the map within the visible region
     var visiblePlaces: [DetailPlace] {
-        return placeTypeFilterVM.getFilteredPlaces()
+        let allFilteredPlaces = placeTypeFilterVM.getFilteredPlaces()
+        
+        guard let mapRegion = mapRegion else {
+            return allFilteredPlaces
+        }
+        
+        // Filter places to only include those within the visible map bounds
+        return allFilteredPlaces.filter { place in
+            guard let placeCoordinate = place.coordinate else { return false }
+            
+            let placeLat = placeCoordinate.latitude
+            let placeLon = placeCoordinate.longitude
+            
+            // Check if place is within the visible map region
+            let region = mapRegion
+            let latMin = region.center.latitude - region.span.latitudeDelta / 2
+            let latMax = region.center.latitude + region.span.latitudeDelta / 2
+            let lonMin = region.center.longitude - region.span.longitudeDelta / 2
+            let lonMax = region.center.longitude + region.span.longitudeDelta / 2
+            
+            return placeLat >= latMin && placeLat <= latMax && 
+                   placeLon >= lonMin && placeLon <= lonMax
+        }
     }
     
     // Card dimensions matching the list popup format
@@ -35,7 +60,7 @@ struct VisiblePlacesPopupView: View {
                 // Header
                 HStack {
                     Spacer()
-                    Text("Visible Places")
+                    Text("Places in View")
                         .font(.headline)
                         .fontWeight(.semibold)
                         .frame(maxWidth: .infinity, alignment: .center)
@@ -45,7 +70,7 @@ struct VisiblePlacesPopupView: View {
                 .padding(.top, 10)
                 
                 // Place count subtitle
-                Text("\(visiblePlaces.count) place\(visiblePlaces.count == 1 ? "" : "s") on map")
+                Text("\(visiblePlaces.count) place\(visiblePlaces.count == 1 ? "" : "s") in visible area")
                     .font(.caption)
                     .foregroundColor(.secondary)
                     .padding(.bottom, 20)
@@ -73,11 +98,11 @@ struct VisiblePlacesPopupView: View {
                             .font(.system(size: 32))
                             .foregroundColor(.gray.opacity(0.5))
                         
-                        Text("No places visible")
+                        Text("No places in view")
                             .font(.subheadline)
                             .foregroundColor(.gray)
                         
-                        Text("Try adjusting your map filters or zoom level")
+                        Text("Try zooming out or panning to see more places")
                             .font(.caption)
                             .foregroundColor(.gray.opacity(0.7))
                             .multilineTextAlignment(.center)

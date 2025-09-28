@@ -24,6 +24,7 @@ struct MapView: View {
     @State private var mapPosition = MapCameraPosition.automatic
     @State private var mapRefreshToggle = false
     @State private var showVisiblePlacesPopup = false
+    @State private var currentMapRegion: MKCoordinateRegion?
     
     var onMapTap: (() -> Void)?
     
@@ -81,6 +82,9 @@ struct MapView: View {
                 }
                 .mapControlVisibility(.hidden)
                 .ignoresSafeArea()
+                .onMapCameraChange { context in
+                    currentMapRegion = context.region
+                }
                 .gesture(
                     LongPressGesture(minimumDuration: 0.7)
                         .sequenced(before: DragGesture(minimumDistance: 0))
@@ -126,9 +130,7 @@ struct MapView: View {
             
             // Visible Places Button
             VStack {
-                Spacer()
                 HStack {
-                    Spacer()
                     Button(action: {
                         showVisiblePlacesPopup = true
                     }) {
@@ -147,9 +149,11 @@ struct MapView: View {
                                 .shadow(color: .black.opacity(0.2), radius: 4, x: 0, y: 2)
                         )
                     }
-                    .padding(.trailing, 20)
-                    .padding(.bottom, 100) // Position above bottom UI elements
+                    .padding(.leading, 20)
+                    .padding(.top, 60) // Position below top safe area
+                    Spacer()
                 }
+                Spacer()
             }
             .onAppear {
                 // Set initial position when the view appears
@@ -206,7 +210,7 @@ struct MapView: View {
             }
         }
         .sheet(isPresented: $showVisiblePlacesPopup) {
-            VisiblePlacesPopupView()
+            VisiblePlacesPopupView(mapRegion: currentMapRegion)
                 .environmentObject(selectedPlaceVM)
                 .environmentObject(placeTypeFilterVM)
                 .presentationDragIndicator(.visible)
