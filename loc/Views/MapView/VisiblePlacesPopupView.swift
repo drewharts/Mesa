@@ -138,9 +138,35 @@ struct VisiblePlaceGridCell: View {
     let cardHeight: CGFloat
     @Binding var placeColors: [UUID: Color]
     
+    @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @Environment(\.presentationMode) var presentationMode
+    
+    private var tikTokVideos: [TikTokVideo] {
+        let placeTikTokVideos = place.tikTokVideos ?? []
+        let userTikTokVideos = profile.getTikTokVideos(for: place.id.uuidString)
+        
+        // Combine and deduplicate based on videoID or URL
+        var allVideos = placeTikTokVideos
+        
+        for userVideo in userTikTokVideos {
+            // Check if this video already exists (by videoID or URL)
+            let alreadyExists = allVideos.contains { existingVideo in
+                existingVideo.videoID == userVideo.videoID || existingVideo.url == userVideo.url
+            }
+            
+            if !alreadyExists {
+                allVideos.append(userVideo)
+            }
+        }
+        
+        return allVideos
+    }
+    
+    private var firstTikTokThumbnail: String? {
+        return tikTokVideos.first?.thumbnailURL
+    }
     
     var body: some View {
         Button(action: {
@@ -148,74 +174,77 @@ struct VisiblePlaceGridCell: View {
             selectedPlaceVM.isDetailSheetPresented = true
             presentationMode.wrappedValue.dismiss()
         }) {
-            ZStack(alignment: .bottom) {
-                // Background image or color
-                Rectangle()
-                    .fill(Color.clear)
-                    .frame(width: cardWidth, height: cardHeight)
-                    .overlay(
-                        Group {
-                            // Try to show place image first
-                            if let image = detailPlaceViewModel.placeImages[place.id.uuidString] {
-                                Image(uiImage: image)
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fill)
-                                    .frame(width: cardWidth, height: cardHeight)
-                                    .clipped()
-                            } else {
-                                // Fallback to colored background
-                                Rectangle()
-                                    .foregroundColor(placeColors[place.id] ?? .gray)
-                                    .frame(width: cardWidth, height: cardHeight)
-                                    .onAppear {
-                                        if detailPlaceViewModel.placeImages[place.id.uuidString] == nil {
-                                            detailPlaceViewModel.fetchPlaceImage(for: place.id.uuidString)
-                                        }
-                                    }
-                            }
+            VStack(alignment: .leading, spacing: 0) {
+                ZStack(alignment: .bottom) {
+                    if let thumbnailURL = firstTikTokThumbnail {
+                        // Show TikTok thumbnail
+                        AsyncImage(url: URL(string: thumbnailURL)) { image in
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .frame(width: cardWidth, height: cardHeight)
+                                .clipped()
+                        } placeholder: {
+                            Rectangle()
+                                .foregroundColor(.gray.opacity(0.3))
+                                .frame(width: cardWidth, height: cardHeight)
                         }
-                        .clipped()
+                    } else if let image = detailPlaceViewModel.placeImages[place.id.uuidString] {
+                        // Show place review image
+                        Image(uiImage: image)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(width: cardWidth, height: cardHeight)
+                            .clipped()
+                    } else {
+                        // Show colored rectangle fallback
+                        Rectangle()
+                            .foregroundColor(detailPlaceViewModel.colorForPlace(placeId: place.id.uuidString))
+                            .frame(width: cardWidth, height: cardHeight)
+                            .onAppear {
+                                profile.loadPlaceImageWithFallback(for: place)
+                            }
+                    }
+                    LinearGradient(
+                        gradient: Gradient(colors: [
+                            Color.black.opacity(0.0),
+                            Color.black.opacity(0.1),
+                            Color.black.opacity(0.2),
+                            Color.black.opacity(1.0)
+                        ]),
+                        startPoint: .top,
+                        endPoint: .bottom
                     )
-                
-                // Gradient overlay for text readability
-                LinearGradient(
-                    gradient: Gradient(colors: [
-                        Color.clear,
-                        Color.black.opacity(0.1),
-                        Color.black.opacity(0.3),
-                        Color.black.opacity(0.8)
-                    ]),
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .frame(width: cardWidth, height: cardHeight)
-                
-                // Text overlay
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(place.name)
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.white)
-                        .lineLimit(2)
-                        .multilineTextAlignment(.leading)
-                    
-                    if let city = place.city {
-                        Text(city)
-                            .font(.caption)
-                            .foregroundColor(.white.opacity(0.8))
+                    .frame(width: cardWidth, height: cardHeight)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(place.name)
+                            .font(.headline)
+                            .foregroundColor(.white)
                             .lineLimit(1)
                             .multilineTextAlignment(.leading)
+                        
+                        if let city = place.city {
+                            Text(city)
+                                .font(.subheadline)
+                                .foregroundColor(.white.opacity(0.7))
+                                .lineLimit(1)
+                                .multilineTextAlignment(.leading)
+                        }
                     }
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .padding(.horizontal, 12)
-                .padding(.bottom, 12)
-                .frame(width: cardWidth, alignment: .leading)
             }
+            .frame(width: cardWidth, height: cardHeight)
+            .background(Color.white)
+            .clipShape(RoundedRectangle(cornerRadius: 20))
+            .overlay(
+                RoundedRectangle(cornerRadius: 20)
+                    .stroke(Color.white, lineWidth: 2)
+            )
+            .shadow(color: Color.black.opacity(0.2), radius: 5, x: 0, y: 2)
         }
         .buttonStyle(PlainButtonStyle())
-        .frame(width: cardWidth, height: cardHeight)
-        .clipped()
-        .cornerRadius(12)
-        .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
     }
 }

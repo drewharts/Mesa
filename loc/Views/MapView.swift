@@ -134,19 +134,19 @@ struct MapView: View {
                     Button(action: {
                         showVisiblePlacesPopup = true
                     }) {
-                        HStack(spacing: 8) {
-                            Image(systemName: "list.bullet")
-                                .font(.system(size: 16, weight: .medium))
-                            Text("Places")
-                                .font(.system(size: 16, weight: .medium))
+                        HStack(spacing: 6) {
+                            Image(systemName: "map")
+                                .font(.system(size: 14, weight: .medium))
+                            Text("View")
+                                .font(.system(size: 14, weight: .medium))
                         }
                         .foregroundColor(.white)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 12)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
                         .background(
-                            RoundedRectangle(cornerRadius: 25)
+                            RoundedRectangle(cornerRadius: 20)
                                 .fill(Color.blue)
-                                .shadow(color: .black.opacity(0.2), radius: 4, x: 0, y: 2)
+                                .shadow(color: .black.opacity(0.2), radius: 3, x: 0, y: 1)
                         )
                     }
                     .padding(.leading, 20)
