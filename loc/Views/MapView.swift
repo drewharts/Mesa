@@ -104,17 +104,14 @@ struct MapView: View {
                 )
             }
             .onChange(of: selectedPlaceVM.selectedPlace) { oldValue, newValue in
-                guard let place = newValue, let geoPoint = place.coordinate else {
+                guard newValue != nil else {
                     // Reset to default if no place is selected
                     withAnimation(.easeOut) {
                         mapPosition = .camera(MapCamera(centerCoordinate: defaultCenter, distance: 100))
                     }
                     return
                 }
-                let newCenter = CLLocationCoordinate2D(latitude: geoPoint.latitude, longitude: geoPoint.longitude)
-                withAnimation(.easeInOut) {
-                    mapPosition = .camera(MapCamera(centerCoordinate: newCenter, distance: 500))
-                }
+                // No zoom animation when selecting a place - just show the detail view
             }
             .onChange(of: recenterMap) { oldValue, newValue in
                 if newValue {
