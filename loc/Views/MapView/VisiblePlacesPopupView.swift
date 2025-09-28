@@ -225,7 +225,7 @@ struct VisiblePlaceGridCell: View {
                         
                         // Show place type instead of city
                         if let placeType = detailPlaceViewModel.placeTypes[place.id.uuidString] {
-                            Text(placeType.rawValue)
+                            Text(placeType)
                                 .font(.subheadline)
                                 .foregroundColor(.white.opacity(0.7))
                                 .lineLimit(1)
