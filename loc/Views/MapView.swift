@@ -23,6 +23,8 @@ struct MapView: View {
     @State private var newPlaceCoordinate: CLLocationCoordinate2D?
     @State private var mapPosition = MapCameraPosition.automatic
     @State private var mapRefreshToggle = false
+    @State private var showVisiblePlacesPopup = false
+    @State private var currentMapRegion: MKCoordinateRegion?
     
     var onMapTap: (() -> Void)?
     
@@ -80,6 +82,9 @@ struct MapView: View {
                 }
                 .mapControlVisibility(.hidden)
                 .ignoresSafeArea()
+                .onMapCameraChange { context in
+                    currentMapRegion = context.region
+                }
                 .gesture(
                     LongPressGesture(minimumDuration: 0.7)
                         .sequenced(before: DragGesture(minimumDistance: 0))
@@ -104,17 +109,14 @@ struct MapView: View {
                 )
             }
             .onChange(of: selectedPlaceVM.selectedPlace) { oldValue, newValue in
-                guard let place = newValue, let geoPoint = place.coordinate else {
+                guard newValue != nil else {
                     // Reset to default if no place is selected
                     withAnimation(.easeOut) {
                         mapPosition = .camera(MapCamera(centerCoordinate: defaultCenter, distance: 100))
                     }
                     return
                 }
-                let newCenter = CLLocationCoordinate2D(latitude: geoPoint.latitude, longitude: geoPoint.longitude)
-                withAnimation(.easeInOut) {
-                    mapPosition = .camera(MapCamera(centerCoordinate: newCenter, distance: 500))
-                }
+                // No zoom animation when selecting a place - just show the detail view
             }
             .onChange(of: recenterMap) { oldValue, newValue in
                 if newValue {
@@ -124,6 +126,34 @@ struct MapView: View {
                     }
                     recenterMap = false
                 }
+            }
+            
+            // Visible Places Button
+            VStack {
+                HStack {
+                    Button(action: {
+                        showVisiblePlacesPopup = true
+                    }) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "map")
+                                .font(.system(size: 14, weight: .medium))
+                            Text("View")
+                                .font(.system(size: 14, weight: .medium))
+                        }
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(
+                            RoundedRectangle(cornerRadius: 20)
+                                .fill(Color.blue)
+                                .shadow(color: .black.opacity(0.2), radius: 3, x: 0, y: 1)
+                        )
+                    }
+                    .padding(.leading, 20)
+                    .padding(.top, 60) // Position below top safe area
+                    Spacer()
+                }
+                Spacer()
             }
             .onAppear {
                 // Set initial position when the view appears
@@ -178,6 +208,12 @@ struct MapView: View {
                 .frame(maxWidth: 400)
                 .zIndex(2)
             }
+        }
+        .sheet(isPresented: $showVisiblePlacesPopup) {
+            VisiblePlacesPopupView(mapRegion: currentMapRegion)
+                .environmentObject(selectedPlaceVM)
+                .environmentObject(placeTypeFilterVM)
+                .presentationDragIndicator(.visible)
         }
     }
     

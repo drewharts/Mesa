@@ -13,6 +13,28 @@ import FirebaseAuth
 import UIKit
 import CoreLocation
 
+// MARK: - List Place Pagination Model
+struct ListPlacePagination {
+    var allPlaceIds: [String] = []
+    var loadedPlaceIds: [String] = []
+    var currentPage: Int = 0
+    var placesPerPage: Int = 5
+    var isLoadingMore: Bool = false
+    var hasMorePlaces: Bool = true
+    
+    var displayedPlaceIds: [String] {
+        return loadedPlaceIds
+    }
+    
+    var totalPlaces: Int {
+        return allPlaceIds.count
+    }
+    
+    var loadedCount: Int {
+        return loadedPlaceIds.count
+    }
+}
+
 @MainActor
 class ProfileViewModel: ObservableObject {
     @Published var user: ProfileData? 
@@ -64,6 +86,12 @@ class ProfileViewModel: ObservableObject {
     // Lazy loading state for lists
     @Published var loadedListIds: Set<UUID> = []
     @Published var loadingListIds: Set<UUID> = []
+    
+    // Pagination state for places within each list
+    @Published var listPlacePagination: [String: ListPlacePagination] = [:] // [listId: pagination state]
+    
+    // Performance optimization: image preloading cache
+    @Published var preloadedImages: [String: Bool] = [:] // [imageURL: isPreloaded]
     
     // Add deduplication mechanism for TikTok URLs
     private var recentlyProcessedURLs: Set<String> = []
@@ -304,6 +332,9 @@ class ProfileViewModel: ObservableObject {
         // Recalculate average coordinates for this list
         recalculateAverageCoordinates(for: listId)
         
+        // Reset pagination to include the new place
+        resetListPagination(listId: listId)
+        
         // Skip sorting for individual place additions to avoid frequent re-sorting
     }
     
@@ -328,13 +359,16 @@ class ProfileViewModel: ObservableObject {
          // Recalculate average coordinates for this list
          recalculateAverageCoordinates(for: listId)
          
+         // Reset pagination to reflect the removed place
+         resetListPagination(listId: listId)
+         
          // Skip sorting for individual place removals to avoid frequent re-sorting
      }
     
      func addFavoritePlace(place: DetailPlace) {
         guard let userId = userSession.currentUserId else { return }
-        // Prevent duplicates and enforce max 4 favorites
-        if userFavorites.count >= 4 {
+        // Prevent duplicates and enforce max 6 favorites
+        if userFavorites.count >= 6 {
             showMaxFavoritesAlert = true
             return
         }
@@ -450,7 +484,10 @@ class ProfileViewModel: ObservableObject {
                     let restaurantReviews: [RestaurantReview] = try await reviewService.fetchUserReviews(userId: userId)
                     let genericReviews: [GenericReview] = try await reviewService.fetchUserReviews(userId: userId)
                     let allReviews: [ReviewProtocol] = restaurantReviews + genericReviews
-                    allReviewedPlaceIds = Array(Set(allReviews.map { $0.placeId }))
+                    
+                    // Sort reviews by timestamp (most recent first) and get unique place IDs
+                    let sortedReviews = allReviews.sorted { $0.timestamp > $1.timestamp }
+                    allReviewedPlaceIds = Array(Set(sortedReviews.map { $0.placeId }))
                 } catch {
                     isLoadingReviewedPlaces = false
                     return
@@ -463,7 +500,7 @@ class ProfileViewModel: ObservableObject {
             }
         } else {
             Task { await self.loadNextBatchOfMyReviews() }
-        }
+}
     }
 
     private func loadNextBatchOfMyReviews() async {
@@ -1157,7 +1194,164 @@ class ProfileViewModel: ObservableObject {
             await MainActor.run {
                 self.loadedListIds.insert(listId)
                 self.loadingListIds.remove(listId)
+                
+                // Initialize pagination for this list
+                self.initializeListPagination(listId: listId)
+                
                 print("✅ [ProfileViewModel] loadListDataIfNeeded: Successfully loaded places for list \(listId)")
+            }
+        }
+    }
+    
+    // MARK: - List Place Pagination Methods
+    
+    /// Initialize pagination state for a list
+    private func initializeListPagination(listId: UUID) {
+        let listIdString = listId.uuidString
+        guard let allPlaceIds = userListsPlaces[listIdString], !allPlaceIds.isEmpty else {
+            print("🔍 [ProfileViewModel] initializeListPagination: No places found for list \(listId)")
+            return
+        }
+        
+        // Initialize pagination state
+        var pagination = ListPlacePagination()
+        pagination.allPlaceIds = allPlaceIds
+        pagination.hasMorePlaces = allPlaceIds.count > pagination.placesPerPage
+        
+        // Load first page
+        loadNextPageForList(listId: listId)
+        
+        listPlacePagination[listIdString] = pagination
+        print("🔍 [ProfileViewModel] initializeListPagination: Initialized pagination for list \(listId) with \(allPlaceIds.count) total places")
+        
+        // Trigger image preloading for initial places
+        preloadImagesForVisiblePlaces(listId: listId)
+    }
+    
+    /// Public method to initialize pagination if needed (called from views)
+    func initializeListPaginationIfNeeded(listId: UUID) {
+        let listIdString = listId.uuidString
+        let allPlaceIds = userListsPlaces[listIdString] ?? []
+        print("🔍 [ProfileViewModel] initializeListPaginationIfNeeded: List \(listId) has \(allPlaceIds.count) places")
+        
+        // Only initialize if not already initialized
+        if listPlacePagination[listIdString] == nil {
+            print("🔍 [ProfileViewModel] initializeListPaginationIfNeeded: Initializing pagination for list \(listId)")
+            initializeListPagination(listId: listId)
+        } else {
+            print("🔍 [ProfileViewModel] initializeListPaginationIfNeeded: Pagination already exists for list \(listId)")
+        }
+    }
+    
+    /// Load the next page of places for a specific list
+    func loadNextPageForList(listId: UUID) {
+        let listIdString = listId.uuidString
+        guard var pagination = listPlacePagination[listIdString],
+              !pagination.isLoadingMore,
+              pagination.hasMorePlaces else {
+            print("🔍 [ProfileViewModel] loadNextPageForList: Cannot load more places for list \(listId)")
+            return
+        }
+        
+        pagination.isLoadingMore = true
+        listPlacePagination[listIdString] = pagination
+        
+        let startIndex = pagination.currentPage * pagination.placesPerPage
+        let endIndex = min(startIndex + pagination.placesPerPage, pagination.allPlaceIds.count)
+        
+        guard startIndex < pagination.allPlaceIds.count else {
+            pagination.isLoadingMore = false
+            pagination.hasMorePlaces = false
+            listPlacePagination[listIdString] = pagination
+            return
+        }
+        
+        let placeIdsToLoad = Array(pagination.allPlaceIds[startIndex..<endIndex])
+        print("🔍 [ProfileViewModel] loadNextPageForList: Loading places \(startIndex) to \(endIndex-1) for list \(listId)")
+        
+        Task {
+            // Load place details for the new place IDs
+            for placeId in placeIdsToLoad {
+                if detailPlaceViewModel.places[placeId] == nil {
+                    do {
+                        let detailPlace = try await placeService.fetchPlace(withId: placeId)
+                        detailPlaceViewModel.places[placeId] = detailPlace
+                        detailPlaceViewModel.fetchPlaceImage(for: placeId)
+                    } catch {
+                        print("❌ [ProfileViewModel] loadNextPageForList: Failed to load place \(placeId): \(error.localizedDescription)")
+                    }
+                }
+            }
+            
+            await MainActor.run {
+                // Update pagination state
+                if var updatedPagination = self.listPlacePagination[listIdString] {
+                    updatedPagination.loadedPlaceIds.append(contentsOf: placeIdsToLoad)
+                    updatedPagination.currentPage += 1
+                    updatedPagination.isLoadingMore = false
+                    updatedPagination.hasMorePlaces = endIndex < updatedPagination.allPlaceIds.count
+                    
+                    self.listPlacePagination[listIdString] = updatedPagination
+                    
+                    print("✅ [ProfileViewModel] loadNextPageForList: Loaded \(placeIdsToLoad.count) more places for list \(listId). Total loaded: \(updatedPagination.loadedCount)/\(updatedPagination.totalPlaces)")
+                    
+                    // Trigger image preloading for newly loaded places
+                    self.preloadImagesForVisiblePlaces(listId: listId)
+                }
+            }
+        }
+    }
+    
+    /// Get the displayed place IDs for a list (respecting pagination)
+    func getDisplayedPlaceIds(for listId: UUID) -> [String] {
+        let listIdString = listId.uuidString
+        return listPlacePagination[listIdString]?.displayedPlaceIds ?? []
+    }
+    
+    /// Check if a list has more places to load
+    func hasMorePlaces(for listId: UUID) -> Bool {
+        let listIdString = listId.uuidString
+        return listPlacePagination[listIdString]?.hasMorePlaces ?? false
+    }
+    
+    /// Check if a list is currently loading more places
+    func isLoadingMorePlaces(for listId: UUID) -> Bool {
+        let listIdString = listId.uuidString
+        return listPlacePagination[listIdString]?.isLoadingMore ?? false
+    }
+    
+    /// Get the total number of places in a list
+    func getTotalPlaceCount(for listId: UUID) -> Int {
+        let listIdString = listId.uuidString
+        return listPlacePagination[listIdString]?.totalPlaces ?? 0
+    }
+    
+    /// Reset pagination for a list (call when places are added/removed)
+    func resetListPagination(listId: UUID) {
+        let listIdString = listId.uuidString
+        listPlacePagination.removeValue(forKey: listIdString)
+        
+        // Re-initialize pagination if the list has places
+        if let placeIds = userListsPlaces[listIdString], !placeIds.isEmpty {
+            initializeListPagination(listId: listId)
+        }
+    }
+    
+    /// Smart image preloading for visible places (simplified)
+    func preloadImagesForVisiblePlaces(listId: UUID) {
+        let displayedPlaceIds = getDisplayedPlaceIds(for: listId)
+        
+        // Simple preloading without complex async - just mark as ready
+        for placeId in displayedPlaceIds {
+            if let place = detailPlaceViewModel.places[placeId] {
+                // Preload TikTok thumbnails
+                if let tikTokVideos = place.tikTokVideos,
+                   let firstVideo = tikTokVideos.first,
+                   !firstVideo.thumbnailURL.isEmpty {
+                    preloadedImages[firstVideo.thumbnailURL] = true
+                }
+                
+                // Note: DetailPlace doesn't have reviews property, so skipping review image preloading
             }
         }
     }

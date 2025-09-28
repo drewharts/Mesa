@@ -29,111 +29,209 @@ struct ProfileFavoriteListView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            // 1) "FAVORITES" button
-            Button {
-                showSearch = true
-            } label: {
-                Text("FAVORITES")
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                    .foregroundStyle(.black)
-            }
-            .buttonStyle(.plain)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 20)
-
-            // 2) Favorite places or placeholders
-            HStack(spacing: 10) {
-                // Display existing favorites
-                ForEach(profile.userFavorites, id: \.self) { place in
-                    let detailPlace = places.places[place]
-                    VStack {
-                        ZStack {
-                            // Check for TikTok thumbnail first, then review image, then colored rectangle
-                            if let firstTikTokThumbnail = getFirstTikTokThumbnail(for: detailPlace) {
-                                AsyncImage(url: URL(string: firstTikTokThumbnail)) { image in
-                                    image
-                                        .resizable()
-                                        .scaledToFill()
-                                        .frame(width: 85, height: 60)
-                                        .cornerRadius(8)
-                                        .clipped()
-                                        .shadow(color: .black.opacity(0.2), radius: 3, x: 0, y: 2)
-                                } placeholder: {
-                                    Rectangle()
-                                        .fill(Color.gray.opacity(0.3))
-                                        .frame(width: 85, height: 60)
-                                        .cornerRadius(8)
-                                        .shadow(color: .black.opacity(0.2), radius: 3, x: 0, y: 2)
-                                }
-                            } else if let image = places.placeImages[place] {
-                                Image(uiImage: image)
-                                    .resizable()
-                                    .scaledToFill()
-                                    .frame(width: 85, height: 60)
-                                    .cornerRadius(8)
-                                    .clipped()
-                                    .shadow(color: .black.opacity(0.2), radius: 3, x: 0, y: 2)
-                            } else {
-                                Rectangle()
-                                    .fill(Color.blue.opacity(0.3))
-                                    .frame(width: 85, height: 60)
-                                    .cornerRadius(8)
-                                    .shadow(color: .black.opacity(0.2), radius: 3, x: 0, y: 2)
-                            }
-                        }
-                        Text(detailPlace?.name.prefix(15) ?? " ")
-                            .foregroundColor(.black)
-                            .fontWeight(.semibold)
-                            .font(.footnote)
-                            .multilineTextAlignment(.center)
-                            .lineLimit(1)
-                            .frame(width: 85, height: 18)
-                        Text(detailPlace?.city?.prefix(15) ?? " ")
-                            .foregroundColor(.black)
-                            .font(.caption)
-                            .fontWeight(.light)
-                            .multilineTextAlignment(.center)
-                            .lineLimit(1)
-                            .frame(width: 85, height: 15)
-                    }
-                    .onTapGesture {
-                        selectedPlaceVM.selectedPlace = detailPlace
-                        selectedPlaceVM.isDetailSheetPresented = true
-                        presentationMode.wrappedValue.dismiss()
-                    }
-                }
-
-                // Add placeholder circles if fewer than 4 favorites
-                if profile.userFavorites.count < 4 {
-                    ForEach(profile.userFavorites.count..<4, id: \.self) { _ in
-                        VStack {
-                            ZStack {
-                                Rectangle()
-                                    .fill(Color.gray.opacity(0.2))
-                                    .frame(width: 85, height: 60)
-                                    .cornerRadius(8)
-                                Image(systemName: "plus")
-                                    .font(.system(size: 20))
-                                    .foregroundColor(.gray)
-                            }
-                            Text(" ")
-                                .frame(width: 85, height: 18)
-                            Text(" ")
-                                .frame(width: 85, height: 15)
-                        }
-                        .onTapGesture {
-                            showSearch = true
-                        }
-                    }
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .center) // Center the content
-            .padding(.horizontal, 20)
-
+        VStack(alignment: .leading, spacing: 12) {
+            favoritesHeader
+            favoritesCard
             Divider()
                 .padding(.horizontal, 20)
         }
+        // TODO: Add search functionality for adding more favorites
+    }
+    
+    private var favoritesHeader: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("FAVORITES")
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.primary)
+                
+                Text("\(profile.userFavorites.count) place\(profile.userFavorites.count == 1 ? "" : "s")")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            
+            Spacer()
+        }
+        .padding(.horizontal, 20)
+    }
+    
+    private var favoritesCard: some View {
+        Button(action: {
+            // Could open a favorites popup or navigate to favorites view
+        }) {
+            VStack(spacing: 0) {
+                if profile.userFavorites.isEmpty {
+                    // Empty state
+                    VStack(spacing: 12) {
+                        Image(systemName: "heart")
+                            .font(.system(size: 32))
+                            .foregroundColor(.gray.opacity(0.5))
+                        
+                        Text("No favorites yet")
+                            .font(.subheadline)
+                            .foregroundColor(.gray)
+                        
+                        Text("Add places to your favorites to see them here")
+                            .font(.caption)
+                            .foregroundColor(.gray.opacity(0.7))
+                            .multilineTextAlignment(.center)
+                    }
+                    .frame(height: 120)
+                    .frame(maxWidth: .infinity)
+                } else {
+                    // Favorites grid (2x3 layout like list previews)
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
+                        ForEach(Array(profile.userFavorites.prefix(6)), id: \.self) { place in
+                            FavoritePlaceCard(place: place)
+                        }
+                        
+                        // Fill remaining slots if less than 6 favorites
+                        if profile.userFavorites.count < 6 {
+                            ForEach(0..<(6 - profile.userFavorites.count), id: \.self) { _ in
+                                Rectangle()
+                                    .fill(Color.gray.opacity(0.1))
+                                    .frame(height: 80)
+                                    .cornerRadius(8)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                                    )
+                            }
+                        }
+                    }
+                    .padding(16)
+                }
+            }
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color(.systemBackground))
+                    .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(Color.gray.opacity(0.1), lineWidth: 1)
+            )
+        }
+        .buttonStyle(PlainButtonStyle())
+        .padding(.horizontal, 20)
     }
 }
+
+struct FavoritePlaceCard: View {
+    let place: String
+    @EnvironmentObject var profile: ProfileViewModel
+    @EnvironmentObject var places: DetailPlaceViewModel
+    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
+    @Environment(\.presentationMode) var presentationMode
+    
+    private var detailPlace: DetailPlace? {
+        places.places[place]
+    }
+    
+    var body: some View {
+        ZStack(alignment: .bottom) {
+            // Container to strictly enforce bounds
+            Rectangle()
+                .fill(Color.clear)
+                .frame(height: 80)
+                .overlay(
+                    Group {
+                        // Image loading matching new card styling
+                        if let firstTikTokThumbnail = getFirstTikTokThumbnail(for: detailPlace) {
+                            AsyncImage(url: URL(string: firstTikTokThumbnail)) { image in
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .frame(width: .infinity, height: 80)
+                                    .clipped()
+                            } placeholder: {
+                                Rectangle()
+                                    .foregroundColor(.gray.opacity(0.3))
+                                    .frame(width: .infinity, height: 80)
+                            }
+                        } else if let image = places.placeImages[place] {
+                            Image(uiImage: image)
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .frame(width: .infinity, height: 80)
+                                .clipped()
+                        } else {
+                            Rectangle()
+                                .foregroundColor(places.colorForPlace(placeId: place))
+                                .frame(width: .infinity, height: 80)
+                                .onAppear {
+                                    if let detailPlace = detailPlace {
+                                        profile.loadPlaceImageWithFallback(for: detailPlace)
+                                    }
+                                }
+                        }
+                    }
+                    .clipped()
+                )
+            
+            // Gradient overlay for text readability
+            LinearGradient(
+                gradient: Gradient(colors: [
+                    Color.black.opacity(0.0),
+                    Color.black.opacity(0.1),
+                    Color.black.opacity(0.2),
+                    Color.black.opacity(1.0)
+                ]),
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: 80)
+            
+            // Text overlay
+            VStack(alignment: .leading, spacing: 2) {
+                Text(detailPlace?.name ?? " ")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.white)
+                    .lineLimit(1)
+                    .multilineTextAlignment(.leading)
+                
+                if let city = detailPlace?.city {
+                    Text(city)
+                        .font(.caption2)
+                        .foregroundColor(.white.opacity(0.7))
+                        .lineLimit(1)
+                        .multilineTextAlignment(.leading)
+                }
+            }
+            .padding(.horizontal, 8)
+            .padding(.bottom, 8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .frame(height: 80)
+        .clipped()
+        .cornerRadius(8)
+        .clipped()
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.gray.opacity(0.1), lineWidth: 0.5)
+        )
+        .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
+        .onTapGesture {
+            selectedPlaceVM.selectedPlace = detailPlace
+            selectedPlaceVM.isDetailSheetPresented = true
+            presentationMode.wrappedValue.dismiss()
+        }
+    }
+    
+    private func getFirstTikTokThumbnail(for place: DetailPlace?) -> String? {
+        guard let place = place else { return nil }
+        
+        // Check place's own TikTok videos first
+        if let placeTikTokVideos = place.tikTokVideos,
+           let firstVideo = placeTikTokVideos.first {
+            return firstVideo.thumbnailURL
+        }
+        
+        // Check user's TikTok videos for this place
+        let userTikTokVideos = profile.getTikTokVideos(for: place.id.uuidString)
+        return userTikTokVideos.first?.thumbnailURL
+    }
+}
+
