@@ -367,8 +367,8 @@ class ProfileViewModel: ObservableObject {
     
      func addFavoritePlace(place: DetailPlace) {
         guard let userId = userSession.currentUserId else { return }
-        // Prevent duplicates and enforce max 4 favorites
-        if userFavorites.count >= 4 {
+        // Prevent duplicates and enforce max 6 favorites
+        if userFavorites.count >= 6 {
             showMaxFavoritesAlert = true
             return
         }

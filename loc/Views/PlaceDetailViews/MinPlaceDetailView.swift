@@ -246,7 +246,7 @@ struct MinPlaceDetailView: View {
         .alert("Max Favorites Reached", isPresented: $profile.showMaxFavoritesAlert) {
             Button("OK", role: .cancel) { }
         } message: {
-            Text("You already have 4 favorites. Remove one before adding a new one.")
+            Text("You already have 6 favorites. Remove one before adding a new one.")
         }
     }
 }
