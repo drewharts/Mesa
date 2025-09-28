@@ -181,14 +181,6 @@ struct VisiblePlaceGridCell: View {
                             .lineLimit(1)
                             .multilineTextAlignment(.leading)
                     }
-                    
-                    // Distance indicator if available
-                    if let distance = place.distance {
-                        Text(String(format: "%.1f mi", distance))
-                            .font(.caption2)
-                            .foregroundColor(.white.opacity(0.7))
-                            .lineLimit(1)
-                    }
                 }
                 .padding(.horizontal, 12)
                 .padding(.bottom, 12)
