@@ -733,6 +733,22 @@ class ProfileViewModel: ObservableObject {
     
     var hasMoreTikTokPlaces: Bool { _hasMoreTikTokPlaces }
     
+    // MARK: - TikTok Places Refresh After Import
+    
+    /// Refresh TikTok places list after a successful import
+    func refreshTikTokPlacesAfterImport() {
+        print("🔄 [ProfileViewModel] Refreshing TikTok places after import...")
+        
+        // Reset pagination state
+        resetTikTokPlacesPagination()
+        
+        // Fetch fresh external places data
+        fetchUserExternalPlaces()
+        
+        // Reload TikTok places with pagination
+        loadTikTokPlacesWithPagination()
+    }
+    
     // MARK: - TikTok Place Deletion
     
     func deleteTikTokPlace(_ place: DetailPlace, completion: @escaping (Bool) -> Void) {
@@ -1066,6 +1082,9 @@ class ProfileViewModel: ObservableObject {
                     isWaitingForPlaceDetail = true
                     print("⏳ [ProfileViewModel] Set isWaitingForPlaceDetail = true, waiting for DetailPlaceView to load...")
                     
+                    // Refresh TikTok places list after successful import
+                    refreshTikTokPlacesAfterImport()
+                    
                     // Don't clear isWaitingForPlaceDetail here - let the DetailPlaceView control when it's ready
                     // The DetailPlaceView will call placeDetailViewReady() when fully loaded
                 
@@ -1097,6 +1116,9 @@ class ProfileViewModel: ObservableObject {
                     importedPlaces = validPlaces
                     isShowingPlaceSelection = true
                     print("🎯 [ProfileViewModel] Set isShowingPlaceSelection = true, importedPlaces count = \(validPlaces.count)")
+                    
+                    // Refresh TikTok places list after successful import (even for multiple places)
+                    refreshTikTokPlacesAfterImport()
                 } else {
                     // No places found
                     print("❌ [ProfileViewModel] No places found: count = \(detailPlaces.count)")
@@ -1155,6 +1177,9 @@ class ProfileViewModel: ObservableObject {
     func clearPlaceSelection() {
         importedPlaces = []
         isShowingPlaceSelection = false
+        
+        // Refresh TikTok places list after clearing selection (in case places were added to lists)
+        refreshTikTokPlacesAfterImport()
     }
     
     func placeSelectionViewAppeared() {
