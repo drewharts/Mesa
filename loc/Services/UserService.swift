@@ -526,7 +526,7 @@ class UserService: ObservableObject {
             .document(userId)
             .collection("placeNotes")
             .whereField("placeId", isEqualTo: placeId)
-            .limit(1)
+            .limit(to: 1)
             .getDocuments { snapshot, error in
                 if let error = error {
                     print("Error fetching place note: \(error.localizedDescription)")
