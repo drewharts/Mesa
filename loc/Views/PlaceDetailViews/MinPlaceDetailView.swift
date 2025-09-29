@@ -231,9 +231,20 @@ struct MinPlaceDetailView: View {
                         .padding(.top, 15)
                     }
                     
-                    Divider()
-                        .padding(.top, 15)
-                        .padding(.bottom, 15)
+                    // TikTok Place Flagging (only for TikTok places)
+                    if profile.hasTikTokVideos(for: selectedPlaceVM.selectedPlace?.id.uuidString ?? "") {
+                        TikTokPlaceFlaggingView(place: selectedPlaceVM.selectedPlace!)
+                            .environmentObject(profile)
+                            .padding(.top, 15)
+                        
+                        Divider()
+                            .padding(.top, 15)
+                            .padding(.bottom, 15)
+                    } else {
+                        Divider()
+                            .padding(.top, 15)
+                            .padding(.bottom, 15)
+                    }
                     
                     MaxPlaceDetailView(
                         viewModel: viewModel,

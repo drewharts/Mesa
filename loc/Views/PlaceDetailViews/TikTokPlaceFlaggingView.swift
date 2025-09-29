@@ -36,15 +36,16 @@ struct TikTokPlaceFlaggingView: View {
     var body: some View {
         if isTikTokPlace {
             VStack(alignment: .leading, spacing: 12) {
-                // Header
+                // Compact Header
                 HStack {
-                    Image(systemName: "flag")
-                        .foregroundColor(.orange)
+                    Image(systemName: hasExistingFlag ? "flag.fill" : "flag")
+                        .foregroundColor(.yellow)
                         .font(.system(size: 16, weight: .medium))
                     
-                    Text("Help Improve Place Detection")
-                        .font(.headline)
-                        .fontWeight(.semibold)
+                    Text(hasExistingFlag ? "Place Flagged" : "Help Improve Detection")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundColor(.primary)
                     
                     Spacer()
                     
@@ -52,106 +53,57 @@ struct TikTokPlaceFlaggingView: View {
                         Button(action: {
                             removeFlag()
                         }) {
-                            Image(systemName: "flag.fill")
-                                .foregroundColor(.orange)
-                                .font(.system(size: 16, weight: .medium))
+                            Text("Remove")
+                                .font(.caption)
+                                .foregroundColor(.blue)
+                        }
+                    } else {
+                        Button(action: {
+                            showingFlagDialog = true
+                        }) {
+                            Text("Flag")
+                                .font(.caption)
+                                .foregroundColor(.blue)
                         }
                     }
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 16)
                 
                 if hasExistingFlag {
-                    // Show existing flag
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundColor(.green)
-                                .font(.system(size: 14))
-                            Text("Flagged: \(existingFlag?.flagType.displayName ?? "")")
-                                .font(.subheadline)
-                                .fontWeight(.medium)
-                                .foregroundColor(.green)
-                        }
-                        
-                        if let comment = existingFlag?.userComment, !comment.isEmpty {
-                            Text("Comment: \(comment)")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 16)
-                } else {
-                    // Show flagging options
-                    VStack(spacing: 12) {
-                        // Unable to identify button
-                        Button(action: {
-                            selectedFlagType = .unableToIdentify
-                            showingFlagDialog = true
-                        }) {
-                            HStack {
-                                Image(systemName: "questionmark.circle")
-                                    .foregroundColor(.blue)
-                                Text("Unable to identify place")
-                                    .font(.subheadline)
-                                    .fontWeight(.medium)
-                                Spacer()
-                                Image(systemName: "chevron.right")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 12)
-                            .background(Color(.systemGray6))
-                            .cornerRadius(8)
-                        }
-                        .buttonStyle(PlainButtonStyle())
-                        
-                        // Wrong suggestion button
-                        Button(action: {
-                            selectedFlagType = .wrongSuggestion
-                            showingFlagDialog = true
-                        }) {
-                            HStack {
-                                Image(systemName: "exclamationmark.triangle")
-                                    .foregroundColor(.orange)
-                                Text("Wrong suggestion")
-                                    .font(.subheadline)
-                                    .fontWeight(.medium)
-                                Spacer()
-                                Image(systemName: "chevron.right")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 12)
-                            .background(Color(.systemGray6))
-                            .cornerRadius(8)
-                        }
-                        .buttonStyle(PlainButtonStyle())
-                        
-                        Text("Help us improve by flagging incorrect place suggestions")
+                    // Show existing flag details
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(existingFlag?.flagType.displayName ?? "")
                             .font(.caption)
                             .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
+                        
+                        if let comment = existingFlag?.userComment, !comment.isEmpty {
+                            Text(comment)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .lineLimit(2)
+                        }
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 16)
+                    .padding(.top, 4)
                 }
             }
             .onAppear {
                 profile.loadTikTokPlaceFlag(for: place.id.uuidString)
             }
-            .alert("Flag Place", isPresented: $showingFlagDialog) {
-                Button("Cancel", role: .cancel) { }
-                Button("Continue") {
-                    showingCommentDialog = true
-                }
-            } message: {
-                if let flagType = selectedFlagType {
-                    Text(flagType.description)
-                }
+            .actionSheet(isPresented: $showingFlagDialog) {
+                ActionSheet(
+                    title: Text("Flag Place"),
+                    message: Text("Help us improve place detection"),
+                    buttons: [
+                        .default(Text("Unable to identify place")) {
+                            selectedFlagType = .unableToIdentify
+                            showingCommentDialog = true
+                        },
+                        .default(Text("Wrong suggestion")) {
+                            selectedFlagType = .wrongSuggestion
+                            showingCommentDialog = true
+                        },
+                        .cancel()
+                    ]
+                )
             }
             .alert("Add Comment (Optional)", isPresented: $showingCommentDialog) {
                 TextField("Additional details...", text: $userComment)
