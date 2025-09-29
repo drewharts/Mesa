@@ -107,6 +107,9 @@ class ProfileViewModel: ObservableObject {
     
     // Pagination for TikTok places
     @Published var isLoadingTikTokPlaces: Bool = false
+    
+    // Place notes
+    @Published var placeNotes: [String: PlaceNote] = [:] // [placeId: PlaceNote]
     @Published var isLoadingMoreTikTokPlaces: Bool = false
     private var _hasMoreTikTokPlaces: Bool = true
     private var currentTikTokPage: Int = 0
@@ -398,6 +401,55 @@ class ProfileViewModel: ObservableObject {
     
     func isPlaceFavorite(placeId: String) -> Bool {
         return userFavorites.contains(placeId)
+    }
+    
+    // MARK: - Place Notes
+    
+    func savePlaceNote(for placeId: String, note: String?, link: String?) {
+        guard let userId = userSession.currentUserId else { return }
+        
+        let placeNote = PlaceNote(placeId: placeId, userId: userId, note: note, link: link)
+        
+        userService.savePlaceNote(userId: userId, placeNote: placeNote) { [weak self] success, error in
+            if success {
+                DispatchQueue.main.async {
+                    self?.placeNotes[placeId] = placeNote
+                }
+            } else if let error = error {
+                print("Error saving place note: \(error.localizedDescription)")
+            }
+        }
+    }
+    
+    func loadPlaceNote(for placeId: String) {
+        guard let userId = userSession.currentUserId else { return }
+        
+        userService.fetchPlaceNote(userId: userId, placeId: placeId) { [weak self] placeNote in
+            DispatchQueue.main.async {
+                if let placeNote = placeNote {
+                    self?.placeNotes[placeId] = placeNote
+                }
+            }
+        }
+    }
+    
+    func deletePlaceNote(for placeId: String) {
+        guard let userId = userSession.currentUserId,
+              let placeNote = placeNotes[placeId] else { return }
+        
+        userService.deletePlaceNote(userId: userId, placeNoteId: placeNote.id) { [weak self] success, error in
+            if success {
+                DispatchQueue.main.async {
+                    self?.placeNotes.removeValue(forKey: placeId)
+                }
+            } else if let error = error {
+                print("Error deleting place note: \(error.localizedDescription)")
+            }
+        }
+    }
+    
+    func getPlaceNote(for placeId: String) -> PlaceNote? {
+        return placeNotes[placeId]
     }
     
      func addNewPlaceList(named name: String, city: String, emoji: String, image: String) {

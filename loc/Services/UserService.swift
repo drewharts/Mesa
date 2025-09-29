@@ -496,6 +496,97 @@ class UserService: ObservableObject {
         }
     }
 
+    // MARK: - Place Notes
+    
+    /// Save or update a place note for a user
+    func savePlaceNote(userId: String, placeNote: PlaceNote, completion: @escaping (Bool, Error?) -> Void) {
+        do {
+            try db.collection("users")
+                .document(userId)
+                .collection("placeNotes")
+                .document(placeNote.id)
+                .setData(from: placeNote) { error in
+                    if let error = error {
+                        print("Error saving place note: \(error.localizedDescription)")
+                        completion(false, error)
+                    } else {
+                        print("Place note successfully saved")
+                        completion(true, nil)
+                    }
+                }
+        } catch {
+            print("Error encoding place note: \(error.localizedDescription)")
+            completion(false, error)
+        }
+    }
+    
+    /// Fetch place note for a specific place and user
+    func fetchPlaceNote(userId: String, placeId: String, completion: @escaping (PlaceNote?) -> Void) {
+        db.collection("users")
+            .document(userId)
+            .collection("placeNotes")
+            .whereField("placeId", isEqualTo: placeId)
+            .limit(1)
+            .getDocuments { snapshot, error in
+                if let error = error {
+                    print("Error fetching place note: \(error.localizedDescription)")
+                    completion(nil)
+                    return
+                }
+                
+                guard let document = snapshot?.documents.first else {
+                    completion(nil)
+                    return
+                }
+                
+                do {
+                    let placeNote = try document.data(as: PlaceNote.self)
+                    completion(placeNote)
+                } catch {
+                    print("Error decoding place note: \(error.localizedDescription)")
+                    completion(nil)
+                }
+            }
+    }
+    
+    /// Delete a place note
+    func deletePlaceNote(userId: String, placeNoteId: String, completion: @escaping (Bool, Error?) -> Void) {
+        db.collection("users")
+            .document(userId)
+            .collection("placeNotes")
+            .document(placeNoteId)
+            .delete { error in
+                if let error = error {
+                    print("Error deleting place note: \(error.localizedDescription)")
+                    completion(false, error)
+                } else {
+                    print("Place note successfully deleted")
+                    completion(true, nil)
+                }
+            }
+    }
+    
+    /// Fetch all place notes for a user
+    func fetchAllPlaceNotes(userId: String, completion: @escaping ([PlaceNote]) -> Void) {
+        db.collection("users")
+            .document(userId)
+            .collection("placeNotes")
+            .order(by: "updatedAt", descending: true)
+            .getDocuments { snapshot, error in
+                if let error = error {
+                    print("Error fetching place notes: \(error.localizedDescription)")
+                    completion([])
+                    return
+                }
+                
+                let placeNotes = snapshot?.documents.compactMap { document in
+                    try? document.data(as: PlaceNote.self)
+                } ?? []
+                
+                completion(placeNotes)
+            }
+    }
+
     // MARK: - Account Deletion
     
     /// Delete user account and all associated data
@@ -527,6 +618,10 @@ class UserService: ObservableObject {
         
         // Delete user's externalPlaces collection
         let externalPlacesRef = db.collection("users").document(userId).collection("externalPlaces")
+        // Note: We can't delete subcollections in batch, so we'll handle this separately
+        
+        // Delete user's placeNotes collection
+        let placeNotesRef = db.collection("users").document(userId).collection("placeNotes")
         // Note: We can't delete subcollections in batch, so we'll handle this separately
         
         // Delete following relationships
@@ -634,6 +729,19 @@ class UserService: ObservableObject {
                 lastError = error
             } else {
                 print("✅ [UserService] Successfully deleted placeLists")
+            }
+            dispatchGroup.leave()
+        }
+        
+        // Delete placeNotes
+        dispatchGroup.enter()
+        deleteCollection(collection: self.db.collection("users").document(userId).collection("placeNotes")) { error in
+            if let error = error {
+                print("❌ [UserService] Error deleting placeNotes: \(error.localizedDescription)")
+                hasError = true
+                lastError = error
+            } else {
+                print("✅ [UserService] Successfully deleted placeNotes")
             }
             dispatchGroup.leave()
         }
