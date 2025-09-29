@@ -82,6 +82,8 @@ class ProfileViewModel: ObservableObject {
     @Published var tikTokImportError: String? = nil
     @Published var importedPlaces: [DetailPlace] = []
     @Published var isShowingPlaceSelection: Bool = false
+    @Published var isShowingNoPlacesFound: Bool = false
+    @Published var noPlacesFoundTikTokUrl: String = ""
     
     // Lazy loading state for lists
     @Published var loadedListIds: Set<UUID> = []
@@ -110,6 +112,9 @@ class ProfileViewModel: ObservableObject {
     
     // Place notes
     @Published var placeNotes: [String: PlaceNote] = [:] // [placeId: PlaceNote]
+    
+    // TikTok place flags
+    @Published var tikTokPlaceFlags: [String: TikTokPlaceFlag] = [:] // [placeId: TikTokPlaceFlag]
     @Published var isLoadingMoreTikTokPlaces: Bool = false
     private var _hasMoreTikTokPlaces: Bool = true
     private var currentTikTokPage: Int = 0
@@ -450,6 +455,65 @@ class ProfileViewModel: ObservableObject {
     
     func getPlaceNote(for placeId: String) -> PlaceNote? {
         return placeNotes[placeId]
+    }
+    
+    // MARK: - TikTok Place Flagging
+    
+    func flagTikTokPlace(for placeId: String, flagType: TikTokPlaceFlagType, tikTokUrl: String? = nil, userComment: String? = nil) {
+        guard let userId = userSession.currentUserId else { return }
+        
+        let flag = TikTokPlaceFlag(
+            placeId: placeId,
+            userId: userId,
+            flagType: flagType,
+            tikTokUrl: tikTokUrl,
+            userComment: userComment
+        )
+        
+        userService.saveTikTokPlaceFlag(flag: flag) { [weak self] success, error in
+            if success {
+                DispatchQueue.main.async {
+                    self?.tikTokPlaceFlags[placeId] = flag
+                }
+            } else if let error = error {
+                print("Error saving TikTok place flag: \(error.localizedDescription)")
+            }
+        }
+    }
+    
+    func loadTikTokPlaceFlag(for placeId: String) {
+        guard let userId = userSession.currentUserId else { return }
+        
+        userService.hasUserFlaggedPlace(userId: userId, placeId: placeId) { [weak self] flag in
+            DispatchQueue.main.async {
+                if let flag = flag {
+                    self?.tikTokPlaceFlags[placeId] = flag
+                }
+            }
+        }
+    }
+    
+    func removeTikTokPlaceFlag(for placeId: String) {
+        guard let userId = userSession.currentUserId,
+              let flag = tikTokPlaceFlags[placeId] else { return }
+        
+        userService.deleteTikTokPlaceFlag(userId: userId, flagId: flag.id) { [weak self] success, error in
+            if success {
+                DispatchQueue.main.async {
+                    self?.tikTokPlaceFlags.removeValue(forKey: placeId)
+                }
+            } else if let error = error {
+                print("Error deleting TikTok place flag: \(error.localizedDescription)")
+            }
+        }
+    }
+    
+    func getTikTokPlaceFlag(for placeId: String) -> TikTokPlaceFlag? {
+        return tikTokPlaceFlags[placeId]
+    }
+    
+    func hasFlaggedTikTokPlace(placeId: String) -> Bool {
+        return tikTokPlaceFlags[placeId] != nil
     }
     
      func addNewPlaceList(named name: String, city: String, emoji: String, image: String) {
@@ -1062,7 +1126,9 @@ class ProfileViewModel: ObservableObject {
                     
                     // Validate place has a name
                     if detailPlace.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                        tikTokImportError = "Could not find a valid place from this TikTok video"
+                        print("❌ [ProfileViewModel] Single place found but has no name")
+                        noPlacesFoundTikTokUrl = urlString
+                        isShowingNoPlacesFound = true
                         deepLinkManager?.isProcessingDeepLink = false
                         // The loading state is now managed by the view's readiness
                         return
@@ -1102,7 +1168,8 @@ class ProfileViewModel: ObservableObject {
                     
                     if validPlaces.isEmpty {
                         print("❌ [ProfileViewModel] No valid places found after filtering")
-                        tikTokImportError = "Could not find any valid places from this TikTok video"
+                        noPlacesFoundTikTokUrl = urlString
+                        isShowingNoPlacesFound = true
                         deepLinkManager?.isProcessingDeepLink = false
                         // The loading state is now managed by the view's readiness
                         return
@@ -1120,9 +1187,10 @@ class ProfileViewModel: ObservableObject {
                     // Refresh TikTok places list after successful import (even for multiple places)
                     refreshTikTokPlacesAfterImport()
                 } else {
-                    // No places found
+                    // No places found - show flagging interface
                     print("❌ [ProfileViewModel] No places found: count = \(detailPlaces.count)")
-                    tikTokImportError = "No places were found in this TikTok video"
+                    noPlacesFoundTikTokUrl = urlString
+                    isShowingNoPlacesFound = true
                     deepLinkManager?.isProcessingDeepLink = false
                     // The loading state is now managed by the view's readiness
                 }
@@ -1180,6 +1248,12 @@ class ProfileViewModel: ObservableObject {
         
         // Refresh TikTok places list after clearing selection (in case places were added to lists)
         refreshTikTokPlacesAfterImport()
+    }
+    
+    /// Clear no places found state
+    func clearNoPlacesFound() {
+        isShowingNoPlacesFound = false
+        noPlacesFoundTikTokUrl = ""
     }
     
     func placeSelectionViewAppeared() {

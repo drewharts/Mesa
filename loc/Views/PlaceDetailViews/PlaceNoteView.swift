@@ -25,6 +25,14 @@ struct PlaceNoteView: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
+            // TikTok Place Flagging (only for TikTok places)
+            if profile.hasTikTokVideos(for: place.id.uuidString) {
+                TikTokPlaceFlaggingView(place: place)
+                    .environmentObject(profile)
+                
+                Divider()
+                    .padding(.horizontal, 20)
+            }
             // Header
             HStack {
                 Image(systemName: "note.text")

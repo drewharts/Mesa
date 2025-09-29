@@ -47,6 +47,12 @@ struct MainView: View {
                     .environmentObject(detailPlaceViewModel)
                     .presentationDragIndicator(.visible)
             }
+            .sheet(isPresented: $profileViewModel.isShowingNoPlacesFound) {
+                TikTokNoPlacesFoundView(tikTokUrl: profileViewModel.noPlacesFoundTikTokUrl)
+                    .environmentObject(profileViewModel)
+                    .environmentObject(userSession)
+                    .presentationDragIndicator(.visible)
+            }
             .navigationDestination(isPresented: $shouldNavigateToProfile) {
                 ProfileView()
                     .environmentObject(userProfileViewModel)
