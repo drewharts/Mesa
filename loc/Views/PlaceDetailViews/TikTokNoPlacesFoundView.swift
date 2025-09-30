@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import FirebaseFirestore
 
 struct TikTokNoPlacesFoundView: View {
     let tikTokUrl: String
@@ -204,17 +205,17 @@ struct TikTokNoPlacesFoundView: View {
         let placeSearchService = PlaceSearchService()
         placeSearchService.searchPlaces(
             query: searchText,
-            onResultsUpdated: { [weak self] suggestions in
+            onResultsUpdated: { suggestions in
                 DispatchQueue.main.async {
-                    self?.searchResults = suggestions
-                    self?.isSearching = false
+                    searchResults = suggestions
+                    isSearching = false
                 }
             },
-            onError: { [weak self] error in
+            onError: { error in
                 DispatchQueue.main.async {
-                    self?.isSearching = false
-                    self?.errorMessage = "Search failed: \(error)"
-                    self?.showingErrorAlert = true
+                    isSearching = false
+                    errorMessage = "Search failed: \(error)"
+                    showingErrorAlert = true
                 }
             }
         )
@@ -234,24 +235,32 @@ struct TikTokNoPlacesFoundView: View {
         let detailPlace = createDetailPlaceFromSuggestion(suggestion)
         
         // Create external place entry with TikTok video
+        let externalTikTokVideo = createExternalTikTokVideoFromUrl()
         let externalPlace = ExternalPlace(
+            id: detailPlace.id.uuidString,
+            addedAt: Date(),
+            address: detailPlace.address ?? "",
+            coordinates: ExternalPlaceCoordinates(
+                latitude: detailPlace.coordinate?.latitude ?? 0,
+                longitude: detailPlace.coordinate?.longitude ?? 0
+            ),
+            name: detailPlace.name,
             placeId: detailPlace.id.uuidString,
-            userId: userId,
-            tikTokVideos: [createTikTokVideoFromUrl()],
-            addedAt: Date()
+            source: "user_assigned",
+            tiktokVideos: [externalTikTokVideo]
         )
         
         // Save to user's external places
-        profile.userService.saveExternalPlace(externalPlace: externalPlace) { [weak self] success, error in
+        profile.saveExternalPlace(externalPlace: externalPlace) { success, error in
             DispatchQueue.main.async {
-                self?.isSubmitting = false
+                isSubmitting = false
                 if success {
                     // Refresh TikTok places list
-                    self?.profile.refreshTikTokPlacesAfterImport()
-                    self?.showingSuccessAlert = true
+                    profile.refreshTikTokPlacesAfterImport()
+                    showingSuccessAlert = true
                 } else {
-                    self?.errorMessage = "Failed to assign TikTok: \(error?.localizedDescription ?? "Unknown error")"
-                    self?.showingErrorAlert = true
+                    errorMessage = "Failed to assign TikTok: \(error?.localizedDescription ?? "Unknown error")"
+                    showingErrorAlert = true
                 }
             }
         }
@@ -270,25 +279,22 @@ struct TikTokNoPlacesFoundView: View {
         return detailPlace
     }
     
-    private func createTikTokVideoFromUrl() -> TikTokVideo {
+    private func createExternalTikTokVideoFromUrl() -> ExternalTikTokVideo {
         // Extract basic info from the TikTok URL
         let videoID = UUID().uuidString // Generate a temporary ID
-        let author = TikTokAuthor(
+        let author = ExternalTikTokAuthor(
             displayName: "Unknown",
-            url: "",
             username: ""
         )
         
-        return TikTokVideo(
-            videoID: videoID,
-            url: tikTokUrl,
-            title: "User Assigned TikTok",
-            caption: "Assigned by user after no automatic detection",
-            embedHTML: "",
-            thumbnailURL: "",
+        return ExternalTikTokVideo(
             author: author,
+            createdAt: ISO8601DateFormatter().string(from: Date()),
+            embedHtml: "",
             hashtags: [],
-            createdAt: ISO8601DateFormatter().string(from: Date())
+            thumbnailUrl: "",
+            url: tikTokUrl,
+            videoId: videoID
         )
     }
     

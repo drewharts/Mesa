@@ -679,10 +679,10 @@ class UserService: ObservableObject {
     }
     
     /// Save an external place (TikTok import)
-    func saveExternalPlace(externalPlace: ExternalPlace, completion: @escaping (Bool, Error?) -> Void) {
+    func saveExternalPlace(externalPlace: ExternalPlace, userId: String, completion: @escaping (Bool, Error?) -> Void) {
         do {
             try db.collection("users")
-                .document(externalPlace.userId)
+                .document(userId)
                 .collection("externalPlaces")
                 .document(externalPlace.placeId)
                 .setData(from: externalPlace) { error in

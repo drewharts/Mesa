@@ -516,6 +516,14 @@ class ProfileViewModel: ObservableObject {
         return tikTokPlaceFlags[placeId] != nil
     }
     
+    func saveExternalPlace(externalPlace: ExternalPlace, completion: @escaping (Bool, Error?) -> Void) {
+        guard let userId = userSession.currentUserId else {
+            completion(false, NSError(domain: "ProfileViewModel", code: -1, userInfo: [NSLocalizedDescriptionKey: "User not logged in"]))
+            return
+        }
+        userService.saveExternalPlace(externalPlace: externalPlace, userId: userId, completion: completion)
+    }
+    
      func addNewPlaceList(named name: String, city: String, emoji: String, image: String) {
          let newPlaceList = PlaceList(name: name, city: city, emoji: emoji, image: image)
          userLists.append(newPlaceList)
