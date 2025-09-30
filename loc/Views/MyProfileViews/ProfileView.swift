@@ -226,6 +226,7 @@ struct SheetsModifier: ViewModifier {
                 TikTokNoPlacesFoundView(tikTokUrl: profile.noPlacesFoundTikTokUrl)
                     .environmentObject(profile)
                     .environmentObject(userSession)
+                    .environmentObject(placeVM)
                     .presentationDragIndicator(.visible)
             }
             .fullScreenCover(isPresented: $showCreateReview) {

@@ -11,6 +11,7 @@ struct TikTokNoPlacesFoundView: View {
     let tikTokUrl: String
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var userSession: UserSession
+    @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
     @Environment(\.presentationMode) var presentationMode
     
     @State private var userComment: String = ""
@@ -19,6 +20,14 @@ struct TikTokNoPlacesFoundView: View {
     @State private var showingSuccessAlert = false
     @State private var showingErrorAlert = false
     @State private var errorMessage = ""
+    
+    // Place search functionality
+    @State private var searchText: String = ""
+    @State private var searchResults: [MesaPlaceSuggestion] = []
+    @State private var isSearching = false
+    @State private var showingPlaceAssignment = false
+    @State private var selectedSuggestion: MesaPlaceSuggestion?
+    @State private var showingAssignmentConfirmation = false
     
     var body: some View {
         VStack(spacing: 20) {
@@ -42,17 +51,75 @@ struct TikTokNoPlacesFoundView: View {
                 }
             }
             
-            // Help improve section
-            VStack(spacing: 12) {
-                Text("Help us improve place detection")
+            // Place search section
+            VStack(spacing: 16) {
+                Text("Search for the place shown in this TikTok")
                     .font(.headline)
                     .fontWeight(.medium)
-                
-                Text("If this video should have shown a specific place, let us know so we can improve our detection")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
-                    .padding(.horizontal, 20)
+                
+                // Search field
+                HStack {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundColor(.gray)
+                    
+                    TextField("Search for a place...", text: $searchText)
+                        .textFieldStyle(PlainTextFieldStyle())
+                        .onSubmit {
+                            performSearch()
+                        }
+                    
+                    if !searchText.isEmpty {
+                        Button(action: {
+                            searchText = ""
+                            searchResults = []
+                        }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundColor(.gray)
+                        }
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(Color(.systemGray6))
+                .cornerRadius(8)
+                
+                // Search results
+                if isSearching {
+                    ProgressView("Searching...")
+                        .padding()
+                } else if !searchResults.isEmpty {
+                    ScrollView {
+                        LazyVStack(spacing: 8) {
+                            ForEach(searchResults, id: \.id) { suggestion in
+                                PlaceSearchResultRow(suggestion: suggestion) {
+                                    selectedSuggestion = suggestion
+                                    showingAssignmentConfirmation = true
+                                }
+                            }
+                        }
+                    }
+                    .frame(maxHeight: 200)
+                }
+                
+                // Manual assignment button
+                if !searchResults.isEmpty {
+                    Button(action: {
+                        showingPlaceAssignment = true
+                    }) {
+                        Text("Can't find the right place? Add manually")
+                            .font(.caption)
+                            .foregroundColor(.blue)
+                    }
+                }
+            }
+            .padding(.horizontal, 20)
+            
+            // Fallback flagging section
+            VStack(spacing: 12) {
+                Text("Still can't find it?")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
                 
                 Button(action: {
                     showingCommentDialog = true
@@ -115,6 +182,114 @@ struct TikTokNoPlacesFoundView: View {
         } message: {
             Text(errorMessage)
         }
+        .alert("Assign TikTok to Place", isPresented: $showingAssignmentConfirmation) {
+            Button("Cancel", role: .cancel) { }
+            Button("Assign") {
+                assignTikTokToPlace()
+            }
+        } message: {
+            if let suggestion = selectedSuggestion {
+                Text("Assign this TikTok video to '\(suggestion.name)'?")
+            }
+        }
+    }
+    
+    // MARK: - Search Functions
+    
+    private func performSearch() {
+        guard !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        
+        isSearching = true
+        
+        let placeSearchService = PlaceSearchService()
+        placeSearchService.searchPlaces(
+            query: searchText,
+            onResultsUpdated: { [weak self] suggestions in
+                DispatchQueue.main.async {
+                    self?.searchResults = suggestions
+                    self?.isSearching = false
+                }
+            },
+            onError: { [weak self] error in
+                DispatchQueue.main.async {
+                    self?.isSearching = false
+                    self?.errorMessage = "Search failed: \(error)"
+                    self?.showingErrorAlert = true
+                }
+            }
+        )
+    }
+    
+    private func assignTikTokToPlace() {
+        guard let suggestion = selectedSuggestion,
+              let userId = userSession.currentUserId else {
+            errorMessage = "Unable to assign TikTok to place"
+            showingErrorAlert = true
+            return
+        }
+        
+        isSubmitting = true
+        
+        // Create a DetailPlace from the suggestion
+        let detailPlace = createDetailPlaceFromSuggestion(suggestion)
+        
+        // Create external place entry with TikTok video
+        let externalPlace = ExternalPlace(
+            placeId: detailPlace.id.uuidString,
+            userId: userId,
+            tikTokVideos: [createTikTokVideoFromUrl()],
+            addedAt: Date()
+        )
+        
+        // Save to user's external places
+        profile.userService.saveExternalPlace(externalPlace: externalPlace) { [weak self] success, error in
+            DispatchQueue.main.async {
+                self?.isSubmitting = false
+                if success {
+                    // Refresh TikTok places list
+                    self?.profile.refreshTikTokPlacesAfterImport()
+                    self?.showingSuccessAlert = true
+                } else {
+                    self?.errorMessage = "Failed to assign TikTok: \(error?.localizedDescription ?? "Unknown error")"
+                    self?.showingErrorAlert = true
+                }
+            }
+        }
+    }
+    
+    private func createDetailPlaceFromSuggestion(_ suggestion: MesaPlaceSuggestion) -> DetailPlace {
+        var detailPlace = DetailPlace()
+        detailPlace.id = UUID(uuidString: suggestion.id) ?? UUID()
+        detailPlace.name = suggestion.name
+        detailPlace.address = suggestion.address
+        detailPlace.coordinate = GeoPoint(
+            latitude: suggestion.coordinate.latitude,
+            longitude: suggestion.coordinate.longitude
+        )
+        detailPlace.createdAt = ISO8601DateFormatter().string(from: Date())
+        return detailPlace
+    }
+    
+    private func createTikTokVideoFromUrl() -> TikTokVideo {
+        // Extract basic info from the TikTok URL
+        let videoID = UUID().uuidString // Generate a temporary ID
+        let author = TikTokAuthor(
+            displayName: "Unknown",
+            url: "",
+            username: ""
+        )
+        
+        return TikTokVideo(
+            videoID: videoID,
+            url: tikTokUrl,
+            title: "User Assigned TikTok",
+            caption: "Assigned by user after no automatic detection",
+            embedHTML: "",
+            thumbnailURL: "",
+            author: author,
+            hashtags: [],
+            createdAt: ISO8601DateFormatter().string(from: Date())
+        )
     }
     
     private func submitFlag() {
@@ -142,5 +317,63 @@ struct TikTokNoPlacesFoundView: View {
             userComment = ""
             showingSuccessAlert = true
         }
+    }
+}
+
+// MARK: - PlaceSearchResultRow Component
+struct PlaceSearchResultRow: View {
+    let suggestion: MesaPlaceSuggestion
+    let onTap: () -> Void
+    
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 12) {
+                // Place image placeholder
+                Rectangle()
+                    .fill(Color.gray.opacity(0.3))
+                    .frame(width: 50, height: 50)
+                    .cornerRadius(8)
+                    .overlay(
+                        Image(systemName: "photo")
+                            .foregroundColor(.gray)
+                    )
+                
+                // Place info
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(suggestion.name)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundColor(.primary)
+                        .lineLimit(1)
+                    
+                    if let address = suggestion.address {
+                        Text(address)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .lineLimit(2)
+                    }
+                    
+                    Text(suggestion.source.capitalized)
+                        .font(.caption)
+                        .foregroundColor(.blue)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.blue.opacity(0.1))
+                        .cornerRadius(4)
+                }
+                
+                Spacer()
+                
+                // Selection indicator
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(Color(.systemGray6))
+            .cornerRadius(8)
+        }
+        .buttonStyle(PlainButtonStyle())
     }
 }

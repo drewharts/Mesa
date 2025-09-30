@@ -677,6 +677,28 @@ class UserService: ObservableObject {
                 }
             }
     }
+    
+    /// Save an external place (TikTok import)
+    func saveExternalPlace(externalPlace: ExternalPlace, completion: @escaping (Bool, Error?) -> Void) {
+        do {
+            try db.collection("users")
+                .document(externalPlace.userId)
+                .collection("externalPlaces")
+                .document(externalPlace.placeId)
+                .setData(from: externalPlace) { error in
+                    if let error = error {
+                        print("Error saving external place: \(error.localizedDescription)")
+                        completion(false, error)
+                    } else {
+                        print("External place successfully saved")
+                        completion(true, nil)
+                    }
+                }
+        } catch {
+            print("Error encoding external place: \(error.localizedDescription)")
+            completion(false, error)
+        }
+    }
 
     // MARK: - Account Deletion
     
