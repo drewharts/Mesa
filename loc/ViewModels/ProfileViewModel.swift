@@ -529,6 +529,11 @@ class ProfileViewModel: ObservableObject {
         noPlacesFoundTikTokUrl = ""
     }
     
+    func clearNoPlacesFound() {
+        isShowingNoPlacesFound = false
+        noPlacesFoundTikTokUrl = ""
+    }
+    
      func addNewPlaceList(named name: String, city: String, emoji: String, image: String) {
          let newPlaceList = PlaceList(name: name, city: city, emoji: emoji, image: image)
          userLists.append(newPlaceList)
