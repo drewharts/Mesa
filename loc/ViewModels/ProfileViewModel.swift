@@ -524,6 +524,11 @@ class ProfileViewModel: ObservableObject {
         userService.saveExternalPlace(externalPlace: externalPlace, userId: userId, completion: completion)
     }
     
+    func clearNoPlacesFound() {
+        isShowingNoPlacesFound = false
+        noPlacesFoundTikTokUrl = ""
+    }
+    
      func addNewPlaceList(named name: String, city: String, emoji: String, image: String) {
          let newPlaceList = PlaceList(name: name, city: city, emoji: emoji, image: image)
          userLists.append(newPlaceList)
@@ -1137,8 +1142,8 @@ class ProfileViewModel: ObservableObject {
                         print("❌ [ProfileViewModel] Single place found but has no name")
                         noPlacesFoundTikTokUrl = urlString
                         isShowingNoPlacesFound = true
+                        isProcessingTikTok = false
                         deepLinkManager?.isProcessingDeepLink = false
-                        // The loading state is now managed by the view's readiness
                         return
                     }
                     
@@ -1178,8 +1183,8 @@ class ProfileViewModel: ObservableObject {
                         print("❌ [ProfileViewModel] No valid places found after filtering")
                         noPlacesFoundTikTokUrl = urlString
                         isShowingNoPlacesFound = true
+                        isProcessingTikTok = false
                         deepLinkManager?.isProcessingDeepLink = false
-                        // The loading state is now managed by the view's readiness
                         return
                     }
                     
@@ -1199,8 +1204,8 @@ class ProfileViewModel: ObservableObject {
                     print("❌ [ProfileViewModel] No places found: count = \(detailPlaces.count)")
                     noPlacesFoundTikTokUrl = urlString
                     isShowingNoPlacesFound = true
+                    isProcessingTikTok = false
                     deepLinkManager?.isProcessingDeepLink = false
-                    // The loading state is now managed by the view's readiness
                 }
             }
             
@@ -1226,6 +1231,7 @@ class ProfileViewModel: ObservableObject {
                 } else {
                     tikTokImportError = "We couldn't find any places in this TikTok video. Try sharing a different video that shows specific locations"
                 }
+                isProcessingTikTok = false
                 deepLinkManager?.isProcessingDeepLink = false
             }
             

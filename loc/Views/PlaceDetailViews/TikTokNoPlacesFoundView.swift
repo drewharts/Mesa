@@ -144,10 +144,10 @@ struct TikTokNoPlacesFoundView: View {
             
             Spacer()
             
-            // Close button
-            Button("Close") {
-                presentationMode.wrappedValue.dismiss()
-            }
+                // Close button
+                Button("Close") {
+                    profile.clearNoPlacesFound()
+                }
             .font(.headline)
             .foregroundColor(.white)
             .frame(maxWidth: .infinity)
@@ -171,12 +171,12 @@ struct TikTokNoPlacesFoundView: View {
         } message: {
             Text("Help us understand what place should have been detected from this TikTok video.")
         }
-        .alert("Flag Submitted", isPresented: $showingSuccessAlert) {
+        .alert("Success", isPresented: $showingSuccessAlert) {
             Button("OK") {
-                presentationMode.wrappedValue.dismiss()
+                profile.clearNoPlacesFound()
             }
         } message: {
-            Text("Thank you for helping us improve! Your feedback has been recorded.")
+            Text("Operation completed successfully!")
         }
         .alert("Error", isPresented: $showingErrorAlert) {
             Button("OK") { }
