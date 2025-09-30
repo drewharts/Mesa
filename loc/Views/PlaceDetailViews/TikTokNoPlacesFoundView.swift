@@ -32,130 +32,11 @@ struct TikTokNoPlacesFoundView: View {
     
     var body: some View {
         VStack(spacing: 20) {
-            // Icon and message
-            VStack(spacing: 16) {
-                Image(systemName: "map.slash")
-                    .font(.system(size: 50))
-                    .foregroundColor(.gray.opacity(0.6))
-                
-                VStack(spacing: 8) {
-                    Text("No Places Found")
-                        .font(.title2)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.primary)
-                    
-                    Text("We couldn't identify any specific places in this TikTok video")
-                        .font(.body)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 20)
-                }
-            }
-            
-            // Place search section
-            VStack(spacing: 16) {
-                Text("Search for the place shown in this TikTok")
-                    .font(.headline)
-                    .fontWeight(.medium)
-                    .multilineTextAlignment(.center)
-                
-                // Search field
-                HStack {
-                    Image(systemName: "magnifyingglass")
-                        .foregroundColor(.gray)
-                    
-                    TextField("Search for a place...", text: $searchText)
-                        .textFieldStyle(PlainTextFieldStyle())
-                        .onSubmit {
-                            performSearch()
-                        }
-                    
-                    if !searchText.isEmpty {
-                        Button(action: {
-                            searchText = ""
-                            searchResults = []
-                        }) {
-                            Image(systemName: "xmark.circle.fill")
-                                .foregroundColor(.gray)
-                        }
-                    }
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(Color(.systemGray6))
-                .cornerRadius(8)
-                
-                // Search results
-                if isSearching {
-                    ProgressView("Searching...")
-                        .padding()
-                } else if !searchResults.isEmpty {
-                    ScrollView {
-                        LazyVStack(spacing: 8) {
-                            ForEach(searchResults, id: \.id) { suggestion in
-                                PlaceSearchResultRow(suggestion: suggestion) {
-                                    selectedSuggestion = suggestion
-                                    showingAssignmentConfirmation = true
-                                }
-                            }
-                        }
-                    }
-                    .frame(maxHeight: 200)
-                }
-                
-                // Manual assignment button
-                if !searchResults.isEmpty {
-                    Button(action: {
-                        showingPlaceAssignment = true
-                    }) {
-                        Text("Can't find the right place? Add manually")
-                            .font(.caption)
-                            .foregroundColor(.blue)
-                    }
-                }
-            }
-            .padding(.horizontal, 20)
-            
-            // Fallback flagging section
-            VStack(spacing: 12) {
-                Text("Still can't find it?")
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                
-                Button(action: {
-                    showingCommentDialog = true
-                }) {
-                    HStack {
-                        Image(systemName: "flag")
-                            .font(.system(size: 16))
-                        Text("Flag as Unable to Identify")
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                    }
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 12)
-                    .background(Color.orange)
-                    .cornerRadius(8)
-                }
-                .buttonStyle(PlainButtonStyle())
-            }
-            .padding(.horizontal, 20)
-            
+            headerSection
+            searchSection
+            flaggingSection
             Spacer()
-            
-                // Close button
-                Button("Close") {
-                    profile.clearNoPlacesFound()
-                }
-            .font(.headline)
-            .foregroundColor(.white)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 12)
-            .background(Color.blue)
-            .cornerRadius(10)
-            .padding(.horizontal, 20)
-            .buttonStyle(PlainButtonStyle())
+            closeButton
         }
         .padding(.vertical, 30)
         .alert("Help Improve Detection", isPresented: $showingCommentDialog) {
@@ -193,6 +74,129 @@ struct TikTokNoPlacesFoundView: View {
                 Text("Assign this TikTok video to '\(suggestion.name)'?")
             }
         }
+    }
+    
+    private var headerSection: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "map.slash")
+                .font(.system(size: 50))
+                .foregroundColor(.gray.opacity(0.6))
+            
+            VStack(spacing: 8) {
+                Text("No Places Found")
+                    .font(.title2)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.primary)
+                
+                Text("We couldn't identify any specific places in this TikTok video")
+                    .font(.body)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 20)
+            }
+        }
+    }
+    
+    private var searchSection: some View {
+        VStack(spacing: 16) {
+            Text("Search for the place shown in this TikTok")
+                .font(.headline)
+                .fontWeight(.medium)
+                .multilineTextAlignment(.center)
+            
+            searchField
+            searchResultsView
+        }
+        .padding(.horizontal, 20)
+    }
+    
+    private var searchField: some View {
+        HStack {
+            Image(systemName: "magnifyingglass")
+                .foregroundColor(.gray)
+            
+            TextField("Search for a place...", text: $searchText)
+                .textFieldStyle(PlainTextFieldStyle())
+                .onSubmit {
+                    performSearch()
+                }
+            
+            if !searchText.isEmpty {
+                Button(action: {
+                    searchText = ""
+                    searchResults = []
+                }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundColor(.gray)
+                }
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(Color(.systemGray6))
+        .cornerRadius(8)
+    }
+    
+    private var searchResultsView: some View {
+        Group {
+            if isSearching {
+                ProgressView("Searching...")
+                    .padding()
+            } else if !searchResults.isEmpty {
+                ScrollView {
+                    LazyVStack(spacing: 8) {
+                        ForEach(searchResults, id: \.id) { suggestion in
+                            PlaceSearchResultRow(suggestion: suggestion) {
+                                selectedSuggestion = suggestion
+                                showingAssignmentConfirmation = true
+                            }
+                        }
+                    }
+                }
+                .frame(maxHeight: 200)
+            }
+        }
+    }
+    
+    private var flaggingSection: some View {
+        VStack(spacing: 12) {
+            Text("Still can't find it?")
+                .font(.subheadline)
+                .fontWeight(.medium)
+            
+            Button(action: {
+                showingCommentDialog = true
+            }) {
+                HStack {
+                    Image(systemName: "flag")
+                        .font(.system(size: 16))
+                    Text("Flag as Unable to Identify")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
+                .background(Color.orange)
+                .cornerRadius(8)
+            }
+            .buttonStyle(PlainButtonStyle())
+        }
+        .padding(.horizontal, 20)
+    }
+    
+    private var closeButton: some View {
+        Button("Close") {
+            profile.clearNoPlacesFound()
+        }
+        .font(.headline)
+        .foregroundColor(.white)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 12)
+        .background(Color.blue)
+        .cornerRadius(10)
+        .padding(.horizontal, 20)
+        .buttonStyle(PlainButtonStyle())
     }
     
     // MARK: - Search Functions
@@ -310,12 +314,7 @@ struct TikTokNoPlacesFoundView: View {
         // Create a temporary place ID for this flag since no place was found
         let tempPlaceId = "no_place_found_\(UUID().uuidString)"
         
-        profile.flagTikTokPlace(
-            for: tempPlaceId,
-            flagType: .unableToIdentify,
-            tikTokUrl: tikTokUrl,
-            userComment: userComment.isEmpty ? nil : userComment
-        )
+        profile.flagTikTokPlace(for: tempPlaceId, flagType: .unableToIdentify, tikTokUrl: tikTokUrl, userComment: userComment)
         
         // Simulate delay for better UX
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
