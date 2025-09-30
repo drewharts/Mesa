@@ -54,7 +54,7 @@ struct TikTokNoPlacesFoundView: View {
         }
         .alert("Success", isPresented: $showingSuccessAlert) {
             Button("OK") {
-                profile.clearNoPlacesFound()
+                self.profile.clearNoPlacesFound()
             }
         } message: {
             Text("Operation completed successfully!")
@@ -187,7 +187,7 @@ struct TikTokNoPlacesFoundView: View {
     
     private var closeButton: some View {
         Button("Close") {
-            profile.clearNoPlacesFound()
+            self.profile.clearNoPlacesFound()
         }
         .font(.headline)
         .foregroundColor(.white)
