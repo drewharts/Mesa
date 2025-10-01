@@ -361,8 +361,9 @@ class ProfileViewModel: ObservableObject {
         // Create a copy of the DetailPlace with TikTok data merged in
         var mergedPlace = detailPlace
 
-        // If the external place has TikTok videos, add them to the detail place
-        if let tikTokVideos = externalPlace.tikTokVideos, !tikTokVideos.isEmpty {
+        // If the external place has TikTok videos, convert and add them to the detail place
+        if !externalPlace.tiktokVideos.isEmpty {
+            let tikTokVideos = externalPlace.tiktokVideos.map { $0.toTikTokVideo() }
             mergedPlace.tikTokVideos = tikTokVideos
             print("🔄 [ProfileViewModel] Merged \(tikTokVideos.count) TikTok video(s) into place: \(detailPlace.name)")
         }
