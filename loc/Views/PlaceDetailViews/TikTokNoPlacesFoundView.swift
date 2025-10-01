@@ -196,7 +196,7 @@ struct TikTokNoPlacesFoundView: View {
         .background(Color.blue)
         .cornerRadius(10)
         .padding(.horizontal, 20)
-        .buttonStyle(PlainButtonStyle())
+        .buttonStyle(.plain)
     }
     
     // MARK: - Search Functions

@@ -10,12 +10,11 @@ import SwiftUI
 
 struct PostReviewButtonView: View {
     @Binding var highlighted: Bool
-    @State private var isLoading = false  // Add loading state
+    @Binding var isLoading: Bool  // Use binding to ViewModel's loading state
     let action: () -> Void
     
     var body: some View {
         Button(action: {
-            isLoading = true  // Set loading true when tapped
             action()
         }) {
             if isLoading {

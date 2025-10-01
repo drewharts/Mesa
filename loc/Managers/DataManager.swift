@@ -446,10 +446,22 @@ class DataManager: ObservableObject {
             async let genericReviews: [GenericReview] = try await reviewService.fetchUserReviews(userId: userId)
             
             let allReviews: [ReviewProtocol] = (try await restaurantReviews) + (try await genericReviews)
-            
+
+            // Sort reviews by timestamp (most recent first) and get unique place IDs while preserving order
+            let sortedReviews = allReviews.sorted { $0.timestamp > $1.timestamp }
+
+            // Get unique place IDs while preserving the order of most recently reviewed places
+            var seenPlaceIds = Set<String>()
+            let placeIds: [String] = sortedReviews.compactMap { review in
+                if seenPlaceIds.contains(review.placeId) {
+                    return nil
+                }
+                seenPlaceIds.insert(review.placeId)
+                return review.placeId
+            }
+
             // Process place details in batches
             let batchSize = 10
-            let placeIds = Array(Set(allReviews.map { $0.placeId }))
             
             for batch in placeIds.chunked(into: batchSize) {
                 await withTaskGroup(of: Void.self) { group in

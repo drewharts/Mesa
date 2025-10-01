@@ -523,17 +523,7 @@ class ProfileViewModel: ObservableObject {
         }
         userService.saveExternalPlace(externalPlace: externalPlace, userId: userId, completion: completion)
     }
-    
-    func clearNoPlacesFound() {
-        isShowingNoPlacesFound = false
-        noPlacesFoundTikTokUrl = ""
-    }
-    
-    func clearNoPlacesFound() {
-        isShowingNoPlacesFound = false
-        noPlacesFoundTikTokUrl = ""
-    }
-    
+
      func addNewPlaceList(named name: String, city: String, emoji: String, image: String) {
          let newPlaceList = PlaceList(name: name, city: city, emoji: emoji, image: image)
          userLists.append(newPlaceList)
@@ -619,9 +609,18 @@ class ProfileViewModel: ObservableObject {
                     let genericReviews: [GenericReview] = try await reviewService.fetchUserReviews(userId: userId)
                     let allReviews: [ReviewProtocol] = restaurantReviews + genericReviews
                     
-                    // Sort reviews by timestamp (most recent first) and get unique place IDs
+                    // Sort reviews by timestamp (most recent first) and get unique place IDs while preserving order
                     let sortedReviews = allReviews.sorted { $0.timestamp > $1.timestamp }
-                    allReviewedPlaceIds = Array(Set(sortedReviews.map { $0.placeId }))
+
+                    // Get unique place IDs while preserving the order of most recently reviewed places
+                    var seenPlaceIds = Set<String>()
+                    allReviewedPlaceIds = sortedReviews.compactMap { review in
+                        if seenPlaceIds.contains(review.placeId) {
+                            return nil
+                        }
+                        seenPlaceIds.insert(review.placeId)
+                        return review.placeId
+                    }
                 } catch {
                     isLoadingReviewedPlaces = false
                     return
