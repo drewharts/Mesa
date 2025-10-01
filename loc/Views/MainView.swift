@@ -122,56 +122,8 @@ struct MainView: View {
         .overlay(
             floatingActionButtons
         )
-        .overlay(
-            alignedButtons
-        )
     }
-
-    // MARK: - Aligned Buttons (Location and View)
-    private var alignedButtons: some View {
-        VStack {
-            Spacer()
-            HStack {
-                // Location Button
-                Button(action: {
-                    recenterMap = true
-                }) {
-                    Image(systemName: "location.fill")
-                        .foregroundColor(.white)
-                        .frame(width: 60, height: 60)
-                        .background(Color.blue)
-                        .clipShape(Circle())
-                        .shadow(radius: 4)
-                }
-
-                Spacer()
-
-                // View/Search Button
-                Button(action: {
-                    withAnimation {
-                        if sheetHeight == maxSheetHeight {
-                            sheetHeight = minSheetHeight
-                        }
-                        isSearchBarMinimized.toggle()
-                    }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                        searchIsFocused = true
-                    }
-                }) {
-                    Image(systemName: "magnifyingglass")
-                        .foregroundColor(.blue)
-                        .frame(width: 60, height: 60)
-                        .background(Color.white)
-                        .clipShape(Circle())
-                        .overlay(Circle().stroke(Color.gray, lineWidth: 2))
-                        .shadow(radius: 4)
-                }
-            }
-            .padding(.horizontal, 20)
-            .padding(.bottom, 20)
-        }
-    }
-
+    
     // MARK: - Top Controls
     private var topControls: some View {
         Group {
@@ -185,7 +137,23 @@ struct MainView: View {
     
     // MARK: - Minimized Controls
     private var minimizedControls: some View {
-        EmptyView()
+        HStack {
+            Spacer()
+            VStack(spacing: 10) {
+                Button(action: {
+                    recenterMap = true
+                }) {
+                    Image(systemName: "location.fill")
+                        .foregroundColor(.white)
+                        .frame(width: 36, height: 36)
+                        .background(Color.blue)
+                        .clipShape(Circle())
+                        .shadow(radius: 4)
+                }
+                .padding(.top, 10)
+                .padding(.trailing, 20)
+            }
+        }
     }
     
     // MARK: - Floating Action Buttons
@@ -193,7 +161,15 @@ struct MainView: View {
         Group {
             if isSearchBarMinimized && !searchIsFocused && !selectedPlaceVM.isDetailSheetPresented {
                 FloatingActionButtons(
-                    shouldNavigateToProfile: $shouldNavigateToProfile
+                    isSearchBarMinimized: $isSearchBarMinimized,
+                    searchIsFocused: Binding(
+                        get: { searchIsFocused },
+                        set: { searchIsFocused = $0 }
+                    ),
+                    sheetHeight: $sheetHeight,
+                    shouldNavigateToProfile: $shouldNavigateToProfile,
+                    maxSheetHeight: maxSheetHeight,
+                    minSheetHeight: minSheetHeight
                 )
                 .environmentObject(profileViewModel)
             }
