@@ -38,11 +38,11 @@ struct FloatingActionButtons: View {
             }
         }) {
             Image(systemName: "magnifyingglass")
-                .foregroundColor(.blue)
-                .frame(width: 60, height: 60)
-                .background(Color.white)
+                .foregroundColor(.secondary)
+                .frame(width: 36, height: 36)
+                .background(.ultraThinMaterial)
                 .clipShape(Circle())
-                .overlay(Circle().stroke(Color.gray, lineWidth: 2))
+                .overlay(Circle().stroke(Color.gray.opacity(0.3), lineWidth: 1))
                 .shadow(radius: 4)
         }
     }
@@ -54,18 +54,19 @@ struct FloatingActionButtons: View {
             if let profilePhoto = profileViewModel.userPicture {
                 Image(uiImage: profilePhoto)
                     .resizable()
-                    .frame(width: 60, height: 60)
+                    .frame(width: 36, height: 36)
+                    .background(.ultraThinMaterial)
                     .clipShape(Circle())
-                    .overlay(Circle().stroke(Color.gray, lineWidth: 2))
+                    .overlay(Circle().stroke(Color.gray.opacity(0.3), lineWidth: 1))
                     .shadow(radius: 4)
             } else {
                 Image(systemName: "person.crop.circle")
                     .resizable()
-                    .foregroundColor(.blue)
-                    .frame(width: 60, height: 60)
-                    .background(Color.white)
+                    .foregroundColor(.secondary)
+                    .frame(width: 36, height: 36)
+                    .background(.ultraThinMaterial)
                     .clipShape(Circle())
-                    .overlay(Circle().stroke(Color.gray, lineWidth: 2))
+                    .overlay(Circle().stroke(Color.gray.opacity(0.3), lineWidth: 1))
                     .shadow(radius: 4)
             }
         }
