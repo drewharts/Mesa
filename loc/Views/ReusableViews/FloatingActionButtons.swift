@@ -39,7 +39,7 @@ struct FloatingActionButtons: View {
         }) {
             Image(systemName: "magnifyingglass")
                 .foregroundColor(.secondary)
-                .frame(width: 36, height: 36)
+                .frame(width: 60, height: 60)
                 .background(.ultraThinMaterial)
                 .clipShape(Circle())
                 .overlay(Circle().stroke(Color.gray.opacity(0.3), lineWidth: 1))
@@ -54,7 +54,7 @@ struct FloatingActionButtons: View {
             if let profilePhoto = profileViewModel.userPicture {
                 Image(uiImage: profilePhoto)
                     .resizable()
-                    .frame(width: 36, height: 36)
+                    .frame(width: 60, height: 60)
                     .background(.ultraThinMaterial)
                     .clipShape(Circle())
                     .overlay(Circle().stroke(Color.gray.opacity(0.3), lineWidth: 1))
@@ -63,7 +63,7 @@ struct FloatingActionButtons: View {
                 Image(systemName: "person.crop.circle")
                     .resizable()
                     .foregroundColor(.secondary)
-                    .frame(width: 36, height: 36)
+                    .frame(width: 60, height: 60)
                     .background(.ultraThinMaterial)
                     .clipShape(Circle())
                     .overlay(Circle().stroke(Color.gray.opacity(0.3), lineWidth: 1))

@@ -141,11 +141,11 @@ struct MapView: View {
                                 .font(.system(size: 14, weight: .medium))
                         }
                         .foregroundColor(.secondary)
-                        .frame(height: 36)
                         .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
                         .background(.ultraThinMaterial)
-                        .clipShape(RoundedRectangle(cornerRadius: 18))
-                        .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.gray.opacity(0.3), lineWidth: 1))
+                        .clipShape(RoundedRectangle(cornerRadius: 20))
+                        .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.gray.opacity(0.3), lineWidth: 1))
                         .shadow(radius: 4)
                     }
                     .padding(.leading, 20)
