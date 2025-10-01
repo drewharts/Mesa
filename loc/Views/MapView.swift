@@ -140,14 +140,13 @@ struct MapView: View {
                             Text("View")
                                 .font(.system(size: 14, weight: .medium))
                         }
-                        .foregroundColor(.white)
+                        .foregroundColor(.secondary)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 8)
-                        .background(
-                            RoundedRectangle(cornerRadius: 20)
-                                .fill(Color.blue)
-                                .shadow(color: .black.opacity(0.2), radius: 3, x: 0, y: 1)
-                        )
+                        .background(.ultraThinMaterial)
+                        .clipShape(RoundedRectangle(cornerRadius: 20))
+                        .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.gray.opacity(0.3), lineWidth: 1))
+                        .shadow(radius: 4)
                     }
                     .padding(.leading, 20)
                     .padding(.top, 60) // Position below top safe area

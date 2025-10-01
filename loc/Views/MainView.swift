@@ -144,10 +144,11 @@ struct MainView: View {
                     recenterMap = true
                 }) {
                     Image(systemName: "location.fill")
-                        .foregroundColor(.white)
+                        .foregroundColor(.secondary)
                         .frame(width: 36, height: 36)
-                        .background(Color.blue)
+                        .background(.ultraThinMaterial)
                         .clipShape(Circle())
+                        .overlay(Circle().stroke(Color.gray.opacity(0.3), lineWidth: 1))
                         .shadow(radius: 4)
                 }
                 .padding(.top, 10)
