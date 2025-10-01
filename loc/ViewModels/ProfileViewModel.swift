@@ -297,43 +297,53 @@ class ProfileViewModel: ObservableObject {
     
      func addPlaceToList(listId: UUID, place: DetailPlace) {
         let listIdString = listId.uuidString
-        guard let userId = userSession.currentUserId else { 
-            return 
+        guard let userId = userSession.currentUserId else {
+            return
         }
         // Find the list in userLists
-        guard let listIndex = userLists.firstIndex(where: { $0.id == listId }) else { 
-            return 
+        guard let listIndex = userLists.firstIndex(where: { $0.id == listId }) else {
+            return
         }
+
+        // Check if this place has associated external place data (TikTok data)
+        // and merge it if the current place doesn't have TikTok videos
+        var updatedPlace = place
+        if place.tikTokVideos == nil || place.tikTokVideos?.isEmpty == true {
+            if let externalPlace = userExternalPlaces[place.id.uuidString] {
+                // Merge TikTok data from external place
+                updatedPlace = mergeTikTokData(into: place, from: externalPlace)
+            }
+        }
+
         // Convert DetailPlace to Place for FirestoreService
-        let placeForList = place.toPlace()
-        
+        let placeForList = updatedPlace.toPlace()
+
         // Update local userListsPlaces
         var places = userListsPlaces[listIdString] ?? []
-        if !places.contains(place.id.uuidString) {
-            places.append(place.id.uuidString)
+        if !places.contains(updatedPlace.id.uuidString) {
+            places.append(updatedPlace.id.uuidString)
             userListsPlaces[listIdString] = places
         }
-        
+
         // Update the places array in the PlaceList
-        if !userLists[listIndex].places.contains(where: { $0.id == place.id }) {
+        if !userLists[listIndex].places.contains(where: { $0.id == updatedPlace.id }) {
             userLists[listIndex].places.append(placeForList)
         }
-        
+
         // Persist to Firestore
         placeService.addPlaceToList(userId: userId, listName: listIdString, place: placeForList)
-        
+
         // Update DetailPlaceViewModel's places dictionary for immediate UI update
-        if detailPlaceViewModel.places[place.id.uuidString] == nil {
-            detailPlaceViewModel.places[place.id.uuidString] = place
-        }
+        // Always update the place to ensure TikTok data and other properties are current
+        detailPlaceViewModel.places[updatedPlace.id.uuidString] = updatedPlace
         
         // Add current user as saver so places appear on map with profile picture
-        if detailPlaceViewModel.placeSavers[place.id.uuidString] == nil {
-            detailPlaceViewModel.placeSavers[place.id.uuidString] = [userId]
-        } else if !detailPlaceViewModel.placeSavers[place.id.uuidString]!.contains(userId) {
-            detailPlaceViewModel.placeSavers[place.id.uuidString]!.append(userId)
+        if detailPlaceViewModel.placeSavers[updatedPlace.id.uuidString] == nil {
+            detailPlaceViewModel.placeSavers[updatedPlace.id.uuidString] = [userId]
+        } else if !detailPlaceViewModel.placeSavers[updatedPlace.id.uuidString]!.contains(userId) {
+            detailPlaceViewModel.placeSavers[updatedPlace.id.uuidString]!.append(userId)
         }
-        
+
         // Recalculate map annotations to include the new place
         detailPlaceViewModel.calculateAnnotationPlaces()
         
@@ -345,7 +355,21 @@ class ProfileViewModel: ObservableObject {
         
         // Skip sorting for individual place additions to avoid frequent re-sorting
     }
-    
+
+    /// Merge TikTok data from an ExternalPlace into a DetailPlace
+    private func mergeTikTokData(into detailPlace: DetailPlace, from externalPlace: ExternalPlace) -> DetailPlace {
+        // Create a copy of the DetailPlace with TikTok data merged in
+        var mergedPlace = detailPlace
+
+        // If the external place has TikTok videos, add them to the detail place
+        if let tikTokVideos = externalPlace.tikTokVideos, !tikTokVideos.isEmpty {
+            mergedPlace.tikTokVideos = tikTokVideos
+            print("🔄 [ProfileViewModel] Merged \(tikTokVideos.count) TikTok video(s) into place: \(detailPlace.name)")
+        }
+
+        return mergedPlace
+    }
+
      func removePlaceFromList(listId: UUID, place: DetailPlace) {
          let listIdString = listId.uuidString
          guard
