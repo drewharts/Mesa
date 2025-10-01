@@ -11,9 +11,15 @@ struct TikTokVideoView: View {
     @StateObject private var viewModel: TikTokVideoViewModel
     @State private var refreshAttempted: Bool = false
     @State private var isPressed: Bool = false
-    
-    init(tikTokVideo: TikTokVideo) {
+
+    // Optional place for navigation instead of opening video
+    let associatedPlace: DetailPlace?
+    let onNavigateToPlace: ((DetailPlace) -> Void)?
+
+    init(tikTokVideo: TikTokVideo, associatedPlace: DetailPlace? = nil, onNavigateToPlace: ((DetailPlace) -> Void)? = nil) {
         _viewModel = StateObject(wrappedValue: TikTokVideoViewModel(tikTokVideo: tikTokVideo))
+        self.associatedPlace = associatedPlace
+        self.onNavigateToPlace = onNavigateToPlace
     }
     
     var body: some View {
@@ -75,7 +81,13 @@ struct TikTokVideoView: View {
                     withAnimation(.easeInOut(duration: 0.1)) {
                         isPressed = false
                     }
-                    viewModel.openVideo()
+
+                    // If we have an associated place, navigate to it instead of opening video
+                    if let place = associatedPlace, let onNavigate = onNavigateToPlace {
+                        onNavigate(place)
+                    } else {
+                        viewModel.openVideo()
+                    }
                 }
         )
     }

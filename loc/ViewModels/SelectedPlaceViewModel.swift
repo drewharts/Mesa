@@ -12,6 +12,7 @@ import UIKit
 import FirebaseAuth
 import FirebaseFirestore
 
+
 class SelectedPlaceViewModel: ObservableObject {
     private let reviewService: ReviewService
     private let userService: UserService
@@ -147,7 +148,7 @@ class SelectedPlaceViewModel: ObservableObject {
     
     // MARK: - Private Methods
     private func loadData(for place: DetailPlace, currentLocation: CLLocationCoordinate2D) {
-        print("🔄 [SelectedPlaceViewModel] Starting to load data for \(place.name) at location \(currentLocation)")
+        debugLog("🔄 [SelectedPlaceViewModel] Starting to load data for \(place.name) at location \(currentLocation)")
         
         // Compute whether the restaurant is open now
         let openNow = isRestaurantOpenNow(place)
@@ -161,7 +162,7 @@ class SelectedPlaceViewModel: ObservableObject {
                 self.isDetailSheetPresented = true
             }
             self.updateCurrentPlaceFullyLoaded()
-            print("🔄 [SelectedPlaceViewModel] Initial place data loaded for \(place.name)")
+            debugLog("🔄 [SelectedPlaceViewModel] Initial place data loaded for \(place.name)")
         }
     }
     
@@ -210,7 +211,7 @@ class SelectedPlaceViewModel: ObservableObject {
     
     private func loadReviews(for place: DetailPlace) {
         let placeId = place.id.uuidString
-        print("📝 [SelectedPlaceViewModel] Starting to load reviews for place: \(place.name)")
+        debugLog("📝 [SelectedPlaceViewModel] Starting to load reviews for place: \(place.name)")
         DispatchQueue.main.async {
             self.reviewLoadingStates[placeId] = .loading
         }

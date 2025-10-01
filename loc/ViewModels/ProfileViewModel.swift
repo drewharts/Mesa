@@ -13,6 +13,7 @@ import FirebaseAuth
 import UIKit
 import CoreLocation
 
+
 // MARK: - List Place Pagination Model
 struct ListPlacePagination {
     var allPlaceIds: [String] = []
@@ -160,7 +161,7 @@ class ProfileViewModel: ObservableObject {
             .dropFirst() // Skip the initial nil value
             .sink { [weak self] location in
                 if location != nil && !(self?.hasPerformedInitialSort ?? false) {
-                    print("📍 [ProfileViewModel] Location first available, performing initial sort with pre-calculated coordinates")
+                    debugLog("📍 [ProfileViewModel] Location first available, performing initial sort with pre-calculated coordinates")
                     Task { @MainActor in
                         self?.sortListsByDistance()
                     }
@@ -967,7 +968,7 @@ class ProfileViewModel: ObservableObject {
                 longitude: averageCoordinate.longitude
             )
             let distance = currentLocation.distance(from: listLocation)
-            print("📍 [ProfileViewModel] List '\(list.name)': Using pre-calculated average coordinates, distance: \(String(format: "%.1f km", distance/1000))")
+            debugLog("📍 [ProfileViewModel] List '\(list.name)': Using pre-calculated average coordinates, distance: \(String(format: "%.1f km", distance/1000))")
             return distance
         }
         
@@ -1077,7 +1078,7 @@ class ProfileViewModel: ObservableObject {
             return 
         }
         
-        print("📍 [ProfileViewModel] sortListsByDistance: Sorting \(userLists.count) lists by distance using pre-calculated coordinates")
+        debugLog("📍 [ProfileViewModel] sortListsByDistance: Sorting \(userLists.count) lists by distance using pre-calculated coordinates")
         
         userLists.sort { list1, list2 in
             let distance1 = calculateDistanceToList(list1)
@@ -1101,7 +1102,7 @@ class ProfileViewModel: ObservableObject {
         }
         
         hasPerformedInitialSort = true
-        print("✅ [ProfileViewModel] sortListsByDistance: Lists sorted successfully using pre-calculated coordinates")
+        debugLog("✅ [ProfileViewModel] sortListsByDistance: Lists sorted successfully using pre-calculated coordinates")
     }
 
     /// Public method for manual refresh (if needed) - should only be called by user actions like pull-to-refresh

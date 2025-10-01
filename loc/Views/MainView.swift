@@ -128,33 +128,14 @@ struct MainView: View {
     private var topControls: some View {
         Group {
             if isSearchBarMinimized {
-                minimizedControls
+                // Location button is now in FloatingActionButtons, so only show empty view when minimized
+                EmptyView()
             } else {
                 expandedSearchControls
             }
         }
     }
     
-    // MARK: - Minimized Controls
-    private var minimizedControls: some View {
-        HStack {
-            Spacer()
-            VStack(spacing: 10) {
-                Button(action: {
-                    recenterMap = true
-                }) {
-                    Image(systemName: "location.fill")
-                        .foregroundColor(.white)
-                        .frame(width: 36, height: 36)
-                        .background(Color.blue)
-                        .clipShape(Circle())
-                        .shadow(radius: 4)
-                }
-                .padding(.top, 10)
-                .padding(.trailing, 20)
-            }
-        }
-    }
     
     // MARK: - Floating Action Buttons
     private var floatingActionButtons: some View {
@@ -168,6 +149,7 @@ struct MainView: View {
                     ),
                     sheetHeight: $sheetHeight,
                     shouldNavigateToProfile: $shouldNavigateToProfile,
+                    recenterMap: $recenterMap,
                     maxSheetHeight: maxSheetHeight,
                     minSheetHeight: minSheetHeight
                 )
