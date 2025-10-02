@@ -102,7 +102,7 @@ struct MainView: View {
     
     // MARK: - Map Layer
     private var mapLayer: some View {
-        MapView(recenterMap: $recenterMap, onMapTap: {
+        MapView(recenterMap: $recenterMap, isSearchBarMinimized: isSearchBarMinimized, onMapTap: {
             withAnimation {
                 isSearchBarMinimized = true
                 searchIsFocused = false
