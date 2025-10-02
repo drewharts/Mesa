@@ -36,7 +36,7 @@ struct MaxPlaceDetailView: View {
                         case .loaded:
                             let photos = selectedPlaceVM.photos
                             if !photos.isEmpty {
-                                GridView(images: photos, onImageTapped: { index in
+                                ModernPhotoGallery(images: photos, onImageTapped: { index in
                                     onPhotoTapped(photos, index)
                                 })
                                 .environmentObject(selectedPlaceVM)
