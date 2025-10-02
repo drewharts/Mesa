@@ -149,7 +149,7 @@ struct MapView: View {
                         .shadow(radius: 4)
                     }
                     .padding(.leading, 20)
-                    .padding(.top, 10) // Position below top safe area
+                    .padding(.top, 60) // Position below top safe area
                     Spacer()
                 }
                 Spacer()
