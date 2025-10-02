@@ -133,7 +133,6 @@ class SelectedPlaceViewModel: ObservableObject {
         
         // Debug logging when the state changes
         if !wasLoaded && isCurrentPlaceFullyLoaded {
-            print("🎯 [SelectedPlaceViewModel] Place \(placeId) is now fully loaded (photos: \(photoState), reviews: \(reviewState))")
         }
     }
     
@@ -148,7 +147,6 @@ class SelectedPlaceViewModel: ObservableObject {
     
     // MARK: - Private Methods
     private func loadData(for place: DetailPlace, currentLocation: CLLocationCoordinate2D) {
-        debugLog("🔄 [SelectedPlaceViewModel] Starting to load data for \(place.name) at location \(currentLocation)")
         
         // Compute whether the restaurant is open now
         let openNow = isRestaurantOpenNow(place)
@@ -162,7 +160,6 @@ class SelectedPlaceViewModel: ObservableObject {
                 self.isDetailSheetPresented = true
             }
             self.updateCurrentPlaceFullyLoaded()
-            debugLog("🔄 [SelectedPlaceViewModel] Initial place data loaded for \(place.name)")
         }
     }
     
@@ -211,7 +208,6 @@ class SelectedPlaceViewModel: ObservableObject {
     
     private func loadReviews(for place: DetailPlace) {
         let placeId = place.id.uuidString
-        debugLog("📝 [SelectedPlaceViewModel] Starting to load reviews for place: \(place.name)")
         DispatchQueue.main.async {
             self.reviewLoadingStates[placeId] = .loading
         }
@@ -583,7 +579,6 @@ class SelectedPlaceViewModel: ObservableObject {
         if commentPhotos[comment.id] != nil || comment.images.isEmpty {
             return
         }
-        print("Loading \(comment.images.count) photos for comment ID: \(comment.id)")
         
         imageService.fetchPhotosFromStorage(urls: comment.images) { [weak self] images, error in
             guard let self = self else { return }
@@ -592,7 +587,6 @@ class SelectedPlaceViewModel: ObservableObject {
                 if let error = error {
                     print("Error loading comment photos: \(error.localizedDescription)")
                 } else if let images = images {
-                    print("Successfully loaded \(images.count) photos for comment ID: \(comment.id)")
                     self.commentPhotos[comment.id] = images
                 }
             }
@@ -650,7 +644,6 @@ class SelectedPlaceViewModel: ObservableObject {
             return
         }
         
-        print("🗑️ Deleting review \(reviewId) from SelectedPlaceViewModel")
         
         reviewService.deleteReview(reviewId: reviewId, placeId: placeId, userId: review.userId) { [weak self] result in
             guard let self = self else { return }
@@ -680,7 +673,6 @@ class SelectedPlaceViewModel: ObservableObject {
                             // Remove from liked reviews set if it was there
                             self.likedReviews.remove(reviewId)
                             
-                            print("✅ Successfully removed review from local cache")
                         }
                     }
                     completion(.success(()))
@@ -757,7 +749,6 @@ class SelectedPlaceViewModel: ObservableObject {
         
         // Prevent liking your own review
         if review.userId == userId {
-            print("Cannot like your own review")
             return
         }
         

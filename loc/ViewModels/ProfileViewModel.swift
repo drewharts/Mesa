@@ -161,7 +161,6 @@ class ProfileViewModel: ObservableObject {
             .dropFirst() // Skip the initial nil value
             .sink { [weak self] location in
                 if location != nil && !(self?.hasPerformedInitialSort ?? false) {
-                    debugLog("📍 [ProfileViewModel] Location first available, performing initial sort with pre-calculated coordinates")
                     Task { @MainActor in
                         self?.sortListsByDistance()
                     }
@@ -366,7 +365,6 @@ class ProfileViewModel: ObservableObject {
         if !externalPlace.tiktokVideos.isEmpty {
             let tikTokVideos = externalPlace.tiktokVideos.map { $0.toTikTokVideo() }
             mergedPlace.tikTokVideos = tikTokVideos
-            print("🔄 [ProfileViewModel] Merged \(tikTokVideos.count) TikTok video(s) into place: \(detailPlace.name)")
         }
 
         return mergedPlace
@@ -817,7 +815,6 @@ class ProfileViewModel: ObservableObject {
         // Recalculate map annotations to include new TikTok places
         detailPlaceViewModel.calculateAnnotationPlaces()
         
-        print("✅ [ProfileViewModel] Loaded \(newPlaceIds.count) new TikTok places, total: \(loadedTikTokPlaceIds.count)/\(allTikTokPlaceIds.count)")
     }
     
     func loadMoreTikTokPlaces() {
@@ -968,7 +965,6 @@ class ProfileViewModel: ObservableObject {
                 longitude: averageCoordinate.longitude
             )
             let distance = currentLocation.distance(from: listLocation)
-            debugLog("📍 [ProfileViewModel] List '\(list.name)': Using pre-calculated average coordinates, distance: \(String(format: "%.1f km", distance/1000))")
             return distance
         }
         
@@ -991,15 +987,12 @@ class ProfileViewModel: ObservableObject {
                     totalDistance += distance
                     validPlaceCount += 1
                 } else {
-                    print("📍 [ProfileViewModel] Place '\(detailPlace.name)' (ID: \(placeId)) has no coordinates")
                 }
             } else {
-                print("📍 [ProfileViewModel] Place with ID \(placeId) not found in detailPlaceViewModel.places")
             }
         }
         
         let averageDistance = validPlaceCount > 0 ? totalDistance / Double(validPlaceCount) : Double.infinity
-        print("📍 [ProfileViewModel] List '\(list.name)': Fallback calculation - \(validPlaceCount)/\(listPlaceIds.count) places with coordinates, avg distance: \(averageDistance > 1000000 ? "∞" : String(format: "%.1f km", averageDistance/1000))")
         
         return averageDistance
     }
@@ -1036,7 +1029,6 @@ class ProfileViewModel: ObservableObject {
             )
             userLists[listIndex].lastCoordinateUpdate = Date()
             
-            print("📍 [ProfileViewModel] Updated average coordinates for list '\(userLists[listIndex].name)': (\(averageLatitude), \(averageLongitude)) from \(validPlaceCount) places")
             
             // Update in Firestore
             if let userId = userSession.currentUserId {
@@ -1048,7 +1040,6 @@ class ProfileViewModel: ObservableObject {
             // No valid coordinates, clear the average
             userLists[listIndex].averageCoordinate = nil
             userLists[listIndex].lastCoordinateUpdate = Date()
-            print("📍 [ProfileViewModel] Cleared average coordinates for list '\(userLists[listIndex].name)' - no valid coordinates")
         }
     }
     
@@ -1064,9 +1055,7 @@ class ProfileViewModel: ObservableObject {
                     "averageCoordinate": averageCoordinate,
                     "lastCoordinateUpdate": FieldValue.serverTimestamp()
                 ])
-            print("✅ [ProfileViewModel] Successfully updated average coordinates in Firestore for list \(listId)")
         } catch {
-            print("❌ [ProfileViewModel] Failed to update average coordinates in Firestore: \(error.localizedDescription)")
         }
     }
     
@@ -1078,7 +1067,6 @@ class ProfileViewModel: ObservableObject {
             return 
         }
         
-        debugLog("📍 [ProfileViewModel] sortListsByDistance: Sorting \(userLists.count) lists by distance using pre-calculated coordinates")
         
         userLists.sort { list1, list2 in
             let distance1 = calculateDistanceToList(list1)
@@ -1102,7 +1090,6 @@ class ProfileViewModel: ObservableObject {
         }
         
         hasPerformedInitialSort = true
-        debugLog("✅ [ProfileViewModel] sortListsByDistance: Lists sorted successfully using pre-calculated coordinates")
     }
 
     /// Public method for manual refresh (if needed) - should only be called by user actions like pull-to-refresh
@@ -1154,11 +1141,6 @@ class ProfileViewModel: ObservableObject {
         case .success(let detailPlaces):
             print("✅ [ProfileViewModel] Successfully processed TikTok URL, received \(detailPlaces.count) place(s)")
             
-            // Debug: Log each place name
-            for (index, place) in detailPlaces.enumerated() {
-                print("🏢 [ProfileViewModel] Place \(index + 1): \(place.name) (ID: \(place.id))")
-            }
-            
             // Clear any previous errors
             tikTokImportError = nil
             
@@ -1176,8 +1158,6 @@ class ProfileViewModel: ObservableObject {
                         deepLinkManager?.isProcessingDeepLink = false
                         return
                     }
-                    
-                    print("✅ [ProfileViewModel] Single place found: \(detailPlace.name)")
                     placeVM.places[detailPlace.id.uuidString] = detailPlace
                     // Add current user as saver so pin shows with profile
                     if let uid = Auth.auth().currentUser?.uid {

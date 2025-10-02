@@ -36,7 +36,6 @@ struct MapView: View {
                 Map(position: $mapPosition) {
                     ForEach(placeTypeFilterVM.getFilteredPlaces().compactMap { place -> PlaceAnnotationItem? in
                         guard let coordinate = place.coordinate else {
-                            print("⚠️ [MapView] Place '\(place.name)' has no coordinate, skipping annotation")
                             return nil
                         }
                         return PlaceAnnotationItem(
@@ -56,7 +55,6 @@ struct MapView: View {
                                 annotationImage: detailPlaceVM.placeAnnotations[place.place.id.uuidString]
                             )
                             .onTapGesture {
-                                print("Place ID: \(place.place.id.uuidString)")
                                 selectedPlaceVM.selectedPlace = place.place
                             }
                         }

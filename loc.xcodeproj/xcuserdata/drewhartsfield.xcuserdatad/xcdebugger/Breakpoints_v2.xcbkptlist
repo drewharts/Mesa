@@ -268,8 +268,8 @@
             endingColumnNumber = "9223372036854775807"
             startingLineNumber = "38"
             endingLineNumber = "38"
-            landmarkName = "init(dataManager:detailPlaceViewModel:placeService:userService:reviewService:)"
-            landmarkType = "7">
+            landmarkName = "UserProfileViewModel"
+            landmarkType = "3">
          </BreakpointContent>
       </BreakpointProxy>
       <BreakpointProxy

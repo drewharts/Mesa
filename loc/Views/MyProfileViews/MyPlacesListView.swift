@@ -660,7 +660,6 @@ struct TikTokPlaceGridCell: View {
             Button("Delete", role: .destructive) {
                 profile.deleteTikTokPlace(place) { success in
                     if success {
-                        print("✅ Successfully deleted TikTok place: \(place.name)")
                     } else {
                         print("❌ Failed to delete TikTok place: \(place.name)")
                     }

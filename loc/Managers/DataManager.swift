@@ -148,11 +148,9 @@ class DataManager: ObservableObject {
     
     // Load user's external places (TikTok-sourced places)
     func loadUserExternalPlaces(userId: String) async {
-        print("🔍 [DataManager] Loading external places for user: \(userId)")
         do {
             let externalPlaces = try await userService.fetchUserExternalPlaces(userId: userId)
             profileViewModel.userExternalPlaces = externalPlaces
-            print("✅ [DataManager] Successfully loaded \(externalPlaces.count) external places")
             
             // Note: DetailPlace objects will be loaded via pagination when TikTok tab is accessed
             
@@ -297,7 +295,6 @@ class DataManager: ObservableObject {
             return
         }
         
-        print("🔍 [DataManager] loadPlacesForList: Loading \(list.places.count) places for list '\(list.name)'")
         
         // Process places in batches for better performance
         let batchSize = 10
@@ -329,7 +326,6 @@ class DataManager: ObservableObject {
             try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
         }
         
-        print("✅ [DataManager] loadPlacesForList: Successfully loaded \(loadedPlaceIds.count) places for list \(listId)")
     }
 
     func processPlacesInList(list: PlaceList, userId: String) async {
