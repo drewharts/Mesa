@@ -242,17 +242,6 @@ struct MinPlaceDetailView: View {
                         viewModel: viewModel,
                         onPhotoTapped: onPhotoTapped
                     )
-
-                    // Divider after photos section
-                    if profile.hasTikTokVideos(for: selectedPlaceVM.selectedPlace?.id.uuidString ?? "") {
-                        Divider()
-                            .padding(.top, 15)
-                            .padding(.bottom, 15)
-                    } else {
-                        Divider()
-                            .padding(.top, 15)
-                            .padding(.bottom, 15)
-                    }
                 case .reviews:
                     PlaceReviewsView(onPhotoTapped: onPhotoTapped)
                         .environmentObject(userProfileViewModel)
