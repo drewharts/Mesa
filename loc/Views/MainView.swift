@@ -151,7 +151,7 @@ struct MainView: View {
                         .overlay(Circle().stroke(Color.gray.opacity(0.3), lineWidth: 1))
                         .shadow(radius: 4)
                 }
-                .padding(.top, 60)
+                .padding(.top, 10)
                 .padding(.trailing, 20)
             }
         }
