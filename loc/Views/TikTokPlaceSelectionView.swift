@@ -62,12 +62,23 @@ struct TikTokPlaceSelectionView: View {
                                     print("🔍 [TikTokPlaceSelectionView] Bookmark tapped for place: \(place.name)")
                                     // First, ensure the lists are loaded and the loading state is correct.
                                     profile.ensureListsLoaded()
-                                    
+
                                     // Now, trigger the sheet.
                                     print("   - Current userLists count: \(profile.userLists.count)")
                                     print("   - Current isLoading state: \(profile.isLoading)")
                                     selectedPlaceForList = place
                                     showingListSelection = true
+                                },
+                                onPlaceTapped: {
+                                    print("📍 [TikTokPlaceSelectionView] Place tapped: \(place.name)")
+                                    // First dismiss this sheet, then navigate to place detail
+                                    profile.clearPlaceSelection()
+
+                                    // Use a small delay to ensure sheet dismissal completes before navigation
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                        selectedPlaceVM.selectedPlace = place
+                                        selectedPlaceVM.isDetailSheetPresented = true
+                                    }
                                 }
                             )
                         }
@@ -119,8 +130,9 @@ struct TikTokPlaceSelectionView: View {
 struct PlaceRowView: View {
     let place: DetailPlace
     let onBookmarkTapped: () -> Void
+    let onPlaceTapped: () -> Void
     @EnvironmentObject var profile: ProfileViewModel
-    
+
     var body: some View {
         HStack(spacing: 12) {
             // Place Image
@@ -138,19 +150,19 @@ struct PlaceRowView: View {
             }
             .frame(width: 60, height: 60)
             .clipShape(RoundedRectangle(cornerRadius: 8))
-            
+
             // Place Info
             VStack(alignment: .leading, spacing: 4) {
                 Text(place.name)
                     .font(.headline)
                     .foregroundColor(.primary)
-                
+
                 if !(place.address?.isEmpty ?? true) {
                     Text(place.address!)
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                 }
-                
+
                 HStack(spacing: 8) {
                     if (place.rating ?? 0) > 0 {
                         HStack(spacing: 4) {
@@ -162,7 +174,7 @@ struct PlaceRowView: View {
                                 .foregroundColor(.secondary)
                         }
                     }
-                    
+
                     if let priceLevel = place.priceLevel, !priceLevel.isEmpty {
                         Text(priceLevel)
                             .font(.caption)
@@ -170,9 +182,9 @@ struct PlaceRowView: View {
                     }
                 }
             }
-            
+
             Spacer()
-            
+
             // Bookmark Button - shows filled if place is in any list
             Button(action: onBookmarkTapped) {
                 Image(systemName: profile.isPlaceInAnyList(placeId: place.id.uuidString) ? "bookmark.fill" : "bookmark")
@@ -185,5 +197,9 @@ struct PlaceRowView: View {
         .background(Color(.systemBackground))
         .cornerRadius(12)
         .shadow(color: Color.black.opacity(0.1), radius: 2, x: 0, y: 1)
+        .contentShape(Rectangle()) // Make the entire row tappable
+        .onTapGesture {
+            onPlaceTapped()
+        }
     }
 } 
