@@ -236,7 +236,15 @@ struct MinPlaceDetailView: View {
                         TikTokPlaceFlaggingView(place: selectedPlaceVM.selectedPlace!)
                             .environmentObject(profile)
                             .padding(.top, 15)
-                        
+                    }
+
+                    MaxPlaceDetailView(
+                        viewModel: viewModel,
+                        onPhotoTapped: onPhotoTapped
+                    )
+
+                    // Divider after photos section
+                    if profile.hasTikTokVideos(for: selectedPlaceVM.selectedPlace?.id.uuidString ?? "") {
                         Divider()
                             .padding(.top, 15)
                             .padding(.bottom, 15)
@@ -245,11 +253,6 @@ struct MinPlaceDetailView: View {
                             .padding(.top, 15)
                             .padding(.bottom, 15)
                     }
-                    
-                    MaxPlaceDetailView(
-                        viewModel: viewModel,
-                        onPhotoTapped: onPhotoTapped
-                    )
                 case .reviews:
                     PlaceReviewsView(onPhotoTapped: onPhotoTapped)
                         .environmentObject(userProfileViewModel)

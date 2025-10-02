@@ -16,14 +16,6 @@ struct MaxPlaceDetailView: View {
     
     var body: some View {
         VStack(spacing: 16) {
-            
-            Text("PHOTOS")
-                .font(.subheadline)
-                .foregroundColor(.black)
-                .fontWeight(.semibold)
-                .padding(.bottom, 5)
-                .frame(maxWidth: .infinity, alignment: .leading)
-
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     if let _ = selectedPlaceVM.selectedPlace {
