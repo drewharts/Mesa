@@ -42,11 +42,11 @@ struct PlaceActionButton: View {
             }
         }
 
-        func iconName(isFavorited: Bool) -> String {
+        func iconName(isFavorited: Bool, isInList: Bool) -> String {
             switch self {
             case .favorite: return isFavorited ? "star.fill" : "star"
             case .share: return "square.and.arrow.up"
-            case .addToList: return "bookmark"
+            case .addToList: return isInList ? "bookmark.fill" : "bookmark"
             case .addReview: return "plus"
             }
         }
@@ -60,11 +60,11 @@ struct PlaceActionButton: View {
             }
         }
 
-        func iconColor(isFavorited: Bool, isSelected: Bool) -> Color {
+        func iconColor(isFavorited: Bool, isInList: Bool, isSelected: Bool) -> Color {
             switch self {
             case .favorite: return isFavorited ? .yellow : .gray
             case .share: return .gray
-            case .addToList: return .gray
+            case .addToList: return isInList ? .blue : .gray
             case .addReview: return .gray
             }
         }
@@ -105,7 +105,8 @@ struct PlaceActionButton: View {
                                             performAction(action)
                                             collapseMenu()
                                         },
-                                        isFavorited: action == .favorite ? profile.isPlaceFavorite(placeId: place.id.uuidString) : false
+                                        isFavorited: action == .favorite ? profile.isPlaceFavorite(placeId: place.id.uuidString) : false,
+                                        isInList: action == .addToList ? profile.isPlaceInAnyList(placeId: place.id.uuidString) : false
                                     )
                                 }
                             }
@@ -230,11 +231,12 @@ struct ActionButton: View {
     let isSelected: Bool
     let onTap: () -> Void
     let isFavorited: Bool
+    let isInList: Bool
 
     var body: some View {
         Button(action: onTap) {
-            let iconName = action.iconName(isFavorited: isFavorited)
-            let iconColor = action.iconColor(isFavorited: isFavorited, isSelected: isSelected)
+            let iconName = action.iconName(isFavorited: isFavorited, isInList: isInList)
+            let iconColor = action.iconColor(isFavorited: isFavorited, isInList: isInList, isSelected: isSelected)
 
             Image(systemName: iconName)
                 .font(.title3)
