@@ -39,6 +39,12 @@ struct TikTokNoPlacesFoundView: View {
             closeButton
         }
         .padding(.vertical, 30)
+        .onAppear {
+            // Ensure all processing states are cleared when this view appears
+            profile.isProcessingTikTok = false
+            profile.isWaitingForPlaceDetail = false
+            print("✅ [TikTokNoPlacesFoundView] onAppear: Cleared all processing states")
+        }
         .alert("Help Improve Detection", isPresented: $showingCommentDialog) {
             TextField("Describe the place that should have been detected...", text: $userComment, axis: .vertical)
                 .lineLimit(3...6)

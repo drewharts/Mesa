@@ -1215,7 +1215,9 @@ class ProfileViewModel: ObservableObject {
                     noPlacesFoundTikTokUrl = urlString
                     isShowingNoPlacesFound = true
                     isProcessingTikTok = false
+                    isWaitingForPlaceDetail = false  // Ensure waiting state is also cleared
                     deepLinkManager?.isProcessingDeepLink = false
+                    print("✅ [ProfileViewModel] Cleared all loading states for no places found")
                 }
             }
             
@@ -1278,6 +1280,11 @@ class ProfileViewModel: ObservableObject {
     func clearNoPlacesFound() {
         isShowingNoPlacesFound = false
         noPlacesFoundTikTokUrl = ""
+        // Ensure processing states are cleared when user closes the view
+        isProcessingTikTok = false
+        isWaitingForPlaceDetail = false
+        deepLinkManager?.isProcessingDeepLink = false
+        print("✅ [ProfileViewModel] clearNoPlacesFound: Cleared all processing states")
     }
     
     func placeSelectionViewAppeared() {
