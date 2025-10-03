@@ -13,9 +13,10 @@ struct MapView: View {
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var detailPlaceVM: DetailPlaceViewModel
     @EnvironmentObject var placeTypeFilterVM: PlaceTypeFilterViewModel
-    
+
     @Binding var recenterMap: Bool
     var isSearchBarMinimized: Bool = true
+    @Binding var isCreatePlacePopupActive: Bool
 
     private let defaultCenter = CLLocationCoordinate2D(latitude: 39.5, longitude: -98.0)
     @State private var showCreatePlacePopup = false
@@ -125,6 +126,9 @@ struct MapView: View {
                     }
                     recenterMap = false
                 }
+            }
+            .onChange(of: showCreatePlacePopup) { oldValue, newValue in
+                isCreatePlacePopupActive = newValue
             }
             
             // Visible Places Button - only show when search is minimized
