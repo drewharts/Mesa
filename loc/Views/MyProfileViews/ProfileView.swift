@@ -63,6 +63,13 @@ struct ProfileView: View {
             } message: {
                 Text(deepLinkViewModel.noLocationAlertMessage)
             }
+            .sheet(isPresented: $profile.isShowingNoPlacesFound) {
+                TikTokNoPlacesFoundView(tikTokUrl: profile.noPlacesFoundTikTokUrl)
+                    .environmentObject(profile)
+                    .environmentObject(userSession)
+                    .environmentObject(placeVM)
+                    .presentationDragIndicator(.visible)
+            }
     }
     
     private var mainContent: some View {
@@ -219,6 +226,13 @@ struct SheetsModifier: ViewModifier {
                 TikTokPlaceSelectionView()
                     .environmentObject(profile)
                     .environmentObject(selectedPlaceVM)
+                    .environmentObject(placeVM)
+                    .presentationDragIndicator(.visible)
+            }
+            .sheet(isPresented: $profile.isShowingNoPlacesFound) {
+                TikTokNoPlacesFoundView(tikTokUrl: profile.noPlacesFoundTikTokUrl)
+                    .environmentObject(profile)
+                    .environmentObject(userSession)
                     .environmentObject(placeVM)
                     .presentationDragIndicator(.visible)
             }

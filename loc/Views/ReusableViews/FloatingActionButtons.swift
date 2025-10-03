@@ -38,11 +38,11 @@ struct FloatingActionButtons: View {
             }
         }) {
             Image(systemName: "magnifyingglass")
-                .foregroundColor(.blue)
+                .foregroundColor(.secondary)
                 .frame(width: 60, height: 60)
-                .background(Color.white)
+                .background(.ultraThinMaterial)
                 .clipShape(Circle())
-                .overlay(Circle().stroke(Color.gray, lineWidth: 2))
+                .overlay(Circle().stroke(Color.gray.opacity(0.3), lineWidth: 1))
                 .shadow(radius: 4)
         }
     }
@@ -55,17 +55,18 @@ struct FloatingActionButtons: View {
                 Image(uiImage: profilePhoto)
                     .resizable()
                     .frame(width: 60, height: 60)
+                    .background(.ultraThinMaterial)
                     .clipShape(Circle())
-                    .overlay(Circle().stroke(Color.gray, lineWidth: 2))
+                    .overlay(Circle().stroke(Color.gray.opacity(0.3), lineWidth: 1))
                     .shadow(radius: 4)
             } else {
                 Image(systemName: "person.crop.circle")
                     .resizable()
-                    .foregroundColor(.blue)
+                    .foregroundColor(.secondary)
                     .frame(width: 60, height: 60)
-                    .background(Color.white)
+                    .background(.ultraThinMaterial)
                     .clipShape(Circle())
-                    .overlay(Circle().stroke(Color.gray, lineWidth: 2))
+                    .overlay(Circle().stroke(Color.gray.opacity(0.3), lineWidth: 1))
                     .shadow(radius: 4)
             }
         }

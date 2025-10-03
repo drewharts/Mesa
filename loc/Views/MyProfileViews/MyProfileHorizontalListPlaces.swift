@@ -72,7 +72,6 @@ struct MyProfileHorizontalListPlaces: View {
         // Only update if there's a change to avoid unnecessary re-renders
         if newVisiblePlaceIds != visiblePlaceIds {
             visiblePlaceIds = newVisiblePlaceIds
-            print("🔍 [MyProfileHorizontalListPlaces] Updated visible places: \(visiblePlaceIds.count) visible out of \(places.count) loaded")
         }
     }
     
@@ -105,12 +104,10 @@ struct MyProfileHorizontalListPlaces: View {
         // Use paginated place IDs instead of all place IDs
         let placeIds = viewModel.getDisplayedPlaceIds(for: listId)
         let allPlaceIds = viewModel.userListsPlaces[listId.uuidString] ?? []
-        print("🔍 [MyProfileHorizontalListPlaces] List \(listId): All place IDs: \(allPlaceIds.count), Displayed: \(placeIds.count)")
         
         // If pagination hasn't loaded yet but we have places, show first 5
         if placeIds.isEmpty && !allPlaceIds.isEmpty {
             let firstFiveIds = Array(allPlaceIds.prefix(5))
-            print("🔍 [MyProfileHorizontalListPlaces] Pagination not ready, showing first 5 places: \(firstFiveIds.count)")
             return firstFiveIds.compactMap { detailPlaceViewModel.places[$0] }
         }
         
@@ -122,7 +119,6 @@ struct MyProfileHorizontalListPlaces: View {
         scrollDebounceTimer?.invalidate()
         scrollDebounceTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: false) { _ in
             if isNearEnd && viewModel.hasMorePlaces(for: listId) && !viewModel.isLoadingMorePlaces(for: listId) {
-                print("🔍 [MyProfileHorizontalListPlaces] Smart loading more places for list \(listId)")
                 viewModel.loadNextPageForList(listId: listId)
             }
         }
@@ -359,7 +355,6 @@ struct MyProfileHorizontalListPlaces: View {
         .onAppear {
             // Smart initialization: only initialize if needed
             let allPlaceIds = viewModel.userListsPlaces[listId.uuidString] ?? []
-            print("🔍 [MyProfileHorizontalListPlaces] Smart onAppear for list \(listId): \(allPlaceIds.count) total places")
             
             if !allPlaceIds.isEmpty && viewModel.getDisplayedPlaceIds(for: listId).isEmpty {
                 // Only initialize if we have places but haven't loaded any yet
