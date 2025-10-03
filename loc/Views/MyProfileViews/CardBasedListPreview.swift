@@ -1,48 +1,35 @@
+//
+//  CardBasedListPreview.swift
+//  loc
+//
+//  Created by Andrew Hartsfield II on 9/22/25.
+//
+
 import SwiftUI
 
-struct UserProfileListViewJustLists: View {
-    @ObservedObject var viewModel: UserProfileViewModel
-    var placeLists: [PlaceList]
-    @State private var placeColors: [UUID: Color] = [:]
-    @State private var selectedList: PlaceList?
-    @State private var showingPlacesPopup = false
-
-    var body: some View {
-        LazyVStack(spacing: 16) {
-            ForEach(placeLists.sorted(by: { $0.sortOrder < $1.sortOrder })) { list in
-                ExternalProfileListSection(
-                    list: list,
-                    viewModel: viewModel,
-                    placeColors: $placeColors,
-                    selectedList: $selectedList,
-                    showingPlacesPopup: $showingPlacesPopup
-                )
-            }
-        }
-        .sheet(isPresented: $showingPlacesPopup) {
-            if let list = selectedList {
-                UserProfileListPlacesPopupView(list: list, viewModel: viewModel, placeColors: $placeColors)
-            }
-        }
-    }
-}
-
-struct ExternalProfileListSection: View {
+struct CardBasedListPreview: View {
     let list: PlaceList
-    @ObservedObject var viewModel: UserProfileViewModel
+    let placeIds: [String]?
+    let detailPlaceViewModel: DetailPlaceViewModel
     @Binding var placeColors: [UUID: Color]
-    @Binding var selectedList: PlaceList?
-    @Binding var showingPlacesPopup: Bool
+    let isLoading: Bool
+    
+    @State private var showingListPopup = false
+    @EnvironmentObject var profile: ProfileViewModel
     
     // Get preview places (first 6 places for 2x3 grid)
     private var previewPlaces: [DetailPlace] {
-        guard let places = viewModel.placeListMapboxPlaces[list.id] else { return [] }
-        return Array(places.prefix(6))
+        guard let placeIds = placeIds, !placeIds.isEmpty else { return [] }
+        let previewPlaceIds = Array(placeIds.prefix(6))
+        return previewPlaceIds.compactMap { placeIdString in
+            guard let place = detailPlaceViewModel.places[placeIdString] else { return nil }
+            return place
+        }
     }
     
     // Get total place count for the list
     private var totalPlaceCount: Int {
-        return viewModel.placeListMapboxPlaces[list.id]?.count ?? 0
+        return placeIds?.count ?? 0
     }
     
     var body: some View {
@@ -66,15 +53,25 @@ struct ExternalProfileListSection: View {
             
             // Card with places grid
             Button(action: {
-                selectedList = list
-                showingPlacesPopup = true
+                showingListPopup = true
             }) {
                 VStack(spacing: 0) {
-                    if !previewPlaces.isEmpty {
+                    if isLoading {
+                        // Loading skeleton
+                        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
+                            ForEach(0..<6, id: \.self) { _ in
+                                Rectangle()
+                                    .fill(Color.gray.opacity(0.3))
+                                    .frame(height: 80)
+                                    .cornerRadius(8)
+                            }
+                        }
+                        .padding(16)
+                    } else if !previewPlaces.isEmpty {
                         // Places grid
                         LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
                             ForEach(previewPlaces, id: \.id) { place in
-                                ExternalPlacePreviewCard(place: place, placeColors: $placeColors)
+                                PlacePreviewCard(place: place, placeColors: $placeColors)
                             }
                             
                             // Fill remaining slots if less than 6 places
@@ -103,7 +100,7 @@ struct ExternalProfileListSection: View {
                                 .font(.subheadline)
                                 .foregroundColor(.gray)
                             
-                            Text("This user hasn't added any places to this list yet")
+                            Text("Add places to this list to see them here")
                                 .font(.caption)
                                 .foregroundColor(.gray.opacity(0.7))
                                 .multilineTextAlignment(.center)
@@ -124,20 +121,27 @@ struct ExternalProfileListSection: View {
             }
             .buttonStyle(PlainButtonStyle())
             .scaleEffect(1.0)
-            .animation(.easeInOut(duration: 0.1), value: showingPlacesPopup)
+            .animation(.easeInOut(duration: 0.1), value: showingListPopup)
         }
         .padding(.horizontal, 20)
+        .sheet(isPresented: $showingListPopup) {
+            let lists = profile.userLists
+            let initialIndex = lists.firstIndex(where: { $0.id == list.id }) ?? 0
+            SwipeableListPopupView(
+                lists: lists,
+                initialListIndex: initialIndex,
+                placeColors: $placeColors
+            )
+        }
     }
 }
 
-struct ExternalPlacePreviewCard: View {
+struct PlacePreviewCard: View {
     let place: DetailPlace
     @Binding var placeColors: [UUID: Color]
     
+    @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
-    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
-    @EnvironmentObject var userProfileViewModel: UserProfileViewModel
-    @Environment(\.presentationMode) var presentationMode
     
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -147,10 +151,10 @@ struct ExternalPlacePreviewCard: View {
                 .frame(height: 80)
                 .overlay(
                     Group {
-                        // Image loading matching new card styling
-                        if let firstTikTokThumbnail = getFirstTikTokThumbnail(for: place) {
+                        // Image loading matching popup view implementation
+                        if let thumbnailURL = getFirstTikTokThumbnail(for: place) {
                             // Show TikTok thumbnail
-                            AsyncImage(url: URL(string: firstTikTokThumbnail)) { image in
+                            AsyncImage(url: URL(string: thumbnailURL)) { image in
                                 image
                                     .resizable()
                                     .aspectRatio(contentMode: .fill)
@@ -174,7 +178,7 @@ struct ExternalPlacePreviewCard: View {
                                 .foregroundColor(detailPlaceViewModel.colorForPlace(placeId: place.id.uuidString))
                                 .frame(width: .infinity, height: 80)
                                 .onAppear {
-                                    detailPlaceViewModel.fetchPlaceImage(for: place.id.uuidString)
+                                    profile.loadPlaceImageWithFallback(for: place)
                                 }
                         }
                     }
@@ -224,18 +228,6 @@ struct ExternalPlacePreviewCard: View {
                 .stroke(Color.gray.opacity(0.1), lineWidth: 0.5)
         )
         .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
-        .onTapGesture {
-            selectedPlaceVM.selectedPlace = place
-            selectedPlaceVM.isDetailSheetPresented = true
-            
-            // Dismiss the user profile sheet properly
-            userProfileViewModel.isUserDetailPresented = false
-            
-            // Also call presentationMode dismiss as backup
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                presentationMode.wrappedValue.dismiss()
-            }
-        }
     }
     
     private func getFirstTikTokThumbnail(for place: DetailPlace) -> String? {
@@ -246,8 +238,18 @@ struct ExternalPlacePreviewCard: View {
             return firstVideo.thumbnailURL
         }
         
-        // For external users, we don't have access to their TikTok videos
-        // This would need to be implemented if we want to show external user's TikTok videos
+        // Check user's TikTok videos for this place (matching popup view implementation)
+        let userTikTokVideos = profile.getTikTokVideos(for: place.id.uuidString)
+        return userTikTokVideos.first?.thumbnailURL
+    }
+    
+    private func getFirstPhotoUrl(for place: DetailPlace) -> String? {
+        if let photoUrls = place.photoUrls,
+           let firstPhoto = photoUrls.first,
+           !firstPhoto.isEmpty {
+            return firstPhoto
+        }
         return nil
     }
 }
+

@@ -15,11 +15,6 @@ struct ListHeaderView: View {
     var body: some View {
         VStack(spacing: 16) {
             HStack {
-                Text("LISTS")
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                    .foregroundStyle(.black)
-                
                 Spacer()
                 
                 HStack(spacing: 12) {

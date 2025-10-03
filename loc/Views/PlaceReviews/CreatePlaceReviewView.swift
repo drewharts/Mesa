@@ -15,6 +15,7 @@ struct CreatePlaceReviewView: View {
     @EnvironmentObject var selectedPlace: SelectedPlaceViewModel
     @State private var showButtonHighlight = false
     @State private var showAlert = false
+    @State private var showSuccessAlert = false
     @State private var alertMessage = ""
     @State private var reviewType = ReviewType.restaurant
     
@@ -56,6 +57,9 @@ struct CreatePlaceReviewView: View {
     }
     
     var btnBack : some View { Button(action: {
+        // Don't allow dismissal while submitting
+        guard !viewModel.isLoading else { return }
+        
         // Close the review screen
         isPresented = false
         }) {
@@ -65,6 +69,7 @@ struct CreatePlaceReviewView: View {
                 .foregroundColor(.black)
             }
         }
+        .disabled(viewModel.isLoading)
     }
 
     var body: some View {
@@ -113,7 +118,7 @@ struct CreatePlaceReviewView: View {
                         .padding(.bottom, 15)
                         .padding(.horizontal, -10)
 
-                    PostReviewButtonView(highlighted: $showButtonHighlight) {
+                    PostReviewButtonView(highlighted: $showButtonHighlight, isLoading: $viewModel.isLoading) {
                         // 1. Immediately highlight the button
                         showButtonHighlight = true
                         
@@ -135,8 +140,8 @@ struct CreatePlaceReviewView: View {
                                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                                     showButtonHighlight = false
                                     
-                                    // Let the parent handle dismissal via binding
-                                    onReviewSubmitted?(place)
+                                    // Show success alert
+                                    showSuccessAlert = true
                                 }
                                 
                             case .failure(let error):
@@ -157,6 +162,15 @@ struct CreatePlaceReviewView: View {
                             message: Text(alertMessage),
                             dismissButton: .default(Text("OK"))
                         )
+                    }
+                    .alert("Review Posted!", isPresented: $showSuccessAlert) {
+                        Button("OK") {
+                            // Dismiss the review screen and call the callback
+                            isPresented = false
+                            onReviewSubmitted?(place)
+                        }
+                    } message: {
+                        Text("Your review has been successfully posted!")
                     }
                 }
                 .padding(.horizontal, 40)

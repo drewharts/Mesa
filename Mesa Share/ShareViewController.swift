@@ -10,19 +10,17 @@ import Social
 import MobileCoreServices
 import UniformTypeIdentifiers
 
-class ShareViewController: SLComposeServiceViewController {
+class ShareViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
         print("🔍 MesaShare: viewDidLoad called")
+        
+        // Process the shared content immediately without showing UI
+        processSharedContent()
     }
-
-    override func isContentValid() -> Bool {
-        print("🔍 MesaShare: isContentValid called")
-        return true
-    }
-
-    override func didSelectPost() {
+    
+    private func processSharedContent() {
         print("🔍 MesaShare: didSelectPost called")
         // Process the shared content
         if let item = extensionContext?.inputItems.first as? NSExtensionItem {
@@ -87,10 +85,6 @@ class ShareViewController: SLComposeServiceViewController {
         
         // If no URL found, just complete
         completeRequest()
-    }
-
-    override func configurationItems() -> [Any]! {
-        return []
     }
     
     private func handleTikTokURL(_ url: URL) {

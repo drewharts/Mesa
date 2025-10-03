@@ -21,7 +21,6 @@ struct LoginViewPreview: View {
                 
                 // Google Sign In Button
                 Button(action: {
-                    print("Google Sign In tapped")
                 }, label: {
                     Image("ios_light_sq_SI")
                         .resizable()

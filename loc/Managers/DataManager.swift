@@ -148,11 +148,9 @@ class DataManager: ObservableObject {
     
     // Load user's external places (TikTok-sourced places)
     func loadUserExternalPlaces(userId: String) async {
-        print("🔍 [DataManager] Loading external places for user: \(userId)")
         do {
             let externalPlaces = try await userService.fetchUserExternalPlaces(userId: userId)
             profileViewModel.userExternalPlaces = externalPlaces
-            print("✅ [DataManager] Successfully loaded \(externalPlaces.count) external places")
             
             // Note: DetailPlace objects will be loaded via pagination when TikTok tab is accessed
             
@@ -297,7 +295,6 @@ class DataManager: ObservableObject {
             return
         }
         
-        print("🔍 [DataManager] loadPlacesForList: Loading \(list.places.count) places for list '\(list.name)'")
         
         // Process places in batches for better performance
         let batchSize = 10
@@ -329,7 +326,6 @@ class DataManager: ObservableObject {
             try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
         }
         
-        print("✅ [DataManager] loadPlacesForList: Successfully loaded \(loadedPlaceIds.count) places for list \(listId)")
     }
 
     func processPlacesInList(list: PlaceList, userId: String) async {
@@ -446,10 +442,22 @@ class DataManager: ObservableObject {
             async let genericReviews: [GenericReview] = try await reviewService.fetchUserReviews(userId: userId)
             
             let allReviews: [ReviewProtocol] = (try await restaurantReviews) + (try await genericReviews)
-            
+
+            // Sort reviews by timestamp (most recent first) and get unique place IDs while preserving order
+            let sortedReviews = allReviews.sorted { $0.timestamp > $1.timestamp }
+
+            // Get unique place IDs while preserving the order of most recently reviewed places
+            var seenPlaceIds = Set<String>()
+            let placeIds: [String] = sortedReviews.compactMap { review in
+                if seenPlaceIds.contains(review.placeId) {
+                    return nil
+                }
+                seenPlaceIds.insert(review.placeId)
+                return review.placeId
+            }
+
             // Process place details in batches
             let batchSize = 10
-            let placeIds = Array(Set(allReviews.map { $0.placeId }))
             
             for batch in placeIds.chunked(into: batchSize) {
                 await withTaskGroup(of: Void.self) { group in

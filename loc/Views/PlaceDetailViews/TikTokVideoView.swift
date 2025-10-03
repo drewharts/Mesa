@@ -10,9 +10,16 @@ import SwiftUI
 struct TikTokVideoView: View {
     @StateObject private var viewModel: TikTokVideoViewModel
     @State private var refreshAttempted: Bool = false
-    
-    init(tikTokVideo: TikTokVideo) {
+    @State private var isPressed: Bool = false
+
+    // Optional place for navigation instead of opening video
+    let associatedPlace: DetailPlace?
+    let onNavigateToPlace: ((DetailPlace) -> Void)?
+
+    init(tikTokVideo: TikTokVideo, associatedPlace: DetailPlace? = nil, onNavigateToPlace: ((DetailPlace) -> Void)? = nil) {
         _viewModel = StateObject(wrappedValue: TikTokVideoViewModel(tikTokVideo: tikTokVideo))
+        self.associatedPlace = associatedPlace
+        self.onNavigateToPlace = onNavigateToPlace
     }
     
     var body: some View {
@@ -35,9 +42,12 @@ struct TikTokVideoView: View {
     }
     
     private var videoThumbnailButton: some View {
-        Button(action: {
-            viewModel.openVideo()
-        }) {
+        ZStack {
+            // Background that matches the tap area
+            Color(isPressed ? .systemGray4 : .systemGray6)
+                .cornerRadius(12)
+
+            // Image content
             CustomImageLoader(
                 urlString: viewModel.tikTokVideo.thumbnailURL,
                 contentMode: .fill,
@@ -53,11 +63,33 @@ struct TikTokVideoView: View {
                 }
             )
             .id("\(viewModel.tikTokVideo.thumbnailURL)_\(viewModel.tikTokVideo.id)")
+            .opacity(isPressed ? 0.7 : 1.0)
+            .scaleEffect(isPressed ? 0.95 : 1.0)
         }
-        .buttonStyle(PlainButtonStyle())
-        .padding(16)
-        .background(Color(.systemGray6))
-        .cornerRadius(12)
+        .frame(width: 192, height: 192) // Match the visual size
+        .contentShape(Rectangle()) // Make the entire frame tappable
+        .gesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { _ in
+                    if !isPressed {
+                        withAnimation(.easeInOut(duration: 0.1)) {
+                            isPressed = true
+                        }
+                    }
+                }
+                .onEnded { _ in
+                    withAnimation(.easeInOut(duration: 0.1)) {
+                        isPressed = false
+                    }
+
+                    // If we have an associated place, navigate to it instead of opening video
+                    if let place = associatedPlace, let onNavigate = onNavigateToPlace {
+                        onNavigate(place)
+                    } else {
+                        viewModel.openVideo()
+                    }
+                }
+        )
     }
     
     private var authorInfoSection: some View {

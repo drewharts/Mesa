@@ -194,11 +194,26 @@ class DeepLinkManager: ObservableObject {
             print("🏙️ City: \(detailPlace.city ?? "No city")")
             print("📌 Coordinates: (\(detailPlace.coordinate?.latitude ?? 0), \(detailPlace.coordinate?.longitude ?? 0))")
             print("🆔 Place ID: \(detailPlace.id)")
-            
+
+            // Check if the place has valid location data
+            let hasValidLocation = detailPlace.coordinate?.latitude != 0.0 &&
+                                   detailPlace.coordinate?.longitude != 0.0 &&
+                                   detailPlace.coordinate?.latitude != nil &&
+                                   detailPlace.coordinate?.longitude != nil
+
+            if !hasValidLocation {
+                print("❌ [DeepLinkManager] Place has invalid location data (coordinates: \(detailPlace.coordinate?.latitude ?? 0), \(detailPlace.coordinate?.longitude ?? 0))")
+                await MainActor.run {
+                    let message = "We couldn't find a valid location for this video. The video may not be associated with a specific place."
+                    self.onNoLocationFound?(message)
+                }
+                return
+            }
+
             // NOTE: Place saving is handled by backend during URL processing
             // Frontend only displays the place, does not save to Firestore
             print("✅ [DeepLinkManager] Place processed, navigating to details")
-            
+
             await navigateToPlace(detailPlace)
             } else {
                 // Multiple places - let ProfileViewModel handle the selection

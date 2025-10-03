@@ -31,7 +31,7 @@ struct UserProfileActivityView: View {
     var body: some View {
         VStack(spacing: 20) {
             VStack(alignment: .leading, spacing: 16) {
-                if UserProfileVM.isLoadingReviewedPlaces || (UserProfileVM.getReviewedPlaces().isEmpty && !UserProfileVM.isLoadingReviewedPlaces) {
+                if UserProfileVM.isLoadingReviewedPlaces {
                     VStack {
                         ProgressView()
                             .scaleEffect(1.2)
@@ -79,11 +79,22 @@ struct UserProfileActivityView: View {
                         }
                     }
                 } else {
-                    Text("No places reviewed yet")
-                        .foregroundColor(.gray)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.leading, 20)
-                        .padding(.vertical, 30)
+                    VStack(spacing: 12) {
+                        Image(systemName: "star.slash")
+                            .font(.system(size: 40))
+                            .foregroundColor(.gray.opacity(0.6))
+                        
+                        Text("No Reviews Yet")
+                            .font(.headline)
+                            .foregroundColor(.gray)
+                        
+                        Text("This user hasn't reviewed any places yet")
+                            .font(.caption)
+                            .foregroundColor(.gray.opacity(0.8))
+                            .multilineTextAlignment(.center)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 50)
                 }
             }
             
@@ -97,12 +108,6 @@ struct UserProfileActivityView: View {
             // Reset loading state when user changes and load new data
             UserProfileVM.resetReviewedPlacesLoadingState()
             UserProfileVM.loadUserReviewedPlacesWithPagination()
-        }
-        .onChange(of: detailPlaceViewModel.placeSavers) {
-            // Stop loading when new data comes in
-            if UserProfileVM.isLoadingReviewedPlaces {
-                UserProfileVM.isLoadingReviewedPlaces = false
-            }
         }
     }
 } 

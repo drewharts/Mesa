@@ -47,6 +47,13 @@ struct MainView: View {
                     .environmentObject(detailPlaceViewModel)
                     .presentationDragIndicator(.visible)
             }
+            .sheet(isPresented: $profileViewModel.isShowingNoPlacesFound) {
+                TikTokNoPlacesFoundView(tikTokUrl: profileViewModel.noPlacesFoundTikTokUrl)
+                    .environmentObject(profileViewModel)
+                    .environmentObject(userSession)
+                    .environmentObject(detailPlaceViewModel)
+                    .presentationDragIndicator(.visible)
+            }
             .navigationDestination(isPresented: $shouldNavigateToProfile) {
                 ProfileView()
                     .environmentObject(userProfileViewModel)
@@ -95,7 +102,7 @@ struct MainView: View {
     
     // MARK: - Map Layer
     private var mapLayer: some View {
-        MapView(recenterMap: $recenterMap, onMapTap: {
+        MapView(recenterMap: $recenterMap, isSearchBarMinimized: isSearchBarMinimized, onMapTap: {
             withAnimation {
                 isSearchBarMinimized = true
                 searchIsFocused = false
@@ -137,10 +144,11 @@ struct MainView: View {
                     recenterMap = true
                 }) {
                     Image(systemName: "location.fill")
-                        .foregroundColor(.white)
+                        .foregroundColor(.secondary)
                         .frame(width: 36, height: 36)
-                        .background(Color.blue)
+                        .background(.ultraThinMaterial)
                         .clipShape(Circle())
+                        .overlay(Circle().stroke(Color.gray.opacity(0.3), lineWidth: 1))
                         .shadow(radius: 4)
                 }
                 .padding(.top, 10)
