@@ -32,7 +32,7 @@ struct PlaceActionButton: View {
     
     enum ActionType: CaseIterable {
         case favorite, share, addToList, addReview
-        
+
         var icon: String {
             switch self {
             case .favorite: return "star"
@@ -41,7 +41,16 @@ struct PlaceActionButton: View {
             case .addReview: return "plus"
             }
         }
-        
+
+        func iconName(isFavorited: Bool, isInList: Bool) -> String {
+            switch self {
+            case .favorite: return isFavorited ? "star.fill" : "star"
+            case .share: return "square.and.arrow.up"
+            case .addToList: return isInList ? "bookmark.fill" : "bookmark"
+            case .addReview: return "plus"
+            }
+        }
+
         var color: Color {
             switch self {
             case .favorite: return .gray
@@ -50,7 +59,16 @@ struct PlaceActionButton: View {
             case .addReview: return .gray
             }
         }
-        
+
+        func iconColor(isFavorited: Bool, isInList: Bool, isSelected: Bool) -> Color {
+            switch self {
+            case .favorite: return isFavorited ? .yellow : .gray
+            case .share: return .gray
+            case .addToList: return isInList ? .blue : .gray
+            case .addReview: return .gray
+            }
+        }
+
         var title: String {
             switch self {
             case .favorite: return "Favorite"
@@ -86,7 +104,9 @@ struct PlaceActionButton: View {
                                         onTap: {
                                             performAction(action)
                                             collapseMenu()
-                                        }
+                                        },
+                                        isFavorited: action == .favorite ? profile.isPlaceFavorite(placeId: place.id.uuidString) : false,
+                                        isInList: action == .addToList ? profile.isPlaceInAnyList(placeId: place.id.uuidString) : false
                                     )
                                 }
                             }
@@ -210,14 +230,19 @@ struct ActionButton: View {
     let action: PlaceActionButton.ActionType
     let isSelected: Bool
     let onTap: () -> Void
-    
+    let isFavorited: Bool
+    let isInList: Bool
+
     var body: some View {
         Button(action: onTap) {
-            Image(systemName: action.icon)
+            let iconName = action.iconName(isFavorited: isFavorited, isInList: isInList)
+            let iconColor = action.iconColor(isFavorited: isFavorited, isInList: isInList, isSelected: isSelected)
+
+            Image(systemName: iconName)
                 .font(.title3)
-                .foregroundColor(isSelected ? .white : action.color)
+                .foregroundColor(isSelected ? .white : iconColor)
                 .frame(width: isSelected ? 36 : 44, height: isSelected ? 36 : 44)
-                .background(isSelected ? action.color : Color.clear)
+                .background(isSelected ? iconColor : Color.clear)
                 .clipShape(Circle())
         }
         .buttonStyle(PlainButtonStyle())
