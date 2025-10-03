@@ -15,7 +15,8 @@ struct MapView: View {
     @EnvironmentObject var placeTypeFilterVM: PlaceTypeFilterViewModel
     
     @Binding var recenterMap: Bool
-    
+    var isSearchBarMinimized: Bool = true
+
     private let defaultCenter = CLLocationCoordinate2D(latitude: 39.5, longitude: -98.0)
     @State private var showCreatePlacePopup = false
     @State private var newPlaceName = ""
@@ -36,7 +37,6 @@ struct MapView: View {
                 Map(position: $mapPosition) {
                     ForEach(placeTypeFilterVM.getFilteredPlaces().compactMap { place -> PlaceAnnotationItem? in
                         guard let coordinate = place.coordinate else {
-                            print("⚠️ [MapView] Place '\(place.name)' has no coordinate, skipping annotation")
                             return nil
                         }
                         return PlaceAnnotationItem(
@@ -56,7 +56,6 @@ struct MapView: View {
                                 annotationImage: detailPlaceVM.placeAnnotations[place.place.id.uuidString]
                             )
                             .onTapGesture {
-                                print("Place ID: \(place.place.id.uuidString)")
                                 selectedPlaceVM.selectedPlace = place.place
                             }
                         }
@@ -128,60 +127,33 @@ struct MapView: View {
                 }
             }
             
-            // Visible Places Button
-            VStack {
-                HStack {
-                    Button(action: {
-                        showVisiblePlacesPopup = true
-                    }) {
-                        HStack(spacing: 6) {
-                            Image(systemName: "map")
-                                .font(.system(size: 14, weight: .medium))
-                            Text("View")
-                                .font(.system(size: 14, weight: .medium))
+            // Visible Places Button - only show when search is minimized
+            if isSearchBarMinimized {
+                VStack {
+                    HStack {
+                        Button(action: {
+                            showVisiblePlacesPopup = true
+                        }) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "map")
+                                    .font(.system(size: 14, weight: .medium))
+                                Text("View")
+                                    .font(.system(size: 14, weight: .medium))
+                            }
+                            .foregroundColor(.secondary)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(.ultraThinMaterial)
+                            .clipShape(RoundedRectangle(cornerRadius: 20))
+                            .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.gray.opacity(0.3), lineWidth: 1))
+                            .shadow(radius: 4)
                         }
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .background(
-                            RoundedRectangle(cornerRadius: 20)
-                                .fill(Color.blue)
-                                .shadow(color: .black.opacity(0.2), radius: 3, x: 0, y: 1)
-                        )
+                        .padding(.leading, 20)
+                        .padding(.top, 70) // Position below top safe area
+                        Spacer()
                     }
-                    .padding(.leading, 20)
-                    .padding(.top, 60) // Position below top safe area
                     Spacer()
                 }
-                Spacer()
-            }
-            .onAppear {
-                // Set initial position when the view appears
-                if let place = selectedPlaceVM.selectedPlace, let geoPoint = place.coordinate {
-                    let newCenter = CLLocationCoordinate2D(latitude: geoPoint.latitude, longitude: geoPoint.longitude)
-                    let camera = MapCamera(centerCoordinate: newCenter, distance: 500)
-                    mapPosition = .camera(camera)
-                } else {
-                    let camera = MapCamera(centerCoordinate: currentCoords, distance: 1000)
-                    mapPosition = .camera(camera)
-                }
-                
-                // Setup notification observer for place updates
-                setupNotificationObservers()
-            }
-             .onDisappear {
-                 // Remove notification observers
-                 removeNotificationObservers()
-             }
-            .task {
-                // Refresh places whenever the view appears
-                await profile.refreshUserPlaces()
-                
-                // Calculate annotation images
-                detailPlaceVM.calculateAnnotationPlaces()
-                
-                // Calculate most frequent types
-                placeTypeFilterVM.refreshMostFrequentTypes()
             }
             
             // Show the create place popup if needed
@@ -208,6 +180,35 @@ struct MapView: View {
                 .frame(maxWidth: 400)
                 .zIndex(2)
             }
+        }
+        .onAppear {
+            // Set initial position when the view appears
+            if let place = selectedPlaceVM.selectedPlace, let geoPoint = place.coordinate {
+                let newCenter = CLLocationCoordinate2D(latitude: geoPoint.latitude, longitude: geoPoint.longitude)
+                let camera = MapCamera(centerCoordinate: newCenter, distance: 500)
+                mapPosition = .camera(camera)
+            } else {
+                // Default to current location or center of US
+                let coords = locationManager.currentLocation?.coordinate ?? defaultCenter
+                mapPosition = .camera(MapCamera(centerCoordinate: coords, distance: 10000))
+            }
+
+            // Setup notification observers
+            setupNotificationObservers()
+        }
+         .onDisappear {
+             // Remove notification observers
+             removeNotificationObservers()
+         }
+        .task {
+            // Refresh places whenever the view appears
+            await profile.refreshUserPlaces()
+
+            // Calculate annotation images
+            detailPlaceVM.calculateAnnotationPlaces()
+
+            // Calculate most frequent types
+            placeTypeFilterVM.refreshMostFrequentTypes()
         }
         .sheet(isPresented: $showVisiblePlacesPopup) {
             VisiblePlacesPopupView(mapRegion: currentMapRegion)

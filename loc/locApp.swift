@@ -64,15 +64,21 @@ struct locApp: App {
             detailPlaceViewModel: detailVM
         )
         
+        let deepLinkVM = DeepLinkViewModel(
+            deepLinkManager: deepLinkMgr,
+            selectedPlaceViewModel: selectedPlaceVM
+        )
+
         let profileVM = ProfileViewModel(
-            userSession: userSess, 
-            userService: services.userService, 
-            detailPlaceViewModel: detailVM, 
-            imageService: services.imageService, 
-            placeService: services.placeService, 
+            userSession: userSess,
+            userService: services.userService,
+            detailPlaceViewModel: detailVM,
+            imageService: services.imageService,
+            placeService: services.placeService,
             reviewService: services.reviewService,
             locationManager: location,
-            deepLinkManager: deepLinkMgr
+            deepLinkManager: deepLinkMgr,
+            deepLinkViewModel: deepLinkVM
         )
         
         let dataMgr = DataManager(
@@ -101,11 +107,6 @@ struct locApp: App {
         let searchVM = SearchViewModel(
             placeService: services.placeService,
             userService: services.userService
-        )
-        
-        let deepLinkVM = DeepLinkViewModel(
-            deepLinkManager: deepLinkMgr,
-            selectedPlaceViewModel: selectedPlaceVM
         )
         
         let placeTypeFilterVM = PlaceTypeFilterViewModel(

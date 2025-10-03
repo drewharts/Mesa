@@ -8,6 +8,21 @@ import SwiftUI
 import FirebaseAuth
 import UIKit
 
+// Debug logging flag - set to true for verbose logging, false for production
+private let DEBUG_LOGGING = {
+    #if DEBUG
+        return true
+    #else
+        return false
+    #endif
+}()
+
+func debugLog(_ message: String) {
+    if DEBUG_LOGGING {
+        print(message)
+    }
+}
+
 @MainActor
 class TikTokVideoViewModel: ObservableObject {
     @Published var tikTokVideo: TikTokVideo
@@ -152,19 +167,13 @@ class TikTokVideoViewModel: ObservableObject {
     func refreshThumbnail() async {
         // Prevent multiple simultaneous refresh attempts
         guard !isRefreshing && !hasAttemptedRefresh else { 
-            print("⚠️ [TikTokVideoViewModel] Refresh blocked - isRefreshing: \(isRefreshing), hasAttemptedRefresh: \(hasAttemptedRefresh)")
             return 
         }
         
-        print("🔄 [TikTokVideoViewModel] Starting refresh process for video: \(tikTokVideo.videoID)")
-        print("🔄 [TikTokVideoViewModel] Current thumbnail URL: \(tikTokVideo.thumbnailURL)")
-        
         isRefreshing = true
         hasAttemptedRefresh = true
-        
+
         let userId = Auth.auth().currentUser?.uid
-        print("🔄 [TikTokVideoViewModel] User ID: \(userId ?? "nil")")
-        print("🔄 [TikTokVideoViewModel] Video URL to refresh: \(tikTokVideo.url)")
         
         let result = await tikTokService.refreshTikTokThumbnail(for: tikTokVideo.url, userId: userId)
         
@@ -176,19 +185,11 @@ class TikTokVideoViewModel: ObservableObject {
         }
         
         isRefreshing = false
-        print("🔄 [TikTokVideoViewModel] Refresh process completed. isRefreshing: \(isRefreshing)")
     }
     
     private func handleSuccessfulThumbnailRefresh(_ newThumbnailURL: String) async {
-        print("✅ [TikTokVideoViewModel] SUCCESS: Received new thumbnail URL: \(newThumbnailURL)")
-        print("✅ [TikTokVideoViewModel] Old thumbnail URL was: \(tikTokVideo.thumbnailURL)")
-        
         await testThumbnailURL(newThumbnailURL)
         updateTikTokVideoWithNewThumbnail(newThumbnailURL)
-        
-        print("✅ [TikTokVideoViewModel] Updated tikTokVideo.thumbnailURL to: \(tikTokVideo.thumbnailURL)")
-        print("✅ [TikTokVideoViewModel] thumbnailLoadError set to: \(thumbnailLoadError)")
-        print("✅ [TikTokVideoViewModel] Replaced entire tikTokVideo struct to trigger @Published updates")
     }
     
     private func updateTikTokVideoWithNewThumbnail(_ newThumbnailURL: String) {
@@ -210,43 +211,26 @@ class TikTokVideoViewModel: ObservableObject {
     }
     
     private func handleThumbnailRefreshError(_ error: Error) {
-        print("❌ [TikTokVideoViewModel] FAILURE: \(error.localizedDescription)")
-        if let nsError = error as NSError? {
-            print("❌ [TikTokVideoViewModel] Error domain: \(nsError.domain)")
-            print("❌ [TikTokVideoViewModel] Error code: \(nsError.code)")
-            print("❌ [TikTokVideoViewModel] Error userInfo: \(nsError.userInfo)")
-        }
+        debugLog("❌ [TikTokVideoViewModel] Thumbnail refresh failed: \(error.localizedDescription)")
     }
 
     private func testThumbnailURL(_ urlString: String) async {
-        print("🧪 [TikTokVideoViewModel] Testing thumbnail URL accessibility: \(urlString)")
-        
         guard let url = URL(string: urlString) else {
-            print("❌ [TikTokVideoViewModel] Invalid URL format: \(urlString)")
             return
         }
-        
+
         do {
-            let (data, response) = try await URLSession.shared.data(from: url)
-            
-            if let httpResponse = response as? HTTPURLResponse {
-                print("🧪 [TikTokVideoViewModel] Thumbnail URL test - Status: \(httpResponse.statusCode)")
-                print("🧪 [TikTokVideoViewModel] Thumbnail URL test - Content-Type: \(httpResponse.allHeaderFields["Content-Type"] ?? "unknown")")
-                print("🧪 [TikTokVideoViewModel] Thumbnail URL test - Content-Length: \(data.count) bytes")
-                
-                if httpResponse.statusCode == 200 {
-                    print("✅ [TikTokVideoViewModel] Thumbnail URL is accessible!")
-                } else {
-                    print("❌ [TikTokVideoViewModel] Thumbnail URL returned status: \(httpResponse.statusCode)")
-                }
+            let (_, response) = try await URLSession.shared.data(from: url)
+
+            if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode != 200 {
+                debugLog("❌ [TikTokVideoViewModel] Thumbnail URL returned status: \(httpResponse.statusCode)")
             }
         } catch {
-            print("❌ [TikTokVideoViewModel] Failed to test thumbnail URL: \(error.localizedDescription)")
+            // URL test failed, but this is not critical - continue silently
         }
     }
     
     func resetRefreshState() {
-        print("🔄 [TikTokVideoViewModel] Resetting refresh state")
         hasAttemptedRefresh = false
         thumbnailLoadError = false
     }

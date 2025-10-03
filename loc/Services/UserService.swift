@@ -496,6 +496,210 @@ class UserService: ObservableObject {
         }
     }
 
+    // MARK: - Place Notes
+    
+    /// Save or update a place note for a user
+    func savePlaceNote(userId: String, placeNote: PlaceNote, completion: @escaping (Bool, Error?) -> Void) {
+        do {
+            try db.collection("users")
+                .document(userId)
+                .collection("placeNotes")
+                .document(placeNote.id)
+                .setData(from: placeNote) { error in
+                    if let error = error {
+                        print("Error saving place note: \(error.localizedDescription)")
+                        completion(false, error)
+                    } else {
+                        print("Place note successfully saved")
+                        completion(true, nil)
+                    }
+                }
+        } catch {
+            print("Error encoding place note: \(error.localizedDescription)")
+            completion(false, error)
+        }
+    }
+    
+    /// Fetch place note for a specific place and user
+    func fetchPlaceNote(userId: String, placeId: String, completion: @escaping (PlaceNote?) -> Void) {
+        db.collection("users")
+            .document(userId)
+            .collection("placeNotes")
+            .whereField("placeId", isEqualTo: placeId)
+            .limit(to: 1)
+            .getDocuments { snapshot, error in
+                if let error = error {
+                    print("Error fetching place note: \(error.localizedDescription)")
+                    completion(nil)
+                    return
+                }
+                
+                guard let document = snapshot?.documents.first else {
+                    completion(nil)
+                    return
+                }
+                
+                do {
+                    let placeNote = try document.data(as: PlaceNote.self)
+                    completion(placeNote)
+                } catch {
+                    print("Error decoding place note: \(error.localizedDescription)")
+                    completion(nil)
+                }
+            }
+    }
+    
+    /// Delete a place note
+    func deletePlaceNote(userId: String, placeNoteId: String, completion: @escaping (Bool, Error?) -> Void) {
+        db.collection("users")
+            .document(userId)
+            .collection("placeNotes")
+            .document(placeNoteId)
+            .delete { error in
+                if let error = error {
+                    print("Error deleting place note: \(error.localizedDescription)")
+                    completion(false, error)
+                } else {
+                    print("Place note successfully deleted")
+                    completion(true, nil)
+                }
+            }
+    }
+    
+    /// Fetch all place notes for a user
+    func fetchAllPlaceNotes(userId: String, completion: @escaping ([PlaceNote]) -> Void) {
+        db.collection("users")
+            .document(userId)
+            .collection("placeNotes")
+            .order(by: "updatedAt", descending: true)
+            .getDocuments { snapshot, error in
+                if let error = error {
+                    print("Error fetching place notes: \(error.localizedDescription)")
+                    completion([])
+                    return
+                }
+                
+                let placeNotes = snapshot?.documents.compactMap { document in
+                    try? document.data(as: PlaceNote.self)
+                } ?? []
+                
+                completion(placeNotes)
+            }
+    }
+    
+    // MARK: - TikTok Place Flagging
+    
+    /// Save a TikTok place flag
+    func saveTikTokPlaceFlag(flag: TikTokPlaceFlag, completion: @escaping (Bool, Error?) -> Void) {
+        do {
+            try db.collection("users")
+                .document(flag.userId)
+                .collection("tikTokPlaceFlags")
+                .document(flag.id)
+                .setData(from: flag) { error in
+                    if let error = error {
+                        print("Error saving TikTok place flag: \(error.localizedDescription)")
+                        completion(false, error)
+                    } else {
+                        print("TikTok place flag successfully saved")
+                        completion(true, nil)
+                    }
+                }
+        } catch {
+            print("Error encoding TikTok place flag: \(error.localizedDescription)")
+            completion(false, error)
+        }
+    }
+    
+    /// Fetch TikTok place flags for a user
+    func fetchTikTokPlaceFlags(userId: String, completion: @escaping ([TikTokPlaceFlag]) -> Void) {
+        db.collection("users")
+            .document(userId)
+            .collection("tikTokPlaceFlags")
+            .order(by: "createdAt", descending: true)
+            .getDocuments { snapshot, error in
+                if let error = error {
+                    print("Error fetching TikTok place flags: \(error.localizedDescription)")
+                    completion([])
+                    return
+                }
+                
+                let flags = snapshot?.documents.compactMap { document in
+                    try? document.data(as: TikTokPlaceFlag.self)
+                } ?? []
+                
+                completion(flags)
+            }
+    }
+    
+    /// Check if a user has flagged a specific place
+    func hasUserFlaggedPlace(userId: String, placeId: String, completion: @escaping (TikTokPlaceFlag?) -> Void) {
+        db.collection("users")
+            .document(userId)
+            .collection("tikTokPlaceFlags")
+            .whereField("placeId", isEqualTo: placeId)
+            .limit(to: 1)
+            .getDocuments { snapshot, error in
+                if let error = error {
+                    print("Error checking place flag: \(error.localizedDescription)")
+                    completion(nil)
+                    return
+                }
+                
+                guard let document = snapshot?.documents.first else {
+                    completion(nil)
+                    return
+                }
+                
+                do {
+                    let flag = try document.data(as: TikTokPlaceFlag.self)
+                    completion(flag)
+                } catch {
+                    print("Error decoding TikTok place flag: \(error.localizedDescription)")
+                    completion(nil)
+                }
+            }
+    }
+    
+    /// Delete a TikTok place flag
+    func deleteTikTokPlaceFlag(userId: String, flagId: String, completion: @escaping (Bool, Error?) -> Void) {
+        db.collection("users")
+            .document(userId)
+            .collection("tikTokPlaceFlags")
+            .document(flagId)
+            .delete { error in
+                if let error = error {
+                    print("Error deleting TikTok place flag: \(error.localizedDescription)")
+                    completion(false, error)
+                } else {
+                    print("TikTok place flag successfully deleted")
+                    completion(true, nil)
+                }
+            }
+    }
+    
+    /// Save an external place (TikTok import)
+    func saveExternalPlace(externalPlace: ExternalPlace, userId: String, completion: @escaping (Bool, Error?) -> Void) {
+        do {
+            try db.collection("users")
+                .document(userId)
+                .collection("externalPlaces")
+                .document(externalPlace.placeId)
+                .setData(from: externalPlace) { error in
+                    if let error = error {
+                        print("Error saving external place: \(error.localizedDescription)")
+                        completion(false, error)
+                    } else {
+                        print("External place successfully saved")
+                        completion(true, nil)
+                    }
+                }
+        } catch {
+            print("Error encoding external place: \(error.localizedDescription)")
+            completion(false, error)
+        }
+    }
+
     // MARK: - Account Deletion
     
     /// Delete user account and all associated data
@@ -527,6 +731,11 @@ class UserService: ObservableObject {
         
         // Delete user's externalPlaces collection
         let externalPlacesRef = db.collection("users").document(userId).collection("externalPlaces")
+        // Note: We can't delete subcollections in batch, so we'll handle this separately
+        
+        // Delete user's placeNotes collection
+            let placeNotesRef = db.collection("users").document(userId).collection("placeNotes")
+            let tikTokPlaceFlagsRef = db.collection("users").document(userId).collection("tikTokPlaceFlags")
         // Note: We can't delete subcollections in batch, so we'll handle this separately
         
         // Delete following relationships
@@ -638,6 +847,19 @@ class UserService: ObservableObject {
             dispatchGroup.leave()
         }
         
+        // Delete placeNotes
+        dispatchGroup.enter()
+        deleteCollection(collection: self.db.collection("users").document(userId).collection("placeNotes")) { error in
+            if let error = error {
+                print("❌ [UserService] Error deleting placeNotes: \(error.localizedDescription)")
+                hasError = true
+                lastError = error
+            } else {
+                print("✅ [UserService] Successfully deleted placeNotes")
+            }
+            dispatchGroup.leave()
+        }
+        
         // Delete externalPlaces
         dispatchGroup.enter()
         deleteCollection(collection: self.db.collection("users").document(userId).collection("externalPlaces")) { error in
@@ -647,6 +869,19 @@ class UserService: ObservableObject {
                 lastError = error
             } else {
                 print("✅ [UserService] Successfully deleted externalPlaces")
+            }
+            dispatchGroup.leave()
+        }
+        
+        // Delete tikTokPlaceFlags
+        dispatchGroup.enter()
+        deleteCollection(collection: self.db.collection("users").document(userId).collection("tikTokPlaceFlags")) { error in
+            if let error = error {
+                print("❌ [UserService] Error deleting tikTokPlaceFlags: \(error.localizedDescription)")
+                hasError = true
+                lastError = error
+            } else {
+                print("✅ [UserService] Successfully deleted tikTokPlaceFlags")
             }
             dispatchGroup.leave()
         }

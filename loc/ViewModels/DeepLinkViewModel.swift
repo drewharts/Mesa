@@ -45,7 +45,11 @@ class DeepLinkViewModel: ObservableObject {
         
         // Since both classes are @MainActor, we can directly assign
         deepLinkManager.$isProcessingDeepLink
-            .assign(to: &$isProcessingDeepLink)
+            .sink { [weak self] newValue in
+                print("🔗 [DeepLinkViewModel] isProcessingDeepLink changed to: \(newValue)")
+                self?.isProcessingDeepLink = newValue
+            }
+            .store(in: &cancellables)
     }
     
     private func setupCallbacks() {
@@ -110,6 +114,9 @@ class DeepLinkViewModel: ObservableObject {
     func showNoLocationFoundAlert(message: String) {
         noLocationAlertMessage = message
         showNoLocationAlert = true
+        // Clear processing state when showing no location alert
+        isProcessingDeepLink = false
+        print("🔗 [DeepLinkViewModel] Cleared processing state for no location alert")
     }
     
     @MainActor

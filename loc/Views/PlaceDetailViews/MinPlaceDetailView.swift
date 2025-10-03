@@ -135,6 +135,27 @@ struct MinPlaceDetailView: View {
                             )
                     }
                     
+                    Button(action: {
+                        selectedTab = .notes
+                    }) {
+                        Text("NOTES")
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.black)
+                            .padding(.bottom, 5)
+                            .overlay(
+                                Group {
+                                    if selectedTab == .notes {
+                                        Rectangle()
+                                            .fill(Color.blue)
+                                            .frame(height: 3)
+                                            .offset(y: 6)
+                                    }
+                                },
+                                alignment: .bottom
+                            )
+                    }
+                    
                     if !selectedPlaceVM.reviews.isEmpty && selectedPlaceVM.placeRating > 0 {
                         Text(String(format: "%.1f", selectedPlaceVM.placeRating))
                             .font(.caption)
@@ -210,10 +231,13 @@ struct MinPlaceDetailView: View {
                         .padding(.top, 15)
                     }
                     
-                    Divider()
-                        .padding(.top, 15)
-                        .padding(.bottom, 15)
-                    
+                    // TikTok Place Flagging (only for TikTok places)
+                    if profile.hasTikTokVideos(for: selectedPlaceVM.selectedPlace?.id.uuidString ?? "") {
+                        TikTokPlaceFlaggingView(place: selectedPlaceVM.selectedPlace!)
+                            .environmentObject(profile)
+                            .padding(.top, 15)
+                    }
+
                     MaxPlaceDetailView(
                         viewModel: viewModel,
                         onPhotoTapped: onPhotoTapped
@@ -221,6 +245,11 @@ struct MinPlaceDetailView: View {
                 case .reviews:
                     PlaceReviewsView(onPhotoTapped: onPhotoTapped)
                         .environmentObject(userProfileViewModel)
+                case .notes:
+                    if let selectedPlace = selectedPlaceVM.selectedPlace {
+                        PlaceNoteView(place: selectedPlace)
+                            .environmentObject(profile)
+                    }
                 }
             }
             .padding(.horizontal, 30)
@@ -255,4 +284,5 @@ struct MinPlaceDetailView: View {
 enum DetailTab {
     case about
     case reviews
+    case notes
 }
