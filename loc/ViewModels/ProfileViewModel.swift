@@ -57,6 +57,7 @@ class ProfileViewModel: ObservableObject {
      internal let detailPlaceViewModel: DetailPlaceViewModel
      private let userSession: UserSession
     private var deepLinkManager: DeepLinkManager?
+    private var deepLinkViewModel: DeepLinkViewModel?
     var userProfileViewModel: UserProfileViewModel?
 
      @Published var showMaxFavoritesAlert: Bool = false
@@ -127,7 +128,7 @@ class ProfileViewModel: ObservableObject {
     private let locationManager: LocationManager
     private var cancellables = Set<AnyCancellable>()
     
-    init(userSession: UserSession, userService: UserService, detailPlaceViewModel: DetailPlaceViewModel, imageService: ImageService, placeService: PlaceService, reviewService: ReviewService, locationManager: LocationManager, deepLinkManager: DeepLinkManager? = nil, userProfileViewModel: UserProfileViewModel? = nil) {
+    init(userSession: UserSession, userService: UserService, detailPlaceViewModel: DetailPlaceViewModel, imageService: ImageService, placeService: PlaceService, reviewService: ReviewService, locationManager: LocationManager, deepLinkManager: DeepLinkManager? = nil, deepLinkViewModel: DeepLinkViewModel? = nil, userProfileViewModel: UserProfileViewModel? = nil) {
          self.userService = userService
          self.detailPlaceViewModel = detailPlaceViewModel
         self.userSession = userSession
@@ -136,6 +137,7 @@ class ProfileViewModel: ObservableObject {
         self.reviewService = reviewService
         self.locationManager = locationManager
         self.deepLinkManager = deepLinkManager
+        self.deepLinkViewModel = deepLinkViewModel
         self.userProfileViewModel = userProfileViewModel
         
         // Observe location changes using Combine
@@ -1217,7 +1219,12 @@ class ProfileViewModel: ObservableObject {
                     isProcessingTikTok = false
                     isWaitingForPlaceDetail = false  // Ensure waiting state is also cleared
                     deepLinkManager?.isProcessingDeepLink = false
+                    deepLinkViewModel?.isProcessingDeepLink = false  // Direct update to ensure sync
                     print("✅ [ProfileViewModel] Cleared all loading states for no places found")
+                    print("   - isProcessingTikTok: \(isProcessingTikTok)")
+                    print("   - isWaitingForPlaceDetail: \(isWaitingForPlaceDetail)")
+                    print("   - deepLinkManager?.isProcessingDeepLink: \(deepLinkManager?.isProcessingDeepLink ?? false)")
+                    print("   - deepLinkViewModel?.isProcessingDeepLink: \(deepLinkViewModel?.isProcessingDeepLink ?? false)")
                 }
             }
             
@@ -1284,6 +1291,7 @@ class ProfileViewModel: ObservableObject {
         isProcessingTikTok = false
         isWaitingForPlaceDetail = false
         deepLinkManager?.isProcessingDeepLink = false
+        deepLinkViewModel?.isProcessingDeepLink = false  // Direct update to ensure sync
         print("✅ [ProfileViewModel] clearNoPlacesFound: Cleared all processing states")
     }
     
@@ -1291,6 +1299,7 @@ class ProfileViewModel: ObservableObject {
         isWaitingForPlaceDetail = false
         isProcessingTikTok = false
         deepLinkManager?.isProcessingDeepLink = false
+        deepLinkViewModel?.isProcessingDeepLink = false  // Direct update to ensure sync
     }
     
     func ensureListsLoaded() {

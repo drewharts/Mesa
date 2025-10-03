@@ -45,7 +45,11 @@ class DeepLinkViewModel: ObservableObject {
         
         // Since both classes are @MainActor, we can directly assign
         deepLinkManager.$isProcessingDeepLink
-            .assign(to: &$isProcessingDeepLink)
+            .sink { [weak self] newValue in
+                print("🔗 [DeepLinkViewModel] isProcessingDeepLink changed to: \(newValue)")
+                self?.isProcessingDeepLink = newValue
+            }
+            .store(in: &cancellables)
     }
     
     private func setupCallbacks() {
