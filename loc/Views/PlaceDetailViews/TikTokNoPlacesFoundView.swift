@@ -43,6 +43,7 @@ struct TikTokNoPlacesFoundView: View {
             // Ensure all processing states are cleared when this view appears
             profile.isProcessingTikTok = false
             profile.isWaitingForPlaceDetail = false
+            // Also clear DeepLinkViewModel state directly if we have access to it
             print("✅ [TikTokNoPlacesFoundView] onAppear: Cleared all processing states")
         }
         .alert("Help Improve Detection", isPresented: $showingCommentDialog) {
