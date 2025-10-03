@@ -30,6 +30,7 @@ struct MainView: View {
     @State private var shouldNavigateToProfile = false
     @State private var triggerFocus = false
     @State private var recenterMap = false
+    @State private var isCreatePlacePopupActive = false
 
     var body: some View {
         NavigationStack {
@@ -102,7 +103,7 @@ struct MainView: View {
     
     // MARK: - Map Layer
     private var mapLayer: some View {
-        MapView(recenterMap: $recenterMap, isSearchBarMinimized: isSearchBarMinimized, onMapTap: {
+        MapView(recenterMap: $recenterMap, isSearchBarMinimized: isSearchBarMinimized, isCreatePlacePopupActive: $isCreatePlacePopupActive, onMapTap: {
             withAnimation {
                 isSearchBarMinimized = true
                 searchIsFocused = false
@@ -160,7 +161,7 @@ struct MainView: View {
     // MARK: - Floating Action Buttons
     private var floatingActionButtons: some View {
         Group {
-            if isSearchBarMinimized && !searchIsFocused && !selectedPlaceVM.isDetailSheetPresented {
+            if isSearchBarMinimized && !searchIsFocused && !selectedPlaceVM.isDetailSheetPresented && !isCreatePlacePopupActive {
                 FloatingActionButtons(
                     isSearchBarMinimized: $isSearchBarMinimized,
                     searchIsFocused: Binding(
