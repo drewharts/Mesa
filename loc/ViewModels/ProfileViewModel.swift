@@ -1325,9 +1325,9 @@ class ProfileViewModel: ObservableObject {
                 await MainActor.run {
                     print("🔍 [ProfileViewModel] ensureListsLoaded: Updating UI with \(lists.count) lists")
                     self.userLists = lists
-                    // Initialize with empty place arrays for lazy loading
+                    // Initialize with place IDs from loaded lists for immediate UI display
                     self.userListsPlaces = lists.reduce(into: [String: [String]]()) { result, list in
-                        result[list.id.uuidString] = []
+                        result[list.id.uuidString] = list.places.map { $0.id.uuidString }
                     }
                     self.isLoading = false
                     print("🔍 [ProfileViewModel] ensureListsLoaded: Updated userListsPlaces with \(self.userListsPlaces.count) entries")
