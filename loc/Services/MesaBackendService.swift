@@ -136,7 +136,7 @@ struct MesaPlaceResult: PlaceResult {
 
 /// Service class for the Mesa backend API
 class MesaBackendService {
-    private let baseURL = "https://mesa-backend-production.up.railway.app"
+    private let baseURL = "https://mesa-backend-staging.up.railway.app"
     private let session = URLSession.shared
     
     /// Fetch place suggestions from Mesa backend

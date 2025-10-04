@@ -197,7 +197,7 @@ class PlaceShareService: ObservableObject {
         }
         
         components.queryItems = queryItems
-        return components.url ?? URL(string: "https://mesa-backend-production.up.railway.app")!
+        return components.url ?? URL(string: "https://mesa-backend-staging.up.railway.app")!
     }
     
     private func generateWebURL(for shareableList: ShareableList) -> URL {
@@ -214,7 +214,7 @@ class PlaceShareService: ObservableObject {
         queryItems.append(URLQueryItem(name: "userId", value: shareableList.userId))
         
         components.queryItems = queryItems
-        return components.url ?? URL(string: "https://mesa-backend-production.up.railway.app")!
+        return components.url ?? URL(string: "https://mesa-backend-staging.up.railway.app")!
     }
     
     // MARK: - Image Helpers
