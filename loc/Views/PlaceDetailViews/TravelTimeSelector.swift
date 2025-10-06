@@ -110,10 +110,6 @@ struct TravelTimeSelector: View {
                         .font(.subheadline)
                         .foregroundColor(.gray)
                 }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 6)
-                .background(Color.gray.opacity(0.05))
-                .clipShape(Capsule())
                 .simultaneousGesture(
                     LongPressGesture(minimumDuration: 0.3)
                         .onEnded { _ in

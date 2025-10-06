@@ -92,6 +92,11 @@ class PlaceDetailViewModel: ObservableObject {
         case .transit:
             launchOptions = [MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeTransit]
             print("🚇 [PlaceDetailViewModel] Using transit directions")
+        case .bicycle:
+            // MapKit doesn't have bicycle directions, so we'll use walking directions
+            // which is better than driving directions for cyclists
+            launchOptions = [MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeWalking]
+            print("🚴 [PlaceDetailViewModel] Using walking directions for bicycle (best available)")
         }
 
         // Launch Apple Maps with the specified options.
