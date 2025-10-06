@@ -98,44 +98,14 @@ class MapKitService {
         }
     }
 
-    /// Alternative transit calculation method using MKTransitDirections
+    /// Alternative transit calculation method with improved timing
     private func calculateTransitTimeAlternative(
         from origin: CLLocationCoordinate2D,
         to destination: CLLocationCoordinate2D,
         completion: @escaping (TimeInterval?, Error?) -> Void
     ) {
         print("🚇 [MapKitService] Trying alternative transit calculation...")
-
-        // First try MKTransitDirections if available (iOS 16+)
-        if #available(iOS 16.0, *) {
-            let request = MKTransitDirections.Request()
-            request.source = MKMapItem(placemark: MKPlacemark(coordinate: origin))
-            request.destination = MKMapItem(placemark: MKPlacemark(coordinate: destination))
-            request.departureDate = Date()
-
-            let directions = MKTransitDirections(request: request)
-            directions.calculate { response, error in
-                if let error = error {
-                    print("❌ [MapKitService] MKTransitDirections error: \(error.localizedDescription)")
-                    // Fall back to regular MKDirections with transit type
-                    self.fallbackTransitCalculation(from: origin, to: destination, completion: completion)
-                    return
-                }
-
-                if let route = response?.routes.first {
-                    let travelTime = route.expectedTravelTime
-                    print("✅ [MapKitService] MKTransitDirections success: \(travelTime) seconds (\(String(format: "%.1f", travelTime/60)) min)")
-                    completion(travelTime, nil)
-                } else {
-                    print("⚠️ [MapKitService] MKTransitDirections found no routes")
-                    // Fall back to regular MKDirections
-                    self.fallbackTransitCalculation(from: origin, to: destination, completion: completion)
-                }
-            }
-        } else {
-            print("⚠️ [MapKitService] MKTransitDirections not available, using fallback")
-            fallbackTransitCalculation(from: origin, to: destination, completion: completion)
-        }
+        fallbackTransitCalculation(from: origin, to: destination, completion: completion)
     }
 
     /// Fallback transit calculation using regular MKDirections with transit type
