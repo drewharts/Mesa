@@ -140,32 +140,36 @@ class PlaceDetailViewModel: ObservableObject {
         // Convert GeoPoint to CLLocationCoordinate2D.
         let placeCoordinate = CLLocationCoordinate2D(latitude: geoPoint.latitude, longitude: geoPoint.longitude)
 
-        // Calculate travel times for all transport types
-        MapKitService.shared.calculateTravelTimes(from: userCoordinate, to: placeCoordinate) { [weak self] results, error in
-            DispatchQueue.main.async {
-                if let error = error {
-                    self?.travelTime = "N/A"
-                    self?.travelTimes = [:]
-                } else if let results = results {
-                    var times: [MapKitService.TransportType: String] = [:]
+        // First check if transit is available, then calculate travel times
+        MapKitService.shared.isTransitAvailable(from: userCoordinate, to: placeCoordinate) { [weak self] transitAvailable in
+            let transportTypes: [MapKitService.TransportType] = transitAvailable ? [.automobile, .walking, .transit] : [.automobile, .walking]
 
-                    for (transportType, timeInterval) in results {
-                        let minutes = timeInterval / 60.0
-                        let timeString = minutes > 60 ? "60+ min" : String(format: "%.0f min", minutes)
-                        times[transportType] = timeString
-                    }
+            MapKitService.shared.calculateTravelTimes(from: userCoordinate, to: placeCoordinate, transportTypes: transportTypes) { results, error in
+                DispatchQueue.main.async {
+                    if let error = error {
+                        self?.travelTime = "N/A"
+                        self?.travelTimes = [:]
+                    } else if let results = results {
+                        var times: [MapKitService.TransportType: String] = [:]
 
-                    self?.travelTimes = times
+                        for (transportType, timeInterval) in results {
+                            let minutes = timeInterval / 60.0
+                            let timeString = minutes > 60 ? "60+ min" : String(format: "%.0f min", minutes)
+                            times[transportType] = timeString
+                        }
 
-                    // Set the current travel time based on current transport type
-                    if let currentTime = times[self?.currentTransportType ?? .automobile] {
-                        self?.travelTime = currentTime
+                        self?.travelTimes = times
+
+                        // Set the current travel time based on current transport type
+                        if let currentTime = times[self?.currentTransportType ?? .automobile] {
+                            self?.travelTime = currentTime
+                        } else {
+                            self?.travelTime = "N/A"
+                        }
                     } else {
                         self?.travelTime = "N/A"
+                        self?.travelTimes = [:]
                     }
-                } else {
-                    self?.travelTime = "N/A"
-                    self?.travelTimes = [:]
                 }
             }
         }

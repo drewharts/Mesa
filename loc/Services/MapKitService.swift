@@ -55,17 +55,63 @@ class MapKitService {
         request.destination = MKMapItem(placemark: destinationPlacemark)
         request.transportType = transportType.mkTransportType
 
+        // For transit, add departure date to help with scheduling
+        if transportType == .transit {
+            request.departureDate = Date()
+        }
+
         let directions = MKDirections(request: request)
         directions.calculate { response, error in
             if let error = error {
-                completion(nil, error)
+                // For transit, if we get a "no routes found" type error, it's likely that transit isn't available
+                // Return nil instead of error for cleaner UX
+                if transportType == .transit && (error as NSError).domain == "MKErrorDomain" {
+                    completion(nil, nil)
+                } else {
+                    completion(nil, error)
+                }
                 return
             }
 
             if let route = response?.routes.first {
                 completion(route.expectedTravelTime, nil)
             } else {
-                completion(nil, nil)
+                // For transit specifically, if no routes are found, it might mean transit isn't available in this area
+                if transportType == .transit {
+                    completion(nil, nil) // Return nil for unavailable transit
+                } else {
+                    completion(nil, nil)
+                }
+            }
+        }
+    }
+
+    /// Checks if transit is available between two coordinates
+    func isTransitAvailable(
+        from origin: CLLocationCoordinate2D,
+        to destination: CLLocationCoordinate2D,
+        completion: @escaping (Bool) -> Void
+    ) {
+        let sourcePlacemark = MKPlacemark(coordinate: origin)
+        let destinationPlacemark = MKPlacemark(coordinate: destination)
+
+        let request = MKDirections.Request()
+        request.source = MKMapItem(placemark: sourcePlacemark)
+        request.destination = MKMapItem(placemark: destinationPlacemark)
+        request.transportType = .transit
+        request.departureDate = Date()
+
+        let directions = MKDirections(request: request)
+        directions.calculate { response, error in
+            if let error = error {
+                completion(false)
+                return
+            }
+
+            if let routes = response?.routes, !routes.isEmpty {
+                completion(true)
+            } else {
+                completion(false)
             }
         }
     }
