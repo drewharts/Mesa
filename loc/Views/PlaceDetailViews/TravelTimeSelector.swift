@@ -53,7 +53,7 @@ struct TravelTimeSelector: View {
                     .zIndex(1000) // Ensure it appears above all other content
             }
         }
-        .highPriorityGesture(
+        .gesture(
             DragGesture(minimumDistance: 0)
                 .onChanged { value in
                     if isExpanded {
@@ -110,25 +110,27 @@ struct TravelTimeSelector: View {
                         .font(.subheadline)
                         .foregroundColor(.gray)
                 }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 6)
+                .background(Color.gray.opacity(0.05))
+                .clipShape(Capsule())
                 .simultaneousGesture(
                     LongPressGesture(minimumDuration: 0.3)
                         .onEnded { _ in
+                            print("👆 [TravelTimeSelector] Long press detected - expanding menu")
                             expandMenu()
                         }
                 )
-                        .highPriorityGesture(
-                            TapGesture()
-                                .onEnded {
-                                    print("👆 [TravelTimeSelector] Tap gesture triggered")
-                                    // Single tap opens navigation
-                                    if let place = selectedPlaceVM.selectedPlace,
-                                       let currentLocation = locationManager.currentLocation {
-                                        viewModel.openNavigation(for: place, currentLocation: currentLocation.coordinate)
-                                    } else {
-                                        print("❌ [TravelTimeSelector] Missing place or location data")
-                                    }
-                                }
-                        )
+                .onTapGesture {
+                    print("👆 [TravelTimeSelector] Tap gesture triggered")
+                    // Single tap opens navigation
+                    if let place = selectedPlaceVM.selectedPlace,
+                       let currentLocation = locationManager.currentLocation {
+                        viewModel.openNavigation(for: place, currentLocation: currentLocation.coordinate)
+                    } else {
+                        print("❌ [TravelTimeSelector] Missing place or location data")
+                    }
+                }
             }
         }
     }
