@@ -24,15 +24,17 @@ class SearchViewModel: ObservableObject {
 
     private let placeService: PlaceService
     private let userService: UserService
+    private let locationManager: LocationManager
 //    private let mapboxSearchService = MapboxSearchService()
     private let searchService = PlaceSearchService()
-    
+
     private var cancellables = Set<AnyCancellable>()
 
-    init(placeService: PlaceService, userService: UserService) {
+    init(placeService: PlaceService, userService: UserService, locationManager: LocationManager) {
         // Initialize dependencies through dependency injection
         self.placeService = placeService
         self.userService = userService
+        self.locationManager = locationManager
         
         // ✅ Debounce to limit API calls while typing
         $searchText
@@ -63,9 +65,16 @@ class SearchViewModel: ObservableObject {
             return
         }
         
+        // Get current location for location-aware search
+        let latitude = locationManager.currentLocation?.coordinate.latitude
+        let longitude = locationManager.currentLocation?.coordinate.longitude
+
         print("🔍 [SearchViewModel] Calling searchService.searchPlaces...")
+        print("🔍 [SearchViewModel] Using location: lat=\(latitude ?? 0), lng=\(longitude ?? 0)")
         searchService.searchPlaces(
             query: query,
+            latitude: latitude,
+            longitude: longitude,
             onResultsUpdated: { [weak self] results in
                 print("🔍 [SearchViewModel] Received \(results.count) place results")
                 for (index, result) in results.enumerated() {

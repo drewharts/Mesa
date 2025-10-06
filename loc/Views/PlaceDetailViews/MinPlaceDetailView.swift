@@ -95,20 +95,7 @@ struct MinPlaceDetailView: View {
                         }
                     }
                     
-                    HStack(spacing: 4) {
-                        Image(systemName: "car.fill")
-                            .foregroundColor(.gray)
-                        
-                        Text(viewModel.travelTime)
-                            .font(.subheadline)
-                            .foregroundColor(.gray)
-                    }
-                    .onTapGesture {
-                        if let place = selectedPlaceVM.selectedPlace,
-                           let currentLocation = locationManager.currentLocation {
-                            viewModel.openNavigation(for: place, currentLocation: currentLocation.coordinate)
-                        }
-                    }
+                    TravelTimeSelector(viewModel: viewModel)
                 }
                 .padding(.bottom, 10)
                 

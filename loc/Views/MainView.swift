@@ -10,6 +10,7 @@ import SwiftUI
 import FirebaseAuth
 import MapboxSearch
 
+
 struct MainView: View {
     @EnvironmentObject var userSession: UserSession
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel

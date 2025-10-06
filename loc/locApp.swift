@@ -106,7 +106,8 @@ struct locApp: App {
 
         let searchVM = SearchViewModel(
             placeService: services.placeService,
-            userService: services.userService
+            userService: services.userService,
+            locationManager: location
         )
         
         let placeTypeFilterVM = PlaceTypeFilterViewModel(

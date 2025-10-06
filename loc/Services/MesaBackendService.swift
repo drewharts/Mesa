@@ -144,28 +144,45 @@ class MesaBackendService {
         query: String,
         limit: Int = 5,
         provider: String = "all",
+        latitude: Double? = nil,
+        longitude: Double? = nil,
         completion: @escaping (Result<[MesaPlaceSuggestion], Error>) -> Void
     ) {
-        print("🌐 [MesaBackendService] fetchSuggestions called with query: '\(query)', limit: \(limit), provider: '\(provider)'")
-        
+        // Log location information
+        if let lat = latitude, let lon = longitude {
+            print("🌐 [MesaBackendService] fetchSuggestions called with query: '\(query)', limit: \(limit), provider: '\(provider)', location: [\(lat), \(lon)]")
+        } else {
+            print("🌐 [MesaBackendService] fetchSuggestions called with query: '\(query)', limit: \(limit), provider: '\(provider)' - NO LOCATION PROVIDED")
+        }
+
         guard !query.isEmpty else {
             print("🌐 [MesaBackendService] Query is empty, returning empty results")
             completion(.success([]))
             return
         }
-        
+
         guard var urlComponents = URLComponents(string: "\(baseURL)/search/suggestions") else {
             print("❌ [MesaBackendService] Failed to create URL components from: \(baseURL)/search/suggestions")
             completion(.failure(NSError(domain: "MesaBackend", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"])))
             return
         }
-        
+
         // Add query parameters
-        urlComponents.queryItems = [
+        var queryItems = [
             URLQueryItem(name: "query", value: query),
             URLQueryItem(name: "limit", value: String(limit)),
             URLQueryItem(name: "provider", value: provider)
         ]
+
+        // Add location parameters if provided
+        if let latitude = latitude {
+            queryItems.append(URLQueryItem(name: "latitude", value: String(latitude)))
+        }
+        if let longitude = longitude {
+            queryItems.append(URLQueryItem(name: "longitude", value: String(longitude)))
+        }
+
+        urlComponents.queryItems = queryItems
         
         guard let url = urlComponents.url else {
             print("❌ [MesaBackendService] Failed to create URL from components")
@@ -363,7 +380,66 @@ class MesaBackendService {
         
         return detailPlace
     }
-    
+        /// Test location-aware search functionality
+    func testLocationAwareSearch(
+        query: String = "comal",
+        completion: @escaping (Result<[String: Any], Error>) -> Void
+    ) {
+        print("🧪 [MesaBackendService] Testing location-aware search with query: '\(query)'")
+
+        guard var urlComponents = URLComponents(string: "\(baseURL)/search/test-location") else {
+            print("❌ [MesaBackendService] Failed to create URL components for test endpoint")
+            completion(.failure(NSError(domain: "MesaBackend", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"])))
+            return
+        }
+
+        urlComponents.queryItems = [
+            URLQueryItem(name: "query", value: query)
+        ]
+
+        guard let url = urlComponents.url else {
+            print("❌ [MesaBackendService] Failed to create URL from components")
+            completion(.failure(NSError(domain: "MesaBackend", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"])))
+            return
+        }
+
+        print("🧪 [MesaBackendService] Making test request to: \(url.absoluteString)")
+
+        let task = session.dataTask(with: url) { data, response, error in
+            if let error = error {
+                print("❌ [MesaBackendService] Test request network error: \(error.localizedDescription)")
+                completion(.failure(error))
+                return
+            }
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                print("❌ [MesaBackendService] Test request invalid HTTP response")
+                completion(.failure(NSError(domain: "MesaBackend", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid server response"])))
+                return
+            }
+
+            guard let data = data else {
+                print("❌ [MesaBackendService] Test request no data received")
+                completion(.failure(NSError(domain: "MesaBackend", code: -1, userInfo: [NSLocalizedDescriptionKey: "No data received"])))
+                return
+            }
+
+            do {
+                if let json = try JSONSerialization.jsonObject(with: data, options: []) as? [String: Any] {
+                    print("✅ [MesaBackendService] Test request successful - received test results")
+                    completion(.success(json))
+                } else {
+                    print("❌ [MesaBackendService] Test request failed to parse JSON")
+                    completion(.failure(NSError(domain: "MesaBackend", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid JSON response"])))
+                }
+            } catch {
+                print("❌ [MesaBackendService] Test request JSON parsing error: \(error.localizedDescription)")
+                completion(.failure(error))
+            }
+        }
+        task.resume()
+    }
+
     /// Fetch place details from Mesa backend
     func fetchPlaceDetails(
         placeId: String,

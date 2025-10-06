@@ -19,6 +19,7 @@ struct PlaceDetailView: View {
     @State private var showCreateReview = false
 
     @EnvironmentObject var profile: ProfileViewModel
+
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var locationManager: LocationManager
     @EnvironmentObject var userProfileViewModel: UserProfileViewModel
@@ -132,6 +133,7 @@ struct PlaceDetailView: View {
                 Spacer()
             }
 
+
             // Photo Gallery Overlay
             if showPhotoGallery, let selectedIndex = selectedImageIndex {
                 PhotoGalleryView(
@@ -145,3 +147,4 @@ struct PlaceDetailView: View {
         }
     }
 }
+

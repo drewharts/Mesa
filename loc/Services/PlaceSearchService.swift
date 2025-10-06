@@ -28,10 +28,14 @@ class PlaceSearchService {
     /// Search for place suggestions
     /// - Parameters:
     ///   - query: The search query
+    ///   - latitude: Optional user's latitude for location-aware search
+    ///   - longitude: Optional user's longitude for location-aware search
     ///   - onResultsUpdated: Callback with search results
     ///   - onError: Callback for errors
     func searchPlaces(
         query: String,
+        latitude: Double? = nil,
+        longitude: Double? = nil,
         onResultsUpdated: @escaping SuggestionsCallback,
         onError: @escaping ErrorCallback
     ) {
@@ -44,7 +48,7 @@ class PlaceSearchService {
         }
         
         print("🔍 [PlaceSearchService] Calling mesaBackendService.fetchSuggestions...")
-        mesaBackendService.fetchSuggestions(query: query) { result in
+        mesaBackendService.fetchSuggestions(query: query, latitude: latitude, longitude: longitude) { result in
             print("🔍 [PlaceSearchService] Received response from mesaBackendService")
             switch result {
             case .success(let suggestions):

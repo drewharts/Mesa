@@ -176,36 +176,6 @@
             endingLineNumber = "267"
             landmarkName = "handleGooglePlaceDetails(_:)"
             landmarkType = "7">
-            <Locations>
-               <Location
-                  uuid = "EF3A84AB-CA99-4FD1-BD80-76E92AA291D0 - 8267355fe3b182a0"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "loc.MesaBackendService.handleGooglePlaceDetails(Swift.Dictionary&lt;Swift.String, Any&gt;) -&gt; loc.DetailPlace"
-                  moduleName = "loc.debug.dylib"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/drewhartsfield/Desktop/Loc/loc/Services/MesaBackendService.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "267"
-                  endingLineNumber = "267">
-               </Location>
-               <Location
-                  uuid = "EF3A84AB-CA99-4FD1-BD80-76E92AA291D0 - 8267355fe3b182a0"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "loc.MesaBackendService.handleGooglePlaceDetails(Swift.Dictionary&lt;Swift.String, Any&gt;) -&gt; loc.DetailPlace"
-                  moduleName = "loc.debug.dylib"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/drewhartsfield/Desktop/Loc/loc/Services/MesaBackendService.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "267"
-                  endingLineNumber = "267">
-               </Location>
-            </Locations>
          </BreakpointContent>
       </BreakpointProxy>
       <BreakpointProxy
