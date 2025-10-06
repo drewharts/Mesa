@@ -82,18 +82,29 @@ class MapKitService {
         request.destination = MKMapItem(placemark: destinationPlacemark)
         request.transportType = transportType.mkTransportType
 
-        // For transit, ensure we have proper timing and settings
+        // For transit, use calculateETA which is better for ETAs than full routing
         if transportType == .transit {
-            request.requestsAlternateRoutes = false // Transit usually has one main route
-            request.departureDate = Date() // Set current time for transit departure
-            // MKDirections transit routing should work in major cities like NYC
+            print("🚇 [MapKitService] Using calculateETA for transit (no full route)")
 
-            // Add some debugging for transit
-            print("🚇 [MapKitService] Transit request setup:")
-            print("   - Departure date: \(request.departureDate?.description ?? "nil")")
-            print("   - Transport type: \(request.transportType.rawValue)")
-            print("   - Source: \(request.source?.placemark.coordinate.latitude ?? 0), \(request.source?.placemark.coordinate.longitude ?? 0)")
-            print("   - Destination: \(request.destination?.placemark.coordinate.latitude ?? 0), \(request.destination?.placemark.coordinate.longitude ?? 0)")
+            let directions = MKDirections(request: request)
+            directions.calculateETA { response, error in
+                if let error = error {
+                    print("❌ [MapKitService] Transit ETA failed: \(error.localizedDescription)")
+                    completion(nil, error)
+                    return
+                }
+
+                if let etaResponse = response {
+                    let travelTime = etaResponse.expectedTravelTime
+                    print("✅ [MapKitService] Transit ETA: \(travelTime) seconds (\(String(format: "%.1f", travelTime/60)) min)")
+                    completion(travelTime, nil)
+                    return
+                }
+
+                print("⚠️ [MapKitService] Transit ETA returned nil response")
+                completion(nil, nil)
+            }
+            return // Exit early for transit ETA
         }
 
         let directions = MKDirections(request: request)
