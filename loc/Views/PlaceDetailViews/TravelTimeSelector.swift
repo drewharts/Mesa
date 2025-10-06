@@ -69,14 +69,8 @@ struct TravelTimeSelector: View {
     }
 
     private var availableTransportTypes: [MapKitService.TransportType] {
-        // Only show transport types that have been calculated (available in travelTimes)
-        Array(viewModel.travelTimes.keys).sorted { transportType1, transportType2 in
-            // Sort by: Drive, Walk, Transit
-            let order: [MapKitService.TransportType] = [.automobile, .walking, .transit]
-            let index1 = order.firstIndex(of: transportType1) ?? 99
-            let index2 = order.firstIndex(of: transportType2) ?? 99
-            return index1 < index2
-        }
+        // Always show all transport types, but they'll show "N/A" if not available
+        MapKitService.TransportType.allCases
     }
 
     private var expandedMenu: some View {
@@ -212,22 +206,37 @@ struct TransportTypeButton: View {
                 Spacer()
             }
             .padding(.horizontal, 12)
+            .opacity(isAvailable ? 1.0 : 0.6)
         }
         .buttonStyle(PlainButtonStyle())
+        .disabled(!isAvailable)
+    }
+
+    private var isAvailable: Bool {
+        currentTime != "N/A" && currentTime != "Calculating..."
     }
 
     private var displayTime: String {
-        currentTime
+        if currentTime == "N/A" {
+            return "Not available"
+        }
+        return currentTime
     }
 
     private var iconColor: Color {
         if isSelected {
             return .white
         }
+        if !isAvailable {
+            return .gray.opacity(0.5)
+        }
         return .gray
     }
 
     private var timeColor: Color {
-        .gray
+        if !isAvailable {
+            return .gray.opacity(0.7)
+        }
+        return .gray
     }
 }
