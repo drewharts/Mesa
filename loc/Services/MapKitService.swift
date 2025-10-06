@@ -99,7 +99,37 @@ class MapKitService {
         let directions = MKDirections(request: request)
         directions.calculate { response, error in
             if let error = error {
+                let nsError = error as NSError
                 print("❌ [MapKitService] Error calculating \(transportType.displayName) time: \(error.localizedDescription)")
+                print("   Error domain: \(nsError.domain), code: \(nsError.code)")
+
+                // Handle specific MapKit errors
+                if nsError.domain == "MKErrorDomain" {
+                    switch nsError.code {
+                    case 5: // MKErrorDirectionsNotFound - No directions available
+                        if transportType == .transit {
+                            // Calculate distance to provide better error context
+                            let originLoc = CLLocation(latitude: origin.latitude, longitude: origin.longitude)
+                            let destLoc = CLLocation(latitude: destination.latitude, longitude: destination.longitude)
+                            let distance = originLoc.distance(from: destLoc) * 0.000621371 // miles
+
+                            if distance < 0.5 {
+                                print("   MKErrorDirectionsNotFound: Transit not available for short distances (< 0.5 miles)")
+                            } else {
+                                print("   MKErrorDirectionsNotFound: No transit routes connect these locations")
+                            }
+                        } else {
+                            print("   MKErrorDirectionsNotFound: No \(transportType.displayName.lowercased()) routes available for this route")
+                        }
+                    case 4: // MKErrorPlacemarkNotFound
+                        print("   MKErrorPlacemarkNotFound: Location could not be geocoded")
+                    case 3: // MKErrorLoadingThrottled
+                        print("   MKErrorLoadingThrottled: Too many requests")
+                    default:
+                        print("   Unknown MKError code: \(nsError.code)")
+                    }
+                }
+
                 completion(nil, error)
                 return
             }
@@ -143,7 +173,14 @@ class MapKitService {
         completion: @escaping ([TransportType: TimeInterval]?, Error?) -> Void
     ) {
         print("🚀 [MapKitService] Starting batch calculation for \(transportTypes.count) transport types")
-        print("📍 [MapKitService] Transit available: \(MapKitService.isTransitSupported())")
+
+        // Calculate distance to determine if transit makes sense
+        let originLocation = CLLocation(latitude: origin.latitude, longitude: origin.longitude)
+        let destinationLocation = CLLocation(latitude: destination.latitude, longitude: destination.longitude)
+        let distanceInMeters = originLocation.distance(from: destinationLocation)
+        let distanceInMiles = distanceInMeters * 0.000621371 // Convert to miles
+
+        print("📏 [MapKitService] Distance: \(String(format: "%.2f", distanceInMiles)) miles (\(Int(distanceInMeters)) meters)")
 
         var results: [TransportType: TimeInterval] = [:]
         var errors: [Error] = []
@@ -151,8 +188,16 @@ class MapKitService {
         let totalCount = transportTypes.count
 
         for transportType in transportTypes {
-            // For now, we always attempt transit routing since support detection is unreliable
-            // Failures will be handled gracefully in the individual calculateTravelTime calls
+            // Skip transit for very short distances (less than 0.5 miles)
+            // Transit doesn't make sense for walking distances
+            if transportType == .transit && distanceInMiles < 0.5 {
+                print("⚠️ [MapKitService] Skipping transit for short distance (\(String(format: "%.2f", distanceInMiles)) miles)")
+                completedCount += 1
+                if completedCount == totalCount {
+                    completion(results, nil)
+                }
+                continue
+            }
 
             calculateTravelTime(from: origin, to: destination, transportType: transportType) { timeInterval, error in
                 completedCount += 1
