@@ -72,7 +72,7 @@ class MapKitService {
         transportType: TransportType = .automobile,
         completion: @escaping (TimeInterval?, Error?) -> Void
     ) {
-        print("🗺️ [MapKitService] Calculating \(transportType.displayName) time from \(origin.latitude),\(origin.longitude) to \(destination.latitude),\(destination.longitude)")
+        print("🗺️ [MapKitService] Calculating \(transportType.displayName) time from \(String(format: "%.6f", origin.latitude)),\(String(format: "%.6f", origin.longitude)) to \(String(format: "%.6f", destination.latitude)),\(String(format: "%.6f", destination.longitude))")
 
         let sourcePlacemark = MKPlacemark(coordinate: origin)
         let destinationPlacemark = MKPlacemark(coordinate: destination)
