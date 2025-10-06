@@ -80,13 +80,18 @@ class PlaceDetailViewModel: ObservableObject {
         // Define launch options based on current transport type.
         var launchOptions: [String: Any] = [:]
 
+        print("🗺️ [PlaceDetailViewModel] Opening navigation with transport type: \(currentTransportType.displayName)")
+
         switch currentTransportType {
         case .automobile:
             launchOptions = [MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeDriving]
+            print("🚗 [PlaceDetailViewModel] Using driving directions")
         case .walking:
             launchOptions = [MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeWalking]
+            print("🚶 [PlaceDetailViewModel] Using walking directions")
         case .transit:
             launchOptions = [MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeTransit]
+            print("🚇 [PlaceDetailViewModel] Using transit directions")
         }
 
         // Launch Apple Maps with the specified options.

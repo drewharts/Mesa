@@ -116,16 +116,19 @@ struct TravelTimeSelector: View {
                             expandMenu()
                         }
                 )
-                .highPriorityGesture(
-                    TapGesture()
-                        .onEnded {
-                            // Single tap opens navigation
-                            if let place = selectedPlaceVM.selectedPlace,
-                               let currentLocation = locationManager.currentLocation {
-                                viewModel.openNavigation(for: place, currentLocation: currentLocation.coordinate)
-                            }
-                        }
-                )
+                        .highPriorityGesture(
+                            TapGesture()
+                                .onEnded {
+                                    print("👆 [TravelTimeSelector] Tap gesture triggered")
+                                    // Single tap opens navigation
+                                    if let place = selectedPlaceVM.selectedPlace,
+                                       let currentLocation = locationManager.currentLocation {
+                                        viewModel.openNavigation(for: place, currentLocation: currentLocation.coordinate)
+                                    } else {
+                                        print("❌ [TravelTimeSelector] Missing place or location data")
+                                    }
+                                }
+                        )
             }
         }
     }
@@ -168,9 +171,11 @@ struct TravelTimeSelector: View {
     }
 
     private func selectTransportType(_ transportType: MapKitService.TransportType) {
+        print("🎯 [TravelTimeSelector] Switching to transport type: \(transportType.displayName)")
         viewModel.switchTransportType(to: transportType)
         // Save as default preference
         viewModel.saveDefaultTransportType(transportType)
+        print("✅ [TravelTimeSelector] Current transport type is now: \(viewModel.currentTransportType.displayName)")
     }
 }
 
