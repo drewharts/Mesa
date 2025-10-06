@@ -40,6 +40,31 @@ class MapKitService {
         }
     }
 
+    /// Check if transit routing is supported in the current region
+    /// Note: This is a best-effort check - actual routing may still fail
+    static func isTransitSupported() -> Bool {
+        // MapKit doesn't have a direct way to check transit support
+        // We'll assume it's supported in major cities and handle failures gracefully
+        return true
+    }
+
+    /// Test transit routing specifically (for debugging)
+    func testTransitRouting(from origin: CLLocationCoordinate2D, to destination: CLLocationCoordinate2D, completion: @escaping (Bool, String) -> Void) {
+        print("🧪 [MapKitService] Testing transit routing availability...")
+
+        // Try a simple transit request - MapKit will handle support detection
+        calculateTravelTime(from: origin, to: destination, transportType: .transit) { timeInterval, error in
+            if let error = error {
+                completion(false, "Transit request failed: \(error.localizedDescription)")
+            } else if let timeInterval = timeInterval {
+                let minutes = timeInterval / 60.0
+                completion(true, "Transit route found: \(String(format: "%.1f", minutes)) minutes")
+            } else {
+                completion(false, "No transit routes available between these locations")
+            }
+        }
+    }
+
     /// Calculates travel time (in seconds) between an origin and destination for a specific transport type.
     func calculateTravelTime(
         from origin: CLLocationCoordinate2D,
@@ -57,25 +82,24 @@ class MapKitService {
         request.destination = MKMapItem(placemark: destinationPlacemark)
         request.transportType = transportType.mkTransportType
 
-        // Additional configuration for transit
+        // For transit, ensure we have proper timing and settings
         if transportType == .transit {
-            // Set departure date to current time for transit
-            request.departureDate = Date()
-            print("🚇 [MapKitService] Transit request configured with departure date: \(Date())")
+            request.requestsAlternateRoutes = false // Transit usually has one main route
+            request.departureDate = Date() // Set current time for transit departure
+            // MKDirections transit routing should work in major cities like NYC
+
+            // Add some debugging for transit
+            print("🚇 [MapKitService] Transit request setup:")
+            print("   - Departure date: \(request.departureDate?.description ?? "nil")")
+            print("   - Transport type: \(request.transportType.rawValue)")
+            print("   - Source: \(request.source?.placemark.coordinate.latitude ?? 0), \(request.source?.placemark.coordinate.longitude ?? 0)")
+            print("   - Destination: \(request.destination?.placemark.coordinate.latitude ?? 0), \(request.destination?.placemark.coordinate.longitude ?? 0)")
         }
 
         let directions = MKDirections(request: request)
         directions.calculate { response, error in
             if let error = error {
                 print("❌ [MapKitService] Error calculating \(transportType.displayName) time: \(error.localizedDescription)")
-                print("❌ [MapKitService] Error domain: \((error as NSError).domain), code: \((error as NSError).code)")
-
-                // For transit, try alternative approach
-                if transportType == .transit {
-                    self.calculateTransitTimeAlternative(from: origin, to: destination, completion: completion)
-                    return
-                }
-
                 completion(nil, error)
                 return
             }
@@ -83,100 +107,29 @@ class MapKitService {
             if let route = response?.routes.first {
                 let travelTime = route.expectedTravelTime
                 print("✅ [MapKitService] \(transportType.displayName) time: \(travelTime) seconds (\(String(format: "%.1f", travelTime/60)) min)")
+
+                // Additional debugging for transit routes
+                if transportType == .transit {
+                    print("🚇 [MapKitService] Transit route details:")
+                    print("   - Distance: \(route.distance) meters")
+                    print("   - Expected travel time: \(route.expectedTravelTime)")
+                    print("   - Transport type: \(route.transportType.rawValue)")
+                    print("   - Has steps: \(route.steps.count)")
+                    if let firstStep = route.steps.first {
+                        print("   - First step: \(firstStep.instructions)")
+                    }
+                }
+
                 completion(travelTime, nil)
             } else {
                 print("⚠️ [MapKitService] No route found for \(transportType.displayName)")
-
-                // For transit, try alternative approach if no routes found
-                if transportType == .transit {
-                    self.calculateTransitTimeAlternative(from: origin, to: destination, completion: completion)
-                    return
+                print("   Available routes count: \(response?.routes.count ?? 0)")
+                if let response = response {
+                    print("   Response has \(response.routes.count) routes")
+                    for (index, route) in response.routes.enumerated() {
+                        print("   Route \(index): \(route.expectedTravelTime) seconds, distance: \(route.distance)m")
+                    }
                 }
-
-                completion(nil, nil)
-            }
-        }
-    }
-
-    /// Alternative transit calculation method with improved timing
-    private func calculateTransitTimeAlternative(
-        from origin: CLLocationCoordinate2D,
-        to destination: CLLocationCoordinate2D,
-        completion: @escaping (TimeInterval?, Error?) -> Void
-    ) {
-        print("🚇 [MapKitService] Trying alternative transit calculation...")
-        fallbackTransitCalculation(from: origin, to: destination, completion: completion)
-    }
-
-    /// Fallback transit calculation using regular MKDirections with transit type
-    private func fallbackTransitCalculation(
-        from origin: CLLocationCoordinate2D,
-        to destination: CLLocationCoordinate2D,
-        completion: @escaping (TimeInterval?, Error?) -> Void
-    ) {
-        print("🚇 [MapKitService] Using fallback transit calculation")
-
-        let sourcePlacemark = MKPlacemark(coordinate: origin)
-        let destinationPlacemark = MKPlacemark(coordinate: destination)
-
-        let request = MKDirections.Request()
-        request.source = MKMapItem(placemark: sourcePlacemark)
-        request.destination = MKMapItem(placemark: destinationPlacemark)
-        request.transportType = .transit
-        request.departureDate = Date()
-        request.arrivalDate = nil // Allow flexible arrival time
-
-        let directions = MKDirections(request: request)
-        directions.calculate { response, error in
-            if let error = error {
-                print("❌ [MapKitService] Fallback transit error: \(error.localizedDescription)")
-                // Try with different time settings
-                self.finalFallbackTransit(from: origin, to: destination, completion: completion)
-                return
-            }
-
-            if let route = response?.routes.first {
-                let travelTime = route.expectedTravelTime
-                print("✅ [MapKitService] Fallback transit success: \(travelTime) seconds (\(String(format: "%.1f", travelTime/60)) min)")
-                completion(travelTime, nil)
-            } else {
-                print("⚠️ [MapKitService] Fallback transit found no routes")
-                self.finalFallbackTransit(from: origin, to: destination, completion: completion)
-            }
-        }
-    }
-
-    /// Final fallback - try with different departure time
-    private func finalFallbackTransit(
-        from origin: CLLocationCoordinate2D,
-        to destination: CLLocationCoordinate2D,
-        completion: @escaping (TimeInterval?, Error?) -> Void
-    ) {
-        print("🚇 [MapKitService] Final fallback transit attempt")
-
-        let sourcePlacemark = MKPlacemark(coordinate: origin)
-        let destinationPlacemark = MKPlacemark(coordinate: destination)
-
-        let request = MKDirections.Request()
-        request.source = MKMapItem(placemark: sourcePlacemark)
-        request.destination = MKMapItem(placemark: destinationPlacemark)
-        request.transportType = .transit
-        request.departureDate = Date().addingTimeInterval(3600) // Try 1 hour from now
-
-        let directions = MKDirections(request: request)
-        directions.calculate { response, error in
-            if let error = error {
-                print("❌ [MapKitService] Final transit fallback failed: \(error.localizedDescription)")
-                completion(nil, nil) // Give up
-                return
-            }
-
-            if let route = response?.routes.first {
-                let travelTime = route.expectedTravelTime
-                print("✅ [MapKitService] Final transit fallback success: \(travelTime) seconds (\(String(format: "%.1f", travelTime/60)) min)")
-                completion(travelTime, nil)
-            } else {
-                print("⚠️ [MapKitService] All transit calculations failed")
                 completion(nil, nil)
             }
         }
@@ -189,12 +142,18 @@ class MapKitService {
         transportTypes: [TransportType] = [.automobile, .walking, .transit],
         completion: @escaping ([TransportType: TimeInterval]?, Error?) -> Void
     ) {
+        print("🚀 [MapKitService] Starting batch calculation for \(transportTypes.count) transport types")
+        print("📍 [MapKitService] Transit available: \(MapKitService.isTransitSupported())")
+
         var results: [TransportType: TimeInterval] = [:]
         var errors: [Error] = []
         var completedCount = 0
         let totalCount = transportTypes.count
 
         for transportType in transportTypes {
+            // For now, we always attempt transit routing since support detection is unreliable
+            // Failures will be handled gracefully in the individual calculateTravelTime calls
+
             calculateTravelTime(from: origin, to: destination, transportType: transportType) { timeInterval, error in
                 completedCount += 1
 
