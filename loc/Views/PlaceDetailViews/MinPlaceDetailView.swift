@@ -22,7 +22,6 @@ struct MinPlaceDetailView: View {
     let onPhotoTapped: ([UIImage], Int) -> Void
     
     @State private var selectedTab: DetailTab = .about
-    @State private var isTransportMenuExpanded = false
     
     private var defaultTab: DetailTab {
         return selectedPlaceVM.reviews.isEmpty ? .about : .reviews
@@ -96,7 +95,7 @@ struct MinPlaceDetailView: View {
                         }
                     }
                     
-                    TravelTimeSelector(viewModel: viewModel, isExpanded: $isTransportMenuExpanded)
+                    TravelTimeSelector(viewModel: viewModel)
                 }
                 .padding(.bottom, 10)
                 
