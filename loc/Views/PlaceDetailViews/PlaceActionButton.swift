@@ -128,24 +128,30 @@ struct PlaceActionButton: View {
                                     .clipShape(Circle())
                                     .shadow(radius: 2)
                             }
-                            .simultaneousGesture(
-                                LongPressGesture(minimumDuration: 0.3)
-                                    .onEnded { _ in
-                                        expandMenu()
-                                    }
-                            )
                         }
                     }
                     .highPriorityGesture(
-                        DragGesture(minimumDistance: 0)
+                        LongPressGesture(minimumDuration: 0.3)
+                            .sequenced(before: DragGesture(minimumDistance: 0))
                             .onChanged { value in
-                                if isExpanded {
-                                    handleDrag(value)
+                                switch value {
+                                case .first(true):
+                                    // Long press detected - expand menu
+                                    expandMenu()
+                                case .second(true, let drag?):
+                                    // Drag started after long press - handle selection
+                                    handleDrag(drag)
+                                default:
+                                    break
                                 }
                             }
-                            .onEnded { _ in
-                                if isExpanded {
+                            .onEnded { value in
+                                switch value {
+                                case .second(true, _):
+                                    // Drag ended - execute selection
                                     handleDragEnd()
+                                default:
+                                    break
                                 }
                             }
                     )
@@ -156,6 +162,7 @@ struct PlaceActionButton: View {
             }
         }
         .animation(.easeInOut(duration: animationDuration), value: isExpanded)
+        .environment(\.allowChildDrag, isExpanded)
     }
     
     // MARK: - Helper Methods

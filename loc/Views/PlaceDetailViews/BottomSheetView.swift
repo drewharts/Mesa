@@ -14,6 +14,7 @@ struct BottomSheetView<Content: View>: View {
     let minSheetHeight: CGFloat
     let maxSheetHeight: CGFloat
     @GestureState private var dragTranslation: CGFloat = 0
+    @Environment(\.allowChildDrag) private var allowChildDrag
     let content: Content
 
     init(
@@ -58,6 +59,7 @@ struct BottomSheetView<Content: View>: View {
                 .cornerRadius(16, corners: [.topLeft, .topRight])
                 .clipped()
                 .gesture(
+                    allowChildDrag ? nil :
                     DragGesture()
                         .updating($dragTranslation) { value, state, _ in
                             state = value.translation.height
@@ -102,6 +104,18 @@ extension EnvironmentValues {
     var isScrollingEnabled: Bool {
         get { self[IsScrollingEnabledKey.self] }
         set { self[IsScrollingEnabledKey.self] = newValue }
+    }
+}
+
+// Custom Environment Key for allowing child drag gestures
+private struct AllowChildDragKey: EnvironmentKey {
+    static let defaultValue: Bool = false
+}
+
+extension EnvironmentValues {
+    var allowChildDrag: Bool {
+        get { self[AllowChildDragKey.self] }
+        set { self[AllowChildDragKey.self] = newValue }
     }
 }
 
