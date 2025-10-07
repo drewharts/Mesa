@@ -12,7 +12,7 @@ struct TravelTimeSelector: View {
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var locationManager: LocationManager
 
-    @State private var isExpanded = false
+    @Binding var isExpanded: Bool
     @State private var dragOffset: CGFloat = 0
     @State private var selectedTransportType: MapKitService.TransportType?
 
@@ -20,66 +20,40 @@ struct TravelTimeSelector: View {
     private let expandedSize: CGFloat = 120
     private let animationDuration: Double = 0.2
 
+    init(viewModel: PlaceDetailViewModel, isExpanded: Binding<Bool>) {
+        self.viewModel = viewModel
+        self._isExpanded = isExpanded
+    }
+
     var body: some View {
         ZStack {
-            backgroundOverlay
-            mainContent
+            // Compact display when not expanded
+            if !isExpanded {
+                mainTimeDisplay
+            }
+
+            // Expanded menu overlay when expanded
+            if isExpanded {
+                expandedMenuOverlay
+            }
         }
         .animation(.easeInOut(duration: animationDuration), value: isExpanded)
         .environment(\.allowChildDrag, isExpanded)
     }
 
-    private var backgroundOverlay: some View {
-        Group {
-            if isExpanded {
-                Color.clear
-                    .contentShape(Rectangle())
-                    .allowsHitTesting(true)
-            }
-        }
-    }
 
-    private var mainContent: some View {
-        transportSelector
-    }
-
-    private var transportSelector: some View {
-        ZStack {
-            // Main time display (only shown when not expanded)
-            mainTimeDisplay
-
-            // Expanded menu (only shown when expanded, appears above everything)
-            if isExpanded {
-                expandedMenu
-                    .zIndex(1000) // Ensure it appears above all other content
-            }
-        }
-        .gesture(
-            LongPressGesture(minimumDuration: 0.3)
-                .sequenced(before: DragGesture(minimumDistance: 0))
-                .onChanged { value in
-                    switch value {
-                    case .first(true):
-                        // Long press detected - expand menu
-                        print("👆 [TravelTimeSelector] Long press detected - expanding menu")
-                        expandMenu()
-                    case .second(true, let drag?):
-                        // Drag started after long press - handle selection
-                        handleDrag(drag)
-                    default:
-                        break
+    private var expandedMenuOverlay: some View {
+        expandedMenu
+            .zIndex(1000)
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { value in
+                        handleDrag(value)
                     }
-                }
-                .onEnded { value in
-                    switch value {
-                    case .second(true, _):
-                        // Drag ended - execute selection
+                    .onEnded { _ in
                         handleDragEnd()
-                    default:
-                        break
                     }
-                }
-        )
+            )
     }
 
     private var availableTransportTypes: [MapKitService.TransportType] {
@@ -113,39 +87,42 @@ struct TravelTimeSelector: View {
     }
 
     private var mainTimeDisplay: some View {
-        Group {
-            if !isExpanded {
-                HStack(spacing: 4) {
-                    Image(systemName: viewModel.currentTransportType.iconName)
-                        .font(.subheadline)
-                        .foregroundColor(.gray)
+        HStack(spacing: 4) {
+            Image(systemName: viewModel.currentTransportType.iconName)
+                .font(.subheadline)
+                .foregroundColor(.gray)
 
-                    Text(viewModel.travelTime)
-                        .font(.subheadline)
-                        .foregroundColor(.gray)
-                }
-                .onTapGesture {
-                    print("👆 [TravelTimeSelector] Tap gesture triggered")
-                    // Single tap opens navigation
-                    if let place = selectedPlaceVM.selectedPlace,
-                       let currentLocation = locationManager.currentLocation {
-                        viewModel.openNavigation(for: place, currentLocation: currentLocation.coordinate)
-                    } else {
-                        print("❌ [TravelTimeSelector] Missing place or location data")
+            Text(viewModel.travelTime)
+                .font(.subheadline)
+                .foregroundColor(.gray)
+        }
+        .gesture(
+            LongPressGesture(minimumDuration: 0.3)
+                .onEnded { _ in
+                    print("👆 [TravelTimeSelector] Long press detected - expanding menu")
+                    withAnimation(.easeInOut(duration: animationDuration)) {
+                        isExpanded = true
                     }
                 }
+        )
+        .onTapGesture {
+            print("👆 [TravelTimeSelector] Tap gesture triggered")
+            // Single tap opens navigation
+            if let place = selectedPlaceVM.selectedPlace,
+               let currentLocation = locationManager.currentLocation {
+                viewModel.openNavigation(for: place, currentLocation: currentLocation.coordinate)
+            } else {
+                print("❌ [TravelTimeSelector] Missing place or location data")
             }
         }
     }
 
     // MARK: - Helper Methods
 
-    private func expandMenu() {
-        isExpanded = true
-    }
-
     private func collapseMenu() {
-        isExpanded = false
+        withAnimation(.easeInOut(duration: animationDuration)) {
+            isExpanded = false
+        }
         selectedTransportType = nil
         dragOffset = 0
     }
