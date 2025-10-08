@@ -20,7 +20,7 @@ class MapKitService {
             case .automobile: return .automobile
             case .walking: return .walking
             case .transit: return .transit
-            case .bicycle: return .automobile // MapKit doesn't have bicycle, use automobile routing
+            case .bicycle: return .cycling // MapKit has native cycling routing (macOS 11.0+/iOS 14.0+)
             }
         }
 
@@ -38,7 +38,7 @@ class MapKitService {
             case .automobile: return "Drive"
             case .walking: return "Walk"
             case .transit: return "Transit"
-            case .bicycle: return "Bike"
+            case .bicycle: return "Cycling"
             }
         }
     }
@@ -85,10 +85,10 @@ class MapKitService {
         request.destination = MKMapItem(placemark: destinationPlacemark)
         request.transportType = transportType.mkTransportType
 
-        // For transit and bicycle, use calculateETA which is better for ETAs than full routing
+        // For transit and cycling, use calculateETA which provides accurate ETAs
         if transportType == .transit || transportType == .bicycle {
             let transportEmoji = transportType == .transit ? "🚇" : "🚴"
-            print("\(transportEmoji) [MapKitService] Using calculateETA for \(transportType.displayName) (no full route)")
+            print("\(transportEmoji) [MapKitService] Using calculateETA for \(transportType.displayName) (\(transportType == .bicycle ? "native cycling routing" : "transit routing"))")
 
             let directions = MKDirections(request: request)
             directions.calculateETA { response, error in
@@ -99,14 +99,7 @@ class MapKitService {
                 }
 
                 if let etaResponse = response {
-                    var travelTime = etaResponse.expectedTravelTime
-
-                    // For bicycle, the automobile ETA might be too fast, so adjust it
-                    // Bicycles are typically 1/3 to 1/2 the speed of cars
-                    if transportType == .bicycle {
-                        travelTime *= 2.5 // Adjust bicycle time to be more realistic
-                        print("🚴 [MapKitService] Adjusted bicycle time: \(String(format: "%.1f", travelTime/60)) min")
-                    }
+                    let travelTime = etaResponse.expectedTravelTime
 
                     print("✅ [MapKitService] \(transportType.displayName) ETA: \(travelTime) seconds (\(String(format: "%.1f", travelTime/60)) min)")
                     completion(travelTime, nil)
@@ -116,7 +109,7 @@ class MapKitService {
                 print("⚠️ [MapKitService] \(transportType.displayName) ETA returned nil response")
                 completion(nil, nil)
             }
-            return // Exit early for transit/bicycle ETA
+            return // Exit early for transit/cycling ETA
         }
 
         let directions = MKDirections(request: request)
