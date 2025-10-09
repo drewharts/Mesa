@@ -252,6 +252,14 @@ class SelectedPlaceViewModel: ObservableObject {
     /// Use this when a user clicks on a place from lists, maps, etc.
     func selectPlaceAndFetchDetails(_ place: DetailPlace) {
         print("🎯 [SelectedPlaceViewModel] Selecting place: '\(place.name)'")
+        print("   📋 Place data:")
+        print("      - ID: \(place.id)")
+        print("      - source: \(place.source ?? "nil")")
+        print("      - googlePlaceId: \(place.googlePlaceId ?? "nil")")
+        print("      - mapboxId: \(place.mapboxId ?? "nil")")
+        print("      - rating: \(place.rating ?? 0)")
+        print("      - userRatingsTotal: \(place.userRatingsTotal ?? 0)")
+        print("      - coordinate: lat=\(place.coordinate?.latitude ?? 0), lng=\(place.coordinate?.longitude ?? 0)")
         
         // Determine source and ID for backend API call
         let source: String
@@ -267,6 +275,7 @@ class SelectedPlaceViewModel: ObservableObject {
                 placeId = mapboxId
             } else {
                 print("⚠️ [SelectedPlaceViewModel] Place '\(place.name)' has source '\(backendSource)' but no matching ID, using cached data")
+                print("   ❌ PROBLEM: Cannot fetch fresh data - missing external ID for source '\(backendSource)'")
                 selectedPlace = place
                 return
             }
@@ -278,6 +287,8 @@ class SelectedPlaceViewModel: ObservableObject {
             placeId = googlePlaceId
         } else {
             print("⚠️ [SelectedPlaceViewModel] Place '\(place.name)' has no external ID, using cached data")
+            print("   ❌ PROBLEM: Cannot fetch fresh data - place has no googlePlaceId or mapboxId")
+            print("   💡 This place was likely added manually or the external ID was never saved")
             selectedPlace = place
             return
         }
