@@ -69,7 +69,7 @@ struct PlaceListView: View {
             ForEach(places, id: \.id) { place in
                 // Wrap the row in a Button (or NavigationLink) so it's tappable
                 Button(action: {
-                    selectedPlaceVM.selectedPlace = place
+                    selectedPlaceVM.selectPlaceAndFetchDetails(place)
                     selectedPlaceVM.isDetailSheetPresented = true
                     presentationMode.wrappedValue.dismiss()
                 }) {

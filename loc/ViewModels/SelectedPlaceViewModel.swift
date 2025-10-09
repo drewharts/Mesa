@@ -248,6 +248,73 @@ class SelectedPlaceViewModel: ObservableObject {
         }
     }
     
+    /// Select a place and fetch fresh details from backend
+    /// Use this when a user clicks on a place from lists, maps, etc.
+    func selectPlaceAndFetchDetails(_ place: DetailPlace) {
+        print("🎯 [SelectedPlaceViewModel] Selecting place: '\(place.name)'")
+        
+        // Determine source and ID for backend API call
+        let source: String
+        let placeId: String
+        
+        // Prioritize the source field from backend if available
+        if let backendSource = place.source, !backendSource.isEmpty {
+            source = backendSource
+            // Use the appropriate ID based on source
+            if backendSource == "google", let googleId = place.googlePlaceId {
+                placeId = googleId
+            } else if backendSource == "mapbox", let mapboxId = place.mapboxId {
+                placeId = mapboxId
+            } else {
+                print("⚠️ [SelectedPlaceViewModel] Place '\(place.name)' has source '\(backendSource)' but no matching ID, using cached data")
+                selectedPlace = place
+                return
+            }
+        } else if let mapboxId = place.mapboxId, !mapboxId.isEmpty {
+            source = "mapbox"
+            placeId = mapboxId
+        } else if let googlePlaceId = place.googlePlaceId, !googlePlaceId.isEmpty {
+            source = "google"
+            placeId = googlePlaceId
+        } else {
+            print("⚠️ [SelectedPlaceViewModel] Place '\(place.name)' has no external ID, using cached data")
+            selectedPlace = place
+            return
+        }
+        
+        // Set the place immediately with cached data (for instant UI feedback)
+        selectedPlace = place
+        
+        print("🌐 [SelectedPlaceViewModel] Fetching fresh details for '\(place.name)' from \(source)")
+        
+        // Fetch fresh details from backend
+        mesaBackendService.fetchPlaceDetails(placeId: placeId, source: source) { [weak self] result in
+            guard let self = self else { return }
+            
+            switch result {
+            case .success(let freshPlace):
+                DispatchQueue.main.async {
+                    // Preserve the original ID and merge fresh data
+                    var updatedPlace = freshPlace
+                    updatedPlace.id = place.id
+                    
+                    print("✅ [SelectedPlaceViewModel] Fetched fresh details for '\(place.name)'")
+                    print("   - Rating: \(updatedPlace.rating ?? 0) (\(updatedPlace.userRatingsTotal ?? 0) reviews)")
+                    
+                    // Update selected place with fresh data
+                    self.selectedPlace = updatedPlace
+                    
+                    // Update Firestore in background
+                    self.updatePlaceInFirestore(updatedPlace)
+                }
+                
+            case .failure(let error):
+                print("❌ [SelectedPlaceViewModel] Failed to fetch fresh details for '\(place.name)': \(error.localizedDescription)")
+                // Already set cached data above, so user sees something immediately
+            }
+        }
+    }
+    
     func isRestaurantOpenNow(_ place: DetailPlace) -> Bool {
         guard let openHours = place.openHours, !openHours.isEmpty else { return false }
         

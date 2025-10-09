@@ -465,7 +465,7 @@ struct PlaceGridCell: View {
         )
         .shadow(color: Color.black.opacity(0.2), radius: 5, x: 0, y: 2)
         .onTapGesture {
-            selectedPlaceVM.selectedPlace = place
+            selectedPlaceVM.selectPlaceAndFetchDetails(place)
             selectedPlaceVM.isDetailSheetPresented = true
             presentationMode.wrappedValue.dismiss()
         }
@@ -648,7 +648,7 @@ struct TikTokPlaceGridCell: View {
         )
         .shadow(color: Color.black.opacity(0.2), radius: 5, x: 0, y: 2)
         .onTapGesture {
-            selectedPlaceVM.selectedPlace = place
+            selectedPlaceVM.selectPlaceAndFetchDetails(place)
             selectedPlaceVM.isDetailSheetPresented = true
             presentationMode.wrappedValue.dismiss()
         }

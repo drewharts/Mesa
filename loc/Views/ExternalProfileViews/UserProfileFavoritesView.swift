@@ -194,7 +194,7 @@ struct ExternalFavoritePlaceCard: View {
         )
         .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
         .onTapGesture {
-            selectedPlaceVM.selectedPlace = place
+            selectedPlaceVM.selectPlaceAndFetchDetails(place)
             selectedPlaceVM.isDetailSheetPresented = true
             
             // Dismiss the user profile sheet properly

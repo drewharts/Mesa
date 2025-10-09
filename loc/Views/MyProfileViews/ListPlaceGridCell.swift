@@ -44,7 +44,7 @@ struct ListPlaceGridCell: View {
 
     var body: some View {
         Button(action: {
-            selectedPlaceVM.selectedPlace = place
+            selectedPlaceVM.selectPlaceAndFetchDetails(place)
             selectedPlaceVM.isDetailSheetPresented = true
             presentationMode.wrappedValue.dismiss()
         }) {

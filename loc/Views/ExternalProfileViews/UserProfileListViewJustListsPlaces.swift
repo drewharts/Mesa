@@ -12,7 +12,7 @@ struct UserProfileListViewJustListsPlaces: View {
         HStack {
             ForEach(places, id: \.id) { place in
                 Button(action: {
-                    selectedPlaceVM.selectedPlace = place
+                    selectedPlaceVM.selectPlaceAndFetchDetails(place)
                     selectedPlaceVM.isDetailSheetPresented = true
                     
                     // Dismiss the user profile sheet properly

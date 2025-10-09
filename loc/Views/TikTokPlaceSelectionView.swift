@@ -76,7 +76,7 @@ struct TikTokPlaceSelectionView: View {
 
                                     // Use a small delay to ensure sheet dismissal completes before navigation
                                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                        selectedPlaceVM.selectedPlace = place
+                                        selectedPlaceVM.selectPlaceAndFetchDetails(place)
                                         selectedPlaceVM.isDetailSheetPresented = true
                                     }
                                 }

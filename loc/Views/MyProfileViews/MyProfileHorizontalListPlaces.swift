@@ -131,7 +131,7 @@ struct MyProfileHorizontalListPlaces: View {
                 // Show loaded places
                 ForEach(places, id: \.id) { place in
                     Button(action: {
-                        selectedPlaceVM.selectedPlace = place
+                        selectedPlaceVM.selectPlaceAndFetchDetails(place)
                         selectedPlaceVM.isDetailSheetPresented = true
                         presentationMode.wrappedValue.dismiss()
                     }) {
