@@ -19,6 +19,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
     var categories: [String]?
     var phone: String?
     var rating: Double?
+    var userRatingsTotal: Int?
     var openHours: [String]?
     var description: String?
     var priceLevel: String?
@@ -47,6 +48,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         case categories
         case phone
         case rating
+        case userRatingsTotal = "user_ratings_total"
         case openHours
         case description
         case priceLevel
@@ -108,6 +110,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         self.categories = try container.decodeIfPresent([String].self, forKey: .categories)
         self.phone = try container.decodeIfPresent(String.self, forKey: .phone)
         self.rating = try container.decodeIfPresent(Double.self, forKey: .rating)
+        self.userRatingsTotal = try container.decodeIfPresent(Int.self, forKey: .userRatingsTotal)
     }
     
     private mutating func decodeExtendedProperties(from container: KeyedDecodingContainer<CodingKeys>) throws {
@@ -158,6 +161,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         try container.encodeIfPresent(categories, forKey: .categories)
         try container.encodeIfPresent(phone, forKey: .phone)
         try container.encodeIfPresent(rating, forKey: .rating)
+        try container.encodeIfPresent(userRatingsTotal, forKey: .userRatingsTotal)
         try container.encodeIfPresent(openHours, forKey: .openHours)
         try container.encodeIfPresent(description, forKey: .description)
         try container.encodeIfPresent(priceLevel, forKey: .priceLevel)
@@ -184,6 +188,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         self.categories = nil
         self.phone = nil
         self.rating = nil
+        self.userRatingsTotal = nil
         self.openHours = nil
         self.description = nil
         self.priceLevel = nil
@@ -209,6 +214,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         self.categories = nil
         self.phone = nil
         self.rating = nil
+        self.userRatingsTotal = nil
         self.openHours = nil
         self.description = nil
         self.priceLevel = nil
@@ -235,6 +241,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         self.categories = nil
         self.phone = nil
         self.rating = nil
+        self.userRatingsTotal = nil
         self.openHours = nil
         self.description = nil
         self.priceLevel = nil
@@ -264,6 +271,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         self.categories = searchResult.categories
         self.phone = searchResult.metadata?.phone
         self.rating = searchResult.metadata?.rating
+        self.userRatingsTotal = nil
         
         // Handle OpenHours
         if let openHours = searchResult.metadata?.openHours as? OpenHours {

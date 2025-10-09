@@ -181,6 +181,35 @@ struct MinPlaceDetailView: View {
                 // MARK: - Tab-Specific Content
                 switch selectedTab {
                 case .about:
+                    // External Rating (Google/Mapbox)
+                    if let rating = selectedPlaceVM.selectedPlace?.rating, rating > 0 {
+                        HStack(spacing: 8) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "star.fill")
+                                    .font(.subheadline)
+                                    .foregroundColor(.yellow)
+                                
+                                Text(String(format: "%.1f", rating))
+                                    .font(.subheadline)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.black)
+                                
+                                if let count = selectedPlaceVM.selectedPlace?.userRatingsTotal {
+                                    Text("(\(count.formatted()) reviews)")
+                                        .font(.subheadline)
+                                        .foregroundColor(.gray)
+                                }
+                            }
+                            
+                            // Google logo
+                            Image("GoogleLogo")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(height: 16)
+                        }
+                        .padding(.bottom, 8)
+                    }
+                    
                     Text(selectedPlaceVM.selectedPlace!.description ?? "No description available")
                         .font(.footnote)
                         .foregroundColor(.black)

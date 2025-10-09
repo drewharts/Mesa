@@ -529,6 +529,11 @@ class MesaBackendService {
                 detailPlace.phone = placeDict["phone"] as? String
                 detailPlace.priceLevel = placeDict["priceLevel"] as? String
                 detailPlace.rating = placeDict["rating"] as? Double
+                detailPlace.userRatingsTotal = placeDict["ratingCount"] as? Int
+
+                // Log rating extraction for debugging
+                print("⭐ [MesaBackendService] fetchPlaceDetails extracted rating: \(detailPlace.rating ?? 0)")
+                print("📊 [MesaBackendService] fetchPlaceDetails extracted ratingCount: \(detailPlace.userRatingsTotal ?? 0)")
                 detailPlace.reservable = placeDict["reservable"] as? Bool
                 detailPlace.servesBreakfast = placeDict["servesBreakfast"] as? Bool
                 detailPlace.serversLunch = placeDict["servesLunch"] as? Bool
