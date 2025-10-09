@@ -12,28 +12,91 @@ import UIKit
 import FirebaseAuth
 import FirebaseFirestore
 
+// MARK: - Services
+// Note: MesaBackendService import should be available via project imports
+
 
 class SelectedPlaceViewModel: ObservableObject {
     private let reviewService: ReviewService
     private let userService: UserService
     private let placeService: PlaceService
     private let imageService: ImageService
-    
+    private let mesaBackendService: MesaBackendService
+
     private let locationManager: LocationManager
-    
+
+    init(locationManager: LocationManager, reviewService: ReviewService, placeService: PlaceService, userService: UserService, imageService: ImageService, mesaBackendService: MesaBackendService = MesaBackendService()) {
+        self.locationManager = locationManager
+        self.reviewService = reviewService
+        self.placeService = placeService
+        self.userService = userService
+        self.imageService = imageService
+        self.mesaBackendService = mesaBackendService
+    }
+
+    private var isUpdatingPlaceDetails = false
+
     @Published var selectedPlace: DetailPlace? {
         didSet {
+            // Prevent infinite loop when updating place details
+            guard !isUpdatingPlaceDetails else { return }
+
             if let place = selectedPlace,
                let currentLocation = locationManager.currentLocation {
-                loadData(for: place, currentLocation: currentLocation.coordinate)
-                loadReviews(for: place)
-                
-                // Reset photo loading state for new place
-                resetPhotoLoading()
-                getPlacePhotos(for: place)
-                
-                // Clear previous likes when loading a new place
-                likedReviews.removeAll()
+
+                // Check if place has complete details (rating, reviews count, categories)
+                // If not, fetch complete details from backend
+                if place.rating == nil || place.userRatingsTotal == nil || place.categories == nil || place.categories?.isEmpty == true {
+                    print("📊 [SelectedPlaceViewModel] Place missing rating/review/category data, fetching complete details...")
+                    fetchCompletePlaceDetails(for: place) { [weak self] updatedPlace in
+                        guard let self = self else { return }
+                        DispatchQueue.main.async {
+                            if let updatedPlace = updatedPlace {
+                                // Update the selected place with complete data (without triggering didSet)
+                                self.isUpdatingPlaceDetails = true
+                                self.selectedPlace = updatedPlace
+                                self.isUpdatingPlaceDetails = false
+                            } else {
+                                // If fetch failed, continue with current data
+                                self.continueWithPlaceSetup(place: place, currentLocation: currentLocation.coordinate)
+                            }
+                        }
+                    }
+                } else {
+                    continueWithPlaceSetup(place: place, currentLocation: currentLocation.coordinate)
+                }
+            }
+        }
+    }
+
+    private func continueWithPlaceSetup(place: DetailPlace, currentLocation: CLLocationCoordinate2D) {
+        loadData(for: place, currentLocation: currentLocation)
+        loadReviews(for: place)
+
+        // Set Google rating from the place data
+        placeRating = place.rating ?? 0
+
+        // Reset photo loading state for new place
+        resetPhotoLoading()
+        getPlacePhotos(for: place)
+
+        // Clear previous likes when loading a new place
+        likedReviews.removeAll()
+    }
+
+    private func fetchCompletePlaceDetails(for place: DetailPlace, completion: @escaping (DetailPlace?) -> Void) {
+        // Use the place ID and try to determine source
+        let source = place.mapboxId != nil ? "mapbox" : "google" // Default fallback
+
+        mesaBackendService.fetchPlaceDetails(placeId: place.id.uuidString, source: source) { result in
+            switch result {
+            case .success(let completePlace):
+                print("✅ [SelectedPlaceViewModel] Successfully fetched complete place details for: \(completePlace.name)")
+                print("   Rating: \(completePlace.rating ?? 0), Reviews: \(completePlace.userRatingsTotal ?? 0), Categories: \(completePlace.categories?.joined(separator: ", ") ?? "None")")
+                completion(completePlace)
+            case .failure(let error):
+                print("❌ [SelectedPlaceViewModel] Failed to fetch complete place details: \(error.localizedDescription)")
+                completion(nil)
             }
         }
     }
@@ -45,6 +108,7 @@ class SelectedPlaceViewModel: ObservableObject {
     @Published private var reviewPhotos: [String: [UIImage]] = [:] // Cache for review photos by reviewId
     @Published private var userProfilePhotos: [String: UIImage] = [:] // Cache for profile photos by userId
     @Published private var restaurantTypes: [String: String] = [:] // Dictionary to store restaurant types by placeId
+    @Published private var reviewPhotosForAbout: [String: [UIImage]] = [:] // Cache for review photos in about section by placeId
     
     @Published var placeRating: Double = 0
     
@@ -52,6 +116,7 @@ class SelectedPlaceViewModel: ObservableObject {
     @Published private var reviewPhotoLoadingStates: [String: LoadingState] = [:] // Loading states for review photos
     @Published private var profilePhotoLoadingStates: [String: LoadingState] = [:] // Loading states for profile photos
     @Published private var reviewLoadingStates: [String: LoadingState] = [:] // Loading states for reviews
+    @Published private var reviewPhotosForAboutLoadingStates: [String: LoadingState] = [:] // Loading states for review photos in about section
     @Published var isCurrentPlaceFullyLoaded: Bool = false
 
     // Add pagination properties for photos
@@ -62,19 +127,12 @@ class SelectedPlaceViewModel: ObservableObject {
     // Add new property to track liked reviews
     @Published private var likedReviews: Set<String> = []
 
+
     // MARK: - Comment Management Properties
     private var placeReviewComments: [String: [Comment]] = [:] // reviewId -> comments
     private var commentLoadingStates: [String: LoadingState] = [:] // reviewId -> loading state
     private var commentPhotos: [String: [UIImage]] = [:] // commentId -> photos
     private var reviewCommentCounts: [String: Int] = [:] // reviewId -> comment count
-    
-    init(locationManager: LocationManager, reviewService: ReviewService, placeService: PlaceService, userService: UserService, imageService: ImageService) {
-        self.locationManager = locationManager
-        self.reviewService = reviewService
-        self.placeService = placeService
-        self.userService = userService
-        self.imageService = imageService
-    }
 
     // MARK: - Loading State Enum
     enum LoadingState: Equatable {
@@ -109,7 +167,8 @@ class SelectedPlaceViewModel: ObservableObject {
         
         let photoState = photoLoadingStates[placeId] ?? .idle
         let reviewState = reviewLoadingStates[placeId] ?? .idle
-        
+        let reviewPhotosForAboutState = reviewPhotosForAboutLoadingStates[placeId] ?? .idle
+
         // Consider loaded if both photos and reviews are either loaded or in error state
         // (we don't want to wait forever if there's an error)
         let photosReady: Bool
@@ -119,7 +178,7 @@ class SelectedPlaceViewModel: ObservableObject {
         case .idle, .loading:
             photosReady = false
         }
-        
+
         let reviewsReady: Bool
         switch reviewState {
         case .loaded, .error:
@@ -127,9 +186,17 @@ class SelectedPlaceViewModel: ObservableObject {
         case .idle, .loading:
             reviewsReady = false
         }
-        
+
+        let reviewPhotosForAboutReady: Bool
+        switch reviewPhotosForAboutState {
+        case .loaded, .error:
+            reviewPhotosForAboutReady = true
+        case .idle, .loading:
+            reviewPhotosForAboutReady = false
+        }
+
         let wasLoaded = isCurrentPlaceFullyLoaded
-        isCurrentPlaceFullyLoaded = photosReady && reviewsReady
+        isCurrentPlaceFullyLoaded = photosReady && reviewsReady && reviewPhotosForAboutReady
         
         // Debug logging when the state changes
         if !wasLoaded && isCurrentPlaceFullyLoaded {
@@ -236,9 +303,6 @@ class SelectedPlaceViewModel: ObservableObject {
                 } else {
                     let fetchedReviews = reviews ?? []
                     self.placeReviews[placeId] = fetchedReviews
-                    if self.selectedPlace?.id.uuidString == placeId {
-                        self.placeRating = self.calculateAvgRating(for: placeId)
-                    }
                     
                     fetchedReviews.forEach { review in
                         self.loadReviewPhotos(for: review)
@@ -252,30 +316,6 @@ class SelectedPlaceViewModel: ObservableObject {
         }
     }
     
-    private func calculateAvgRating(for placeId: String) -> Double {
-        guard let reviews = placeReviews[placeId], !reviews.isEmpty else { return 0 }
-        
-        // Filter restaurant reviews
-        let restaurantReviews = reviews.compactMap { $0 as? RestaurantReview }
-        
-        // If we have restaurant reviews, calculate based on food rating
-        if !restaurantReviews.isEmpty {
-            let total = restaurantReviews.reduce(into: 0.0) { result, review in
-                result += review.foodRating
-            }
-            return total / Double(restaurantReviews.count)
-        }
-        
-        // If no restaurant reviews, check for generic reviews
-        let genericReviews = reviews.compactMap { $0 as? GenericReview }
-        if !genericReviews.isEmpty {
-            // For generic reviews, we could use a default rating or a different calculation
-            // For now, we'll return a default value
-            return 0.0
-        }
-        
-        return 0.0
-    }
     
     // MARK: - Photo Loading
     
@@ -283,6 +323,8 @@ class SelectedPlaceViewModel: ObservableObject {
         if let placeId = selectedPlace?.id.uuidString {
             placePhotos[placeId]?.removeAll()
             photoLoadingStates[placeId] = .idle
+            reviewPhotosForAbout[placeId]?.removeAll()
+            reviewPhotosForAboutLoadingStates[placeId] = .idle
             lastPhotoDocument = nil
             allPhotosLoaded = false
         }
@@ -375,7 +417,52 @@ class SelectedPlaceViewModel: ObservableObject {
             }
         }
     }
-    
+
+    func loadReviewPhotosForAbout(for place: DetailPlace) {
+        let placeId = place.id.uuidString
+
+        // Don't fetch if already loading
+        if reviewPhotosForAboutLoadingStates[placeId] == .loading {
+            return
+        }
+
+        DispatchQueue.main.async {
+            self.reviewPhotosForAboutLoadingStates[placeId] = .loading
+        }
+
+        // Get review photo URLs from Firestore
+        mesaBackendService.getReviewPhotos(for: placeId) { [weak self] photoUrls in
+            guard let self = self else { return }
+
+            if photoUrls.isEmpty {
+                // No review photos found
+                DispatchQueue.main.async {
+                    self.reviewPhotosForAbout[placeId] = []
+                    self.reviewPhotosForAboutLoadingStates[placeId] = .loaded
+                    self.updateCurrentPlaceFullyLoaded()
+                }
+                return
+            }
+
+            // Fetch the actual images from storage
+            self.imageService.fetchPhotosFromStorage(urls: photoUrls) { [weak self] images, error in
+                guard let self = self else { return }
+
+                DispatchQueue.main.async {
+                    if let error = error {
+                        print("Error fetching review photos for about section: \(error.localizedDescription)")
+                        self.reviewPhotosForAboutLoadingStates[placeId] = .error(error)
+                        self.reviewPhotosForAbout[placeId] = []
+                    } else {
+                        self.reviewPhotosForAbout[placeId] = images ?? []
+                        self.reviewPhotosForAboutLoadingStates[placeId] = .loaded
+                    }
+                    self.updateCurrentPlaceFullyLoaded()
+                }
+            }
+        }
+    }
+
     private func loadReviewPhotos<T: ReviewProtocol>(for review: T) {
         let reviewId = review.id
         guard !review.images.isEmpty else {
@@ -626,7 +713,6 @@ class SelectedPlaceViewModel: ObservableObject {
             var currentReviews = self.placeReviews[placeId] ?? []
             currentReviews.insert(review, at: 0) // Insert at the beginning instead of appending
             self.placeReviews[placeId] = currentReviews
-            self.placeRating = self.calculateAvgRating(for: placeId)
             self.loadReviewPhotos(for: review)
             self.loadProfilePhoto(for: review)
         }
@@ -657,10 +743,7 @@ class SelectedPlaceViewModel: ObservableObject {
                         if let index = currentReviews.firstIndex(where: { $0.id == reviewId }) {
                             currentReviews.remove(at: index)
                             self.placeReviews[placeId] = currentReviews
-                            
-                            // Recalculate rating after deletion
-                            self.placeRating = self.calculateAvgRating(for: placeId)
-                            
+
                             // Clean up cached photos for this review
                             self.reviewPhotos.removeValue(forKey: reviewId)
                             self.reviewPhotoLoadingStates.removeValue(forKey: reviewId)
@@ -739,7 +822,15 @@ class SelectedPlaceViewModel: ObservableObject {
     func reviewLoadingState(forPlaceId placeId: String) -> LoadingState {
         return reviewLoadingStates[placeId] ?? .idle
     }
-    
+
+    func reviewPhotosForAbout(forPlaceId placeId: String) -> [UIImage] {
+        return reviewPhotosForAbout[placeId] ?? []
+    }
+
+    func reviewPhotosForAboutLoadingState(forPlaceId placeId: String) -> LoadingState {
+        return reviewPhotosForAboutLoadingStates[placeId] ?? .idle
+    }
+
     var allPhotosLoadedForCurrentPlace: Bool {
         return allPhotosLoaded
     }
@@ -933,4 +1024,3 @@ class SelectedPlaceViewModel: ObservableObject {
         }
     }
 }
-

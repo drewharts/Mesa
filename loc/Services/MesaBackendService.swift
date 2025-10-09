@@ -503,16 +503,27 @@ class MesaBackendService {
             
             do {
                 print("🌐 [MesaBackendService] fetchPlaceDetails attempting to parse JSON...")
-                
+
                 // First parse the data into a dictionary
                 let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
                 print("🌐 [MesaBackendService] fetchPlaceDetails successfully parsed JSON")
-                
+
+                // Log the full backend response for debugging
+                print("🔍 [MesaBackendService] fetchPlaceDetails FULL BACKEND RESPONSE:")
+                if let jsonData = try? JSONSerialization.data(withJSONObject: json as Any, options: .prettyPrinted),
+                   let jsonString = String(data: jsonData, encoding: .utf8) {
+                    print(jsonString)
+                }
+
                 // Extract the "place" object
                 guard let placeDict = json?["place"] as? [String: Any] else {
                     print("❌ [MesaBackendService] fetchPlaceDetails failed to extract 'place' object from JSON")
                     throw NSError(domain: "MesaBackend", code: -2, userInfo: [NSLocalizedDescriptionKey: "Invalid JSON structure"])
                 }
+
+                // Log the place dictionary for debugging
+                print("🔍 [MesaBackendService] fetchPlaceDetails PLACE OBJECT KEYS:")
+                print(Array(placeDict.keys).sorted())
                 
                 print("🌐 [MesaBackendService] fetchPlaceDetails successfully extracted place object")
                 
@@ -529,6 +540,11 @@ class MesaBackendService {
                 detailPlace.phone = placeDict["phone"] as? String
                 detailPlace.priceLevel = placeDict["priceLevel"] as? String
                 detailPlace.rating = placeDict["rating"] as? Double
+                detailPlace.userRatingsTotal = placeDict["ratingCount"] as? Int
+
+                // Log rating extraction for debugging
+                print("⭐ [MesaBackendService] fetchPlaceDetails extracted rating: \(detailPlace.rating ?? 0)")
+                print("📊 [MesaBackendService] fetchPlaceDetails extracted ratingCount: \(detailPlace.userRatingsTotal ?? 0)")
                 detailPlace.reservable = placeDict["reservable"] as? Bool
                 detailPlace.servesBreakfast = placeDict["servesBreakfast"] as? Bool
                 detailPlace.serversLunch = placeDict["servesLunch"] as? Bool
@@ -554,5 +570,53 @@ class MesaBackendService {
         
         print("🌐 [MesaBackendService] fetchPlaceDetails starting network request...")
         task.resume()
+    }
+
+    /// Fetch review photos from Firestore for a place
+    func getReviewPhotos(for placeId: String, completion: @escaping ([String]) -> Void) {
+        let db = Firestore.firestore()
+        let reviewsRef = db.collection("places").document(placeId).collection("reviews")
+
+        // Get up to 10 reviews to ensure we find 5 photos
+        reviewsRef.limit(to: 10).getDocuments { snapshot, error in
+            guard let documents = snapshot?.documents, error == nil else {
+                print("❌ [MesaBackendService] Error fetching reviews: \(error?.localizedDescription ?? "Unknown error")")
+                completion([])
+                return
+            }
+
+            var photoUrls: [String] = []
+
+            // Loop through each review document
+            for document in documents {
+                let data = document.data()
+
+                // Extract media array from review
+                if let mediaArray = data["media"] as? [[String: Any]] {
+                    for mediaItem in mediaArray {
+                        // Check if it's an image with a URL
+                        if let type = mediaItem["type"] as? String,
+                           type == "image",
+                           let imageUrl = mediaItem["imageUrl"] as? String {
+
+                            photoUrls.append(imageUrl)
+
+                            // Stop once we have 5 photos
+                            if photoUrls.count >= 5 {
+                                break
+                            }
+                        }
+                    }
+                }
+
+                // Stop if we already have 5 photos
+                if photoUrls.count >= 5 {
+                    break
+                }
+            }
+
+            print("📸 [MesaBackendService] Found \(photoUrls.count) review photos for place \(placeId)")
+            completion(photoUrls)
+        }
     }
 }
