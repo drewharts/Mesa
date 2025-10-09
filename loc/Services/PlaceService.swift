@@ -91,17 +91,13 @@ class PlaceService: ObservableObject {
     func fetchPlace(withId placeId: String, completion: @escaping (Result<DetailPlace, Error>) -> Void) {
         let placeRef = db.collection("places").document(placeId)
         
-        print("🔥 [PlaceService] Fetching place from Firestore: \(placeId)")
-        
         placeRef.getDocument { documentSnapshot, error in
             if let error = error {
-                print("   ❌ Firestore error: \(error.localizedDescription)")
                 completion(.failure(error))
                 return
             }
             
             guard let documentSnapshot = documentSnapshot, documentSnapshot.exists else {
-                print("   ❌ Document doesn't exist in Firestore")
                 let notFoundError = NSError(domain: "FirestoreService", code: 404, userInfo: [
                     NSLocalizedDescriptionKey: "Place not found"
                 ])
@@ -109,58 +105,10 @@ class PlaceService: ObservableObject {
                 return
             }
             
-            print("   ✓ Document exists, attempting to decode...")
-            
-            // Log raw Firestore data
-            if let data = documentSnapshot.data() {
-                print("   📦 RAW FIRESTORE DATA:")
-                print("      - id: \(data["id"] as? String ?? "nil")")
-                print("      - name: \(data["name"] as? String ?? "nil")")
-                print("      - googlePlacesId: \(data["googlePlacesId"] as? String ?? "nil")")
-                print("      - google_place_id: \(data["google_place_id"] as? String ?? "nil")")
-                print("      - mapboxId: \(data["mapboxId"] as? String ?? "nil")")
-                print("      - source: \(data["source"] as? String ?? "nil")")
-                print("      - rating: \(data["rating"] as? Double ?? 0)")
-                print("      - ratingCount: \(data["ratingCount"] as? Int ?? 0)")
-                print("      - user_ratings_total: \(data["user_ratings_total"] as? Int ?? 0)")
-                print("      - categories: \((data["categories"] as? [String])?.count ?? 0) items")
-                print("      - openHours: \(data["openHours"] != nil ? "present" : "nil")")
-                print("      - coordinate: \(data["coordinate"] != nil ? "present" : "nil")")
-            }
-            
             do {
                 let detailPlace = try documentSnapshot.data(as: DetailPlace.self)
-                print("   ✅ Successfully decoded DetailPlace!")
-                print("      → Name: \(detailPlace.name)")
-                print("      → Google Place ID: \(detailPlace.googlePlaceId ?? "nil")")
-                print("      → Source: \(detailPlace.source ?? "nil")")
-                print("      → Rating: \(detailPlace.rating ?? 0)")
-                print("      → Categories: \(detailPlace.categories?.count ?? 0)")
                 completion(.success(detailPlace))
             } catch {
-                print("   ❌❌❌ DECODING FAILED:")
-                print("      Error: \(error.localizedDescription)")
-                if let decodingError = error as? DecodingError {
-                    switch decodingError {
-                    case .dataCorrupted(let context):
-                        print("      Data corrupted at: \(context.codingPath.map { $0.stringValue }.joined(separator: "."))")
-                        print("      Debug: \(context.debugDescription)")
-                    case .keyNotFound(let key, let context):
-                        print("      Key not found: \(key.stringValue)")
-                        print("      Path: \(context.codingPath.map { $0.stringValue }.joined(separator: "."))")
-                        print("      Debug: \(context.debugDescription)")
-                    case .typeMismatch(let type, let context):
-                        print("      Type mismatch: expected \(type)")
-                        print("      Path: \(context.codingPath.map { $0.stringValue }.joined(separator: "."))")
-                        print("      Debug: \(context.debugDescription)")
-                    case .valueNotFound(let type, let context):
-                        print("      Value not found: \(type)")
-                        print("      Path: \(context.codingPath.map { $0.stringValue }.joined(separator: "."))")
-                        print("      Debug: \(context.debugDescription)")
-                    @unknown default:
-                        print("      Unknown decoding error")
-                    }
-                }
                 completion(.failure(error))
             }
         }

@@ -69,17 +69,6 @@ struct PlaceListView: View {
             ForEach(places, id: \.id) { place in
                 // Wrap the row in a Button (or NavigationLink) so it's tappable
                 Button(action: {
-                    print("🖱️ [PlaceListView] User tapped place: '\(place.name)'")
-                    print("   📍 Place ID: \(place.id)")
-                    print("   🗂️ Initial data fields present:")
-                    print("      - Address: \(place.address != nil ? "✓" : "✗")")
-                    print("      - Rating: \(place.rating != nil ? "✓ (\(place.rating!))" : "✗")")
-                    print("      - Categories: \(place.categories != nil ? "✓" : "✗")")
-                    print("      - Open Hours: \(place.openHours != nil ? "✓" : "✗")")
-                    print("      - Phone: \(place.phone != nil ? "✓" : "✗")")
-                    print("      - Google ID: \(place.googlePlaceId != nil ? "✓" : "✗")")
-                    print("      - Mapbox ID: \(place.mapboxId != nil ? "✓" : "✗")")
-                    print("   → Calling selectPlaceAndFetchDetails...")
                     selectedPlaceVM.selectPlaceAndFetchDetails(place)
                     selectedPlaceVM.isDetailSheetPresented = true
                     presentationMode.wrappedValue.dismiss()
