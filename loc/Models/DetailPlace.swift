@@ -84,6 +84,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         self.categories = nil
         self.phone = nil
         self.rating = nil
+        self.userRatingsTotal = nil
         self.openHours = nil
         self.description = nil
         self.priceLevel = nil

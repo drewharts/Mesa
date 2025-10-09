@@ -96,9 +96,13 @@ class ProfileViewModel: ObservableObject {
     
     // Performance optimization: image preloading cache
     @Published var preloadedImages: [String: Bool] = [:] // [imageURL: isPreloaded]
-    
+
     // Add deduplication mechanism for TikTok URLs
     private var recentlyProcessedURLs: Set<String> = []
+
+    // Concurrency control for list loading
+    private let maxConcurrentListLoads = 2
+    private var activeListLoadTasks: [UUID: Task<Void, Never>] = [:]
     
     // Pagination for reviewed places
     @Published var isLoadingReviewedPlaces: Bool = false
@@ -686,13 +690,29 @@ class ProfileViewModel: ObservableObject {
         
         for placeId in placeIdsToLoad {
             if detailPlaceViewModel.places[placeId] == nil {
-                do {
-                    let detailPlace = try await placeService.fetchPlace(withId: placeId)
-                    detailPlaceViewModel.places[placeId] = detailPlace
-                    detailPlaceViewModel.fetchPlaceImage(for: placeId)
-                    successfullyLoadedPlaceIds.append(placeId)
-                } catch {
-                    // Ignore failed loads
+                // Retry logic for failed place loads
+                var retryCount = 0
+                let maxRetries = 2
+
+                while retryCount <= maxRetries {
+                    do {
+                        let detailPlace = try await placeService.fetchPlace(withId: placeId)
+                        await MainActor.run {
+                            detailPlaceViewModel.places[placeId] = detailPlace
+                            detailPlaceViewModel.fetchPlaceImage(for: placeId)
+                            successfullyLoadedPlaceIds.append(placeId)
+                        }
+                        break // Success, exit retry loop
+                    } catch {
+                        retryCount += 1
+                        if retryCount <= maxRetries {
+                            print("⚠️ [ProfileViewModel] Failed to load place \(placeId), retrying (\(retryCount)/\(maxRetries)): \(error.localizedDescription)")
+                            try? await Task.sleep(nanoseconds: 500_000_000 * UInt64(retryCount)) // Exponential backoff
+                        } else {
+                            print("❌ [ProfileViewModel] Failed to load place \(placeId) after \(maxRetries) retries: \(error.localizedDescription)")
+                            // Could add to a failed places list for later retry
+                        }
+                    }
                 }
             } else {
                 successfullyLoadedPlaceIds.append(placeId)
@@ -785,14 +805,28 @@ class ProfileViewModel: ObservableObject {
         
         for placeId in placeIdsToLoad {
             if detailPlaceViewModel.places[placeId] == nil {
-                do {
-                    let detailPlace = try await placeService.fetchPlace(withId: placeId)
-                    detailPlaceViewModel.places[placeId] = detailPlace
-                    detailPlaceViewModel.fetchPlaceImage(for: placeId)
-                    successfullyLoadedPlaceIds.append(placeId)
-                } catch {
-                    print("❌ Failed to load TikTok place \(placeId): \(error.localizedDescription)")
-                    // Continue with next place
+                // Retry logic for failed TikTok place loads
+                var retryCount = 0
+                let maxRetries = 2
+
+                while retryCount <= maxRetries {
+                    do {
+                        let detailPlace = try await placeService.fetchPlace(withId: placeId)
+                        await MainActor.run {
+                            detailPlaceViewModel.places[placeId] = detailPlace
+                            detailPlaceViewModel.fetchPlaceImage(for: placeId)
+                            successfullyLoadedPlaceIds.append(placeId)
+                        }
+                        break // Success, exit retry loop
+                    } catch {
+                        retryCount += 1
+                        if retryCount <= maxRetries {
+                            print("⚠️ [ProfileViewModel] Failed to load TikTok place \(placeId), retrying (\(retryCount)/\(maxRetries)): \(error.localizedDescription)")
+                            try? await Task.sleep(nanoseconds: 500_000_000 * UInt64(retryCount)) // Exponential backoff
+                        } else {
+                            print("❌ [ProfileViewModel] Failed to load TikTok place \(placeId) after \(maxRetries) retries: \(error.localizedDescription)")
+                        }
+                    }
                 }
             } else {
                 successfullyLoadedPlaceIds.append(placeId)
@@ -1370,27 +1404,52 @@ class ProfileViewModel: ObservableObject {
     
     func loadListDataIfNeeded(listId: UUID) {
         guard !loadedListIds.contains(listId) && !loadingListIds.contains(listId),
-              let userId = user?.id else { 
+              let userId = user?.id else {
             print("🔍 [ProfileViewModel] loadListDataIfNeeded: List \(listId) already loaded or loading")
-            return 
+            return
         }
-        
-        print("🔍 [ProfileViewModel] loadListDataIfNeeded: Loading data for list \(listId)")
-        loadingListIds.insert(listId)
-        
-        Task {
-            // Use DataManager to load places for this list
-            await detailPlaceViewModel.dataManager?.loadPlacesForList(listId: listId, userId: userId)
-            
-            await MainActor.run {
-                self.loadedListIds.insert(listId)
-                self.loadingListIds.remove(listId)
-                
-                // Initialize pagination for this list
-                self.initializeListPagination(listId: listId)
-                
-                print("✅ [ProfileViewModel] loadListDataIfNeeded: Successfully loaded places for list \(listId)")
+
+        // Check if we're at the concurrency limit
+        if activeListLoadTasks.count >= maxConcurrentListLoads {
+            print("🔍 [ProfileViewModel] loadListDataIfNeeded: At concurrency limit (\(maxConcurrentListLoads)), queuing list \(listId)")
+            // Queue the task for later execution
+            let task = Task {
+                // Wait for a slot to become available
+                while activeListLoadTasks.count >= maxConcurrentListLoads {
+                    try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 second
+                    if Task.isCancelled { return }
+                }
+                await self.performListLoad(listId: listId, userId: userId)
             }
+            activeListLoadTasks[listId] = task
+            return
+        }
+
+        // Execute immediately if under the limit
+        let task = Task {
+            await self.performListLoad(listId: listId, userId: userId)
+        }
+        activeListLoadTasks[listId] = task
+    }
+
+    private func performListLoad(listId: UUID, userId: String) async {
+        print("🔍 [ProfileViewModel] performListLoad: Loading data for list \(listId)")
+        await MainActor.run {
+            self.loadingListIds.insert(listId)
+        }
+
+        // Use DataManager to load places for this list
+        await detailPlaceViewModel.dataManager?.loadPlacesForList(listId: listId, userId: userId)
+
+        await MainActor.run {
+            self.loadedListIds.insert(listId)
+            self.loadingListIds.remove(listId)
+            self.activeListLoadTasks.removeValue(forKey: listId)
+
+            // Initialize pagination for this list
+            self.initializeListPagination(listId: listId)
+
+            print("✅ [ProfileViewModel] performListLoad: Successfully loaded places for list \(listId)")
         }
     }
     

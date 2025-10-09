@@ -546,14 +546,29 @@ class UserProfileViewModel: ObservableObject {
             
             // Fetch and store the place if not already present
             if detailPlaceViewModel.places[placeId] == nil {
-                do {
-                    let detailPlace = try await placeService.fetchPlace(withId: placeId)
-                    detailPlaceViewModel.places[placeId] = detailPlace
-                    detailPlaceViewModel.fetchPlaceImage(for: placeId)
-                    // Only add to successfully loaded places if we got the data
-                    successfullyLoadedPlaceIds.append(placeId)
-                } catch {
-                    print("Error fetching place for reviewed placeId \(placeId): \(error.localizedDescription)")
+                // Retry logic for failed place loads
+                var retryCount = 0
+                let maxRetries = 2
+
+                while retryCount <= maxRetries {
+                    do {
+                        let detailPlace = try await placeService.fetchPlace(withId: placeId)
+                        await MainActor.run {
+                            detailPlaceViewModel.places[placeId] = detailPlace
+                            detailPlaceViewModel.fetchPlaceImage(for: placeId)
+                            // Only add to successfully loaded places if we got the data
+                            successfullyLoadedPlaceIds.append(placeId)
+                        }
+                        break // Success, exit retry loop
+                    } catch {
+                        retryCount += 1
+                        if retryCount <= maxRetries {
+                            print("⚠️ [UserProfileViewModel] Failed to load place \(placeId), retrying (\(retryCount)/\(maxRetries)): \(error.localizedDescription)")
+                            try? await Task.sleep(nanoseconds: 500_000_000 * UInt64(retryCount)) // Exponential backoff
+                        } else {
+                            print("❌ [UserProfileViewModel] Failed to load place \(placeId) after \(maxRetries) retries: \(error.localizedDescription)")
+                        }
+                    }
                 }
             } else {
                 // Place already exists, add to successfully loaded

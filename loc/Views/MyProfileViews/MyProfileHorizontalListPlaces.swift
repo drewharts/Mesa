@@ -259,12 +259,17 @@ struct MyProfileHorizontalListPlaces: View {
                             GeometryReader { geometry in
                                 Color.clear
                                     .onAppear {
-                                        placeFrames[place.id] = geometry.frame(in: .global)
-                                        updateVisiblePlaces()
+                                        let frame = geometry.frame(in: .global)
+                                        if frame.width > 0 && frame.height > 0 {
+                                            placeFrames[place.id] = frame
+                                            updateVisiblePlaces()
+                                        }
                                     }
                                     .onChange(of: geometry.frame(in: .global)) { newFrame in
-                                        placeFrames[place.id] = newFrame
-                                        updateVisiblePlaces()
+                                        if newFrame.width > 0 && newFrame.height > 0 {
+                                            placeFrames[place.id] = newFrame
+                                            updateVisiblePlaces()
+                                        }
                                     }
                             }
                         )
@@ -341,12 +346,17 @@ struct MyProfileHorizontalListPlaces: View {
                 GeometryReader { geometry in
                     Color.clear
                         .onAppear {
-                            scrollViewFrame = geometry.frame(in: .global)
-                            updateVisiblePlaces()
+                            let frame = geometry.frame(in: .global)
+                            if frame.width > 0 && frame.height > 0 {
+                                scrollViewFrame = frame
+                                updateVisiblePlaces()
+                            }
                         }
                         .onChange(of: geometry.frame(in: .global)) { newFrame in
-                            scrollViewFrame = newFrame
-                            updateVisiblePlaces()
+                            if newFrame.width > 0 && newFrame.height > 0 {
+                                scrollViewFrame = newFrame
+                                updateVisiblePlaces()
+                            }
                         }
                 }
             )

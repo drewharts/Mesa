@@ -40,6 +40,7 @@ class SearchViewModel: ObservableObject {
         $searchText
             .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main) // 300ms delay
             .removeDuplicates() // Avoid duplicate searches
+            .filter { !$0.isEmpty } // Only search for non-empty queries
             .sink { [weak self] text in
                 print("🔍 [SearchViewModel] Search text changed: '\(text)'")
                 self?.searchPlaces(query: text)
@@ -49,21 +50,30 @@ class SearchViewModel: ObservableObject {
                     self?.placeTypeFilterVM?.filterBySearchText(text)
                 }
             }
+
+        // Handle empty search text separately to clear results immediately
+        $searchText
+            .filter { $0.isEmpty }
+            .sink { [weak self] _ in
+                print("🔍 [SearchViewModel] Search text is empty, clearing all results")
+                self?.searchResults = []
+                self?.userResults = []
+                self?.searchError = nil
+                self?.showNoPlaceFound = false
+                Task { @MainActor in
+                    self?.placeTypeFilterVM?.filterBySearchText("")
+                }
+            }
             .store(in: &cancellables)
     }
 
     func searchPlaces(query: String) {
         print("🔍 [SearchViewModel] searchPlaces called with query: '\(query)'")
-        
+
         // Clear previous results first
         searchResults = []
         searchError = nil
         showNoPlaceFound = false
-        
-        guard !query.isEmpty else {
-            print("🔍 [SearchViewModel] Query is empty, clearing results")
-            return
-        }
         
         // Get current location for location-aware search
         let latitude = locationManager.currentLocation?.coordinate.latitude
@@ -162,12 +172,6 @@ class SearchViewModel: ObservableObject {
     
     private func searchUsers(query: String) {
         print("👥 [SearchViewModel] searchUsers called with query: '\(query)'")
-        
-        guard !query.isEmpty else {
-            print("👥 [SearchViewModel] Query is empty, clearing user results")
-            userResults = []
-            return
-        }
 
         print("👥 [SearchViewModel] Calling userService.searchUsers...")
         userService.searchUsers(query: query) { [weak self] users, error in

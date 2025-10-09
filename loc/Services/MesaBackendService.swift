@@ -482,4 +482,52 @@ class MesaBackendService {
         
         task.resume()
     }
+
+    /// Fetch review photos from Firestore for a place
+    func getReviewPhotos(for placeId: String, completion: @escaping ([String]) -> Void) {
+        let db = Firestore.firestore()
+        let reviewsRef = db.collection("places").document(placeId).collection("reviews")
+
+        // Get up to 10 reviews to ensure we find 5 photos
+        reviewsRef.limit(to: 10).getDocuments { snapshot, error in
+            guard let documents = snapshot?.documents, error == nil else {
+                print("❌ [MesaBackendService] Error fetching reviews: \(error?.localizedDescription ?? "Unknown error")")
+                completion([])
+                return
+            }
+
+            var photoUrls: [String] = []
+
+            // Loop through each review document
+            for document in documents {
+                let data = document.data()
+
+                // Extract media array from review
+                if let mediaArray = data["media"] as? [[String: Any]] {
+                    for mediaItem in mediaArray {
+                        // Check if it's an image with a URL
+                        if let type = mediaItem["type"] as? String,
+                           type == "image",
+                           let imageUrl = mediaItem["imageUrl"] as? String {
+
+                            photoUrls.append(imageUrl)
+
+                            // Stop once we have 5 photos
+                            if photoUrls.count >= 5 {
+                                break
+                            }
+                        }
+                    }
+                }
+
+                // Stop if we already have 5 photos
+                if photoUrls.count >= 5 {
+                    break
+                }
+            }
+
+            print("📸 [MesaBackendService] Found \(photoUrls.count) review photos for place \(placeId)")
+            completion(photoUrls)
+        }
+    }
 }

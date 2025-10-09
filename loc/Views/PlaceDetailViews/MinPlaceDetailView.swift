@@ -214,7 +214,83 @@ struct MinPlaceDetailView: View {
                         .font(.footnote)
                         .foregroundColor(.black)
                         .fixedSize(horizontal: false, vertical: true)
-                    
+
+                    // Google Rating Display
+                    if selectedPlaceVM.placeRating > 0 {
+                        HStack(spacing: 8) {
+                            HStack(spacing: 4) {
+                                Text(String(format: "%.1f", selectedPlaceVM.placeRating))
+                                    .font(.title3)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.black)
+
+                                if let ratingCount = selectedPlaceVM.selectedPlace?.userRatingsTotal {
+                                    Text("(\(ratingCount))")
+                                        .font(.caption)
+                                        .foregroundColor(.gray)
+                                }
+                            }
+
+                            Image(systemName: "star.fill")
+                                .foregroundColor(.yellow)
+                                .font(.title3)
+
+                            ZStack {
+                                Circle()
+                                    .fill(Color.white)
+                                    .frame(width: 20, height: 20)
+                                Text("G")
+                                    .font(.system(size: 14, weight: .bold))
+                                    .foregroundColor(.blue)
+                            }
+                            .overlay(
+                                Circle()
+                                    .stroke(Color.blue.opacity(0.3), lineWidth: 1)
+                            )
+                        }
+                        .padding(.vertical, 8)
+                    }
+
+                    // Review Photos Section
+                    let reviewPhotos = selectedPlaceVM.reviewPhotosForAbout(forPlaceId: selectedPlaceVM.selectedPlace?.id.uuidString ?? "")
+                    if !reviewPhotos.isEmpty {
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack {
+                                Text("Review Photos")
+                                    .font(.headline)
+                                    .fontWeight(.bold)
+
+                                Spacer()
+
+                                Text("\(reviewPhotos.count)")
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(Color.gray.opacity(0.2))
+                                    .cornerRadius(12)
+                            }
+
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 12) {
+                                    ForEach(Array(reviewPhotos.enumerated()), id: \.offset) { index, photo in
+                                        Image(uiImage: photo)
+                                            .resizable()
+                                            .aspectRatio(contentMode: .fill)
+                                            .frame(width: 120, height: 120)
+                                            .clipped()
+                                            .cornerRadius(8)
+                                            .onTapGesture {
+                                                onPhotoTapped(reviewPhotos, index)
+                                            }
+                                    }
+                                }
+                                .padding(.horizontal, 1)
+                            }
+                        }
+                        .padding(.top, 15)
+                    }
+
                     // TikTok Videos Section
                     if !tikTokVideos.isEmpty {
                         VStack(alignment: .leading, spacing: 12) {
@@ -222,9 +298,9 @@ struct MinPlaceDetailView: View {
                                 Text("TikTok Videos")
                                     .font(.headline)
                                     .fontWeight(.bold)
-                                
+
                                 Spacer()
-                                
+
                                 Text("\(tikTokVideos.count)")
                                     .font(.caption)
                                     .foregroundColor(.gray)
@@ -233,7 +309,7 @@ struct MinPlaceDetailView: View {
                                     .background(Color.gray.opacity(0.2))
                                     .cornerRadius(12)
                             }
-                            
+
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 12) {
                                     ForEach(tikTokVideos, id: \.videoID) { video in
@@ -274,6 +350,11 @@ struct MinPlaceDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             selectedTab = defaultTab
+
+            // Load review photos for the about section when the detail view appears
+            if let place = selectedPlaceVM.selectedPlace {
+                selectedPlaceVM.loadReviewPhotosForAbout(for: place)
+            }
         }
         .onReceive(notificationManager.$highlightedReviewId) { reviewId in
             if reviewId != nil {
