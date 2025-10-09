@@ -18,6 +18,7 @@ class SelectedPlaceViewModel: ObservableObject {
     private let userService: UserService
     private let placeService: PlaceService
     private let imageService: ImageService
+    private let mesaBackendService = MesaBackendService()
     
     private let locationManager: LocationManager
     
@@ -34,6 +35,9 @@ class SelectedPlaceViewModel: ObservableObject {
                 
                 // Clear previous likes when loading a new place
                 likedReviews.removeAll()
+                
+                // Lazy load external ratings if missing
+                refreshExternalRatingsIfNeeded(for: place)
             }
         }
     }
@@ -160,6 +164,87 @@ class SelectedPlaceViewModel: ObservableObject {
                 self.isDetailSheetPresented = true
             }
             self.updateCurrentPlaceFullyLoaded()
+        }
+    }
+    
+    /// Lazy load external ratings (Google/Mapbox) if they're missing
+    private func refreshExternalRatingsIfNeeded(for place: DetailPlace) {
+        // Skip if we already have valid ratings (rating > 0 and count exists)
+        if let rating = place.rating, rating > 0, place.userRatingsTotal != nil {
+            print("📊 [SelectedPlaceViewModel] Place '\(place.name)' already has ratings (\(rating)), skipping refresh")
+            return
+        }
+        
+        // Determine source and ID for backend API call
+        let source: String
+        let placeId: String
+        
+        // Prioritize the source field from backend if available
+        if let backendSource = place.source, !backendSource.isEmpty {
+            source = backendSource
+            // Use the appropriate ID based on source
+            if backendSource == "google", let googleId = place.googlePlaceId {
+                placeId = googleId
+            } else if backendSource == "mapbox", let mapboxId = place.mapboxId {
+                placeId = mapboxId
+            } else {
+                print("📊 [SelectedPlaceViewModel] Place '\(place.name)' has source '\(backendSource)' but no matching ID")
+                return
+            }
+        } else if let mapboxId = place.mapboxId, !mapboxId.isEmpty {
+            source = "mapbox"
+            placeId = mapboxId
+        } else if let googlePlaceId = place.googlePlaceId, !googlePlaceId.isEmpty {
+            source = "google"
+            placeId = googlePlaceId
+        } else {
+            print("📊 [SelectedPlaceViewModel] Place '\(place.name)' has no external ID, cannot refresh ratings")
+            return
+        }
+        
+        print("📊 [SelectedPlaceViewModel] Fetching external ratings for '\(place.name)' from \(source)")
+        
+        mesaBackendService.fetchPlaceDetails(placeId: placeId, source: source) { [weak self] result in
+            guard let self = self else { return }
+            
+            switch result {
+            case .success(let updatedPlace):
+                DispatchQueue.main.async {
+                    // Only update if this is still the selected place
+                    guard self.selectedPlace?.id == place.id else {
+                        print("📊 [SelectedPlaceViewModel] Place changed, skipping rating update")
+                        return
+                    }
+                    
+                    // Update the selected place with fresh ratings
+                    var updatedSelectedPlace = self.selectedPlace
+                    updatedSelectedPlace?.rating = updatedPlace.rating
+                    updatedSelectedPlace?.userRatingsTotal = updatedPlace.userRatingsTotal
+                    
+                    print("✅ [SelectedPlaceViewModel] Updated ratings for '\(place.name)': \(updatedPlace.rating ?? 0) (\(updatedPlace.userRatingsTotal ?? 0) reviews)")
+                    
+                    self.selectedPlace = updatedSelectedPlace
+                    
+                    // Update Firestore in background (non-blocking)
+                    if let placeToUpdate = updatedSelectedPlace {
+                        self.updatePlaceInFirestore(placeToUpdate)
+                    }
+                }
+                
+            case .failure(let error):
+                print("❌ [SelectedPlaceViewModel] Failed to fetch ratings for '\(place.name)': \(error.localizedDescription)")
+            }
+        }
+    }
+    
+    /// Update place in Firestore with fresh data
+    private func updatePlaceInFirestore(_ place: DetailPlace) {
+        placeService.updatePlace(detailPlace: place) { error in
+            if let error = error {
+                print("❌ [SelectedPlaceViewModel] Failed to update place in Firestore: \(error.localizedDescription)")
+            } else {
+                print("✅ [SelectedPlaceViewModel] Successfully updated place '\(place.name)' in Firestore")
+            }
         }
     }
     
