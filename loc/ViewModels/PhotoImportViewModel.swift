@@ -274,6 +274,8 @@ class PhotoImportViewModel: ObservableObject {
     private func convertToDetailPlace(_ nearbyPlace: NearbyPlaceFeature) -> DetailPlace {
         var detailPlace = DetailPlace()
         
+        // TODO: This should use the backend to get/assign place IDs instead of creating them locally
+        // RISK: Hash-based UUIDs might not match backend-assigned UUIDs, causing duplicate places
         // Create a consistent UUID from the actualId by hashing it
         detailPlace.id = createConsistentUUID(from: nearbyPlace.properties.actualId)
         detailPlace.name = nearbyPlace.properties.name
@@ -304,6 +306,10 @@ class PhotoImportViewModel: ObservableObject {
         if let uuid = UUID(uuidString: string) {
             return uuid
         }
+        
+        // TODO: This hash-based approach is problematic
+        // The backend might assign different UUIDs for the same place, causing duplicates
+        // BETTER APPROACH: Send the Google Place ID to backend, let it assign/find the UUID
         
         // For non-UUID strings (like Google Place IDs), create a consistent UUID by hashing
         // This ensures the same string always produces the same UUID

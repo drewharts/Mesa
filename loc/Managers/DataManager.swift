@@ -256,6 +256,7 @@ class DataManager: ObservableObject {
     private func fetchAndStorePlaceDetails(placeId: String, userId: String, listId: String) async {
         do {
             let detailPlace = try await placeService.fetchPlace(withId: placeId)
+            
             await MainActor.run {
                 self.detailPlaceViewModel.places[placeId] = detailPlace
                 // Generate color for the place
@@ -268,7 +269,7 @@ class DataManager: ObservableObject {
                 }
             }
         } catch {
-            print("Error fetching place details: \(error.localizedDescription) (listId: \(listId), placeId: \(placeId))")
+            print("Error fetching place from Firestore: \(error.localizedDescription)")
             
             // Create fallback DetailPlace from the list data
             if let list = profileViewModel.userLists.first(where: { $0.id.uuidString == listId }),

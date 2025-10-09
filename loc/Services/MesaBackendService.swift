@@ -148,21 +148,12 @@ class MesaBackendService {
         longitude: Double? = nil,
         completion: @escaping (Result<[MesaPlaceSuggestion], Error>) -> Void
     ) {
-        // Log location information
-        if let lat = latitude, let lon = longitude {
-            print("🌐 [MesaBackendService] fetchSuggestions called with query: '\(query)', limit: \(limit), provider: '\(provider)', location: [\(lat), \(lon)]")
-        } else {
-            print("🌐 [MesaBackendService] fetchSuggestions called with query: '\(query)', limit: \(limit), provider: '\(provider)' - NO LOCATION PROVIDED")
-        }
-
         guard !query.isEmpty else {
-            print("🌐 [MesaBackendService] Query is empty, returning empty results")
             completion(.success([]))
             return
         }
 
         guard var urlComponents = URLComponents(string: "\(baseURL)/search/suggestions") else {
-            print("❌ [MesaBackendService] Failed to create URL components from: \(baseURL)/search/suggestions")
             completion(.failure(NSError(domain: "MesaBackend", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"])))
             return
         }
@@ -185,55 +176,35 @@ class MesaBackendService {
         urlComponents.queryItems = queryItems
         
         guard let url = urlComponents.url else {
-            print("❌ [MesaBackendService] Failed to create URL from components")
             completion(.failure(NSError(domain: "MesaBackend", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"])))
             return
         }
         
-        print("🌐 [MesaBackendService] Making request to: \(url.absoluteString)")
-        
         let task = session.dataTask(with: url) { data, response, error in
-            print("🌐 [MesaBackendService] Network request completed")
-            
             if let error = error {
-                print("❌ [MesaBackendService] Network error: \(error.localizedDescription)")
                 completion(.failure(error))
                 return
             }
             
             guard let httpResponse = response as? HTTPURLResponse else {
-                print("❌ [MesaBackendService] Invalid HTTP response")
                 completion(.failure(NSError(domain: "MesaBackend", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid server response"])))
                 return
             }
             
-            print("🌐 [MesaBackendService] HTTP Status Code: \(httpResponse.statusCode)")
-            
             guard (200...299).contains(httpResponse.statusCode) else {
-                print("❌ [MesaBackendService] HTTP error with status code: \(httpResponse.statusCode)")
                 completion(.failure(NSError(domain: "MesaBackend", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: "Server returned status code \(httpResponse.statusCode)"])))
                 return
             }
             
             guard let data = data else {
-                print("❌ [MesaBackendService] No data received")
                 completion(.failure(NSError(domain: "MesaBackend", code: -1, userInfo: [NSLocalizedDescriptionKey: "No data received"])))
                 return
             }
             
-            print("🌐 [MesaBackendService] Received \(data.count) bytes of data")
-            
-            // Print raw data
-            if let rawString = String(data: data, encoding: .utf8) {
-                print("📦 [MesaBackendService] Raw API Response: \(rawString)")
-            }
-            
             do {
                 let response = try JSONDecoder().decode(MesaSuggestionsResponse.self, from: data)
-                print("✅ [MesaBackendService] Successfully decoded response with \(response.suggestions.count) suggestions")
                 
                 let suggestions = response.suggestions.map { mesaSuggestion in
-                    print("🔍 [MesaBackendService] Processing suggestion: \(mesaSuggestion.name) (ID: \(mesaSuggestion.id), Source: \(mesaSuggestion.source))")
                     return MesaPlaceSuggestion(
                         id: mesaSuggestion.id,
                         name: mesaSuggestion.name,
@@ -246,36 +217,17 @@ class MesaBackendService {
                     )
                 }
                 
-                print("✅ [MesaBackendService] Successfully created \(suggestions.count) MesaPlaceSuggestion objects")
                 completion(.success(suggestions))
             } catch {
-                print("❌ [MesaBackendService] JSON decoding error: \(error.localizedDescription)")
-                
-                // Additional debugging information
-                if let decodingError = error as? DecodingError {
-                    switch decodingError {
-                    case .dataCorrupted(let context):
-                        print("❌ [MesaBackendService] Data corrupted: \(context)")
-                    case .keyNotFound(let key, let context):
-                        print("❌ [MesaBackendService] Key not found: \(key), context: \(context)")
-                    case .typeMismatch(let type, let context):
-                        print("❌ [MesaBackendService] Type mismatch: \(type), context: \(context)")
-                    case .valueNotFound(let type, let context):
-                        print("❌ [MesaBackendService] Value not found: \(type), context: \(context)")
-                    @unknown default:
-                        print("❌ [MesaBackendService] Unknown decoding error")
-                    }
-                }
-                
                 completion(.failure(error))
             }
         }
         
-        print("🌐 [MesaBackendService] Starting network request...")
         task.resume()
     }
     
     /// Handle Google place details
+    /// WARNING: This function appears to be unused/dead code
     private func handleGooglePlaceDetails(_ data: [String: Any]) -> DetailPlace {
         var additionalData: [String: String] = [:]
         
@@ -297,7 +249,8 @@ class MesaBackendService {
         
         // Create DetailPlace object
         var detailPlace = DetailPlace()
-        //TODO: I think this should be the same id that was created in the backend
+        // CRITICAL: This function should be updated to use backend-provided ID
+        // For now, creating a new UUID but this is incorrect and will orphan places
         detailPlace.id = UUID()
         detailPlace.name = data["name"] as? String ?? ""
         detailPlace.address = data["formatted_address"] as? String
@@ -311,6 +264,7 @@ class MesaBackendService {
     }
     
     /// Handle Mapbox place details
+    /// WARNING: This function appears to be unused/dead code
     private func handleMapboxPlaceDetails(_ data: [String: Any]) -> DetailPlace {
         // Create DetailPlace object
         var detailPlace = DetailPlace()
@@ -318,6 +272,8 @@ class MesaBackendService {
         // Extract the additional_data which contains most of the fields
         if let additionalData = data["additional_data"] as? [String: Any] {
             // Set basic fields
+            // CRITICAL: This function should be updated to use backend-provided ID
+            // For now, creating a new UUID but this is incorrect and will orphan places
             detailPlace.id = UUID()
             detailPlace.name = additionalData["name"] as? String ?? ""
             detailPlace.address = additionalData["full_address"] as? String
@@ -351,6 +307,7 @@ class MesaBackendService {
     }
     
     /// Handle local place details
+    /// WARNING: This function appears to be unused/dead code
     private func handleLocalPlaceDetails(_ data: [String: Any]) -> DetailPlace {
         // Create a new DetailPlace object
         var detailPlace = DetailPlace()
@@ -358,6 +315,8 @@ class MesaBackendService {
         // Extract the additional_data which contains most of the fields
         if let additionalData = data["additional_data"] as? [String: Any] {
             // Set basic fields
+            // CRITICAL: Never create a new UUID - always use the backend's ID
+            // The fallback to UUID() here is WRONG and will orphan places
             detailPlace.id = UUID(uuidString: additionalData["id"] as? String ?? "") ?? UUID()
             detailPlace.name = additionalData["name"] as? String ?? ""
             detailPlace.address = additionalData["address"] as? String
@@ -385,10 +344,7 @@ class MesaBackendService {
         query: String = "comal",
         completion: @escaping (Result<[String: Any], Error>) -> Void
     ) {
-        print("🧪 [MesaBackendService] Testing location-aware search with query: '\(query)'")
-
         guard var urlComponents = URLComponents(string: "\(baseURL)/search/test-location") else {
-            print("❌ [MesaBackendService] Failed to create URL components for test endpoint")
             completion(.failure(NSError(domain: "MesaBackend", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"])))
             return
         }
@@ -398,42 +354,33 @@ class MesaBackendService {
         ]
 
         guard let url = urlComponents.url else {
-            print("❌ [MesaBackendService] Failed to create URL from components")
             completion(.failure(NSError(domain: "MesaBackend", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"])))
             return
         }
 
-        print("🧪 [MesaBackendService] Making test request to: \(url.absoluteString)")
-
         let task = session.dataTask(with: url) { data, response, error in
             if let error = error {
-                print("❌ [MesaBackendService] Test request network error: \(error.localizedDescription)")
                 completion(.failure(error))
                 return
             }
 
             guard let httpResponse = response as? HTTPURLResponse else {
-                print("❌ [MesaBackendService] Test request invalid HTTP response")
                 completion(.failure(NSError(domain: "MesaBackend", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid server response"])))
                 return
             }
 
             guard let data = data else {
-                print("❌ [MesaBackendService] Test request no data received")
                 completion(.failure(NSError(domain: "MesaBackend", code: -1, userInfo: [NSLocalizedDescriptionKey: "No data received"])))
                 return
             }
 
             do {
                 if let json = try JSONSerialization.jsonObject(with: data, options: []) as? [String: Any] {
-                    print("✅ [MesaBackendService] Test request successful - received test results")
                     completion(.success(json))
                 } else {
-                    print("❌ [MesaBackendService] Test request failed to parse JSON")
                     completion(.failure(NSError(domain: "MesaBackend", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid JSON response"])))
                 }
             } catch {
-                print("❌ [MesaBackendService] Test request JSON parsing error: \(error.localizedDescription)")
                 completion(.failure(error))
             }
         }
@@ -462,63 +409,46 @@ class MesaBackendService {
             return
         }
         
-        print("🌐 [MesaBackendService] fetchPlaceDetails called with placeId: '\(placeId)', source: '\(source)'")
-        print("🌐 [MesaBackendService] Fetching place details from URL: \(url.absoluteString)")
-        
         let task = session.dataTask(with: url) { data, response, error in
-            print("🌐 [MesaBackendService] fetchPlaceDetails network request completed")
-            
             if let error = error {
-                print("❌ [MesaBackendService] fetchPlaceDetails network error: \(error.localizedDescription)")
                 completion(.failure(error))
                 return
             }
             
             guard let httpResponse = response as? HTTPURLResponse else {
-                print("❌ [MesaBackendService] fetchPlaceDetails invalid HTTP response")
                 completion(.failure(NSError(domain: "MesaBackend", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid server response"])))
                 return
             }
             
-            print("🌐 [MesaBackendService] fetchPlaceDetails HTTP Status Code: \(httpResponse.statusCode)")
-            
             guard (200...299).contains(httpResponse.statusCode) else {
-                print("❌ [MesaBackendService] fetchPlaceDetails HTTP error with status code: \(httpResponse.statusCode)")
                 completion(.failure(NSError(domain: "MesaBackend", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: "Server returned status code \(httpResponse.statusCode)"])))
                 return
             }
             
             guard let data = data else {
-                print("❌ [MesaBackendService] fetchPlaceDetails no data received")
                 completion(.failure(NSError(domain: "MesaBackend", code: -1, userInfo: [NSLocalizedDescriptionKey: "No data received"])))
                 return
             }
             
-            print("🌐 [MesaBackendService] fetchPlaceDetails received \(data.count) bytes of data")
-            
-            // Print raw data
-            if let rawString = String(data: data, encoding: .utf8) {
-                print("📦 [MesaBackendService] fetchPlaceDetails Raw API Response: \(rawString)")
-            }
-            
             do {
-                print("🌐 [MesaBackendService] fetchPlaceDetails attempting to parse JSON...")
-                
                 // First parse the data into a dictionary
                 let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
-                print("🌐 [MesaBackendService] fetchPlaceDetails successfully parsed JSON")
                 
                 // Extract the "place" object
                 guard let placeDict = json?["place"] as? [String: Any] else {
-                    print("❌ [MesaBackendService] fetchPlaceDetails failed to extract 'place' object from JSON")
                     throw NSError(domain: "MesaBackend", code: -2, userInfo: [NSLocalizedDescriptionKey: "Invalid JSON structure"])
                 }
                 
-                print("🌐 [MesaBackendService] fetchPlaceDetails successfully extracted place object")
-                
                 // Create a DetailPlace object manually
                 var detailPlace = DetailPlace()
-                detailPlace.id = UUID(uuidString: placeDict["id"] as? String ?? "") ?? UUID()
+                
+                // CRITICAL: Always use the backend's ID - never create a new one!
+                // Creating a new ID would orphan the place in the backend
+                guard let idString = placeDict["id"] as? String,
+                      let placeId = UUID(uuidString: idString) else {
+                    throw NSError(domain: "MesaBackend", code: -3, userInfo: [NSLocalizedDescriptionKey: "Invalid place ID from backend"])
+                }
+                detailPlace.id = placeId
                 detailPlace.name = placeDict["name"] as? String ?? ""
                 detailPlace.address = placeDict["address"] as? String
                 detailPlace.city = placeDict["city"] as? String
@@ -530,10 +460,6 @@ class MesaBackendService {
                 detailPlace.priceLevel = placeDict["priceLevel"] as? String
                 detailPlace.rating = placeDict["rating"] as? Double
                 detailPlace.userRatingsTotal = placeDict["ratingCount"] as? Int
-
-                // Log rating extraction for debugging
-                print("⭐ [MesaBackendService] fetchPlaceDetails extracted rating: \(detailPlace.rating ?? 0)")
-                print("📊 [MesaBackendService] fetchPlaceDetails extracted ratingCount: \(detailPlace.userRatingsTotal ?? 0)")
                 detailPlace.reservable = placeDict["reservable"] as? Bool
                 detailPlace.servesBreakfast = placeDict["servesBreakfast"] as? Bool
                 detailPlace.serversLunch = placeDict["servesLunch"] as? Bool
@@ -546,18 +472,14 @@ class MesaBackendService {
                    let latitude = locationDict["latitude"] as? Double,
                    let longitude = locationDict["longitude"] as? Double {
                     detailPlace.coordinate = GeoPoint(latitude: latitude, longitude: longitude)
-                    print("🌐 [MesaBackendService] fetchPlaceDetails extracted coordinates: (\(latitude), \(longitude))")
                 }
                 
-                print("✅ [MesaBackendService] fetchPlaceDetails successfully created DetailPlace: \(detailPlace.name)")
                 completion(.success(detailPlace))
             } catch {
-                print("❌ [MesaBackendService] fetchPlaceDetails error parsing place details: \(error)")
                 completion(.failure(error))
             }
         }
         
-        print("🌐 [MesaBackendService] fetchPlaceDetails starting network request...")
         task.resume()
     }
 }

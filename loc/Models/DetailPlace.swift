@@ -49,6 +49,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         case phone
         case rating
         case userRatingsTotal = "user_ratings_total"
+        case ratingCount  // Firestore uses "ratingCount"
         case openHours
         case description
         case priceLevel
@@ -60,9 +61,11 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         case X
         case tikTokVideos = "tiktok_videos"
         case googlePlaceId = "google_place_id"
+        case googlePlacesId  // Firestore uses "googlePlacesId" (with 's')
         case source
         case createdAt = "created_at"
         case photoUrls
+        case thumbnailUrl  // Firestore uses "thumbnailUrl"
     }
     
     // Custom decoding to handle backend's coordinates format
@@ -110,11 +113,27 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         self.categories = try container.decodeIfPresent([String].self, forKey: .categories)
         self.phone = try container.decodeIfPresent(String.self, forKey: .phone)
         self.rating = try container.decodeIfPresent(Double.self, forKey: .rating)
-        self.userRatingsTotal = try container.decodeIfPresent(Int.self, forKey: .userRatingsTotal)
+        
+        // Try both field names for rating count (backend uses user_ratings_total, Firestore uses ratingCount)
+        self.userRatingsTotal = try container.decodeIfPresent(Int.self, forKey: .userRatingsTotal) 
+            ?? container.decodeIfPresent(Int.self, forKey: .ratingCount)
     }
     
     private mutating func decodeExtendedProperties(from container: KeyedDecodingContainer<CodingKeys>) throws {
-        self.openHours = try container.decodeIfPresent([String].self, forKey: .openHours)
+        // Try to decode openHours as array of strings first (backend format)
+        self.openHours = try? container.decodeIfPresent([String].self, forKey: .openHours)
+        
+        // If that fails, try to decode as array of objects (Firestore format)
+        if self.openHours == nil {
+            if let openHoursObjects = try? container.decodeIfPresent([[String: String]].self, forKey: .openHours) {
+                // Convert from [{ day: "Monday", hours: "11 AM–11 PM" }] to ["Monday: 11 AM–11 PM"]
+                self.openHours = openHoursObjects.compactMap { dict in
+                    guard let day = dict["day"], let hours = dict["hours"] else { return nil }
+                    return "\(day): \(hours)"
+                }
+            }
+        }
+        
         self.description = try container.decodeIfPresent(String.self, forKey: .description)
         self.priceLevel = try container.decodeIfPresent(String.self, forKey: .priceLevel)
         self.reservable = try container.decodeIfPresent(Bool.self, forKey: .reservable)
@@ -127,10 +146,33 @@ struct DetailPlace: Codable, Identifiable, Equatable {
     
     private mutating func decodeTikTokProperties(from container: KeyedDecodingContainer<CodingKeys>) throws {
         self.tikTokVideos = try container.decodeIfPresent([TikTokVideo].self, forKey: .tikTokVideos)
-        self.googlePlaceId = try container.decodeIfPresent(String.self, forKey: .googlePlaceId)
+        
+        // Try both field names for Google Place ID (backend uses google_place_id, Firestore uses googlePlacesId)
+        let googlePlaceIdBackend = try container.decodeIfPresent(String.self, forKey: .googlePlaceId)
+        let googlePlaceIdFirestore = try container.decodeIfPresent(String.self, forKey: .googlePlacesId)
+        
+        self.googlePlaceId = googlePlaceIdBackend ?? googlePlaceIdFirestore
+        
         self.source = try container.decodeIfPresent(String.self, forKey: .source)
+        
+        // If source is nil, infer it from which external ID exists
+        if self.source == nil {
+            if self.googlePlaceId != nil && !self.googlePlaceId!.isEmpty {
+                self.source = "google"
+            } else if self.mapboxId != nil && !self.mapboxId!.isEmpty {
+                self.source = "mapbox"
+            }
+        }
+        
         self.createdAt = try container.decodeIfPresent(String.self, forKey: .createdAt)
+        
+        // Try to decode photoUrls, or use thumbnailUrl as fallback
         self.photoUrls = try container.decodeIfPresent([String].self, forKey: .photoUrls)
+        if self.photoUrls == nil || self.photoUrls?.isEmpty == true {
+            if let thumbnailUrl = try container.decodeIfPresent(String.self, forKey: .thumbnailUrl) {
+                self.photoUrls = [thumbnailUrl]
+            }
+        }
     }
     
     private static func decodeID(from container: KeyedDecodingContainer<CodingKeys>) throws -> UUID {
