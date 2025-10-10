@@ -38,37 +38,62 @@ class SelectedPlaceViewModel: ObservableObject {
 
     @Published var selectedPlace: DetailPlace? {
         didSet {
+            print("🔄 [SelectedPlaceViewModel] selectedPlace didSet triggered for: \(selectedPlace?.name ?? "nil")")
+            
             // Prevent infinite loop when updating place details
-            guard !isUpdatingPlaceDetails else { return }
+            guard !isUpdatingPlaceDetails else {
+                print("⚠️ [SelectedPlaceViewModel] Skipping didSet - isUpdatingPlaceDetails = true")
+                return
+            }
 
             if let place = selectedPlace,
                let currentLocation = locationManager.currentLocation {
+                
+                print("📍 [SelectedPlaceViewModel] Place and location available")
+                print("   - Rating: \(place.rating ?? 0)")
+                print("   - Categories: \(place.categories?.count ?? 0)")
+                print("   - UserRatingsTotal: \(place.userRatingsTotal ?? 0)")
 
                 // Check if place has complete details (rating, reviews count, categories)
                 // If not, fetch complete details from backend
                 if place.rating == nil || place.userRatingsTotal == nil || place.categories == nil || place.categories?.isEmpty == true {
+                    print("⚠️ [SelectedPlaceViewModel] Place missing details, fetching complete details...")
                     fetchCompletePlaceDetails(for: place) { [weak self] updatedPlace in
                         guard let self = self else { return }
                         DispatchQueue.main.async {
                             if let updatedPlace = updatedPlace {
+                                print("✅ [SelectedPlaceViewModel] Got complete details, updating place")
                                 // Update the selected place with complete data (without triggering didSet)
                                 self.isUpdatingPlaceDetails = true
                                 self.selectedPlace = updatedPlace
                                 self.isUpdatingPlaceDetails = false
+                                
+                                // Since we bypassed didSet, manually trigger the setup
+                                print("🎬 [SelectedPlaceViewModel] Manually calling continueWithPlaceSetup after bypass")
+                                self.continueWithPlaceSetup(place: updatedPlace, currentLocation: currentLocation.coordinate)
                             } else {
+                                print("❌ [SelectedPlaceViewModel] Failed to get complete details, continuing with current data")
                                 // If fetch failed, continue with current data
                                 self.continueWithPlaceSetup(place: place, currentLocation: currentLocation.coordinate)
                             }
                         }
                     }
                 } else {
+                    print("✅ [SelectedPlaceViewModel] Place has complete details, continuing with setup")
                     continueWithPlaceSetup(place: place, currentLocation: currentLocation.coordinate)
+                }
+            } else {
+                if selectedPlace == nil {
+                    print("⚠️ [SelectedPlaceViewModel] selectedPlace is nil, skipping setup")
+                } else {
+                    print("⚠️ [SelectedPlaceViewModel] currentLocation is nil, skipping setup")
                 }
             }
         }
     }
 
     private func continueWithPlaceSetup(place: DetailPlace, currentLocation: CLLocationCoordinate2D) {
+        print("🎬 [SelectedPlaceViewModel] continueWithPlaceSetup for '\(place.name)'")
         loadData(for: place, currentLocation: currentLocation)
         loadReviews(for: place)
 
@@ -76,7 +101,9 @@ class SelectedPlaceViewModel: ObservableObject {
         placeRating = place.rating ?? 0
 
         // Reset photo loading state for new place
+        print("🔄 [SelectedPlaceViewModel] Resetting photo loading state")
         resetPhotoLoading()
+        print("📸 [SelectedPlaceViewModel] Starting to get place photos")
         getPlacePhotos(for: place)
 
         // Clear previous likes when loading a new place
@@ -84,10 +111,10 @@ class SelectedPlaceViewModel: ObservableObject {
     }
 
     private func fetchCompletePlaceDetails(for place: DetailPlace, completion: @escaping (DetailPlace?) -> Void) {
-        // Use the place ID and try to determine source
-        let source = place.mapboxId != nil ? "mapbox" : "google" // Default fallback
+        // Backend now accepts UUID and handles everything automatically
+        let placeId = place.id.uuidString
 
-        mesaBackendService.fetchPlaceDetails(placeId: place.id.uuidString, source: source) { result in
+        mesaBackendService.fetchPlaceDetails(placeId: placeId, source: "google") { result in
             switch result {
             case .success(let completePlace):
                 completion(completePlace)
@@ -234,36 +261,12 @@ class SelectedPlaceViewModel: ObservableObject {
             return
         }
         
-        // Determine source and ID for backend API call
-        let source: String
-        let placeId: String
+        // Backend now accepts UUID and handles everything automatically
+        let placeId = place.id.uuidString
         
-        // Prioritize the source field from backend if available
-        if let backendSource = place.source, !backendSource.isEmpty {
-            source = backendSource
-            // Use the appropriate ID based on source
-            if backendSource == "google", let googleId = place.googlePlaceId {
-                placeId = googleId
-            } else if backendSource == "mapbox", let mapboxId = place.mapboxId {
-                placeId = mapboxId
-            } else {
-                print("📊 [SelectedPlaceViewModel] Place '\(place.name)' has source '\(backendSource)' but no matching ID")
-                return
-            }
-        } else if let mapboxId = place.mapboxId, !mapboxId.isEmpty {
-            source = "mapbox"
-            placeId = mapboxId
-        } else if let googlePlaceId = place.googlePlaceId, !googlePlaceId.isEmpty {
-            source = "google"
-            placeId = googlePlaceId
-        } else {
-            print("📊 [SelectedPlaceViewModel] Place '\(place.name)' has no external ID, cannot refresh ratings")
-            return
-        }
+        print("📊 [SelectedPlaceViewModel] Fetching external ratings for '\(place.name)' using UUID: \(placeId)")
         
-        print("📊 [SelectedPlaceViewModel] Fetching external ratings for '\(place.name)' from \(source)")
-        
-        mesaBackendService.fetchPlaceDetails(placeId: placeId, source: source) { [weak self] result in
+        mesaBackendService.fetchPlaceDetails(placeId: placeId, source: "google") { [weak self] result in
             guard let self = self else { return }
             
             switch result {
@@ -310,55 +313,16 @@ class SelectedPlaceViewModel: ObservableObject {
     /// Select a place and fetch fresh details from backend
     /// Use this when a user clicks on a place from lists, maps, etc.
     func selectPlaceAndFetchDetails(_ place: DetailPlace) {
-        print("🎯 [SelectedPlaceViewModel] Selecting place: '\(place.name)'")
-        print("   📋 Place data:")
-        print("      - ID: \(place.id)")
-        print("      - source: \(place.source ?? "nil")")
-        print("      - googlePlaceId: \(place.googlePlaceId ?? "nil")")
-        print("      - mapboxId: \(place.mapboxId ?? "nil")")
-        print("      - rating: \(place.rating ?? 0)")
-        print("      - userRatingsTotal: \(place.userRatingsTotal ?? 0)")
-        print("      - coordinate: lat=\(place.coordinate?.latitude ?? 0), lng=\(place.coordinate?.longitude ?? 0)")
+        print("🎯 [SelectedPlaceViewModel] Selecting place: '\(place.name)' with ID: \(place.id)")
         
-        // Determine source and ID for backend API call
-        let source: String
-        let placeId: String
+        // Backend now accepts UUID and handles everything automatically
+        // Just send the UUID as place_id and "google" as provider
+        let placeId = place.id.uuidString
         
-        // Prioritize the source field from backend if available
-        if let backendSource = place.source, !backendSource.isEmpty {
-            source = backendSource
-            // Use the appropriate ID based on source
-            if backendSource == "google", let googleId = place.googlePlaceId {
-                placeId = googleId
-            } else if backendSource == "mapbox", let mapboxId = place.mapboxId {
-                placeId = mapboxId
-            } else {
-                print("⚠️ [SelectedPlaceViewModel] Place '\(place.name)' has source '\(backendSource)' but no matching ID, using cached data")
-                print("   ❌ PROBLEM: Cannot fetch fresh data - missing external ID for source '\(backendSource)'")
-                selectedPlace = place
-                return
-            }
-        } else if let mapboxId = place.mapboxId, !mapboxId.isEmpty {
-            source = "mapbox"
-            placeId = mapboxId
-        } else if let googlePlaceId = place.googlePlaceId, !googlePlaceId.isEmpty {
-            source = "google"
-            placeId = googlePlaceId
-        } else {
-            print("⚠️ [SelectedPlaceViewModel] Place '\(place.name)' has no external ID, using cached data")
-            print("   ❌ PROBLEM: Cannot fetch fresh data - place has no googlePlaceId or mapboxId")
-            print("   💡 This place was likely added manually or the external ID was never saved")
-            selectedPlace = place
-            return
-        }
+        print("🌐 [SelectedPlaceViewModel] Fetching fresh details for '\(place.name)' using UUID: \(placeId)")
         
-        // Set the place immediately with cached data (for instant UI feedback)
-        selectedPlace = place
-        
-        print("🌐 [SelectedPlaceViewModel] Fetching fresh details for '\(place.name)' from \(source)")
-        
-        // Fetch fresh details from backend
-        mesaBackendService.fetchPlaceDetails(placeId: placeId, source: source) { [weak self] result in
+        // Fetch fresh details from backend first
+        mesaBackendService.fetchPlaceDetails(placeId: placeId, source: "google") { [weak self] result in
             guard let self = self else { return }
             
             switch result {
@@ -372,6 +336,7 @@ class SelectedPlaceViewModel: ObservableObject {
                     print("   - Rating: \(updatedPlace.rating ?? 0) (\(updatedPlace.userRatingsTotal ?? 0) reviews)")
                     
                     // Update selected place with fresh data
+                    // This will trigger didSet which handles loading reviews/photos
                     self.selectedPlace = updatedPlace
                     
                     // Update Firestore in background
@@ -380,7 +345,10 @@ class SelectedPlaceViewModel: ObservableObject {
                 
             case .failure(let error):
                 print("❌ [SelectedPlaceViewModel] Failed to fetch fresh details for '\(place.name)': \(error.localizedDescription)")
-                // Already set cached data above, so user sees something immediately
+                // Set cached data - didSet will handle loading reviews/photos
+                DispatchQueue.main.async {
+                    self.selectedPlace = place
+                }
             }
         }
     }
@@ -496,21 +464,32 @@ class SelectedPlaceViewModel: ObservableObject {
     private func getPlacePhotos(for place: DetailPlace, loadMore: Bool = false) {
         let placeId = place.id.uuidString
         
+        print("📸 [getPlacePhotos] Called for place: \(place.name) (ID: \(placeId))")
+        print("   - loadMore: \(loadMore)")
+        print("   - Current state: \(photoLoadingStates[placeId] ?? .idle)")
+        
         // Don't fetch if already loading
         if photoLoadingStates[placeId] == .loading && !loadMore {
+            print("⚠️ [getPlacePhotos] Already loading, skipping")
             return
         }
         
         DispatchQueue.main.async {
+            print("📸 [getPlacePhotos] Setting state to .loading")
             self.photoLoadingStates[placeId] = .loading
         }
         
+        print("📸 [getPlacePhotos] Fetching friends reviews...")
         // Use the same review fetching logic to get photo URLs
         userService.fetchFriendsReviews(placeId: placeId, currentUserId: Auth.auth().currentUser?.uid ?? "") { [weak self] reviews, error in
             guard let self = self else { return }
             
+            print("📸 [getPlacePhotos] Callback received")
+            print("   - Reviews count: \(reviews?.count ?? 0)")
+            print("   - Error: \(error?.localizedDescription ?? "none")")
+            
             if let error = error {
-                print("Error fetching reviews for place \(placeId): \(error.localizedDescription)")
+                print("❌ [getPlacePhotos] Error fetching reviews for place \(placeId): \(error.localizedDescription)")
                 DispatchQueue.main.async {
                     self.photoLoadingStates[placeId] = .error(error)
                     self.updateCurrentPlaceFullyLoaded()
@@ -523,8 +502,11 @@ class SelectedPlaceViewModel: ObservableObject {
                 photoURLs.append(contentsOf: review.images)
             }
             
+            print("📸 [getPlacePhotos] Extracted \(photoURLs.count) photo URLs from reviews")
+            
             // If no photos found in any reviews, mark as loaded
             if photoURLs.isEmpty {
+                print("📸 [getPlacePhotos] No photos found, marking as loaded with empty array")
                 DispatchQueue.main.async {
                     self.photoLoadingStates[placeId] = .loaded
                     self.placePhotos[placeId] = []
@@ -538,8 +520,11 @@ class SelectedPlaceViewModel: ObservableObject {
             let startIndex = self.placePhotos[placeId]?.count ?? 0
             let endIndex = min(startIndex + self.photoPageLimit, photoURLs.count)
             
+            print("📸 [getPlacePhotos] Pagination: startIndex=\(startIndex), endIndex=\(endIndex), total=\(photoURLs.count)")
+            
             guard startIndex < endIndex else {
                 // No more photos to load
+                print("📸 [getPlacePhotos] No more photos to load, marking as complete")
                 self.allPhotosLoaded = true
                 self.photoLoadingStates[placeId] = .loaded
                 self.updateCurrentPlaceFullyLoaded()
@@ -547,13 +532,18 @@ class SelectedPlaceViewModel: ObservableObject {
             }
             
             let urlsToFetch = Array(photoURLs[startIndex..<endIndex])
+            print("📸 [getPlacePhotos] Fetching \(urlsToFetch.count) images from storage...")
             
             imageService.fetchPhotosFromStorage(urls: urlsToFetch) { [weak self] images, error in
                 guard let self = self else { return }
                 
+                print("📸 [getPlacePhotos] Image fetch callback received")
+                print("   - Images count: \(images?.count ?? 0)")
+                print("   - Error: \(error?.localizedDescription ?? "none")")
+                
                 DispatchQueue.main.async {
                     if let error = error {
-                        print("Error fetching photos for place \(placeId): \(error.localizedDescription)")
+                        print("❌ [getPlacePhotos] Error fetching photos for place \(placeId): \(error.localizedDescription)")
                         self.photoLoadingStates[placeId] = .error(error)
                         self.updateCurrentPlaceFullyLoaded()
                     } else {
@@ -561,6 +551,8 @@ class SelectedPlaceViewModel: ObservableObject {
                         currentPhotos.append(contentsOf: images ?? [])
                         self.placePhotos[placeId] = currentPhotos
                         self.photoLoadingStates[placeId] = .loaded
+                        
+                        print("✅ [getPlacePhotos] Successfully loaded photos. Total now: \(currentPhotos.count)")
                         
                         // Check if all photos have been loaded
                         if currentPhotos.count >= photoURLs.count {
