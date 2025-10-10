@@ -215,42 +215,6 @@ struct MinPlaceDetailView: View {
                         .foregroundColor(.black)
                         .fixedSize(horizontal: false, vertical: true)
 
-                    // Google Rating Display
-                    if selectedPlaceVM.placeRating > 0 {
-                        HStack(spacing: 8) {
-                            HStack(spacing: 4) {
-                                Text(String(format: "%.1f", selectedPlaceVM.placeRating))
-                                    .font(.title3)
-                                    .fontWeight(.semibold)
-                                    .foregroundColor(.black)
-
-                                if let ratingCount = selectedPlaceVM.selectedPlace?.userRatingsTotal {
-                                    Text("(\(ratingCount))")
-                                        .font(.caption)
-                                        .foregroundColor(.gray)
-                                }
-                            }
-
-                            Image(systemName: "star.fill")
-                                .foregroundColor(.yellow)
-                                .font(.title3)
-
-                            ZStack {
-                                Circle()
-                                    .fill(Color.white)
-                                    .frame(width: 20, height: 20)
-                                Text("G")
-                                    .font(.system(size: 14, weight: .bold))
-                                    .foregroundColor(.blue)
-                            }
-                            .overlay(
-                                Circle()
-                                    .stroke(Color.blue.opacity(0.3), lineWidth: 1)
-                            )
-                        }
-                        .padding(.vertical, 8)
-                    }
-
                     // Review Photos Section
                     let reviewPhotos = selectedPlaceVM.reviewPhotosForAbout(forPlaceId: selectedPlaceVM.selectedPlace?.id.uuidString ?? "")
                     if !reviewPhotos.isEmpty {
