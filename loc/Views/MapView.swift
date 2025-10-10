@@ -59,7 +59,11 @@ struct MapView: View {
                                 annotationImage: detailPlaceVM.placeAnnotations[place.place.id.uuidString]
                             )
                             .onTapGesture {
+                                // Set selected place first (instant, shows cached data)
                                 selectedPlaceVM.selectedPlace = place.place
+                                // Show sheet immediately for instant feedback
+                                selectedPlaceVM.isDetailSheetPresented = true
+                                // Background data fetching and loading happens automatically via didSet
                             }
                         }
                     }

@@ -246,7 +246,8 @@ class SelectedPlaceViewModel: ObservableObject {
         
         DispatchQueue.main.async {
             self.isRestaurantOpen = openNow
-            if self.allowAutoPresent {
+            // Only auto-present if allowed and not already presented
+            if self.allowAutoPresent && !self.isDetailSheetPresented {
                 self.isDetailSheetPresented = true
             }
             self.updateCurrentPlaceFullyLoaded()
