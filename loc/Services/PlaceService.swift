@@ -418,4 +418,64 @@ class PlaceService: ObservableObject {
         let placeRef = db.collection("places").document(placeId)
         try await placeRef.delete()
     }
-} 
+    
+    // MARK: - Viewport-Based Place Loading
+    
+    /// Fetch places within a geographic bounding box (viewport)
+    /// This is the key optimization - only load places visible on the map
+    func fetchPlacesInViewport(
+        northLat: Double,
+        southLat: Double,
+        eastLng: Double,
+        westLng: Double
+    ) async throws -> [DetailPlace] {
+        print("🗺️ [PlaceService] Fetching places in viewport:")
+        print("   Lat: \(southLat) to \(northLat)")
+        print("   Lng: \(westLng) to \(eastLng)")
+        
+        // Query Firestore with geographic bounds
+        // Uses composite index on (latitude, longitude)
+        let query = db.collection("places")
+            .whereField("latitude", isGreaterThanOrEqualTo: southLat)
+            .whereField("latitude", isLessThanOrEqualTo: northLat)
+            .whereField("longitude", isGreaterThanOrEqualTo: westLng)
+            .whereField("longitude", isLessThanOrEqualTo: eastLng)
+        
+        let snapshot = try await query.getDocuments()
+        
+        let places = snapshot.documents.compactMap { doc -> DetailPlace? in
+            do {
+                return try doc.data(as: DetailPlace.self)
+            } catch {
+                print("⚠️ [PlaceService] Error decoding place \(doc.documentID): \(error.localizedDescription)")
+                return nil
+            }
+        }
+        
+        print("✅ [PlaceService] Loaded \(places.count) places in viewport")
+        return places
+    }
+    
+    /// Fetch specific places by their IDs (for user's saved places)
+    func fetchPlacesByIds(_ placeIds: [String]) async throws -> [DetailPlace] {
+        guard !placeIds.isEmpty else { return [] }
+        
+        // Firestore 'in' queries are limited to 30 items at a time
+        let batchSize = 30
+        var allPlaces: [DetailPlace] = []
+        
+        for batch in placeIds.chunked(into: batchSize) {
+            let query = db.collection("places")
+                .whereField(FieldPath.documentID(), in: batch)
+            
+            let snapshot = try await query.getDocuments()
+            let places = snapshot.documents.compactMap { doc -> DetailPlace? in
+                try? doc.data(as: DetailPlace.self)
+            }
+            allPlaces.append(contentsOf: places)
+        }
+        
+        print("✅ [PlaceService] Loaded \(allPlaces.count) places by IDs")
+        return allPlaces
+    }
+}

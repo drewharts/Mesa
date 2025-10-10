@@ -13,6 +13,7 @@ struct MapView: View {
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var detailPlaceVM: DetailPlaceViewModel
     @EnvironmentObject var placeTypeFilterVM: PlaceTypeFilterViewModel
+    @EnvironmentObject var mapViewModel: MapViewModel
 
     @Binding var recenterMap: Bool
     var isSearchBarMinimized: Bool = true
@@ -27,6 +28,7 @@ struct MapView: View {
     @State private var mapRefreshToggle = false
     @State private var showVisiblePlacesPopup = false
     @State private var currentMapRegion: MKCoordinateRegion?
+    @State private var hasLoadedInitialViewport = false
     
     var onMapTap: (() -> Void)?
     
@@ -84,6 +86,10 @@ struct MapView: View {
                 .ignoresSafeArea()
                 .onMapCameraChange { context in
                     currentMapRegion = context.region
+                    
+                    // 🔄 CRITICAL: Dynamic loading on every viewport change
+                    // This fires when user pans or zooms the map
+                    mapViewModel.onMapRegionChange(context.region)
                 }
                 .gesture(
                     LongPressGesture(minimumDuration: 0.7)
@@ -199,6 +205,14 @@ struct MapView: View {
 
             // Setup notification observers
             setupNotificationObservers()
+            
+            // 🚀 Load initial viewport places
+            if !hasLoadedInitialViewport, let region = currentMapRegion {
+                Task {
+                    await mapViewModel.loadInitialViewportPlaces(region)
+                    hasLoadedInitialViewport = true
+                }
+            }
         }
          .onDisappear {
              // Remove notification observers
@@ -213,6 +227,28 @@ struct MapView: View {
 
             // Calculate most frequent types
             placeTypeFilterVM.refreshMostFrequentTypes()
+            
+            // 🚀 Load initial viewport if we have a region
+            if !hasLoadedInitialViewport {
+                // Give the map a moment to settle and provide a region
+                try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+                
+                if let region = currentMapRegion {
+                    await mapViewModel.loadInitialViewportPlaces(region)
+                    hasLoadedInitialViewport = true
+                    print("✅ [MapView] Initial viewport loaded")
+                } else {
+                    // Create a region from the current map position
+                    let coords = locationManager.currentLocation?.coordinate ?? defaultCenter
+                    let region = MKCoordinateRegion(
+                        center: coords,
+                        span: MKCoordinateSpan(latitudeDelta: 0.1, longitudeDelta: 0.1)
+                    )
+                    await mapViewModel.loadInitialViewportPlaces(region)
+                    hasLoadedInitialViewport = true
+                    print("✅ [MapView] Initial viewport loaded with default region")
+                }
+            }
         }
         .sheet(isPresented: $showVisiblePlacesPopup) {
             VisiblePlacesPopupView(mapRegion: currentMapRegion)

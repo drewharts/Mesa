@@ -21,6 +21,7 @@ struct locApp: App {
     @StateObject private var deepLinkManager: DeepLinkManager
     @StateObject private var deepLinkViewModel: DeepLinkViewModel
     @StateObject private var placeTypeFilterViewModel: PlaceTypeFilterViewModel
+    @StateObject private var mapViewModel: MapViewModel
     
     private let dataManager: DataManager
     private let serviceContainer = ServiceContainer.shared
@@ -110,10 +111,18 @@ struct locApp: App {
             locationManager: location
         )
         
+        let mapVM = MapViewModel(
+            placeService: services.placeService,
+            detailPlaceVM: detailVM
+        )
+        
         let placeTypeFilterVM = PlaceTypeFilterViewModel(
             detailPlaceVM: detailVM,
             profileVM: profileVM
         )
+        
+        // Wire up MapViewModel to PlaceTypeFilterViewModel
+        placeTypeFilterVM.mapViewModel = mapVM
         
         self._locationManager = StateObject(wrappedValue: location)
         self._userSession = StateObject(wrappedValue: userSess)
@@ -126,6 +135,7 @@ struct locApp: App {
         self._deepLinkManager = StateObject(wrappedValue: deepLinkMgr)
         self._deepLinkViewModel = StateObject(wrappedValue: deepLinkVM)
         self._placeTypeFilterViewModel = StateObject(wrappedValue: placeTypeFilterVM)
+        self._mapViewModel = StateObject(wrappedValue: mapVM)
         
         // Pass user service to AppDelegate
         appDelegate.userService = services.userService
@@ -148,6 +158,7 @@ struct locApp: App {
                 .environmentObject(deepLinkManager)
                 .environmentObject(deepLinkViewModel)
                 .environmentObject(placeTypeFilterViewModel)
+                .environmentObject(mapViewModel)
                 .preferredColorScheme(.light)
                 .onOpenURL { url in
                     // Handle deep links for places

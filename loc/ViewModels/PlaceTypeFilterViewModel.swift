@@ -21,6 +21,9 @@ class PlaceTypeFilterViewModel: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     private var recalculationTimer: Timer?
     
+    // Optional MapViewModel for viewport places
+    weak var mapViewModel: MapViewModel?
+    
     init(detailPlaceVM: DetailPlaceViewModel, profileVM: ProfileViewModel) {
         self.detailPlaceVM = detailPlaceVM
         self.profileVM = profileVM
@@ -185,12 +188,15 @@ class PlaceTypeFilterViewModel: ObservableObject {
     // MARK: - Filtering Logic
     
     func getFilteredPlaces() -> [DetailPlace] {
+        // Get all places to display (viewport + saved places)
+        let allPlaces = getAllDisplayPlaces()
+        
         guard !selectedPlaceTypes.isEmpty else {
-            return detailPlaceVM.savedDetailPlaces
+            return allPlaces
         }
         
         // First pass: Calculate missing place types on-demand for filtering
-        let placesToCalculate = detailPlaceVM.savedDetailPlaces.filter { place in
+        let placesToCalculate = allPlaces.filter { place in
             detailPlaceVM.placeTypes[place.id.uuidString] == nil
         }
         
@@ -202,7 +208,7 @@ class PlaceTypeFilterViewModel: ObservableObject {
         }
         
         // Second pass: Apply filtering with all types calculated
-        let filteredPlaces = detailPlaceVM.savedDetailPlaces.filter { place in
+        let filteredPlaces = allPlaces.filter { place in
             let placeId = place.id.uuidString
             
             guard let placeType = detailPlaceVM.placeTypes[placeId] else { 
@@ -213,6 +219,17 @@ class PlaceTypeFilterViewModel: ObservableObject {
         }
         
         return filteredPlaces
+    }
+    
+    /// Get all places to display (combines viewport places with user's saved places)
+    private func getAllDisplayPlaces() -> [DetailPlace] {
+        // If we have a MapViewModel, use its combined places
+        if let mapVM = mapViewModel {
+            return mapVM.getAllDisplayPlaces()
+        }
+        
+        // Fallback to saved places only (for non-map views)
+        return detailPlaceVM.savedDetailPlaces
     }
     
     // Helper method to determine if a place type should be included based on selected filters
