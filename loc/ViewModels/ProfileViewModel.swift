@@ -59,6 +59,7 @@ class ProfileViewModel: ObservableObject {
     private var deepLinkManager: DeepLinkManager?
     private var deepLinkViewModel: DeepLinkViewModel?
     var userProfileViewModel: UserProfileViewModel?
+    weak var mapViewModel: MapViewModel?  // For updating friends' places in viewport
 
      @Published var showMaxFavoritesAlert: Bool = false
      @Published var isLoading: Bool = true
@@ -227,6 +228,9 @@ class ProfileViewModel: ObservableObject {
             self.userFollowing.removeAll { $0.id == userId }
             self.followingCount = max(0, self.followingCount - 1)
             
+            // Update friend IDs in MapViewModel for viewport filtering
+            updateMapViewModelFriendIds()
+            
             // Make the actual API call
             userService.unfollowUser(followerId: currentUserId, followingId: userId) { [weak self] success, error in
                 if !success {
@@ -234,6 +238,7 @@ class ProfileViewModel: ObservableObject {
                     DispatchQueue.main.async {
                         self?.userFollowing = originalUserFollowing
                         self?.followingCount = originalFollowingCount
+                        self?.updateMapViewModelFriendIds()
                         // Show error alert
                         self?.showFollowError = true
                         self?.followErrorMessage = "Failed to unfollow user. Please try again."
@@ -250,7 +255,11 @@ class ProfileViewModel: ObservableObject {
                     // Fetch the ProfileData for the followed user and add to userFollowing
                     self?.userService.fetchUserById(userId: userId) { result in
                         if case .success(let profileData) = result {
-                            self?.userFollowing.append(profileData)
+                            DispatchQueue.main.async {
+                                self?.userFollowing.append(profileData)
+                                // Update friend IDs in MapViewModel for viewport filtering
+                                self?.updateMapViewModelFriendIds()
+                            }
                         }
                     }
                 } else {
@@ -264,6 +273,14 @@ class ProfileViewModel: ObservableObject {
                     }
                 }
             }
+        }
+    }
+    
+    /// Update friend IDs in MapViewModel for viewport filtering
+    private func updateMapViewModelFriendIds() {
+        let friendIds = userFollowing.map { $0.id }
+        Task { @MainActor in
+            mapViewModel?.updateFriendIds(friendIds)
         }
     }
     

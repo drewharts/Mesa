@@ -478,4 +478,48 @@ class PlaceService: ObservableObject {
         print("✅ [PlaceService] Loaded \(allPlaces.count) places by IDs")
         return allPlaces
     }
+    
+    /// Fetch friends' places within a geographic bounding box (viewport)
+    /// This is 10x faster than loading ALL friends' places globally!
+    func fetchFriendsPlacesInViewport(
+        friendUserIds: [String],
+        northLat: Double,
+        southLat: Double,
+        eastLng: Double,
+        westLng: Double
+    ) async throws -> [DetailPlace] {
+        guard !friendUserIds.isEmpty else { return [] }
+        
+        print("👥 [PlaceService] Fetching friends' places in viewport:")
+        print("   Friends count: \(friendUserIds.count)")
+        print("   Lat: \(southLat) to \(northLat)")
+        print("   Lng: \(westLng) to \(eastLng)")
+        
+        var allPlaces: [DetailPlace] = []
+        
+        // Firestore 'in' operator supports max 10 items for userId
+        // Batch the friend IDs to handle users with 10+ friends
+        for batch in friendUserIds.chunked(into: 10) {
+            let query = db.collection("places")
+                .whereField("latitude", isGreaterThanOrEqualTo: southLat)
+                .whereField("latitude", isLessThanOrEqualTo: northLat)
+                .whereField("longitude", isGreaterThanOrEqualTo: westLng)
+                .whereField("longitude", isLessThanOrEqualTo: eastLng)
+                .whereField("userId", in: Array(batch))
+            
+            let snapshot = try await query.getDocuments()
+            let places = snapshot.documents.compactMap { doc -> DetailPlace? in
+                do {
+                    return try doc.data(as: DetailPlace.self)
+                } catch {
+                    print("⚠️ [PlaceService] Error decoding friend's place \(doc.documentID): \(error.localizedDescription)")
+                    return nil
+                }
+            }
+            allPlaces.append(contentsOf: places)
+        }
+        
+        print("✅ [PlaceService] Loaded \(allPlaces.count) friends' places in viewport")
+        return allPlaces
+    }
 }

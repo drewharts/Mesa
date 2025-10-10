@@ -124,6 +124,9 @@ struct locApp: App {
         // Wire up MapViewModel to PlaceTypeFilterViewModel
         placeTypeFilterVM.mapViewModel = mapVM
         
+        // Wire up ProfileViewModel to MapViewModel (for friends' places viewport filtering)
+        profileVM.mapViewModel = mapVM
+        
         self._locationManager = StateObject(wrappedValue: location)
         self._userSession = StateObject(wrappedValue: userSess)
         self._profileViewModel = StateObject(wrappedValue: profileVM)

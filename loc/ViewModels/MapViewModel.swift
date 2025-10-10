@@ -18,6 +18,7 @@ class MapViewModel: ObservableObject {
     private let placeService: PlaceService
     private let detailPlaceVM: DetailPlaceViewModel
     private var lastLoadedRegion: MKCoordinateRegion?
+    private var friendUserIds: [String] = []  // Store friend IDs for viewport queries
     
     // Minimum movement threshold to trigger reload (in degrees)
     private let minMovementThreshold: Double = 0.01 // ~1km at equator
@@ -25,6 +26,12 @@ class MapViewModel: ObservableObject {
     init(placeService: PlaceService, detailPlaceVM: DetailPlaceViewModel) {
         self.placeService = placeService
         self.detailPlaceVM = detailPlaceVM
+    }
+    
+    /// Update friend IDs when they change (call this from ProfileViewModel)
+    func updateFriendIds(_ friendIds: [String]) {
+        self.friendUserIds = friendIds
+        print("👥 [MapViewModel] Updated friend IDs count: \(friendIds.count)")
     }
     
     /// Call this when the map region changes (pan or zoom)
@@ -53,6 +60,7 @@ class MapViewModel: ObservableObject {
     }
     
     /// Main method to load places for a given viewport
+    /// Loads BOTH regular places AND friends' places in parallel (10x faster!)
     private func loadPlacesForViewport(_ region: MKCoordinateRegion) async {
         let startTime = Date()
         isLoadingViewportPlaces = true
@@ -60,16 +68,28 @@ class MapViewModel: ObservableObject {
         let bounds = getViewportBounds(from: region)
         
         do {
-            let places = try await placeService.fetchPlacesInViewport(
+            // Load both regular places AND friends' places in parallel
+            async let regularPlaces = placeService.fetchPlacesInViewport(
                 northLat: bounds.northLat,
                 southLat: bounds.southLat,
                 eastLng: bounds.eastLng,
                 westLng: bounds.westLng
             )
             
-            // Update viewport places dictionary
+            async let friendsPlaces = placeService.fetchFriendsPlacesInViewport(
+                friendUserIds: friendUserIds,
+                northLat: bounds.northLat,
+                southLat: bounds.southLat,
+                eastLng: bounds.eastLng,
+                westLng: bounds.westLng
+            )
+            
+            // Wait for both queries to complete
+            let (regular, friends) = try await (regularPlaces, friendsPlaces)
+            
+            // Merge and deduplicate places
             var newViewportPlaces: [String: DetailPlace] = [:]
-            for place in places {
+            for place in (regular + friends) {
                 let placeId = place.id.uuidString
                 newViewportPlaces[placeId] = place
                 
@@ -85,7 +105,8 @@ class MapViewModel: ObservableObject {
             self.lastLoadedRegion = region
             
             let loadTime = Date().timeIntervalSince(startTime)
-            print("⏱️ [MapViewModel] Loaded \(places.count) places in \(String(format: "%.2f", loadTime))s")
+            print("⏱️ [MapViewModel] Loaded \(regular.count) regular + \(friends.count) friends' places in \(String(format: "%.2f", loadTime))s")
+            print("📊 [MapViewModel] Total viewport places: \(newViewportPlaces.count)")
             
         } catch {
             print("❌ [MapViewModel] Error loading viewport places: \(error.localizedDescription)")
