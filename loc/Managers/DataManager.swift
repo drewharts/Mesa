@@ -40,63 +40,108 @@ class DataManager: ObservableObject {
     }
 
     func initializeProfileData(userId: String) async {
+        let startTime = Date()
+        print("🚀 [DataManager] Starting LAZY LOADING initialization...")
+        
         startDataLoadingFlags()
         
-        // PHASE 1: Load critical user data in parallel (fastest to show something to user)
-        await loadCriticalUserData(userId: userId)
+        // PHASE 1: Load ONLY metadata (IDs, not full place documents) - INSTANT!
+        await loadMinimalStartupData(userId: userId)
         
-        // PHASE 2: Load remaining user data in parallel
-        await loadRemainingUserData(userId: userId)
+        let loadTime = Date().timeIntervalSince(startTime)
+        print("✅ [DataManager] Minimal data loaded in \(String(format: "%.2f", loadTime))s")
+        print("🗺️ [DataManager] Map can show NOW! Viewport loading will handle place details.")
         
-        // PHASE 3: Load social data in background (non-blocking)
+        // PHASE 2: Background tasks (don't block map from showing)
         Task.detached { [weak self] in
-            await self?.loadSocialDataInBackground(userId: userId)
+            await self?.loadBackgroundData(userId: userId)
         }
-        
-        calculateMapAnnotations()
     }
     
-    // PHASE 1: Load most important user data first (parallel)
-    private func loadCriticalUserData(userId: String) async {
-        async let profileData: () = loadProfileData(userId: userId)
-        async let myPlaces: () = loadUserMyPlaces(userId: userId)
-        async let favorites: () = loadUserFavoritePlaces(userId: userId)
+    // PHASE 1: Load ONLY what's needed to show the map - FAST! (< 0.3s)
+    private func loadMinimalStartupData(userId: String) async {
+        print("📋 [DataManager] Loading minimal startup data (IDs only)...")
         
-        // Wait for critical data to complete
-        await profileData
-        await myPlaces
-        await favorites
-    }
-    
-    // PHASE 2: Load remaining user data (parallel)
-    private func loadRemainingUserData(userId: String) async {
-        async let placeLists: () = loadUserPlaceLists(userId: userId)
-        async let reviewedPlaces: () = loadUserReviewedPlaces(userId: userId)
+        async let profile: () = loadProfileData(userId: userId)
+        async let placeIds: () = loadUserPlaceIdsOnly(userId: userId)
+        async let friendIds: () = loadFriendIdsOnly(userId: userId)
         async let followCounts: () = fetchFollowerAndFollowingCountsAsync(userId: userId)
-        async let externalPlaces: () = loadUserExternalPlaces(userId: userId)
         
-        // Wait for remaining user data
-        await placeLists
-        await reviewedPlaces
+        // Wait for all to complete (should be < 0.3s total)
+        await profile
+        await placeIds
+        await friendIds
         await followCounts
-        await externalPlaces
+        
+        print("✅ [DataManager] Minimal startup data loaded - map ready to show!")
     }
     
-    // PHASE 3: Load social data without blocking UI
-    private func loadSocialDataInBackground(userId: String) async {
+    // PHASE 2: Load everything else in background (non-blocking)
+    private func loadBackgroundData(userId: String) async {
+        print("🔄 [DataManager] Loading background data...")
+        
+        // Load external places and social data
+        async let externalPlaces: () = loadUserExternalPlaces(userId: userId)
         async let following: () = loadFollowing(userId: userId)
         async let followers: () = loadFollowers(userId: userId)
         
-        // Wait for social connections
+        await externalPlaces
         await following
         await followers
         
-        // Load reviewed places for following users
-        await loadReviewedPlacesForFollowing(userId: userId)
+        print("✅ [DataManager] Background data loaded")
         
         // Update annotations after social data loads
         await MainActor.run {
             calculateMapAnnotations()
+        }
+    }
+    
+    // NEW: Load only place IDs, not full place documents
+    private func loadUserPlaceIdsOnly(userId: String) async {
+        do {
+            print("📋 [DataManager] Loading place IDs only (no full documents)...")
+            
+            async let favoriteIds = try await userService.fetchFavoritePlaceIds(userId)
+            async let myPlaceIds = try await placeService.fetchMyPlaceIds(userId)
+            async let listMetadata = try await placeService.fetchListMetadata(userId)
+            
+            let (favIds, myIds, lists) = try await (favoriteIds, myPlaceIds, listMetadata)
+            
+            await MainActor.run {
+                profileViewModel.userFavorites = favIds
+                profileViewModel.myPlaces = myIds
+                profileViewModel.userLists = lists
+                
+                // Initialize empty place arrays for lazy loading
+                profileViewModel.userListsPlaces = lists.reduce(into: [String: [String]]()) { result, list in
+                    result[list.id.uuidString] = []
+                }
+                
+                print("✅ Loaded \(favIds.count) favorite IDs")
+                print("✅ Loaded \(myIds.count) myPlace IDs")
+                print("✅ Loaded \(lists.count) list metadata")
+                
+                profileViewModel.isMyPlacesLoading = false
+            }
+        } catch {
+            print("❌ [DataManager] Error loading place IDs: \(error.localizedDescription)")
+        }
+    }
+    
+    // NEW: Load only friend IDs, not full profile/place data
+    private func loadFriendIdsOnly(userId: String) async {
+        do {
+            let friendIds = try await userService.fetchFriendIds(userId)
+            
+            await MainActor.run {
+                // Pass friend IDs to MapViewModel for viewport filtering
+                profileViewModel.mapViewModel?.updateFriendIds(friendIds)
+                
+                print("✅ Loaded \(friendIds.count) friend IDs")
+            }
+        } catch {
+            print("❌ [DataManager] Error loading friend IDs: \(error.localizedDescription)")
         }
     }
 
@@ -109,6 +154,45 @@ class DataManager: ObservableObject {
     
     func calculateMapAnnotations() {
         detailPlaceViewModel.calculateAnnotationPlaces()
+    }
+    
+    // MARK: - Lazy Loading Methods (Load on-demand)
+    
+    /// Load full place details for user's saved places (call when user opens profile)
+    func loadUserSavedPlaces(userId: String) async {
+        print("📱 [DataManager] Loading user's saved places on-demand...")
+        
+        // Collect all unique place IDs from favorites and myPlaces
+        let allPlaceIds = Set(profileViewModel.userFavorites + profileViewModel.myPlaces)
+        
+        guard !allPlaceIds.isEmpty else {
+            print("ℹ️ [DataManager] No saved places to load")
+            return
+        }
+        
+        do {
+            let places = try await placeService.fetchPlacesByIds(Array(allPlaceIds))
+            
+            await MainActor.run {
+                for place in places {
+                    let placeId = place.id.uuidString
+                    detailPlaceViewModel.places[placeId] = place
+                    detailPlaceViewModel.generateColorForPlace(placeId)
+                    detailPlaceViewModel.calculateRestaurantType(for: place)
+                    
+                    // Update place savers
+                    if detailPlaceViewModel.placeSavers[placeId] == nil {
+                        detailPlaceViewModel.placeSavers[placeId] = [userId]
+                    } else if !detailPlaceViewModel.placeSavers[placeId]!.contains(userId) {
+                        detailPlaceViewModel.placeSavers[placeId]!.append(userId)
+                    }
+                }
+                
+                print("✅ [DataManager] Loaded \(places.count) saved places on-demand")
+            }
+        } catch {
+            print("❌ [DataManager] Error loading saved places: \(error.localizedDescription)")
+        }
     }
     
     func loadUserMyPlaces(userId: String) async {
@@ -377,37 +461,22 @@ class DataManager: ObservableObject {
             // Store the profiles in the profileViewModel
             self.profileViewModel.userFollowing = profiles
             
-            // Load profile pictures first (quick)
+            // Load profile pictures (quick and useful)
             for profile in profiles {
                 if let profilePhotoURL = profile.profilePhotoURL {
                     self.AddProfilePicture(userId: profile.id, profilePhotoUrl: profilePhotoURL)
                 }
             }
             
-            // Load places data for following users in background with limited concurrency
-            await loadFollowingPlacesDataOptimized(profiles: profiles)
+            // ✅ OPTIMIZATION: Don't load friends' places on startup anymore!
+            // Friends' places will be loaded via viewport queries automatically
+            // This saves 1,000+ Firestore reads on startup
+            
+            print("✅ [DataManager] Loaded \(profiles.count) friend profiles (places will load via viewport)")
         } catch {
             print("Error loading following profiles: \(error.localizedDescription)")
         }
         profileViewModel.isFollowingListLoading = false
-    }
-    
-    // Optimized loading for following users' place data
-    private func loadFollowingPlacesDataOptimized(profiles: [ProfileData]) async {
-        // Process in smaller batches to avoid overwhelming the system
-        let batchSize = 5
-        for batch in profiles.chunked(into: batchSize) {
-            await withTaskGroup(of: Void.self) { group in
-                for profile in batch {
-                    group.addTask {
-                        async let favorites: () = self.loadUserFavoritePlaces(userId: profile.id, forUser: profile)
-                        async let lists: () = self.loadUserPlaceLists(userId: profile.id, forUser: profile)
-                        await favorites
-                        await lists
-                    }
-                }
-            }
-        }
     }
 
     

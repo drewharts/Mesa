@@ -317,6 +317,9 @@ struct StateChangesModifier: ViewModifier {
                     selectedPlaceVM: selectedPlaceVM,
                     placeVM: placeVM
                 )
+                
+                // 🚀 LAZY LOADING: Load saved places on-demand (only when user opens profile)
+                profile.loadSavedPlacesIfNeeded()
             }
             .onChange(of: showCreateReview) {
                 handleCreateReviewChange()
