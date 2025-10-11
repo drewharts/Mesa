@@ -563,8 +563,13 @@ class PlaceService: ObservableObject {
             return PlaceList(
                 id: UUID(uuidString: doc.documentID) ?? UUID(),
                 name: listName,
+                places: places,
+                city: data["city"] as? String ?? "",
+                emoji: data["emoji"] as? String ?? "📍",
                 image: data["image"] as? String,
-                places: places
+                sortOrder: data["sortOrder"] as? Int ?? 0,
+                averageCoordinate: data["averageCoordinate"] as? GeoPoint,
+                lastCoordinateUpdate: (data["lastCoordinateUpdate"] as? Timestamp)?.dateValue()
             )
         }
     }
