@@ -67,60 +67,50 @@ class MapViewModel: ObservableObject {
         
         let bounds = getViewportBounds(from: region)
         
-        // Load regular places (always works)
-        var regular: [DetailPlace] = []
         do {
-            regular = try await placeService.fetchPlacesInViewport(
+            // Load both regular places AND friends' places in parallel
+            async let regularPlaces = placeService.fetchPlacesInViewport(
                 northLat: bounds.northLat,
                 southLat: bounds.southLat,
                 eastLng: bounds.eastLng,
                 westLng: bounds.westLng
             )
-            print("✅ [MapViewModel] Loaded \(regular.count) regular places")
-        } catch {
-            print("❌ [MapViewModel] Error loading regular viewport places: \(error.localizedDescription)")
-        }
-        
-        // Load friends' places (may fail if index not created yet - that's OK!)
-        var friends: [DetailPlace] = []
-        do {
-            friends = try await placeService.fetchFriendsPlacesInViewport(
+            
+            async let friendsPlaces = placeService.fetchFriendsPlacesInViewport(
                 friendUserIds: friendUserIds,
                 northLat: bounds.northLat,
                 southLat: bounds.southLat,
                 eastLng: bounds.eastLng,
                 westLng: bounds.westLng
             )
-            print("✅ [MapViewModel] Loaded \(friends.count) friends' places")
-        } catch {
-            print("⚠️ [MapViewModel] Friends' places query failed (index may not exist yet): \(error.localizedDescription)")
-            print("💡 Regular places will still display. Create the composite index to enable friends' places.")
-        }
-        
-        // Merge and deduplicate places (even if friends query failed)
-        var newViewportPlaces: [String: DetailPlace] = [:]
-        for place in (regular + friends) {
-            let placeId = place.id.uuidString
-            newViewportPlaces[placeId] = place
             
-            // Also update the main detailPlaceVM cache if not already present
-            if detailPlaceVM.places[placeId] == nil {
-                detailPlaceVM.places[placeId] = place
-                detailPlaceVM.generateColorForPlace(placeId)
-                detailPlaceVM.calculateRestaurantType(for: place)
+            // Wait for both queries to complete
+            let (regular, friends) = try await (regularPlaces, friendsPlaces)
+            
+            // Merge and deduplicate places
+            var newViewportPlaces: [String: DetailPlace] = [:]
+            for place in (regular + friends) {
+                let placeId = place.id.uuidString
+                newViewportPlaces[placeId] = place
+                
+                // Also update the main detailPlaceVM cache if not already present
+                if detailPlaceVM.places[placeId] == nil {
+                    detailPlaceVM.places[placeId] = place
+                    detailPlaceVM.generateColorForPlace(placeId)
+                    detailPlaceVM.calculateRestaurantType(for: place)
+                }
             }
+            
+            self.viewportPlaces = newViewportPlaces
+            self.lastLoadedRegion = region
+            
+            let loadTime = Date().timeIntervalSince(startTime)
+            print("⏱️ [MapViewModel] Loaded \(regular.count) regular + \(friends.count) friends' places in \(String(format: "%.2f", loadTime))s")
+            print("📊 [MapViewModel] Total viewport places: \(newViewportPlaces.count)")
+            
+        } catch {
+            print("❌ [MapViewModel] Error loading viewport places: \(error.localizedDescription)")
         }
-        
-        self.viewportPlaces = newViewportPlaces
-        self.lastLoadedRegion = region
-        
-        let loadTime = Date().timeIntervalSince(startTime)
-        print("⏱️ [MapViewModel] Loaded \(regular.count) regular + \(friends.count) friends' places in \(String(format: "%.2f", loadTime))s")
-        print("📊 [MapViewModel] Total viewport places stored: \(newViewportPlaces.count)")
-        print("📊 [MapViewModel] Updated detailPlaceVM.places with \(newViewportPlaces.count) places")
-        
-        // Trigger UI update by notifying that places changed
-        self.objectWillChange.send()
         
         isLoadingViewportPlaces = false
     }
@@ -163,11 +153,6 @@ class MapViewModel: ObservableObject {
     
     /// Get all places to display on map (viewport + user's saved places)
     func getAllDisplayPlaces() -> [DetailPlace] {
-        print("🗺️ [MapViewModel.getAllDisplayPlaces] Called")
-        print("   - viewportPlaces count: \(viewportPlaces.count)")
-        print("   - detailPlaceVM.places count: \(detailPlaceVM.places.count)")
-        print("   - detailPlaceVM.placeSavers count: \(detailPlaceVM.placeSavers.count)")
-        
         // Combine viewport places with user's saved places
         var allPlaces = viewportPlaces
         
@@ -181,7 +166,6 @@ class MapViewModel: ObservableObject {
             }
         }
         
-        print("   - Total places to display: \(allPlaces.count)")
         return Array(allPlaces.values)
     }
     

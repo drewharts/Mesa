@@ -49,25 +49,6 @@ class UserService: ObservableObject {
                 completion(followingIds, nil)
             }
     }
-    
-    // MARK: - Lazy Loading Optimization - ID-Only Methods
-    
-    /// Fetch friend IDs only (async) - FAST! Used for startup
-    func fetchFriendIds(userId: String) async throws -> [String] {
-        let snapshot = try await db.collection("following")
-            .whereField("followerId", isEqualTo: userId)
-            .getDocuments()
-        
-        return snapshot.documents.compactMap { document in
-            document.get("followingId") as? String
-        }
-    }
-    
-    /// Fetch favorite place IDs only (async) - FAST! Used for startup
-    func fetchFavoritePlaceIds(userId: String) async throws -> [String] {
-        let doc = try await db.collection("users").document(userId).getDocument()
-        return doc.data()?["favorites"] as? [String] ?? []
-    }
 
     func fetchProfiles(for userIds: [String], completion: @escaping ([User]?, Error?) -> Void) {
         var profiles: [User] = []

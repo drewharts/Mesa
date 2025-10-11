@@ -223,30 +223,36 @@ struct MapView: View {
              removeNotificationObservers()
          }
         .task {
-            print("🗺️ [MapView] Map view task started")
-            
+            // Refresh places whenever the view appears
+            await profile.refreshUserPlaces()
+
             // Calculate annotation images
             detailPlaceVM.calculateAnnotationPlaces()
 
-            // Calculate most frequent types (uses cached data)
+            // Calculate most frequent types
             placeTypeFilterVM.refreshMostFrequentTypes()
             
-            // 🚀 CRITICAL: Load initial viewport places FIRST (this is what user sees!)
+            // 🚀 Load initial viewport if we have a region
             if !hasLoadedInitialViewport {
-                let coords = locationManager.currentLocation?.coordinate ?? defaultCenter
-                let region = MKCoordinateRegion(
-                    center: coords,
-                    span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)  // Smaller viewport for faster load
-                )
+                // Give the map a moment to settle and provide a region
+                try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
                 
-                print("🚀 [MapView] Loading initial viewport immediately...")
-                await mapViewModel.loadInitialViewportPlaces(region)
-                hasLoadedInitialViewport = true
-                print("✅ [MapView] Initial viewport loaded - map ready!")
+                if let region = currentMapRegion {
+                    await mapViewModel.loadInitialViewportPlaces(region)
+                    hasLoadedInitialViewport = true
+                    print("✅ [MapView] Initial viewport loaded")
+                } else {
+                    // Create a region from the current map position
+                    let coords = locationManager.currentLocation?.coordinate ?? defaultCenter
+                    let region = MKCoordinateRegion(
+                        center: coords,
+                        span: MKCoordinateSpan(latitudeDelta: 0.1, longitudeDelta: 0.1)
+                    )
+                    await mapViewModel.loadInitialViewportPlaces(region)
+                    hasLoadedInitialViewport = true
+                    print("✅ [MapView] Initial viewport loaded with default region")
+                }
             }
-            
-            // ✅ REMOVED: await profile.refreshUserPlaces()
-            // No longer needed - viewport loading handles everything!
         }
         .sheet(isPresented: $showVisiblePlacesPopup) {
             VisiblePlacesPopupView(mapRegion: currentMapRegion)

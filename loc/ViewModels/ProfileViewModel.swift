@@ -284,29 +284,6 @@ class ProfileViewModel: ObservableObject {
         }
     }
     
-    // MARK: - Lazy Loading
-    
-    /// Load user's saved places when they open their profile (lazy loading)
-    func loadSavedPlacesIfNeeded() {
-        guard let userId = user?.id else { return }
-        
-        // Check if we've already loaded places
-        let allSavedIds = Set(userFavorites + myPlaces)
-        let loadedIds = Set(detailPlaceViewModel.places.keys)
-        let needToLoad = allSavedIds.subtracting(loadedIds)
-        
-        guard !needToLoad.isEmpty else {
-            print("✅ [ProfileViewModel] Saved places already loaded")
-            return
-        }
-        
-        print("📱 [ProfileViewModel] Loading \(needToLoad.count) saved places lazily...")
-        
-        Task {
-            await detailPlaceViewModel.dataManager?.loadUserSavedPlaces(userId: userId)
-        }
-    }
-    
      private func combinedCircularImage(image1: UIImage?, image2: UIImage? = nil, image3: UIImage? = nil) -> UIImage {
          let totalSize = CGSize(width: 80, height: 40)
          let singleCircleSize = CGSize(width: 40, height: 40)
