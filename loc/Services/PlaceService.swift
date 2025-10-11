@@ -556,7 +556,7 @@ class PlaceService: ObservableObject {
                 Place(
                     id: UUID(uuidString: id) ?? UUID(),
                     name: "",  // Will be loaded lazily
-                    address: nil
+                    address: ""  // Will be loaded lazily
                 )
             }
             
