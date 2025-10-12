@@ -3,7 +3,7 @@ import Firebase
 
 class UserService: ObservableObject {
     static let shared = UserService()
-    private let db = FirebaseManager.shared.db
+    let db = FirebaseManager.shared.db  // Made public for fast startup optimization
     
     private init() {}
 

@@ -40,20 +40,68 @@ class DataManager: ObservableObject {
     }
 
     func initializeProfileData(userId: String) async {
+        // 🚀 FAST STARTUP: Load minimal data for instant map
+        await loadMinimalDataForInstantMap(userId: userId)
+        
+        // Background: Load everything else without blocking
+        Task.detached(priority: .background) { [weak self] in
+            await self?.loadFullDataInBackground(userId: userId)
+        }
+    }
+    
+    /// FAST: Load only essential data for instant map display (< 0.5s)
+    private func loadMinimalDataForInstantMap(userId: String) async {
+        print("⚡ [DataManager] Fast startup - loading minimal data")
+        let startTime = Date()
+        
+        // Only load user profile (1 document)
+        await loadProfileData(userId: userId)
+        
+        // Load just the IDs, not full documents
+        await loadUserPlaceIdsOnly(userId: userId)
+        
+        let loadTime = Date().timeIntervalSince(startTime)
+        print("✅ [DataManager] Minimal data loaded in \(String(format: "%.2f", loadTime))s")
+        
+        // Map can show NOW with viewport loading!
+    }
+    
+    /// Load place IDs only (not full documents) for instant startup
+    private func loadUserPlaceIdsOnly(userId: String) async {
+        do {
+            // Fetch just the favorites array from user doc (lightweight!)
+            if let userDoc = try? await userService.db.collection("users").document(userId).getDocument(),
+               let favorites = userDoc.data()?["favorites"] as? [String] {
+                profileViewModel.userFavorites = favorites
+                print("⚡ Loaded \(favorites.count) favorite IDs (no documents)")
+            }
+            
+            // Note: Lists and myPlaces will load in background
+        } catch {
+            print("Error loading place IDs: \(error)")
+        }
+    }
+    
+    /// Background: Load all the heavy data without blocking UI
+    private func loadFullDataInBackground(userId: String) async {
+        print("📦 [DataManager] Loading full data in background...")
         startDataLoadingFlags()
         
-        // PHASE 1: Load critical user data in parallel (fastest to show something to user)
+        // PHASE 1: Load user's own data
         await loadCriticalUserData(userId: userId)
         
-        // PHASE 2: Load remaining user data in parallel
+        // PHASE 2: Load remaining user data
         await loadRemainingUserData(userId: userId)
         
-        // PHASE 3: Load social data in background (non-blocking)
-        Task.detached { [weak self] in
-            await self?.loadSocialDataInBackground(userId: userId)
-        }
+        // PHASE 3: Load social data
+        await loadSocialDataInBackground(userId: userId)
         
-        calculateMapAnnotations()
+        // Skip expensive annotation calculations - let viewport handle it
+        // await MainActor.run {
+        //     calculateMapAnnotations()
+        // }
+        
+        print("✅ [DataManager] Full data loaded in background")
     }
     
     // PHASE 1: Load most important user data first (parallel)
@@ -94,10 +142,10 @@ class DataManager: ObservableObject {
         // Load reviewed places for following users
         await loadReviewedPlacesForFollowing(userId: userId)
         
-        // Update annotations after social data loads
-        await MainActor.run {
-            calculateMapAnnotations()
-        }
+        // Skip annotation updates - viewport handles this now
+        // await MainActor.run {
+        //     calculateMapAnnotations()
+        // }
     }
 
     // Sets all relevant loading flags to true before data loading begins
