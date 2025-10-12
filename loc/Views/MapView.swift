@@ -225,27 +225,31 @@ struct MapView: View {
         .task {
             // 🚀 CRITICAL: Load viewport places FIRST (instant map rendering)
             if !hasLoadedInitialViewport {
-                // Minimal delay - just enough for map to initialize
-                try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+                // Give the map a moment to settle and provide a region
+                try? await Task.sleep(nanoseconds: 300_000_000) // 0.3 seconds
                 
-                // Always create a region - don't wait for currentMapRegion
-                let coords = locationManager.currentLocation?.coordinate ?? defaultCenter
-                let region = MKCoordinateRegion(
-                    center: coords,
-                    span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)  // Smaller initial viewport
-                )
-                
-                await mapViewModel.loadInitialViewportPlaces(region)
-                hasLoadedInitialViewport = true
-                print("✅ [MapView] Initial viewport loaded instantly")
+                if let region = currentMapRegion {
+                    await mapViewModel.loadInitialViewportPlaces(region)
+                    hasLoadedInitialViewport = true
+                    print("✅ [MapView] Initial viewport loaded")
+                } else {
+                    // Create a region from the current map position
+                    let coords = locationManager.currentLocation?.coordinate ?? defaultCenter
+                    let region = MKCoordinateRegion(
+                        center: coords,
+                        span: MKCoordinateSpan(latitudeDelta: 0.1, longitudeDelta: 0.1)
+                    )
+                    await mapViewModel.loadInitialViewportPlaces(region)
+                    hasLoadedInitialViewport = true
+                    print("✅ [MapView] Initial viewport loaded with default region")
+                }
             }
             
             // Move expensive operations to background (non-blocking)
             Task.detached(priority: .background) {
-                // Skip these expensive operations - they'll happen naturally as data loads
-                // await profile.refreshUserPlaces()  // Not needed - viewport handles this
-                // await detailPlaceVM.calculateAnnotationPlaces()  // Too expensive
-                await placeTypeFilterVM.refreshMostFrequentTypes()  // Lightweight, keep it
+                await profile.refreshUserPlaces()
+                await detailPlaceVM.calculateAnnotationPlaces()
+                await placeTypeFilterVM.refreshMostFrequentTypes()
             }
         }
         .sheet(isPresented: $showVisiblePlacesPopup) {
