@@ -76,9 +76,34 @@ class DataManager: ObservableObject {
                 print("⚡ Loaded \(favorites.count) favorite IDs (no documents)")
             }
             
+            // CRITICAL: Load friend IDs so their places show on map!
+            await loadFriendIdsForMap(userId: userId)
+            
             // Note: Lists and myPlaces will load in background
         } catch {
             print("Error loading place IDs: \(error)")
+        }
+    }
+    
+    /// Load just friend IDs for map viewport queries (lightweight)
+    private func loadFriendIdsForMap(userId: String) async {
+        do {
+            // Get following list (just IDs, not full profiles)
+            let followingSnapshot = try await userService.db.collection("users")
+                .document(userId)
+                .collection("following")
+                .getDocuments()
+            
+            let friendIds = followingSnapshot.documents.map { $0.documentID }
+            
+            print("⚡ Loaded \(friendIds.count) friend IDs for map")
+            
+            // Update MapViewModel with friend IDs
+            await MainActor.run {
+                profileViewModel.mapViewModel?.updateFriendIds(friendIds)
+            }
+        } catch {
+            print("Error loading friend IDs: \(error)")
         }
     }
     

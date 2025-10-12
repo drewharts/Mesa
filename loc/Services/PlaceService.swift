@@ -422,37 +422,43 @@ class PlaceService: ObservableObject {
     // MARK: - Viewport-Based Place Loading
     
     /// Fetch places within a geographic bounding box (viewport)
-    /// This is the key optimization - only load places visible on the map
+    /// OPTIMIZED: Single-field query + client filtering for speed
     func fetchPlacesInViewport(
         northLat: Double,
         southLat: Double,
         eastLng: Double,
         westLng: Double
     ) async throws -> [DetailPlace] {
-        print("🗺️ [PlaceService] Fetching places in viewport:")
+        print("🗺️ [PlaceService] Fast viewport query:")
         print("   Lat: \(southLat) to \(northLat)")
         print("   Lng: \(westLng) to \(eastLng)")
         
-        // Query Firestore with geographic bounds
-        // Uses composite index on (latitude, longitude)
+        // OPTIMIZATION: Query by latitude only (single index = faster!)
+        // Then filter longitude client-side
         let query = db.collection("places")
             .whereField("latitude", isGreaterThanOrEqualTo: southLat)
             .whereField("latitude", isLessThanOrEqualTo: northLat)
-            .whereField("longitude", isGreaterThanOrEqualTo: westLng)
-            .whereField("longitude", isLessThanOrEqualTo: eastLng)
+            .limit(to: 300)  // Prevent huge result sets
         
         let snapshot = try await query.getDocuments()
         
+        // Client-side longitude filter (faster than compound query)
         let places = snapshot.documents.compactMap { doc -> DetailPlace? in
             do {
-                return try doc.data(as: DetailPlace.self)
+                let place = try doc.data(as: DetailPlace.self)
+                // Check longitude bounds
+                if let coord = place.coordinate,
+                   coord.longitude >= westLng && coord.longitude <= eastLng {
+                    return place
+                }
+                return nil
             } catch {
-                print("⚠️ [PlaceService] Error decoding place \(doc.documentID): \(error.localizedDescription)")
+                print("⚠️ [PlaceService] Error decoding: \(error)")
                 return nil
             }
         }
         
-        print("✅ [PlaceService] Loaded \(places.count) places in viewport")
+        print("✅ [PlaceService] Loaded \(places.count) viewport places (filtered from \(snapshot.documents.count))")
         return places
     }
     
@@ -480,7 +486,7 @@ class PlaceService: ObservableObject {
     }
     
     /// Fetch friends' places within a geographic bounding box (viewport)
-    /// This is 10x faster than loading ALL friends' places globally!
+    /// OPTIMIZED: Simpler query + client-side filtering
     func fetchFriendsPlacesInViewport(
         friendUserIds: [String],
         northLat: Double,
@@ -490,36 +496,40 @@ class PlaceService: ObservableObject {
     ) async throws -> [DetailPlace] {
         guard !friendUserIds.isEmpty else { return [] }
         
-        print("👥 [PlaceService] Fetching friends' places in viewport:")
-        print("   Friends count: \(friendUserIds.count)")
-        print("   Lat: \(southLat) to \(northLat)")
-        print("   Lng: \(westLng) to \(eastLng)")
+        print("👥 [PlaceService] Fast friends' places query:")
+        print("   Friends: \(friendUserIds.count)")
         
         var allPlaces: [DetailPlace] = []
         
-        // Firestore 'in' operator supports max 10 items for userId
-        // Batch the friend IDs to handle users with 10+ friends
+        // Batch friend IDs (Firestore limit: 10 per 'in' query)
         for batch in friendUserIds.chunked(into: 10) {
+            // OPTIMIZATION: Query by userId + latitude only
             let query = db.collection("places")
+                .whereField("userId", in: Array(batch))
                 .whereField("latitude", isGreaterThanOrEqualTo: southLat)
                 .whereField("latitude", isLessThanOrEqualTo: northLat)
-                .whereField("longitude", isGreaterThanOrEqualTo: westLng)
-                .whereField("longitude", isLessThanOrEqualTo: eastLng)
-                .whereField("userId", in: Array(batch))
+                .limit(to: 100)  // Limit per batch
             
             let snapshot = try await query.getDocuments()
+            
+            // Client-side longitude filter
             let places = snapshot.documents.compactMap { doc -> DetailPlace? in
                 do {
-                    return try doc.data(as: DetailPlace.self)
+                    let place = try doc.data(as: DetailPlace.self)
+                    // Check longitude bounds
+                    if let coord = place.coordinate,
+                       coord.longitude >= westLng && coord.longitude <= eastLng {
+                        return place
+                    }
+                    return nil
                 } catch {
-                    print("⚠️ [PlaceService] Error decoding friend's place \(doc.documentID): \(error.localizedDescription)")
                     return nil
                 }
             }
             allPlaces.append(contentsOf: places)
         }
         
-        print("✅ [PlaceService] Loaded \(allPlaces.count) friends' places in viewport")
+        print("✅ [PlaceService] Loaded \(allPlaces.count) friends' places")
         return allPlaces
     }
 }
