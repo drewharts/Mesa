@@ -38,7 +38,7 @@ struct MapView: View {
         ZStack {
             MapReader { mapProxy in
                 Map(position: $mapPosition) {
-                    ForEach(placeTypeFilterVM.getFilteredPlaces().compactMap { place -> PlaceAnnotationItem? in
+                    ForEach(placeTypeFilterVM.filteredPlaces.compactMap { place -> PlaceAnnotationItem? in
                         guard let coordinate = place.coordinate else {
                             return nil
                         }
@@ -223,19 +223,10 @@ struct MapView: View {
              removeNotificationObservers()
          }
         .task {
-            // Refresh places whenever the view appears
-            await profile.refreshUserPlaces()
-
-            // Calculate annotation images
-            detailPlaceVM.calculateAnnotationPlaces()
-
-            // Calculate most frequent types
-            placeTypeFilterVM.refreshMostFrequentTypes()
-            
-            // 🚀 Load initial viewport if we have a region
+            // 🚀 CRITICAL: Load viewport places FIRST (instant map rendering)
             if !hasLoadedInitialViewport {
                 // Give the map a moment to settle and provide a region
-                try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+                try? await Task.sleep(nanoseconds: 300_000_000) // 0.3 seconds
                 
                 if let region = currentMapRegion {
                     await mapViewModel.loadInitialViewportPlaces(region)
@@ -252,6 +243,13 @@ struct MapView: View {
                     hasLoadedInitialViewport = true
                     print("✅ [MapView] Initial viewport loaded with default region")
                 }
+            }
+            
+            // Move expensive operations to background (non-blocking)
+            Task.detached(priority: .background) {
+                await profile.refreshUserPlaces()
+                await detailPlaceVM.calculateAnnotationPlaces()
+                await placeTypeFilterVM.refreshMostFrequentTypes()
             }
         }
         .sheet(isPresented: $showVisiblePlacesPopup) {

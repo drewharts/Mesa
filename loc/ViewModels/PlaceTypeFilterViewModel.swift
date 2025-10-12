@@ -15,6 +15,7 @@ class PlaceTypeFilterViewModel: ObservableObject {
     @Published var mostFrequentTypes: [String] = []
     @Published var availableTypes: [String] = []
     @Published var isCalculatingTypes: Bool = false
+    @Published var filteredPlaces: [DetailPlace] = []  // CACHED for performance
     
     private let detailPlaceVM: DetailPlaceViewModel
     private let profileVM: ProfileViewModel
@@ -34,17 +35,26 @@ class PlaceTypeFilterViewModel: ObservableObject {
         
         // Calculate immediately in case data is already available
         calculateMostFrequentTypes()
+        updateFilteredPlaces()
         
         // Set up periodic recalculation for the first 10 seconds to handle async loading
         startPeriodicRecalculation()
     }
     
     private func setupProfileDataObservers() {
+        // Watch for changes to selected place types - update filtered places
+        $selectedPlaceTypes
+            .sink { [weak self] _ in
+                self?.updateFilteredPlaces()
+            }
+            .store(in: &cancellables)
+        
         // Watch for changes to user favorites
         profileVM.$userFavorites
             .dropFirst() // Skip initial empty value
             .sink { [weak self] favorites in
                 self?.calculateMostFrequentTypes()
+                self?.updateFilteredPlaces()
             }
             .store(in: &cancellables)
         
@@ -53,6 +63,7 @@ class PlaceTypeFilterViewModel: ObservableObject {
             .dropFirst() // Skip initial empty value
             .sink { [weak self] listsPlaces in
                 self?.calculateMostFrequentTypes()
+                self?.updateFilteredPlaces()
             }
             .store(in: &cancellables)
         
@@ -61,6 +72,7 @@ class PlaceTypeFilterViewModel: ObservableObject {
             .dropFirst()
             .sink { [weak self] places in
                 self?.calculateMostFrequentTypes()
+                self?.updateFilteredPlaces()
             }
             .store(in: &cancellables)
         
@@ -69,6 +81,18 @@ class PlaceTypeFilterViewModel: ObservableObject {
             .dropFirst() // Skip initial empty value
             .sink { [weak self] placeTypes in
                 self?.calculateMostFrequentTypes()
+                self?.updateFilteredPlaces()
+            }
+            .store(in: &cancellables)
+    }
+    
+    /// Setup observer for MapViewModel viewport changes
+    func observeMapViewModel() {
+        guard let mapVM = mapViewModel else { return }
+        
+        mapVM.$viewportPlaces
+            .sink { [weak self] _ in
+                self?.updateFilteredPlaces()
             }
             .store(in: &cancellables)
     }
@@ -187,12 +211,14 @@ class PlaceTypeFilterViewModel: ObservableObject {
     
     // MARK: - Filtering Logic
     
-    func getFilteredPlaces() -> [DetailPlace] {
+    /// Update the cached filtered places (called when data changes)
+    func updateFilteredPlaces() {
         // Get all places to display (viewport + saved places)
         let allPlaces = getAllDisplayPlaces()
         
         guard !selectedPlaceTypes.isEmpty else {
-            return allPlaces
+            filteredPlaces = allPlaces
+            return
         }
         
         // First pass: Calculate missing place types on-demand for filtering
@@ -208,7 +234,7 @@ class PlaceTypeFilterViewModel: ObservableObject {
         }
         
         // Second pass: Apply filtering with all types calculated
-        let filteredPlaces = allPlaces.filter { place in
+        filteredPlaces = allPlaces.filter { place in
             let placeId = place.id.uuidString
             
             guard let placeType = detailPlaceVM.placeTypes[placeId] else { 
@@ -217,7 +243,11 @@ class PlaceTypeFilterViewModel: ObservableObject {
             
             return shouldIncludePlaceType(placeType)
         }
-        
+    }
+    
+    /// DEPRECATED: Use filteredPlaces @Published property instead
+    /// Kept for backward compatibility
+    func getFilteredPlaces() -> [DetailPlace] {
         return filteredPlaces
     }
     

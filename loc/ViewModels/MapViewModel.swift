@@ -45,7 +45,7 @@ class MapViewModel: ObservableObject {
         debounceTimer?.invalidate()
         
         debounceTimer = Timer.scheduledTimer(
-            withTimeInterval: 0.5,  // Wait 500ms after user stops moving
+            withTimeInterval: 0.8,  // Increased to 800ms for smoother experience
             repeats: false
         ) { [weak self] _ in
             Task { @MainActor in
@@ -137,16 +137,20 @@ class MapViewModel: ObservableObject {
     
     /// Check if region change is significant enough to reload
     private func shouldReloadForRegion(_ newRegion: MKCoordinateRegion, lastRegion: MKCoordinateRegion) -> Bool {
-        // Calculate center movement
+        // Calculate center movement (increased threshold for smoother UX)
         let latDiff = abs(newRegion.center.latitude - lastRegion.center.latitude)
         let lngDiff = abs(newRegion.center.longitude - lastRegion.center.longitude)
-        let centerMoved = latDiff > minMovementThreshold || lngDiff > minMovementThreshold
         
-        // Calculate zoom change (span change)
+        // Only reload if moved at least 30% of the current viewport
+        let latMovementThreshold = lastRegion.span.latitudeDelta * 0.3
+        let lngMovementThreshold = lastRegion.span.longitudeDelta * 0.3
+        let centerMoved = latDiff > latMovementThreshold || lngDiff > lngMovementThreshold
+        
+        // Calculate zoom change (span change) - more conservative threshold
         let latSpanChange = abs(newRegion.span.latitudeDelta - lastRegion.span.latitudeDelta)
         let lngSpanChange = abs(newRegion.span.longitudeDelta - lastRegion.span.longitudeDelta)
-        let zoomChanged = latSpanChange > (lastRegion.span.latitudeDelta * 0.3) || 
-                          lngSpanChange > (lastRegion.span.longitudeDelta * 0.3)
+        let zoomChanged = latSpanChange > (lastRegion.span.latitudeDelta * 0.5) || 
+                          lngSpanChange > (lastRegion.span.longitudeDelta * 0.5)
         
         return centerMoved || zoomChanged
     }
