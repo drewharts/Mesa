@@ -302,7 +302,7 @@ class SelectedPlaceViewModel: ObservableObject {
     
     /// Update place in Firestore with fresh data
     private func updatePlaceInFirestore(_ place: DetailPlace) {
-        placeService.updatePlace(detailPlace: place) { error in
+        placeService.updatePlace(place: place) { error in
             if let error = error {
                 print("❌ [SelectedPlaceViewModel] Failed to update place in Firestore: \(error.localizedDescription)")
             } else {
@@ -415,7 +415,7 @@ class SelectedPlaceViewModel: ObservableObject {
         }
         
         // Use the new method to fetch reviews from friends and the current user (both restaurant and generic)
-        userService.fetchFriendsReviews(placeId: placeId, currentUserId: currentUserId) { [weak self] reviews, error in
+        userService.fetchFriendsReviews(userId: currentUserId) { [weak self] reviews, error in
             guard let self = self else { return }
             
             DispatchQueue.main.async {
@@ -482,7 +482,7 @@ class SelectedPlaceViewModel: ObservableObject {
         
         print("📸 [getPlacePhotos] Fetching friends reviews...")
         // Use the same review fetching logic to get photo URLs
-        userService.fetchFriendsReviews(placeId: placeId, currentUserId: Auth.auth().currentUser?.uid ?? "") { [weak self] reviews, error in
+        userService.fetchFriendsReviews(userId: Auth.auth().currentUser?.uid ?? "") { [weak self] reviews, error in
             guard let self = self else { return }
             
             print("📸 [getPlacePhotos] Callback received")
@@ -702,10 +702,15 @@ class SelectedPlaceViewModel: ObservableObject {
         likedReviews.removeAll()
         
         reviews.forEach { review in
-            reviewService.hasUserLikedReview(userId: userId, reviewId: review.id) { [weak self] isLiked in
+            reviewService.hasUserLikedReview(userId: userId, placeId: placeId, reviewId: review.id) { [weak self] result in
                 DispatchQueue.main.async {
-                    if isLiked {
-                        self?.likedReviews.insert(review.id)
+                    switch result {
+                    case .success(let isLiked):
+                        if isLiked {
+                            self?.likedReviews.insert(review.id)
+                        }
+                    case .failure(let error):
+                        print("❌ Error checking if review is liked: \(error)")
                     }
                 }
             }
@@ -722,7 +727,7 @@ class SelectedPlaceViewModel: ObservableObject {
         }
         
         // Add limit and order by timestamp to get only the most recent 5 comments
-        reviewService.fetchComments(placeId: placeId, reviewId: reviewId, limit: 5) { [weak self] comments, error in
+        reviewService.fetchComments(for: reviewId) { [weak self] comments, error in
             guard let self = self else { return }
             
             DispatchQueue.main.async {
@@ -775,15 +780,15 @@ class SelectedPlaceViewModel: ObservableObject {
             case .success(let downloadURLs):
                 comment.images = downloadURLs
                 
-                ReviewService.shared.addComment(placeId: placeId, reviewId: reviewId, comment: comment) { [weak self] result in
+                ReviewService.shared.addComment(reviewId: reviewId, userId: userId, text: comment.commentText) { [weak self] result in
                     guard let self = self else { return }
                     
                     DispatchQueue.main.async {
                         switch result {
-                        case .success(let savedComment):
+                        case .success:
                             // Add the comment to our local collection
                             var currentComments = self.placeReviewComments[reviewId] ?? []
-                            currentComments.insert(savedComment, at: 0) // Add at the top
+                            currentComments.insert(comment, at: 0) // Add at the top
                             self.placeReviewComments[reviewId] = currentComments
                             
                             // Update the comment count
@@ -794,8 +799,8 @@ class SelectedPlaceViewModel: ObservableObject {
                             self.commentLoadingStates[reviewId] = .loaded
                             
                             // Load comment photos if any
-                            if !savedComment.images.isEmpty {
-                                self.loadCommentPhotos(for: savedComment)
+                            if !comment.images.isEmpty {
+                                self.loadCommentPhotos(for: comment)
                             }
                             
                         case .failure(let error):
@@ -879,7 +884,7 @@ class SelectedPlaceViewModel: ObservableObject {
         }
         
         
-        reviewService.deleteReview(reviewId: reviewId, placeId: placeId, userId: review.userId) { [weak self] result in
+        reviewService.deleteReview(reviewId: reviewId) { [weak self] result in
             guard let self = self else { return }
             
             switch result {
@@ -984,101 +989,19 @@ class SelectedPlaceViewModel: ObservableObject {
     }
     
     func likeReview<T: ReviewProtocol>(_ review: T, userId: String) {
-        guard let placeId = selectedPlace?.id.uuidString else { return }
-        
-        // Prevent liking your own review
-        if review.userId == userId {
-            return
-        }
-        
-        reviewService.hasUserLikedReview(userId: userId, reviewId: review.id) { [weak self] isLiked in
-            guard let self = self else { return }
-            
-            if isLiked {
-                // Unlike the review
-                reviewService.unlikeReview(userId: userId, placeId: placeId, reviewId: review.id) { [weak self] result in
-                    guard let self = self else { return }
-                    
-                    switch result {
-                    case .success:
-                        DispatchQueue.main.async {
-                            if var currentReviews = self.placeReviews[placeId] {
-                                if let index = currentReviews.firstIndex(where: { $0.id == review.id }) {
-                                    // Create a new Review instance with updated likes count
-                                    var updatedReview = currentReviews[index]
-                                    updatedReview.likes = max(0, updatedReview.likes - 1)
-                                    currentReviews[index] = updatedReview
-                                    self.placeReviews[placeId] = currentReviews
-                                    self.likedReviews.remove(review.id)
-                                }
-                            }
-                        }
-                    case .failure(let error):
-                        print("Error unliking review: \(error.localizedDescription)")
-                    }
-                }
-            } else {
-                // Like the review
-                reviewService.likeReview(userId: userId, placeId: placeId, reviewId: review.id) { [weak self] result in
-                    guard let self = self else { return }
-                    
-                    switch result {
-                    case .success:
-                        DispatchQueue.main.async {
-                            if var currentReviews = self.placeReviews[placeId] {
-                                if let index = currentReviews.firstIndex(where: { $0.id == review.id }) {
-                                    // Create a new Review instance with updated likes count
-                                    var updatedReview = currentReviews[index]
-                                    updatedReview.likes += 1
-                                    currentReviews[index] = updatedReview
-                                    self.placeReviews[placeId] = currentReviews
-                                    self.likedReviews.insert(review.id)
-                                }
-                            }
-                        }
-                    case .failure(let error):
-                        print("Error liking review: \(error.localizedDescription)")
-                    }
-                }
-            }
-        }
+        print("⚠️ [SelectedPlaceViewModel] likeReview not fully implemented")
+        // TODO: Implement proper like/unlike logic with Supabase
     }
 
     // Add helper method to check if a review is liked
     func isReviewLiked(_ reviewId: String) -> Bool {
         return likedReviews.contains(reviewId)
     }
-
+    
     // Load comment count for a review (without loading all comments)
-    private func loadCommentCountForReview(placeId: String, reviewId: String) {
-        reviewService.fetchCommentCount(placeId: placeId, reviewId: reviewId) { [weak self] count, error in
-            guard let self = self else { return }
-            
-            DispatchQueue.main.async {
-                if let error = error {
-                    print("Error fetching comment count: \(error.localizedDescription)")
-                } else if let count = count {
-                    // Store the count in our dictionary
-                    self.reviewCommentCounts[reviewId] = count
-                    
-                    // Create a placeholder array with the right number of empty comments
-                    // This ensures commentCount returns the correct count even before comments are loaded
-                    if count > 0 {
-                        if self.placeReviewComments[reviewId] == nil {
-                            // Store empty array with the right capacity
-                            self.placeReviewComments[reviewId] = []
-                            
-                            // Mark as idle so actual comments can be loaded when needed
-                            self.commentLoadingStates[reviewId] = .idle
-                        }
-                    } else {
-                        // If no comments, initialize with empty array
-                        self.placeReviewComments[reviewId] = []
-                        self.commentLoadingStates[reviewId] = .loaded
-                    }
-                }
-            }
-        }
+    func loadCommentCountForReview(placeId: String, reviewId: String) {
+        print("⚠️ [SelectedPlaceViewModel] loadCommentCountForReview not fully implemented")
+        // TODO: Implement with Supabase
     }
 
     // Load additional comments beyond the initial 5
@@ -1088,15 +1011,14 @@ class SelectedPlaceViewModel: ObservableObject {
             // Just keep the existing comments visible while loading more
         }
         
-        reviewService.fetchComments(placeId: placeId, reviewId: reviewId, limit: limit) { [weak self] comments, error in
+        reviewService.fetchComments(for: reviewId) { [weak self] comments, error in
             guard let self = self else { return }
             
             DispatchQueue.main.async {
                 if let error = error {
                     print("Error loading more comments: \(error.localizedDescription)")
                     // Don't update loading state to error to preserve existing comments
-                } else {
-                    let fetchedComments = comments ?? []
+                } else if let fetchedComments = comments {
                     self.placeReviewComments[reviewId] = fetchedComments
                     
                     // Only update comment count if we get more than we knew about
@@ -1148,14 +1070,14 @@ class SelectedPlaceViewModel: ObservableObject {
         }
         
         // Save to main places collection
-        placeService.addToAllPlaces(detailPlace: newPlace) { error in
+        placeService.addToAllPlaces(place: newPlace) { error in
             if let error = error {
                 print("Error saving place to main collection: \(error.localizedDescription)")
             } else {
                 print("Successfully saved place to main collection")
                 
                 // Save to user's myPlaces collection
-                self.placeService.addToMyPlaces(userId: userId, detailPlace: newPlace) { error in
+                self.placeService.addToMyPlaces(userId: userId, place: newPlace) { error in
                     if let error = error {
                         print("Error saving place to user's collection: \(error.localizedDescription)")
                     } else {

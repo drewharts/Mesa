@@ -173,17 +173,17 @@ class UserProfileViewModel: ObservableObject {
     
     private func fetchProfileFavorites(userId: String) {
         print("Fetching favorites for userId: \(userId)")
-        placeService.fetchProfileFavorites(userId: userId) { [weak self] favorites in
+        placeService.fetchProfileFavorites(userId: userId) { [weak self] favorites, error in
             guard let self = self else { return }
-            if favorites == nil {
-                print("Favorites fetch returned nil - possible error or no data")
+            if let error = error {
+                print("Error fetching favorites: \(error)")
                 self.userFavorites = []
-            } else if favorites!.isEmpty {
+            } else if favorites.isEmpty {
                 print("No favorites found for userId: \(userId)")
                 self.userFavorites = []
             } else {
-                print("Fetched \(favorites!.count) favorites for userId: \(userId)")
-                self.userFavorites = favorites!
+                print("Fetched \(favorites.count) favorites for userId: \(userId)")
+                self.userFavorites = favorites
             }
         }
     }
@@ -464,7 +464,7 @@ class UserProfileViewModel: ObservableObject {
             
             do {
                 let restaurantReviews: [RestaurantReview] = try await reviewService.fetchUserReviews(userId: userId)
-                let genericReviews: [GenericReview] = try await reviewService.fetchUserReviews(userId: userId)
+                let genericReviews: [GenericReview] = try await reviewService.fetchUserGenericReviews(userId: userId)
                 let allReviews: [ReviewProtocol] = restaurantReviews + genericReviews
                 
                 // Sort reviews by timestamp (most recent first) and get unique place IDs while preserving order

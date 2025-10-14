@@ -153,7 +153,7 @@ class PlaceReviewViewModel: ObservableObject {
             return
         }
         
-        placeService.addPhotosToPlace(placeId: placeId, photoUrls: review.images) { error in
+        placeService.addPhotosToPlace(placeId: placeId, photoURLs: review.images) { error in
             if let error = error {
                 print("❌ Failed to add photos to place: \(error.localizedDescription)")
             } else {
@@ -167,7 +167,7 @@ class PlaceReviewViewModel: ObservableObject {
        isLoading = true
        errorMessage = nil
        
-       reviewService.deleteReview(reviewId: reviewId, placeId: place.id.uuidString, userId: userId) { [weak self] result in
+       reviewService.deleteReview(reviewId: reviewId) { [weak self] result in
            DispatchQueue.main.async {
                self?.isLoading = false
                

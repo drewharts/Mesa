@@ -1,10 +1,7 @@
 import SwiftUI
-import Firebase
-import FirebaseAuth
-import FirebaseAppCheck
-import FirebaseMessaging
 import GoogleSignIn
 import UserNotifications
+import Supabase
 
 @main
 struct locApp: App {
@@ -27,10 +24,9 @@ struct locApp: App {
     private let serviceContainer = ServiceContainer.shared
     
     init() {
-        FirebaseApp.configure()
-        let providerFactory = AppAttestProviderFactory()
-        AppCheck.setAppCheckProviderFactory(providerFactory)
-
+        // Supabase is initialized via SupabaseManager.shared
+        print("🚀 Initializing app with Supabase (Firebase removed)")
+        
         // Get services from container
         let services = ServiceContainer.shared
         services.setupServices()
@@ -189,9 +185,26 @@ struct locApp: App {
                     }
                 }
                 .task {
-                    if let currentUser = Auth.auth().currentUser {
-                        userSession.setUserLoggedIn(uid: currentUser.uid)
-                        await dataManager.initializeProfileData(userId: currentUser.uid)
+                    // Check for existing Supabase session
+                    do {
+                        let session = try await SupabaseAuthService.shared.getSession()
+                        
+                        // Look up the actual user profile ID instead of using Supabase auth UID
+                        do {
+                            let profile = try await UserService.shared.fetchUserById(userId: session.user.id.uuidString)
+                            let userId = profile.id
+                            userSession.setUserLoggedIn(uid: userId)
+                            await dataManager.initializeProfileData(userId: userId)
+                            print("✅ Found existing Supabase session: \(userId)")
+                        } catch {
+                            // Fallback to Supabase auth UID if profile lookup fails
+                            let userId = session.user.id.uuidString
+                            userSession.setUserLoggedIn(uid: userId)
+                            await dataManager.initializeProfileData(userId: userId)
+                            print("✅ Found existing Supabase session (fallback): \(userId)")
+                        }
+                    } catch {
+                        print("ℹ️ No existing session, user needs to sign in")
                     }
                     
                     // Check for shared TikTok URLs
@@ -229,9 +242,6 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         
-        // Set FCM messaging delegate
-        Messaging.messaging().delegate = self
-        
         // Set UNUserNotificationCenter delegate
         UNUserNotificationCenter.current().delegate = self
         
@@ -266,11 +276,9 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
         print("📱 APNS token received: \(deviceToken.map { String(format: "%02.2hhx", $0) }.joined())")
         
-        // Set APNS token for FCM
-        Messaging.messaging().apnsToken = deviceToken
-        
-        // Now FCM can generate its token
-        print("🔥 APNS token set, FCM will now generate token...")
+        // TODO: Implement push notifications without Firebase
+        // You can use this token for APNs directly or another push service
+        print("⚠️ Push notifications need to be implemented (Firebase FCM removed)")
     }
     
     // Called when registration for remote notifications fails
@@ -308,23 +316,8 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     }
 }
 
-// MARK: - FCM Messaging Delegate
-extension AppDelegate: MessagingDelegate {
-    func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
-        print("🔥 Firebase registration token received: \(String(describing: fcmToken))")
-        
-        // Save the FCM token to Firestore if user is logged in
-        if let fcmToken = fcmToken, let currentUserId = Auth.auth().currentUser?.uid {
-            userService?.updateFCMToken(userId: currentUserId, token: fcmToken) { error in
-                if let error = error {
-                    print("❌ Error updating FCM token: \(error)")
-                } else {
-                    print("✅ FCM token successfully updated in Firestore")
-                }
-            }
-        }
-    }
-}
+// MARK: - Push Notifications (FCM removed)
+// TODO: Implement alternative push notification system (APNs, OneSignal, etc.)
 
 // MARK: - User Notification Center Delegate
 extension AppDelegate: UNUserNotificationCenterDelegate {
@@ -373,9 +366,5 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
     }
 }
 
-class AppAttestProviderFactory: NSObject, AppCheckProviderFactory {
-    func createProvider(with app: FirebaseApp) -> AppCheckProvider? {
-        return AppAttestProvider(app: app)
-    }
-}
+// Firebase completely removed - using Supabase for all backend services
 

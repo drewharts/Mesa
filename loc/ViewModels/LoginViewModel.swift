@@ -2,35 +2,36 @@
 //  LoginViewModel.swift
 //  loc
 //
-//  Created by Andrew Hartsfield II on 12/5/24.
+//  Updated to use Supabase Authentication
 //
-
 
 import SwiftUI
 import GoogleSignIn
-import FirebaseAuth
-import FirebaseCore
-import FirebaseFirestore
-import FirebaseMessaging
 import AuthenticationServices
 import CryptoKit
+import Supabase
 
 @MainActor
 class LoginViewModel: ObservableObject {
     @Published var errorMessage: String?
     private let userService: UserService
     private let dataManager: DataManager
+    private let authService = SupabaseAuthService.shared
     private var currentNonce: String?
-    
     
     init(userService: UserService, dataManager: DataManager) {
         self.userService = userService
         self.dataManager = dataManager
     }
 
+    // MARK: - Google Sign-In
+    
     func signInWithGoogle(userSession: UserSession) {
-        guard let clientID = FirebaseApp.app()?.options.clientID else {
-            errorMessage = "Missing client ID"
+        // Get Google Client ID from GoogleService-Info.plist
+        guard let path = Bundle.main.path(forResource: "GoogleService-Info", ofType: "plist"),
+              let plistConfig = NSDictionary(contentsOfFile: path),
+              let clientID = plistConfig["CLIENT_ID"] as? String else {
+            errorMessage = "Missing Google client ID in GoogleService-Info.plist"
             return
         }
 
@@ -46,115 +47,414 @@ class LoginViewModel: ObservableObject {
         }
 
         GIDSignIn.sharedInstance.signIn(withPresenting: rootViewController) { [weak self] result, error in
+            guard let self = self else { return }
+            
             if let error = error {
-                self?.errorMessage = error.localizedDescription
+                Task { @MainActor in
+                    self.errorMessage = error.localizedDescription
+                }
                 return
             }
 
             guard let user = result?.user,
                   let idToken = user.idToken?.tokenString else {
-                self?.errorMessage = "Failed to retrieve user credentials"
+                Task { @MainActor in
+                    self.errorMessage = "Failed to retrieve user credentials"
+                }
                 return
             }
 
-            let accessToken = user.accessToken.tokenString
-            self?.authenticateWithFirebase(idToken: idToken, accessToken: accessToken, user: user, userSession: userSession)
-        }
-    }
-
-    private func authenticateWithFirebase(idToken: String, accessToken: String, user: GIDGoogleUser, userSession: UserSession) {
-        let credential = GoogleAuthProvider.credential(withIDToken: idToken, accessToken: accessToken)
-
-        Auth.auth().signIn(with: credential) { [weak self] authResult, error in
-            if let error = error {
-                self?.errorMessage = error.localizedDescription
-            } else {
-                if let firebaseUser = authResult?.user {
-                    print("👤 Google Sign In - Firebase user UID: \(firebaseUser.uid)")
-                    print("👤 Google Sign In - Firebase user email: \(firebaseUser.email ?? "nil")")
-                    print("👤 Google Sign In - Firebase user provider data:")
-                    for profile in firebaseUser.providerData {
-                        print("   - Provider: \(profile.providerID), UID: \(profile.uid), Email: \(profile.email ?? "nil")")
-                    }
-                    
-                    // SECURITY CHECK: Ensure user is actually signed in with Google, not linked to Apple
-                    let hasGoogleProvider = firebaseUser.providerData.contains { $0.providerID == "google.com" }
-                    let hasAppleProvider = firebaseUser.providerData.contains { $0.providerID == "apple.com" }
-                    
-                    if hasAppleProvider && !hasGoogleProvider {
-                        print("🚨 SECURITY ISSUE: User signed in with Google but got linked to Apple account!")
-                        print("🚨 Signing out for security...")
-                        
-                        // Sign out immediately for security
-                        do {
-                            try Auth.auth().signOut()
-                            self?.errorMessage = "Security issue: Account linking detected. Please use a different email or contact support."
-                        } catch {
-                            print("❌ Error signing out: \(error)")
-                            self?.errorMessage = "Security error occurred. Please try again."
-                        }
-                        return
-                    }
-                    
-                    if hasGoogleProvider {
-                        print("✅ User properly signed in with Google")
-                    }
-                }
-                
-                self?.fetchGoogleUserProfile(user: user, userSession: userSession)
+            Task { @MainActor in
+                await self.authenticateWithSupabase(idToken: idToken, user: user, userSession: userSession)
             }
         }
     }
 
-    private func fetchGoogleUserProfile(user: GIDGoogleUser, userSession: UserSession) {
-        guard let uid = Auth.auth().currentUser?.uid else {
-            errorMessage = "Failed to get user UID"
+    private func authenticateWithSupabase(idToken: String, user: GIDGoogleUser, userSession: UserSession) async {
+        do {
+            // Sign in with Supabase using Google OAuth token
+            let session = try await authService.signInWithIdToken(provider: .google, idToken: idToken)
+            
+            print("✅ Signed in with Google via Supabase")
+            print("👤 User ID: \(session.user.id)")
+            print("👤 Email: \(session.user.email ?? "nil")")
+            
+            // Handle migration: find existing profile by email and migrate to new Supabase auth ID
+            let googleEmail = user.profile?.email
+            print("📧 Google email from profile: \(googleEmail ?? "nil")")
+            print("📧 Supabase session email: \(session.user.email ?? "nil")")
+
+            await handleUserMigration(
+                email: googleEmail ?? session.user.email,
+                supabaseUserId: session.user.id.uuidString,
+                userProfile: user.profile,
+                userSession: userSession
+            )
+            
+        } catch {
+            print("❌ Supabase Google sign-in error: \(error.localizedDescription)")
+            errorMessage = "Failed to sign in with Google: \(error.localizedDescription)"
+        }
+    }
+
+    private func handleUserMigration(
+        email: String?,
+        supabaseUserId: String,
+        userProfile: GIDProfileData? = nil,
+        appleFullName: PersonNameComponents? = nil,
+        appleEmail: String? = nil,
+        userSession: UserSession
+    ) async {
+        guard let email = email else {
+            print("❌ No email provided for migration")
+            await createNewUserProfile(
+                supabaseUserId: supabaseUserId,
+                email: "",
+                userProfile: userProfile,
+                appleFullName: appleFullName,
+                appleEmail: appleEmail,
+                userSession: userSession
+            )
             return
         }
 
-        // Check if profile exists first
-        userService.fetchUserById(userId: uid) { [weak self] result in
-            switch result {
-            case .success(_):
-                // Profile exists, update FCM token and proceed
-                userSession.setUserLoggedIn(uid: uid)
-                userSession.registerForFCMToken()
-                Task {
-                    await self?.dataManager.initializeProfileData(userId: uid)
+        print("🔄 Checking for existing user profile with email: '\(email)' (length: \(email.count))")
+        print("🔍 Email contains @gmail.com: \(email.contains("@gmail.com"))")
+        print("🔍 Email contains @privaterelay.appleid.com: \(email.contains("@privaterelay.appleid.com"))")
+
+        // Check if a user profile already exists with this email
+        let existingUser = await findExistingUserByEmail(email: email)
+
+        if let existingUser = existingUser {
+            print("🎯 Found existing user profile! Linking to Supabase UID: \(supabaseUserId)")
+
+            // Simply update the existing record to link it to the new Supabase auth ID
+            await linkExistingUserToSupabase(
+                existingUser: existingUser,
+                supabaseUserId: supabaseUserId,
+                userSession: userSession
+            )
+        } else {
+            print("👤 No existing user found, creating new profile")
+            // No existing user, create new profile with Supabase auth ID
+            await createNewUserProfile(
+                supabaseUserId: supabaseUserId,
+                email: email,
+                userProfile: userProfile,
+                appleFullName: appleFullName,
+                appleEmail: appleEmail,
+                userSession: userSession
+            )
+        }
+    }
+
+    private func findExistingUserByEmail(email: String) async -> ProfileData? {
+        print("🔍 Querying database for email: '\(email)'")
+
+        do {
+            let profiles: [ProfileData] = try await SupabaseManager.shared.database
+                .from("users")
+                .select()
+                .eq("email", value: email)
+                .execute()
+                .value
+
+            print("🔍 Query returned \(profiles.count) results")
+
+            // If multiple profiles with same email, prioritize:
+            // 1. Original Firebase users (have firebase_uid set)
+            // 2. Users without supabase_uid set (not fully migrated)
+            // 3. Any remaining user
+            let prioritizedProfiles = profiles.sorted { (a, b) -> Bool in
+                // Prefer users with firebase_uid (original Firebase users)
+                if a.firebaseUid != nil && b.firebaseUid == nil {
+                    return true
                 }
-            case .failure(let error):
-                // Only create if not found (404)
-                if (error as NSError).code == 404 {
-                    // Get FCM token for new user
-                    Messaging.messaging().token { [weak self] token, error in
-                        let profileData = ProfileData(
-                            id: uid,
-                            firstName: user.profile?.givenName ?? "",
-                            lastName: user.profile?.familyName ?? "",
-                            email: user.profile?.email ?? "",
-                            profilePhotoURL: user.profile?.imageURL(withDimension: 200),
-                            phoneNumber: "",
-                            fullNameLower: "\(user.profile?.givenName ?? "") \(user.profile?.familyName ?? "")".lowercased(),
-                            fullName: "\(user.profile?.givenName ?? "") \(user.profile?.familyName ?? "")",
-                            fcmToken: token
-                        )
-                        self?.userService.saveUserProfile(uid: uid, profileData: profileData) { [weak self] error in
-                            if let error = error {
-                                self?.errorMessage = "Error saving profile: \(error.localizedDescription)"
-                            } else {
-                                userSession.setUserLoggedIn(uid: uid)
-                                userSession.registerForFCMToken()
-                            }
-                        }
-                    }
+                if b.firebaseUid != nil && a.firebaseUid == nil {
+                    return false
+                }
+
+                // Then prefer users without supabase_uid (not migrated yet)
+                if a.supabaseUid == nil && b.supabaseUid != nil {
+                    return true
+                }
+                if b.supabaseUid == nil && a.supabaseUid != nil {
+                    return false
+                }
+
+                // Finally, prefer older records (by ID if they're UUIDs)
+                return a.id < b.id
+            }
+
+            if let profile = prioritizedProfiles.first {
+                print("🔍 Selected profile: id=\(profile.id), firebase_uid=\(profile.firebaseUid ?? "nil"), supabase_uid=\(profile.supabaseUid ?? "nil")")
+                return profile
+            } else {
+                print("🔍 No profile found with email '\(email)'")
+                return nil
+            }
+        } catch {
+            print("❌ Error searching for existing user: \(error.localizedDescription)")
+            print("❌ Query failed for email: '\(email)'")
+            return nil
+        }
+    }
+
+    private func linkExistingUserToSupabase(
+        existingUser: ProfileData,
+        supabaseUserId: String,
+        userSession: UserSession
+    ) async {
+        print("🔗 Linking existing user \(existingUser.id) to Supabase auth ID: \(supabaseUserId)")
+
+        do {
+            print("🔄 Attempting to update user record with supabase_uid...")
+
+            // First check current state
+            let beforeUpdate: [ProfileData] = try await SupabaseManager.shared.database
+                .from("users")
+                .select()
+                .eq("email", value: existingUser.email)
+                .execute()
+                .value
+
+            if let current = beforeUpdate.first {
+                print("📋 Before update: id=\(current.id), supabase_uid=\(current.supabaseUid ?? "null")")
+            }
+
+            // Simply update the existing user record to link it to the Supabase auth ID
+            let updateResponse = try await SupabaseManager.shared.database
+                .from("users")
+                .update(["supabase_uid": supabaseUserId])
+                .eq("email", value: existingUser.email)
+                .execute()
+
+            print("✅ Database update executed successfully")
+            print("📊 Update response: \(updateResponse)")
+
+            // Verify the link worked
+            let verifyProfiles: [ProfileData] = try await SupabaseManager.shared.database
+                .from("users")
+                .select()
+                .eq("email", value: existingUser.email)
+                .execute()
+                .value
+
+            if let linkedProfile = verifyProfiles.first {
+                print("✅ Link verified: id=\(linkedProfile.id), supabase_uid=\(linkedProfile.supabaseUid ?? "nil")")
+                if linkedProfile.supabaseUid == supabaseUserId {
+                    print("✅ User successfully linked to Supabase auth!")
                 } else {
-                    self?.errorMessage = "Error fetching profile: \(error.localizedDescription)"
+                    print("❌ MISMATCH: Expected supabase_uid=\(supabaseUserId), got \(linkedProfile.supabaseUid ?? "nil")")
                 }
+            } else {
+                print("❌ No profile found after update - this shouldn't happen!")
+            }
+
+            print("✅ User linking completed successfully")
+            Task { @MainActor in
+                // For existing users, keep using the original Firebase UID as the session ID
+                // but they're now authenticated via Supabase
+                userSession.setUserLoggedIn(uid: existingUser.id)
+                await self.dataManager.initializeProfileData(userId: existingUser.id)
+            }
+
+        } catch {
+            print("❌ Error linking user to Supabase: \(error.localizedDescription)")
+            Task { @MainActor in
+                self.errorMessage = "Error linking user account: \(error.localizedDescription)"
             }
         }
     }
 
-    // MARK: - Sign in with Apple
+    private func updateRelatedTables(oldUserId: String, newUserId: String) async {
+        print("🔄 Updating related tables for user migration...")
+        print("📋 Old User ID: \(oldUserId)")
+        print("📋 New User ID: \(newUserId)")
+
+        do {
+            // Update favorites
+            print("🔄 Updating favorites...")
+            try await SupabaseManager.shared.database
+                .from("favorites")
+                .update(["user_id": newUserId])
+                .eq("user_id", value: oldUserId)
+                .execute()
+            print("✅ favorites updated")
+
+            // Update following (both follower and following)
+            print("🔄 Updating following (follower_id)...")
+            try await SupabaseManager.shared.database
+                .from("following")
+                .update(["follower_id": newUserId])
+                .eq("follower_id", value: oldUserId)
+                .execute()
+            print("✅ following (follower_id) updated")
+
+            print("🔄 Updating following (following_id)...")
+            try await SupabaseManager.shared.database
+                .from("following")
+                .update(["following_id": newUserId])
+                .eq("following_id", value: oldUserId)
+                .execute()
+            print("✅ following (following_id) updated")
+
+            // Update place lists
+            print("🔄 Updating place_lists...")
+            try await SupabaseManager.shared.database
+                .from("place_lists")
+                .update(["user_id": newUserId])
+                .eq("user_id", value: oldUserId)
+                .execute()
+            print("✅ place_lists updated")
+
+            // Update reviews
+            print("🔄 Updating reviews...")
+            try await SupabaseManager.shared.database
+                .from("reviews")
+                .update(["user_id": newUserId])
+                .eq("user_id", value: oldUserId)
+                .execute()
+            print("✅ reviews updated")
+
+            // Update comments
+            print("🔄 Updating comments...")
+            try await SupabaseManager.shared.database
+                .from("comments")
+                .update(["user_id": newUserId])
+                .eq("user_id", value: oldUserId)
+                .execute()
+            print("✅ comments updated")
+
+            // Update my_places
+            print("🔄 Updating my_places...")
+            try await SupabaseManager.shared.database
+                .from("my_places")
+                .update(["user_id": newUserId])
+                .eq("user_id", value: oldUserId)
+                .execute()
+            print("✅ my_places updated")
+
+            // Update external_places
+            print("🔄 Updating external_places...")
+            try await SupabaseManager.shared.database
+                .from("external_places")
+                .update(["user_id": newUserId])
+                .eq("user_id", value: oldUserId)
+                .execute()
+            print("✅ external_places updated")
+
+            // Update place_notes
+            print("🔄 Updating place_notes...")
+            try await SupabaseManager.shared.database
+                .from("place_notes")
+                .update(["user_id": newUserId])
+                .eq("user_id", value: oldUserId)
+                .execute()
+            print("✅ place_notes updated")
+
+            // Update tik_tok_place_flags
+            print("🔄 Updating tik_tok_place_flags...")
+            try await SupabaseManager.shared.database
+                .from("tik_tok_place_flags")
+                .update(["user_id": newUserId])
+                .eq("user_id", value: oldUserId)
+                .execute()
+            print("✅ tik_tok_place_flags updated")
+
+            // Update user_notifications
+            print("🔄 Updating user_notifications...")
+            try await SupabaseManager.shared.database
+                .from("user_notifications")
+                .update(["user_id": newUserId])
+                .eq("user_id", value: oldUserId)
+                .execute()
+            print("✅ user_notifications updated")
+
+            // Update review_likes
+            print("🔄 Updating review_likes...")
+            try await SupabaseManager.shared.database
+                .from("review_likes")
+                .update(["user_id": newUserId])
+                .eq("user_id", value: oldUserId)
+                .execute()
+            print("✅ review_likes updated")
+
+            print("✅ All related tables updated successfully")
+
+        } catch {
+            print("❌ Error updating related tables: \(error.localizedDescription)")
+        }
+    }
+
+    private func createNewUserProfile(
+        supabaseUserId: String,
+        email: String,
+        userProfile: GIDProfileData? = nil,
+        appleFullName: PersonNameComponents? = nil,
+        appleEmail: String? = nil,
+        userSession: UserSession
+    ) async {
+        print("👤 Creating new user profile for Supabase user: \(supabaseUserId)")
+
+        // Determine profile data from either Google or Apple
+        let firstName: String
+        let lastName: String
+        let profilePhotoURL: URL?
+
+        if let googleProfile = userProfile {
+            // Google profile data
+            firstName = googleProfile.givenName ?? ""
+            lastName = googleProfile.familyName ?? ""
+            profilePhotoURL = googleProfile.imageURL(withDimension: 200)
+        } else if let appleName = appleFullName {
+            // Apple profile data
+            firstName = appleName.givenName ?? ""
+            lastName = appleName.familyName ?? ""
+            profilePhotoURL = nil  // Apple doesn't provide profile photos
+        } else {
+            // Fallback
+            firstName = ""
+            lastName = ""
+            profilePhotoURL = nil
+        }
+
+                    let profileData = ProfileData(
+                        id: supabaseUserId,
+              firstName: firstName,
+              lastName: lastName,
+              email: email,
+              profilePhotoURL: profilePhotoURL,
+                        phoneNumber: "",
+              fullNameLower: "\(firstName) \(lastName)".lowercased(),
+              fullName: "\(firstName) \(lastName)",
+              fcmToken: nil,  // TODO: Implement push notifications with Supabase
+              firebaseUid: nil,
+              supabaseUid: supabaseUserId  // New users have supabase_uid = id
+          )
+
+        await withCheckedContinuation { continuation in
+            userService.saveUserProfile(uid: supabaseUserId, profileData: profileData) { [weak self] error in
+                guard let self = self else { return }
+
+                        if let error = error {
+                    print("❌ Error creating new profile: \(error.localizedDescription)")
+                            Task { @MainActor in
+                        self.errorMessage = "Error creating profile: \(error.localizedDescription)"
+                    }
+                } else {
+                    print("✅ New profile created successfully")
+                    Task { @MainActor in
+                        // For new users, the profile ID is the same as supabaseUserId
+                        userSession.setUserLoggedIn(uid: supabaseUserId)
+                    }
+                }
+                continuation.resume()
+            }
+        }
+    }
+
+    // MARK: - Apple Sign-In
 
     func prepareAppleSignIn(request: ASAuthorizationAppleIDRequest) {
         print("🍎 Preparing Apple Sign In request...")
@@ -172,6 +472,7 @@ class LoginViewModel: ObservableObject {
         case .failure(let error):
             print("❌ Apple Sign In failed: \(error.localizedDescription)")
             errorMessage = error.localizedDescription
+            
         case .success(let authResults):
             print("✅ Apple Sign In successful, processing credential...")
             
@@ -194,158 +495,111 @@ class LoginViewModel: ObservableObject {
                 return
             }
 
-            print("🍎 Got Apple ID token, creating Firebase credential...")
-            let credential = OAuthProvider.credential(withProviderID: "apple.com", idToken: idTokenString, rawNonce: nonce)
-
-            print("🔥 Signing in with Firebase...")
-            print("🍎 Apple email: \(appleIDCredential.email ?? "nil")")
-            print("🍎 Apple user ID: \(appleIDCredential.user)")
+            print("🍎 Got Apple identity token, signing in with Supabase...")
             
-            Auth.auth().signIn(with: credential) { [weak self] authResult, error in
-                if let error = error {
-                    print("❌ Firebase sign in failed: \(error.localizedDescription)")
-                    self?.errorMessage = error.localizedDescription
-                    return
-                }
-
-                print("✅ Firebase sign in successful!")
-                if let user = authResult?.user {
-                    print("👤 Firebase user UID: \(user.uid)")
-                    print("👤 Firebase user email: \(user.email ?? "nil")")
-                    print("👤 Firebase user provider data:")
-                    for profile in user.providerData {
-                        print("   - Provider: \(profile.providerID), UID: \(profile.uid), Email: \(profile.email ?? "nil")")
-                    }
-                    
-                    // SECURITY CHECK: Ensure user is actually signed in with Apple, not linked to Google
-                    let hasAppleProvider = user.providerData.contains { $0.providerID == "apple.com" }
-                    let hasGoogleProvider = user.providerData.contains { $0.providerID == "google.com" }
-                    
-                    print("🔍 Security check - Apple provider: \(hasAppleProvider), Google provider: \(hasGoogleProvider)")
-                    print("🔍 Provider count: \(user.providerData.count)")
-                    
-                    // STRICT SECURITY: Only allow pure Apple authentication
-                    if !hasAppleProvider {
-                        print("🚨 SECURITY ISSUE: User signed in with Apple but no Apple provider found!")
-                        print("🚨 Signing out for security...")
-                        
-                        // Sign out immediately for security
-                        do {
-                            try Auth.auth().signOut()
-                            self?.errorMessage = "Security issue: Invalid authentication method. Please try again."
-                        } catch {
-                            print("❌ Error signing out: \(error)")
-                            self?.errorMessage = "Security error occurred. Please try again."
-                        }
-                        return
-                    }
-                    
-                    // Check for any other providers (Google, etc.)
-                    let otherProviders = user.providerData.filter { $0.providerID != "apple.com" }
-                    if !otherProviders.isEmpty {
-                        print("🚨 SECURITY ISSUE: User signed in with Apple but has other providers: \(otherProviders.map { $0.providerID })")
-                        print("🚨 Signing out for security...")
-                        
-                        // Sign out immediately for security
-                        do {
-                            try Auth.auth().signOut()
-                            self?.errorMessage = "Security issue: Account linking detected. Please use a different email or contact support."
-                        } catch {
-                            print("❌ Error signing out: \(error)")
-                            self?.errorMessage = "Security error occurred. Please try again."
-                        }
-                        return
-                    }
-                    
-                    if hasAppleProvider && otherProviders.isEmpty {
-                        print("✅ User properly signed in with Apple (no other providers)")
-                    }
-                }
-                
-                self?.fetchAppleUserProfile(fullName: appleIDCredential.fullName, email: appleIDCredential.email, userSession: userSession)
+            Task { @MainActor in
+                await authenticateWithSupabaseApple(
+                    idToken: idTokenString,
+                    nonce: nonce,
+                    fullName: appleIDCredential.fullName,
+                    email: appleIDCredential.email,
+                    userSession: userSession
+                )
             }
         }
     }
 
-    private func fetchAppleUserProfile(fullName: PersonNameComponents?, email: String?, userSession: UserSession) {
-        print("👤 Fetching Apple user profile...")
-        
-        guard let uid = Auth.auth().currentUser?.uid else {
-            print("❌ Failed to get user UID from Firebase")
-            errorMessage = "Failed to get user UID"
-            return
+    private func authenticateWithSupabaseApple(
+        idToken: String,
+        nonce: String,
+        fullName: PersonNameComponents?,
+        email: String?,
+        userSession: UserSession
+    ) async {
+        do {
+            // Sign in with Supabase using Apple identity token
+            let session = try await authService.signInWithApple(idToken: idToken, nonce: nonce)
+            
+            print("✅ Signed in with Apple via Supabase")
+            print("👤 User ID: \(session.user.id)")
+            print("👤 Email: \(session.user.email ?? "nil")")
+            
+            // Handle migration: find existing profile by email and migrate to new Supabase auth ID
+            await handleUserMigration(
+                email: email ?? session.user.email,
+                supabaseUserId: session.user.id.uuidString,
+                appleFullName: fullName,
+                appleEmail: email,
+                userSession: userSession
+            )
+            
+        } catch {
+            print("❌ Supabase Apple sign-in error: \(error.localizedDescription)")
+            errorMessage = "Failed to sign in with Apple: \(error.localizedDescription)"
         }
-        
-        print("👤 User UID: \(uid)")
+    }
 
-        userService.fetchUserById(userId: uid) { [weak self] result in
+    private func fetchOrCreateAppleProfile(
+        supabaseUserId: String,
+        fullName: PersonNameComponents?,
+        email: String?,
+        userSession: UserSession
+    ) async {
+        userService.fetchUserById(userId: supabaseUserId) { [weak self] result in
+            guard let self = self else { return }
+            
             switch result {
             case .success(let existingUser):
-                print("✅ User already exists in database")
-                print("🔍 Existing user email: \(existingUser.email)")
-                print("🔍 Existing user name: \(existingUser.fullName)")
+                print("✅ Existing Apple user profile found")
+                print("🔍 Email: \(existingUser.email)")
                 
-                // SECURITY CHECK: Ensure this is actually an Apple user
-                if !existingUser.email.contains("privaterelay.appleid.com") && !existingUser.email.isEmpty {
-                    print("🚨 SECURITY ISSUE: Existing user found but not an Apple private relay email!")
-                    print("🚨 This suggests account linking. Signing out for security...")
-                    
-                    // Sign out immediately for security
-                    do {
-                        try Auth.auth().signOut()
-                        self?.errorMessage = "Security issue: Account linking detected. Please use a different email or contact support."
-                    } catch {
-                        print("❌ Error signing out: \(error)")
-                        self?.errorMessage = "Security error occurred. Please try again."
-                    }
-                    return
+                Task { @MainActor in
+                    // For existing users, use the existing profile ID, not the Supabase auth UID
+                    userSession.setUserLoggedIn(uid: existingUser.id)
+                    await self.dataManager.initializeProfileData(userId: existingUser.id)
                 }
                 
-                userSession.setUserLoggedIn(uid: uid)
-                userSession.registerForFCMToken()
-                Task { await self?.dataManager.initializeProfileData(userId: uid) }
-                print("🎉 User successfully logged in!")
             case .failure(let error):
-                print("❌ Error fetching user: \(error.localizedDescription)")
                 if (error as NSError).code == 404 {
-                    print("👤 User not found, creating new profile...")
-                    Messaging.messaging().token { [weak self] token, _ in
-                        let givenName = fullName?.givenName ?? ""
-                        let familyName = fullName?.familyName ?? ""
-                        // SECURITY: Ensure no profile photo URL for Apple users (they don't get one from Apple)
-                        let profileData = ProfileData(
-                            id: uid,
-                            firstName: givenName,
-                            lastName: familyName,
-                            email: email ?? "",
-                            profilePhotoURL: nil, // Apple doesn't provide profile photos
-                            phoneNumber: "",
-                            fullNameLower: "\(givenName) \(familyName)".lowercased(),
-                            fullName: "\(givenName) \(familyName)",
-                            fcmToken: token
-                        )
-                        print("💾 Saving new user profile...")
-                        self?.userService.saveUserProfile(uid: uid, profileData: profileData) { [weak self] error in
-                            if let error = error {
-                                print("❌ Error saving profile: \(error.localizedDescription)")
+                    print("👤 Creating new Apple user profile...")
+                    
+                    let givenName = fullName?.givenName ?? ""
+                    let familyName = fullName?.familyName ?? ""
+                    
+                    let profileData = ProfileData(
+                        id: supabaseUserId,
+                        firstName: givenName,
+                        lastName: familyName,
+                        email: email ?? "",
+                        profilePhotoURL: nil,  // Apple doesn't provide profile photos
+                        phoneNumber: "",
+                        fullNameLower: "\(givenName) \(familyName)".lowercased(),
+                        fullName: "\(givenName) \(familyName)",
+                        fcmToken: nil  // TODO: Implement push notifications with Supabase
+                    )
+                    
+                    self.userService.saveUserProfile(uid: supabaseUserId, profileData: profileData) { [weak self] error in
+                        if let error = error {
+                            Task { @MainActor in
                                 self?.errorMessage = "Error saving profile: \(error.localizedDescription)"
-                            } else {
-                                print("✅ Profile saved successfully!")
-                                userSession.setUserLoggedIn(uid: uid)
-                                userSession.registerForFCMToken()
-                                print("🎉 New user successfully logged in!")
+                            }
+                        } else {
+                            print("✅ Apple profile created successfully")
+                            Task { @MainActor in
+                                userSession.setUserLoggedIn(uid: supabaseUserId)
                             }
                         }
                     }
                 } else {
-                    print("❌ Unexpected error: \(error.localizedDescription)")
-                    self?.errorMessage = "Error fetching profile: \(error.localizedDescription)"
+                    Task { @MainActor in
+                        self.errorMessage = "Error fetching profile: \(error.localizedDescription)"
+                    }
                 }
             }
         }
     }
 
-    // MARK: - Nonce helpers
+    // MARK: - Nonce Helpers
 
     private func randomNonceString(length: Int = 32) -> String {
         precondition(length > 0)
@@ -380,5 +634,5 @@ class LoginViewModel: ObservableObject {
         let hashed = SHA256.hash(data: inputData)
         return hashed.compactMap { String(format: "%02x", $0) }.joined()
     }
-
 }
+

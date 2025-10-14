@@ -60,30 +60,27 @@ struct ContentView: View {
         print("🚀 Processing notification navigation to place: \(navigation.placeId), review: \(navigation.reviewId)")
         
         // Fetch the place details first
-        serviceContainer.placeService.getDetailPlace(placeId: navigation.placeId) { place, error in
-            DispatchQueue.main.async {
-                if let place = place {
-                    print("✅ Found place: \(place.name)")
-                    
-                    // Set the selected place and show the detail sheet
-                    selectedPlaceVM.selectedPlace = place
-                    selectedPlaceVM.isDetailSheetPresented = true
-                    
-                    // Clear the pending navigation but keep the highlighted review ID
-                    notificationManager.clearPendingNavigation()
-                    
-                    print("📍 Navigated to place detail view, highlighting review: \(navigation.reviewId)")
-                } else {
-                    let errorMsg = error!.localizedDescription
-                    print("❌ Failed to fetch place details: \(errorMsg)")
-                    
-                    // Show user-friendly error
-                    navigationErrorMessage = "Sorry, we couldn't find that place. It may have been removed."
-                    showNavigationError = true
-                    
-                    notificationManager.clearPendingNavigation()
-                    notificationManager.clearHighlightedReview()
-                }
+        serviceContainer.placeService.getDetailPlace(mapboxId: navigation.placeId) { place in
+            if let place = place {
+                print("✅ Found place: \(place.name)")
+                
+                // Set the selected place and show the detail sheet
+                selectedPlaceVM.selectedPlace = place
+                selectedPlaceVM.isDetailSheetPresented = true
+                
+                // Clear the pending navigation but keep the highlighted review ID
+                notificationManager.clearPendingNavigation()
+                
+                print("📍 Navigated to place detail view, highlighting review: \(navigation.reviewId)")
+            } else {
+                print("❌ Failed to fetch place details")
+                
+                // Show user-friendly error
+                navigationErrorMessage = "Sorry, we couldn't find that place. It may have been removed."
+                showNavigationError = true
+                
+                notificationManager.clearPendingNavigation()
+                notificationManager.clearHighlightedReview()
             }
         }
     }

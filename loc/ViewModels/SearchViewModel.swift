@@ -123,7 +123,7 @@ class SearchViewModel: ObservableObject {
                     existingDetailPlace.openHours = DetailPlace.serializeOpenHours(openHours)
                     
                     // Update the place in Firestore
-                    self?.placeService.updatePlace(detailPlace: existingDetailPlace) { error in
+                    self?.placeService.updatePlace(place: existingDetailPlace) { error in
                         if let error = error {
                             print("Error updating place hours in Firestore: \(error.localizedDescription)")
                         }
@@ -181,7 +181,20 @@ class SearchViewModel: ObservableObject {
             }
             print("👥 [SearchViewModel] Received \(users?.count ?? 0) user results")
             DispatchQueue.main.async {
-                self?.userResults = users ?? []
+                // Convert User to ProfileData if needed
+                let profileData = users?.compactMap { user in
+                    ProfileData(
+                        id: user.id,
+                        firstName: user.firstName,
+                        lastName: user.lastName,
+                        email: user.email,
+                        profilePhotoURL: user.profilePhotoURL,
+                        phoneNumber: "",
+                        fullNameLower: "\(user.firstName) \(user.lastName)".lowercased(),
+                        fullName: "\(user.firstName) \(user.lastName)"
+                    )
+                } ?? []
+                self?.userResults = profileData
                 print("👥 [SearchViewModel] Updated userResults with \(users?.count ?? 0) items")
             }
         }

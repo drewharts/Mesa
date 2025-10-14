@@ -150,7 +150,9 @@ class DataManager: ObservableObject {
     func loadUserExternalPlaces(userId: String) async {
         do {
             let externalPlaces = try await userService.fetchUserExternalPlaces(userId: userId)
-            profileViewModel.userExternalPlaces = externalPlaces
+            // Convert array to dictionary with place IDs as keys
+            let externalPlacesDict = Dictionary(uniqueKeysWithValues: externalPlaces.map { ($0.placeId, $0) })
+            profileViewModel.userExternalPlaces = externalPlacesDict
             
             // Note: DetailPlace objects will be loaded via pagination when TikTok tab is accessed
             
@@ -440,7 +442,7 @@ class DataManager: ObservableObject {
         do {
             // Fetch all reviews (RestaurantReview and GenericReview) in parallel
             async let restaurantReviews: [RestaurantReview] = try await reviewService.fetchUserReviews(userId: userId)
-            async let genericReviews: [GenericReview] = try await reviewService.fetchUserReviews(userId: userId)
+            async let genericReviews: [GenericReview] = try await reviewService.fetchUserGenericReviews(userId: userId)
             
             let allReviews: [ReviewProtocol] = (try await restaurantReviews) + (try await genericReviews)
 

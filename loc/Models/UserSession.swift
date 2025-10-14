@@ -5,16 +5,16 @@
 //  Created by Andrew Hartsfield II on 11/11/24.
 //
 
-import FirebaseAuth
 import GoogleSignIn
-import FirebaseFirestore
-import FirebaseMessaging
 import SwiftUI
+import Supabase
 
 class UserSession: ObservableObject {
     @Published var isUserLoggedIn: Bool = false
     @Published var profileViewModel: ProfileViewModel?
     @Published var currentUserId: String?
+    
+    private let authService = SupabaseAuthService.shared
     private let userService: UserService
     private let locationManager: LocationManager
     private let detailPlaceVM: DetailPlaceViewModel
@@ -23,33 +23,58 @@ class UserSession: ObservableObject {
         self.userService = userService
         self.locationManager = locationManager
         self.detailPlaceVM = detailPlaceVM
-        if let currentUser = Auth.auth().currentUser {
+        
+        // Check for existing Supabase session
+        Task { @MainActor in
+            await checkSupabaseSession()
+        }
+    }
+
+    func checkSupabaseSession() async {
+        do {
+            let session = try await authService.getSession()
             self.isUserLoggedIn = true
-            self.currentUserId = currentUser.uid
-            // Register for FCM token updates
+            
+            // Look up the actual user profile ID instead of using Supabase auth UID
+            do {
+                let profile = try await userService.fetchUserById(userId: session.user.id.uuidString)
+                self.currentUserId = profile.id
+                print("✅ Found existing Supabase session: \(profile.id)")
+            } catch {
+                // Fallback to Supabase auth UID if profile lookup fails
+                self.currentUserId = session.user.id.uuidString
+                print("✅ Found Supabase session (fallback): \(session.user.id)")
+            }
+            
             self.registerForFCMToken()
-//            fetchProfile(for: currentUser.uid)
-        } else {
+        } catch {
+            print("ℹ️ No existing Supabase session: \(error.localizedDescription)")
             self.isUserLoggedIn = false
             self.profileViewModel = nil
         }
     }
-
+    
     func logout() {
-        do {
-            try Auth.auth().signOut()
-            GIDSignIn.sharedInstance.signOut()
-            isUserLoggedIn = false
-            profileViewModel = nil
-            currentUserId = nil
-            print("👋 User logged out successfully")
-        } catch let signOutError as NSError {
-            print("❌ Error signing out: \(signOutError)")
+        Task { @MainActor in
+            do {
+                try await authService.signOut()
+                GIDSignIn.sharedInstance.signOut()
+                isUserLoggedIn = false
+                profileViewModel = nil
+                currentUserId = nil
+                print("👋 User logged out successfully from Supabase")
+            } catch {
+                print("❌ Error signing out: \(error.localizedDescription)")
+            }
         }
     }
     
     func setUserLoggedIn(uid: String) {
         print("🔐 Setting user as logged in: \(uid)")
+        print("🔍 [UserSession] Call stack:")
+        print("   - Thread: \(Thread.isMainThread ? "Main" : "Background")")
+        print("   - Current currentUserId: \(self.currentUserId ?? "nil")")
+        print("   - New currentUserId: \(uid)")
         DispatchQueue.main.async {
             self.isUserLoggedIn = true
             self.currentUserId = uid
@@ -57,28 +82,11 @@ class UserSession: ObservableObject {
         }
     }
     
-    // MARK: - FCM Token Management
+    // MARK: - Push Notifications (Firebase FCM removed)
     func registerForFCMToken() {
-        guard let currentUserId = self.currentUserId else { 
-            print("⚠️ Cannot register FCM token - no current user ID")
-            return 
-        }
-        
-        print("📱 Registering FCM token for user: \(currentUserId)")
-        Messaging.messaging().token { [weak self] token, error in
-            if let error = error {
-                print("❌ Error fetching FCM registration token: \(error)")
-            } else if let token = token {
-                print("📱 FCM registration token: \(token)")
-                self?.userService.updateFCMToken(userId: currentUserId, token: token) { error in
-                    if let error = error {
-                        print("❌ Error updating FCM token in Firestore: \(error)")
-                    } else {
-                        print("✅ FCM token successfully updated in Firestore")
-                    }
-                }
-            }
-        }
+        // TODO: Implement push notifications without Firebase
+        // Options: APNs directly, OneSignal, Pusher Beams, or other service
+        print("⚠️ Push notifications need to be implemented (Firebase FCM removed)")
     }
     
 //    func fetchProfile(for uid: String) {
@@ -109,20 +117,23 @@ class UserSession: ObservableObject {
 //    }
     
     func signInWithGoogle(user: GIDGoogleUser) {
-        guard let idToken = user.idToken?.tokenString else { return }
-        let credential = GoogleAuthProvider.credential(withIDToken: idToken, accessToken: user.accessToken.tokenString)
-        
-        Auth.auth().signIn(with: credential) { [weak self] authResult, error in
-            guard let self = self else { return }
-            if let error = error {
-                print("❌ Firebase sign-in error: \(error.localizedDescription)")
-                return
-            }
-            if let currentUser = Auth.auth().currentUser {
-                self.setUserLoggedIn(uid: currentUser.uid)
-                // Register for FCM token after successful login
-                self.registerForFCMToken()
-//                self.fetchProfile(for: currentUser.uid)
+        Task { @MainActor in
+            do {
+                guard let idToken = user.idToken?.tokenString else {
+                    print("❌ No ID token available")
+                    return
+                }
+                
+                // Sign in with Supabase using Google OAuth
+                // Note: This requires Google OAuth to be configured in Supabase Dashboard
+                _ = try await authService.signInWithIdToken(provider: .google, idToken: idToken)
+                
+                // Check session after sign-in
+                await checkSupabaseSession()
+                
+                print("✅ Signed in with Google via Supabase")
+            } catch {
+                print("❌ Supabase Google sign-in error: \(error.localizedDescription)")
             }
         }
     }

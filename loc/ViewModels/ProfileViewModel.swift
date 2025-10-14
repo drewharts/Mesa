@@ -409,7 +409,13 @@ class ProfileViewModel: ObservableObject {
          
          let placeForList = place.toPlace()
 
-         placeService.removePlaceFromList(userId: userId, listId: list.id, place: placeForList)
+         placeService.removePlaceFromList(userId: userId, listId: list.id.uuidString, placeId: placeForList.id.uuidString) { error in
+             if let error = error {
+                 print("❌ Error removing place from list: \(error)")
+             } else {
+                 print("✅ Successfully removed place from list")
+             }
+         }
          
          // Recalculate average coordinates for this list
          recalculateAverageCoordinates(for: listId)
@@ -429,7 +435,13 @@ class ProfileViewModel: ObservableObject {
         }
         if !userFavorites.contains(place.id.uuidString) {
             userFavorites.append(place.id.uuidString)
-            userService.addProfileFavorite(userId: userId, place: place)
+            userService.addProfileFavorite(userId: userId, placeId: place.id.uuidString) { error in
+                if let error = error {
+                    print("❌ Error adding profile favorite: \(error)")
+                } else {
+                    print("✅ Successfully added profile favorite")
+                }
+            }
             
             // Add current user as saver so favorite places appear on map with profile picture
             if detailPlaceViewModel.placeSavers[place.id.uuidString] == nil {
@@ -447,7 +459,13 @@ class ProfileViewModel: ObservableObject {
         guard let userId = userSession.currentUserId else { return }
         if let index = userFavorites.firstIndex(of: place.id.uuidString) {
             userFavorites.remove(at: index)
-            userService.removeProfileFavorite(userId: userId, placeId: place.id.uuidString)
+            userService.removeProfileFavorite(userId: userId, placeId: place.id.uuidString) { error in
+                if let error = error {
+                    print("❌ Error removing profile favorite: \(error)")
+                } else {
+                    print("✅ Successfully removed profile favorite")
+                }
+            }
         }
     }
     
@@ -462,7 +480,7 @@ class ProfileViewModel: ObservableObject {
         
         let placeNote = PlaceNote(placeId: placeId, userId: userId, note: note, link: link)
         
-        userService.savePlaceNote(userId: userId, placeNote: placeNote) { [weak self] success, error in
+        userService.savePlaceNote(note: placeNote) { [weak self] success, error in
             if success {
                 DispatchQueue.main.async {
                     self?.placeNotes[placeId] = placeNote
@@ -476,7 +494,7 @@ class ProfileViewModel: ObservableObject {
     func loadPlaceNote(for placeId: String) {
         guard let userId = userSession.currentUserId else { return }
         
-        userService.fetchPlaceNote(userId: userId, placeId: placeId) { [weak self] placeNote in
+        userService.fetchPlaceNote(userId: userId, placeId: placeId) { [weak self] placeNote, error in
             DispatchQueue.main.async {
                 if let placeNote = placeNote {
                     self?.placeNotes[placeId] = placeNote
@@ -489,7 +507,7 @@ class ProfileViewModel: ObservableObject {
         guard let userId = userSession.currentUserId,
               let placeNote = placeNotes[placeId] else { return }
         
-        userService.deletePlaceNote(userId: userId, placeNoteId: placeNote.id) { [weak self] success, error in
+        userService.deletePlaceNote(userId: userId, placeId: placeNote.placeId) { [weak self] success, error in
             if success {
                 DispatchQueue.main.async {
                     self?.placeNotes.removeValue(forKey: placeId)
@@ -531,7 +549,7 @@ class ProfileViewModel: ObservableObject {
     func loadTikTokPlaceFlag(for placeId: String) {
         guard let userId = userSession.currentUserId else { return }
         
-        userService.hasUserFlaggedPlace(userId: userId, placeId: placeId) { [weak self] flag in
+        userService.hasUserFlaggedPlace(userId: userId, placeId: placeId) { [weak self] flag, error in
             DispatchQueue.main.async {
                 if let flag = flag {
                     self?.tikTokPlaceFlags[placeId] = flag
@@ -544,7 +562,7 @@ class ProfileViewModel: ObservableObject {
         guard let userId = userSession.currentUserId,
               let flag = tikTokPlaceFlags[placeId] else { return }
         
-        userService.deleteTikTokPlaceFlag(userId: userId, flagId: flag.id) { [weak self] success, error in
+        userService.deleteTikTokPlaceFlag(userId: userId, placeId: placeId) { [weak self] success, error in
             if success {
                 DispatchQueue.main.async {
                     self?.tikTokPlaceFlags.removeValue(forKey: placeId)
@@ -568,15 +586,21 @@ class ProfileViewModel: ObservableObject {
             completion(false, NSError(domain: "ProfileViewModel", code: -1, userInfo: [NSLocalizedDescriptionKey: "User not logged in"]))
             return
         }
-        userService.saveExternalPlace(externalPlace: externalPlace, userId: userId, completion: completion)
+        userService.saveExternalPlace(externalPlace: externalPlace, completion: completion)
     }
 
      func addNewPlaceList(named name: String, city: String, emoji: String, image: String) {
          let newPlaceList = PlaceList(name: name, city: city, emoji: emoji, image: image)
          userLists.append(newPlaceList)
          sortListsByDistance() // Sort lists by distance after adding new list
-         guard let userId = user?.id else { return }
-         placeService.createNewList(placeList: newPlaceList, userID: userId)
+         guard let userId = userSession.currentUserId else { return }
+         placeService.createNewList(userId: userId, listName: newPlaceList.name, city: newPlaceList.city, emoji: newPlaceList.emoji, image: newPlaceList.image ?? "") { [weak self] createdList, error in
+             if let error = error {
+                 print("❌ Error creating new list: \(error)")
+             } else if let createdList = createdList {
+                 print("✅ Successfully created new list: \(createdList.name)")
+             }
+         }
          recentlyCreatedListId = newPlaceList.id
          
          // Clear the recently created list ID after a short delay
@@ -653,7 +677,7 @@ class ProfileViewModel: ObservableObject {
             Task {
                 do {
                     let restaurantReviews: [RestaurantReview] = try await reviewService.fetchUserReviews(userId: userId)
-                    let genericReviews: [GenericReview] = try await reviewService.fetchUserReviews(userId: userId)
+                    let genericReviews: [GenericReview] = try await reviewService.fetchUserGenericReviews(userId: userId)
                     let allReviews: [ReviewProtocol] = restaurantReviews + genericReviews
                     
                     // Sort reviews by timestamp (most recent first) and get unique place IDs while preserving order
@@ -944,17 +968,14 @@ class ProfileViewModel: ObservableObject {
         detailPlaceViewModel.calculateAnnotationPlaces()
         
         // Call backend to delete the TikTok place
-        userService.deleteTikTokPlace(userId: userId, placeId: placeId) { [weak self] success, error in
+        userService.deleteTikTokPlace(userId: userId, placeId: placeId) { [weak self] error in
             DispatchQueue.main.async {
-                if success {
+                if let error = error {
+                    print("❌ [ProfileViewModel] Error deleting TikTok place: \(error.localizedDescription)")
+                    completion(false)
+                } else {
                     print("✅ [ProfileViewModel] Successfully deleted TikTok place: \(place.name)")
                     completion(true)
-                } else {
-                    print("❌ [ProfileViewModel] Failed to delete TikTok place: \(error?.localizedDescription ?? "Unknown error")")
-                    
-                    // Revert optimistic update on failure
-                    self?.revertTikTokPlaceDeletion(place)
-                    completion(false)
                 }
             }
         }
@@ -1828,32 +1849,29 @@ class ProfileViewModel: ObservableObject {
         
         print("🔍 [ProfileViewModel] Fetching external places for user: \(userId)")
         
-        userService.fetchUserExternalPlaces(userId: userId) { [weak self] externalPlaces, error in
+        userService.fetchUserExternalPlaces(userId: userId) { [weak self] result in
             guard let self = self else { return }
             
-            if let error = error {
-                print("❌ [ProfileViewModel] Error fetching external places: \(error.localizedDescription)")
-                return
-            }
-            
-            guard let externalPlaces = externalPlaces else {
-                print("⚠️ [ProfileViewModel] No external places returned")
-                return
-            }
-            
-            print("✅ [ProfileViewModel] Successfully fetched \(externalPlaces.count) external places")
-            self.userExternalPlaces = externalPlaces
-            
-            // Load TikTok thumbnail images for external places
-            for (placeId, externalPlace) in externalPlaces {
+            switch result {
+            case .success(let externalPlaces):
+                print("✅ [ProfileViewModel] Successfully fetched \(externalPlaces.count) external places")
+                // Convert array to dictionary
+                let externalPlacesDict = Dictionary(uniqueKeysWithValues: externalPlaces.map { ($0.placeId, $0) })
+                self.userExternalPlaces = externalPlacesDict
+                
+                // Load TikTok thumbnail images for external places
+                for externalPlace in externalPlaces {
                 // Get the first TikTok video's thumbnail as the place image
                 if let firstTikTokVideo = externalPlace.tiktokVideos.first,
                    !firstTikTokVideo.thumbnailUrl.isEmpty {
                     self.loadTikTokThumbnailAsPlaceImage(
-                        placeId: placeId,
+                        placeId: externalPlace.placeId,
                         thumbnailURL: firstTikTokVideo.thumbnailUrl
                     )
                 }
+            }
+            case .failure(let error):
+                print("❌ [ProfileViewModel] Error fetching external places: \(error.localizedDescription)")
             }
         }
     }
@@ -1945,7 +1963,11 @@ class ProfileViewModel: ObservableObject {
         // Asynchronously delete from backend
         Task {
             do {
-                try await placeService.deletePlaceFromMyPlaces(userId: userId, placeId: place.id.uuidString)
+                placeService.deletePlaceFromMyPlaces(userId: userId, placeId: place.id.uuidString) { error in
+                    if let error = error {
+                        print("❌ Error deleting place from my places: \(error)")
+                    }
+                }
                 try await placeService.deletePlaceFromAllPlaces(placeId: place.id.uuidString)
                 
                 // On success, call completion on main thread
@@ -1974,15 +1996,12 @@ class ProfileViewModel: ObservableObject {
         print("🗑️ [ProfileViewModel] Starting account deletion for user: \(userId)")
         
         // Delete user data from Firestore
-        userService.deleteUserAccount(userId: userId) { [weak self] success, error in
+        userService.deleteUserAccount(userId: userId) { [weak self] error in
             DispatchQueue.main.async {
                 if let error = error {
                     print("❌ [ProfileViewModel] Error deleting account: \(error.localizedDescription)")
                     completion(false, error.localizedDescription)
-                    return
-                }
-                
-                if success {
+                } else {
                     print("✅ [ProfileViewModel] Successfully deleted user data from Firestore")
                     
                     // Delete Firebase Auth user
@@ -2002,8 +2021,6 @@ class ProfileViewModel: ObservableObject {
                             completion(true, nil)
                         }
                     }
-                } else {
-                    completion(false, "Failed to delete user data")
                 }
             }
         }

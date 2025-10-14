@@ -77,11 +77,11 @@ class MapViewModel: ObservableObject {
             )
             
             async let friendsPlaces = placeService.fetchFriendsPlacesInViewport(
-                friendUserIds: friendUserIds,
                 northLat: bounds.northLat,
                 southLat: bounds.southLat,
                 eastLng: bounds.eastLng,
-                westLng: bounds.westLng
+                westLng: bounds.westLng,
+                friendIds: friendUserIds
             )
             
             // Wait for both queries to complete

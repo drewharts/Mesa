@@ -226,7 +226,7 @@ class PhotoImportViewModel: ObservableObject {
             
             // Save to main places collection
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-                placeService.addToAllPlaces(detailPlace: detailPlace) { error in
+                placeService.addToAllPlaces(place: detailPlace) { error in
                     if let error = error {
                         print("❌ Error saving place to main collection: \(error.localizedDescription)")
                         continuation.resume(throwing: error)
@@ -240,7 +240,7 @@ class PhotoImportViewModel: ObservableObject {
             // Only save to user's myPlaces collection if this is a user-created place
             if nearbyPlace.properties.source == "user_created" {
                 try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-                    placeService.addToMyPlaces(userId: currentUserId, detailPlace: detailPlace) { error in
+                    placeService.addToMyPlaces(userId: currentUserId, place: detailPlace) { error in
                         if let error = error {
                             print("❌ Error saving place to user's collection: \(error.localizedDescription)")
                             continuation.resume(throwing: error)
@@ -253,7 +253,13 @@ class PhotoImportViewModel: ObservableObject {
             }
             
             // Add to user's map places for tracking
-            userService.addOrUpdateMapPlace(for: currentUserId, place: detailPlace, type: "selected")
+            userService.addOrUpdateMapPlace(userId: currentUserId, place: detailPlace) { error in
+                if let error = error {
+                    print("❌ Error updating map place: \(error)")
+                } else {
+                    print("✅ Successfully updated map place")
+                }
+            }
             
             // Notify other components to refresh map annotations
             NotificationCenter.default.post(name: NSNotification.Name("RefreshMapAnnotations"), object: nil)
