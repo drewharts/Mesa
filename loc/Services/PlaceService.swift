@@ -91,25 +91,44 @@ class PlaceService: ObservableObject {
         }
     }
     
+    /// Fetch ALL user places in a single optimized query (fastest!)
+    /// Includes my_places, favorites, and all place_list_items
+    func fetchAllUserPlaces(userId: String) async throws -> [DetailPlace] {
+        print("🚀 [PlaceService] Delegating fetchAllUserPlaces to Supabase...")
+        return try await supabase.fetchAllUserPlaces(userId: userId)
+    }
+    
     func fetchMyPlaces(userId: String, completion: @escaping (Result<[DetailPlace], Error>) -> Void) {
-        print("⚠️ [PlaceService] fetchMyPlaces not fully implemented")
-        completion(.success([]))
+        print("🔄 [PlaceService] Delegating fetchMyPlaces to Supabase...")
+        Task { @MainActor in
+            await supabase.fetchMyPlaces(userId: userId) { places, error in
+                if let error = error {
+                    completion(.failure(error))
+                } else {
+                    completion(.success(places ?? []))
+                }
+            }
+        }
     }
     
     func fetchMyPlaces(userId: String) async throws -> [DetailPlace] {
-        print("⚠️ [PlaceService] fetchMyPlaces async not fully implemented")
-        return []
+        print("🔄 [PlaceService] Delegating fetchMyPlaces async to Supabase...")
+        return try await supabase.fetchMyPlaces(userId: userId)
     }
     
     func fetchProfileFavorites(userId: String, completion: @escaping ([DetailPlace], Error?) -> Void) {
-        print("⚠️ [PlaceService] fetchProfileFavorites not fully implemented")
-        completion([], nil)
+        print("🔄 [PlaceService] Delegating fetchProfileFavorites to Supabase...")
+        Task { @MainActor in
+            await supabase.fetchProfileFavorites(userId: userId) { places, error in
+                completion(places ?? [], error)
+            }
+        }
     }
 
     func fetchProfileFavorites(userId: String) async throws -> [DetailPlace] {
-        print("⚠️ [PlaceService] fetchProfileFavorites async not fully implemented")
-        return []
-            }
+        print("🔄 [PlaceService] Delegating fetchProfileFavorites async to Supabase...")
+        return try await supabase.fetchProfileFavorites(userId: userId)
+    }
     
     func fetchLists(userId: String, completion: @escaping ([PlaceList]) -> Void) {
         print("🔄 [PlaceService] Delegating fetchLists to Supabase...")
@@ -124,23 +143,84 @@ class PlaceService: ObservableObject {
     }
     
     func fetchPlacesInViewport(viewport: (minLat: Double, maxLat: Double, minLng: Double, maxLng: Double), completion: @escaping ([DetailPlace]?, Error?) -> Void) {
-        print("⚠️ [PlaceService] fetchPlacesInViewport not fully implemented")
-        completion([], nil)
+        print("🔄 [PlaceService] Delegating fetchPlacesInViewport to Supabase...")
+        Task { @MainActor in
+            guard let userId = await SupabaseAuthService.shared.currentUserId else {
+                print("⚠️ [PlaceService] No userId available for viewport query")
+                completion([], nil)
+                return
+            }
+            await supabase.fetchPlacesInViewport(
+                northLat: viewport.maxLat,
+                southLat: viewport.minLat,
+                eastLng: viewport.maxLng,
+                westLng: viewport.minLng,
+                userId: userId,
+                completion: completion
+            )
+        }
     }
     
     func fetchPlacesInViewport(northLat: Double, southLat: Double, eastLng: Double, westLng: Double) async throws -> [DetailPlace] {
-        print("⚠️ [PlaceService] fetchPlacesInViewport async not fully implemented")
-        return []
+        print("🔄 [PlaceService] Delegating fetchPlacesInViewport async to Supabase...")
+        guard let userId = await SupabaseAuthService.shared.currentUserId else {
+            print("⚠️ [PlaceService] No userId available for viewport query")
+            return []
+        }
+        return try await supabase.fetchPlacesInViewport(
+            northLat: northLat,
+            southLat: southLat,
+            eastLng: eastLng,
+            westLng: westLng,
+            userId: userId
+        )
     }
     
     func fetchFriendsPlacesInViewport(viewport: (minLat: Double, maxLat: Double, minLng: Double, maxLng: Double), friendIds: [String], completion: @escaping ([DetailPlace]?, Error?) -> Void) {
-        print("⚠️ [PlaceService] fetchFriendsPlacesInViewport not fully implemented")
-        completion([], nil)
+        print("🔄 [PlaceService] Delegating fetchFriendsPlacesInViewport to Supabase...")
+        Task { @MainActor in
+            do {
+                var allPlaces: [DetailPlace] = []
+                // Fetch places for each friend
+                for friendId in friendIds {
+                    let friendPlaces = try await supabase.fetchPlacesInViewport(
+                        northLat: viewport.maxLat,
+                        southLat: viewport.minLat,
+                        eastLng: viewport.maxLng,
+                        westLng: viewport.minLng,
+                        userId: friendId
+                    )
+                    allPlaces.append(contentsOf: friendPlaces)
+                }
+                // Remove duplicates by place ID
+                let uniquePlaces = Dictionary(grouping: allPlaces, by: { $0.id })
+                    .compactMap { $0.value.first }
+                completion(uniquePlaces, nil)
+            } catch {
+                print("❌ [PlaceService] Error fetching friends' viewport places: \(error)")
+                completion(nil, error)
+            }
+        }
     }
     
     func fetchFriendsPlacesInViewport(northLat: Double, southLat: Double, eastLng: Double, westLng: Double, friendIds: [String]) async throws -> [DetailPlace] {
-        print("⚠️ [PlaceService] fetchFriendsPlacesInViewport async not fully implemented")
-        return []
+        print("🔄 [PlaceService] Delegating fetchFriendsPlacesInViewport async to Supabase...")
+        var allPlaces: [DetailPlace] = []
+        // Fetch places for each friend
+        for friendId in friendIds {
+            let friendPlaces = try await supabase.fetchPlacesInViewport(
+                northLat: northLat,
+                southLat: southLat,
+                eastLng: eastLng,
+                westLng: westLng,
+                userId: friendId
+            )
+            allPlaces.append(contentsOf: friendPlaces)
+        }
+        // Remove duplicates by place ID
+        let uniquePlaces = Dictionary(grouping: allPlaces, by: { $0.id })
+            .compactMap { $0.value.first }
+        return uniquePlaces
     }
     
     func addToAllPlaces(place: DetailPlace, completion: @escaping (Error?) -> Void) {

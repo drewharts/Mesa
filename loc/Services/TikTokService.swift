@@ -7,8 +7,6 @@
 
 import Foundation
 import CoreLocation
-import FirebaseFirestore
-import FirebaseAuth
 
 // MARK: - TikTok Data Models
 // NOTE: Most TikTok-specific data models are no longer needed since the backend 
@@ -201,13 +199,13 @@ class TikTokService: ObservableObject {
     }
     
     private func addAuthenticationToken(to request: inout URLRequest) async {
-        if let currentUser = Auth.auth().currentUser {
-            do {
-                let idToken = try await currentUser.getIDToken()
-                request.setValue("Bearer \(idToken)", forHTTPHeaderField: "Authorization")
-            } catch {
-                // Continue without auth token - backend supports unauthenticated requests
-            }
+        do {
+            let session = try await SupabaseAuthService.shared.getSession()
+            let accessToken = session.accessToken
+            request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        } catch {
+            // Continue without auth token - backend supports unauthenticated requests
+            print("⚠️ No auth session available, continuing without auth token")
         }
     }
     
@@ -252,7 +250,7 @@ class TikTokService: ObservableObject {
         
         // Set coordinate separately
         if let coordinatesArray = locationDict["coordinates"] as? [Double], coordinatesArray.count >= 2 {
-            detailPlace.coordinate = GeoPoint(latitude: coordinatesArray[0], longitude: coordinatesArray[1])
+            detailPlace.coordinate = CLLocationCoordinate2D(latitude: coordinatesArray[0], longitude: coordinatesArray[1])
         }
         
         // Add TikTok video data if available
@@ -307,11 +305,11 @@ class TikTokService: ObservableObject {
         if let coordinateDict = dict["coordinate"] as? [String: Any],
            let latitude = coordinateDict["latitude"] as? Double,
            let longitude = coordinateDict["longitude"] as? Double {
-            detailPlace.coordinate = GeoPoint(latitude: latitude, longitude: longitude)
+            detailPlace.coordinate = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
         } else if let locationDict = dict["location"] as? [String: Any],
                   let latitude = locationDict["latitude"] as? Double,
                   let longitude = locationDict["longitude"] as? Double {
-            detailPlace.coordinate = GeoPoint(latitude: latitude, longitude: longitude)
+            detailPlace.coordinate = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
         }
         
         // Handle TikTok videos if present

@@ -1,6 +1,5 @@
 import Foundation
 import CoreLocation
-import FirebaseFirestore
 import MapboxSearch
 
 // MARK: - Search Service Protocols
@@ -254,7 +253,7 @@ class MesaBackendService {
         detailPlace.id = UUID()
         detailPlace.name = data["name"] as? String ?? ""
         detailPlace.address = data["formatted_address"] as? String
-        detailPlace.coordinate = GeoPoint(latitude: latitude, longitude: longitude)
+        detailPlace.coordinate = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
         detailPlace.rating = data["rating"] as? Double
         detailPlace.openHours = additionalData["weekday_text"]?.components(separatedBy: "|")
         detailPlace.priceLevel = data["price_level"] as? String
@@ -292,7 +291,7 @@ class MesaBackendService {
             if let coordinates = additionalData["coordinates"] as? [String: Any],
                let latitude = coordinates["latitude"] as? Double,
                let longitude = coordinates["longitude"] as? Double {
-                detailPlace.coordinate = GeoPoint(latitude: latitude, longitude: longitude)
+                detailPlace.coordinate = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
             }
             
             // Additional metadata fields are available but not currently used:
@@ -333,7 +332,7 @@ class MesaBackendService {
             if let coordinate = additionalData["coordinate"] as? [String: Any],
                let latitude = coordinate["latitude"] as? Double,
                let longitude = coordinate["longitude"] as? Double {
-                detailPlace.coordinate = GeoPoint(latitude: latitude, longitude: longitude)
+                detailPlace.coordinate = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
             }
         }
         
@@ -467,11 +466,11 @@ class MesaBackendService {
                 detailPlace.Instagram = placeDict["instagram"] as? String
                 detailPlace.X = placeDict["twitter"] as? String
                 
-                // Manually extract coordinates and create GeoPoint
+                // Manually extract coordinates and create CLLocationCoordinate2D
                 if let locationDict = placeDict["location"] as? [String: Any],
                    let latitude = locationDict["latitude"] as? Double,
                    let longitude = locationDict["longitude"] as? Double {
-                    detailPlace.coordinate = GeoPoint(latitude: latitude, longitude: longitude)
+                    detailPlace.coordinate = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
                 }
                 
                 completion(.success(detailPlace))
@@ -483,8 +482,15 @@ class MesaBackendService {
         task.resume()
     }
 
-    /// Fetch review photos from Firestore for a place
+    /// Fetch review photos from Supabase for a place
     func getReviewPhotos(for placeId: String, completion: @escaping ([String]) -> Void) {
+        // TODO: Implement with Supabase
+        // For now, return empty array to prevent Firebase crash
+        print("⚠️ getReviewPhotos not yet implemented for Supabase - returning empty array")
+        completion([])
+        return
+        
+        /* OLD FIRESTORE CODE - DISABLED
         let db = Firestore.firestore()
         let reviewsRef = db.collection("places").document(placeId).collection("reviews")
 
@@ -529,5 +535,6 @@ class MesaBackendService {
             print("📸 [MesaBackendService] Found \(photoUrls.count) review photos for place \(placeId)")
             completion(photoUrls)
         }
+        */
     }
 }

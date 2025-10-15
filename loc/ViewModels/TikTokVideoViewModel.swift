@@ -5,7 +5,6 @@
 
 import Foundation
 import SwiftUI
-import FirebaseAuth
 import UIKit
 
 // Debug logging flag - set to true for verbose logging, false for production
@@ -173,7 +172,7 @@ class TikTokVideoViewModel: ObservableObject {
         isRefreshing = true
         hasAttemptedRefresh = true
 
-        let userId = Auth.auth().currentUser?.uid
+        let userId = await SupabaseAuthService.shared.currentUserId
         
         let result = await tikTokService.refreshTikTokThumbnail(for: tikTokVideo.url, userId: userId)
         

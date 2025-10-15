@@ -58,17 +58,11 @@ class PlaceDetailViewModel: ObservableObject {
     }
     
     func openNavigation(for place: DetailPlace, currentLocation: CLLocationCoordinate2D) {
-        // Unwrap the GeoPoint from place.coordinate
-        guard let geoPoint = place.coordinate else {
+        // Unwrap the coordinate
+        guard let destinationCoordinate = place.coordinate else {
             print("No coordinate available for this place.")
             return
         }
-
-        // Convert GeoPoint to CLLocationCoordinate2D.
-        let destinationCoordinate = CLLocationCoordinate2D(
-            latitude: geoPoint.latitude,
-            longitude: geoPoint.longitude
-        )
 
         let destinationPlacemark = MKPlacemark(coordinate: destinationCoordinate)
         let destinationMapItem = MKMapItem(placemark: destinationPlacemark)
@@ -138,17 +132,14 @@ class PlaceDetailViewModel: ObservableObject {
 //    }
     
     func updateTravelTime(for place: DetailPlace, from userCoordinate: CLLocationCoordinate2D) {
-        // Unwrap the GeoPoint; if it's nil, set travelTime to "N/A" and return.
-        guard let geoPoint = place.coordinate else {
+        // Unwrap the coordinate; if it's nil, set travelTime to "N/A" and return.
+        guard let placeCoordinate = place.coordinate else {
             DispatchQueue.main.async { [weak self] in
                 self?.travelTime = "N/A"
                 self?.travelTimes = [:]
             }
             return
         }
-
-        // Convert GeoPoint to CLLocationCoordinate2D.
-        let placeCoordinate = CLLocationCoordinate2D(latitude: geoPoint.latitude, longitude: geoPoint.longitude)
 
         // Calculate travel times for all transport types
         MapKitService.shared.calculateTravelTimes(from: userCoordinate, to: placeCoordinate) { [weak self] results, error in

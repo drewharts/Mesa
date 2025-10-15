@@ -7,7 +7,7 @@
 
 import Foundation
 import SwiftUI
-import FirebaseFirestore
+import CoreLocation
 
 @MainActor
 class DeepLinkManager: ObservableObject {
@@ -260,7 +260,7 @@ class DeepLinkManager: ObservableObject {
         detailPlace.mapboxId = shareablePlace.mapboxId
         
         if let lat = shareablePlace.latitude, let lng = shareablePlace.longitude {
-            detailPlace.coordinate = GeoPoint(latitude: lat, longitude: lng)
+            detailPlace.coordinate = CLLocationCoordinate2D(latitude: lat, longitude: lng)
         }
         
         return detailPlace

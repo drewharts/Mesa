@@ -7,7 +7,6 @@
 
 import SwiftUI
 import CoreLocation
-import FirebaseAuth
 
 struct SplashScreenView: View {
     @State private var isActive = false

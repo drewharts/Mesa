@@ -7,9 +7,7 @@
 
 import Foundation
 import UIKit
-import FirebaseFirestore
 import MapboxSearch
-import FirebaseAuth
 import SwiftUI
 
 @MainActor
@@ -158,13 +156,18 @@ class DetailPlaceViewModel: ObservableObject {
         guard placeImages[placeId] == nil else { return }
         
         // Get the current user ID
-        guard let currentUserId = Auth.auth().currentUser?.uid else {
-            print("Error: Current user ID is not available")
-            DispatchQueue.main.async {
+        Task { @MainActor in
+            guard let currentUserId = await SupabaseAuthService.shared.currentUserId else {
+                print("Error: Current user ID is not available")
                 self.placeImages[placeId] = nil
+                return
             }
-            return
+            
+            self.fetchPlaceImageWithUserId(placeId: placeId, currentUserId: currentUserId)
         }
+    }
+    
+    private func fetchPlaceImageWithUserId(placeId: String, currentUserId: String) {
         
         // Use friends' reviews to get images (both restaurant and generic)
         userService.fetchFriendsReviews(userId: currentUserId) { [weak self] (reviews, error) in

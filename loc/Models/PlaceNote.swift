@@ -6,7 +6,6 @@
 //
 
 import Foundation
-import FirebaseFirestore
 
 struct PlaceNote: Codable, Identifiable {
     var id: String = UUID().uuidString
@@ -14,16 +13,16 @@ struct PlaceNote: Codable, Identifiable {
     var userId: String
     var note: String?
     var link: String?
-    var createdAt: Timestamp
-    var updatedAt: Timestamp
+    var createdAt: Date?
+    var updatedAt: Date?
     
     init(placeId: String, userId: String, note: String? = nil, link: String? = nil) {
         self.placeId = placeId
         self.userId = userId
         self.note = note
         self.link = link
-        self.createdAt = Timestamp()
-        self.updatedAt = Timestamp()
+        self.createdAt = Date()
+        self.updatedAt = Date()
     }
     
     // Computed property to check if note has content

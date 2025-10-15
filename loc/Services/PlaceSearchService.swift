@@ -7,7 +7,6 @@
 
 import Foundation
 import CoreLocation
-import FirebaseFirestore
 import MapboxSearch
 
 /// A service that uses Mesa backend for place search

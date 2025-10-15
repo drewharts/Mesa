@@ -7,7 +7,6 @@
 
 import Foundation
 import MapKit
-import FirebaseFirestore
 
 @MainActor
 class MapViewModel: ObservableObject {

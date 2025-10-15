@@ -6,7 +6,7 @@
 //
 
 import SwiftUI
-import FirebaseFirestore
+import CoreLocation
 
 struct TikTokNoPlacesFoundView: View {
     let tikTokUrl: String
@@ -282,7 +282,7 @@ struct TikTokNoPlacesFoundView: View {
         detailPlace.id = UUID(uuidString: suggestion.id) ?? UUID()
         detailPlace.name = suggestion.name
         detailPlace.address = suggestion.address
-        detailPlace.coordinate = GeoPoint(
+        detailPlace.coordinate = CLLocationCoordinate2D(
             latitude: suggestion.coordinate.latitude,
             longitude: suggestion.coordinate.longitude
         )

@@ -9,9 +9,6 @@ import PhotosUI
 import CoreLocation
 import ImageIO
 import UIKit
-import FirebaseAuth
-import FirebaseStorage
-import FirebaseFirestore
 
 @MainActor
 class PhotoImportViewModel: ObservableObject {
@@ -213,7 +210,7 @@ class PhotoImportViewModel: ObservableObject {
     }
     
     private func saveSelectedPlaceToFirestore(_ nearbyPlace: NearbyPlaceFeature) async {
-        guard let currentUserId = Auth.auth().currentUser?.uid else {
+        guard let currentUserId = await SupabaseAuthService.shared.currentUserId else {
             print("❌ No authenticated user found")
             return
         }
@@ -286,7 +283,7 @@ class PhotoImportViewModel: ObservableObject {
         detailPlace.id = createConsistentUUID(from: nearbyPlace.properties.actualId)
         detailPlace.name = nearbyPlace.properties.name
         detailPlace.address = nearbyPlace.properties.address
-        detailPlace.coordinate = GeoPoint(
+        detailPlace.coordinate = CLLocationCoordinate2D(
             latitude: nearbyPlace.geometry.latitude,
             longitude: nearbyPlace.geometry.longitude
         )

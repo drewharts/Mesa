@@ -8,7 +8,6 @@
 import Foundation
 import Supabase
 import CoreLocation
-import FirebaseFirestore
 
 @MainActor
 class SupabasePlaceService: ObservableObject {
@@ -116,6 +115,115 @@ class SupabasePlaceService: ObservableObject {
     
     // MARK: - Favorites
     
+    func fetchProfileFavorites(userId: String, completion: @escaping ([DetailPlace]?, Error?) -> Void) {
+        Task {
+            do {
+                print("🔍 [Supabase] Fetching profile favorites for user: \(userId)")
+                
+                // First get favorite place IDs
+                let favoriteRecords: [FavoriteRecord] = try await supabase.client
+                    .from("favorites")
+                    .select()
+                    .eq("user_id", value: userId)
+                    .execute()
+                    .value
+                
+                print("🔍 [Supabase] Found \(favoriteRecords.count) favorite records")
+                
+                let placeIds = favoriteRecords.map { $0.place_id }
+                
+                guard !placeIds.isEmpty else {
+                    print("🔍 [Supabase] No favorite place IDs found")
+                    completion([], nil)
+                    return
+                }
+                
+                print("🔍 [Supabase] Fetching details for \(placeIds.count) favorite places")
+                
+                // Then fetch the places
+                let response: [PlaceRecord] = try await supabase.client
+                    .from("places")
+                    .select()
+                    .in("id", values: placeIds)
+                    .execute()
+                    .value
+                
+                let places = response.map { convertToDetailPlace($0) }
+                print("✅ [Supabase] Successfully fetched \(places.count) favorite places")
+                
+                completion(places, nil)
+            } catch {
+                print("❌ [Supabase] Error fetching profile favorites: \(error)")
+                completion(nil, error)
+            }
+        }
+    }
+    
+    func fetchProfileFavorites(userId: String) async throws -> [DetailPlace] {
+        print("🔍 [Supabase] Fetching profile favorites async for user: \(userId)")
+        
+        // First get favorite place IDs
+        let favoriteRecords: [FavoriteRecord] = try await supabase.client
+            .from("favorites")
+            .select()
+            .eq("user_id", value: userId)
+            .execute()
+            .value
+        
+        print("🔍 [Supabase] Found \(favoriteRecords.count) favorite records")
+        
+        let placeIds = favoriteRecords.map { $0.place_id }
+        
+        guard !placeIds.isEmpty else {
+            print("🔍 [Supabase] No favorite place IDs found")
+            return []
+        }
+        
+        print("🔍 [Supabase] Fetching details for \(placeIds.count) favorite places")
+        
+        // Then fetch the places
+        print("🔍 [Supabase] About to fetch places with IDs: \(placeIds)")
+        
+        let response: [PlaceRecord]
+        do {
+            response = try await supabase.client
+                .from("places")
+                .select()
+                .in("id", values: placeIds)
+                .execute()
+                .value
+            
+            print("🔍 [Supabase] Raw place records fetched: \(response.count)")
+            for (index, record) in response.enumerated() {
+                let locationInfo = record.location != nil ? "type=\(record.location?.type ?? "nil"), coords=\(record.location?.coordinates ?? [])" : "nil"
+                print("🔍 [Supabase] Place record \(index + 1): id=\(record.id), name=\(record.name), location=\(locationInfo)")
+            }
+        } catch {
+            print("❌ [Supabase] Error fetching place records: \(error)")
+            print("❌ [Supabase] Error type: \(type(of: error))")
+            if let decodingError = error as? DecodingError {
+                print("❌ [Supabase] Decoding error details: \(decodingError)")
+            }
+            throw error
+        }
+        
+        var places: [DetailPlace] = []
+        for (index, record) in response.enumerated() {
+            do {
+                let place = convertToDetailPlace(record)
+                places.append(place)
+                print("✅ [Supabase] Successfully converted place \(index + 1): \(place.name)")
+            } catch {
+                print("❌ [Supabase] Error converting place \(index + 1) (\(record.name)): \(error)")
+                print("❌ [Supabase] Place record data: \(record)")
+            }
+        }
+        
+        print("✅ [Supabase] Successfully fetched \(places.count) favorite places")
+        
+        return places
+    }
+    
     func fetchFavorites(userId: String, completion: @escaping ([DetailPlace]?, Error?) -> Void) {
         Task {
             do {
@@ -150,6 +258,307 @@ class SupabasePlaceService: ObservableObject {
             }
         }
     }
+    
+    // MARK: - All User Places (Optimized Single Query)
+    
+    /// Fetch ALL places saved by user from any source (my_places, favorites, place_lists)
+    /// This is the fastest way to load all user's places - single database query!
+    func fetchAllUserPlaces(userId: String) async throws -> [DetailPlace] {
+        let startTime = Date()
+        print("🚀 [Supabase] Fetching ALL user places with optimized query...")
+        
+        do {
+            // Try using the optimized SQL function first
+            let response: [PlaceRecord] = try await supabase.client
+                .rpc("get_all_user_places", params: ["p_user_id": userId])
+                .execute()
+                .value
+            
+            let places = response.map { convertToDetailPlace($0) }
+            let duration = Date().timeIntervalSince(startTime)
+            
+            print("✅ [Supabase] Fetched \(places.count) total places in \(String(format: "%.2f", duration))s (via RPC)")
+            
+            return places
+        } catch {
+            // Fallback: If RPC function doesn't exist, aggregate manually
+            print("⚠️ [Supabase] RPC function not found, using fallback query: \(error)")
+            return try await fetchAllUserPlacesFallback(userId: userId, startTime: startTime)
+        }
+    }
+    
+    /// Fallback method if RPC function doesn't exist
+    /// Loads ALL places from my_places, favorites, AND all place_list_items
+    private func fetchAllUserPlacesFallback(userId: String, startTime: Date) async throws -> [DetailPlace] {
+        print("🔄 [Supabase] Using fallback to load ALL user places...")
+        
+        // Step 1: Get all unique place IDs from all sources
+        var allPlaceIds = Set<String>()
+        
+        // Get from my_places
+        do {
+            let myPlacesRecords: [MyPlaceRecord] = try await supabase.client
+                .from("my_places")
+                .select()
+                .eq("user_id", value: userId)
+                .execute()
+                .value
+            let myPlaceIds = myPlacesRecords.map { $0.place_id }
+            allPlaceIds.formUnion(myPlaceIds)
+            print("🔍 [Supabase Fallback] Found \(myPlaceIds.count) place IDs from my_places")
+        } catch {
+            print("⚠️ [Supabase Fallback] Error fetching my_places: \(error)")
+        }
+        
+        // Get from favorites
+        do {
+            let favoriteRecords: [FavoriteRecord] = try await supabase.client
+                .from("favorites")
+                .select()
+                .eq("user_id", value: userId)
+                .execute()
+                .value
+            let favoriteIds = favoriteRecords.map { $0.place_id }
+            allPlaceIds.formUnion(favoriteIds)
+            print("🔍 [Supabase Fallback] Found \(favoriteIds.count) place IDs from favorites")
+        } catch {
+            print("⚠️ [Supabase Fallback] Error fetching favorites: \(error)")
+        }
+        
+        // Get from place_list_items (via user's lists)
+        do {
+            // First get user's list IDs
+            struct ListIdOnly: Codable {
+                let id: String
+            }
+            
+            let userLists: [ListIdOnly] = try await supabase.client
+                .from("place_lists")
+                .select("id")
+                .eq("user_id", value: userId)
+                .execute()
+                .value
+            
+            let listIds = userLists.map { $0.id }
+            print("🔍 [Supabase Fallback] Found \(listIds.count) lists for user")
+            
+            if !listIds.isEmpty {
+                // Get ALL place_list_items for those lists
+                let listItems: [PlaceListItemRecord] = try await supabase.client
+                    .from("place_list_items")
+                    .select()
+                    .in("list_id", values: listIds)
+                    .execute()
+                    .value
+                let listItemIds = listItems.map { $0.place_id }
+                allPlaceIds.formUnion(listItemIds)
+                print("🔍 [Supabase Fallback] Found \(listItemIds.count) place IDs from place_list_items")
+            }
+        } catch {
+            print("⚠️ [Supabase Fallback] Error fetching place_list_items: \(error)")
+        }
+        
+        // Step 2: Fetch all place details in one query
+        guard !allPlaceIds.isEmpty else {
+            print("⚠️ [Supabase Fallback] No place IDs found from any source")
+            return []
+        }
+        
+        print("🚀 [Supabase Fallback] Fetching details for \(allPlaceIds.count) unique places...")
+        
+        let placeRecords: [PlaceRecord] = try await supabase.client
+            .from("places")
+            .select()
+            .in("id", values: Array(allPlaceIds))
+            .execute()
+            .value
+        
+        let places = placeRecords.map { convertToDetailPlace($0) }
+        
+        let duration = Date().timeIntervalSince(startTime)
+        print("✅ [Supabase] Fetched \(places.count) total places in \(String(format: "%.2f", duration))s (via fallback)")
+        print("   - From my_places, favorites, and all \(allPlaceIds.count) place_list_items")
+        
+        return places
+    }
+    
+    // MARK: - My Places
+    
+    /// Fetch user's personally created/saved places from my_places table
+    func fetchMyPlaces(userId: String) async throws -> [DetailPlace] {
+        print("🔍 [Supabase] Fetching my_places for user: \(userId)")
+        
+        // First get my_places records to get place IDs
+        let myPlacesRecords: [MyPlaceRecord] = try await supabase.client
+            .from("my_places")
+            .select()
+            .eq("user_id", value: userId)
+            .execute()
+            .value
+        
+        print("🔍 [Supabase] Found \(myPlacesRecords.count) my_places records")
+        
+        let placeIds = myPlacesRecords.map { $0.place_id }
+        
+        guard !placeIds.isEmpty else {
+            print("🔍 [Supabase] No my_places found")
+            return []
+        }
+        
+        print("🔍 [Supabase] Fetching details for \(placeIds.count) my_places")
+        
+        // Then fetch the actual place details
+        let response: [PlaceRecord] = try await supabase.client
+            .from("places")
+            .select()
+            .in("id", values: placeIds)
+            .execute()
+            .value
+        
+        let places = response.map { convertToDetailPlace($0) }
+        print("✅ [Supabase] Successfully fetched \(places.count) my_places")
+        
+        return places
+    }
+    
+    func fetchMyPlaces(userId: String, completion: @escaping ([DetailPlace]?, Error?) -> Void) {
+        Task {
+            do {
+                let places = try await fetchMyPlaces(userId: userId)
+                completion(places, nil)
+            } catch {
+                print("❌ [Supabase] Error fetching my_places: \(error)")
+                completion(nil, error)
+            }
+        }
+    }
+    
+    // MARK: - Viewport Queries
+    
+    /// Fetch places within a geographic viewport (bounding box)
+    /// Uses PostGIS for efficient spatial queries
+    func fetchPlacesInViewport(northLat: Double, southLat: Double, eastLng: Double, westLng: Double, userId: String) async throws -> [DetailPlace] {
+        print("🗺️ [Supabase] Fetching places in viewport: N=\(northLat), S=\(southLat), E=\(eastLng), W=\(westLng)")
+        
+        // Query places where user has saved them (my_places, favorites, or place_list_items)
+        // Using a more efficient approach: get user's place IDs first, then filter by viewport
+        
+        // Get all place IDs the user has saved (my_places + favorites + place_list_items)
+        let myPlacesIds = try await fetchUserPlaceIds(userId: userId)
+        
+        guard !myPlacesIds.isEmpty else {
+            print("🗺️ [Supabase] No places found for user")
+            return []
+        }
+        
+        // Fetch places that are both in the user's collections AND in the viewport
+        // Using ST_MakeEnvelope for bbox query
+        let query = """
+        id.in.(\(myPlacesIds.map { "\($0)" }.joined(separator: ",")))
+        """
+        
+        let response: [PlaceRecord] = try await supabase.client
+            .from("places")
+            .select()
+            .in("id", values: myPlacesIds)
+            .gte("latitude", value: southLat)
+            .lte("latitude", value: northLat)
+            .gte("longitude", value: westLng)
+            .lte("longitude", value: eastLng)
+            .execute()
+            .value
+        
+        let places = response.map { convertToDetailPlace($0) }
+        print("✅ [Supabase] Found \(places.count) places in viewport")
+        
+        return places
+    }
+    
+    /// Helper to get all place IDs associated with a user
+    private func fetchUserPlaceIds(userId: String) async throws -> [String] {
+        var placeIds = Set<String>()
+        
+        // Get from my_places
+        do {
+            let myPlaces: [MyPlaceRecord] = try await supabase.client
+                .from("my_places")
+                .select()
+                .eq("user_id", value: userId)
+                .execute()
+                .value
+            let myPlaceIds = myPlaces.map { $0.place_id }
+            placeIds.formUnion(myPlaceIds)
+            print("🔍 [Supabase] Found \(myPlaceIds.count) place IDs from my_places")
+        } catch {
+            print("⚠️ [Supabase] Error fetching my_places for user IDs: \(error)")
+        }
+        
+        // Get from favorites
+        do {
+            let favorites: [FavoriteRecord] = try await supabase.client
+                .from("favorites")
+                .select()
+                .eq("user_id", value: userId)
+                .execute()
+                .value
+            let favoriteIds = favorites.map { $0.place_id }
+            placeIds.formUnion(favoriteIds)
+            print("🔍 [Supabase] Found \(favoriteIds.count) place IDs from favorites: \(favoriteIds)")
+        } catch {
+            print("⚠️ [Supabase] Error fetching favorites for user IDs: \(error)")
+        }
+        
+        // Get from place_list_items via place_lists
+        do {
+            // Query place_list_items with just the needed fields
+            struct ListIdOnly: Codable {
+                let id: String
+            }
+            
+            let userLists: [ListIdOnly] = try await supabase.client
+                .from("place_lists")
+                .select("id")
+                .eq("user_id", value: userId)
+                .execute()
+                .value
+            
+            let listIds = userLists.map { $0.id }
+            print("🔍 [Supabase] Found \(listIds.count) list IDs for user")
+            
+            if !listIds.isEmpty {
+                // Then get place_list_items for those lists
+                let listItems: [PlaceListItemRecord] = try await supabase.client
+                    .from("place_list_items")
+                    .select()
+                    .in("list_id", values: listIds)
+                    .execute()
+                    .value
+                let listItemIds = listItems.map { $0.place_id }
+                placeIds.formUnion(listItemIds)
+                print("🔍 [Supabase] Found \(listItemIds.count) place IDs from place_list_items")
+            }
+        } catch {
+            print("⚠️ [Supabase] Error fetching place_list_items for user IDs: \(error)")
+        }
+        
+        print("🔍 [Supabase] Found \(placeIds.count) total unique place IDs for user")
+        
+        return Array(placeIds)
+    }
+    
+    func fetchPlacesInViewport(northLat: Double, southLat: Double, eastLng: Double, westLng: Double, userId: String, completion: @escaping ([DetailPlace]?, Error?) -> Void) {
+        Task {
+            do {
+                let places = try await fetchPlacesInViewport(northLat: northLat, southLat: southLat, eastLng: eastLng, westLng: westLng, userId: userId)
+                completion(places, nil)
+            } catch {
+                print("❌ [Supabase] Error fetching viewport places: \(error)")
+                completion(nil, error)
+            }
+        }
+    }
+    
+    // MARK: - Add/Remove Favorites
     
     func addFavorite(userId: String, placeId: String, completion: @escaping (Error?) -> Void) {
         Task {
@@ -222,21 +631,63 @@ class SupabasePlaceService: ObservableObject {
         place.createdAt = record.created_at
         
         // Handle coordinate from PostGIS geometry
-        if let locationString = record.location_text {
-            // Try to parse the GeoJSON format or raw coordinates
+        if let locationData = record.location {
+            print("🔍 [Supabase] Parsing location data: type=\(locationData.type ?? "nil"), coordinates=\(locationData.coordinates ?? [])")
+            // Try to parse the GeoJSON format
             // Format example: {"type":"Point","coordinates":[-122.4,37.8]}
-            if let data = locationString.data(using: .utf8),
-               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let coords = json["coordinates"] as? [Double], coords.count >= 2 {
-                place.coordinate = GeoPoint(latitude: coords[1], longitude: coords[0])
+            if let coords = locationData.coordinates, coords.count >= 2 {
+                place.coordinate = CLLocationCoordinate2D(latitude: coords[1], longitude: coords[0])
+                print("✅ [Supabase] Successfully parsed coordinates: lat=\(coords[1]), lng=\(coords[0])")
+            } else {
+                print("⚠️ [Supabase] Could not parse location coordinates: \(locationData.coordinates ?? [])")
             }
+        } else {
+            print("🔍 [Supabase] No location found for place: \(record.name)")
         }
         
         return place
     }
 
     // MARK: - Fetch Place Lists
-
+    
+    /// Helper to fetch places for a specific list
+    private func fetchPlacesForList(listId: String) async throws -> [Place] {
+        // Get place_list_items for this list
+        let listItems: [PlaceListItemRecord] = try await supabase.client
+            .from("place_list_items")
+            .select()
+            .eq("list_id", value: listId)
+            .order("sort_order", ascending: true)
+            .execute()
+            .value
+        
+        guard !listItems.isEmpty else {
+            return []
+        }
+        
+        let placeIds = listItems.map { $0.place_id }
+        
+        // Fetch place details
+        let placeRecords: [PlaceRecord] = try await supabase.client
+            .from("places")
+            .select()
+            .in("id", values: placeIds)
+            .execute()
+            .value
+        
+        // Convert to simplified Place objects for PlaceList
+        let places = placeRecords.map { record in
+            Place(
+                id: UUID(uuidString: record.id) ?? UUID(),
+                name: record.name,
+                address: record.address ?? ""
+            )
+        }
+        
+        print("🔍 [Supabase] Fetched \(places.count) places for list \(listId)")
+        return places
+    }
+    
     func fetchLists(userId: String, completion: @escaping ([PlaceList]) -> Void) {
         Task {
             do {
@@ -258,12 +709,14 @@ class SupabasePlaceService: ObservableObject {
                     print("🔍 [Supabase] Record \(index + 1): id=\(record.id), name=\(record.name), user_id=\(record.user_id)")
                 }
 
+                // Convert records to PlaceLists WITHOUT fetching places
+                // Places will be loaded lazily when lists are opened
                 let placeLists = records.map { record in
                     PlaceList(
                         id: UUID(uuidString: record.id) ?? UUID(),
                         name: record.name,
-                        places: [], // TODO: Fetch actual places in list
-                        city: "", // TODO: Calculate from places in list
+                        places: [], // Will be loaded lazily via place_list_items query
+                        city: "",
                         emoji: "📍", // Default emoji
                         image: record.cover_image_url,
                         sortOrder: record.sort_order,
@@ -272,19 +725,7 @@ class SupabasePlaceService: ObservableObject {
                     )
                 }
 
-                print("✅ [Supabase] Fetched \(placeLists.count) place lists for user: \(userId)")
-                
-                // Log each place list with details
-                for (index, list) in placeLists.enumerated() {
-                    print("📋 [Supabase] Place List \(index + 1):")
-                    print("   - ID: \(list.id)")
-                    print("   - Name: \(list.name)")
-                    print("   - Sort Order: \(list.sortOrder)")
-                    print("   - Cover Image: \(list.image ?? "nil")")
-                    print("   - Places Count: \(list.places.count)")
-                    print("   - City: \(list.city)")
-                    print("   - Emoji: \(list.emoji)")
-                }
+                print("✅ [Supabase] Fetched \(placeLists.count) place lists (metadata only, places load on-demand)")
                 
                 completion(placeLists)
 
@@ -299,79 +740,6 @@ class SupabasePlaceService: ObservableObject {
         print("📋 [Supabase] Fetching place lists for user: \(userId)")
 
         do {
-            print("🔍 [Supabase] Querying place_lists for user_id: \(userId)")
-            print("🔍 [Supabase] User ID type: \(type(of: userId))")
-            print("🔍 [Supabase] User ID length: \(userId.count)")
-            print("🔍 [Supabase] User ID characters: \(Array(userId))")
-            print("🔍 [Supabase] Using Supabase client for database queries")
-            print("🔍 [Supabase] Supabase URL from config: \(SupabaseConfig.supabaseURL)")
-            print("🔍 [Supabase] Project ref: \(SupabaseConfig.supabaseURL.lastPathComponent)")
-            
-            // Check authentication status
-            do {
-                let session = try await supabase.client.auth.session
-                print("🔍 [Supabase] Auth session exists: true")
-                print("🔍 [Supabase] Auth user ID: \(session.user.id)")
-                print("🔍 [Supabase] Auth user email: \(session.user.email ?? "nil")")
-            } catch {
-                print("❌ [Supabase] No auth session: \(error)")
-            }
-            
-            // First, let's test if we can query the table at all
-            do {
-                let allRecords: [PlaceListRecord] = try await supabase.client
-                    .from("place_lists")
-                    .select()
-                    .limit(5)
-                    .execute()
-                    .value
-                
-                print("🔍 [Supabase] Test query - found \(allRecords.count) total records in place_lists table")
-                for (index, record) in allRecords.enumerated() {
-                    print("🔍 [Supabase] Test record \(index + 1): id=\(record.id), name=\(record.name), user_id=\(record.user_id)")
-                }
-            } catch {
-                print("❌ [Supabase] Error accessing place_lists table: \(error)")
-                print("❌ [Supabase] Error details: \(error.localizedDescription)")
-                if let supabaseError = error as? PostgrestError {
-                    print("❌ [Supabase] PostgrestError: \(supabaseError)")
-                }
-            }
-            
-            // Let's also test if we can access the users table
-            do {
-                let userRecords: [ProfileData] = try await supabase.client
-                    .from("users")
-                    .select()
-                    .limit(3)
-                    .execute()
-                    .value
-                print("🔍 [Supabase] Test query - found \(userRecords.count) total records in users table")
-                for (index, user) in userRecords.enumerated() {
-                    print("🔍 [Supabase] Test user \(index + 1): id=\(user.id), name=\(user.firstName) \(user.lastName)")
-                }
-            } catch {
-                print("❌ [Supabase] Error accessing users table: \(error)")
-            }
-            
-            // Let's check if there are any other tables that might contain place lists
-            print("🔍 [Supabase] Checking for alternative table names...")
-            let alternativeTableNames = ["lists", "user_lists", "places", "user_places", "collections"]
-            
-            for tableName in alternativeTableNames {
-                do {
-                    let testRecords: [PlaceListRecord] = try await supabase.client
-                        .from(tableName)
-                        .select()
-                        .limit(1)
-                        .execute()
-                        .value
-                    print("🔍 [Supabase] Found \(testRecords.count) records in '\(tableName)' table")
-                } catch {
-                    print("🔍 [Supabase] Table '\(tableName)' not found or not accessible")
-                }
-            }
-            
             // Try querying with the profile user ID first
             var records: [PlaceListRecord] = try await supabase.client
                 .from("place_lists")
@@ -381,15 +749,11 @@ class SupabasePlaceService: ObservableObject {
                 .execute()
                 .value
             
-            print("🔍 [Supabase] Query with profile user ID returned: \(records.count) records")
-            
             // If no records found, try with the Supabase auth user ID
             if records.isEmpty {
                 do {
                     let session = try await supabase.client.auth.session
                     let authUserId = session.user.id.uuidString
-                    print("🔍 [Supabase] Trying query with auth user ID: \(authUserId)")
-                    
                     records = try await supabase.client
                         .from("place_lists")
                         .select()
@@ -397,24 +761,19 @@ class SupabasePlaceService: ObservableObject {
                         .order("sort_order", ascending: true)
                         .execute()
                         .value
-                    
-                    print("🔍 [Supabase] Query with auth user ID returned: \(records.count) records")
                 } catch {
                     print("❌ [Supabase] Error getting auth session for fallback query: \(error)")
                 }
             }
 
-            print("🔍 [Supabase] Raw database response: \(records.count) records")
-            for (index, record) in records.enumerated() {
-                print("🔍 [Supabase] Record \(index + 1): id=\(record.id), name=\(record.name), user_id=\(record.user_id)")
-            }
-
+            // Convert records to PlaceLists WITHOUT fetching places
+            // Places will be loaded lazily when lists are opened
             let placeLists = records.map { record in
                 PlaceList(
                     id: UUID(uuidString: record.id) ?? UUID(),
                     name: record.name,
-                    places: [], // TODO: Fetch actual places in list
-                    city: "", // TODO: Calculate from places in list
+                    places: [], // Will be loaded lazily via place_list_items query
+                    city: "",
                     emoji: "📍", // Default emoji
                     image: record.cover_image_url,
                     sortOrder: record.sort_order,
@@ -423,19 +782,7 @@ class SupabasePlaceService: ObservableObject {
                 )
             }
 
-            print("✅ [Supabase] Fetched \(placeLists.count) place lists")
-            
-            // Log each place list with details
-            for (index, list) in placeLists.enumerated() {
-                print("📋 [Supabase] Place List \(index + 1):")
-                print("   - ID: \(list.id)")
-                print("   - Name: \(list.name)")
-                print("   - Sort Order: \(list.sortOrder)")
-                print("   - Cover Image: \(list.image ?? "nil")")
-                print("   - Places Count: \(list.places.count)")
-                print("   - City: \(list.city)")
-                print("   - Emoji: \(list.emoji)")
-            }
+            print("✅ [Supabase] Fetched \(placeLists.count) place lists (metadata only)")
             
             return placeLists
 
@@ -454,7 +801,7 @@ struct PlaceRecord: Codable {
     let address: String?
     let city: String?
     let mapbox_id: String?
-    let location_text: String? // PostGIS geometry as text/GeoJSON string
+    let location: LocationData? // PostGIS geometry as custom struct
     let categories: [String]?
     let phone: String?
     let rating: Double?
@@ -475,16 +822,71 @@ struct PlaceRecord: Codable {
     
     enum CodingKeys: String, CodingKey {
         case id, name, address, city, mapbox_id
-        case location_text = "location"
-        case categories, phone, rating
+        case location, categories, phone, rating
         case user_ratings_total, open_hours, description_text, price_level, reservable
         case serves_breakfast, serves_lunch, serves_dinner, instagram, x, photo_urls
         case google_place_id, source, created_at
+    }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        
+        id = try container.decode(String.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        address = try container.decodeIfPresent(String.self, forKey: .address)
+        city = try container.decodeIfPresent(String.self, forKey: .city)
+        mapbox_id = try container.decodeIfPresent(String.self, forKey: .mapbox_id)
+        location = try container.decodeIfPresent(LocationData.self, forKey: .location)
+        categories = try container.decodeIfPresent([String].self, forKey: .categories)
+        phone = try container.decodeIfPresent(String.self, forKey: .phone)
+        rating = try container.decodeIfPresent(Double.self, forKey: .rating)
+        user_ratings_total = try container.decodeIfPresent(Int.self, forKey: .user_ratings_total)
+        description_text = try container.decodeIfPresent(String.self, forKey: .description_text)
+        price_level = try container.decodeIfPresent(String.self, forKey: .price_level)
+        reservable = try container.decodeIfPresent(Bool.self, forKey: .reservable)
+        serves_breakfast = try container.decodeIfPresent(Bool.self, forKey: .serves_breakfast)
+        serves_lunch = try container.decodeIfPresent(Bool.self, forKey: .serves_lunch)
+        serves_dinner = try container.decodeIfPresent(Bool.self, forKey: .serves_dinner)
+        instagram = try container.decodeIfPresent(String.self, forKey: .instagram)
+        x = try container.decodeIfPresent(String.self, forKey: .x)
+        photo_urls = try container.decodeIfPresent([String].self, forKey: .photo_urls)
+        google_place_id = try container.decodeIfPresent(String.self, forKey: .google_place_id)
+        source = try container.decodeIfPresent(String.self, forKey: .source)
+        created_at = try container.decodeIfPresent(String.self, forKey: .created_at)
+        
+        // Handle open_hours - skip if it can't be decoded as [String]
+        do {
+            open_hours = try container.decodeIfPresent([String].self, forKey: .open_hours)
+        } catch {
+            print("⚠️ [Supabase] Could not decode open_hours as [String], setting to nil: \(error)")
+            open_hours = nil
+        }
+    }
+}
+
+struct LocationData: Codable {
+    let type: String?
+    let coordinates: [Double]?
+    
+    enum CodingKeys: String, CodingKey {
+        case type, coordinates
     }
 }
 
 struct FavoriteRecord: Codable {
     let user_id: String
     let place_id: String
+}
+
+struct MyPlaceRecord: Codable {
+    let user_id: String
+    let place_id: String
+    let timestamp: String?
+}
+
+struct PlaceListItemRecord: Codable {
+    let place_id: String
+    let list_id: String
+    let sort_order: Int?
 }
 

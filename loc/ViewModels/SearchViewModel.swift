@@ -9,7 +9,6 @@ import SwiftUI
 import Combine
 import MapboxSearch
 import CoreLocation
-import FirebaseFirestore
 
 class SearchViewModel: ObservableObject {
     @Published var searchText = ""  // User's search input

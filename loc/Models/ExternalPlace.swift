@@ -6,7 +6,6 @@
 //
 
 import Foundation
-import FirebaseFirestore
 
 // MARK: - ExternalPlace Models
 struct ExternalPlace: Codable, Identifiable {

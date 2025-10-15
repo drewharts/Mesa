@@ -6,8 +6,8 @@
 //
 
 import Foundation
-import FirebaseFirestore
 import MapboxSearch
+import CoreLocation
 
 struct DetailPlace: Codable, Identifiable, Equatable {
     var id: UUID = UUID()
@@ -15,7 +15,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
     var address: String?
     var city: String?
     var mapboxId: String?
-    var coordinate: GeoPoint?
+    var coordinate: CLLocationCoordinate2D?
     var categories: [String]?
     var phone: String?
     var rating: Double?
@@ -181,14 +181,20 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         return UUID(uuidString: idString) ?? UUID()
     }
     
-    private static func decodeCoordinates(from container: KeyedDecodingContainer<CodingKeys>) throws -> GeoPoint? {
-        // Try backend format first (coordinates object)
+    private static func decodeCoordinates(from container: KeyedDecodingContainer<CodingKeys>) throws -> CLLocationCoordinate2D? {
+        // Try backend format first (coordinates object with lat/lng)
         if let coordinatesData = try? container.decode([String: Double].self, forKey: .coordinates),
            let lat = coordinatesData["latitude"], let lng = coordinatesData["longitude"] {
-            return GeoPoint(latitude: lat, longitude: lng)
+            return CLLocationCoordinate2D(latitude: lat, longitude: lng)
         }
-        // Fall back to iOS format (GeoPoint)
-        return try container.decodeIfPresent(GeoPoint.self, forKey: .coordinate)
+        
+        // Try to decode as a structure with latitude and longitude
+        if let coordData = try? container.decodeIfPresent([String: Double].self, forKey: .coordinate),
+           let lat = coordData["latitude"], let lng = coordData["longitude"] {
+            return CLLocationCoordinate2D(latitude: lat, longitude: lng)
+        }
+        
+        return nil
     }
     
     // Custom encoding to maintain compatibility
@@ -200,7 +206,11 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         try container.encodeIfPresent(address, forKey: .address)
         try container.encodeIfPresent(city, forKey: .city)
         try container.encodeIfPresent(mapboxId, forKey: .mapboxId)
-        try container.encodeIfPresent(coordinate, forKey: .coordinate)
+        // Encode coordinate as dictionary for Supabase compatibility
+        if let coordinate = coordinate {
+            let coordDict = ["latitude": coordinate.latitude, "longitude": coordinate.longitude]
+            try container.encode(coordDict, forKey: .coordinate)
+        }
         try container.encodeIfPresent(categories, forKey: .categories)
         try container.encodeIfPresent(phone, forKey: .phone)
         try container.encodeIfPresent(rating, forKey: .rating)
@@ -307,7 +317,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         self.address = searchResult.address?.formattedAddress(style: .medium)
         self.city = searchResult.address?.place
         self.mapboxId = searchResult.id
-        self.coordinate = GeoPoint(
+        self.coordinate = CLLocationCoordinate2D(
             latitude: searchResult.coordinate.latitude,
             longitude: searchResult.coordinate.longitude
         )

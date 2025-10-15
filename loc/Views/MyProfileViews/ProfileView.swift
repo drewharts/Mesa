@@ -6,7 +6,6 @@
 
 import SwiftUI
 import PhotosUI
-import FirebaseFirestore
 
 struct ProfileView: View {
     @Environment(\.presentationMode) var presentationMode: Binding<PresentationMode>

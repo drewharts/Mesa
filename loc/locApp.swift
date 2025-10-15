@@ -126,6 +126,9 @@ struct locApp: App {
         // Setup observer for viewport changes (must be after mapViewModel is set)
         placeTypeFilterVM.observeMapViewModel()
         
+        // Wire up DataManager to PlaceTypeFilterViewModel for map updates
+        dataMgr.placeTypeFilterViewModel = placeTypeFilterVM
+        
         self._locationManager = StateObject(wrappedValue: location)
         self._userSession = StateObject(wrappedValue: userSess)
         self._profileViewModel = StateObject(wrappedValue: profileVM)

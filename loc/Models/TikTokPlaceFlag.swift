@@ -6,7 +6,6 @@
 //
 
 import Foundation
-import FirebaseFirestore
 
 enum TikTokPlaceFlagType: String, CaseIterable, Codable {
     case unableToIdentify = "unable_to_identify"
@@ -38,8 +37,8 @@ struct TikTokPlaceFlag: Codable, Identifiable {
     var flagType: TikTokPlaceFlagType
     var tikTokUrl: String?
     var userComment: String?
-    var createdAt: Timestamp
-    var updatedAt: Timestamp
+    var createdAt: Date?
+    var updatedAt: Date?
     
     init(placeId: String, userId: String, flagType: TikTokPlaceFlagType, tikTokUrl: String? = nil, userComment: String? = nil) {
         self.placeId = placeId
@@ -47,7 +46,7 @@ struct TikTokPlaceFlag: Codable, Identifiable {
         self.flagType = flagType
         self.tikTokUrl = tikTokUrl
         self.userComment = userComment
-        self.createdAt = Timestamp()
-        self.updatedAt = Timestamp()
+        self.createdAt = Date()
+        self.updatedAt = Date()
     }
 }

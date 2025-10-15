@@ -1,6 +1,5 @@
 import SwiftUI
 import UIKit
-import FirebaseFirestore
 
 struct MyPlacesListView: View {
     @EnvironmentObject var profile: ProfileViewModel

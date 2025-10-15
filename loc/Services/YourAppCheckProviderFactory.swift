@@ -6,6 +6,8 @@
 //
 
 
+// Firebase App Check removed - not needed for Supabase
+/*
 import Firebase
 
 class YourAppCheckProviderFactory: NSObject, AppCheckProviderFactory {
@@ -17,3 +19,4 @@ class YourAppCheckProviderFactory: NSObject, AppCheckProviderFactory {
         }
     }
 }
+*/

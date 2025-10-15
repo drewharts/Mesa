@@ -7,8 +7,6 @@
 //  Updated to align with Profile and UserSession changes
 
 import SwiftUI
-import FirebaseAuth
-import FirebaseMessaging
 
 struct ContentView: View {
     @EnvironmentObject var userSession: UserSession

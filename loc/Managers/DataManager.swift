@@ -6,7 +6,6 @@
 //
 
 import Foundation
-import FirebaseAuth
 import UIKit
 
 @MainActor
@@ -20,6 +19,7 @@ class DataManager: ObservableObject {
     private let locationManager: LocationManager
     private let profileViewModel: ProfileViewModel
     private let detailPlaceViewModel: DetailPlaceViewModel
+    weak var placeTypeFilterViewModel: PlaceTypeFilterViewModel?
     
     init(
         userService: UserService,
@@ -42,6 +42,10 @@ class DataManager: ObservableObject {
     func initializeProfileData(userId: String) async {
         startDataLoadingFlags()
         
+        // PHASE 0: Load ALL user places immediately (single optimized query!)
+        // This ensures map shows all places instantly
+        await loadAllUserPlacesOptimized(userId: userId)
+        
         // PHASE 1: Load critical user data in parallel (fastest to show something to user)
         await loadCriticalUserData(userId: userId)
         
@@ -54,6 +58,61 @@ class DataManager: ObservableObject {
         }
         
         calculateMapAnnotations()
+    }
+    
+    /// PHASE 0: Load ALL user places in a single optimized query
+    /// This is the fastest way to get all places on the map
+    private func loadAllUserPlacesOptimized(userId: String) async {
+        let startTime = Date()
+        do {
+            let allPlaces = try await placeService.fetchAllUserPlaces(userId: userId)
+            
+            await MainActor.run {
+                // Cache all places in DetailPlaceViewModel
+                for place in allPlaces {
+                    let placeId = place.id.uuidString
+                    self.detailPlaceViewModel.places[placeId] = place
+                    self.detailPlaceViewModel.generateColorForPlace(placeId)
+                    
+                    // Mark user as saver for map display
+                    if self.detailPlaceViewModel.placeSavers[placeId] == nil {
+                        self.detailPlaceViewModel.placeSavers[placeId] = [userId]
+                    } else if !self.detailPlaceViewModel.placeSavers[placeId]!.contains(userId) {
+                        self.detailPlaceViewModel.placeSavers[placeId]!.append(userId)
+                    }
+                }
+                
+                let duration = Date().timeIntervalSince(startTime)
+                print("⚡ [DataManager] Loaded \(allPlaces.count) total places in \(String(format: "%.2f", duration))s")
+                
+                // Debug: Verify places were stored
+                print("🔍 [DataManager] Verification:")
+                print("   - Places in detailPlaceVM.places: \(self.detailPlaceViewModel.places.count)")
+                print("   - Places in placeSavers: \(self.detailPlaceViewModel.placeSavers.count)")
+                print("   - SavedDetailPlaces count: \(self.detailPlaceViewModel.savedDetailPlaces.count)")
+                if !allPlaces.isEmpty {
+                    let firstPlace = allPlaces[0]
+                    print("   - First place: \(firstPlace.name) at \(firstPlace.coordinate?.latitude ?? 0), \(firstPlace.coordinate?.longitude ?? 0)")
+                    print("   - Place ID: \(firstPlace.id.uuidString)")
+                    print("   - In places dict: \(self.detailPlaceViewModel.places[firstPlace.id.uuidString] != nil)")
+                    print("   - In placeSavers: \(self.detailPlaceViewModel.placeSavers[firstPlace.id.uuidString] != nil)")
+                }
+            }
+            
+            // Trigger map annotation calculation
+            calculateMapAnnotations()
+            
+            // Force update of filtered places for map display
+            await MainActor.run {
+                if let placeTypeFilterVM = self.placeTypeFilterViewModel {
+                    placeTypeFilterVM.updateFilteredPlaces()
+                    print("🗺️ [DataManager] Forced filteredPlaces update, now showing: \(placeTypeFilterVM.filteredPlaces.count) places")
+                }
+            }
+            
+        } catch {
+            print("❌ [DataManager] Error loading all user places: \(error.localizedDescription)")
+        }
     }
     
     // PHASE 1: Load most important user data first (parallel)
@@ -218,18 +277,49 @@ class DataManager: ObservableObject {
             // If this is for the current user, update the ProfileViewModel
             if forUser == nil {
                 self.profileViewModel.userLists = lists
-                // Initialize with empty place arrays for lazy loading
+                // Initialize with empty place arrays - will be populated via place_list_items query
                 self.profileViewModel.userListsPlaces = lists.reduce(into: [String: [String]]()) { result, list in
                     result[list.id.uuidString] = []
                 }
                 // Sort lists by distance after loading
                 self.profileViewModel.sortListsByDistance()
+                
+                // NEW: Preload place DETAILS (not list items) for the first 5 lists
+                // This populates place_list_items and DetailPlace objects
+                print("📍 [DataManager] Preloading place details for first 5 place_lists...")
+                await preloadPlacesForTopLists(lists: lists, userId: userId, topN: 5)
             }
-            // Note: Places will be loaded lazily when lists become visible
-            // No need to process all places upfront
         } catch {
             print("Error loading user place lists: \(error.localizedDescription)")
         }
+    }
+    
+    /// Preload place details for the top N lists (sorted by distance)
+    /// This improves initial loading experience for the most relevant lists
+    private func preloadPlacesForTopLists(lists: [PlaceList], userId: String, topN: Int) async {
+        // Sort lists by distance (if they have averageCoordinate) or use first N
+        let sortedLists = lists.prefix(topN)
+        
+        print("📍 [DataManager] Preloading places for \(sortedLists.count) lists...")
+        
+        // Load places for each of the top lists in parallel
+        await withTaskGroup(of: Void.self) { group in
+            for list in sortedLists {
+                group.addTask {
+                    await self.loadPlacesForList(listId: list.id, userId: userId)
+                }
+            }
+        }
+        
+        // Mark these lists as loaded in ProfileViewModel
+        await MainActor.run {
+            for list in sortedLists {
+                self.profileViewModel.loadedListIds.insert(list.id)
+                print("✅ [DataManager] Marked list '\(list.name)' as preloaded")
+            }
+        }
+        
+        print("✅ [DataManager] Finished preloading places for first \(sortedLists.count) lists")
     }
     
     // Optimized to process multiple places concurrently but with limits

@@ -9,8 +9,6 @@ import Foundation
 import MapboxSearch
 import CoreLocation
 import UIKit
-import FirebaseAuth
-import FirebaseFirestore
 
 // MARK: - Services
 // Note: MesaBackendService import should be available via project imports
@@ -144,7 +142,7 @@ class SelectedPlaceViewModel: ObservableObject {
 
     // Add pagination properties for photos
     @Published private var photoPageLimit = 9
-    @Published private var lastPhotoDocument: DocumentSnapshot?
+    @Published private var lastPhotoDocument: Any? // Replaced DocumentSnapshot for Supabase migration
     @Published private var allPhotosLoaded = false
     
     // Add new property to track liked reviews
@@ -403,16 +401,21 @@ class SelectedPlaceViewModel: ObservableObject {
             self.reviewLoadingStates[placeId] = .loading
         }
         
-        // Use the user's ID to get only reviews from followed users
-        guard let currentUserId = Auth.auth().currentUser?.uid else {
-            print("Error: Current user ID is not available")
-            DispatchQueue.main.async {
+        // Use Task to handle async call to get current user ID
+        Task { @MainActor in
+            guard let currentUserId = await SupabaseAuthService.shared.currentUserId else {
+                print("Error: Current user ID is not available")
                 self.reviewLoadingStates[placeId] = .error(NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "User not logged in"]))
                 self.placeReviews[placeId] = []
                 self.updateCurrentPlaceFullyLoaded()
+                return
             }
-            return
+            
+            self.loadReviewsWithUserId(placeId: placeId, currentUserId: currentUserId)
         }
+    }
+    
+    private func loadReviewsWithUserId(placeId: String, currentUserId: String) {
         
         // Use the new method to fetch reviews from friends and the current user (both restaurant and generic)
         userService.fetchFriendsReviews(userId: currentUserId) { [weak self] reviews, error in
@@ -420,7 +423,7 @@ class SelectedPlaceViewModel: ObservableObject {
             
             DispatchQueue.main.async {
                 if let error = error {
-                    print("Error fetching reviews for place \(place.name): \(error.localizedDescription)")
+                    print("Error fetching reviews for place: \(error.localizedDescription)")
                     self.reviewLoadingStates[placeId] = .error(error)
                     self.placeReviews[placeId] = []
                     self.updateCurrentPlaceFullyLoaded()
@@ -481,9 +484,11 @@ class SelectedPlaceViewModel: ObservableObject {
         }
         
         print("📸 [getPlacePhotos] Fetching friends reviews...")
-        // Use the same review fetching logic to get photo URLs
-        userService.fetchFriendsReviews(userId: Auth.auth().currentUser?.uid ?? "") { [weak self] reviews, error in
-            guard let self = self else { return }
+        // Use Task to handle async call to get current user ID
+        Task { @MainActor in
+            let currentUserId = await SupabaseAuthService.shared.currentUserId ?? ""
+            self.userService.fetchFriendsReviews(userId: currentUserId) { [weak self] reviews, error in
+                guard let self = self else { return }
             
             print("📸 [getPlacePhotos] Callback received")
             print("   - Reviews count: \(reviews?.count ?? 0)")
@@ -562,6 +567,7 @@ class SelectedPlaceViewModel: ObservableObject {
                         self.updateCurrentPlaceFullyLoaded()
                     }
                 }
+            }
             }
         }
     }
@@ -1043,7 +1049,7 @@ class SelectedPlaceViewModel: ObservableObject {
         }
         newPlace.name = name
         newPlace.description = description
-        newPlace.coordinate = GeoPoint(
+        newPlace.coordinate = CLLocationCoordinate2D(
             latitude: coordinate.latitude,
             longitude: coordinate.longitude
         )

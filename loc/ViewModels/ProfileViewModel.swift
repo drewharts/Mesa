@@ -8,8 +8,6 @@ import SwiftUI
 import Combine
 import MapboxSearch
 import Foundation
-import FirebaseFirestore
-import FirebaseAuth
 import UIKit
 import CoreLocation
 
@@ -1097,7 +1095,7 @@ class ProfileViewModel: ObservableObject {
             let averageLatitude = totalLatitude / Double(validPlaceCount)
             let averageLongitude = totalLongitude / Double(validPlaceCount)
             
-            userLists[listIndex].averageCoordinate = GeoPoint(
+            userLists[listIndex].averageCoordinate = CLLocationCoordinate2D(
                 latitude: averageLatitude,
                 longitude: averageLongitude
             )
@@ -1117,20 +1115,12 @@ class ProfileViewModel: ObservableObject {
         }
     }
     
-    /// Updates the average coordinates in Firestore
-    private func updateListAverageCoordinates(userId: String, listId: UUID, averageCoordinate: GeoPoint) async {
-        do {
-            let db = Firestore.firestore()
-            try await db.collection("users")
-                .document(userId)
-                .collection("placeLists")
-                .document(listId.uuidString)
-                .updateData([
-                    "averageCoordinate": averageCoordinate,
-                    "lastCoordinateUpdate": FieldValue.serverTimestamp()
-                ])
-        } catch {
-        }
+    /// Updates the average coordinates in Supabase
+    private func updateListAverageCoordinates(userId: String, listId: UUID, averageCoordinate: CLLocationCoordinate2D) async {
+        // TODO: Implement with Supabase
+        // Previously used Firestore to update place list average coordinates
+        // Need to implement equivalent Supabase update
+        print("⚠️ updateListAverageCoordinates not yet implemented for Supabase")
     }
     
     /// Sorts userLists by their distance from the user's current location (closest first)
@@ -1218,7 +1208,7 @@ class ProfileViewModel: ObservableObject {
             // Clear any previous errors
             tikTokImportError = nil
             
-            await MainActor.run {
+            Task { @MainActor in
                 if detailPlaces.count == 1 {
                     // Single place - show detail directly
                     let detailPlace = detailPlaces[0]
@@ -1234,7 +1224,7 @@ class ProfileViewModel: ObservableObject {
                     }
                     placeVM.places[detailPlace.id.uuidString] = detailPlace
                     // Add current user as saver so pin shows with profile
-                    if let uid = Auth.auth().currentUser?.uid {
+                    if let uid = await SupabaseAuthService.shared.currentUserId {
                         placeVM.placeSavers[detailPlace.id.uuidString] = [uid]
                     }
                     placeVM.calculateAnnotationPlaces()
@@ -1472,6 +1462,26 @@ class ProfileViewModel: ObservableObject {
 
     private func performListLoad(listId: UUID, userId: String) async {
         print("🔍 [ProfileViewModel] performListLoad: Loading data for list \(listId)")
+        
+        // Check if places are already loaded (e.g., from preloading)
+        let alreadyLoaded = await MainActor.run {
+            let listIdString = listId.uuidString
+            let hasPlaceIds = userListsPlaces[listIdString]?.isEmpty == false
+            let hasDetailPlaces = userListsPlaces[listIdString]?.allSatisfy { placeId in
+                detailPlaceViewModel.places[placeId] != nil
+            } ?? false
+            return hasPlaceIds && hasDetailPlaces
+        }
+        
+        if alreadyLoaded {
+            print("✅ [ProfileViewModel] performListLoad: Places already loaded for list \(listId), skipping")
+            await MainActor.run {
+                self.loadedListIds.insert(listId)
+                self.initializeListPagination(listId: listId)
+            }
+            return
+        }
+        
         await MainActor.run {
             self.loadingListIds.insert(listId)
         }
@@ -1666,7 +1676,7 @@ class ProfileViewModel: ObservableObject {
         detailPlace.id = createConsistentUUID(from: nearbyPlace.properties.actualId)
         detailPlace.name = nearbyPlace.properties.name
         detailPlace.address = nearbyPlace.properties.address
-        detailPlace.coordinate = GeoPoint(
+        detailPlace.coordinate = CLLocationCoordinate2D(
             latitude: nearbyPlace.geometry.latitude,
             longitude: nearbyPlace.geometry.longitude
         )
@@ -2002,23 +2012,21 @@ class ProfileViewModel: ObservableObject {
                     print("❌ [ProfileViewModel] Error deleting account: \(error.localizedDescription)")
                     completion(false, error.localizedDescription)
                 } else {
-                    print("✅ [ProfileViewModel] Successfully deleted user data from Firestore")
+                    print("✅ [ProfileViewModel] Successfully deleted user data from Supabase")
                     
-                    // Delete Firebase Auth user
-                    Auth.auth().currentUser?.delete { authError in
-                        DispatchQueue.main.async {
-                            if let authError = authError {
-                                print("❌ [ProfileViewModel] Error deleting Firebase Auth user: \(authError.localizedDescription)")
-                                completion(false, "Failed to delete authentication account: \(authError.localizedDescription)")
-                                return
-                            }
-                            
-                            print("✅ [ProfileViewModel] Successfully deleted Firebase Auth user")
+                    // Delete Supabase Auth user
+                    Task { @MainActor in
+                        do {
+                            try await SupabaseAuthService.shared.deleteAccount()
+                            print("✅ [ProfileViewModel] Successfully deleted Supabase Auth user")
                             
                             // Log out the user
                             self?.userSession.logout()
                             
                             completion(true, nil)
+                        } catch {
+                            print("❌ [ProfileViewModel] Error deleting Supabase Auth user: \(error.localizedDescription)")
+                            completion(false, "Failed to delete authentication account: \(error.localizedDescription)")
                         }
                     }
                 }
