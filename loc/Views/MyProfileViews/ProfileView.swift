@@ -21,6 +21,9 @@ struct ProfileView: View {
     @State private var selectedReviewType: CreatePlaceReviewView.ReviewType = .restaurant
     @State private var reviewWasSubmitted = false
     @StateObject private var tikTokService = TikTokService()
+    
+    // Track if we've already done initial data refresh
+    @State private var hasRefreshedPlaces = false
 
     init() {
         // Configure navigation bar appearance to remove the bottom border
@@ -53,7 +56,8 @@ struct ProfileView: View {
                 placeVM: placeVM,
                 showCreateReview: $showCreateReview,
                 reviewWasSubmitted: $reviewWasSubmitted,
-                tikTokService: tikTokService
+                tikTokService: tikTokService,
+                hasRefreshedPlaces: $hasRefreshedPlaces
             ))
             .alert("No Location Found", isPresented: $deepLinkViewModel.showNoLocationAlert) {
                 Button("OK") {
@@ -298,11 +302,20 @@ struct StateChangesModifier: ViewModifier {
     @Binding var showCreateReview: Bool
     @Binding var reviewWasSubmitted: Bool
     @ObservedObject var tikTokService: TikTokService
+    @Binding var hasRefreshedPlaces: Bool  // Track if refresh already happened
     
     func body(content: Content) -> some View {
         content
             .task {
-                await profile.refreshUserPlaces()
+                // Only refresh if we haven't already (avoid blocking UI on every appearance)
+                // Places are already loaded in Phase 0, so this is usually redundant
+                if !hasRefreshedPlaces {
+                    hasRefreshedPlaces = true
+                    // Run in background to not block UI
+                    Task.detached(priority: .background) {
+                        await profile.refreshUserPlaces()
+                    }
+                }
             }
             .onChange(of: photoImportVM.selectedItems) {
                 Task {
