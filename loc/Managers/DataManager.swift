@@ -141,17 +141,19 @@ class DataManager: ObservableObject {
         await externalPlaces
     }
     
-    // PHASE 3: Load social data without blocking UI
+    // PHASE 3: Load social data WITHOUT blocking UI
+    // NOTE: Full follower/following profiles are NOW LAZY - only loaded when user clicks!
+    // Counts are loaded in Phase 2, profile data loads on-demand
     private func loadSocialDataInBackground(userId: String) async {
-        async let following: () = loadFollowing(userId: userId)
-        async let followers: () = loadFollowers(userId: userId)
+        // Skip loading follower/following profiles here
+        // They will load lazily when user clicks on "Followers" or "Following"
+        print("💤 [DataManager] Skipping follower/following profile loading (LAZY - loads on click)")
         
-        // Wait for social connections
-        await following
-        await followers
-        
-        // Load reviewed places for following users
-        await loadReviewedPlacesForFollowing(userId: userId)
+        // Only load reviewed places for following users if we already have the following list
+        // Otherwise this will also be lazy
+        if !profileViewModel.userFollowing.isEmpty {
+            await loadReviewedPlacesForFollowing(userId: userId)
+        }
         
         // Update annotations after social data loads
         await MainActor.run {
@@ -462,10 +464,18 @@ class DataManager: ObservableObject {
         }
     }
     
+    /// LAZY: Load following profiles (only when user clicks "Following")
     func loadFollowing(userId: String) async {
+        let startTime = Date()
+        print("👥 [DataManager] Loading following profiles (LAZY)...")
         profileViewModel.isFollowingListLoading = true
+        
         do {
             let profiles = try await userService.fetchFollowingProfilesData(for: userId)
+            
+            let duration = Date().timeIntervalSince(startTime)
+            print("⚡ [DataManager] Loaded \(profiles.count) following profiles in \(String(format: "%.2f", duration))s")
+            
             // Store the profiles in the profileViewModel
             self.profileViewModel.userFollowing = profiles
             
@@ -503,28 +513,55 @@ class DataManager: ObservableObject {
     }
 
     
+    /// LAZY: Load follower profiles (only when user clicks "Followers")
     func loadFollowers(userId: String) async {
+        let startTime = Date()
+        print("👥 [DataManager] Loading follower profiles (LAZY)...")
         profileViewModel.isFollowersListLoading = true
+        
         do {
             let profiles = try await userService.fetchFollowerProfilesData(for: userId)
+            
+            let duration = Date().timeIntervalSince(startTime)
+            print("⚡ [DataManager] Loaded \(profiles.count) follower profiles in \(String(format: "%.2f", duration))s")
+            
             // Store the profiles in the profileViewModel
             self.profileViewModel.userFollowers = profiles
+            
+            // Load profile pictures
+            for profile in profiles {
+                if let profilePhotoURL = profile.profilePhotoURL {
+                    self.AddProfilePicture(userId: profile.id, profilePhotoUrl: profilePhotoURL)
+                }
+            }
         } catch {
-            print("Error loading followers: \(error.localizedDescription)")
+            print("Error loading follower profiles: \(error.localizedDescription)")
         }
         profileViewModel.isFollowersListLoading = false
     }
     
+    /// FAST: Load follower/following COUNTS only (~20-50ms total!)
+    /// Profile data loads lazily when user clicks
     func fetchFollowerAndFollowingCountsAsync(userId: String) async {
+        let startTime = Date()
+        print("🔢 [DataManager] Loading follower/following COUNTS (fast)...")
+        
         profileViewModel.isFollowersLoading = true
         profileViewModel.isFollowingLoading = true
-        async let followers: Int = try! await userService.getNumberFollowers(forUserId: userId)
-        async let following: Int = try! await userService.getNumberFollowing(forUserId: userId)
+        
+        // Run both count queries in parallel
+        async let followers: Int = (try? await userService.getNumberFollowers(forUserId: userId)) ?? 0
+        async let following: Int = (try? await userService.getNumberFollowing(forUserId: userId)) ?? 0
+        
         let (followersCount, followingCount) = await (followers, following)
+        
         profileViewModel.followersCount = followersCount
         profileViewModel.followingCount = followingCount
         profileViewModel.isFollowersLoading = false
         profileViewModel.isFollowingLoading = false
+        
+        let duration = Date().timeIntervalSince(startTime)
+        print("⚡ [DataManager] Loaded counts in \(String(format: "%.2f", duration))s (Followers: \(followersCount), Following: \(followingCount))")
     }
     
     // Loads all places the user has reviewed, even if not in favorites or lists

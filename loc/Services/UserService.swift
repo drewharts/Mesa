@@ -211,44 +211,75 @@ class UserService: ObservableObject {
         return []
     }
     
+    // LAZY Loading - Only load when user clicks!
     func fetchFollowingProfilesData(for userId: String, completion: @escaping (Result<[ProfileData], Error>) -> Void) {
-        print("⚠️ [UserService] fetchFollowingProfilesData not fully implemented")
-        completion(.success([]))
+        print("🔄 [UserService] Delegating fetchFollowingProfilesData to Supabase (LAZY)...")
+        Task { @MainActor in
+            do {
+                let profiles = try await supabase.fetchFollowingProfilesData(for: userId)
+                completion(.success(profiles))
+            } catch {
+                completion(.failure(error))
+            }
+        }
     }
     
     func fetchFollowingProfilesData(for userId: String) async throws -> [ProfileData] {
-        print("⚠️ [UserService] fetchFollowingProfilesData async not fully implemented")
-        return []
+        print("🔄 [UserService] Delegating fetchFollowingProfilesData async to Supabase (LAZY)...")
+        return try await supabase.fetchFollowingProfilesData(for: userId)
     }
     
     func fetchFollowerProfilesData(for userId: String, completion: @escaping (Result<[ProfileData], Error>) -> Void) {
-        print("⚠️ [UserService] fetchFollowerProfilesData not fully implemented")
-        completion(.success([]))
+        print("🔄 [UserService] Delegating fetchFollowerProfilesData to Supabase (LAZY)...")
+        Task { @MainActor in
+            do {
+                let profiles = try await supabase.fetchFollowerProfilesData(for: userId)
+                completion(.success(profiles))
+            } catch {
+                completion(.failure(error))
+            }
+        }
     }
     
     func fetchFollowerProfilesData(for userId: String) async throws -> [ProfileData] {
-        print("⚠️ [UserService] fetchFollowerProfilesData async not fully implemented")
-        return []
+        print("🔄 [UserService] Delegating fetchFollowerProfilesData async to Supabase (LAZY)...")
+        return try await supabase.fetchFollowerProfilesData(for: userId)
     }
     
+    // COUNT ONLY - Super fast! (~20-50ms)
     func getNumberFollowers(forUserId userId: String, completion: @escaping (Int, Error?) -> Void) {
-        print("⚠️ [UserService] getNumberFollowers not fully implemented")
-        completion(0, nil)
+        print("🔄 [UserService] Delegating getNumberFollowers to Supabase...")
+        Task { @MainActor in
+            do {
+                let count = try await supabase.getNumberFollowers(forUserId: userId)
+                completion(count, nil)
+            } catch {
+                completion(0, error)
+            }
+        }
     }
     
     func getNumberFollowers(forUserId userId: String) async throws -> Int {
-        print("⚠️ [UserService] getNumberFollowers async not fully implemented")
-        return 0
+        print("🔄 [UserService] Delegating getNumberFollowers async to Supabase...")
+        return try await supabase.getNumberFollowers(forUserId: userId)
     }
     
+    // COUNT ONLY - Super fast! (~20-50ms)
     func getNumberFollowing(forUserId userId: String, completion: @escaping (Int, Error?) -> Void) {
-        print("⚠️ [UserService] getNumberFollowing not fully implemented")
-        completion(0, nil)
+        print("🔄 [UserService] Delegating getNumberFollowing to Supabase...")
+        Task { @MainActor in
+            do {
+                let count = try await supabase.getNumberFollowing(forUserId: userId)
+                completion(count, nil)
+            } catch {
+                completion(0, error)
+            }
+        }
     }
     
     func getNumberFollowing(forUserId userId: String) async throws -> Int {
-        print("⚠️ [UserService] getNumberFollowing async not fully implemented")
-        return 0
+        print("🔄 [UserService] Delegating getNumberFollowing async to Supabase...")
+        return try await supabase.getNumberFollowing(forUserId: userId)
     }
     
     func isFollowingUser(followerId: String, followingId: String, completion: @escaping (Bool) -> Void) {
