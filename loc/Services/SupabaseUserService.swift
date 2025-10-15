@@ -221,15 +221,24 @@ class SupabaseUserService: ObservableObject {
     // MARK: - Follower/Following Profile Data (Lazy - Load on Demand!)
     
     /// Fetch follower profiles - LAZY! Only call when user clicks "Followers"
-    func fetchFollowerProfilesData(for userId: String) async throws -> [ProfileData] {
-        print("👥 [Supabase] Fetching follower PROFILES for user: \(userId)")
+    /// With optional pagination for progressive loading
+    func fetchFollowerProfilesData(for userId: String, limit: Int? = nil, offset: Int = 0) async throws -> [ProfileData] {
+        let limitStr = limit.map { " (first \($0))" } ?? ""
+        print("👥 [Supabase] Fetching follower PROFILES for user\(limitStr)...")
         let startTime = Date()
         
-        // Step 1: Get follower IDs from following table
-        let followRecords: [FollowingRecord] = try await supabase.client
+        // Step 1: Get follower IDs from following table (with pagination)
+        var query = supabase.client
             .from("following")
             .select()
             .eq("following_id", value: userId)
+            .order("followed_at", ascending: false) // Most recent first
+        
+        if let limit = limit {
+            query = query.limit(limit).range(from: offset, to: offset + limit - 1)
+        }
+        
+        let followRecords: [FollowingRecord] = try await query
             .execute()
             .value
         
@@ -259,15 +268,24 @@ class SupabaseUserService: ObservableObject {
     }
     
     /// Fetch following profiles - LAZY! Only call when user clicks "Following"
-    func fetchFollowingProfilesData(for userId: String) async throws -> [ProfileData] {
-        print("👥 [Supabase] Fetching following PROFILES for user: \(userId)")
+    /// With optional pagination for progressive loading
+    func fetchFollowingProfilesData(for userId: String, limit: Int? = nil, offset: Int = 0) async throws -> [ProfileData] {
+        let limitStr = limit.map { " (first \($0))" } ?? ""
+        print("👥 [Supabase] Fetching following PROFILES for user\(limitStr)...")
         let startTime = Date()
         
-        // Step 1: Get following IDs from following table
-        let followRecords: [FollowingRecord] = try await supabase.client
+        // Step 1: Get following IDs from following table (with pagination)
+        var query = supabase.client
             .from("following")
             .select()
             .eq("follower_id", value: userId)
+            .order("followed_at", ascending: false) // Most recent first
+        
+        if let limit = limit {
+            query = query.limit(limit).range(from: offset, to: offset + limit - 1)
+        }
+        
+        let followRecords: [FollowingRecord] = try await query
             .execute()
             .value
         

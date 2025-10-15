@@ -226,7 +226,13 @@ class UserService: ObservableObject {
     
     func fetchFollowingProfilesData(for userId: String) async throws -> [ProfileData] {
         print("🔄 [UserService] Delegating fetchFollowingProfilesData async to Supabase (LAZY)...")
-        return try await supabase.fetchFollowingProfilesData(for: userId)
+        return try await supabase.fetchFollowingProfilesData(for: userId, limit: nil, offset: 0)
+    }
+    
+    // Paginated version for progressive loading
+    func fetchFollowingProfilesData(for userId: String, limit: Int, offset: Int) async throws -> [ProfileData] {
+        print("🔄 [UserService] Delegating fetchFollowingProfilesData with pagination...")
+        return try await supabase.fetchFollowingProfilesData(for: userId, limit: limit, offset: offset)
     }
     
     func fetchFollowerProfilesData(for userId: String, completion: @escaping (Result<[ProfileData], Error>) -> Void) {
@@ -243,7 +249,13 @@ class UserService: ObservableObject {
     
     func fetchFollowerProfilesData(for userId: String) async throws -> [ProfileData] {
         print("🔄 [UserService] Delegating fetchFollowerProfilesData async to Supabase (LAZY)...")
-        return try await supabase.fetchFollowerProfilesData(for: userId)
+        return try await supabase.fetchFollowerProfilesData(for: userId, limit: nil, offset: 0)
+    }
+    
+    // Paginated version for progressive loading
+    func fetchFollowerProfilesData(for userId: String, limit: Int, offset: Int) async throws -> [ProfileData] {
+        print("🔄 [UserService] Delegating fetchFollowerProfilesData with pagination...")
+        return try await supabase.fetchFollowerProfilesData(for: userId, limit: limit, offset: offset)
     }
     
     // COUNT ONLY - Super fast! (~20-50ms)
