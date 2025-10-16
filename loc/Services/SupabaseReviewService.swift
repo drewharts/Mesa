@@ -115,9 +115,28 @@ class SupabaseReviewService: ObservableObject {
             .value
         
         let reviews = response.compactMap { record -> RestaurantReview? in
-            guard let timestamp = ISO8601DateFormatter().date(from: record.timestamp) else {
-                print("⚠️ [Supabase] Invalid timestamp for review \(record.id)")
-                return nil
+            // Parse timestamp - it could be ISO8601 string or PostgreSQL timestamp
+            print("🔍 [Supabase] Raw timestamp for review \(record.id): '\(record.timestamp)'")
+            let timestamp: Date
+            if let isoDate = ISO8601DateFormatter().date(from: record.timestamp) {
+                timestamp = isoDate
+            } else {
+                // Try parsing as PostgreSQL timestamp format
+                let formatter = DateFormatter()
+                formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSSSS"
+                formatter.timeZone = TimeZone(secondsFromGMT: 0)
+                if let pgDate = formatter.date(from: record.timestamp) {
+                    timestamp = pgDate
+                } else {
+                    // Try alternative PostgreSQL format
+                    formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+                    if let altDate = formatter.date(from: record.timestamp) {
+                        timestamp = altDate
+                    } else {
+                        print("⚠️ [Supabase] Invalid timestamp for review \(record.id): \(record.timestamp)")
+                        return nil
+                    }
+                }
             }
             
             return RestaurantReview(
@@ -156,9 +175,27 @@ class SupabaseReviewService: ObservableObject {
             .value
         
         let reviews = response.compactMap { record -> GenericReview? in
-            guard let timestamp = ISO8601DateFormatter().date(from: record.timestamp) else {
-                print("⚠️ [Supabase] Invalid timestamp for review \(record.id)")
-                return nil
+            // Parse timestamp - it could be ISO8601 string or PostgreSQL timestamp
+            let timestamp: Date
+            if let isoDate = ISO8601DateFormatter().date(from: record.timestamp) {
+                timestamp = isoDate
+            } else {
+                // Try parsing as PostgreSQL timestamp format
+                let formatter = DateFormatter()
+                formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSSSS"
+                formatter.timeZone = TimeZone(secondsFromGMT: 0)
+                if let pgDate = formatter.date(from: record.timestamp) {
+                    timestamp = pgDate
+                } else {
+                    // Try alternative PostgreSQL format
+                    formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+                    if let altDate = formatter.date(from: record.timestamp) {
+                        timestamp = altDate
+                    } else {
+                        print("⚠️ [Supabase] Invalid timestamp for review \(record.id): \(record.timestamp)")
+                        return nil
+                    }
+                }
             }
             
             return GenericReview(
