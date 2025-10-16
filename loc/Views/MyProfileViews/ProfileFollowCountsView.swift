@@ -18,6 +18,23 @@ struct ProfileFollowCountsView: View {
     @State private var showingMyPlaces = false
     @State private var refreshToggle = false
     
+    // Calculate total My Places count (created + reviewed + TikTok)
+    var totalMyPlacesCount: Int {
+        let createdCount = profile.myPlaces.count
+        
+        // Get reviewed places count (excluding created places)
+        let reviewedPlaceIds = profile.detailPlaceViewModel.placeSavers.compactMap { (placeId, userIds) -> String? in
+            guard let currentUserId = profile.user?.id else { return nil }
+            return userIds.contains(currentUserId) && !profile.myPlaces.contains(placeId) ? placeId : nil
+        }
+        let reviewedCount = reviewedPlaceIds.count
+        
+        // Get TikTok places count
+        let tikTokCount = profile.getTikTokPlaces().count
+        
+        return createdCount + reviewedCount + tikTokCount
+    }
+    
     var body: some View {
         HStack(spacing: 24) {
             // Followers count
@@ -85,7 +102,7 @@ struct ProfileFollowCountsView: View {
                         ProgressView()
                             .frame(width: 20, height: 20)
                     } else {
-                        Text("\(profile.myPlaces.count)")
+                        Text("\(totalMyPlacesCount)")
                             .font(.headline)
                             .foregroundColor(.black)
                             .fontWeight(.regular)
@@ -112,7 +129,7 @@ struct ProfileFollowCountsView: View {
         .onChange(of: profile.userFollowers.count) {
             refreshToggle.toggle()
         }
-        .onChange(of: profile.myPlaces.count) {
+        .onChange(of: totalMyPlacesCount) {
             refreshToggle.toggle()
         }
     }

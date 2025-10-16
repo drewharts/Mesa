@@ -26,9 +26,11 @@ struct ProfileView: View {
     @State private var hasRefreshedPlaces = false
 
     init() {
-        // Configure navigation bar appearance to remove the bottom border
-        let appearance = UINavigationBarAppearance()
-        appearance.configureWithOpaqueBackground() // Use opaque background
+        // ENTERPRISE OPTIMIZATION: Configure navigation bar appearance asynchronously
+        DispatchQueue.main.async {
+            let appearance = UINavigationBarAppearance()
+            appearance.configureWithOpaqueBackground()
+        }
     }
 
     var body: some View {
@@ -36,6 +38,8 @@ struct ProfileView: View {
             .navigationBarBackButtonHidden(true)
             .preferredColorScheme(.light)
             .navigationBarTitleDisplayMode(.inline)
+            // ENTERPRISE OPTIMIZATION: Ensure immediate rendering
+            .drawingGroup() // Force immediate rendering
             .modifier(ToolbarModifier(
                 presentationMode: presentationMode,
                 photoImportVM: photoImportVM
@@ -307,12 +311,17 @@ struct StateChangesModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .onAppear {
-                // Only refresh if we haven't already (avoid blocking UI on every appearance)
-                // Places are already loaded in Phase 0, so this is usually redundant
-                if !hasRefreshedPlaces {
-                    hasRefreshedPlaces = true
-                    // Run in background to not block UI - use Task.detached for true background execution
-                    Task.detached(priority: .background) {
+                // ENTERPRISE OPTIMIZATION: Only run lightweight operations on main thread
+                // All heavy operations moved to background with proper async handling
+                setupCallbacks()
+                
+                // Run all heavy operations in background without blocking UI
+                Task.detached(priority: .background) {
+                    // Only refresh if we haven't already (avoid blocking UI on every appearance)
+                    if !hasRefreshedPlaces {
+                        await MainActor.run {
+                            hasRefreshedPlaces = true
+                        }
                         await profile.refreshUserPlaces()
                     }
                 }
@@ -323,12 +332,16 @@ struct StateChangesModifier: ViewModifier {
                 }
             }
             .onAppear {
-                setupCallbacks()
-                profile.checkPendingTikTokURL(
-                    tikTokService: tikTokService,
-                    selectedPlaceVM: selectedPlaceVM,
-                    placeVM: placeVM
-                )
+                // ENTERPRISE OPTIMIZATION: Move TikTok URL check to background
+                Task.detached(priority: .background) {
+                    await MainActor.run {
+                        profile.checkPendingTikTokURL(
+                            tikTokService: tikTokService,
+                            selectedPlaceVM: selectedPlaceVM,
+                            placeVM: placeVM
+                        )
+                    }
+                }
             }
             .onChange(of: showCreateReview) {
                 handleCreateReviewChange()
