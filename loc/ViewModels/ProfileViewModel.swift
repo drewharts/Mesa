@@ -786,6 +786,9 @@ class ProfileViewModel: ObservableObject {
     
     /// Fetch review images for a batch of places to enhance the place display
     private func fetchReviewImagesForPlaces(_ placeIds: [String], userId: String) async {
+        // Collect all image URLs first
+        var imageUrlsToLoad: [(placeId: String, imageUrl: String)] = []
+        
         // Fetch reviews for these places to get images
         for placeId in placeIds {
             do {
@@ -794,15 +797,24 @@ class ProfileViewModel: ObservableObject {
                 let userReviews = reviews.filter { $0.userId == userId }
                 
                 if let mostRecentReview = userReviews.first(where: { !$0.images.isEmpty }),
-                   let imageUrl = mostRecentReview.images.first {
-                    // Load the review image and add it to placeImages if it doesn't already have one
-                    if detailPlaceViewModel.placeImages[placeId] == nil {
-                        // Load image directly from URL
-                        await loadImageFromURL(imageUrl: imageUrl, placeId: placeId)
-                    }
+                   let imageUrl = mostRecentReview.images.first,
+                   detailPlaceViewModel.placeImages[placeId] == nil {
+                    imageUrlsToLoad.append((placeId: placeId, imageUrl: imageUrl))
                 }
             } catch {
                 print("⚠️ [ProfileViewModel] Failed to fetch review images for place \(placeId): \(error.localizedDescription)")
+            }
+        }
+        
+        // Load all images in parallel
+        if !imageUrlsToLoad.isEmpty {
+            print("🖼️ [ProfileViewModel] Loading \(imageUrlsToLoad.count) review images in parallel...")
+            await withTaskGroup(of: Void.self) { group in
+                for (placeId, imageUrl) in imageUrlsToLoad {
+                    group.addTask {
+                        await self.loadImageFromURL(imageUrl: imageUrl, placeId: placeId)
+                    }
+                }
             }
         }
     }
@@ -819,7 +831,13 @@ class ProfileViewModel: ObservableObject {
         }
         
         do {
-            let (data, _) = try await URLSession.shared.data(from: url)
+            // Use a more efficient URLSession configuration for image loading
+            let config = URLSessionConfiguration.default
+            config.timeoutIntervalForRequest = 10.0
+            config.timeoutIntervalForResource = 30.0
+            let session = URLSession(configuration: config)
+            
+            let (data, _) = try await session.data(from: url)
             if let image = UIImage(data: data) {
                 await MainActor.run {
                     detailPlaceViewModel.placeImages[placeId] = image
