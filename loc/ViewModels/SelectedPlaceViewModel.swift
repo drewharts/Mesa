@@ -417,26 +417,28 @@ class SelectedPlaceViewModel: ObservableObject {
     
     private func loadReviewsWithUserId(placeId: String, currentUserId: String) {
         
-        // Use the new method to fetch reviews from friends and the current user (both restaurant and generic)
-        userService.fetchFriendsReviews(userId: currentUserId) { [weak self] reviews, error in
-            guard let self = self else { return }
-            
-            DispatchQueue.main.async {
-                if let error = error {
-                    print("Error fetching reviews for place: \(error.localizedDescription)")
-                    self.reviewLoadingStates[placeId] = .error(error)
-                    self.placeReviews[placeId] = []
-                    self.updateCurrentPlaceFullyLoaded()
-                } else {
-                    let fetchedReviews = reviews ?? []
-                    self.placeReviews[placeId] = fetchedReviews
+        // Fetch reviews for the specific place
+        Task {
+            do {
+                let reviews = try await reviewService.fetchPlaceReviews(placeId: placeId, latestOnly: false)
+                
+                await MainActor.run {
+                    self.placeReviews[placeId] = reviews
                     
-                    fetchedReviews.forEach { review in
+                    reviews.forEach { review in
                         self.loadReviewPhotos(for: review)
                         self.loadProfilePhoto(for: review)
                         self.loadCommentCountForReview(placeId: placeId, reviewId: review.id)
                     }
                     self.reviewLoadingStates[placeId] = .loaded
+                    self.updateCurrentPlaceFullyLoaded()
+                    print("✅ [SelectedPlaceViewModel] Loaded \(reviews.count) reviews for place \(placeId)")
+                }
+            } catch {
+                await MainActor.run {
+                    print("❌ [SelectedPlaceViewModel] Error fetching reviews for place \(placeId): \(error.localizedDescription)")
+                    self.reviewLoadingStates[placeId] = .error(error)
+                    self.placeReviews[placeId] = []
                     self.updateCurrentPlaceFullyLoaded()
                 }
             }
@@ -483,65 +485,54 @@ class SelectedPlaceViewModel: ObservableObject {
             self.photoLoadingStates[placeId] = .loading
         }
         
-        print("📸 [getPlacePhotos] Fetching friends reviews...")
-        // Use Task to handle async call to get current user ID
-        Task { @MainActor in
-            let currentUserId = await SupabaseAuthService.shared.currentUserId ?? ""
-            self.userService.fetchFriendsReviews(userId: currentUserId) { [weak self] reviews, error in
-                guard let self = self else { return }
-            
-            print("📸 [getPlacePhotos] Callback received")
-            print("   - Reviews count: \(reviews?.count ?? 0)")
-            print("   - Error: \(error?.localizedDescription ?? "none")")
-            
-            if let error = error {
-                print("❌ [getPlacePhotos] Error fetching reviews for place \(placeId): \(error.localizedDescription)")
-                DispatchQueue.main.async {
-                    self.photoLoadingStates[placeId] = .error(error)
-                    self.updateCurrentPlaceFullyLoaded()
+        print("📸 [getPlacePhotos] Fetching reviews for place...")
+        // Fetch reviews for the specific place to get photos
+        Task {
+            do {
+                let reviews = try await reviewService.fetchPlaceReviews(placeId: placeId, latestOnly: false)
+                
+                print("📸 [getPlacePhotos] Fetched \(reviews.count) reviews for place \(placeId)")
+                
+                var photoURLs: [String] = []
+                for review in reviews {
+                    photoURLs.append(contentsOf: review.images)
                 }
-                return
-            }
-            
-            var photoURLs: [String] = []
-            for review in reviews ?? [] {
-                photoURLs.append(contentsOf: review.images)
-            }
-            
-            print("📸 [getPlacePhotos] Extracted \(photoURLs.count) photo URLs from reviews")
-            
-            // If no photos found in any reviews, mark as loaded
-            if photoURLs.isEmpty {
-                print("📸 [getPlacePhotos] No photos found, marking as loaded with empty array")
-                DispatchQueue.main.async {
-                    self.photoLoadingStates[placeId] = .loaded
-                    self.placePhotos[placeId] = []
-                    self.allPhotosLoaded = true
-                    self.updateCurrentPlaceFullyLoaded()
+                
+                print("📸 [getPlacePhotos] Extracted \(photoURLs.count) photo URLs from reviews")
+                
+                // If no photos found in any reviews, mark as loaded
+                if photoURLs.isEmpty {
+                    print("📸 [getPlacePhotos] No photos found, marking as loaded with empty array")
+                    await MainActor.run {
+                        self.photoLoadingStates[placeId] = .loaded
+                        self.placePhotos[placeId] = []
+                        self.allPhotosLoaded = true
+                        self.updateCurrentPlaceFullyLoaded()
+                    }
+                    return
                 }
-                return
-            }
-            
-            // Paginate the photo URLs
-            let startIndex = self.placePhotos[placeId]?.count ?? 0
-            let endIndex = min(startIndex + self.photoPageLimit, photoURLs.count)
-            
-            print("📸 [getPlacePhotos] Pagination: startIndex=\(startIndex), endIndex=\(endIndex), total=\(photoURLs.count)")
-            
-            guard startIndex < endIndex else {
-                // No more photos to load
-                print("📸 [getPlacePhotos] No more photos to load, marking as complete")
-                self.allPhotosLoaded = true
-                self.photoLoadingStates[placeId] = .loaded
-                self.updateCurrentPlaceFullyLoaded()
-                return
-            }
-            
-            let urlsToFetch = Array(photoURLs[startIndex..<endIndex])
-            print("📸 [getPlacePhotos] Fetching \(urlsToFetch.count) images from URLs...")
-            
-            // Load images in parallel using TaskGroup
-            Task {
+                
+                // Paginate the photo URLs
+                let startIndex = self.placePhotos[placeId]?.count ?? 0
+                let endIndex = min(startIndex + self.photoPageLimit, photoURLs.count)
+                
+                print("📸 [getPlacePhotos] Pagination: startIndex=\(startIndex), endIndex=\(endIndex), total=\(photoURLs.count)")
+                
+                guard startIndex < endIndex else {
+                    // No more photos to load
+                    print("📸 [getPlacePhotos] No more photos to load, marking as complete")
+                    await MainActor.run {
+                        self.allPhotosLoaded = true
+                        self.photoLoadingStates[placeId] = .loaded
+                        self.updateCurrentPlaceFullyLoaded()
+                    }
+                    return
+                }
+                
+                let urlsToFetch = Array(photoURLs[startIndex..<endIndex])
+                print("📸 [getPlacePhotos] Fetching \(urlsToFetch.count) images from URLs...")
+                
+                // Load images in parallel using TaskGroup
                 var loadedImages: [UIImage] = []
                 
                 await withTaskGroup(of: UIImage?.self) { group in
@@ -572,7 +563,12 @@ class SelectedPlaceViewModel: ObservableObject {
                     }
                     self.updateCurrentPlaceFullyLoaded()
                 }
-            }
+            } catch {
+                await MainActor.run {
+                    print("❌ [getPlacePhotos] Error fetching reviews for place \(placeId): \(error.localizedDescription)")
+                    self.photoLoadingStates[placeId] = .error(error)
+                    self.updateCurrentPlaceFullyLoaded()
+                }
             }
         }
     }
