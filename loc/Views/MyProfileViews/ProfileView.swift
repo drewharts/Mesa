@@ -311,11 +311,10 @@ struct StateChangesModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .onAppear {
-                // ENTERPRISE OPTIMIZATION: Only run lightweight operations on main thread
-                // All heavy operations moved to background with proper async handling
+                // ENTERPRISE OPTIMIZATION: Run essential operations immediately, heavy ones in background
                 setupCallbacks()
                 
-                // Run all heavy operations in background without blocking UI
+                // Run heavy operations in background without blocking UI
                 Task.detached(priority: .background) {
                     // Only refresh if we haven't already (avoid blocking UI on every appearance)
                     if !hasRefreshedPlaces {

@@ -30,6 +30,9 @@ struct ProfileContentView: View {
                         .font(.title2)
                         .fontWeight(.bold)
                         .foregroundColor(.black)
+                        .onAppear {
+                            print("🔍 [ProfileContentView] User data: firstName='\(firstName)', lastName='\(lastName)', user=\(profile.user?.id ?? "nil")")
+                        }
                     
                     // Follow Counts
                     ProfileFollowCountsView()
