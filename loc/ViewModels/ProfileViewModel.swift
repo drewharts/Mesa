@@ -109,7 +109,7 @@ class ProfileViewModel: ObservableObject {
     private var _hasMoreReviews: Bool = true
     private var currentReviewPage: Int = 0
     private let reviewsPerPage: Int = 8
-    private var allReviewedPlaceIds: [String] = []
+    var allReviewedPlaceIds: [String] = []
     private var loadedReviewedPlaceIds: [String] = []
     
     // Pagination for TikTok places
