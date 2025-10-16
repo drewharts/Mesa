@@ -735,6 +735,7 @@ struct UserReviewsView: View {
 struct ReviewCard: View {
     let review: ReviewProtocol
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
+    @EnvironmentObject var profile: ProfileViewModel
     @Environment(\.presentationMode) var presentationMode
     
     var body: some View {
