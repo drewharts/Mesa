@@ -793,14 +793,23 @@ class ProfileViewModel: ObservableObject {
                 let reviews = try await reviewService.fetchPlaceReviews(placeId: placeId, latestOnly: false)
                 let userReviews = reviews.filter { $0.userId == userId }
                 
-                if let mostRecentReview = userReviews.first(where: { !$0.images.isEmpty }) {
-                    // Update the place with the review image if it doesn't already have one
-                    if let place = detailPlaceViewModel.places[placeId],
-                       place.photoUrls?.isEmpty != false {
-                        var updatedPlace = place
-                        updatedPlace.photoUrls = [mostRecentReview.images.first!]
-                        await MainActor.run {
-                            detailPlaceViewModel.places[placeId] = updatedPlace
+                if let mostRecentReview = userReviews.first(where: { !$0.images.isEmpty }),
+                   let imageUrl = mostRecentReview.images.first {
+                    // Load the review image and add it to placeImages if it doesn't already have one
+                    if detailPlaceViewModel.placeImages[placeId] == nil {
+                        // Use ImageService to load the image from URL
+                        ImageService.shared.fetchPhotosFromStorage(urls: [imageUrl]) { [weak self] images, error in
+                            guard let self = self else { return }
+                            
+                            DispatchQueue.main.async {
+                                if let error = error {
+                                    print("⚠️ [ProfileViewModel] Failed to load review image for place \(placeId): \(error.localizedDescription)")
+                                } else if let images = images, !images.isEmpty {
+                                    // Use the first successfully loaded image
+                                    self.detailPlaceViewModel.placeImages[placeId] = images[0]
+                                    print("✅ [ProfileViewModel] Loaded review image for place \(placeId)")
+                                }
+                            }
                         }
                     }
                 }
