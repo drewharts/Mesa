@@ -100,6 +100,86 @@ class SupabaseReviewService: ObservableObject {
         }
     }
     
+    // MARK: - User Reviews
+    
+    func fetchUserReviews(userId: String) async throws -> [RestaurantReview] {
+        print("📝 [Supabase] Fetching restaurant reviews for user \(userId)")
+        
+        let response: [ReviewRecord] = try await supabase.client
+            .from("reviews")
+            .select()
+            .eq("user_id", value: userId)
+            .eq("type", value: "restaurant")
+            .order("timestamp", ascending: false)
+            .execute()
+            .value
+        
+        let reviews = response.compactMap { record -> RestaurantReview? in
+            guard let timestamp = ISO8601DateFormatter().date(from: record.timestamp) else {
+                print("⚠️ [Supabase] Invalid timestamp for review \(record.id)")
+                return nil
+            }
+            
+            return RestaurantReview(
+                id: record.id,
+                userId: record.user_id,
+                profilePhotoUrl: record.profile_photo_url ?? "",
+                userFirstName: record.user_first_name ?? "",
+                userLastName: record.user_last_name ?? "",
+                placeId: record.place_id,
+                placeName: record.place_name ?? "",
+                foodRating: record.food_rating ?? 0,
+                serviceRating: record.service_rating ?? 0,
+                ambienceRating: record.ambience_rating ?? 0,
+                favoriteDishes: record.favorite_dishes ?? [],
+                reviewText: record.review_text ?? "",
+                timestamp: timestamp,
+                images: record.images ?? [],
+                likes: record.likes ?? 0
+            )
+        }
+        
+        print("✅ [Supabase] Fetched \(reviews.count) restaurant reviews for user")
+        return reviews
+    }
+    
+    func fetchUserGenericReviews(userId: String) async throws -> [GenericReview] {
+        print("📝 [Supabase] Fetching generic reviews for user \(userId)")
+        
+        let response: [ReviewRecord] = try await supabase.client
+            .from("reviews")
+            .select()
+            .eq("user_id", value: userId)
+            .eq("type", value: "generic")
+            .order("timestamp", ascending: false)
+            .execute()
+            .value
+        
+        let reviews = response.compactMap { record -> GenericReview? in
+            guard let timestamp = ISO8601DateFormatter().date(from: record.timestamp) else {
+                print("⚠️ [Supabase] Invalid timestamp for review \(record.id)")
+                return nil
+            }
+            
+            return GenericReview(
+                id: record.id,
+                userId: record.user_id,
+                profilePhotoUrl: record.profile_photo_url ?? "",
+                userFirstName: record.user_first_name ?? "",
+                userLastName: record.user_last_name ?? "",
+                placeId: record.place_id,
+                placeName: record.place_name ?? "",
+                reviewText: record.review_text ?? "",
+                timestamp: timestamp,
+                images: record.images ?? [],
+                likes: record.likes ?? 0
+            )
+        }
+        
+        print("✅ [Supabase] Fetched \(reviews.count) generic reviews for user")
+        return reviews
+    }
+    
     // MARK: - Comments
     
     func fetchComments(reviewId: String, completion: @escaping ([Comment]?, Error?) -> Void) {
@@ -144,16 +224,19 @@ struct ReviewRecord: Codable {
     let id: String
     let place_id: String
     let user_id: String
-    let type: String
-    let rating: Int?
-    let text: String?
-    let photo_urls: [String]?
+    let user_first_name: String?
+    let user_last_name: String?
+    let profile_photo_url: String?
+    let place_name: String?
+    let food_rating: Double?
+    let service_rating: Double?
+    let ambience_rating: Double?
+    let favorite_dishes: [String]?
+    let review_text: String?
+    let images: [String]?
     let timestamp: String
-    let food_rating: Int?
-    let service_rating: Int?
-    let ambiance_rating: Int?
-    let value_rating: Int?
-    let would_recommend: Bool?
+    let likes: Int?
+    let type: String?
 }
 
 struct CommentRecord: Codable {

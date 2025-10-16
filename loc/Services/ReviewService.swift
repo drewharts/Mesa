@@ -118,13 +118,13 @@ class ReviewService: ObservableObject {
     }
     
     func fetchUserReviews(userId: String) async throws -> [RestaurantReview] {
-        print("⚠️ [ReviewService] fetchUserReviews async not fully implemented")
-        return []
+        print("🔄 [ReviewService] Delegating fetchUserReviews to Supabase...")
+        return try await supabase.fetchUserReviews(userId: userId)
     }
     
     func fetchUserGenericReviews(userId: String) async throws -> [GenericReview] {
-        print("⚠️ [ReviewService] fetchUserGenericReviews async not fully implemented")
-        return []
+        print("🔄 [ReviewService] Delegating fetchUserGenericReviews to Supabase...")
+        return try await supabase.fetchUserGenericReviews(userId: userId)
     }
     
     func fetchPlaceReviews(placeId: String, latestOnly: Bool = false, completion: @escaping ([ReviewProtocol]?, Error?) -> Void) {
