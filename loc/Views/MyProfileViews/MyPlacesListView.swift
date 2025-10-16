@@ -776,9 +776,9 @@ struct ReviewCard: View {
             // Restaurant-specific ratings
             if let restaurantReview = review as? RestaurantReview {
                 HStack(spacing: 16) {
-                    RatingView(title: "Food", rating: restaurantReview.foodRating)
-                    RatingView(title: "Service", rating: restaurantReview.serviceRating)
-                    RatingView(title: "Ambience", rating: restaurantReview.ambienceRating)
+                    ReviewRatingView(title: "Food", rating: restaurantReview.foodRating)
+                    ReviewRatingView(title: "Service", rating: restaurantReview.serviceRating)
+                    ReviewRatingView(title: "Ambience", rating: restaurantReview.ambienceRating)
                 }
             }
             
@@ -823,8 +823,8 @@ struct ReviewCard: View {
     }
 }
 
-// MARK: - Rating View
-struct RatingView: View {
+// MARK: - Review Rating View
+struct ReviewRatingView: View {
     let title: String
     let rating: Double
     
