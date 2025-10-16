@@ -130,8 +130,13 @@ struct MyPlacesListView: View {
                             removal: .move(edge: .trailing).combined(with: .opacity)
                         ))
                     } else if selectedTab == 1 {
-                        // User Reviews
-                        UserReviewsView()
+                        // Reviewed Places (with pagination)
+                        PaginatedReviewedPlacesView(
+                            columns: columns,
+                            cardWidth: cardWidth,
+                            cardHeight: cardHeight,
+                            colorForPlace: colorForPlace
+                        )
                         .transition(.asymmetric(
                             insertion: .move(edge: .trailing).combined(with: .opacity),
                             removal: .move(edge: .leading).combined(with: .opacity)
@@ -210,14 +215,13 @@ struct MyPlacesListView: View {
             }
         }
         .onAppear {
-            print("📱 [MyPlacesListView] Sheet appeared - triggering My Places, Reviewed Places, and User Reviews refresh")
-            // Trigger My Places, Reviewed Places, and User Reviews data refresh when sheet appears
+            print("📱 [MyPlacesListView] Sheet appeared - triggering My Places and Reviewed Places refresh")
+            // Trigger My Places and Reviewed Places data refresh when sheet appears
             if let userId = profile.user?.id {
-                print("🏠 [MyPlacesListView] Starting My Places, Reviewed Places, and User Reviews refresh...")
+                print("🏠 [MyPlacesListView] Starting My Places and Reviewed Places refresh...")
                 Task {
                     await profile.detailPlaceViewModel.dataManager?.refreshMyPlaces(userId: userId)
                     await profile.detailPlaceViewModel.dataManager?.refreshReviewedPlaces(userId: userId)
-                    await profile.loadUserReviews()
                 }
             }
             
