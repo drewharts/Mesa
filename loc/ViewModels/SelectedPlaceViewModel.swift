@@ -538,34 +538,39 @@ class SelectedPlaceViewModel: ObservableObject {
             }
             
             let urlsToFetch = Array(photoURLs[startIndex..<endIndex])
-            print("📸 [getPlacePhotos] Fetching \(urlsToFetch.count) images from storage...")
+            print("📸 [getPlacePhotos] Fetching \(urlsToFetch.count) images from URLs...")
             
-            imageService.fetchPhotosFromStorage(urls: urlsToFetch) { [weak self] images, error in
-                guard let self = self else { return }
+            // Load images in parallel using TaskGroup
+            Task {
+                var loadedImages: [UIImage] = []
                 
-                print("📸 [getPlacePhotos] Image fetch callback received")
-                print("   - Images count: \(images?.count ?? 0)")
-                print("   - Error: \(error?.localizedDescription ?? "none")")
-                
-                DispatchQueue.main.async {
-                    if let error = error {
-                        print("❌ [getPlacePhotos] Error fetching photos for place \(placeId): \(error.localizedDescription)")
-                        self.photoLoadingStates[placeId] = .error(error)
-                        self.updateCurrentPlaceFullyLoaded()
-                    } else {
-                        var currentPhotos = self.placePhotos[placeId] ?? []
-                        currentPhotos.append(contentsOf: images ?? [])
-                        self.placePhotos[placeId] = currentPhotos
-                        self.photoLoadingStates[placeId] = .loaded
-                        
-                        print("✅ [getPlacePhotos] Successfully loaded photos. Total now: \(currentPhotos.count)")
-                        
-                        // Check if all photos have been loaded
-                        if currentPhotos.count >= photoURLs.count {
-                            self.allPhotosLoaded = true
+                await withTaskGroup(of: UIImage?.self) { group in
+                    for imageUrl in urlsToFetch {
+                        group.addTask {
+                            await self.loadImageFromURL(imageUrl: imageUrl)
                         }
-                        self.updateCurrentPlaceFullyLoaded()
                     }
+                    
+                    for await image in group {
+                        if let image = image {
+                            loadedImages.append(image)
+                        }
+                    }
+                }
+                
+                await MainActor.run {
+                    var currentPhotos = self.placePhotos[placeId] ?? []
+                    currentPhotos.append(contentsOf: loadedImages)
+                    self.placePhotos[placeId] = currentPhotos
+                    self.photoLoadingStates[placeId] = .loaded
+                    
+                    print("✅ [getPlacePhotos] Successfully loaded \(loadedImages.count) photos. Total now: \(currentPhotos.count)")
+                    
+                    // Check if all photos have been loaded
+                    if currentPhotos.count >= photoURLs.count {
+                        self.allPhotosLoaded = true
+                    }
+                    self.updateCurrentPlaceFullyLoaded()
                 }
             }
             }
@@ -631,19 +636,45 @@ class SelectedPlaceViewModel: ObservableObject {
             self.reviewPhotoLoadingStates[reviewId] = .loading
         }
         
-        imageService.fetchPhotosFromStorage(urls: review.images) { [weak self] images, error in
-            guard let self = self else { return }
+        // Load images in parallel using TaskGroup
+        Task {
+            var loadedImages: [UIImage] = []
             
-            DispatchQueue.main.async {
-                if let error = error {
-                    print("Error fetching photos for review \(reviewId): \(error.localizedDescription)")
-                    self.reviewPhotoLoadingStates[reviewId] = .error(error)
-                    self.reviewPhotos[reviewId] = []
-                } else {
-                    self.reviewPhotos[reviewId] = images ?? []
-                    self.reviewPhotoLoadingStates[reviewId] = .loaded
+            await withTaskGroup(of: UIImage?.self) { group in
+                for imageUrl in review.images {
+                    group.addTask {
+                        await self.loadImageFromURL(imageUrl: imageUrl)
+                    }
+                }
+                
+                for await image in group {
+                    if let image = image {
+                        loadedImages.append(image)
+                    }
                 }
             }
+            
+            await MainActor.run {
+                self.reviewPhotos[reviewId] = loadedImages
+                self.reviewPhotoLoadingStates[reviewId] = .loaded
+                print("✅ [SelectedPlaceViewModel] Loaded \(loadedImages.count) images for review \(reviewId)")
+            }
+        }
+    }
+    
+    /// Load image directly from URL
+    private func loadImageFromURL(imageUrl: String) async -> UIImage? {
+        guard let url = URL(string: imageUrl) else {
+            print("⚠️ [SelectedPlaceViewModel] Invalid image URL: \(imageUrl)")
+            return nil
+        }
+        
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            return UIImage(data: data)
+        } catch {
+            print("⚠️ [SelectedPlaceViewModel] Failed to load image from URL: \(error.localizedDescription)")
+            return nil
         }
     }
     
