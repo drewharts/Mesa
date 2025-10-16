@@ -215,6 +215,15 @@ struct MyPlacesListView: View {
             }
         }
         .onAppear {
+            print("📱 [MyPlacesListView] Sheet appeared - triggering My Places refresh")
+            // Trigger My Places data refresh when sheet appears
+            if let userId = profile.user?.id {
+                print("🏠 [MyPlacesListView] Starting My Places refresh...")
+                Task {
+                    await profile.detailPlaceViewModel.dataManager?.refreshMyPlaces(userId: userId)
+                }
+            }
+            
             // Generate colors for created, reviewed, and TikTok places
             let allPlaces = createdPlaces + reviewedPlaces + tikTokPlaces
             for place in allPlaces {

@@ -12,6 +12,7 @@ struct ProfileFollowCountsView: View {
     @EnvironmentObject var userProfileViewModel: UserProfileViewModel
     @EnvironmentObject var dataManager: DataManager
     @EnvironmentObject var userSession: UserSession
+    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @State private var showingFollowers = false
     @State private var showingFollowing = false
     @State private var showingMyPlaces = false
@@ -97,6 +98,11 @@ struct ProfileFollowCountsView: View {
             }
             .sheet(isPresented: $showingMyPlaces) {
                 MyPlacesListView()
+                    .environmentObject(profile)
+                    .environmentObject(userProfileViewModel)
+                    .environmentObject(dataManager)
+                    .environmentObject(userSession)
+                    .environmentObject(selectedPlaceVM)
             }
         }
         .padding(.vertical, 10)

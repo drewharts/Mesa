@@ -202,6 +202,14 @@ class DataManager: ObservableObject {
         profileViewModel.isMyPlacesLoading = false
     }
     
+    /// Refresh My Places data (for when user clicks on My Places)
+    func refreshMyPlaces(userId: String) async {
+        print("🔄 [DataManager] Refreshing My Places data...")
+        // Clear existing data and reload
+        profileViewModel.myPlaces.removeAll()
+        await loadUserMyPlaces(userId: userId)
+    }
+    
     // Load's current user's profile data and profile picture
     func loadProfileData(userId: String) async {
         do {
