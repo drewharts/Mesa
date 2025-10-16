@@ -51,9 +51,6 @@ struct ProfileFollowCountsView: View {
                             .foregroundColor(.black)
                             .fontWeight(.regular)
                             .id("followers_\(refreshToggle)")
-                            .onAppear {
-                                print("🔍 [ProfileFollowCountsView] Followers count: \(profile.followersCount), loading: \(profile.isFollowersLoading)")
-                            }
                     }
                     Text("Followers")
                         .font(.caption)
