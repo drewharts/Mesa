@@ -18,6 +18,8 @@ struct ProfileContentView: View {
     
     var body: some View {
         ZStack {
+            Color.blue.opacity(0.1) // Debug: Make entire view visible
+                .ignoresSafeArea()
             ScrollView {
                 VStack(spacing: 12) {
                     // Profile Picture
@@ -30,9 +32,7 @@ struct ProfileContentView: View {
                         .font(.title2)
                         .fontWeight(.bold)
                         .foregroundColor(.black)
-                        .onAppear {
-                            print("🔍 [ProfileContentView] User data: firstName='\(firstName)', lastName='\(lastName)', user=\(profile.user?.id ?? "nil")")
-                        }
+                        .background(Color.yellow.opacity(0.3)) // Debug: Make name visible
                     
                     // Follow Counts
                     ProfileFollowCountsView()

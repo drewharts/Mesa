@@ -38,8 +38,6 @@ struct ProfileView: View {
             .navigationBarBackButtonHidden(true)
             .preferredColorScheme(.light)
             .navigationBarTitleDisplayMode(.inline)
-            // ENTERPRISE OPTIMIZATION: Ensure immediate rendering
-            .drawingGroup() // Force immediate rendering
             .modifier(ToolbarModifier(
                 presentationMode: presentationMode,
                 photoImportVM: photoImportVM
