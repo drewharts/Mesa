@@ -796,6 +796,11 @@ class ProfileViewModel: ObservableObject {
 
     var hasMoreReviews: Bool { _hasMoreReviews }
     
+    /// Get the total count of reviewed places
+    var reviewedPlacesCount: Int {
+        return allReviewedPlaceIds.count
+    }
+    
     // MARK: - TikTok Places Pagination
     
     func loadTikTokPlacesWithPagination() {

@@ -18,23 +18,6 @@ struct ProfileFollowCountsView: View {
     @State private var showingMyPlaces = false
     @State private var refreshToggle = false
     
-    // Calculate total My Places count (created + reviewed + TikTok)
-    var totalMyPlacesCount: Int {
-        let createdCount = profile.myPlaces.count
-        
-        // Get reviewed places count (excluding created places)
-        let reviewedPlaceIds = profile.detailPlaceViewModel.placeSavers.compactMap { (placeId, userIds) -> String? in
-            guard let currentUserId = profile.user?.id else { return nil }
-            return userIds.contains(currentUserId) && !profile.myPlaces.contains(placeId) ? placeId : nil
-        }
-        let reviewedCount = reviewedPlaceIds.count
-        
-        // Get TikTok places count
-        let tikTokCount = profile.getTikTokPlaces().count
-        
-        return createdCount + reviewedCount + tikTokCount
-    }
-    
     var body: some View {
         HStack(spacing: 24) {
             // Followers count
@@ -93,7 +76,7 @@ struct ProfileFollowCountsView: View {
                     .environmentObject(userSession)
             }
             
-            // My Places count
+            // My Places count (Created + Reviewed)
             Button(action: {
                 showingMyPlaces = true
             }) {
@@ -102,11 +85,19 @@ struct ProfileFollowCountsView: View {
                         ProgressView()
                             .frame(width: 20, height: 20)
                     } else {
-                        Text("\(totalMyPlacesCount)")
-                            .font(.headline)
-                            .foregroundColor(.black)
-                            .fontWeight(.regular)
-                            .id("myPlaces_\(refreshToggle)")
+                        VStack(spacing: 2) {
+                            Text("\(profile.myPlaces.count)")
+                                .font(.headline)
+                                .foregroundColor(.black)
+                                .fontWeight(.regular)
+                                .id("myPlaces_\(refreshToggle)")
+                            
+                            Text("\(profile.reviewedPlacesCount)")
+                                .font(.subheadline)
+                                .foregroundColor(.blue)
+                                .fontWeight(.medium)
+                                .id("reviewedPlaces_\(refreshToggle)")
+                        }
                     }
                     Text("My Places")
                         .font(.caption)
@@ -129,7 +120,10 @@ struct ProfileFollowCountsView: View {
         .onChange(of: profile.userFollowers.count) {
             refreshToggle.toggle()
         }
-        .onChange(of: totalMyPlacesCount) {
+        .onChange(of: profile.myPlaces.count) {
+            refreshToggle.toggle()
+        }
+        .onChange(of: profile.reviewedPlacesCount) {
             refreshToggle.toggle()
         }
     }

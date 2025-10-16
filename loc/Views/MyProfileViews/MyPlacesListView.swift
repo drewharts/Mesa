@@ -215,12 +215,13 @@ struct MyPlacesListView: View {
             }
         }
         .onAppear {
-            print("📱 [MyPlacesListView] Sheet appeared - triggering My Places refresh")
-            // Trigger My Places data refresh when sheet appears
+            print("📱 [MyPlacesListView] Sheet appeared - triggering My Places and Reviewed Places refresh")
+            // Trigger My Places and Reviewed Places data refresh when sheet appears
             if let userId = profile.user?.id {
-                print("🏠 [MyPlacesListView] Starting My Places refresh...")
+                print("🏠 [MyPlacesListView] Starting My Places and Reviewed Places refresh...")
                 Task {
                     await profile.detailPlaceViewModel.dataManager?.refreshMyPlaces(userId: userId)
+                    await profile.detailPlaceViewModel.dataManager?.refreshReviewedPlaces(userId: userId)
                 }
             }
             

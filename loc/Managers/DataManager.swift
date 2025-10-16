@@ -210,6 +210,14 @@ class DataManager: ObservableObject {
         await loadUserMyPlaces(userId: userId)
     }
     
+    /// Refresh Reviewed Places data (for when user clicks on My Places)
+    func refreshReviewedPlaces(userId: String) async {
+        print("🔄 [DataManager] Refreshing Reviewed Places data...")
+        // Clear existing data and reload
+        profileViewModel.allReviewedPlaceIds.removeAll()
+        await loadUserReviewedPlaces(userId: userId)
+    }
+    
     // Load's current user's profile data and profile picture
     func loadProfileData(userId: String) async {
         do {
@@ -671,6 +679,11 @@ class DataManager: ObservableObject {
                 }
                 seenPlaceIds.insert(review.placeId)
                 return review.placeId
+            }
+            
+            // Update the ProfileViewModel with the reviewed place IDs for count display
+            await MainActor.run {
+                profileViewModel.allReviewedPlaceIds = placeIds
             }
 
             // Process place details in batches
