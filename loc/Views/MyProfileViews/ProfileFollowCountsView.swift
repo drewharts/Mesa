@@ -76,7 +76,7 @@ struct ProfileFollowCountsView: View {
                     .environmentObject(userSession)
             }
             
-            // My Places count (Created + Reviewed)
+            // My Places count (Created places only)
             Button(action: {
                 showingMyPlaces = true
             }) {
@@ -85,19 +85,11 @@ struct ProfileFollowCountsView: View {
                         ProgressView()
                             .frame(width: 20, height: 20)
                     } else {
-                        VStack(spacing: 2) {
-                            Text("\(profile.myPlaces.count)")
-                                .font(.headline)
-                                .foregroundColor(.black)
-                                .fontWeight(.regular)
-                                .id("myPlaces_\(refreshToggle)")
-                            
-                            Text("\(profile.reviewedPlacesCount)")
-                                .font(.subheadline)
-                                .foregroundColor(.blue)
-                                .fontWeight(.medium)
-                                .id("reviewedPlaces_\(refreshToggle)")
-                        }
+                        Text("\(profile.myPlaces.count)")
+                            .font(.headline)
+                            .foregroundColor(.black)
+                            .fontWeight(.regular)
+                            .id("myPlaces_\(refreshToggle)")
                     }
                     Text("My Places")
                         .font(.caption)
@@ -121,9 +113,6 @@ struct ProfileFollowCountsView: View {
             refreshToggle.toggle()
         }
         .onChange(of: profile.myPlaces.count) {
-            refreshToggle.toggle()
-        }
-        .onChange(of: profile.reviewedPlacesCount) {
             refreshToggle.toggle()
         }
     }
