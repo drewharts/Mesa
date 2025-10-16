@@ -801,6 +801,41 @@ class ProfileViewModel: ObservableObject {
         return allReviewedPlaceIds.count
     }
     
+    // User reviews for display in My Places
+    @Published var userReviews: [ReviewProtocol] = []
+    @Published var isLoadingUserReviews: Bool = false
+    
+    /// Load the last 8 reviews made by the user
+    func loadUserReviews() async {
+        guard let userId = user?.id else { return }
+        
+        await MainActor.run {
+            isLoadingUserReviews = true
+        }
+        
+        do {
+            // Fetch both restaurant and generic reviews
+            async let restaurantReviews: [RestaurantReview] = try await reviewService.fetchUserReviews(userId: userId)
+            async let genericReviews: [GenericReview] = try await reviewService.fetchUserGenericReviews(userId: userId)
+            
+            let allReviews: [ReviewProtocol] = (try await restaurantReviews) + (try await genericReviews)
+            
+            // Sort by timestamp (most recent first) and take the last 8
+            let sortedReviews = allReviews.sorted { $0.timestamp > $1.timestamp }
+            let last8Reviews = Array(sortedReviews.prefix(8))
+            
+            await MainActor.run {
+                userReviews = last8Reviews
+                isLoadingUserReviews = false
+            }
+        } catch {
+            print("❌ [ProfileViewModel] Error loading user reviews: \(error.localizedDescription)")
+            await MainActor.run {
+                isLoadingUserReviews = false
+            }
+        }
+    }
+    
     // MARK: - TikTok Places Pagination
     
     func loadTikTokPlacesWithPagination() {

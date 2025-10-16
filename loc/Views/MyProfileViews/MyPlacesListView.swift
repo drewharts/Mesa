@@ -130,13 +130,8 @@ struct MyPlacesListView: View {
                             removal: .move(edge: .trailing).combined(with: .opacity)
                         ))
                     } else if selectedTab == 1 {
-                        // Reviewed Places (with pagination)
-                        PaginatedReviewedPlacesView(
-                            columns: columns,
-                            cardWidth: cardWidth,
-                            cardHeight: cardHeight,
-                            colorForPlace: colorForPlace
-                        )
+                        // User Reviews
+                        UserReviewsView()
                         .transition(.asymmetric(
                             insertion: .move(edge: .trailing).combined(with: .opacity),
                             removal: .move(edge: .leading).combined(with: .opacity)
@@ -215,13 +210,14 @@ struct MyPlacesListView: View {
             }
         }
         .onAppear {
-            print("📱 [MyPlacesListView] Sheet appeared - triggering My Places and Reviewed Places refresh")
-            // Trigger My Places and Reviewed Places data refresh when sheet appears
+            print("📱 [MyPlacesListView] Sheet appeared - triggering My Places, Reviewed Places, and User Reviews refresh")
+            // Trigger My Places, Reviewed Places, and User Reviews data refresh when sheet appears
             if let userId = profile.user?.id {
-                print("🏠 [MyPlacesListView] Starting My Places and Reviewed Places refresh...")
+                print("🏠 [MyPlacesListView] Starting My Places, Reviewed Places, and User Reviews refresh...")
                 Task {
                     await profile.detailPlaceViewModel.dataManager?.refreshMyPlaces(userId: userId)
                     await profile.detailPlaceViewModel.dataManager?.refreshReviewedPlaces(userId: userId)
+                    await profile.loadUserReviews()
                 }
             }
             
@@ -676,6 +672,175 @@ struct TikTokPlaceGridCell: View {
             }
         } message: {
             Text("Are you sure you want to delete \"\(place.name)\"? This action cannot be undone.")
+        }
+    }
+}
+
+// MARK: - User Reviews View
+struct UserReviewsView: View {
+    @EnvironmentObject var profile: ProfileViewModel
+    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
+    @Environment(\.presentationMode) var presentationMode
+    
+    var body: some View {
+        if profile.isLoadingUserReviews {
+            VStack {
+                Spacer()
+                ProgressView()
+                Text("Loading reviews...")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+                    .padding(.top, 8)
+                Spacer()
+            }
+            .onAppear {
+                Task {
+                    await profile.loadUserReviews()
+                }
+            }
+        } else if profile.userReviews.isEmpty {
+            VStack(spacing: 16) {
+                Spacer()
+                Text("No Reviews Yet")
+                    .font(.title3)
+                    .fontWeight(.medium)
+                    .foregroundColor(.gray)
+                Text("When you review a place, it'll appear here.")
+                    .font(.body)
+                    .foregroundColor(.gray)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+                Spacer()
+            }
+        } else {
+            ScrollView {
+                LazyVStack(spacing: 12) {
+                    ForEach(profile.userReviews, id: \.id) { review in
+                        ReviewCard(review: review)
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 10)
+            }
+            .onAppear {
+                Task {
+                    await profile.loadUserReviews()
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Review Card
+struct ReviewCard: View {
+    let review: ReviewProtocol
+    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
+    @Environment(\.presentationMode) var presentationMode
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Header with place name and date
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(review.placeName)
+                        .font(.headline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.black)
+                    
+                    Text(formatDate(review.timestamp))
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                }
+                
+                Spacer()
+                
+                // Review type indicator
+                Text(review.type.rawValue.capitalized)
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(review.type == .restaurant ? Color.blue : Color.green)
+                    .cornerRadius(8)
+            }
+            
+            // Review text
+            if !review.reviewText.isEmpty {
+                Text(review.reviewText)
+                    .font(.body)
+                    .foregroundColor(.black)
+                    .lineLimit(3)
+            }
+            
+            // Restaurant-specific ratings
+            if let restaurantReview = review as? RestaurantReview {
+                HStack(spacing: 16) {
+                    RatingView(title: "Food", rating: restaurantReview.foodRating)
+                    RatingView(title: "Service", rating: restaurantReview.serviceRating)
+                    RatingView(title: "Ambience", rating: restaurantReview.ambienceRating)
+                }
+            }
+            
+            // Images if available
+            if !review.images.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(review.images.prefix(3), id: \.self) { imageUrl in
+                            AsyncImage(url: URL(string: imageUrl)) { image in
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                            } placeholder: {
+                                Rectangle()
+                                    .fill(Color.gray.opacity(0.3))
+                            }
+                            .frame(width: 60, height: 60)
+                            .cornerRadius(8)
+                        }
+                    }
+                    .padding(.horizontal, 1)
+                }
+            }
+        }
+        .padding(16)
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+        .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
+        .onTapGesture {
+            // Navigate to place detail
+            if let placeId = UUID(uuidString: review.placeId) {
+                selectedPlaceVM.selectedPlaceId = placeId
+                presentationMode.wrappedValue.dismiss()
+            }
+        }
+    }
+    
+    private func formatDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        return formatter.string(from: date)
+    }
+}
+
+// MARK: - Rating View
+struct RatingView: View {
+    let title: String
+    let rating: Double
+    
+    var body: some View {
+        VStack(spacing: 2) {
+            Text(title)
+                .font(.caption2)
+                .foregroundColor(.gray)
+            
+            HStack(spacing: 2) {
+                ForEach(1...5, id: \.self) { star in
+                    Image(systemName: star <= Int(rating) ? "star.fill" : "star")
+                        .font(.caption2)
+                        .foregroundColor(.yellow)
+                }
+            }
         }
     }
 } 
