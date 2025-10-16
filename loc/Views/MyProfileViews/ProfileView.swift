@@ -306,12 +306,12 @@ struct StateChangesModifier: ViewModifier {
     
     func body(content: Content) -> some View {
         content
-            .task {
+            .onAppear {
                 // Only refresh if we haven't already (avoid blocking UI on every appearance)
                 // Places are already loaded in Phase 0, so this is usually redundant
                 if !hasRefreshedPlaces {
                     hasRefreshedPlaces = true
-                    // Run in background to not block UI
+                    // Run in background to not block UI - use Task.detached for true background execution
                     Task.detached(priority: .background) {
                         await profile.refreshUserPlaces()
                     }
