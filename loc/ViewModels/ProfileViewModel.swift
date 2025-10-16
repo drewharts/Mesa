@@ -797,20 +797,8 @@ class ProfileViewModel: ObservableObject {
                    let imageUrl = mostRecentReview.images.first {
                     // Load the review image and add it to placeImages if it doesn't already have one
                     if detailPlaceViewModel.placeImages[placeId] == nil {
-                        // Use ImageService to load the image from URL
-                        ImageService.shared.fetchPhotosFromStorage(urls: [imageUrl]) { [weak self] images, error in
-                            guard let self = self else { return }
-                            
-                            DispatchQueue.main.async {
-                                if let error = error {
-                                    print("⚠️ [ProfileViewModel] Failed to load review image for place \(placeId): \(error.localizedDescription)")
-                                } else if let images = images, !images.isEmpty {
-                                    // Use the first successfully loaded image
-                                    self.detailPlaceViewModel.placeImages[placeId] = images[0]
-                                    print("✅ [ProfileViewModel] Loaded review image for place \(placeId)")
-                                }
-                            }
-                        }
+                        // Load image directly from URL
+                        await loadImageFromURL(imageUrl: imageUrl, placeId: placeId)
                     }
                 }
             } catch {
@@ -821,6 +809,28 @@ class ProfileViewModel: ObservableObject {
 
     func getMyReviewedPlaces() -> [DetailPlace] {
         return loadedReviewedPlaceIds.compactMap { detailPlaceViewModel.places[$0] }
+    }
+    
+    /// Load image directly from URL and add to placeImages
+    private func loadImageFromURL(imageUrl: String, placeId: String) async {
+        guard let url = URL(string: imageUrl) else {
+            print("⚠️ [ProfileViewModel] Invalid image URL: \(imageUrl)")
+            return
+        }
+        
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            if let image = UIImage(data: data) {
+                await MainActor.run {
+                    detailPlaceViewModel.placeImages[placeId] = image
+                    print("✅ [ProfileViewModel] Loaded review image for place \(placeId)")
+                }
+            } else {
+                print("⚠️ [ProfileViewModel] Failed to create UIImage from data for place \(placeId)")
+            }
+        } catch {
+            print("⚠️ [ProfileViewModel] Failed to load image from URL for place \(placeId): \(error.localizedDescription)")
+        }
     }
 
     func resetMyReviewedPlacesPagination() {
