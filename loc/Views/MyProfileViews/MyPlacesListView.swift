@@ -809,8 +809,8 @@ struct ReviewCard: View {
         .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
         .onTapGesture {
             // Navigate to place detail
-            if let placeId = UUID(uuidString: review.placeId) {
-                selectedPlaceVM.selectedPlaceId = placeId
+            if let place = profile.detailPlaceViewModel.places[review.placeId] {
+                selectedPlaceVM.selectPlaceAndFetchDetails(place)
                 presentationMode.wrappedValue.dismiss()
             }
         }
