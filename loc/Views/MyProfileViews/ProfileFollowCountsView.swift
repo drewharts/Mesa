@@ -10,6 +10,8 @@ import SwiftUI
 struct ProfileFollowCountsView: View {
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var userProfileViewModel: UserProfileViewModel
+    @EnvironmentObject var dataManager: DataManager
+    @EnvironmentObject var userSession: UserSession
     @State private var showingFollowers = false
     @State private var showingFollowing = false
     @State private var showingMyPlaces = false
@@ -39,7 +41,10 @@ struct ProfileFollowCountsView: View {
             }
             .sheet(isPresented: $showingFollowers) {
                 FollowersListView()
+                    .environmentObject(profile)
                     .environmentObject(userProfileViewModel)
+                    .environmentObject(dataManager)
+                    .environmentObject(userSession)
             }
             
             // Following count
@@ -64,7 +69,10 @@ struct ProfileFollowCountsView: View {
             }
             .sheet(isPresented: $showingFollowing) {
                 FollowingListView()
+                    .environmentObject(profile)
                     .environmentObject(userProfileViewModel)
+                    .environmentObject(dataManager)
+                    .environmentObject(userSession)
             }
             
             // My Places count

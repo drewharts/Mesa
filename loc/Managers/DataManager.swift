@@ -149,6 +149,14 @@ class DataManager: ObservableObject {
         // They will load lazily when user clicks on "Followers" or "Following"
         print("💤 [DataManager] Skipping follower/following profile loading (LAZY - loads on click)")
         
+        // Reset the list loading flags since we're not loading profiles here
+        // This allows the lazy loading to work when user clicks on followers/following
+        await MainActor.run {
+            profileViewModel.isFollowersListLoading = false
+            profileViewModel.isFollowingListLoading = false
+            print("✅ [DataManager] Reset follower/following list loading flags to false")
+        }
+        
         // Only load reviewed places for following users if we already have the following list
         // Otherwise this will also be lazy
         if !profileViewModel.userFollowing.isEmpty {

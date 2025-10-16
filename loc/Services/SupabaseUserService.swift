@@ -232,7 +232,7 @@ class SupabaseUserService: ObservableObject {
             .from("following")
             .select()
             .eq("following_id", value: userId)
-            .order("followed_at", ascending: false) // Most recent first
+            .order("created_at", ascending: false) // Most recent first
         
         if let limit = limit {
             query = query.limit(limit).range(from: offset, to: offset + limit - 1)
@@ -279,7 +279,7 @@ class SupabaseUserService: ObservableObject {
             .from("following")
             .select()
             .eq("follower_id", value: userId)
-            .order("followed_at", ascending: false) // Most recent first
+            .order("created_at", ascending: false) // Most recent first
         
         if let limit = limit {
             query = query.limit(limit).range(from: offset, to: offset + limit - 1)
@@ -367,6 +367,7 @@ struct UserRecord: Codable {
 struct FollowingRecord: Codable {
     let follower_id: String
     let following_id: String
+    let created_at: String?
 }
 
 struct ProfileDataRecord: Codable {
