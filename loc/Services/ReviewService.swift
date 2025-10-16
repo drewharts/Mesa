@@ -133,8 +133,8 @@ class ReviewService: ObservableObject {
     }
     
     func fetchPlaceReviews(placeId: String, latestOnly: Bool = false) async throws -> [ReviewProtocol] {
-        print("⚠️ [ReviewService] fetchPlaceReviews async not fully implemented")
-        return []
+        print("🔄 [ReviewService] Delegating fetchPlaceReviews to Supabase...")
+        return try await supabase.fetchPlaceReviews(placeId: placeId, latestOnly: latestOnly)
     }
     
     func deleteReview(reviewId: String, completion: @escaping (Result<Void, Error>) -> Void) {

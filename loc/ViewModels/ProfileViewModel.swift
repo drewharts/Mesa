@@ -727,6 +727,9 @@ class ProfileViewModel: ObservableObject {
             return
         }
         
+        // Fetch review images for these places in parallel
+        await fetchReviewImagesForPlaces(placeIdsToLoad, userId: currentUserId)
+        
         for placeId in placeIdsToLoad {
             if detailPlaceViewModel.places[placeId] == nil {
                 // Retry logic for failed place loads
@@ -779,6 +782,32 @@ class ProfileViewModel: ObservableObject {
 
     func loadMoreMyReviews() {
         Task { await self.loadNextBatchOfMyReviews() }
+    }
+    
+    /// Fetch review images for a batch of places to enhance the place display
+    private func fetchReviewImagesForPlaces(_ placeIds: [String], userId: String) async {
+        // Fetch reviews for these places to get images
+        for placeId in placeIds {
+            do {
+                // Get the most recent review for this place by this user
+                let reviews = try await reviewService.fetchPlaceReviews(placeId: placeId, latestOnly: false)
+                let userReviews = reviews.filter { $0.userId == userId }
+                
+                if let mostRecentReview = userReviews.first(where: { !$0.images.isEmpty }) {
+                    // Update the place with the review image if it doesn't already have one
+                    if let place = detailPlaceViewModel.places[placeId],
+                       place.photoUrls?.isEmpty != false {
+                        var updatedPlace = place
+                        updatedPlace.photoUrls = [mostRecentReview.images.first!]
+                        await MainActor.run {
+                            detailPlaceViewModel.places[placeId] = updatedPlace
+                        }
+                    }
+                }
+            } catch {
+                print("⚠️ [ProfileViewModel] Failed to fetch review images for place \(placeId): \(error.localizedDescription)")
+            }
+        }
     }
 
     func getMyReviewedPlaces() -> [DetailPlace] {

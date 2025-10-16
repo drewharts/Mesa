@@ -217,6 +217,87 @@ class SupabaseReviewService: ObservableObject {
         return reviews
     }
     
+    // MARK: - Place Reviews
+    
+    func fetchPlaceReviews(placeId: String, latestOnly: Bool = false) async throws -> [ReviewProtocol] {
+        print("📝 [Supabase] Fetching reviews for place \(placeId)")
+        
+        var query = supabase.client
+            .from("reviews")
+            .select()
+            .eq("place_id", value: placeId)
+            .order("timestamp", ascending: false)
+        
+        if latestOnly {
+            query = query.limit(1)
+        }
+        
+        let response: [ReviewRecord] = try await query.execute().value
+        
+        let reviews = response.compactMap { record -> ReviewProtocol? in
+            // Parse timestamp - it could be ISO8601 string or PostgreSQL timestamp
+            let timestamp: Date
+            if let isoDate = ISO8601DateFormatter().date(from: record.timestamp) {
+                timestamp = isoDate
+            } else {
+                // Try parsing as PostgreSQL timestamp format
+                let formatter = DateFormatter()
+                formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSSSS"
+                formatter.timeZone = TimeZone(secondsFromGMT: 0)
+                if let pgDate = formatter.date(from: record.timestamp) {
+                    timestamp = pgDate
+                } else {
+                    // Try alternative PostgreSQL format
+                    formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+                    if let altDate = formatter.date(from: record.timestamp) {
+                        timestamp = altDate
+                    } else {
+                        print("⚠️ [Supabase] Invalid timestamp for review \(record.id): \(record.timestamp)")
+                        return nil
+                    }
+                }
+            }
+            
+            // Create appropriate review type based on record.type
+            if record.type == "restaurant" {
+                return RestaurantReview(
+                    id: record.id,
+                    userId: record.user_id,
+                    profilePhotoUrl: record.profile_photo_url ?? "",
+                    userFirstName: record.user_first_name ?? "",
+                    userLastName: record.user_last_name ?? "",
+                    placeId: record.place_id,
+                    placeName: record.place_name ?? "",
+                    foodRating: record.food_rating ?? 0,
+                    serviceRating: record.service_rating ?? 0,
+                    ambienceRating: record.ambience_rating ?? 0,
+                    favoriteDishes: record.favorite_dishes ?? [],
+                    reviewText: record.review_text ?? "",
+                    timestamp: timestamp,
+                    images: record.images ?? [],
+                    likes: record.likes ?? 0
+                )
+            } else {
+                return GenericReview(
+                    id: record.id,
+                    userId: record.user_id,
+                    profilePhotoUrl: record.profile_photo_url ?? "",
+                    userFirstName: record.user_first_name ?? "",
+                    userLastName: record.user_last_name ?? "",
+                    placeId: record.place_id,
+                    placeName: record.place_name ?? "",
+                    reviewText: record.review_text ?? "",
+                    timestamp: timestamp,
+                    images: record.images ?? [],
+                    likes: record.likes ?? 0
+                )
+            }
+        }
+        
+        print("✅ [Supabase] Fetched \(reviews.count) reviews for place")
+        return reviews
+    }
+    
     // MARK: - Comments
     
     func fetchComments(reviewId: String, completion: @escaping ([Comment]?, Error?) -> Void) {
