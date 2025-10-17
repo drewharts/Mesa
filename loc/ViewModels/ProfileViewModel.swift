@@ -2136,29 +2136,33 @@ class ProfileViewModel: ObservableObject {
             switch result {
             case .success(let externalPlaces):
                 print("✅ [ProfileViewModel] Successfully fetched \(externalPlaces.count) external places")
-                // External places details loaded
                 
                 // Convert array to dictionary
                 let externalPlacesDict = Dictionary(uniqueKeysWithValues: externalPlaces.map { ($0.placeId, $0) })
-                self.userExternalPlaces = externalPlacesDict
-                print("📚 [ProfileViewModel] Updated userExternalPlaces dictionary with \(externalPlacesDict.count) entries")
                 
-                // Load TikTok thumbnail images for external places
-                print("🖼️ [ProfileViewModel] Starting to load TikTok thumbnails...")
-                for externalPlace in externalPlaces {
-                    // Get the first TikTok video's thumbnail as the place image
-                    if let firstTikTokVideo = externalPlace.tiktokVideos.first,
-                       !firstTikTokVideo.thumbnailUrl.isEmpty {
-                        // Loading TikTok thumbnail for \(externalPlace.name)
-                        self.loadTikTokThumbnailAsPlaceImage(
-                            placeId: externalPlace.placeId,
-                            thumbnailURL: firstTikTokVideo.thumbnailUrl
-                        )
-                    } else {
-                        print("⚠️ [ProfileViewModel] No thumbnail available for \(externalPlace.name)")
+                // Update on main thread to avoid UI threading issues
+                DispatchQueue.main.async {
+                    // External places details loaded
+                    self.userExternalPlaces = externalPlacesDict
+                    print("📚 [ProfileViewModel] Updated userExternalPlaces dictionary with \(externalPlacesDict.count) entries")
+                    
+                    // Load TikTok thumbnail images for external places
+                    print("🖼️ [ProfileViewModel] Starting to load TikTok thumbnails...")
+                    for externalPlace in externalPlaces {
+                        // Get the first TikTok video's thumbnail as the place image
+                        if let firstTikTokVideo = externalPlace.tiktokVideos.first,
+                           !firstTikTokVideo.thumbnailUrl.isEmpty {
+                            // Loading TikTok thumbnail for \(externalPlace.name)
+                            self.loadTikTokThumbnailAsPlaceImage(
+                                placeId: externalPlace.placeId,
+                                thumbnailURL: firstTikTokVideo.thumbnailUrl
+                            )
+                        } else {
+                            print("⚠️ [ProfileViewModel] No thumbnail available for \(externalPlace.name)")
+                        }
                     }
+                    print("✅ [ProfileViewModel] Completed TikTok thumbnail loading")
                 }
-                print("✅ [ProfileViewModel] Completed TikTok thumbnail loading")
                 
             case .failure(let error):
                 print("❌ [ProfileViewModel] Error fetching external places: \(error.localizedDescription)")
