@@ -82,24 +82,23 @@ struct ExternalTikTokVideo: Codable, Identifiable {
     }
     
     // Convert to the existing TikTokVideo format for compatibility
-    func toTikTokVideo() -> TikTokVideo {
-        let tikTokAuthor = TikTokAuthor(
-            displayName: author.displayName,
-            url: "", // Not available in external format
-            username: author.username
-        )
-        
-        return TikTokVideo(
-            videoID: videoId,
-            url: url,
-            title: nil, // Not available in external format
-            caption: nil, // Not available in external format
-            embedHTML: embedHtml,
-            thumbnailURL: thumbnailUrl,
-            author: tikTokAuthor,
-            hashtags: hashtags,
-            createdAt: createdAt
-        )
+    // Note: This conversion is handled in the service layer to avoid circular imports
+    func toTikTokVideo() -> [String: Any] {
+        return [
+            "video_id": videoId,
+            "url": url,
+            "title": NSNull(),
+            "caption": NSNull(),
+            "embed_html": embedHtml,
+            "thumbnail_url": thumbnailUrl,
+            "author": [
+                "display_name": author.displayName,
+                "url": "",
+                "username": author.username
+            ],
+            "hashtags": hashtags,
+            "created_at": createdAt
+        ]
     }
 }
 

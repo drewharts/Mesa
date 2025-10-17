@@ -7,7 +7,7 @@ class ReviewService: ObservableObject {
     private let supabase = SupabaseReviewService.shared // All data comes from Supabase
     
     private init() {
-        print("⚠️ ReviewService is a compatibility wrapper - all data from Supabase")
+        // ReviewService is a compatibility wrapper - all data from Supabase
     }
 
     func fetchReviews<T>(placeId: String, latestOnly: Bool = false, completion: @escaping ([T]?, Error?) -> Void) {

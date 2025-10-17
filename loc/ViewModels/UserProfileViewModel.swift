@@ -325,9 +325,30 @@ class UserProfileViewModel: ObservableObject {
     /// Get TikTok videos for a specific place
     func getTikTokVideos(for placeId: String) -> [TikTokVideo] {
         if let externalPlace = dataManager.getExternalPlace(for: placeId) {
-            return externalPlace.tiktokVideos.map { $0.toTikTokVideo() }
+            return externalPlace.tiktokVideos.compactMap { convertExternalTikTokVideoToTikTokVideo($0) }
         }
         return []
+    }
+    
+    /// Convert ExternalTikTokVideo to TikTokVideo
+    private func convertExternalTikTokVideoToTikTokVideo(_ externalVideo: ExternalTikTokVideo) -> TikTokVideo? {
+        let tikTokAuthor = TikTokAuthor(
+            displayName: externalVideo.author.displayName,
+            url: "", // Not available in external format
+            username: externalVideo.author.username
+        )
+        
+        return TikTokVideo(
+            videoID: externalVideo.videoId,
+            url: externalVideo.url,
+            title: nil, // Not available in external format
+            caption: nil, // Not available in external format
+            embedHTML: externalVideo.embedHtml,
+            thumbnailURL: externalVideo.thumbnailUrl,
+            author: tikTokAuthor,
+            hashtags: externalVideo.hashtags,
+            createdAt: externalVideo.createdAt
+        )
     }
     
     /// Get first TikTok thumbnail URL for a place
@@ -350,7 +371,7 @@ class UserProfileViewModel: ObservableObject {
             return
         }
         
-        print("🖼️ [UserProfileViewModel] Loading TikTok thumbnail for place \(placeId)")
+        // Loading TikTok thumbnail for place
         
         URLSession.shared.dataTask(with: url) { [weak self] data, response, error in
             guard let self = self else { return }
@@ -360,7 +381,7 @@ class UserProfileViewModel: ObservableObject {
                     print("❌ [UserProfileViewModel] Error loading TikTok thumbnail for \(placeId): \(error.localizedDescription)")
                     completion(placeId, nil)
                 } else if let data = data, let image = UIImage(data: data) {
-                    print("✅ [UserProfileViewModel] Successfully loaded TikTok thumbnail for place \(placeId)")
+                    // Successfully loaded TikTok thumbnail
                     // Store in both dictionaries to ensure consistency
                     self.placeImages[placeId] = image
                     completion(placeId, image)

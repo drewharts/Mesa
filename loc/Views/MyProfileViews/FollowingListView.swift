@@ -11,6 +11,8 @@ import UIKit
 struct FollowingListView: View {
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var userProfileViewModel: UserProfileViewModel
+    @EnvironmentObject var dataManager: DataManager
+    @EnvironmentObject var userSession: UserSession
     @Environment(\.presentationMode) var presentationMode
     
     var body: some View {
@@ -46,6 +48,18 @@ struct FollowingListView: View {
             }
             .navigationTitle("Following")
             .navigationBarTitleDisplayMode(.inline)
+            .onAppear {
+                print("📱 [FollowingListView] Sheet appeared - triggering following load")
+                // Trigger following loading when sheet appears
+                if profile.userFollowing.isEmpty && !profile.isFollowingListLoading {
+                    print("👥 [FollowingListView] Starting following load...")
+                    Task {
+                        await dataManager.loadFollowing(userId: userSession.currentUserId ?? "")
+                    }
+                } else {
+                    print("👥 [FollowingListView] Skipping load - already loaded or loading")
+                }
+            }
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button(action: {

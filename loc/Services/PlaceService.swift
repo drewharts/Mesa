@@ -7,7 +7,7 @@ class PlaceService: ObservableObject {
     private let supabase = SupabasePlaceService.shared // All data comes from Supabase
     
     private init() {
-        print("⚠️ PlaceService is a compatibility wrapper - all data from Supabase")
+        // PlaceService is a compatibility wrapper - all data from Supabase
     }
 
     // Async version of fetchAllPlaces
@@ -43,7 +43,6 @@ class PlaceService: ObservableObject {
     }
     
     func fetchPlace(withId placeId: String) async throws -> DetailPlace {
-        print("🔄 [PlaceService] Delegating to Supabase (async)...")
         return try await withCheckedThrowingContinuation { continuation in
             Task { @MainActor in
                 await supabase.fetchPlace(withId: placeId) { result in

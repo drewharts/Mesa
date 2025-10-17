@@ -632,12 +632,16 @@ class SelectedPlaceViewModel: ObservableObject {
             self.reviewPhotoLoadingStates[reviewId] = .loading
         }
         
-        // Load images in parallel using TaskGroup
+        // Load only the first 4 images initially for better performance
+        let initialImageCount = min(4, review.images.count)
+        let initialImageUrls = Array(review.images.prefix(initialImageCount))
+        
+        // Load initial images in parallel using TaskGroup
         Task {
             var loadedImages: [UIImage] = []
             
             await withTaskGroup(of: UIImage?.self) { group in
-                for imageUrl in review.images {
+                for imageUrl in initialImageUrls {
                     group.addTask {
                         await self.loadImageFromURL(imageUrl: imageUrl)
                     }
@@ -653,9 +657,64 @@ class SelectedPlaceViewModel: ObservableObject {
             await MainActor.run {
                 self.reviewPhotos[reviewId] = loadedImages
                 self.reviewPhotoLoadingStates[reviewId] = .loaded
-                print("✅ [SelectedPlaceViewModel] Loaded \(loadedImages.count) images for review \(reviewId)")
+                print("✅ [SelectedPlaceViewModel] Loaded \(loadedImages.count) initial images for review \(reviewId) (total available: \(review.images.count))")
             }
         }
+    }
+    
+    /// Load more photos for a specific review when user scrolls
+    func loadMoreReviewPhotos(for reviewId: String, allImageUrls: [String]) {
+        guard let currentPhotos = reviewPhotos[reviewId],
+              currentPhotos.count < allImageUrls.count else {
+            return // Already loaded all photos or no photos to load
+        }
+        
+        let startIndex = currentPhotos.count
+        let endIndex = min(startIndex + 4, allImageUrls.count) // Load 4 more at a time
+        let urlsToLoad = Array(allImageUrls[startIndex..<endIndex])
+        
+        print("📸 [SelectedPlaceViewModel] Loading more photos for review \(reviewId): \(startIndex) to \(endIndex-1)")
+        
+        Task {
+            var newImages: [UIImage] = []
+            
+            await withTaskGroup(of: UIImage?.self) { group in
+                for imageUrl in urlsToLoad {
+                    group.addTask {
+                        await self.loadImageFromURL(imageUrl: imageUrl)
+                    }
+                }
+                
+                for await image in group {
+                    if let image = image {
+                        newImages.append(image)
+                    }
+                }
+            }
+            
+            await MainActor.run {
+                self.reviewPhotos[reviewId]?.append(contentsOf: newImages)
+                print("✅ [SelectedPlaceViewModel] Loaded \(newImages.count) more images for review \(reviewId) (total: \(self.reviewPhotos[reviewId]?.count ?? 0))")
+            }
+        }
+    }
+    
+    /// Load more photos for the about section when user scrolls
+    func loadMorePhotosForAbout(placeId: String) {
+        // This method should load more photos from all reviews for the about section
+        // For now, we'll use the existing loadMorePhotos method which handles place-level photo pagination
+        loadMorePhotos()
+    }
+    
+    /// Get a review by its ID to access original data
+    func getReview(by reviewId: String) -> (any ReviewProtocol)? {
+        // Search through all place reviews to find the review with matching ID
+        for reviews in placeReviews.values {
+            if let review = reviews.first(where: { $0.id == reviewId }) {
+                return review
+            }
+        }
+        return nil
     }
     
     /// Load image directly from URL

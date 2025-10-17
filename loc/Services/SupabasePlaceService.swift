@@ -170,19 +170,11 @@ class SupabasePlaceService: ObservableObject {
             .execute()
             .value
         
-        print("🔍 [Supabase] Found \(favoriteRecords.count) favorite records")
-        
         let placeIds = favoriteRecords.map { $0.place_id }
         
         guard !placeIds.isEmpty else {
-            print("🔍 [Supabase] No favorite place IDs found")
             return []
         }
-        
-        print("🔍 [Supabase] Fetching details for \(placeIds.count) favorite places")
-        
-        // Then fetch the places
-        print("🔍 [Supabase] About to fetch places with IDs: \(placeIds)")
         
         let response: [PlaceRecord]
         do {
@@ -193,11 +185,7 @@ class SupabasePlaceService: ObservableObject {
                 .execute()
                 .value
             
-            print("🔍 [Supabase] Raw place records fetched: \(response.count)")
-            for (index, record) in response.enumerated() {
-                let locationInfo = record.location != nil ? "type=\(record.location?.type ?? "nil"), coords=\(record.location?.coordinates ?? [])" : "nil"
-                print("🔍 [Supabase] Place record \(index + 1): id=\(record.id), name=\(record.name), location=\(locationInfo)")
-            }
+            // Successfully fetched place records
         } catch {
             print("❌ [Supabase] Error fetching place records: \(error)")
             print("❌ [Supabase] Error type: \(type(of: error))")
@@ -212,7 +200,6 @@ class SupabasePlaceService: ObservableObject {
             do {
                 let place = convertToDetailPlace(record)
                 places.append(place)
-                print("✅ [Supabase] Successfully converted place \(index + 1): \(place.name)")
             } catch {
                 print("❌ [Supabase] Error converting place \(index + 1) (\(record.name)): \(error)")
                 print("❌ [Supabase] Place record data: \(record)")
@@ -632,12 +619,9 @@ class SupabasePlaceService: ObservableObject {
         
         // Handle coordinate from PostGIS geometry
         if let locationData = record.location {
-            print("🔍 [Supabase] Parsing location data: type=\(locationData.type ?? "nil"), coordinates=\(locationData.coordinates ?? [])")
-            // Try to parse the GeoJSON format
-            // Format example: {"type":"Point","coordinates":[-122.4,37.8]}
+            // Try to parse the GeoJSON format: {"type":"Point","coordinates":[-122.4,37.8]}
             if let coords = locationData.coordinates, coords.count >= 2 {
                 place.coordinate = CLLocationCoordinate2D(latitude: coords[1], longitude: coords[0])
-                print("✅ [Supabase] Successfully parsed coordinates: lat=\(coords[1]), lng=\(coords[0])")
             } else {
                 print("⚠️ [Supabase] Could not parse location coordinates: \(locationData.coordinates ?? [])")
             }

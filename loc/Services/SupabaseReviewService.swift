@@ -116,7 +116,7 @@ class SupabaseReviewService: ObservableObject {
         
         let reviews = response.compactMap { record -> RestaurantReview? in
             // Parse timestamp - it could be ISO8601 string or PostgreSQL timestamp
-            print("🔍 [Supabase] Raw timestamp for review \(record.id): '\(record.timestamp)'")
+            // Parsing timestamp for review
             let timestamp: Date
             if let isoDate = ISO8601DateFormatter().date(from: record.timestamp) {
                 timestamp = isoDate

@@ -123,8 +123,8 @@ class ProfileViewModel: ObservableObject {
     @Published var isLoadingMoreTikTokPlaces: Bool = false
     private var _hasMoreTikTokPlaces: Bool = true
     private var currentTikTokPage: Int = 0
-    private let tikTokPlacesPerPage: Int = 10
-    private var allTikTokPlaceIds: [String] = []
+    private let tikTokPlacesPerPage: Int = 8
+    var allTikTokPlaceIds: [String] = []
     private var loadedTikTokPlaceIds: [String] = []
     
     // Location manager for distance calculations
@@ -384,11 +384,32 @@ class ProfileViewModel: ObservableObject {
 
         // If the external place has TikTok videos, convert and add them to the detail place
         if !externalPlace.tiktokVideos.isEmpty {
-            let tikTokVideos = externalPlace.tiktokVideos.map { $0.toTikTokVideo() }
+            let tikTokVideos = externalPlace.tiktokVideos.compactMap { convertExternalTikTokVideoToTikTokVideo($0) }
             mergedPlace.tikTokVideos = tikTokVideos
         }
 
         return mergedPlace
+    }
+    
+    /// Convert ExternalTikTokVideo to TikTokVideo
+    private func convertExternalTikTokVideoToTikTokVideo(_ externalVideo: ExternalTikTokVideo) -> TikTokVideo? {
+        let tikTokAuthor = TikTokAuthor(
+            displayName: externalVideo.author.displayName,
+            url: "", // Not available in external format
+            username: externalVideo.author.username
+        )
+        
+        return TikTokVideo(
+            videoID: externalVideo.videoId,
+            url: externalVideo.url,
+            title: nil, // Not available in external format
+            caption: nil, // Not available in external format
+            embedHTML: externalVideo.embedHtml,
+            thumbnailURL: externalVideo.thumbnailUrl,
+            author: tikTokAuthor,
+            hashtags: externalVideo.hashtags,
+            createdAt: externalVideo.createdAt
+        )
     }
 
      func removePlaceFromList(listId: UUID, place: DetailPlace) {
@@ -808,7 +829,7 @@ class ProfileViewModel: ObservableObject {
         
         // Load all images in parallel
         if !imageUrlsToLoad.isEmpty {
-            print("🖼️ [ProfileViewModel] Loading \(imageUrlsToLoad.count) review images in parallel...")
+            // Loading review images in parallel
             await withTaskGroup(of: Void.self) { group in
                 for (placeId, imageUrl) in imageUrlsToLoad {
                     group.addTask {
@@ -841,7 +862,7 @@ class ProfileViewModel: ObservableObject {
             if let image = UIImage(data: data) {
                 await MainActor.run {
                     detailPlaceViewModel.placeImages[placeId] = image
-                    print("✅ [ProfileViewModel] Loaded review image for place \(placeId)")
+                    // Loaded review image for place
                 }
             } else {
                 print("⚠️ [ProfileViewModel] Failed to create UIImage from data for place \(placeId)")
@@ -905,7 +926,10 @@ class ProfileViewModel: ObservableObject {
     // MARK: - TikTok Places Pagination
     
     func loadTikTokPlacesWithPagination() {
-        guard let userId = user?.id else { return }
+        guard let userId = user?.id else {
+            return
+        }
+        
         if allTikTokPlaceIds.isEmpty {
             isLoadingTikTokPlaces = true
             Task {
@@ -931,15 +955,18 @@ class ProfileViewModel: ObservableObject {
             isLoadingTikTokPlaces = false
             return
         }
+        
         isLoadingMoreTikTokPlaces = true
         let startIndex = currentTikTokPage * tikTokPlacesPerPage
         let endIndex = min(startIndex + tikTokPlacesPerPage, allTikTokPlaceIds.count)
+        
         guard startIndex < allTikTokPlaceIds.count else {
             _hasMoreTikTokPlaces = false
             isLoadingMoreTikTokPlaces = false
             isLoadingTikTokPlaces = false
             return
         }
+        
         let placeIdsToLoad = Array(allTikTokPlaceIds[startIndex..<endIndex])
         var successfullyLoadedPlaceIds: [String] = []
         guard let currentUserId = user?.id else {
@@ -950,28 +977,37 @@ class ProfileViewModel: ObservableObject {
         
         for placeId in placeIdsToLoad {
             if detailPlaceViewModel.places[placeId] == nil {
-                // Retry logic for failed TikTok place loads
-                var retryCount = 0
-                let maxRetries = 2
+                // Get the actual place_id from the external place to fetch from main places table
+                if let externalPlace = userExternalPlaces[placeId] {
+                    let actualPlaceId = externalPlace.placeId
+                    print("🔄 [ProfileViewModel] Fetching place data for external place '\(externalPlace.name)' using place_id: \(actualPlaceId)")
+                    
+                    // Retry logic for failed TikTok place loads
+                    var retryCount = 0
+                    let maxRetries = 2
 
-                while retryCount <= maxRetries {
-                    do {
-                        let detailPlace = try await placeService.fetchPlace(withId: placeId)
-                        await MainActor.run {
-                            detailPlaceViewModel.places[placeId] = detailPlace
-                            detailPlaceViewModel.fetchPlaceImage(for: placeId)
-                            successfullyLoadedPlaceIds.append(placeId)
-                        }
-                        break // Success, exit retry loop
-                    } catch {
-                        retryCount += 1
-                        if retryCount <= maxRetries {
-                            print("⚠️ [ProfileViewModel] Failed to load TikTok place \(placeId), retrying (\(retryCount)/\(maxRetries)): \(error.localizedDescription)")
-                            try? await Task.sleep(nanoseconds: 500_000_000 * UInt64(retryCount)) // Exponential backoff
-                        } else {
-                            print("❌ [ProfileViewModel] Failed to load TikTok place \(placeId) after \(maxRetries) retries: \(error.localizedDescription)")
+                    while retryCount <= maxRetries {
+                        do {
+                            let detailPlace = try await placeService.fetchPlace(withId: actualPlaceId)
+                            
+                            await MainActor.run {
+                                detailPlaceViewModel.places[placeId] = detailPlace
+                                detailPlaceViewModel.fetchPlaceImage(for: placeId)
+                                successfullyLoadedPlaceIds.append(placeId)
+                            }
+                            break // Success, exit retry loop
+                        } catch {
+                            retryCount += 1
+                            print("⚠️ [ProfileViewModel] Failed to fetch place \(actualPlaceId) (attempt \(retryCount)/\(maxRetries + 1)): \(error.localizedDescription)")
+                            if retryCount <= maxRetries {
+                                try? await Task.sleep(nanoseconds: 500_000_000 * UInt64(retryCount)) // Exponential backoff
+                            } else {
+                                print("❌ [ProfileViewModel] Failed to fetch place \(actualPlaceId) after \(maxRetries + 1) attempts")
+                            }
                         }
                     }
+                } else {
+                    print("⚠️ [ProfileViewModel] External place not found for placeId: \(placeId)")
                 }
             } else {
                 successfullyLoadedPlaceIds.append(placeId)
@@ -995,7 +1031,6 @@ class ProfileViewModel: ObservableObject {
         
         // Recalculate map annotations to include new TikTok places
         detailPlaceViewModel.calculateAnnotationPlaces()
-        
     }
     
     func loadMoreTikTokPlaces() {
@@ -1004,7 +1039,8 @@ class ProfileViewModel: ObservableObject {
     
     func getTikTokPlaces() -> [DetailPlace] {
         // Return places in the order they were loaded (most recent first)
-        return loadedTikTokPlaceIds.compactMap { detailPlaceViewModel.places[$0] }
+        let places = loadedTikTokPlaceIds.compactMap { detailPlaceViewModel.places[$0] }
+        return places
     }
     
     func resetTikTokPlacesPagination() {
@@ -1961,33 +1997,53 @@ class ProfileViewModel: ObservableObject {
     
     /// Fetch user's external places and populate the dictionary
     func fetchUserExternalPlaces() {
-        guard let userId = user?.id else { return }
+        guard let userId = user?.id else { 
+            print("❌ [ProfileViewModel] No user ID available for fetching external places")
+            return 
+        }
         
-        print("🔍 [ProfileViewModel] Fetching external places for user: \(userId)")
+        print("🔍 [ProfileViewModel] Starting fetchUserExternalPlaces for user: \(userId)")
+        print("🔍 [ProfileViewModel] User object: \(String(describing: user))")
+        print("🔍 [ProfileViewModel] User ID type: \(type(of: userId))")
         
         userService.fetchUserExternalPlaces(userId: userId) { [weak self] result in
-            guard let self = self else { return }
+            guard let self = self else { 
+                print("❌ [ProfileViewModel] Self is nil in fetchUserExternalPlaces callback")
+                return 
+            }
+            
+            print("📨 [ProfileViewModel] Received result from userService.fetchUserExternalPlaces")
             
             switch result {
             case .success(let externalPlaces):
                 print("✅ [ProfileViewModel] Successfully fetched \(externalPlaces.count) external places")
+                // External places details loaded
+                
                 // Convert array to dictionary
                 let externalPlacesDict = Dictionary(uniqueKeysWithValues: externalPlaces.map { ($0.placeId, $0) })
                 self.userExternalPlaces = externalPlacesDict
+                print("📚 [ProfileViewModel] Updated userExternalPlaces dictionary with \(externalPlacesDict.count) entries")
                 
                 // Load TikTok thumbnail images for external places
+                print("🖼️ [ProfileViewModel] Starting to load TikTok thumbnails...")
                 for externalPlace in externalPlaces {
-                // Get the first TikTok video's thumbnail as the place image
-                if let firstTikTokVideo = externalPlace.tiktokVideos.first,
-                   !firstTikTokVideo.thumbnailUrl.isEmpty {
-                    self.loadTikTokThumbnailAsPlaceImage(
-                        placeId: externalPlace.placeId,
-                        thumbnailURL: firstTikTokVideo.thumbnailUrl
-                    )
+                    // Get the first TikTok video's thumbnail as the place image
+                    if let firstTikTokVideo = externalPlace.tiktokVideos.first,
+                       !firstTikTokVideo.thumbnailUrl.isEmpty {
+                        // Loading TikTok thumbnail for \(externalPlace.name)
+                        self.loadTikTokThumbnailAsPlaceImage(
+                            placeId: externalPlace.placeId,
+                            thumbnailURL: firstTikTokVideo.thumbnailUrl
+                        )
+                    } else {
+                        print("⚠️ [ProfileViewModel] No thumbnail available for \(externalPlace.name)")
+                    }
                 }
-            }
+                print("✅ [ProfileViewModel] Completed TikTok thumbnail loading")
+                
             case .failure(let error):
                 print("❌ [ProfileViewModel] Error fetching external places: \(error.localizedDescription)")
+                print("🔍 [ProfileViewModel] Error details: \(error)")
             }
         }
     }
@@ -2004,7 +2060,7 @@ class ProfileViewModel: ObservableObject {
             return
         }
         
-        print("🖼️ [ProfileViewModel] Loading TikTok thumbnail for place \(placeId)")
+        // Loading TikTok thumbnail for place
         
         URLSession.shared.dataTask(with: url) { [weak self] data, response, error in
             guard let self = self else { return }
@@ -2013,7 +2069,7 @@ class ProfileViewModel: ObservableObject {
                 if let error = error {
                     print("❌ [ProfileViewModel] Error loading TikTok thumbnail for \(placeId): \(error.localizedDescription)")
                 } else if let data = data, let image = UIImage(data: data) {
-                    print("✅ [ProfileViewModel] Successfully loaded TikTok thumbnail for place \(placeId)")
+                    // Successfully loaded TikTok thumbnail
                     // Store in DetailPlaceViewModel for popup views to access
                     self.detailPlaceViewModel.placeImages[placeId] = image
                 } else {
@@ -2030,7 +2086,7 @@ class ProfileViewModel: ObservableObject {
         }
         
         // Convert ExternalTikTokVideos to TikTokVideos for compatibility
-        return externalPlace.tiktokVideos.map { $0.toTikTokVideo() }
+        return externalPlace.tiktokVideos.compactMap { convertExternalTikTokVideoToTikTokVideo($0) }
     }
     
     /// Check if user has TikTok videos for a specific place
@@ -2062,6 +2118,33 @@ class ProfileViewModel: ObservableObject {
             userProfileViewModel?.loadTikTokThumbnailAsPlaceImage(placeId: placeId, thumbnailURL: firstTikTokVideo.thumbnailUrl) { [weak self] placeId, image in
                 if let image = image {
                     self?.detailPlaceViewModel.placeImages[placeId] = image
+                }
+            }
+        }
+    }
+    
+    /// Load images for places with prioritization - first 8 immediately, rest in background
+    func loadPriorityImagesForPlaces(_ places: [DetailPlace], priorityCount: Int = 8) {
+        let priorityPlaces = Array(places.prefix(priorityCount))
+        let remainingPlaces = Array(places.dropFirst(priorityCount))
+        
+        // Load priority places immediately
+        for place in priorityPlaces {
+            loadPlaceImageWithFallback(for: place)
+        }
+        
+        // Load remaining places in background with lower priority
+        if !remainingPlaces.isEmpty {
+            Task.detached(priority: .background) { [weak self] in
+                // Add small delay to not interfere with priority loading
+                try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+                
+                for place in remainingPlaces {
+                    await MainActor.run {
+                        self?.loadPlaceImageWithFallback(for: place)
+                    }
+                    // Small delay between each background load to avoid overwhelming the system
+                    try? await Task.sleep(nanoseconds: 50_000_000) // 0.05 seconds
                 }
             }
         }

@@ -35,6 +35,10 @@ struct ProfileFavoriteListView: View {
             Divider()
                 .padding(.horizontal, 20)
         }
+        .onAppear {
+            // Preload images for the first 6 priority tiles immediately
+            preloadPriorityFavoriteImages()
+        }
         // TODO: Add search functionality for adding more favorites
     }
     
@@ -82,8 +86,8 @@ struct ProfileFavoriteListView: View {
                 } else {
                     // Favorites grid (2x3 layout like list previews)
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
-                        ForEach(Array(profile.userFavorites.prefix(6)), id: \.self) { place in
-                            FavoritePlaceCard(place: place)
+                        ForEach(Array(profile.userFavorites.prefix(6).enumerated()), id: \.element) { index, place in
+                            FavoritePlaceCard(place: place, isPriorityTile: index < 6)
                         }
                         
                         // Fill remaining slots if less than 6 favorites
@@ -116,10 +120,21 @@ struct ProfileFavoriteListView: View {
         .buttonStyle(PlainButtonStyle())
         .padding(.horizontal, 20)
     }
+    
+    // Preload images for the first 6 priority favorite tiles
+    private func preloadPriorityFavoriteImages() {
+        let priorityFavorites = Array(profile.userFavorites.prefix(6))
+        let favoritePlaces = priorityFavorites.compactMap { placeId in
+            places.places[placeId]
+        }
+        // Use the optimized priority loading method
+        profile.loadPriorityImagesForPlaces(favoritePlaces, priorityCount: 6)
+    }
 }
 
 struct FavoritePlaceCard: View {
     let place: String
+    let isPriorityTile: Bool
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var places: DetailPlaceViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
@@ -161,6 +176,7 @@ struct FavoritePlaceCard: View {
                                 .foregroundColor(places.colorForPlace(placeId: place))
                                 .frame(width: .infinity, height: 80)
                                 .onAppear {
+                                    // Load images for priority tiles immediately, or lazy load for others
                                     if let detailPlace = detailPlace {
                                         profile.loadPlaceImageWithFallback(for: detailPlace)
                                     }

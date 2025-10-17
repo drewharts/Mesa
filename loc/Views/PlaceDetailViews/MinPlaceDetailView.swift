@@ -246,6 +246,15 @@ struct MinPlaceDetailView: View {
                                             .onTapGesture {
                                                 onPhotoTapped(reviewPhotos, index)
                                             }
+                                            .onAppear {
+                                                // Load more photos when user scrolls to the last visible photo
+                                                if index == reviewPhotos.count - 1 {
+                                                    // For the about section, we need to load more photos from all reviews
+                                                    if let placeId = selectedPlaceVM.selectedPlace?.id.uuidString {
+                                                        selectedPlaceVM.loadMorePhotosForAbout(placeId: placeId)
+                                                    }
+                                                }
+                                            }
                                     }
                                 }
                                 .padding(.horizontal, 1)

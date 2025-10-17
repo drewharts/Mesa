@@ -32,6 +32,12 @@ struct CardBasedListPreview: View {
         return placeIds?.count ?? 0
     }
     
+    // Preload images for the first 6 priority tiles
+    private func preloadPriorityImages() {
+        // Use the optimized priority loading method
+        profile.loadPriorityImagesForPlaces(previewPlaces, priorityCount: 6)
+    }
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             // List header with title and place count
@@ -70,8 +76,12 @@ struct CardBasedListPreview: View {
                     } else if !previewPlaces.isEmpty {
                         // Places grid
                         LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
-                            ForEach(previewPlaces, id: \.id) { place in
-                                PlacePreviewCard(place: place, placeColors: $placeColors)
+                            ForEach(Array(previewPlaces.enumerated()), id: \.element.id) { index, place in
+                                PlacePreviewCard(
+                                    place: place, 
+                                    placeColors: $placeColors,
+                                    isPriorityTile: index < 6 // First 6 tiles are priority (2x3 grid)
+                                )
                             }
                             
                             // Fill remaining slots if less than 6 places
@@ -124,6 +134,10 @@ struct CardBasedListPreview: View {
             .animation(.easeInOut(duration: 0.1), value: showingListPopup)
         }
         .padding(.horizontal, 20)
+        .onAppear {
+            // Preload images for the first 6 priority tiles immediately
+            preloadPriorityImages()
+        }
         .sheet(isPresented: $showingListPopup) {
             let lists = profile.userLists
             let initialIndex = lists.firstIndex(where: { $0.id == list.id }) ?? 0
@@ -139,6 +153,7 @@ struct CardBasedListPreview: View {
 struct PlacePreviewCard: View {
     let place: DetailPlace
     @Binding var placeColors: [UUID: Color]
+    let isPriorityTile: Bool // New parameter to indicate if this is in the first 8 tiles
     
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
@@ -178,6 +193,7 @@ struct PlacePreviewCard: View {
                                 .foregroundColor(detailPlaceViewModel.colorForPlace(placeId: place.id.uuidString))
                                 .frame(width: .infinity, height: 80)
                                 .onAppear {
+                                    // Load images for priority tiles immediately, or lazy load for others
                                     profile.loadPlaceImageWithFallback(for: place)
                                 }
                         }

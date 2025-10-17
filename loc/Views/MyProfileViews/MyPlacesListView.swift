@@ -215,13 +215,21 @@ struct MyPlacesListView: View {
             }
         }
         .onAppear {
-            print("📱 [MyPlacesListView] Sheet appeared - triggering My Places and Reviewed Places refresh")
             // Trigger My Places and Reviewed Places data refresh when sheet appears
             if let userId = profile.user?.id {
-                print("🏠 [MyPlacesListView] Starting My Places and Reviewed Places refresh...")
                 Task {
                     await profile.detailPlaceViewModel.dataManager?.refreshMyPlaces(userId: userId)
                     await profile.detailPlaceViewModel.dataManager?.refreshReviewedPlaces(userId: userId)
+                    
+                    // Load TikTok places with pagination
+                    await MainActor.run {
+                        profile.loadTikTokPlacesWithPagination()
+                    }
+                    
+                    // Preload images after data is loaded
+                    await MainActor.run {
+                        preloadPriorityMyPlacesImages()
+                    }
                 }
             }
             
@@ -255,6 +263,14 @@ struct MyPlacesListView: View {
     
     private func colorForPlace(_ place: DetailPlace) -> Color {
         placeColors[place.id] ?? .gray
+    }
+    
+    // Preload images for the first 8 priority tiles across all tabs
+    private func preloadPriorityMyPlacesImages() {
+        // Use the optimized priority loading method for each category
+        profile.loadPriorityImagesForPlaces(createdPlaces, priorityCount: 8)
+        profile.loadPriorityImagesForPlaces(profile.getMyReviewedPlaces(), priorityCount: 8)
+        profile.loadPriorityImagesForPlaces(profile.getTikTokPlaces(), priorityCount: 8)
     }
 }
 
@@ -298,12 +314,13 @@ struct CreatedPlacesView: View {
         } else {
             ScrollView {
                 LazyVGrid(columns: columns, spacing: 15) {
-                    ForEach(createdPlaces) { place in
+                    ForEach(Array(createdPlaces.enumerated()), id: \.element.id) { index, place in
                         PlaceGridCell(
                             place: place,
                             cardWidth: cardWidth,
                             cardHeight: cardHeight,
                             colorForPlace: colorForPlace,
+                            isPriorityTile: index < 8, // First 8 tiles are priority
                             onLongPress: {
                                 placeToDelete = place
                             }
@@ -313,6 +330,12 @@ struct CreatedPlacesView: View {
                 .padding(.horizontal, 20)
                 .padding(.vertical, 10)
             }
+        .onAppear {
+            // Ensure images are loaded for created places when this view appears
+            if !createdPlaces.isEmpty {
+                profile.loadPriorityImagesForPlaces(createdPlaces, priorityCount: 8)
+            }
+        }
             .alert(item: $placeToDelete) { place in
                 Alert(
                     title: Text("Delete Place"),
@@ -377,7 +400,8 @@ struct PaginatedReviewedPlacesView: View {
                             place: place,
                             cardWidth: cardWidth,
                             cardHeight: cardHeight,
-                            colorForPlace: colorForPlace
+                            colorForPlace: colorForPlace,
+                            isPriorityTile: index < 8 // First 8 tiles are priority
                         )
                         .onAppear {
                             let lastIndex = profile.getMyReviewedPlaces().count - 1
@@ -415,6 +439,7 @@ struct PlaceGridCell: View {
     let cardWidth: CGFloat
     let cardHeight: CGFloat
     let colorForPlace: (DetailPlace) -> Color
+    let isPriorityTile: Bool // New parameter to indicate if this is in the first 8 tiles
     var onLongPress: (() -> Void)? = nil
     
     @EnvironmentObject var profile: ProfileViewModel
@@ -434,6 +459,10 @@ struct PlaceGridCell: View {
                     Rectangle()
                         .foregroundColor(colorForPlace(place))
                         .frame(width: cardWidth, height: cardHeight)
+                        .onAppear {
+                            // Load images for priority tiles immediately, or lazy load for others
+                            profile.loadPlaceImageWithFallback(for: place)
+                        }
                 }
                 
                 // Gradient overlay
@@ -537,7 +566,8 @@ struct PaginatedTikTokPlacesView: View {
                             cardWidth: cardWidth,
                             cardHeight: cardHeight,
                             color: colorForPlace(place),
-                            externalPlace: profile.userExternalPlaces[place.id.uuidString]
+                            externalPlace: profile.userExternalPlaces[place.id.uuidString],
+                            isPriorityTile: index < 8 // First 8 tiles are priority
                         )
                         .onAppear {
                             let lastIndex = profile.getTikTokPlaces().count - 1
@@ -580,6 +610,7 @@ struct TikTokPlaceGridCell: View {
     let cardHeight: CGFloat
     let color: Color
     let externalPlace: ExternalPlace?
+    let isPriorityTile: Bool // New parameter to indicate if this is in the first 8 tiles
     
     @State private var showDeleteConfirmation = false
     
@@ -614,9 +645,6 @@ struct TikTokPlaceGridCell: View {
                     Rectangle()
                         .foregroundColor(color)
                         .frame(width: cardWidth, height: cardHeight)
-                        .onAppear {
-                            profile.loadPlaceImageWithFallback(for: place)
-                        }
                 }
                 
                 // Gradient overlay for text readability

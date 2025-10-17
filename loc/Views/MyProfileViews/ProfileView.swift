@@ -26,11 +26,9 @@ struct ProfileView: View {
     @State private var hasRefreshedPlaces = false
 
     init() {
-        // ENTERPRISE OPTIMIZATION: Configure navigation bar appearance asynchronously
-        DispatchQueue.main.async {
-            let appearance = UINavigationBarAppearance()
-            appearance.configureWithOpaqueBackground()
-        }
+        // Configure navigation bar appearance to remove the bottom border
+        let appearance = UINavigationBarAppearance()
+        appearance.configureWithOpaqueBackground() // Use opaque background
     }
 
     var body: some View {
@@ -309,17 +307,55 @@ struct StateChangesModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .onAppear {
-                // ENTERPRISE OPTIMIZATION: Run essential operations immediately, heavy ones in background
-                setupCallbacks()
-                
-                // Run heavy operations in background without blocking UI
-                Task.detached(priority: .background) {
-                    // Only refresh if we haven't already (avoid blocking UI on every appearance)
-                    if !hasRefreshedPlaces {
-                        await MainActor.run {
-                            hasRefreshedPlaces = true
-                        }
+                // Only refresh if we haven't already (avoid blocking UI on every appearance)
+                // Places are already loaded in Phase 0, so this is usually redundant
+                if !hasRefreshedPlaces {
+                    hasRefreshedPlaces = true
+                    // Run in background to not block UI - use Task.detached for true background execution
+                    Task.detached(priority: .background) {
                         await profile.refreshUserPlaces()
+                        
+        // Fetch external places (TikTok places) to ensure they're available
+        await MainActor.run {
+            profile.fetchUserExternalPlaces()
+        }
+                        
+                        // After refreshing places, trigger prioritized image loading for visible tiles
+                        await MainActor.run {
+                            // Get all places from favorites and lists for prioritized image loading
+                            var allPlaces: [DetailPlace] = []
+                            
+                            // Add favorite places
+                            for placeId in profile.userFavorites {
+                                if let place = profile.detailPlaceViewModel.places[placeId] {
+                                    allPlaces.append(place)
+                                }
+                            }
+                            
+                            // Add places from lists
+                            for listPlaces in profile.userListsPlaces.values {
+                                for placeId in listPlaces {
+                                    if let place = profile.detailPlaceViewModel.places[placeId] {
+                                        allPlaces.append(place)
+                                    }
+                                }
+                            }
+                            
+                            // Remove duplicates while preserving order
+                            var seenPlaceIds = Set<String>()
+                            let uniquePlaces = allPlaces.filter { place in
+                                if seenPlaceIds.contains(place.id.uuidString) {
+                                    return false
+                                }
+                                seenPlaceIds.insert(place.id.uuidString)
+                                return true
+                            }
+                            
+            // Trigger prioritized image loading for the first 8 places
+            if !uniquePlaces.isEmpty {
+                profile.loadPriorityImagesForPlaces(uniquePlaces, priorityCount: 8)
+            }
+                        }
                     }
                 }
             }
@@ -329,16 +365,12 @@ struct StateChangesModifier: ViewModifier {
                 }
             }
             .onAppear {
-                // ENTERPRISE OPTIMIZATION: Move TikTok URL check to background
-                Task.detached(priority: .background) {
-                    await MainActor.run {
-                        profile.checkPendingTikTokURL(
-                            tikTokService: tikTokService,
-                            selectedPlaceVM: selectedPlaceVM,
-                            placeVM: placeVM
-                        )
-                    }
-                }
+                setupCallbacks()
+                profile.checkPendingTikTokURL(
+                    tikTokService: tikTokService,
+                    selectedPlaceVM: selectedPlaceVM,
+                    placeVM: placeVM
+                )
             }
             .onChange(of: showCreateReview) {
                 handleCreateReviewChange()

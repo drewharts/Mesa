@@ -1,4 +1,156 @@
 import Foundation
+import Supabase
+
+// MARK: - Response Models for External Places
+struct ExternalPlaceResponse: Codable {
+    let id: String
+    let userId: String
+    let placeId: String
+    let source: String
+    let tiktokVideos: AnyCodable?
+    let addedAt: Date
+    let places: ExternalPlaceData?
+    
+    enum CodingKeys: String, CodingKey {
+        case id
+        case userId = "user_id"
+        case placeId = "place_id"
+        case source
+        case tiktokVideos = "tiktok_videos"
+        case addedAt = "added_at"
+        case places
+    }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        
+        self.id = try container.decode(String.self, forKey: .id)
+        self.userId = try container.decode(String.self, forKey: .userId)
+        self.placeId = try container.decode(String.self, forKey: .placeId)
+        self.source = try container.decode(String.self, forKey: .source)
+        self.addedAt = try container.decode(Date.self, forKey: .addedAt)
+        self.places = try container.decodeIfPresent(ExternalPlaceData.self, forKey: .places)
+        self.tiktokVideos = try container.decodeIfPresent(AnyCodable.self, forKey: .tiktokVideos)
+    }
+    
+    // Manual initializer for creating instances programmatically
+    init(id: String, userId: String, placeId: String, source: String, tiktokVideos: AnyCodable?, addedAt: Date, places: ExternalPlaceData?) {
+        self.id = id
+        self.userId = userId
+        self.placeId = placeId
+        self.source = source
+        self.tiktokVideos = tiktokVideos
+        self.addedAt = addedAt
+        self.places = places
+    }
+}
+
+// Helper struct to handle Any type in Codable
+struct AnyCodable: Codable {
+    let value: Any
+    
+    init(_ value: Any) {
+        self.value = value
+    }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        
+        if let string = try? container.decode(String.self) {
+            value = string
+        } else if let int = try? container.decode(Int.self) {
+            value = int
+        } else if let double = try? container.decode(Double.self) {
+            value = double
+        } else if let bool = try? container.decode(Bool.self) {
+            value = bool
+        } else if let array = try? container.decode([AnyCodable].self) {
+            value = array.map { $0.value }
+        } else if let dict = try? container.decode([String: AnyCodable].self) {
+            value = dict.mapValues { $0.value }
+        } else {
+            throw DecodingError.typeMismatch(AnyCodable.self, DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Unsupported type"))
+        }
+    }
+    
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        
+        if let string = value as? String {
+            try container.encode(string)
+        } else if let int = value as? Int {
+            try container.encode(int)
+        } else if let double = value as? Double {
+            try container.encode(double)
+        } else if let bool = value as? Bool {
+            try container.encode(bool)
+        } else if let array = value as? [Any] {
+            try container.encode(array.map { AnyCodable($0) })
+        } else if let dict = value as? [String: Any] {
+            try container.encode(dict.mapValues { AnyCodable($0) })
+        } else {
+            throw EncodingError.invalidValue(value, EncodingError.Context(codingPath: encoder.codingPath, debugDescription: "Unsupported type"))
+        }
+    }
+}
+
+struct ExternalPlaceData: Codable {
+    let id: String
+    let name: String
+    let address: String?
+    let latitude: Double?
+    let longitude: Double?
+}
+
+struct ExternalPlaceBasicResponse: Codable {
+    let id: String
+    let userId: String
+    let placeId: String
+    let source: String
+    let tiktokVideos: AnyCodable?
+    let addedAt: Date
+    
+    enum CodingKeys: String, CodingKey {
+        case id
+        case userId = "user_id"
+        case placeId = "place_id"
+        case source
+        case tiktokVideos = "tiktok_videos"
+        case addedAt = "added_at"
+    }
+}
+
+struct PlaceBasicResponse: Codable {
+    let id: String
+    let name: String
+    let address: String?
+    let latitude: Double?
+    let longitude: Double?
+}
+
+struct ExternalPlaceDirectResponse: Codable {
+    let id: String
+    let userId: String
+    let placeId: String?
+    let name: String?
+    let address: String?
+    let coordinates: AnyCodable? // PostGIS geometry
+    let source: String?
+    let tiktokVideos: AnyCodable? // JSONB array
+    let addedAt: Date?
+    
+    enum CodingKeys: String, CodingKey {
+        case id
+        case userId = "user_id"
+        case placeId = "place_id"
+        case name
+        case address
+        case coordinates
+        case source
+        case tiktokVideos = "tiktok_videos"
+        case addedAt = "added_at"
+    }
+}
 
 /// Legacy UserService - now delegates all calls to SupabaseUserService
 /// This wrapper exists for backward compatibility with existing ViewModels
@@ -7,7 +159,7 @@ class UserService: ObservableObject {
     private let supabase = SupabaseUserService.shared // All data comes from Supabase
     
     private init() {
-        print("⚠️ UserService is a compatibility wrapper - all data from Supabase")
+        // UserService is a compatibility wrapper - all data from Supabase
     }
 
     func fetchUser(userId: String, completion: @escaping (User?, Error?) -> Void) {
@@ -106,19 +258,7 @@ class UserService: ObservableObject {
                 .execute()
                 .value
 
-            print("✅ [UserService] Found user profile by id: \(profile.firstName) \(profile.lastName)")
-            print("📋 [UserService] Full ProfileData:")
-            print("   - ID: \(profile.id)")
-            print("   - First Name: \(profile.firstName)")
-            print("   - Last Name: \(profile.lastName)")
-            print("   - Email: \(profile.email)")
-            print("   - Profile Photo URL: \(profile.profilePhotoURL?.absoluteString ?? "nil")")
-            print("   - Phone Number: \(profile.phoneNumber)")
-            print("   - Full Name Lower: \(profile.fullNameLower)")
-            print("   - Full Name: \(profile.fullName)")
-            print("   - FCM Token: \(profile.fcmToken ?? "nil")")
-            print("   - Firebase UID: \(profile.firebaseUid ?? "nil")")
-            print("   - Supabase UID: \(profile.supabaseUid ?? "nil")")
+            print("✅ [UserService] Found user profile: \(profile.firstName) \(profile.lastName)")
             return profile
 
         } catch {
@@ -135,18 +275,6 @@ class UserService: ObservableObject {
                     .value
 
                 print("✅ [UserService] Found user profile by supabase_uid: \(profile.firstName) \(profile.lastName)")
-                print("📋 [UserService] Full ProfileData:")
-                print("   - ID: \(profile.id)")
-                print("   - First Name: \(profile.firstName)")
-                print("   - Last Name: \(profile.lastName)")
-                print("   - Email: \(profile.email)")
-                print("   - Profile Photo URL: \(profile.profilePhotoURL?.absoluteString ?? "nil")")
-                print("   - Phone Number: \(profile.phoneNumber)")
-                print("   - Full Name Lower: \(profile.fullNameLower)")
-                print("   - Full Name: \(profile.fullName)")
-                print("   - FCM Token: \(profile.fcmToken ?? "nil")")
-                print("   - Firebase UID: \(profile.firebaseUid ?? "nil")")
-                print("   - Supabase UID: \(profile.supabaseUid ?? "nil")")
                 return profile
 
                 } catch {
@@ -180,19 +308,7 @@ class UserService: ObservableObject {
                 .execute()
                 .value
 
-            print("✅ [UserService] Found user profile by supabase_uid: \(profile.firstName) \(profile.lastName)")
-            print("📋 [UserService] Full ProfileData:")
-            print("   - ID: \(profile.id)")
-            print("   - First Name: \(profile.firstName)")
-            print("   - Last Name: \(profile.lastName)")
-            print("   - Email: \(profile.email)")
-            print("   - Profile Photo URL: \(profile.profilePhotoURL?.absoluteString ?? "nil")")
-            print("   - Phone Number: \(profile.phoneNumber)")
-            print("   - Full Name Lower: \(profile.fullNameLower)")
-            print("   - Full Name: \(profile.fullName)")
-            print("   - FCM Token: \(profile.fcmToken ?? "nil")")
-            print("   - Firebase UID: \(profile.firebaseUid ?? "nil")")
-            print("   - Supabase UID: \(profile.supabaseUid ?? "nil")")
+            print("✅ [UserService] Found user profile: \(profile.firstName) \(profile.lastName)")
             return profile
 
         } catch {
@@ -202,18 +318,231 @@ class UserService: ObservableObject {
     }
     
     func fetchUserExternalPlaces(userId: String, completion: @escaping (Result<[ExternalPlace], Error>) -> Void) {
-        print("⚠️ [UserService] fetchUserExternalPlaces not fully implemented")
-        completion(.success([]))
+        print("🔄 [UserService] Fetching external places for user: \(userId)")
+        Task {
+            do {
+                let externalPlaces = try await fetchUserExternalPlaces(userId: userId)
+                completion(.success(externalPlaces))
+            } catch {
+                completion(.failure(error))
+            }
+        }
     }
     
     func fetchUserExternalPlaces(userId: String) async throws -> [ExternalPlace] {
-        print("⚠️ [UserService] fetchUserExternalPlaces async not fully implemented")
-        return []
+        do {
+            // Fetch external places for the specific user
+            let externalPlacesResponse: [ExternalPlaceDirectResponse] = try await SupabaseManager.shared.database
+                .from("external_places")
+                .select("""
+                    id,
+                    user_id,
+                    place_id,
+                    name,
+                    address,
+                    coordinates,
+                    source,
+                    tiktok_videos,
+                    added_at
+                """)
+                .eq("user_id", value: userId)
+                .execute()
+                .value
+            
+            print("✅ [UserService] Found \(externalPlacesResponse.count) external places for user")
+            
+            // If no external places found, try alternative user ID formats
+            if externalPlacesResponse.isEmpty {
+                let alternativeUserIds = [
+                    userId.lowercased(),
+                    userId.uppercased(),
+                    userId.replacingOccurrences(of: "-", with: ""),
+                    userId.replacingOccurrences(of: "-", with: "").lowercased()
+                ].filter { $0 != userId }
+                
+                for altUserId in alternativeUserIds {
+                    let altResponse: [ExternalPlaceDirectResponse] = try await SupabaseManager.shared.database
+                        .from("external_places")
+                        .select("""
+                            id,
+                            user_id,
+                            place_id,
+                            name,
+                            address,
+                            coordinates,
+                            source,
+                            tiktok_videos,
+                            added_at
+                        """)
+                        .eq("user_id", value: altUserId)
+                        .execute()
+                        .value
+                    
+                    if !altResponse.isEmpty {
+                        print("✅ [UserService] Found \(altResponse.count) external places with alternative user_id")
+                        return try await processDirectExternalPlacesResponse(altResponse)
+                    }
+                }
+                
+                return []
+            }
+            
+            // Process the external places response
+            return try await processDirectExternalPlacesResponse(externalPlacesResponse)
+            
+        } catch {
+            print("❌ [UserService] Error fetching external places: \(error.localizedDescription)")
+            throw error
+        }
+    }
+    
+    // Helper method to process external places response
+    private func processExternalPlacesResponse(_ externalPlacesResponse: [ExternalPlaceBasicResponse]) async throws -> [ExternalPlace] {
+        // Get all place IDs from external places
+        let placeIds = externalPlacesResponse.map { $0.placeId }
+        print("📍 [UserService] Fetching details for \(placeIds.count) places: \(placeIds)")
+        
+        // Fetch place details separately
+        let placesResponse: [PlaceBasicResponse] = try await SupabaseManager.shared.database
+            .from("places")
+            .select("""
+                id,
+                name,
+                address,
+                latitude,
+                longitude
+            """)
+            .in("id", values: placeIds)
+            .execute()
+            .value
+        
+        print("🏢 [UserService] Found \(placesResponse.count) place details")
+        
+        // Create a dictionary for quick lookup
+        let placesDict = Dictionary(uniqueKeysWithValues: placesResponse.map { ($0.id, $0) })
+        
+        // Combine external places with place details
+        let response = externalPlacesResponse.compactMap { externalPlace -> ExternalPlaceResponse? in
+            guard let place = placesDict[externalPlace.placeId] else {
+                print("⚠️ [UserService] No place details found for place ID: \(externalPlace.placeId)")
+                return nil
+            }
+            
+            return ExternalPlaceResponse(
+                id: externalPlace.id,
+                userId: externalPlace.userId,
+                placeId: externalPlace.placeId,
+                source: externalPlace.source,
+                tiktokVideos: externalPlace.tiktokVideos,
+                addedAt: externalPlace.addedAt,
+                places: ExternalPlaceData(
+                    id: place.id,
+                    name: place.name,
+                    address: place.address,
+                    latitude: place.latitude,
+                    longitude: place.longitude
+                )
+            )
+        }
+        
+        print("📊 [UserService] Raw response count: \(response.count)")
+        print("📋 [UserService] Raw response data: \(response)")
+        
+        // Convert to ExternalPlace format
+        let externalPlaces = response.compactMap { response -> ExternalPlace? in
+            print("🔄 [UserService] Processing response item: \(response.id)")
+            print("📍 [UserService] Place data: \(response.places?.name ?? "nil")")
+            print("🎥 [UserService] TikTok videos data: \(response.tiktokVideos?.value ?? "nil")")
+            
+            guard let place = response.places else { 
+                print("❌ [UserService] No place data for response: \(response.id)")
+                return nil 
+            }
+            
+            let coordinates = ExternalPlaceCoordinates(
+                latitude: place.latitude ?? 0.0,
+                longitude: place.longitude ?? 0.0
+            )
+            
+            // Parse TikTok videos from JSONB
+            var tiktokVideos: [ExternalTikTokVideo] = []
+            if let videosData = response.tiktokVideos?.value {
+                print("🎬 [UserService] Parsing TikTok videos data...")
+                do {
+                    let jsonData = try JSONSerialization.data(withJSONObject: videosData)
+                    tiktokVideos = try JSONDecoder().decode([ExternalTikTokVideo].self, from: jsonData)
+                    print("✅ [UserService] Successfully parsed \(tiktokVideos.count) TikTok videos")
+                } catch {
+                    print("⚠️ [UserService] Error parsing TikTok videos: \(error)")
+                    print("🔍 [UserService] Videos data was: \(videosData)")
+                }
+            } else {
+                print("ℹ️ [UserService] No TikTok videos data for place: \(place.name)")
+            }
+            
+            let externalPlace = ExternalPlace(
+                id: response.id,
+                addedAt: response.addedAt,
+                address: place.address ?? "",
+                coordinates: coordinates,
+                name: place.name,
+                placeId: place.id,
+                source: response.source,
+                tiktokVideos: tiktokVideos
+            )
+            
+            print("✅ [UserService] Created ExternalPlace: \(externalPlace.name) with \(externalPlace.tiktokVideos.count) videos")
+            return externalPlace
+        }
+        
+        print("✅ [UserService] Successfully fetched \(externalPlaces.count) external places")
+        for place in externalPlaces {
+            print("📍 [UserService] - \(place.name) (\(place.placeId)) with \(place.tiktokVideos.count) videos")
+        }
+        return externalPlaces
+    }
+    
+    // Helper method to process direct external places response (from your table structure)
+    private func processDirectExternalPlacesResponse(_ externalPlacesResponse: [ExternalPlaceDirectResponse]) async throws -> [ExternalPlace] {
+        let externalPlaces = externalPlacesResponse.compactMap { response -> ExternalPlace? in
+            // Extract coordinates from PostGIS geometry
+            var coordinates = ExternalPlaceCoordinates(latitude: 0.0, longitude: 0.0)
+            if let coordsData = response.coordinates?.value {
+                // PostGIS geometry format - might need special parsing
+                // For now, we'll use default coordinates
+            }
+            
+            // Parse TikTok videos from JSONB array
+            var tiktokVideos: [ExternalTikTokVideo] = []
+            if let videosData = response.tiktokVideos?.value {
+                do {
+                    let jsonData = try JSONSerialization.data(withJSONObject: videosData)
+                    tiktokVideos = try JSONDecoder().decode([ExternalTikTokVideo].self, from: jsonData)
+                } catch {
+                    print("⚠️ [UserService] Error parsing TikTok videos: \(error)")
+                }
+            }
+            
+            let externalPlace = ExternalPlace(
+                id: response.id,
+                addedAt: response.addedAt ?? Date(),
+                address: response.address ?? "",
+                coordinates: coordinates,
+                name: response.name ?? "Unknown Place",
+                placeId: response.placeId ?? response.id, // Use place_id if available, otherwise use id
+                source: response.source ?? "unknown",
+                tiktokVideos: tiktokVideos
+            )
+            
+            return externalPlace
+        }
+        
+        print("✅ [UserService] Successfully processed \(externalPlaces.count) external places")
+        return externalPlaces
     }
     
     // LAZY Loading - Only load when user clicks!
     func fetchFollowingProfilesData(for userId: String, completion: @escaping (Result<[ProfileData], Error>) -> Void) {
-        print("🔄 [UserService] Delegating fetchFollowingProfilesData to Supabase (LAZY)...")
         Task { @MainActor in
             do {
                 let profiles = try await supabase.fetchFollowingProfilesData(for: userId)
@@ -225,18 +554,15 @@ class UserService: ObservableObject {
     }
     
     func fetchFollowingProfilesData(for userId: String) async throws -> [ProfileData] {
-        print("🔄 [UserService] Delegating fetchFollowingProfilesData async to Supabase (LAZY)...")
         return try await supabase.fetchFollowingProfilesData(for: userId, limit: nil, offset: 0)
     }
     
     // Paginated version for progressive loading
     func fetchFollowingProfilesData(for userId: String, limit: Int, offset: Int) async throws -> [ProfileData] {
-        print("🔄 [UserService] Delegating fetchFollowingProfilesData with pagination...")
         return try await supabase.fetchFollowingProfilesData(for: userId, limit: limit, offset: offset)
     }
     
     func fetchFollowerProfilesData(for userId: String, completion: @escaping (Result<[ProfileData], Error>) -> Void) {
-        print("🔄 [UserService] Delegating fetchFollowerProfilesData to Supabase (LAZY)...")
         Task { @MainActor in
             do {
                 let profiles = try await supabase.fetchFollowerProfilesData(for: userId)
@@ -248,19 +574,16 @@ class UserService: ObservableObject {
     }
     
     func fetchFollowerProfilesData(for userId: String) async throws -> [ProfileData] {
-        print("🔄 [UserService] Delegating fetchFollowerProfilesData async to Supabase (LAZY)...")
         return try await supabase.fetchFollowerProfilesData(for: userId, limit: nil, offset: 0)
     }
     
     // Paginated version for progressive loading
     func fetchFollowerProfilesData(for userId: String, limit: Int, offset: Int) async throws -> [ProfileData] {
-        print("🔄 [UserService] Delegating fetchFollowerProfilesData with pagination...")
         return try await supabase.fetchFollowerProfilesData(for: userId, limit: limit, offset: offset)
     }
     
     // COUNT ONLY - Super fast! (~20-50ms)
     func getNumberFollowers(forUserId userId: String, completion: @escaping (Int, Error?) -> Void) {
-        print("🔄 [UserService] Delegating getNumberFollowers to Supabase...")
         Task { @MainActor in
             do {
                 let count = try await supabase.getNumberFollowers(forUserId: userId)
@@ -272,13 +595,11 @@ class UserService: ObservableObject {
     }
     
     func getNumberFollowers(forUserId userId: String) async throws -> Int {
-        print("🔄 [UserService] Delegating getNumberFollowers async to Supabase...")
         return try await supabase.getNumberFollowers(forUserId: userId)
     }
     
     // COUNT ONLY - Super fast! (~20-50ms)
     func getNumberFollowing(forUserId userId: String, completion: @escaping (Int, Error?) -> Void) {
-        print("🔄 [UserService] Delegating getNumberFollowing to Supabase...")
         Task { @MainActor in
             do {
                 let count = try await supabase.getNumberFollowing(forUserId: userId)
@@ -290,7 +611,6 @@ class UserService: ObservableObject {
     }
     
     func getNumberFollowing(forUserId userId: String) async throws -> Int {
-        print("🔄 [UserService] Delegating getNumberFollowing async to Supabase...")
         return try await supabase.getNumberFollowing(forUserId: userId)
     }
     
@@ -320,7 +640,7 @@ class UserService: ObservableObject {
     }
     
     func fetchFriendsReviews(userId: String, completion: @escaping ([ReviewProtocol]?, Error?) -> Void) {
-        print("⚠️ [UserService] fetchFriendsReviews not fully implemented")
+        // fetchFriendsReviews not fully implemented
                     completion([], nil)
     }
     
