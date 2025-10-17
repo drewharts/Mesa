@@ -461,7 +461,7 @@ struct PlaceGridCell: View {
                         .frame(width: cardWidth, height: cardHeight)
                         .onAppear {
                             // Load images for priority tiles immediately, or lazy load for others
-                            profile.loadPlaceImageWithFallback(for: place)
+                            profile.detailPlaceViewModel.fetchPlaceImage(for: place.id.uuidString)
                         }
                 }
                 

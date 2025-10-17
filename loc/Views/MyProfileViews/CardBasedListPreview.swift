@@ -194,7 +194,7 @@ struct PlacePreviewCard: View {
                                 .frame(maxWidth: .infinity, maxHeight: 80)
                                 .onAppear {
                                     // Load images for priority tiles immediately, or lazy load for others
-                                    profile.loadPlaceImageWithFallback(for: place)
+                                    profile.detailPlaceViewModel.fetchPlaceImage(for: place.id.uuidString)
                                 }
                         }
                     }

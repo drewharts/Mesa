@@ -2276,7 +2276,7 @@ class ProfileViewModel: ObservableObject {
         
         // Load priority places immediately
         for place in priorityPlaces {
-            loadPlaceImageWithFallback(for: place)
+            detailPlaceViewModel.fetchPlaceImage(for: place.id.uuidString)
         }
         
         // Load remaining places in background with lower priority
@@ -2287,7 +2287,7 @@ class ProfileViewModel: ObservableObject {
                 
                 for place in remainingPlaces {
                     await MainActor.run {
-                        self?.loadPlaceImageWithFallback(for: place)
+                        self?.detailPlaceViewModel.fetchPlaceImage(for: place.id.uuidString)
                     }
                     // Small delay between each background load to avoid overwhelming the system
                     try? await Task.sleep(nanoseconds: 50_000_000) // 0.05 seconds

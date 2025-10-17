@@ -178,7 +178,7 @@ struct FavoritePlaceCard: View {
                                 .onAppear {
                                     // Load images for priority tiles immediately, or lazy load for others
                                     if let detailPlace = detailPlace {
-                                        profile.loadPlaceImageWithFallback(for: detailPlace)
+                                        profile.detailPlaceViewModel.fetchPlaceImage(for: detailPlace.id.uuidString)
                                     }
                                 }
                         }
