@@ -173,25 +173,25 @@ struct PlacePreviewCard: View {
                                 image
                                     .resizable()
                                     .aspectRatio(contentMode: .fill)
-                                    .frame(width: .infinity, height: 80)
+                                    .frame(maxWidth: .infinity, maxHeight: 80)
                                     .clipped()
                             } placeholder: {
                                 Rectangle()
                                     .foregroundColor(.gray.opacity(0.3))
-                                    .frame(width: .infinity, height: 80)
+                                    .frame(maxWidth: .infinity, maxHeight: 80)
                             }
                         } else if let image = detailPlaceViewModel.placeImages[place.id.uuidString] {
                             // Show place review image
                             Image(uiImage: image)
                                 .resizable()
                                 .aspectRatio(contentMode: .fill)
-                                .frame(width: .infinity, height: 80)
+                                .frame(maxWidth: .infinity, maxHeight: 80)
                                 .clipped()
                         } else {
                             // Show colored rectangle fallback
                             Rectangle()
                                 .foregroundColor(detailPlaceViewModel.colorForPlace(placeId: place.id.uuidString))
-                                .frame(width: .infinity, height: 80)
+                                .frame(maxWidth: .infinity, maxHeight: 80)
                                 .onAppear {
                                     // Load images for priority tiles immediately, or lazy load for others
                                     profile.loadPlaceImageWithFallback(for: place)

@@ -158,23 +158,23 @@ struct FavoritePlaceCard: View {
                                 image
                                     .resizable()
                                     .aspectRatio(contentMode: .fill)
-                                    .frame(width: .infinity, height: 80)
+                                    .frame(maxWidth: .infinity, maxHeight: 80)
                                     .clipped()
                             } placeholder: {
                                 Rectangle()
                                     .foregroundColor(.gray.opacity(0.3))
-                                    .frame(width: .infinity, height: 80)
+                                    .frame(maxWidth: .infinity, maxHeight: 80)
                             }
                         } else if let image = places.placeImages[place] {
                             Image(uiImage: image)
                                 .resizable()
                                 .aspectRatio(contentMode: .fill)
-                                .frame(width: .infinity, height: 80)
+                                .frame(maxWidth: .infinity, maxHeight: 80)
                                 .clipped()
                         } else {
                             Rectangle()
                                 .foregroundColor(places.colorForPlace(placeId: place))
-                                .frame(width: .infinity, height: 80)
+                                .frame(maxWidth: .infinity, maxHeight: 80)
                                 .onAppear {
                                     // Load images for priority tiles immediately, or lazy load for others
                                     if let detailPlace = detailPlace {
