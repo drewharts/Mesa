@@ -331,10 +331,9 @@ class DataManager: ObservableObject {
                     self.profileViewModel.sortListsByDistance()
                 }
                 
-                // NEW: Preload place DETAILS (not list items) for the first 5 lists
-                // This populates place_list_items and DetailPlace objects
-                print("📍 [DataManager] Preloading place details for first 5 place_lists...")
-                await preloadPlacesForTopLists(lists: lists, userId: userId, topN: 5)
+                // Use the optimized loading method instead of the old preloading
+                print("📍 [DataManager] Triggering optimized list loading...")
+                self.profileViewModel.ensureListsLoaded()
             }
         } catch {
             print("Error loading user place lists: \(error.localizedDescription)")

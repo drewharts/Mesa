@@ -1508,40 +1508,33 @@ class ProfileViewModel: ObservableObject {
     }
     
     func ensureListsLoaded() {
-        guard userLists.isEmpty, let userId = user?.id else { 
-            print("🔍 [ProfileViewModel] ensureListsLoaded: Lists not empty or no user ID")
-            if !userLists.isEmpty {
-                // If lists are already loaded, ensure the loading state is false.
-                self.isLoading = false
-            }
+        guard let userId = user?.id else { 
+            print("🔍 [ProfileViewModel] ensureListsLoaded: No user ID")
             return 
         }
         
-        print("🔍 [ProfileViewModel] ensureListsLoaded: Starting to load lists for user \(userId)")
+        // Check if we need to load places for the first 3 lists
+        let firstThreeLists = Array(userLists.prefix(3))
+        let needsPlaceLoading = firstThreeLists.contains { list in
+            userListsPlaces[list.id.uuidString]?.isEmpty != false
+        }
+        
+        if !needsPlaceLoading {
+            print("🔍 [ProfileViewModel] ensureListsLoaded: First 3 lists already have places loaded")
+            self.isLoading = false
+            return
+        }
+        
+        print("🔍 [ProfileViewModel] ensureListsLoaded: Loading places for first 3 lists")
+        
         // Indicate loading state so UI can show a spinner
         isLoading = true
         
         Task {
             do {
-                // Use proximity-based sorting if location is available
-                let userLocation = detailPlaceViewModel.dataManager?.currentUserLocation
-                let lists: [PlaceList]
-                
-                if let userLocation = userLocation {
-                    print("📍 [ProfileViewModel] Loading place lists with proximity sorting")
-                    lists = try await placeService.fetchListsByProximity(userId: userId, userLocation: userLocation)
-                } else {
-                    print("📍 [ProfileViewModel] Loading place lists with regular sorting (no location)")
-                    lists = try await placeService.fetchLists(userId: userId)
-                }
-                
-                print("🔍 [ProfileViewModel] ensureListsLoaded: Received \(lists.count) lists from API")
-                
-                await MainActor.run {
-                    print("🔍 [ProfileViewModel] ensureListsLoaded: Updating UI with \(lists.count) lists")
-                    self.userLists = lists
-                    self.isLoading = false
-                }
+                // Use the existing lists (already loaded by DataManager)
+                let lists = self.userLists
+                print("🔍 [ProfileViewModel] ensureListsLoaded: Using existing \(lists.count) lists")
                 
                 // Load places and counts for the first 3 visible lists
                 let firstThreeListIds = Array(lists.prefix(3).map { $0.id.uuidString })
@@ -1583,13 +1576,16 @@ class ProfileViewModel: ObservableObject {
                         print("🔍 [ProfileViewModel] ensureListsLoaded: Updated userListsPlaces with \(self.userListsPlaces.count) entries")
                         print("🔍 [ProfileViewModel] ensureListsLoaded: Loaded places for first \(placesForLists.count) lists")
                         
-                        // Bulk calculate average coordinates for fast proximity sorting
-                        self.bulkCalculateAverageCoordinates()
+                        self.isLoading = false
+                    }
+                } else {
+                    await MainActor.run {
+                        self.isLoading = false
                     }
                 }
                 
             } catch {
-                print("❌ [ProfileViewModel] ensureListsLoaded: Error loading user lists: \(error.localizedDescription)")
+                print("❌ [ProfileViewModel] ensureListsLoaded: Error loading places for lists: \(error.localizedDescription)")
                 await MainActor.run {
                     self.isLoading = false
                 }
