@@ -698,6 +698,92 @@ class SupabasePlaceService: ObservableObject {
         return places
     }
     
+    /// Fetch places for multiple lists efficiently (for first 6 visible lists)
+    func fetchPlacesForLists(listIds: [String], maxPlacesPerList: Int = 6) async throws -> [String: [DetailPlace]] {
+        print("🚀 [Supabase] Fetching places for \(listIds.count) lists (max \(maxPlacesPerList) per list)")
+        
+        var result: [String: [DetailPlace]] = [:]
+        
+        // Get all place_list_items for these lists
+        let listItems: [PlaceListItemRecord] = try await supabase.client
+            .from("place_list_items")
+            .select()
+            .in("list_id", values: listIds)
+            .order("list_id", ascending: true)
+            .order("sort_order", ascending: true)
+            .execute()
+            .value
+        
+        print("🔍 [Supabase] Found \(listItems.count) place_list_items for \(listIds.count) lists")
+        
+        // Group by list_id and limit to maxPlacesPerList per list
+        var listPlaceIds: [String: [String]] = [:]
+        for item in listItems {
+            if listPlaceIds[item.list_id] == nil {
+                listPlaceIds[item.list_id] = []
+            }
+            if listPlaceIds[item.list_id]!.count < maxPlacesPerList {
+                listPlaceIds[item.list_id]!.append(item.place_id)
+            }
+        }
+        
+        // Get all unique place IDs
+        let allPlaceIds = Set(listPlaceIds.values.flatMap { $0 })
+        print("🔍 [Supabase] Fetching details for \(allPlaceIds.count) unique places")
+        
+        // Fetch all place details in one query
+        let placeRecords: [PlaceRecord] = try await supabase.client
+            .from("places")
+            .select()
+            .in("id", values: Array(allPlaceIds))
+            .execute()
+            .value
+        
+        // Convert to DetailPlace objects
+        let placesMap = Dictionary(uniqueKeysWithValues: placeRecords.map { record in
+            (record.id, convertToDetailPlace(record))
+        })
+        
+        // Group places back by list_id
+        for (listId, placeIds) in listPlaceIds {
+            let places = placeIds.compactMap { placesMap[$0] }
+            result[listId] = places
+            print("🔍 [Supabase] List \(listId): \(places.count) places")
+        }
+        
+        print("✅ [Supabase] Successfully fetched places for \(result.count) lists")
+        return result
+    }
+    
+    /// Get place count for multiple lists efficiently
+    func getPlaceCountsForLists(listIds: [String]) async throws -> [String: Int] {
+        print("🔍 [Supabase] Getting place counts for \(listIds.count) lists")
+        
+        // Get place counts for all lists in one query
+        let listItems: [PlaceListItemRecord] = try await supabase.client
+            .from("place_list_items")
+            .select("list_id")
+            .in("list_id", values: listIds)
+            .execute()
+            .value
+        
+        // Count places per list
+        var counts: [String: Int] = [:]
+        for item in listItems {
+            counts[item.list_id, default: 0] += 1
+        }
+        
+        // Ensure all requested lists have an entry (even if 0)
+        for listId in listIds {
+            if counts[listId] == nil {
+                counts[listId] = 0
+            }
+        }
+        
+        print("✅ [Supabase] Got place counts for \(counts.count) lists")
+        return counts
+    }
+    
     func fetchLists(userId: String, completion: @escaping ([PlaceList]) -> Void) {
         Task {
             do {

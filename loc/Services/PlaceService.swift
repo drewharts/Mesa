@@ -156,6 +156,18 @@ class PlaceService: ObservableObject {
         return try await supabase.fetchListsByProximity(userId: userId, userLocation: userLocation)
     }
     
+    /// Fetch places for multiple lists efficiently (for first 6 visible lists)
+    func fetchPlacesForLists(listIds: [String], maxPlacesPerList: Int = 6) async throws -> [String: [DetailPlace]] {
+        print("🔄 [PlaceService] Delegating fetchPlacesForLists to Supabase...")
+        return try await supabase.fetchPlacesForLists(listIds: listIds, maxPlacesPerList: maxPlacesPerList)
+    }
+    
+    /// Get place count for multiple lists efficiently
+    func getPlaceCountsForLists(listIds: [String]) async throws -> [String: Int] {
+        print("🔄 [PlaceService] Delegating getPlaceCountsForLists to Supabase...")
+        return try await supabase.getPlaceCountsForLists(listIds: listIds)
+    }
+    
     func fetchPlacesInViewport(viewport: (minLat: Double, maxLat: Double, minLng: Double, maxLng: Double), completion: @escaping ([DetailPlace]?, Error?) -> Void) {
         print("🔄 [PlaceService] Delegating fetchPlacesInViewport to Supabase...")
         Task { @MainActor in

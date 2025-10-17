@@ -19,6 +19,7 @@ class UserProfileViewModel: ObservableObject {
 
     @Published var userLists: [PlaceList] = []
     @Published var placeListMapboxPlaces: [UUID: [DetailPlace]] = [:]
+    @Published var placeListCounts: [UUID: Int] = [:]
     @Published var placeImages: [String: UIImage] = [:]
     @Published var isFollowing: Bool = false
     @Published var followers: Int = 0
@@ -207,38 +208,60 @@ class UserProfileViewModel: ObservableObject {
         // Use proximity-based sorting if location is available
         let userLocation = dataManager.currentUserLocation
         
-        if let userLocation = userLocation {
-            print("📍 [UserProfileViewModel] Loading place lists with proximity sorting")
-            placeService.fetchListsByProximity(userId: userId, userLocation: userLocation) { lists in
-                self.userLists = lists
-                // Fetch places and images for each PlaceList
-                for list in lists {
-                    self.fetchFirestorePlaces(for: list.places) { places in
-                        self.placeListMapboxPlaces[list.id] = places
-                        // Fetch images for places in this list
-                        for place in places {
-                            self.fetchImage(for: place) { [weak self] placeId, image in
-                                self?.placeImages[placeId] = image
+        Task {
+            do {
+                let lists: [PlaceList]
+                
+                if let userLocation = userLocation {
+                    print("📍 [UserProfileViewModel] Loading place lists with proximity sorting")
+                    lists = try await placeService.fetchListsByProximity(userId: userId, userLocation: userLocation)
+                } else {
+                    print("📍 [UserProfileViewModel] Loading place lists with regular sorting (no location)")
+                    lists = try await placeService.fetchLists(userId: userId)
+                }
+                
+                await MainActor.run {
+                    self.userLists = lists
+                }
+                
+                // Load places and counts for the first 6 visible lists
+                let firstSixListIds = Array(lists.prefix(6).map { $0.id.uuidString })
+                
+                if !firstSixListIds.isEmpty {
+                    // Fetch places for first 6 lists (6 places each)
+                    let placesForLists = try await placeService.fetchPlacesForLists(listIds: firstSixListIds, maxPlacesPerList: 6)
+                    
+                    // Fetch place counts for all lists
+                    let placeCounts = try await placeService.getPlaceCountsForLists(listIds: lists.map { $0.id.uuidString })
+                    
+                    await MainActor.run {
+                        // Update places for first 6 lists
+                        for (listId, places) in placesForLists {
+                            if let uuid = UUID(uuidString: listId) {
+                                self.placeListMapboxPlaces[uuid] = places
+                                
+                                // Fetch images for places in this list
+                                for place in places {
+                                    self.fetchImage(for: place) { [weak self] placeId, image in
+                                        self?.placeImages[placeId] = image
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // Store place counts for all lists (for display)
+                        for (listId, count) in placeCounts {
+                            if let uuid = UUID(uuidString: listId) {
+                                self.placeListCounts[uuid] = count
                             }
                         }
                     }
                 }
-            }
-        } else {
-            print("📍 [UserProfileViewModel] Loading place lists with regular sorting (no location)")
-            placeService.fetchLists(userId: userId) { lists in
-                self.userLists = lists
-                // Fetch places and images for each PlaceList
-                for list in lists {
-                    self.fetchFirestorePlaces(for: list.places) { places in
-                        self.placeListMapboxPlaces[list.id] = places
-                        // Fetch images for places in this list
-                        for place in places {
-                            self.fetchImage(for: place) { [weak self] placeId, image in
-                                self?.placeImages[placeId] = image
-                            }
-                        }
-                    }
+                
+            } catch {
+                print("❌ [UserProfileViewModel] Error fetching lists: \(error)")
+                await MainActor.run {
+                    self.userLists = []
                 }
             }
         }
@@ -672,5 +695,37 @@ class UserProfileViewModel: ObservableObject {
     // Check if we've attempted to load reviews for a specific user
     func hasAttemptedLoadReviews(for userId: String) -> Bool {
         return hasAttemptedLoadReviewedPlaces[userId] ?? false
+    }
+    
+    // MARK: - Place List Management
+    
+    /// Load places for a specific list (for lists beyond the first 6)
+    func loadPlacesForList(_ list: PlaceList) {
+        // Only load if we don't already have places for this list
+        guard placeListMapboxPlaces[list.id] == nil else { return }
+        
+        Task {
+            do {
+                let placesForLists = try await placeService.fetchPlacesForLists(
+                    listIds: [list.id.uuidString], 
+                    maxPlacesPerList: 50 // Load more places when list is opened
+                )
+                
+                if let places = placesForLists[list.id.uuidString] {
+                    await MainActor.run {
+                        self.placeListMapboxPlaces[list.id] = places
+                        
+                        // Fetch images for places in this list
+                        for place in places {
+                            self.fetchImage(for: place) { [weak self] placeId, image in
+                                self?.placeImages[placeId] = image
+                            }
+                        }
+                    }
+                }
+            } catch {
+                print("❌ [UserProfileViewModel] Error loading places for list \(list.name): \(error)")
+            }
+        }
     }
 }

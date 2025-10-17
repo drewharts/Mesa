@@ -42,7 +42,7 @@ struct ExternalProfileListSection: View {
     
     // Get total place count for the list
     private var totalPlaceCount: Int {
-        return viewModel.placeListMapboxPlaces[list.id]?.count ?? 0
+        return viewModel.placeListCounts[list.id] ?? 0
     }
     
     var body: some View {
@@ -66,6 +66,8 @@ struct ExternalProfileListSection: View {
             
             // Card with places grid
             Button(action: {
+                // Load places for this list if not already loaded
+                viewModel.loadPlacesForList(list)
                 selectedList = list
                 showingPlacesPopup = true
             }) {
