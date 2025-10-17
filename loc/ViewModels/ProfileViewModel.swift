@@ -42,10 +42,6 @@ class ProfileViewModel: ObservableObject {
     @Published var userListsPlaces: [String: [String]] = [:] // [listId: [placeId]]
     @Published var placeListCounts: [UUID: Int] = [:]
     @Published var userFavorites: [String] = []
-    
-    // Lazy loading properties
-    private var loadedListIds: Set<UUID> = []
-    private var loadingListIds: Set<UUID> = []
     @Published var userFollowing: [ProfileData] = []
     @Published var userFollowers: [ProfileData] = []
     //TODO: Implement my places
