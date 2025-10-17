@@ -1545,10 +1545,13 @@ class ProfileViewModel: ObservableObject {
                 
                 // Load places and counts for the first 3 visible lists
                 let firstThreeListIds = Array(lists.prefix(3).map { $0.id.uuidString })
+                print("🔍 [ProfileViewModel] First 3 list IDs: \(firstThreeListIds)")
                 
                 if !firstThreeListIds.isEmpty {
+                    print("🔍 [ProfileViewModel] Fetching places for first 3 lists...")
                     // Fetch places for first 3 lists (6 places each)
                     let placesForLists = try await placeService.fetchPlacesForLists(listIds: firstThreeListIds, maxPlacesPerList: 6)
+                    print("🔍 [ProfileViewModel] Received places for \(placesForLists.count) lists")
                     
                     // Fetch place counts for all lists
                     let placeCounts = try await placeService.getPlaceCountsForLists(listIds: lists.map { $0.id.uuidString })

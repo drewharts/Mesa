@@ -701,6 +701,7 @@ class SupabasePlaceService: ObservableObject {
     /// Fetch places for multiple lists efficiently (for first 6 visible lists)
     func fetchPlacesForLists(listIds: [String], maxPlacesPerList: Int = 6) async throws -> [String: [DetailPlace]] {
         print("🚀 [Supabase] Fetching places for \(listIds.count) lists (max \(maxPlacesPerList) per list)")
+        print("🔍 [Supabase] List IDs: \(listIds)")
         
         var result: [String: [DetailPlace]] = [:]
         
@@ -748,7 +749,15 @@ class SupabasePlaceService: ObservableObject {
         for (listId, placeIds) in listPlaceIds {
             let places = placeIds.compactMap { placesMap[$0] }
             result[listId] = places
-            print("🔍 [Supabase] List \(listId): \(places.count) places")
+            print("🔍 [Supabase] List \(listId): \(places.count) places (from \(placeIds.count) place IDs)")
+        }
+        
+        // Ensure all requested lists have an entry (even if empty)
+        for listId in listIds {
+            if result[listId] == nil {
+                result[listId] = []
+                print("🔍 [Supabase] List \(listId): 0 places (no place_list_items found)")
+            }
         }
         
         print("✅ [Supabase] Successfully fetched places for \(result.count) lists")
