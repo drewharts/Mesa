@@ -1562,7 +1562,7 @@ class ProfileViewModel: ObservableObject {
                             
                             // Load images for these places
                             for place in places {
-                                self.detailPlaceViewModel.loadImageForPlace(place)
+                                self.detailPlaceViewModel.fetchPlaceImage(for: place.id.uuidString)
                             }
                             
                             // Mark as loaded
@@ -1695,10 +1695,10 @@ class ProfileViewModel: ObservableObject {
                         self.detailPlaceViewModel.places[place.id.uuidString] = place
                     }
                     
-                    // Load images for these places
-                    for place in places {
-                        self.detailPlaceViewModel.loadImageForPlace(place)
-                    }
+                            // Load images for these places
+                            for place in places {
+                                self.detailPlaceViewModel.fetchPlaceImage(for: place.id.uuidString)
+                            }
                     
                     self.loadedListIds.insert(listId)
                     self.loadingListIds.remove(listId)
@@ -1752,10 +1752,10 @@ class ProfileViewModel: ObservableObject {
                             self.detailPlaceViewModel.places[place.id.uuidString] = place
                         }
                         
-                        // Load images for these places
-                        for place in places {
-                            self.detailPlaceViewModel.loadImageForPlace(place)
-                        }
+                            // Load images for these places
+                            for place in places {
+                                self.detailPlaceViewModel.fetchPlaceImage(for: place.id.uuidString)
+                            }
                         
                         // Mark as loaded
                         if let uuid = UUID(uuidString: listId) {
