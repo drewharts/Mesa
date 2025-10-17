@@ -7,6 +7,7 @@
 
 import Foundation
 import UIKit
+import CoreLocation
 
 @MainActor
 class DataManager: ObservableObject {
@@ -37,6 +38,11 @@ class DataManager: ObservableObject {
         self.locationManager = locationManager
         self.profileViewModel = profileViewModel
         self.detailPlaceViewModel = detailPlaceViewModel
+    }
+    
+    /// Get current user location for proximity-based sorting
+    var currentUserLocation: CLLocationCoordinate2D? {
+        return locationManager.currentLocation?.coordinate
     }
 
     func initializeProfileData(userId: String) async {
@@ -299,7 +305,18 @@ class DataManager: ObservableObject {
     
     func loadUserPlaceLists(userId: String, forUser: ProfileData? = nil) async {
         do {
-            let lists = try await placeService.fetchLists(userId: userId)
+            // Use proximity-based sorting if location is available
+            let userLocation = locationManager.currentLocation?.coordinate
+            let lists: [PlaceList]
+            
+            if let userLocation = userLocation {
+                print("📍 [DataManager] Loading place lists with proximity sorting")
+                lists = try await placeService.fetchListsByProximity(userId: userId, userLocation: userLocation)
+            } else {
+                print("📍 [DataManager] Loading place lists with regular sorting (no location)")
+                lists = try await placeService.fetchLists(userId: userId)
+            }
+            
             // If this is for the current user, update the ProfileViewModel
             if forUser == nil {
                 self.profileViewModel.userLists = lists
@@ -307,8 +324,12 @@ class DataManager: ObservableObject {
                 self.profileViewModel.userListsPlaces = lists.reduce(into: [String: [String]]()) { result, list in
                     result[list.id.uuidString] = []
                 }
-                // Sort lists by distance after loading
-                self.profileViewModel.sortListsByDistance()
+                
+                // If we used proximity sorting, lists are already sorted by distance
+                // If we used regular sorting, sort by distance after loading
+                if userLocation == nil {
+                    self.profileViewModel.sortListsByDistance()
+                }
                 
                 // NEW: Preload place DETAILS (not list items) for the first 5 lists
                 // This populates place_list_items and DetailPlace objects

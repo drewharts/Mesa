@@ -9,7 +9,7 @@ struct UserProfileListViewJustLists: View {
 
     var body: some View {
         LazyVStack(spacing: 16) {
-            ForEach(placeLists.sorted(by: { $0.sortOrder < $1.sortOrder })) { list in
+            ForEach(placeLists) { list in
                 ExternalProfileListSection(
                     list: list,
                     viewModel: viewModel,

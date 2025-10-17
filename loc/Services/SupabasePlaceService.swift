@@ -15,6 +15,28 @@ class SupabasePlaceService: ObservableObject {
     private let supabase = SupabaseManager.shared
     
     private init() {}
+    
+    // MARK: - Helper Functions
+    
+    /// Parses PostGIS geometry string (WKT format) to CLLocationCoordinate2D
+    private func parseGeometryToCoordinate(_ geometryString: String?) -> CLLocationCoordinate2D? {
+        guard let geometryString = geometryString else { return nil }
+        
+        // Parse WKT format: "POINT(longitude latitude)"
+        let pattern = #"POINT\(([-\d.]+)\s+([-\d.]+)\)"#
+        let regex = try? NSRegularExpression(pattern: pattern)
+        let range = NSRange(location: 0, length: geometryString.utf16.count)
+        
+        if let match = regex?.firstMatch(in: geometryString, range: range),
+           let longitudeRange = Range(match.range(at: 1), in: geometryString),
+           let latitudeRange = Range(match.range(at: 2), in: geometryString),
+           let longitude = Double(String(geometryString[longitudeRange])),
+           let latitude = Double(String(geometryString[latitudeRange])) {
+            return CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+        }
+        
+        return nil
+    }
 
     // MARK: - PlaceList Records
 
@@ -26,6 +48,8 @@ class SupabasePlaceService: ObservableObject {
         let cover_image_url: String?
         let is_public: Bool
         let sort_order: Int
+        let average_location: String? // PostGIS geometry as WKT string
+        let distance_meters: Double? // Distance from user location (when sorted by proximity)
 
         enum CodingKeys: String, CodingKey {
             case id
@@ -35,6 +59,8 @@ class SupabasePlaceService: ObservableObject {
             case cover_image_url
             case is_public
             case sort_order
+            case average_location
+            case distance_meters
         }
     }
     
@@ -704,7 +730,7 @@ class SupabasePlaceService: ObservableObject {
                         emoji: "📍", // Default emoji
                         image: record.cover_image_url,
                         sortOrder: record.sort_order,
-                        averageCoordinate: nil,
+                        averageCoordinate: parseGeometryToCoordinate(record.average_location),
                         lastCoordinateUpdate: nil
                     )
                 }
@@ -715,6 +741,79 @@ class SupabasePlaceService: ObservableObject {
 
             } catch {
                 print("❌ [Supabase] Error fetching place lists: \(error)")
+                completion([])
+            }
+        }
+    }
+    
+    /// Fetches place lists sorted by proximity to user's current location
+    func fetchListsByProximity(userId: String, userLocation: CLLocationCoordinate2D?, completion: @escaping ([PlaceList]) -> Void) {
+        Task {
+            do {
+                print("🔍 [Supabase] Querying place_lists by proximity for user_id: \(userId)")
+                
+                var records: [PlaceListRecord]
+                
+                if let userLocation = userLocation {
+                    // Use the proximity-based SQL function
+                    print("📍 [Supabase] Using proximity sorting with user location: \(userLocation.latitude), \(userLocation.longitude)")
+                    
+                    struct ProximityParams: Encodable {
+                        let p_user_id: String
+                        let p_user_lat: Double
+                        let p_user_lng: Double
+                    }
+                    
+                    let params = ProximityParams(
+                        p_user_id: userId,
+                        p_user_lat: userLocation.latitude,
+                        p_user_lng: userLocation.longitude
+                    )
+                    
+                    records = try await supabase.client
+                        .rpc("get_user_place_lists_by_proximity", params: params)
+                        .execute()
+                        .value
+                } else {
+                    // Fallback to regular sorting if no location available
+                    print("📍 [Supabase] No user location available, using regular sort_order")
+                    records = try await supabase.client
+                        .from("place_lists")
+                        .select()
+                        .eq("user_id", value: userId)
+                        .order("sort_order", ascending: true)
+                        .execute()
+                        .value
+                }
+
+                print("🔍 [Supabase] Raw database response: \(records.count) records")
+                for (index, record) in records.enumerated() {
+                    let distance = record.distance_meters != nil ? String(format: "%.1f km", record.distance_meters! / 1000) : "unknown"
+                    print("🔍 [Supabase] Record \(index + 1): id=\(record.id), name=\(record.name), distance=\(distance)")
+                }
+
+                // Convert records to PlaceLists WITHOUT fetching places
+                // Places will be loaded lazily when lists are opened
+                let placeLists = records.map { record in
+                    PlaceList(
+                        id: UUID(uuidString: record.id) ?? UUID(),
+                        name: record.name,
+                        places: [], // Will be loaded lazily via place_list_items query
+                        city: "",
+                        emoji: "📍", // Default emoji
+                        image: record.cover_image_url,
+                        sortOrder: record.sort_order,
+                        averageCoordinate: parseGeometryToCoordinate(record.average_location),
+                        lastCoordinateUpdate: nil
+                    )
+                }
+
+                print("✅ [Supabase] Fetched \(placeLists.count) place lists sorted by proximity")
+                
+                completion(placeLists)
+
+            } catch {
+                print("❌ [Supabase] Error fetching place lists by proximity: \(error)")
                 completion([])
             }
         }
@@ -761,7 +860,7 @@ class SupabasePlaceService: ObservableObject {
                     emoji: "📍", // Default emoji
                     image: record.cover_image_url,
                     sortOrder: record.sort_order,
-                    averageCoordinate: nil,
+                    averageCoordinate: parseGeometryToCoordinate(record.average_location),
                     lastCoordinateUpdate: nil
                 )
             }
@@ -772,6 +871,77 @@ class SupabasePlaceService: ObservableObject {
 
         } catch {
             print("❌ [Supabase] Error fetching place lists: \(error)")
+            throw error
+        }
+    }
+    
+    /// Async version: Fetches place lists sorted by proximity to user's current location
+    func fetchListsByProximity(userId: String, userLocation: CLLocationCoordinate2D?) async throws -> [PlaceList] {
+        print("📋 [Supabase] Fetching place lists by proximity for user: \(userId)")
+        
+        do {
+            var records: [PlaceListRecord]
+            
+            if let userLocation = userLocation {
+                // Use the proximity-based SQL function
+                print("📍 [Supabase] Using proximity sorting with user location: \(userLocation.latitude), \(userLocation.longitude)")
+                
+                struct ProximityParams: Encodable {
+                    let p_user_id: String
+                    let p_user_lat: Double
+                    let p_user_lng: Double
+                }
+                
+                let params = ProximityParams(
+                    p_user_id: userId,
+                    p_user_lat: userLocation.latitude,
+                    p_user_lng: userLocation.longitude
+                )
+                
+                records = try await supabase.client
+                    .rpc("get_user_place_lists_by_proximity", params: params)
+                    .execute()
+                    .value
+            } else {
+                // Fallback to regular sorting if no location available
+                print("📍 [Supabase] No user location available, using regular sort_order")
+                records = try await supabase.client
+                    .from("place_lists")
+                    .select()
+                    .eq("user_id", value: userId)
+                    .order("sort_order", ascending: true)
+                    .execute()
+                    .value
+            }
+
+            print("🔍 [Supabase] Raw database response: \(records.count) records")
+            for (index, record) in records.enumerated() {
+                let distance = record.distance_meters != nil ? String(format: "%.1f km", record.distance_meters! / 1000) : "unknown"
+                print("🔍 [Supabase] Record \(index + 1): id=\(record.id), name=\(record.name), distance=\(distance)")
+            }
+
+            // Convert records to PlaceLists WITHOUT fetching places
+            // Places will be loaded lazily when lists are opened
+            let placeLists = records.map { record in
+                PlaceList(
+                    id: UUID(uuidString: record.id) ?? UUID(),
+                    name: record.name,
+                    places: [], // Will be loaded lazily via place_list_items query
+                    city: "",
+                    emoji: "📍", // Default emoji
+                    image: record.cover_image_url,
+                    sortOrder: record.sort_order,
+                    averageCoordinate: parseGeometryToCoordinate(record.average_location),
+                    lastCoordinateUpdate: nil
+                )
+            }
+
+            print("✅ [Supabase] Fetched \(placeLists.count) place lists sorted by proximity")
+            
+            return placeLists
+
+        } catch {
+            print("❌ [Supabase] Error fetching place lists by proximity: \(error)")
             throw error
         }
     }

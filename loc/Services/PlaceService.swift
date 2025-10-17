@@ -1,4 +1,5 @@
 import Foundation
+import CoreLocation
 
 /// Legacy PlaceService - now delegates all calls to SupabasePlaceService
 /// This wrapper exists for backward compatibility with existing ViewModels
@@ -139,6 +140,20 @@ class PlaceService: ObservableObject {
     func fetchLists(userId: String) async throws -> [PlaceList] {
         print("🔄 [PlaceService] Delegating fetchLists async to Supabase...")
         return try await supabase.fetchLists(userId: userId)
+    }
+    
+    /// Fetches place lists sorted by proximity to user's current location
+    func fetchListsByProximity(userId: String, userLocation: CLLocationCoordinate2D?, completion: @escaping ([PlaceList]) -> Void) {
+        print("🔄 [PlaceService] Delegating fetchListsByProximity to Supabase...")
+        Task { @MainActor in
+            await supabase.fetchListsByProximity(userId: userId, userLocation: userLocation, completion: completion)
+        }
+    }
+    
+    /// Async version: Fetches place lists sorted by proximity to user's current location
+    func fetchListsByProximity(userId: String, userLocation: CLLocationCoordinate2D?) async throws -> [PlaceList] {
+        print("🔄 [PlaceService] Delegating fetchListsByProximity async to Supabase...")
+        return try await supabase.fetchListsByProximity(userId: userId, userLocation: userLocation)
     }
     
     func fetchPlacesInViewport(viewport: (minLat: Double, maxLat: Double, minLng: Double, maxLng: Double), completion: @escaping ([DetailPlace]?, Error?) -> Void) {

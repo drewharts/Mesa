@@ -204,16 +204,39 @@ class UserProfileViewModel: ObservableObject {
     }
     
     private func fetchLists(userId: String) {
-        placeService.fetchLists(userId: userId) { lists in
-            self.userLists = lists
-            // Fetch places and images for each PlaceList
-            for list in lists {
-                self.fetchFirestorePlaces(for: list.places) { places in
-                    self.placeListMapboxPlaces[list.id] = places
-                    // Fetch images for places in this list
-                    for place in places {
-                        self.fetchImage(for: place) { [weak self] placeId, image in
-                            self?.placeImages[placeId] = image
+        // Use proximity-based sorting if location is available
+        let userLocation = dataManager.currentUserLocation
+        
+        if let userLocation = userLocation {
+            print("📍 [UserProfileViewModel] Loading place lists with proximity sorting")
+            placeService.fetchListsByProximity(userId: userId, userLocation: userLocation) { lists in
+                self.userLists = lists
+                // Fetch places and images for each PlaceList
+                for list in lists {
+                    self.fetchFirestorePlaces(for: list.places) { places in
+                        self.placeListMapboxPlaces[list.id] = places
+                        // Fetch images for places in this list
+                        for place in places {
+                            self.fetchImage(for: place) { [weak self] placeId, image in
+                                self?.placeImages[placeId] = image
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            print("📍 [UserProfileViewModel] Loading place lists with regular sorting (no location)")
+            placeService.fetchLists(userId: userId) { lists in
+                self.userLists = lists
+                // Fetch places and images for each PlaceList
+                for list in lists {
+                    self.fetchFirestorePlaces(for: list.places) { places in
+                        self.placeListMapboxPlaces[list.id] = places
+                        // Fetch images for places in this list
+                        for place in places {
+                            self.fetchImage(for: place) { [weak self] placeId, image in
+                                self?.placeImages[placeId] = image
+                            }
                         }
                     }
                 }
