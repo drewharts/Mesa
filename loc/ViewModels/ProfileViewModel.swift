@@ -224,8 +224,10 @@ class ProfileViewModel: ObservableObject {
         
         if userFollowing.contains(where: { $0.id == userId }) {
             // Optimistic update: immediately change UI
-            self.userFollowing.removeAll { $0.id == userId }
-            self.followingCount = max(0, self.followingCount - 1)
+            DispatchQueue.main.async {
+                self.userFollowing.removeAll { $0.id == userId }
+                self.followingCount = max(0, self.followingCount - 1)
+            }
             
             // Update friend IDs in MapViewModel for viewport filtering
             updateMapViewModelFriendIds()
@@ -246,7 +248,9 @@ class ProfileViewModel: ObservableObject {
             }
         } else {
             // Optimistic update: immediately change UI
-            self.followingCount += 1
+            DispatchQueue.main.async {
+                self.followingCount += 1
+            }
             
             // Make the actual API call
             userService.followUser(followerId: currentUserId, followingId: userId) { [weak self] success, error in
@@ -1521,14 +1525,18 @@ class ProfileViewModel: ObservableObject {
         
         if !needsPlaceLoading {
             print("🔍 [ProfileViewModel] ensureListsLoaded: First 3 lists already have places loaded")
-            self.isLoading = false
+            DispatchQueue.main.async {
+                self.isLoading = false
+            }
             return
         }
         
         print("🔍 [ProfileViewModel] ensureListsLoaded: Loading places for first 3 lists")
         
         // Indicate loading state so UI can show a spinner
-        isLoading = true
+        DispatchQueue.main.async {
+            self.isLoading = true
+        }
         
         Task {
             do {

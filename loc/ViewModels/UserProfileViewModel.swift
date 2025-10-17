@@ -99,11 +99,15 @@ class UserProfileViewModel: ObservableObject {
     
     func checkIfFollowing(currentUserId: String) {
         guard let targetUserId = selectedUser?.id, !targetUserId.isEmpty else {
-            self.isFollowing = false
+            DispatchQueue.main.async {
+                self.isFollowing = false
+            }
             return
         }
         userService.isFollowingUser(followerId: currentUserId, followingId: targetUserId) { [weak self] isFollowing in
-            self?.isFollowing = isFollowing
+            DispatchQueue.main.async {
+                self?.isFollowing = isFollowing
+            }
         }
     }
     
@@ -116,8 +120,10 @@ class UserProfileViewModel: ObservableObject {
         
         if isFollowing {
             // Optimistic update: immediately change UI
-            self.isFollowing = false
-            self.followers = max(0, self.followers - 1)
+            DispatchQueue.main.async {
+                self.isFollowing = false
+                self.followers = max(0, self.followers - 1)
+            }
             // Remove user from placeSavers and recalculate annotations
             self.removeUserFromPlaceSavers(userId: targetUserId)
             self.detailPlaceViewModel.calculateAnnotationPlaces()
@@ -140,8 +146,10 @@ class UserProfileViewModel: ObservableObject {
             }
         } else {
             // Optimistic update: immediately change UI
-            self.isFollowing = true
-            self.followers += 1
+            DispatchQueue.main.async {
+                self.isFollowing = true
+                self.followers += 1
+            }
             
             // Make the actual API call
             userService.followUser(followerId: currentUserId, followingId: targetUserId) { success, error in
