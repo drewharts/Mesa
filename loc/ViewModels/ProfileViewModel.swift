@@ -40,6 +40,7 @@ class ProfileViewModel: ObservableObject {
     @Published var userPicture: UIImage?
     @Published var userLists: [PlaceList] = []
     @Published var userListsPlaces: [String: [String]] = [:] // [listId: [placeId]]
+    @Published var placeListCounts: [UUID: Int] = [:]
     @Published var userFavorites: [String] = []
     @Published var userFollowing: [ProfileData] = []
     @Published var userFollowers: [ProfileData] = []
@@ -1522,23 +1523,63 @@ class ProfileViewModel: ObservableObject {
         
         Task {
             do {
-                print("🔍 [ProfileViewModel] ensureListsLoaded: Making API call to fetch lists")
-                let lists = try await placeService.fetchLists(userId: userId)
+                // Use proximity-based sorting if location is available
+                let userLocation = detailPlaceViewModel.dataManager?.currentUserLocation
+                let lists: [PlaceList]
+                
+                if let userLocation = userLocation {
+                    print("📍 [ProfileViewModel] Loading place lists with proximity sorting")
+                    lists = try await placeService.fetchListsByProximity(userId: userId, userLocation: userLocation)
+                } else {
+                    print("📍 [ProfileViewModel] Loading place lists with regular sorting (no location)")
+                    lists = try await placeService.fetchLists(userId: userId)
+                }
+                
                 print("🔍 [ProfileViewModel] ensureListsLoaded: Received \(lists.count) lists from API")
                 
                 await MainActor.run {
                     print("🔍 [ProfileViewModel] ensureListsLoaded: Updating UI with \(lists.count) lists")
                     self.userLists = lists
-                    // Initialize with place IDs from loaded lists for immediate UI display
-                    self.userListsPlaces = lists.reduce(into: [String: [String]]()) { result, list in
-                        result[list.id.uuidString] = list.places.map { $0.id.uuidString }
-                    }
                     self.isLoading = false
-                    print("🔍 [ProfileViewModel] ensureListsLoaded: Updated userListsPlaces with \(self.userListsPlaces.count) entries")
-                    
-                    // Bulk calculate average coordinates for fast proximity sorting
-                    self.bulkCalculateAverageCoordinates()
                 }
+                
+                // Load places and counts for the first 6 visible lists
+                let firstSixListIds = Array(lists.prefix(6).map { $0.id.uuidString })
+                
+                if !firstSixListIds.isEmpty {
+                    // Fetch places for first 6 lists (6 places each)
+                    let placesForLists = try await placeService.fetchPlacesForLists(listIds: firstSixListIds, maxPlacesPerList: 6)
+                    
+                    // Fetch place counts for all lists
+                    let placeCounts = try await placeService.getPlaceCountsForLists(listIds: lists.map { $0.id.uuidString })
+                    
+                    await MainActor.run {
+                        // Update places for first 6 lists
+                        for (listId, places) in placesForLists {
+                            let placeIds = places.map { $0.id.uuidString }
+                            self.userListsPlaces[listId] = placeIds
+                            
+                            // Store places in detailPlaceViewModel for immediate access
+                            for place in places {
+                                self.detailPlaceViewModel.places[place.id.uuidString] = place
+                            }
+                        }
+                        
+                        // Store place counts for all lists (for display)
+                        for (listId, count) in placeCounts {
+                            if let uuid = UUID(uuidString: listId) {
+                                self.placeListCounts[uuid] = count
+                            }
+                        }
+                        
+                        print("🔍 [ProfileViewModel] ensureListsLoaded: Updated userListsPlaces with \(self.userListsPlaces.count) entries")
+                        print("🔍 [ProfileViewModel] ensureListsLoaded: Loaded places for first \(placesForLists.count) lists")
+                        
+                        // Bulk calculate average coordinates for fast proximity sorting
+                        self.bulkCalculateAverageCoordinates()
+                    }
+                }
+                
             } catch {
                 print("❌ [ProfileViewModel] ensureListsLoaded: Error loading user lists: \(error.localizedDescription)")
                 await MainActor.run {
@@ -1628,18 +1669,39 @@ class ProfileViewModel: ObservableObject {
             self.loadingListIds.insert(listId)
         }
 
-        // Use DataManager to load places for this list
-        await detailPlaceViewModel.dataManager?.loadPlacesForList(listId: listId, userId: userId)
+        // Use the optimized method to load places for this list
+        do {
+            let placesForLists = try await placeService.fetchPlacesForLists(
+                listIds: [listId.uuidString], 
+                maxPlacesPerList: 50 // Load more places when list is opened
+            )
+            
+            if let places = placesForLists[listId.uuidString] {
+                await MainActor.run {
+                    let placeIds = places.map { $0.id.uuidString }
+                    self.userListsPlaces[listId.uuidString] = placeIds
+                    
+                    // Store places in detailPlaceViewModel for immediate access
+                    for place in places {
+                        self.detailPlaceViewModel.places[place.id.uuidString] = place
+                    }
+                    
+                    self.loadedListIds.insert(listId)
+                    self.loadingListIds.remove(listId)
+                    self.activeListLoadTasks.removeValue(forKey: listId)
 
-        await MainActor.run {
-            self.loadedListIds.insert(listId)
-            self.loadingListIds.remove(listId)
-            self.activeListLoadTasks.removeValue(forKey: listId)
+                    // Initialize pagination for this list
+                    self.initializeListPagination(listId: listId)
 
-            // Initialize pagination for this list
-            self.initializeListPagination(listId: listId)
-
-            print("✅ [ProfileViewModel] performListLoad: Successfully loaded places for list \(listId)")
+                    print("✅ [ProfileViewModel] performListLoad: Successfully loaded \(places.count) places for list \(listId)")
+                }
+            }
+        } catch {
+            print("❌ [ProfileViewModel] performListLoad: Error loading places for list \(listId): \(error)")
+            await MainActor.run {
+                self.loadingListIds.remove(listId)
+                self.activeListLoadTasks.removeValue(forKey: listId)
+            }
         }
     }
     
