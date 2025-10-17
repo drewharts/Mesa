@@ -1560,6 +1560,11 @@ class ProfileViewModel: ObservableObject {
                                 self.detailPlaceViewModel.places[place.id.uuidString] = place
                             }
                             
+                            // Load images for these places
+                            for place in places {
+                                self.detailPlaceViewModel.loadImageForPlace(place)
+                            }
+                            
                             // Mark as loaded
                             if let uuid = UUID(uuidString: listId) {
                                 self.loadedListIds.insert(uuid)
@@ -1690,6 +1695,11 @@ class ProfileViewModel: ObservableObject {
                         self.detailPlaceViewModel.places[place.id.uuidString] = place
                     }
                     
+                    // Load images for these places
+                    for place in places {
+                        self.detailPlaceViewModel.loadImageForPlace(place)
+                    }
+                    
                     self.loadedListIds.insert(listId)
                     self.loadingListIds.remove(listId)
                     self.activeListLoadTasks.removeValue(forKey: listId)
@@ -1740,6 +1750,11 @@ class ProfileViewModel: ObservableObject {
                         // Store places in detailPlaceViewModel for immediate access
                         for place in places {
                             self.detailPlaceViewModel.places[place.id.uuidString] = place
+                        }
+                        
+                        // Load images for these places
+                        for place in places {
+                            self.detailPlaceViewModel.loadImageForPlace(place)
                         }
                         
                         // Mark as loaded
