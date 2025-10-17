@@ -9,7 +9,7 @@ struct UserProfileListViewJustLists: View {
 
     var body: some View {
         LazyVStack(spacing: 16) {
-            ForEach(placeLists) { list in
+            ForEach(Array(placeLists.enumerated()), id: \.element.id) { index, list in
                 ExternalProfileListSection(
                     list: list,
                     viewModel: viewModel,
@@ -17,6 +17,12 @@ struct UserProfileListViewJustLists: View {
                     selectedList: $selectedList,
                     showingPlacesPopup: $showingPlacesPopup
                 )
+                .onAppear {
+                    // Trigger lazy loading when we're near the end of visible lists
+                    if index >= placeLists.count - 2 { // Load more when 2 lists from the end
+                        viewModel.loadMoreListsIfNeeded()
+                    }
+                }
             }
         }
         .sheet(isPresented: $showingPlacesPopup) {

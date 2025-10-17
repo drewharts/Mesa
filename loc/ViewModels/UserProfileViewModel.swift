@@ -21,6 +21,10 @@ class UserProfileViewModel: ObservableObject {
     @Published var placeListMapboxPlaces: [UUID: [DetailPlace]] = [:]
     @Published var placeListCounts: [UUID: Int] = [:]
     @Published var placeImages: [String: UIImage] = [:]
+    
+    // Lazy loading properties
+    private var loadedListIds: Set<UUID> = []
+    private var loadingListIds: Set<UUID> = []
     @Published var isFollowing: Bool = false
     @Published var followers: Int = 0
     
@@ -224,18 +228,18 @@ class UserProfileViewModel: ObservableObject {
                     self.userLists = lists
                 }
                 
-                // Load places and counts for the first 6 visible lists
-                let firstSixListIds = Array(lists.prefix(6).map { $0.id.uuidString })
+                // Load places and counts for the first 3 visible lists
+                let firstThreeListIds = Array(lists.prefix(3).map { $0.id.uuidString })
                 
-                if !firstSixListIds.isEmpty {
-                    // Fetch places for first 6 lists (6 places each)
-                    let placesForLists = try await placeService.fetchPlacesForLists(listIds: firstSixListIds, maxPlacesPerList: 6)
+                if !firstThreeListIds.isEmpty {
+                    // Fetch places for first 3 lists (6 places each)
+                    let placesForLists = try await placeService.fetchPlacesForLists(listIds: firstThreeListIds, maxPlacesPerList: 6)
                     
                     // Fetch place counts for all lists
                     let placeCounts = try await placeService.getPlaceCountsForLists(listIds: lists.map { $0.id.uuidString })
                     
                     await MainActor.run {
-                        // Update places for first 6 lists
+                        // Update places for first 3 lists
                         for (listId, places) in placesForLists {
                             if let uuid = UUID(uuidString: listId) {
                                 self.placeListMapboxPlaces[uuid] = places
@@ -246,6 +250,9 @@ class UserProfileViewModel: ObservableObject {
                                         self?.placeImages[placeId] = image
                                     }
                                 }
+                                
+                                // Mark as loaded
+                                self.loadedListIds.insert(uuid)
                             }
                         }
                         
@@ -699,7 +706,7 @@ class UserProfileViewModel: ObservableObject {
     
     // MARK: - Place List Management
     
-    /// Load places for a specific list (for lists beyond the first 6)
+    /// Load places for a specific list (for lists beyond the first 3)
     func loadPlacesForList(_ list: PlaceList) {
         // Only load if we don't already have places for this list
         guard placeListMapboxPlaces[list.id] == nil else { return }
@@ -721,10 +728,67 @@ class UserProfileViewModel: ObservableObject {
                                 self?.placeImages[placeId] = image
                             }
                         }
+                        
+                        // Mark as loaded
+                        self.loadedListIds.insert(list.id)
                     }
                 }
             } catch {
                 print("❌ [UserProfileViewModel] Error loading places for list \(list.name): \(error)")
+            }
+        }
+    }
+    
+    /// Load more lists when user scrolls (lazy loading)
+    func loadMoreListsIfNeeded() {
+        // Find the next 3 lists that haven't been loaded yet
+        let unloadedLists = userLists.filter { !loadedListIds.contains($0.id) && !loadingListIds.contains($0.id) }
+        let nextThreeLists = Array(unloadedLists.prefix(3))
+        
+        guard !nextThreeLists.isEmpty else { return }
+        
+        let listIds = nextThreeLists.map { $0.id.uuidString }
+        
+        Task {
+            do {
+                // Mark as loading
+                await MainActor.run {
+                    for list in nextThreeLists {
+                        self.loadingListIds.insert(list.id)
+                    }
+                }
+                
+                // Fetch places for these lists
+                let placesForLists = try await placeService.fetchPlacesForLists(listIds: listIds, maxPlacesPerList: 6)
+                
+                await MainActor.run {
+                    // Update places for these lists
+                    for (listId, places) in placesForLists {
+                        if let uuid = UUID(uuidString: listId) {
+                            self.placeListMapboxPlaces[uuid] = places
+                            
+                            // Fetch images for places in this list
+                            for place in places {
+                                self.fetchImage(for: place) { [weak self] placeId, image in
+                                    self?.placeImages[placeId] = image
+                                }
+                            }
+                            
+                            // Mark as loaded
+                            self.loadedListIds.insert(uuid)
+                            self.loadingListIds.remove(uuid)
+                        }
+                    }
+                    
+                    print("🔍 [UserProfileViewModel] loadMoreListsIfNeeded: Loaded \(placesForLists.count) more lists")
+                }
+            } catch {
+                print("❌ [UserProfileViewModel] loadMoreListsIfNeeded: Error loading more lists: \(error)")
+                await MainActor.run {
+                    for list in nextThreeLists {
+                        self.loadingListIds.remove(list.id)
+                    }
+                }
             }
         }
     }

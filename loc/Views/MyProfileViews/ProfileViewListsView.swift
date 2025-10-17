@@ -55,6 +55,12 @@ struct ProfileViewListsView: View {
                         .onAppear {
                             // Load list data only when it becomes visible
                             profile.loadListDataIfNeeded(listId: list.id)
+                            
+                            // Trigger lazy loading when we're near the end of visible lists
+                            let currentIndex = filteredLists.firstIndex(where: { $0.id == list.id }) ?? 0
+                            if currentIndex >= filteredLists.count - 2 { // Load more when 2 lists from the end
+                                profile.loadMoreListsIfNeeded()
+                            }
                         }
                     }
                 }
