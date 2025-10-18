@@ -449,20 +449,30 @@ struct PlaceGridCell: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             ZStack(alignment: .bottom) {
-                if let image = profile.detailPlaceViewModel.placeImages[place.id.uuidString] {
+                if let image = profile.detailPlaceViewModel.placeImages[place.id.uuidString], 
+                   image.size.width > 0 && image.size.height > 0 {
                     Image(uiImage: image)
                         .resizable()
                         .aspectRatio(contentMode: .fill)
                         .frame(width: cardWidth, height: cardHeight)
                         .clipped()
                 } else {
-                    Rectangle()
-                        .foregroundColor(colorForPlace(place))
-                        .frame(width: cardWidth, height: cardHeight)
-                        .onAppear {
-                            // Load images for priority tiles immediately, or lazy load for others
-                            profile.detailPlaceViewModel.fetchPlaceImage(for: place.id.uuidString)
+                    ZStack {
+                        Rectangle()
+                            .foregroundColor(colorForPlace(place))
+                            .frame(width: cardWidth, height: cardHeight)
+                        
+                        // Show loading indicator if this is a priority tile and still loading
+                        if isPriorityTile && profile.detailPlaceViewModel.isPlaceImageLoading(placeId: place.id.uuidString) {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                .scaleEffect(0.8)
                         }
+                    }
+                    .onAppear {
+                        // Load images for priority tiles immediately, or lazy load for others
+                        profile.detailPlaceViewModel.fetchPlaceImage(for: place.id.uuidString)
+                    }
                 }
                 
                 // Gradient overlay
@@ -631,20 +641,39 @@ struct TikTokPlaceGridCell: View {
                             .frame(width: cardWidth, height: cardHeight)
                             .clipped()
                     } placeholder: {
-                        Rectangle()
-                            .foregroundColor(color)
-                            .frame(width: cardWidth, height: cardHeight)
+                        ZStack {
+                            Rectangle()
+                                .foregroundColor(color)
+                                .frame(width: cardWidth, height: cardHeight)
+                            
+                            // Show loading indicator for priority tiles only if still loading
+                            if isPriorityTile && profile.detailPlaceViewModel.isPlaceImageLoading(placeId: place.id.uuidString) {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                    .scaleEffect(0.8)
+                            }
+                        }
                     }
-                } else if let image = profile.detailPlaceViewModel.placeImages[place.id.uuidString] {
+                } else if let image = profile.detailPlaceViewModel.placeImages[place.id.uuidString], 
+                          image.size.width > 0 && image.size.height > 0 {
                     Image(uiImage: image)
                         .resizable()
                         .aspectRatio(contentMode: .fill)
                         .frame(width: cardWidth, height: cardHeight)
                         .clipped()
                 } else {
-                    Rectangle()
-                        .foregroundColor(color)
-                        .frame(width: cardWidth, height: cardHeight)
+                    ZStack {
+                        Rectangle()
+                            .foregroundColor(color)
+                            .frame(width: cardWidth, height: cardHeight)
+                        
+                        // Show loading indicator for priority tiles only if still loading
+                        if isPriorityTile && profile.detailPlaceViewModel.isPlaceImageLoading(placeId: place.id.uuidString) {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                .scaleEffect(0.8)
+                        }
+                    }
                 }
                 
                 // Gradient overlay for text readability

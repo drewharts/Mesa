@@ -180,7 +180,8 @@ struct PlacePreviewCard: View {
                                     .foregroundColor(.gray.opacity(0.3))
                                     .frame(maxWidth: .infinity, maxHeight: 80)
                             }
-                        } else if let image = detailPlaceViewModel.placeImages[place.id.uuidString] {
+                        } else if let image = detailPlaceViewModel.placeImages[place.id.uuidString], 
+                                  image.size.width > 0 && image.size.height > 0 {
                             // Show place review image
                             Image(uiImage: image)
                                 .resizable()
@@ -188,14 +189,23 @@ struct PlacePreviewCard: View {
                                 .frame(maxWidth: .infinity, maxHeight: 80)
                                 .clipped()
                         } else {
-                            // Show colored rectangle fallback
-                            Rectangle()
-                                .foregroundColor(detailPlaceViewModel.colorForPlace(placeId: place.id.uuidString))
-                                .frame(maxWidth: .infinity, maxHeight: 80)
-                                .onAppear {
-                                    // Load images for priority tiles immediately, or lazy load for others
-                                    profile.detailPlaceViewModel.fetchPlaceImage(for: place.id.uuidString)
+                            // Show colored rectangle fallback with loading indicator
+                            ZStack {
+                                Rectangle()
+                                    .foregroundColor(detailPlaceViewModel.colorForPlace(placeId: place.id.uuidString))
+                                    .frame(maxWidth: .infinity, maxHeight: 80)
+                                
+                                // Show loading indicator only if we're still loading images
+                                if isPriorityTile && detailPlaceViewModel.isPlaceImageLoading(placeId: place.id.uuidString) {
+                                    ProgressView()
+                                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                        .scaleEffect(0.6)
                                 }
+                            }
+                            .onAppear {
+                                // Load images for priority tiles immediately, or lazy load for others
+                                profile.detailPlaceViewModel.fetchPlaceImage(for: place.id.uuidString)
+                            }
                         }
                     }
                     .clipped()

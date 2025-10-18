@@ -17,6 +17,7 @@ class DetailPlaceViewModel: ObservableObject {
     @Published var placeSavers: [String: [String]] = [:] // Tracks who saved each place PlaceId -> UserIds
     @Published var placeAnnotations: [String: UIImage] = [:] // Each place annotation's combined profile images
     @Published var placeTypes: [String: String] = [:] // Tracks restaurant types
+    @Published var placeImageLoadingStates: [String: Bool] = [:] // Tracks if we've finished loading images for each place
 
     @Published var userProfilePicture: [String: UIImage] = [:] // Each user's profile picture
 
@@ -155,6 +156,9 @@ class DetailPlaceViewModel: ObservableObject {
     func fetchPlaceImage(for placeId: String) {
         guard placeImages[placeId] == nil else { return }
         
+        // Set loading state to true when we start loading
+        placeImageLoadingStates[placeId] = true
+        
         // This method is for normal place tiles that get images from reviews OR place's own photoUrls
         // TikTok place tiles use AsyncImage directly with TikTok URLs
         
@@ -169,14 +173,16 @@ class DetailPlaceViewModel: ObservableObject {
                 DispatchQueue.main.async {
                     if let error = error {
                         print("❌ [DetailPlaceViewModel] Error loading place's own images for \(placeId): \(error.localizedDescription)")
-                        self.placeImages[placeId] = nil
+                        self.placeImages[placeId] = UIImage()
                     } else if let images = images, !images.isEmpty {
                         print("✅ [DetailPlaceViewModel] Successfully loaded place's own image for \(placeId)")
                         self.placeImages[placeId] = images[0]
                     } else {
                         print("⚠️ [DetailPlaceViewModel] No images found in place's photoUrls for \(placeId)")
-                        self.placeImages[placeId] = nil
+                        self.placeImages[placeId] = UIImage()
                     }
+                    // Mark loading as complete
+                    self.placeImageLoadingStates[placeId] = false
                 }
             }
             return
@@ -187,7 +193,8 @@ class DetailPlaceViewModel: ObservableObject {
         Task { @MainActor in
             guard let currentUserId = await SupabaseAuthService.shared.currentUserId else {
                 print("Error: Current user ID is not available")
-                self.placeImages[placeId] = nil
+                self.placeImages[placeId] = UIImage()
+                self.placeImageLoadingStates[placeId] = false
                 return
             }
             
@@ -240,6 +247,8 @@ class DetailPlaceViewModel: ObservableObject {
                             print("⚠️ [DetailPlaceViewModel] No images loaded for place \(placeId)")
                             self.placeImages[placeId] = UIImage()
                         }
+                        // Mark loading as complete
+                        self.placeImageLoadingStates[placeId] = false
                     }
                 }
             } catch {
@@ -261,6 +270,8 @@ class DetailPlaceViewModel: ObservableObject {
             DispatchQueue.main.async {
                 // Set a special "no image" marker instead of nil to prevent infinite loading
                 self.placeImages[placeId] = UIImage()
+                // Mark loading as complete
+                self.placeImageLoadingStates[placeId] = false
             }
             return
         }
@@ -273,6 +284,7 @@ class DetailPlaceViewModel: ObservableObject {
             print("❌ [DetailPlaceViewModel] Invalid TikTok thumbnail URL for place \(placeId): \(thumbnailURL)")
             DispatchQueue.main.async {
                 self.placeImages[placeId] = UIImage()
+                self.placeImageLoadingStates[placeId] = false
             }
             return
         }
@@ -308,6 +320,8 @@ class DetailPlaceViewModel: ObservableObject {
                     print("❌ [DetailPlaceViewModel] No response data for place \(placeId)")
                     self.placeImages[placeId] = UIImage()
                 }
+                // Mark loading as complete
+                self.placeImageLoadingStates[placeId] = false
             }
         }.resume()
     }
@@ -453,6 +467,11 @@ class DetailPlaceViewModel: ObservableObject {
             // This should rarely happen as colors should be pre-generated
             return Color.gray
         }
+    }
+    
+    // Public method to check if a place is still loading images
+    func isPlaceImageLoading(placeId: String) -> Bool {
+        return placeImageLoadingStates[placeId] ?? false
     }
     
     // Initialize colors for all existing places
