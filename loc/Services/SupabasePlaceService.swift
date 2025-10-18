@@ -575,12 +575,11 @@ class SupabasePlaceService: ObservableObject {
         Task {
             do {
                 print("🔍 [Supabase] Testing connection...")
-                let response: [PlaceRecord] = try await supabase.client
+                // Test with a simple count query instead of trying to decode PlaceRecord
+                let response = try await supabase.client
                     .from("places")
-                    .select("id")
-                    .limit(1)
+                    .select("id", head: true, count: .exact)
                     .execute()
-                    .value
                 
                 print("✅ [Supabase] Connection test successful")
                 completion(true, nil)
