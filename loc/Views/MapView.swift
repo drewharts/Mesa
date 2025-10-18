@@ -183,7 +183,7 @@ struct MapView: View {
                 ) { name, description in
                     if let userId = profile.user?.id {
                         let generatedId = UUID().uuidString
-                        selectedPlaceVM.allowAutoPresent = false
+                        selectedPlaceVM.allowAutoPresent = true // Allow auto-present for newly created places
                         selectedPlaceVM.createNewPlace(idString: generatedId, name: name, description: description, coordinate: coordinate, userId: userId, profileVM: profile, detailPlaceVM: detailPlaceVM)
                         // Reset fields
                         newPlaceName = ""

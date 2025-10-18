@@ -1151,6 +1151,9 @@ class SelectedPlaceViewModel: ObservableObject {
                 
                 // Trigger annotation calculation for immediate display
                 detailPlaceVM.calculateAnnotationPlaces()
+                
+                // Generate color for the new place
+                detailPlaceVM.generateColorForPlace(newPlace.id.uuidString)
             }
             
             // Update ProfileViewModel's myPlaces list
@@ -1159,6 +1162,9 @@ class SelectedPlaceViewModel: ObservableObject {
                     profileVM.myPlaces.append(newPlace.id.uuidString)
                 }
             }
+            
+            // Send notification to refresh map annotations
+            NotificationCenter.default.post(name: NSNotification.Name("RefreshMapAnnotations"), object: nil)
         }
         
         // Save to main places collection
