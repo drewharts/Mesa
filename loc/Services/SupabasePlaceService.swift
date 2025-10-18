@@ -638,17 +638,21 @@ class SupabasePlaceService: ObservableObject {
                 print("📍 [Supabase] Adding place to my_places for user: \(userId)")
                 print("📍 [Supabase] Place ID: \(place.id.uuidString)")
                 
-                // Convert coordinate to PostGIS geometry string
-                var coordinateString: String? = nil
+                // Convert coordinate to LocationData struct (same format as PlaceRecord)
+                var locationData: LocationData? = nil
                 if let coordinate = place.coordinate {
-                    coordinateString = "POINT(\(coordinate.longitude) \(coordinate.latitude))"
+                    locationData = LocationData(
+                        type: "Point",
+                        coordinates: [coordinate.longitude, coordinate.latitude],
+                        wkt: "POINT(\(coordinate.longitude) \(coordinate.latitude))"
+                    )
                 }
                 
                 let myPlaceRecord = MyPlaceRecord(
                     user_id: userId,
                     place_id: place.id.uuidString,
                     name: place.name,
-                    coordinate: coordinateString
+                    coordinate: locationData
                 )
                 
                 print("📍 [Supabase] MyPlaceRecord: \(myPlaceRecord)")
@@ -860,10 +864,10 @@ class SupabasePlaceService: ObservableObject {
         place.priceLevel = record.price_level
         place.reservable = record.reservable
         place.servesBreakfast = record.serves_breakfast
-        place.servesLunch = record.serves_lunch
-        place.servesDinner = record.serves_dinner
-        place.instagram = record.instagram
-        place.x = record.twitter // Note: DetailPlace doesn't have twitter field, using x instead
+        place.serversLunch = record.serves_lunch
+        place.serversDinner = record.serves_dinner
+        place.Instagram = record.instagram
+        place.X = record.twitter // Note: DetailPlace doesn't have twitter field, using x instead
         place.photoUrls = record.photo_urls
         place.googlePlaceId = record.google_places_id
         place.source = record.source
@@ -1359,7 +1363,7 @@ struct MyPlaceRecord: Codable {
     let user_id: String
     let place_id: String
     let name: String
-    let coordinate: String? // PostGIS geometry as WKT string
+    let coordinate: LocationData? // PostGIS geometry as custom struct (same as PlaceRecord)
 }
 
 struct PlaceListItemRecord: Codable {
