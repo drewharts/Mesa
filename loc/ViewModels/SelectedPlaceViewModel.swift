@@ -1127,6 +1127,13 @@ class SelectedPlaceViewModel: ObservableObject {
     }
 
     func createNewPlace(idString: String?, name: String, description: String?, coordinate: CLLocationCoordinate2D, userId: String, profileVM: ProfileViewModel? = nil, detailPlaceVM: DetailPlaceViewModel? = nil) {
+        print("🎬 [SelectedPlaceViewModel] createNewPlace called")
+        print("🎬 [SelectedPlaceViewModel] Name: \(name)")
+        print("🎬 [SelectedPlaceViewModel] Description: \(description ?? "nil")")
+        print("🎬 [SelectedPlaceViewModel] Coordinate: \(coordinate.latitude), \(coordinate.longitude)")
+        print("🎬 [SelectedPlaceViewModel] User ID: \(userId)")
+        print("🎬 [SelectedPlaceViewModel] ID String: \(idString ?? "nil")")
+        
         // Create a new place
         var newPlace = DetailPlace()
         if let idString = idString, let uuid = UUID(uuidString: idString) {
@@ -1139,6 +1146,9 @@ class SelectedPlaceViewModel: ObservableObject {
             longitude: coordinate.longitude
         )
         newPlace.isCustom = true // Mark as custom place
+        
+        print("🎬 [SelectedPlaceViewModel] Created new place with ID: \(newPlace.id.uuidString)")
+        print("🎬 [SelectedPlaceViewModel] Place isCustom: \(newPlace.isCustom ?? false)")
         
         // Immediately update local state for instant UI feedback
         DispatchQueue.main.async {
@@ -1167,19 +1177,30 @@ class SelectedPlaceViewModel: ObservableObject {
             NotificationCenter.default.post(name: NSNotification.Name("RefreshMapAnnotations"), object: nil)
         }
         
-        // Save to main places collection
-        placeService.addToAllPlaces(place: newPlace) { error in
-            if let error = error {
-                print("Error saving place to main collection: \(error.localizedDescription)")
-            } else {
-                print("Successfully saved place to main collection")
-                
-                // Save to user's myPlaces collection
-                self.placeService.addToMyPlaces(userId: userId, place: newPlace) { error in
-                    if let error = error {
-                        print("Error saving place to user's collection: \(error.localizedDescription)")
-                    } else {
-                        print("Successfully saved place to user's myPlaces collection")
+        // Test Supabase connection first
+        print("🔍 [SelectedPlaceViewModel] Testing Supabase connection...")
+        SupabasePlaceService.shared.testSupabaseConnection { isConnected, error in
+            if !isConnected {
+                print("❌ [SelectedPlaceViewModel] Supabase connection failed: \(error?.localizedDescription ?? "Unknown error")")
+                return
+            }
+            
+            // Save to main places collection
+            print("💾 [SelectedPlaceViewModel] Starting to save place to database...")
+            self.placeService.addToAllPlaces(place: newPlace) { error in
+                if let error = error {
+                    print("❌ [SelectedPlaceViewModel] Error saving place to main collection: \(error.localizedDescription)")
+                } else {
+                    print("✅ [SelectedPlaceViewModel] Successfully saved place to main collection")
+                    
+                    // Save to user's myPlaces collection
+                    print("💾 [SelectedPlaceViewModel] Starting to save place to user's myPlaces...")
+                    self.placeService.addToMyPlaces(userId: userId, place: newPlace) { error in
+                        if let error = error {
+                            print("❌ [SelectedPlaceViewModel] Error saving place to user's collection: \(error.localizedDescription)")
+                        } else {
+                            print("✅ [SelectedPlaceViewModel] Successfully saved place to user's myPlaces collection")
+                        }
                     }
                 }
             }

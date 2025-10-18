@@ -570,13 +570,38 @@ class SupabasePlaceService: ObservableObject {
     
     // MARK: - Place Creation
     
+    /// Test method to verify Supabase connection
+    func testSupabaseConnection(completion: @escaping (Bool, Error?) -> Void) {
+        Task {
+            do {
+                print("🔍 [Supabase] Testing connection...")
+                let response: [PlaceRecord] = try await supabase.client
+                    .from("places")
+                    .select("id")
+                    .limit(1)
+                    .execute()
+                    .value
+                
+                print("✅ [Supabase] Connection test successful")
+                completion(true, nil)
+            } catch {
+                print("❌ [Supabase] Connection test failed: \(error)")
+                completion(false, error)
+            }
+        }
+    }
+    
     func addToAllPlaces(place: DetailPlace, completion: @escaping (Error?) -> Void) {
         Task {
             do {
                 print("📍 [Supabase] Adding place to all_places: \(place.name)")
+                print("📍 [Supabase] Place ID: \(place.id.uuidString)")
+                print("📍 [Supabase] Place coordinate: \(place.coordinate?.latitude ?? 0), \(place.coordinate?.longitude ?? 0)")
+                print("📍 [Supabase] Place isCustom: \(place.isCustom ?? false)")
                 
                 // Convert DetailPlace to dictionary for Supabase insertion
                 let placeData = convertToPlaceData(place)
+                print("📍 [Supabase] Place data prepared: \(placeData)")
                 
                 let response: [PlaceRecord] = try await supabase.client
                     .from("places")
@@ -586,9 +611,11 @@ class SupabasePlaceService: ObservableObject {
                     .value
                 
                 print("✅ [Supabase] Successfully added place to all_places: \(place.name)")
+                print("✅ [Supabase] Response: \(response)")
                 completion(nil)
             } catch {
                 print("❌ [Supabase] Error adding place to all_places: \(error)")
+                print("❌ [Supabase] Error details: \(error.localizedDescription)")
                 completion(error)
             }
         }
@@ -598,12 +625,15 @@ class SupabasePlaceService: ObservableObject {
         Task {
             do {
                 print("📍 [Supabase] Adding place to my_places for user: \(userId)")
+                print("📍 [Supabase] Place ID: \(place.id.uuidString)")
                 
                 let myPlaceRecord = MyPlaceRecord(
                     user_id: userId,
                     place_id: place.id.uuidString,
                     timestamp: ISO8601DateFormatter().string(from: Date())
                 )
+                
+                print("📍 [Supabase] MyPlaceRecord: \(myPlaceRecord)")
                 
                 let response: MyPlaceRecord = try await supabase.client
                     .from("my_places")
@@ -614,9 +644,11 @@ class SupabasePlaceService: ObservableObject {
                     .value
                 
                 print("✅ [Supabase] Successfully added place to my_places for user: \(userId)")
+                print("✅ [Supabase] Response: \(response)")
                 completion(nil)
             } catch {
                 print("❌ [Supabase] Error adding place to my_places: \(error)")
+                print("❌ [Supabase] Error details: \(error.localizedDescription)")
                 completion(error)
             }
         }
