@@ -7,7 +7,6 @@
 
 import Foundation
 import UIKit
-import MapboxSearch
 import SwiftUI
 
 @MainActor
@@ -338,43 +337,7 @@ class DetailPlaceViewModel: ObservableObject {
 //        }
     }
 
-    // Convert SearchResult to DetailPlace and save it
-    func searchResultToDetailPlace(place: SearchResult, completion: @escaping (DetailPlace) -> Void) {
-        // Safely unwrap mapboxId to avoid force-unwrap crash
-        guard let mapboxId = place.mapboxId else {
-            print("SearchResult has no mapboxId")
-            return
-        }
-        
-        placeService.findPlace(mapboxId: mapboxId) { [weak self] existingDetailPlace, error in
-            guard let self = self else { return }
-            
-            // Log any errors from Firestore lookup
-            if let error = error {
-                print("Error checking for existing place: \(error.localizedDescription)")
-            }
-            
-            // If place exists, return it
-            if let existingDetailPlace = existingDetailPlace {
-                // Calculate restaurant type for existing place
-                self.calculateRestaurantType(for: existingDetailPlace)
-                completion(existingDetailPlace)
-                return
-            }
-            
-            // Create new DetailPlace using the new constructor
-            let detailPlace = DetailPlace(from: place)
-            
-            // Update local state and fetch image on main thread
-            DispatchQueue.main.async {
-                self.places[detailPlace.id.uuidString] = detailPlace
-                self.fetchPlaceImage(for: detailPlace.id.uuidString)
-                self.calculateRestaurantType(for: detailPlace) // Calculate restaurant type
-                self.generateColorForPlace(detailPlace.id.uuidString) // Generate color for new place
-                completion(detailPlace)
-            }
-        }
-    }
+    // Removed MapboxSearch searchResultToDetailPlace method - now using Google Places API
     
     private func combinedCircularImage(image1: UIImage?, image2: UIImage? = nil, image3: UIImage? = nil) -> UIImage {
         let totalSize = CGSize(width: 80, height: 40)

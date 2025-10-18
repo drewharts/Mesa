@@ -1,5 +1,5 @@
 {
-  "originHash" : "3981bdf87c4d81c134ed70f79edc97d6e88d33c6d72c3226279b142bc1b1dac9",
+  "originHash" : "e8f9f66f429827cbb5f554e6af306133ab0e97b23ea9844f8db1f147a8718738",
   "pins" : [
     {
       "identity" : "abseil-cpp-binary",
@@ -146,33 +146,6 @@
       }
     },
     {
-      "identity" : "mapbox-common-ios",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/mapbox/mapbox-common-ios.git",
-      "state" : {
-        "revision" : "eea3a287b1f6212a624b05286799cd22c554849f",
-        "version" : "24.10.0-rc.1"
-      }
-    },
-    {
-      "identity" : "mapbox-core-maps-ios",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/mapbox/mapbox-core-maps-ios.git",
-      "state" : {
-        "revision" : "1938905a7bc2721069df573d5010d8461fbe5ec7",
-        "version" : "11.10.0-rc.1"
-      }
-    },
-    {
-      "identity" : "mapbox-maps-ios",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/mapbox/mapbox-maps-ios.git",
-      "state" : {
-        "revision" : "8a58e117b0adf7a7503e743b8841a558d0a559ea",
-        "version" : "11.10.0-rc.1"
-      }
-    },
-    {
       "identity" : "nanopb",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/firebase/nanopb.git",
@@ -188,15 +161,6 @@
       "state" : {
         "revision" : "540318ecedd63d883069ae7f1ed811a2df00b6ac",
         "version" : "2.4.0"
-      }
-    },
-    {
-      "identity" : "search-ios",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/mapbox/search-ios.git",
-      "state" : {
-        "revision" : "de703a98a68eb2a548e67ee10a75dce03652ef03",
-        "version" : "2.8.0-rc.2"
       }
     },
     {
@@ -260,15 +224,6 @@
       "state" : {
         "revision" : "2547102afd04fe49f1b286090f13ebce07284980",
         "version" : "1.31.1"
-      }
-    },
-    {
-      "identity" : "turf-swift",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/mapbox/turf-swift.git",
-      "state" : {
-        "revision" : "bf840e6b9529d105687840fe2c9dcd74197d46d1",
-        "version" : "4.0.0"
       }
     },
     {

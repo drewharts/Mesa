@@ -7,7 +7,6 @@
 
 import SwiftUI
 import Combine
-import MapboxSearch
 import CoreLocation
 
 class SearchViewModel: ObservableObject {
@@ -189,39 +188,7 @@ class SearchViewModel: ObservableObject {
         }
     }
     
-    private func searchResultToDetailPlace(place: SearchResult, completion: @escaping (DetailPlace) -> Void) {
-        // First, check if the DetailPlace exists in Firestore using mapboxId
-        placeService.findPlace(mapboxId: place.mapboxId!) { [weak self] existingDetailPlace, error in
-            if let error = error {
-                print("Error checking for existing place: \(error.localizedDescription)")
-                // If there's an error, proceed to create a new DetailPlace (or handle differently)
-            }
-            
-            if var existingDetailPlace = existingDetailPlace {
-                // Update the OpenHours for the existing place
-                if let openHours = place.metadata?.openHours as? OpenHours {
-                    existingDetailPlace.openHours = DetailPlace.serializeOpenHours(openHours)
-                    
-                    // Update the place in Firestore
-                    self?.placeService.updatePlace(place: existingDetailPlace) { error in
-                        if let error = error {
-                            print("Error updating place hours in Firestore: \(error.localizedDescription)")
-                        }
-                        completion(existingDetailPlace)
-                    }
-                } else {
-                    completion(existingDetailPlace)
-                }
-                return
-            }
-            
-            // If no existing place is found, create a new DetailPlace using the initializer
-            let detailPlace = DetailPlace(from: place)
-            
-            // Return the newly created DetailPlace
-            completion(detailPlace)
-        }
-    }
+    // Removed MapboxSearch searchResultToDetailPlace method - now using Google Places API
     
     func selectSuggestion(_ suggestion: MesaPlaceSuggestion) {
         searchService.selectSuggestion(

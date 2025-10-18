@@ -6,7 +6,6 @@
 //
 
 import Foundation
-import MapboxSearch
 import CoreLocation
 import UIKit
 

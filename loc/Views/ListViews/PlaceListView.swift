@@ -9,7 +9,6 @@
 // PlaceListView.swift
 
 import SwiftUI
-import MapboxSearch
 
 struct WidePlaceView: View {
     @EnvironmentObject var profile: ProfileViewModel

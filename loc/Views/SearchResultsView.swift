@@ -1,5 +1,4 @@
 import SwiftUI
-import MapboxSearch
 
 struct SearchResultsView: View {
     let placeResults: [MesaPlaceSuggestion]

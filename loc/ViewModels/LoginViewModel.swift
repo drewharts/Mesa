@@ -152,7 +152,7 @@ class LoginViewModel: ObservableObject {
         print("🔍 Querying database for email: '\(email)'")
 
         do {
-            let profiles: [ProfileData] = try await SupabaseManager.shared.database
+            let profiles: [ProfileData] = try await SupabaseManager.shared.client
                 .from("users")
                 .select()
                 .eq("email", value: email)
@@ -211,7 +211,7 @@ class LoginViewModel: ObservableObject {
             print("🔄 Attempting to update user record with supabase_uid...")
 
             // First check current state
-            let beforeUpdate: [ProfileData] = try await SupabaseManager.shared.database
+            let beforeUpdate: [ProfileData] = try await SupabaseManager.shared.client
                 .from("users")
                 .select()
                 .eq("email", value: existingUser.email)
@@ -223,7 +223,7 @@ class LoginViewModel: ObservableObject {
             }
 
             // Simply update the existing user record to link it to the Supabase auth ID
-            let updateResponse = try await SupabaseManager.shared.database
+            let updateResponse = try await SupabaseManager.shared.client
                 .from("users")
                 .update(["supabase_uid": supabaseUserId])
                 .eq("email", value: existingUser.email)
@@ -233,7 +233,7 @@ class LoginViewModel: ObservableObject {
             print("📊 Update response: \(updateResponse)")
 
             // Verify the link worked
-            let verifyProfiles: [ProfileData] = try await SupabaseManager.shared.database
+            let verifyProfiles: [ProfileData] = try await SupabaseManager.shared.client
                 .from("users")
                 .select()
                 .eq("email", value: existingUser.email)
@@ -275,7 +275,7 @@ class LoginViewModel: ObservableObject {
         do {
             // Update favorites
             print("🔄 Updating favorites...")
-            try await SupabaseManager.shared.database
+            try await SupabaseManager.shared.client
                 .from("favorites")
                 .update(["user_id": newUserId])
                 .eq("user_id", value: oldUserId)
@@ -284,7 +284,7 @@ class LoginViewModel: ObservableObject {
 
             // Update following (both follower and following)
             print("🔄 Updating following (follower_id)...")
-            try await SupabaseManager.shared.database
+            try await SupabaseManager.shared.client
                 .from("following")
                 .update(["follower_id": newUserId])
                 .eq("follower_id", value: oldUserId)
@@ -292,7 +292,7 @@ class LoginViewModel: ObservableObject {
             print("✅ following (follower_id) updated")
 
             print("🔄 Updating following (following_id)...")
-            try await SupabaseManager.shared.database
+            try await SupabaseManager.shared.client
                 .from("following")
                 .update(["following_id": newUserId])
                 .eq("following_id", value: oldUserId)
@@ -301,7 +301,7 @@ class LoginViewModel: ObservableObject {
 
             // Update place lists
             print("🔄 Updating place_lists...")
-            try await SupabaseManager.shared.database
+            try await SupabaseManager.shared.client
                 .from("place_lists")
                 .update(["user_id": newUserId])
                 .eq("user_id", value: oldUserId)
@@ -310,7 +310,7 @@ class LoginViewModel: ObservableObject {
 
             // Update reviews
             print("🔄 Updating reviews...")
-            try await SupabaseManager.shared.database
+            try await SupabaseManager.shared.client
                 .from("reviews")
                 .update(["user_id": newUserId])
                 .eq("user_id", value: oldUserId)
@@ -319,7 +319,7 @@ class LoginViewModel: ObservableObject {
 
             // Update comments
             print("🔄 Updating comments...")
-            try await SupabaseManager.shared.database
+            try await SupabaseManager.shared.client
                 .from("comments")
                 .update(["user_id": newUserId])
                 .eq("user_id", value: oldUserId)
@@ -328,7 +328,7 @@ class LoginViewModel: ObservableObject {
 
             // Update my_places
             print("🔄 Updating my_places...")
-            try await SupabaseManager.shared.database
+            try await SupabaseManager.shared.client
                 .from("my_places")
                 .update(["user_id": newUserId])
                 .eq("user_id", value: oldUserId)
@@ -337,7 +337,7 @@ class LoginViewModel: ObservableObject {
 
             // Update external_places
             print("🔄 Updating external_places...")
-            try await SupabaseManager.shared.database
+            try await SupabaseManager.shared.client
                 .from("external_places")
                 .update(["user_id": newUserId])
                 .eq("user_id", value: oldUserId)
@@ -346,7 +346,7 @@ class LoginViewModel: ObservableObject {
 
             // Update place_notes
             print("🔄 Updating place_notes...")
-            try await SupabaseManager.shared.database
+            try await SupabaseManager.shared.client
                 .from("place_notes")
                 .update(["user_id": newUserId])
                 .eq("user_id", value: oldUserId)
@@ -355,7 +355,7 @@ class LoginViewModel: ObservableObject {
 
             // Update tik_tok_place_flags
             print("🔄 Updating tik_tok_place_flags...")
-            try await SupabaseManager.shared.database
+            try await SupabaseManager.shared.client
                 .from("tik_tok_place_flags")
                 .update(["user_id": newUserId])
                 .eq("user_id", value: oldUserId)
@@ -364,7 +364,7 @@ class LoginViewModel: ObservableObject {
 
             // Update user_notifications
             print("🔄 Updating user_notifications...")
-            try await SupabaseManager.shared.database
+            try await SupabaseManager.shared.client
                 .from("user_notifications")
                 .update(["user_id": newUserId])
                 .eq("user_id", value: oldUserId)
@@ -373,7 +373,7 @@ class LoginViewModel: ObservableObject {
 
             // Update review_likes
             print("🔄 Updating review_likes...")
-            try await SupabaseManager.shared.database
+            try await SupabaseManager.shared.client
                 .from("review_likes")
                 .update(["user_id": newUserId])
                 .eq("user_id", value: oldUserId)

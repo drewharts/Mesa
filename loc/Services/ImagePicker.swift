@@ -49,14 +49,20 @@ struct ImagePicker: UIViewControllerRepresentable {
         func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
             
             if let selectedImage = info[.originalImage] as? UIImage {
-                if parent.selectionLimit == 1 {
-                    // Single image selection: replace the array
-                    parent.images = [selectedImage]
-                } else {
-                    // Multiple image selection: append to the array
-                    parent.images.append(selectedImage)
+                DispatchQueue.main.async {
+                    if self.parent.selectionLimit == 1 {
+                        // Single image selection: replace the array
+                        self.parent.images = [selectedImage]
+                    } else {
+                        // Multiple image selection: append to the array
+                        self.parent.images.append(selectedImage)
+                    }
                 }
             }
+            picker.dismiss(animated: true)
+        }
+        
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
             picker.dismiss(animated: true)
         }
     }

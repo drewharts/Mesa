@@ -7,7 +7,6 @@
 
 import SwiftUI
 import PhotosUI
-import MapboxSearch
 
 struct ProfileViewListsView: View {
     @EnvironmentObject var profile: ProfileViewModel

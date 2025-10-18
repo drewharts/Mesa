@@ -220,8 +220,8 @@ class UserService: ObservableObject {
         print("🔄 [UserService] Fetching user profile from Supabase: \(userId)")
         Task { @MainActor in
             do {
-                let response: [ProfileData] = try await SupabaseManager.shared.database
-                    .from("users")
+            let response: [ProfileData] = try await SupabaseManager.shared.client
+                .from("users")
                     .select()
                     .eq("id", value: userId)
                     .single()
@@ -250,7 +250,7 @@ class UserService: ObservableObject {
 
         do {
             // First try to fetch by id (works for Firebase UIDs and new Supabase users)
-            let profile: ProfileData = try await SupabaseManager.shared.database
+            let profile: ProfileData = try await SupabaseManager.shared.client
                 .from("users")
                 .select()
                 .eq("id", value: userId)
@@ -266,7 +266,7 @@ class UserService: ObservableObject {
 
             // If not found by id, try by supabase_uid (for Supabase auth UIDs)
             do {
-                let profile: ProfileData = try await SupabaseManager.shared.database
+                let profile: ProfileData = try await SupabaseManager.shared.client
                     .from("users")
                     .select()
                     .eq("supabase_uid", value: userId)
@@ -304,7 +304,7 @@ class UserService: ObservableObject {
         print("🔄 [UserService] Fetching user profile by Supabase auth UID: \(supabaseUid)")
 
         do {
-            let profile: ProfileData = try await SupabaseManager.shared.database
+            let profile: ProfileData = try await SupabaseManager.shared.client
                 .from("users")
                 .select()
                 .eq("supabase_uid", value: supabaseUid)
@@ -340,7 +340,7 @@ class UserService: ObservableObject {
     func fetchUserExternalPlaces(userId: String) async throws -> [ExternalPlace] {
         do {
             // Fetch external places for the specific user
-            let externalPlacesResponse: [ExternalPlaceDirectResponse] = try await SupabaseManager.shared.database
+            let externalPlacesResponse: [ExternalPlaceDirectResponse] = try await SupabaseManager.shared.client
                 .from("external_places")
                 .select("""
                     id,
@@ -369,7 +369,7 @@ class UserService: ObservableObject {
                 ].filter { $0 != userId }
                 
                 for altUserId in alternativeUserIds {
-                    let altResponse: [ExternalPlaceDirectResponse] = try await SupabaseManager.shared.database
+                    let altResponse: [ExternalPlaceDirectResponse] = try await SupabaseManager.shared.client
                         .from("external_places")
                         .select("""
                             id,
@@ -411,7 +411,7 @@ class UserService: ObservableObject {
         print("📍 [UserService] Fetching details for \(placeIds.count) places: \(placeIds)")
         
         // Fetch place details separately
-        let placesResponse: [PlaceBasicResponse] = try await SupabaseManager.shared.database
+        let placesResponse: [PlaceBasicResponse] = try await SupabaseManager.shared.client
             .from("places")
             .select("""
                 id,
@@ -657,7 +657,7 @@ class UserService: ObservableObject {
         print("💾 [UserService] Saving user profile to Supabase: \(profileData.firstName) \(profileData.lastName)")
         Task { @MainActor in
             do {
-                let _ = try await SupabaseManager.shared.database
+                let _ = try await SupabaseManager.shared.client
                     .from("users")
                     .insert(profileData)
                     .execute()

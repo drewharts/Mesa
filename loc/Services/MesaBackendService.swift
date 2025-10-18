@@ -1,6 +1,5 @@
 import Foundation
 import CoreLocation
-import MapboxSearch
 
 // MARK: - Search Service Protocols
 

@@ -7,7 +7,6 @@
 import Foundation
 import UIKit
 import SwiftUI
-import MapboxSearch
 
 @MainActor
 class UserProfileViewModel: ObservableObject {

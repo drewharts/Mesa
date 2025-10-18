@@ -6,7 +6,6 @@
 //
 
 import SwiftUI
-import MapboxSearch
 
 // ListDescription
 struct ListDescription: View {

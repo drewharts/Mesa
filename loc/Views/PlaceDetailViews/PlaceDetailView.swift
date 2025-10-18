@@ -39,6 +39,9 @@ struct PlaceDetailView: View {
             VStack(spacing: 16) {
                 if viewModel.placeName == "Unknown" {
                     ProgressView("Loading Place Details...")
+                        .onAppear {
+                            print("📱 [PlaceDetailView] Showing loading state - placeName: '\(viewModel.placeName)'")
+                        }
                 } else {
                     MinPlaceDetailView(
                         viewModel: viewModel,
@@ -51,6 +54,9 @@ struct PlaceDetailView: View {
                     )
                     .environmentObject(userProfileViewModel)
                     .scrollDisabled(!isScrollingEnabled) // Disable scrolling based on sheet height
+                    .onAppear {
+                        print("📱 [PlaceDetailView] Showing content - placeName: '\(viewModel.placeName)'")
+                    }
                 }
             }
             .padding(.vertical)
@@ -99,6 +105,12 @@ struct PlaceDetailView: View {
                 if let place = selectedPlaceVM.selectedPlace,
                    let currentLocation = locationManager.currentLocation {
                     viewModel.loadData(for: place, currentLocation: currentLocation.coordinate)
+                }
+            }
+            .onChange(of: selectedPlaceVM.selectedPlace) { _, newPlace in
+                if let place = newPlace {
+                    print("🔄 [PlaceDetailView] Selected place changed, updating view model")
+                    viewModel.updatePlaceData(place)
                 }
             }
             .onChange(of: selectedPlaceVM.isCurrentPlaceFullyLoaded) { _, isLoaded in

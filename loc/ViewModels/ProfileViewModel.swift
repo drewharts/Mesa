@@ -6,7 +6,6 @@
 
 import SwiftUI
 import Combine
-import MapboxSearch
 import Foundation
 import UIKit
 import CoreLocation
@@ -61,6 +60,7 @@ class ProfileViewModel: ObservableObject {
 
      @Published var showMaxFavoritesAlert: Bool = false
      @Published var isLoading: Bool = true
+     @Published var isUploadingProfilePhoto: Bool = false
      private var loadingTasks: Int = 0
      @Published var followersCount: Int = 0
      @Published var followingCount: Int = 0
@@ -175,18 +175,76 @@ class ProfileViewModel: ObservableObject {
     }
     
      func changeProfilePhoto(_ newImage: UIImage) async {
-        guard let userId = user?.id else { return }
+        print("🔄 [ProfileViewModel] changeProfilePhoto called")
+        
+        // Set loading state and update UI immediately on main thread
+        await MainActor.run {
+            self.isUploadingProfilePhoto = true
+            // Update UI immediately to show the new image for instant feedback
+            self.userPicture = cropToSquare(newImage)
+        }
+        
+        guard let userId = user?.id else { 
+            print("❌ [ProfileViewModel] No user ID found - user is nil")
+            await MainActor.run {
+                self.isUploadingProfilePhoto = false
+            }
+            return 
+        }
+        
+        print("🔍 [ProfileViewModel] User ID: \(userId)")
+        print("🔍 [ProfileViewModel] User object: \(String(describing: user))")
+        
         let croppedImage = cropToSquare(newImage)
+        print("🔍 [ProfileViewModel] Image cropped, size: \(croppedImage.size)")
+        
         do {
+            print("🚀 [ProfileViewModel] Starting profile photo upload...")
             let url = try await imageService.updateProfilePhoto(userId: userId, image: croppedImage)
-            // Update local user and userPicture
-            DispatchQueue.main.async {
+            print("✅ [ProfileViewModel] Upload successful, URL: \(url)")
+            
+            // Update the users table with the new profile photo URL
+            do {
+                print("🔄 [ProfileViewModel] Updating users table with new profile photo URL...")
+                try await updateProfilePhotoInDatabase(userId: userId, photoURL: url)
+                print("✅ [ProfileViewModel] Database updated successfully")
+            } catch {
+                print("⚠️ [ProfileViewModel] Failed to update database, but upload succeeded: \(error)")
+            }
+            
+            // Update local user and userPicture on main thread
+            await MainActor.run {
                 self.user?.profilePhotoURL = url
                 self.userPicture = croppedImage
+                self.isUploadingProfilePhoto = false
+                print("✅ [ProfileViewModel] Local state updated successfully")
             }
         } catch {
-            print("Failed to update profile photo: \(error)")
+            print("❌ [ProfileViewModel] Failed to upload profile photo: \(error)")
+            print("❌ [ProfileViewModel] Error type: \(type(of: error))")
+            print("❌ [ProfileViewModel] Error details: \(error.localizedDescription)")
+            
+            // Revert the image on error and clear loading state
+            await MainActor.run {
+                self.isUploadingProfilePhoto = false
+                // Keep the current userPicture or revert to previous state
+                print("❌ [ProfileViewModel] Reverting image due to upload failure")
+            }
         }
+    }
+    
+     /// Update the users table with the new profile photo URL
+     private func updateProfilePhotoInDatabase(userId: String, photoURL: URL) async throws {
+        let supabase = await SupabaseManager.shared
+        
+        // Update the users table with the new profile_photo_url
+        try await supabase.client
+            .from("users")
+            .update(["profile_photo_url": photoURL.absoluteString])
+            .eq("id", value: userId)
+            .execute()
+        
+        print("✅ [ProfileViewModel] Updated users table with new profile photo URL: \(photoURL)")
     }
     
      private func cropToSquare(_ image: UIImage) -> UIImage {

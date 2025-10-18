@@ -7,7 +7,6 @@
 
 
 import SwiftUI
-import MapboxSearch
 
 
 struct MainView: View {

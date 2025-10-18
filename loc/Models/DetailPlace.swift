@@ -6,7 +6,6 @@
 //
 
 import Foundation
-import MapboxSearch
 import CoreLocation
 
 struct DetailPlace: Codable, Identifiable, Equatable {
@@ -319,43 +318,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         self.isCustom = nil
     }
 
-    init(from searchResult: SearchResult) {
-        self.id = UUID()
-        self.name = searchResult.name
-        self.address = searchResult.address?.formattedAddress(style: .medium)
-        self.city = searchResult.address?.place
-        self.mapboxId = searchResult.id
-        self.coordinate = CLLocationCoordinate2D(
-            latitude: searchResult.coordinate.latitude,
-            longitude: searchResult.coordinate.longitude
-        )
-        self.categories = searchResult.categories
-        self.phone = searchResult.metadata?.phone
-        self.rating = searchResult.metadata?.rating
-        self.userRatingsTotal = nil
-        
-        // Handle OpenHours
-        if let openHours = searchResult.metadata?.openHours as? OpenHours {
-            self.openHours = DetailPlace.serializeOpenHours(openHours)
-        } else {
-            self.openHours = nil
-        }
-        
-        self.description = searchResult.metadata?.description
-        self.priceLevel = searchResult.metadata?.priceLevel
-        self.reservable = searchResult.metadata?.reservable
-        self.servesBreakfast = searchResult.metadata?.servesBreakfast
-        self.serversLunch = searchResult.metadata?.servesLunch
-        self.serversDinner = searchResult.metadata?.servesDinner
-        self.Instagram = searchResult.metadata?.instagram
-        self.X = searchResult.metadata?.twitter
-        self.tikTokVideos = nil
-        self.photoUrls = nil
-        self.googlePlaceId = nil
-        self.source = nil
-        self.createdAt = nil
-        self.isCustom = nil
-    }
+    // Removed MapboxSearch SearchResult initializer - now using Google Places API
 
     // MARK: - Conversion Methods
     func toPlace() -> Place {
@@ -366,28 +329,5 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         )
     }
     
-    public static func serializeOpenHours(_ openHours: OpenHours) -> [String] {
-        switch openHours {
-        case .alwaysOpened:
-            return ["always_opened"]
-        case .temporarilyClosed:
-            return ["temporarily_closed"]
-        case .permanentlyClosed:
-            return ["permanently_closed"]
-        case .scheduled(periods: let periods, weekdayText: let weekdayText, note: let note):
-            var result: [String] = periods.map { period in
-                // Extract from start and end (DateComponents)
-                let open = "\(period.start.weekday ?? 0):\(period.start.hour ?? 0):\(period.start.minute ?? 0)"
-                let close = "\(period.end.weekday ?? 0):\(period.end.hour ?? 0):\(period.end.minute ?? 0)"
-                return "\(open)-\(close)"
-            }
-            if let weekdayText = weekdayText {
-                result.append(contentsOf: weekdayText)
-            }
-            if let note = note {
-                result.append("note:\(note)")
-            }
-            return result
-        }
-    }
+    // Removed MapboxSearch OpenHours serialization - now using Google Places API
 }

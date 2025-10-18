@@ -8,7 +8,7 @@
 import Foundation
 import CoreLocation
 
-extension CLLocationCoordinate2D: Codable {
+extension CLLocationCoordinate2D: @retroactive Codable {
     enum CodingKeys: String, CodingKey {
         case latitude
         case longitude
@@ -30,10 +30,15 @@ extension CLLocationCoordinate2D: Codable {
 
 // Note: CLLocationCoordinate2D already conforms to Equatable in iOS 13+
 // Adding Hashable conformance for use in Sets and Dictionaries
-extension CLLocationCoordinate2D: Hashable {
+extension CLLocationCoordinate2D: @retroactive Hashable {
     public func hash(into hasher: inout Hasher) {
         hasher.combine(latitude)
         hasher.combine(longitude)
+    }
+    
+    // Implement Equatable conformance manually to avoid synthesis issues
+    public static func == (lhs: CLLocationCoordinate2D, rhs: CLLocationCoordinate2D) -> Bool {
+        return lhs.latitude == rhs.latitude && lhs.longitude == rhs.longitude
     }
 }
 

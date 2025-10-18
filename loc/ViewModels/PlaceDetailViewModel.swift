@@ -7,7 +7,6 @@
 
 import SwiftUI
 import MapKit
-import MapboxSearch
 import UIKit
 
 class PlaceDetailViewModel: ObservableObject {

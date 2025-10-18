@@ -7,7 +7,6 @@
 
 import SwiftUI
 import Combine
-import MapboxSearch
 
 class PlaceReviewViewModel: ObservableObject {
    // MARK: - Published Properties (bound to the View)
