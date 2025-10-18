@@ -82,24 +82,31 @@ class SupabasePlaceService: ObservableObject {
         let name: String
         let address: String?
         let city: String?
-        let mapbox_id: String?
+        let description: String?
         let location: String? // PostGIS geometry as WKT string
+        let geohash: String?
+        let rating: Double?
+        let rating_count: Int?
+        let price_level: String?
         let categories: [String]?
         let phone: String?
-        let rating: Double?
-        let user_ratings_total: Int?
+        let website: String?
+        let menu_url: String?
+        let instagram: String?
+        let twitter: String?
+        let google_places_id: String?
+        let mapbox_id: String?
+        let fid: String?
+        let cid: String?
+        let thumbnail_url: String?
+        let photo_urls: [String]?
         let open_hours: [String]?
-        let description_text: String?
-        let price_level: String?
         let reservable: Bool?
         let serves_breakfast: Bool?
         let serves_lunch: Bool?
         let serves_dinner: Bool?
-        let instagram: String?
-        let x: String?
-        let photo_urls: [String]?
-        let google_place_id: String?
         let source: String?
+        let updated_at: String?
         let is_custom: Bool
     }
     
@@ -116,24 +123,31 @@ class SupabasePlaceService: ObservableObject {
             name: place.name,
             address: place.address,
             city: place.city,
-            mapbox_id: place.mapboxId,
+            description: place.description,
             location: locationString,
+            geohash: nil, // Not available in DetailPlace
+            rating: place.rating,
+            rating_count: place.userRatingsTotal,
+            price_level: place.priceLevel,
             categories: place.categories,
             phone: place.phone,
-            rating: place.rating,
-            user_ratings_total: place.userRatingsTotal,
+            website: nil, // Not available in DetailPlace
+            menu_url: nil, // Not available in DetailPlace
+            instagram: place.instagram,
+            twitter: nil, // Not available in DetailPlace
+            google_places_id: place.googlePlaceId,
+            mapbox_id: place.mapboxId,
+            fid: nil, // Not available in DetailPlace
+            cid: nil, // Not available in DetailPlace
+            thumbnail_url: nil, // Not available in DetailPlace
+            photo_urls: place.photoUrls,
             open_hours: place.openHours,
-            description_text: place.description,
-            price_level: place.priceLevel,
             reservable: place.reservable,
             serves_breakfast: place.servesBreakfast,
             serves_lunch: place.servesLunch,
             serves_dinner: place.servesDinner,
-            instagram: place.instagram,
-            x: place.x,
-            photo_urls: place.photoUrls,
-            google_place_id: place.googlePlaceId,
             source: place.isCustom == true ? "custom" : place.source,
+            updated_at: nil, // Let database handle this
             is_custom: place.isCustom ?? false
         )
     }
@@ -624,10 +638,17 @@ class SupabasePlaceService: ObservableObject {
                 print("📍 [Supabase] Adding place to my_places for user: \(userId)")
                 print("📍 [Supabase] Place ID: \(place.id.uuidString)")
                 
+                // Convert coordinate to PostGIS geometry string
+                var coordinateString: String? = nil
+                if let coordinate = place.coordinate {
+                    coordinateString = "POINT(\(coordinate.longitude) \(coordinate.latitude))"
+                }
+                
                 let myPlaceRecord = MyPlaceRecord(
                     user_id: userId,
                     place_id: place.id.uuidString,
-                    timestamp: ISO8601DateFormatter().string(from: Date())
+                    name: place.name,
+                    coordinate: coordinateString
                 )
                 
                 print("📍 [Supabase] MyPlaceRecord: \(myPlaceRecord)")
@@ -1327,7 +1348,8 @@ struct FavoriteRecord: Codable {
 struct MyPlaceRecord: Codable {
     let user_id: String
     let place_id: String
-    let timestamp: String?
+    let name: String
+    let coordinate: String? // PostGIS geometry as WKT string
 }
 
 struct PlaceListItemRecord: Codable {
