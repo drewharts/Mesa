@@ -75,7 +75,9 @@ class UserSession: ObservableObject {
         print("   - Thread: \(Thread.isMainThread ? "Main" : "Background")")
         print("   - Current currentUserId: \(self.currentUserId ?? "nil")")
         print("   - New currentUserId: \(uid)")
-        DispatchQueue.main.async {
+        
+        // Ensure we're on the main thread for @Published property updates
+        Task { @MainActor in
             self.isUserLoggedIn = true
             self.currentUserId = uid
             print("✅ User session updated - isUserLoggedIn: \(self.isUserLoggedIn), currentUserId: \(self.currentUserId ?? "nil")")

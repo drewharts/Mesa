@@ -38,10 +38,16 @@ class SupabaseUserService: ObservableObject {
                     fullName: response.full_name
                 )
 
-                completion(user, nil)
+                // Ensure completion is called on main thread
+                await MainActor.run {
+                    completion(user, nil)
+                }
             } catch {
                 print("❌ [Supabase] Error fetching user by Supabase UID \(supabaseUid): \(error)")
-                completion(nil, error)
+                // Ensure completion is called on main thread
+                await MainActor.run {
+                    completion(nil, error)
+                }
             }
         }
     }
@@ -87,10 +93,16 @@ class SupabaseUserService: ObservableObject {
                     fullName: response.full_name
                 )
                 
-                completion(user, nil)
+                // Ensure completion is called on main thread
+                await MainActor.run {
+                    completion(user, nil)
+                }
             } catch {
                 print("❌ [Supabase] Error fetching user \(userId): \(error)")
-                completion(nil, error)
+                // Ensure completion is called on main thread
+                await MainActor.run {
+                    completion(nil, error)
+                }
             }
         }
     }
@@ -106,10 +118,16 @@ class SupabaseUserService: ObservableObject {
                     .value
                 
                 let followingIds = followingRecords.map { $0.following_id }
-                completion(followingIds, nil)
+                // Ensure completion is called on main thread
+                await MainActor.run {
+                    completion(followingIds, nil)
+                }
             } catch {
                 print("❌ [Supabase] Error fetching friends for \(userId): \(error)")
-                completion(nil, error)
+                // Ensure completion is called on main thread
+                await MainActor.run {
+                    completion(nil, error)
+                }
             }
         }
     }
@@ -118,7 +136,9 @@ class SupabaseUserService: ObservableObject {
         Task {
             do {
                 guard !userIds.isEmpty else {
-                    completion([], nil)
+                    await MainActor.run {
+                        completion([], nil)
+                    }
                     return
                 }
                 
@@ -140,10 +160,16 @@ class SupabaseUserService: ObservableObject {
                     )
                 }
                 
-                completion(users, nil)
+                // Ensure completion is called on main thread
+                await MainActor.run {
+                    completion(users, nil)
+                }
             } catch {
                 print("❌ [Supabase] Error fetching profiles: \(error)")
-                completion(nil, error)
+                // Ensure completion is called on main thread
+                await MainActor.run {
+                    completion(nil, error)
+                }
             }
         }
     }
@@ -174,10 +200,16 @@ class SupabaseUserService: ObservableObject {
                     .execute()
                 
                 print("✅ [Supabase] FCM token updated for user \(userId)")
-                completion(nil)
+                // Ensure completion is called on main thread
+                await MainActor.run {
+                    completion(nil)
+                }
             } catch {
                 print("❌ [Supabase] Error updating FCM token: \(error)")
-                completion(error)
+                // Ensure completion is called on main thread
+                await MainActor.run {
+                    completion(error)
+                }
             }
         }
     }

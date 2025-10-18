@@ -288,14 +288,25 @@ class PlaceTypeFilterViewModel: ObservableObject {
             return
         }
         
-        let matchingTypes = availableTypes.filter { type in
-            type.lowercased().contains(searchText.lowercased())
-        }
+        // Capture availableTypes on main thread before background processing
+        let availableTypes = self.availableTypes
         
-        if matchingTypes.count == 1 {
-            selectPlaceType(matchingTypes[0])
-        } else if matchingTypes.count <= 5 {
-            selectedPlaceTypes = Set(matchingTypes)
+        // Perform filtering on background queue to prevent blocking main thread
+        Task.detached(priority: .userInitiated) { [weak self] in
+            guard let self = self else { return }
+            
+            let matchingTypes = availableTypes.filter { type in
+                type.lowercased().contains(searchText.lowercased())
+            }
+            
+            // Update UI on main thread
+            await MainActor.run {
+                if matchingTypes.count == 1 {
+                    self.selectPlaceType(matchingTypes[0])
+                } else if matchingTypes.count <= 5 {
+                    self.selectedPlaceTypes = Set(matchingTypes)
+                }
+            }
         }
     }
     

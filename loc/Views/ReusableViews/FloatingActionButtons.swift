@@ -27,13 +27,14 @@ struct FloatingActionButtons: View {
     
     private var searchButton: some View {
         Button(action: {
-            withAnimation {
+            withAnimation(.easeInOut(duration: 0.3)) {
                 if sheetHeight == maxSheetHeight {
                     sheetHeight = minSheetHeight
                 }
-                isSearchBarMinimized.toggle()
+                isSearchBarMinimized = false
             }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            // Focus the search bar immediately after animation starts
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 searchIsFocused = true
             }
         }) {

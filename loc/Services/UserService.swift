@@ -286,12 +286,16 @@ class UserService: ObservableObject {
 
     func fetchUserBySupabaseUid(supabaseUid: String, completion: @escaping (Result<ProfileData, Error>) -> Void) {
         print("🔄 [UserService] Fetching user profile by Supabase auth UID: \(supabaseUid)")
-        Task { @MainActor in
+        Task {
             do {
                 let profile = try await fetchUserBySupabaseUid(supabaseUid: supabaseUid)
-                completion(.success(profile))
-        } catch {
-                completion(.failure(error))
+                await MainActor.run {
+                    completion(.success(profile))
+                }
+            } catch {
+                await MainActor.run {
+                    completion(.failure(error))
+                }
             }
         }
     }
@@ -322,9 +326,13 @@ class UserService: ObservableObject {
         Task {
             do {
                 let externalPlaces = try await fetchUserExternalPlaces(userId: userId)
-                completion(.success(externalPlaces))
+                await MainActor.run {
+                    completion(.success(externalPlaces))
+                }
             } catch {
-                completion(.failure(error))
+                await MainActor.run {
+                    completion(.failure(error))
+                }
             }
         }
     }

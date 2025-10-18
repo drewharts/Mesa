@@ -2164,7 +2164,7 @@ class ProfileViewModel: ObservableObject {
                 let externalPlacesDict = Dictionary(uniqueKeysWithValues: externalPlaces.map { ($0.placeId, $0) })
                 
                 // Update on main thread to avoid UI threading issues
-                DispatchQueue.main.async {
+                Task { @MainActor in
                     // External places details loaded
                     self.userExternalPlaces = externalPlacesDict
                     print("📚 [ProfileViewModel] Updated userExternalPlaces dictionary with \(externalPlacesDict.count) entries")
