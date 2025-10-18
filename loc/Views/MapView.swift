@@ -274,6 +274,10 @@ struct MapView: View {
                 await profile.refreshUserPlaces()
                 await detailPlaceVM.calculateAnnotationPlaces()
                 await placeTypeFilterVM.refreshMostFrequentTypes()
+                // Also update filtered places to ensure new annotations appear
+                await MainActor.run {
+                    placeTypeFilterVM.updateFilteredPlaces()
+                }
             }
         }
     }
