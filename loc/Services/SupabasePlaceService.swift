@@ -18,43 +18,44 @@ class SupabasePlaceService: ObservableObject {
     
     // MARK: - Helper Functions
     
-    /// Converts DetailPlace to PlaceRecord for Supabase insertion
-    private func convertToPlaceRecord(_ place: DetailPlace) -> PlaceRecord {
-        // Convert coordinate to LocationData format
-        var locationData: LocationData? = nil
+    /// Converts DetailPlace to dictionary for Supabase insertion
+    private func convertToPlaceData(_ place: DetailPlace) -> [String: Any] {
+        var placeData: [String: Any] = [
+            "id": place.id.uuidString,
+            "name": place.name,
+            "is_custom": place.isCustom ?? true
+        ]
+        
+        // Add optional fields if they exist
+        if let address = place.address { placeData["address"] = address }
+        if let city = place.city { placeData["city"] = city }
+        if let mapboxId = place.mapboxId { placeData["mapbox_id"] = mapboxId }
+        if let description = place.description { placeData["description_text"] = description }
+        if let rating = place.rating { placeData["rating"] = rating }
+        if let userRatingsTotal = place.userRatingsTotal { placeData["user_ratings_total"] = userRatingsTotal }
+        if let priceLevel = place.priceLevel { placeData["price_level"] = priceLevel }
+        if let categories = place.categories { placeData["categories"] = categories }
+        if let phone = place.phone { placeData["phone"] = phone }
+        if let openHours = place.openHours { placeData["open_hours"] = openHours }
+        if let reservable = place.reservable { placeData["reservable"] = reservable }
+        if let servesBreakfast = place.servesBreakfast { placeData["serves_breakfast"] = servesBreakfast }
+        if let servesLunch = place.serversLunch { placeData["serves_lunch"] = servesLunch }
+        if let servesDinner = place.serversDinner { placeData["serves_dinner"] = servesDinner }
+        if let instagram = place.Instagram { placeData["instagram"] = instagram }
+        if let x = place.X { placeData["x"] = x }
+        if let photoUrls = place.photoUrls { placeData["photo_urls"] = photoUrls }
+        if let googlePlaceId = place.googlePlaceId { placeData["google_place_id"] = googlePlaceId }
+        if let source = place.source { placeData["source"] = source }
+        
+        // Add coordinate as PostGIS geometry
         if let coordinate = place.coordinate {
-            locationData = LocationData(
-                type: "Point",
-                coordinates: [coordinate.longitude, coordinate.latitude]
-            )
+            placeData["location"] = "POINT(\(coordinate.longitude) \(coordinate.latitude))"
         }
         
-        return PlaceRecord(
-            id: place.id.uuidString,
-            name: place.name,
-            address: place.address,
-            city: place.city,
-            mapbox_id: place.mapboxId,
-            location: locationData,
-            categories: place.categories,
-            phone: place.phone,
-            rating: place.rating,
-            user_ratings_total: place.userRatingsTotal,
-            open_hours: place.openHours,
-            description_text: place.description,
-            price_level: place.priceLevel,
-            reservable: place.reservable,
-            serves_breakfast: place.servesBreakfast,
-            serves_lunch: place.serversLunch,
-            serves_dinner: place.serversDinner,
-            instagram: place.Instagram,
-            x: place.X,
-            photo_urls: place.photoUrls,
-            google_place_id: place.googlePlaceId,
-            source: place.source ?? "custom",
-            created_at: ISO8601DateFormatter().string(from: Date()),
-            is_custom: place.isCustom ?? true // Default to true for custom places
-        )
+        // Add timestamp
+        placeData["created_at"] = ISO8601DateFormatter().string(from: Date())
+        
+        return placeData
     }
     
     /// Parses PostGIS geometry string (WKT format) to CLLocationCoordinate2D
@@ -492,14 +493,13 @@ class SupabasePlaceService: ObservableObject {
             do {
                 print("📍 [Supabase] Adding place to all_places: \(place.name)")
                 
-                // Convert DetailPlace to PlaceRecord for Supabase
-                let placeRecord = convertToPlaceRecord(place)
+                // Convert DetailPlace to dictionary for Supabase insertion
+                let placeData = convertToPlaceData(place)
                 
-                let response: PlaceRecord = try await supabase.client
+                let response: [PlaceRecord] = try await supabase.client
                     .from("places")
-                    .insert(placeRecord)
+                    .insert(placeData)
                     .select()
-                    .single()
                     .execute()
                     .value
                 
