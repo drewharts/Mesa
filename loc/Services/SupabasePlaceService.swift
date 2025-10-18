@@ -100,7 +100,6 @@ class SupabasePlaceService: ObservableObject {
         let photo_urls: [String]?
         let google_place_id: String?
         let source: String?
-        let created_at: String
         let is_custom: Bool
     }
     
@@ -128,15 +127,14 @@ class SupabasePlaceService: ObservableObject {
             price_level: place.priceLevel,
             reservable: place.reservable,
             serves_breakfast: place.servesBreakfast,
-            serves_lunch: place.serversLunch,
-            serves_dinner: place.serversDinner,
-            instagram: place.Instagram,
-            x: place.X,
+            serves_lunch: place.servesLunch,
+            serves_dinner: place.servesDinner,
+            instagram: place.instagram,
+            x: place.x,
             photo_urls: place.photoUrls,
             google_place_id: place.googlePlaceId,
-            source: place.source ?? "custom",
-            created_at: ISO8601DateFormatter().string(from: Date()),
-            is_custom: place.isCustom ?? true
+            source: place.isCustom == true ? "custom" : place.source,
+            is_custom: place.isCustom ?? false
         )
     }
     
