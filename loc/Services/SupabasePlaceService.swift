@@ -20,10 +20,13 @@ class SupabasePlaceService: ObservableObject {
     
     /// Converts DetailPlace to PlaceRecord for Supabase insertion
     private func convertToPlaceRecord(_ place: DetailPlace) -> PlaceRecord {
-        // Convert coordinate to PostGIS geometry string
-        var locationString: String? = nil
+        // Convert coordinate to LocationData format
+        var locationData: LocationData? = nil
         if let coordinate = place.coordinate {
-            locationString = "POINT(\(coordinate.longitude) \(coordinate.latitude))"
+            locationData = LocationData(
+                type: "Point",
+                coordinates: [coordinate.longitude, coordinate.latitude]
+            )
         }
         
         return PlaceRecord(
@@ -31,31 +34,25 @@ class SupabasePlaceService: ObservableObject {
             name: place.name,
             address: place.address,
             city: place.city,
-            description: place.description,
-            location: locationString,
-            geohash: nil, // Will be calculated by database trigger
-            rating: place.rating,
-            rating_count: place.userRatingsTotal,
-            price_level: place.priceLevel,
+            mapbox_id: place.mapboxId,
+            location: locationData,
             categories: place.categories,
             phone: place.phone,
-            website: nil, // Not in DetailPlace model
-            menu_url: nil, // Not in DetailPlace model
-            instagram: place.Instagram,
-            twitter: place.X,
-            google_places_id: place.googlePlaceId,
-            mapbox_id: place.mapboxId,
-            fid: nil, // Not in DetailPlace model
-            cid: nil, // Not in DetailPlace model
-            thumbnail_url: place.photoUrls?.first,
-            photo_urls: place.photoUrls,
-            open_hours: place.openHours?.map { ["day": "Unknown", "hours": $0] }, // Convert to JSONB format
+            rating: place.rating,
+            user_ratings_total: place.userRatingsTotal,
+            open_hours: place.openHours,
+            description_text: place.description,
+            price_level: place.priceLevel,
             reservable: place.reservable,
             serves_breakfast: place.servesBreakfast,
             serves_lunch: place.serversLunch,
             serves_dinner: place.serversDinner,
+            instagram: place.Instagram,
+            x: place.X,
+            photo_urls: place.photoUrls,
+            google_place_id: place.googlePlaceId,
             source: place.source ?? "custom",
-            updated_at: ISO8601DateFormatter().string(from: Date()),
+            created_at: ISO8601DateFormatter().string(from: Date()),
             is_custom: place.isCustom ?? true // Default to true for custom places
         )
     }
@@ -521,10 +518,9 @@ class SupabasePlaceService: ObservableObject {
                 print("📍 [Supabase] Adding place to my_places for user: \(userId)")
                 
                 let myPlaceRecord = MyPlaceRecord(
-                    id: UUID().uuidString,
                     user_id: userId,
                     place_id: place.id.uuidString,
-                    created_at: ISO8601DateFormatter().string(from: Date())
+                    timestamp: ISO8601DateFormatter().string(from: Date())
                 )
                 
                 let response: MyPlaceRecord = try await supabase.client
