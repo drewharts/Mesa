@@ -53,8 +53,22 @@ class PlaceDetailViewModel: ObservableObject {
         
         self.currentPlaceID = place.id.uuidString
         
+        print("🔄 [PlaceDetailViewModel] loadData: Setting placeName to '\(place.name)'")
         self.placeName = place.name
         self.updateTravelTime(for: place, from: currentLocation)
+    }
+    
+    func updatePlaceData(_ place: DetailPlace) {
+        // Update the place data when SelectedPlaceViewModel gets complete details
+        // Update currentPlaceID if it's different (indicates a new place was selected)
+        if currentPlaceID != place.id.uuidString {
+            print("🔄 [PlaceDetailViewModel] updatePlaceData: New place detected, updating currentPlaceID")
+            currentPlaceID = place.id.uuidString
+        }
+        
+        print("🔄 [PlaceDetailViewModel] updatePlaceData: Setting placeName to '\(place.name)'")
+        self.placeName = place.name
+        // Add any other place properties that need to be updated here
     }
     
     func openNavigation(for place: DetailPlace, currentLocation: CLLocationCoordinate2D) {

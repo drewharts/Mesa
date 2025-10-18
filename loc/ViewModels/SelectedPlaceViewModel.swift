@@ -103,6 +103,10 @@ class SelectedPlaceViewModel: ObservableObject {
         resetPhotoLoading()
         print("📸 [SelectedPlaceViewModel] Starting to get place photos")
         getPlacePhotos(for: place)
+        
+        // Load review photos for about section
+        print("📸 [SelectedPlaceViewModel] Starting to load review photos for about section")
+        loadReviewPhotosForAbout(for: place)
 
         // Clear previous likes when loading a new place
         likedReviews.removeAll()
@@ -188,7 +192,6 @@ class SelectedPlaceViewModel: ObservableObject {
         
         let photoState = photoLoadingStates[placeId] ?? .idle
         let reviewState = reviewLoadingStates[placeId] ?? .idle
-        let reviewPhotosForAboutState = reviewPhotosForAboutLoadingStates[placeId] ?? .idle
 
         // Consider loaded if both photos and reviews are either loaded or in error state
         // (we don't want to wait forever if there's an error)
@@ -208,19 +211,15 @@ class SelectedPlaceViewModel: ObservableObject {
             reviewsReady = false
         }
 
-        let reviewPhotosForAboutReady: Bool
-        switch reviewPhotosForAboutState {
-        case .loaded, .error:
-            reviewPhotosForAboutReady = true
-        case .idle, .loading:
-            reviewPhotosForAboutReady = false
-        }
+        // Note: reviewPhotosForAbout is loaded separately and asynchronously, but we don't want to block
+        // the main place detail view from loading. The about section can show a loading state independently.
 
         let wasLoaded = isCurrentPlaceFullyLoaded
-        isCurrentPlaceFullyLoaded = photosReady && reviewsReady && reviewPhotosForAboutReady
+        isCurrentPlaceFullyLoaded = photosReady && reviewsReady
         
         // Debug logging when the state changes
         if !wasLoaded && isCurrentPlaceFullyLoaded {
+            print("✅ [SelectedPlaceViewModel] Place '\(selectedPlace?.name ?? "Unknown")' is now fully loaded")
         }
     }
     
