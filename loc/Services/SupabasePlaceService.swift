@@ -18,44 +18,68 @@ class SupabasePlaceService: ObservableObject {
     
     // MARK: - Helper Functions
     
-    /// Converts DetailPlace to dictionary for Supabase insertion
-    private func convertToPlaceData(_ place: DetailPlace) -> [String: Any] {
-        var placeData: [String: Any] = [
-            "id": place.id.uuidString,
-            "name": place.name,
-            "is_custom": place.isCustom ?? true
-        ]
-        
-        // Add optional fields if they exist
-        if let address = place.address { placeData["address"] = address }
-        if let city = place.city { placeData["city"] = city }
-        if let mapboxId = place.mapboxId { placeData["mapbox_id"] = mapboxId }
-        if let description = place.description { placeData["description_text"] = description }
-        if let rating = place.rating { placeData["rating"] = rating }
-        if let userRatingsTotal = place.userRatingsTotal { placeData["user_ratings_total"] = userRatingsTotal }
-        if let priceLevel = place.priceLevel { placeData["price_level"] = priceLevel }
-        if let categories = place.categories { placeData["categories"] = categories }
-        if let phone = place.phone { placeData["phone"] = phone }
-        if let openHours = place.openHours { placeData["open_hours"] = openHours }
-        if let reservable = place.reservable { placeData["reservable"] = reservable }
-        if let servesBreakfast = place.servesBreakfast { placeData["serves_breakfast"] = servesBreakfast }
-        if let servesLunch = place.serversLunch { placeData["serves_lunch"] = servesLunch }
-        if let servesDinner = place.serversDinner { placeData["serves_dinner"] = servesDinner }
-        if let instagram = place.Instagram { placeData["instagram"] = instagram }
-        if let x = place.X { placeData["x"] = x }
-        if let photoUrls = place.photoUrls { placeData["photo_urls"] = photoUrls }
-        if let googlePlaceId = place.googlePlaceId { placeData["google_place_id"] = googlePlaceId }
-        if let source = place.source { placeData["source"] = source }
-        
-        // Add coordinate as PostGIS geometry
+    /// Struct for inserting places into Supabase
+    private struct PlaceInsertData: Encodable {
+        let id: String
+        let name: String
+        let address: String?
+        let city: String?
+        let mapbox_id: String?
+        let location: String? // PostGIS geometry as WKT string
+        let categories: [String]?
+        let phone: String?
+        let rating: Double?
+        let user_ratings_total: Int?
+        let open_hours: [String]?
+        let description_text: String?
+        let price_level: String?
+        let reservable: Bool?
+        let serves_breakfast: Bool?
+        let serves_lunch: Bool?
+        let serves_dinner: Bool?
+        let instagram: String?
+        let x: String?
+        let photo_urls: [String]?
+        let google_place_id: String?
+        let source: String?
+        let created_at: String
+        let is_custom: Bool
+    }
+    
+    /// Converts DetailPlace to PlaceInsertData for Supabase insertion
+    private func convertToPlaceData(_ place: DetailPlace) -> PlaceInsertData {
+        // Convert coordinate to PostGIS geometry string
+        var locationString: String? = nil
         if let coordinate = place.coordinate {
-            placeData["location"] = "POINT(\(coordinate.longitude) \(coordinate.latitude))"
+            locationString = "POINT(\(coordinate.longitude) \(coordinate.latitude))"
         }
         
-        // Add timestamp
-        placeData["created_at"] = ISO8601DateFormatter().string(from: Date())
-        
-        return placeData
+        return PlaceInsertData(
+            id: place.id.uuidString,
+            name: place.name,
+            address: place.address,
+            city: place.city,
+            mapbox_id: place.mapboxId,
+            location: locationString,
+            categories: place.categories,
+            phone: place.phone,
+            rating: place.rating,
+            user_ratings_total: place.userRatingsTotal,
+            open_hours: place.openHours,
+            description_text: place.description,
+            price_level: place.priceLevel,
+            reservable: place.reservable,
+            serves_breakfast: place.servesBreakfast,
+            serves_lunch: place.serversLunch,
+            serves_dinner: place.serversDinner,
+            instagram: place.Instagram,
+            x: place.X,
+            photo_urls: place.photoUrls,
+            google_place_id: place.googlePlaceId,
+            source: place.source ?? "custom",
+            created_at: ISO8601DateFormatter().string(from: Date()),
+            is_custom: place.isCustom ?? true
+        )
     }
     
     /// Parses PostGIS geometry string (WKT format) to CLLocationCoordinate2D
