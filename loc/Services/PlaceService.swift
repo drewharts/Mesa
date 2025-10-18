@@ -251,12 +251,16 @@ class PlaceService: ObservableObject {
     
     func addToAllPlaces(place: DetailPlace, completion: @escaping (Error?) -> Void) {
         print("🔄 [PlaceService] Delegating addToAllPlaces to Supabase...")
-        SupabasePlaceService.shared.addToAllPlaces(place: place, completion: completion)
+        Task { @MainActor in
+            SupabasePlaceService.shared.addToAllPlaces(place: place, completion: completion)
+        }
     }
     
     func addToMyPlaces(userId: String, place: DetailPlace, completion: @escaping (Error?) -> Void) {
         print("🔄 [PlaceService] Delegating addToMyPlaces to Supabase...")
-        SupabasePlaceService.shared.addToMyPlaces(userId: userId, place: place, completion: completion)
+        Task { @MainActor in
+            SupabasePlaceService.shared.addToMyPlaces(userId: userId, place: place, completion: completion)
+        }
     }
     
     func fetchList(userId: String, listId: String, completion: @escaping (Result<PlaceList, Error>) -> Void) {
