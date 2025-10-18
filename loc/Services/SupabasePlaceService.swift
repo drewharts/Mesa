@@ -133,7 +133,7 @@ class SupabasePlaceService: ObservableObject {
             phone: place.phone,
             website: nil, // Not available in DetailPlace
             menu_url: nil, // Not available in DetailPlace
-            instagram: place.instagram,
+            instagram: place.Instagram,
             twitter: nil, // Not available in DetailPlace
             google_places_id: place.googlePlaceId,
             mapbox_id: place.mapboxId,
@@ -144,8 +144,8 @@ class SupabasePlaceService: ObservableObject {
             open_hours: place.openHours,
             reservable: place.reservable,
             serves_breakfast: place.servesBreakfast,
-            serves_lunch: place.servesLunch,
-            serves_dinner: place.servesDinner,
+            serves_lunch: place.serversLunch,
+            serves_dinner: place.serversDinner,
             source: place.isCustom == true ? "custom" : place.source,
             updated_at: nil, // Let database handle this
             is_custom: place.isCustom ?? false
@@ -854,20 +854,19 @@ class SupabasePlaceService: ObservableObject {
         place.categories = record.categories
         place.phone = record.phone
         place.rating = record.rating
-        place.userRatingsTotal = record.user_ratings_total
+        place.userRatingsTotal = record.rating_count
         place.openHours = record.open_hours
-        place.description = record.description_text
+        place.description = record.description
         place.priceLevel = record.price_level
         place.reservable = record.reservable
         place.servesBreakfast = record.serves_breakfast
-        place.serversLunch = record.serves_lunch
-        place.serversDinner = record.serves_dinner
-        place.Instagram = record.instagram
-        place.X = record.x
+        place.servesLunch = record.serves_lunch
+        place.servesDinner = record.serves_dinner
+        place.instagram = record.instagram
+        place.x = record.twitter // Note: DetailPlace doesn't have twitter field, using x instead
         place.photoUrls = record.photo_urls
-        place.googlePlaceId = record.google_place_id
+        place.googlePlaceId = record.google_places_id
         place.source = record.source
-        place.createdAt = record.created_at
         place.isCustom = record.is_custom
         
         // Handle coordinate from PostGIS geometry
@@ -1265,33 +1264,38 @@ struct PlaceRecord: Codable {
     let name: String
     let address: String?
     let city: String?
-    let mapbox_id: String?
+    let description: String?
     let location: LocationData? // PostGIS geometry as custom struct
+    let geohash: String?
+    let rating: Double?
+    let rating_count: Int?
+    let price_level: String?
     let categories: [String]?
     let phone: String?
-    let rating: Double?
-    let user_ratings_total: Int?
+    let website: String?
+    let menu_url: String?
+    let instagram: String?
+    let twitter: String?
+    let google_places_id: String?
+    let mapbox_id: String?
+    let fid: String?
+    let cid: String?
+    let thumbnail_url: String?
+    let photo_urls: [String]?
     let open_hours: [String]?
-    let description_text: String?
-    let price_level: String?
     let reservable: Bool?
     let serves_breakfast: Bool?
     let serves_lunch: Bool?
     let serves_dinner: Bool?
-    let instagram: String?
-    let x: String?
-    let photo_urls: [String]?
-    let google_place_id: String?
     let source: String?
-    let created_at: String?
+    let updated_at: String?
     let is_custom: Bool?
     
     enum CodingKeys: String, CodingKey {
-        case id, name, address, city, mapbox_id
-        case location, categories, phone, rating
-        case user_ratings_total, open_hours, description_text, price_level, reservable
-        case serves_breakfast, serves_lunch, serves_dinner, instagram, x, photo_urls
-        case google_place_id, source, created_at, is_custom
+        case id, name, address, city, description, location, geohash, rating, rating_count, price_level
+        case categories, phone, website, menu_url, instagram, twitter, google_places_id, mapbox_id
+        case fid, cid, thumbnail_url, photo_urls, open_hours, reservable
+        case serves_breakfast, serves_lunch, serves_dinner, source, updated_at, is_custom
     }
     
     init(from decoder: Decoder) throws {
@@ -1301,24 +1305,30 @@ struct PlaceRecord: Codable {
         name = try container.decode(String.self, forKey: .name)
         address = try container.decodeIfPresent(String.self, forKey: .address)
         city = try container.decodeIfPresent(String.self, forKey: .city)
-        mapbox_id = try container.decodeIfPresent(String.self, forKey: .mapbox_id)
+        description = try container.decodeIfPresent(String.self, forKey: .description)
         location = try container.decodeIfPresent(LocationData.self, forKey: .location)
+        geohash = try container.decodeIfPresent(String.self, forKey: .geohash)
+        rating = try container.decodeIfPresent(Double.self, forKey: .rating)
+        rating_count = try container.decodeIfPresent(Int.self, forKey: .rating_count)
+        price_level = try container.decodeIfPresent(String.self, forKey: .price_level)
         categories = try container.decodeIfPresent([String].self, forKey: .categories)
         phone = try container.decodeIfPresent(String.self, forKey: .phone)
-        rating = try container.decodeIfPresent(Double.self, forKey: .rating)
-        user_ratings_total = try container.decodeIfPresent(Int.self, forKey: .user_ratings_total)
-        description_text = try container.decodeIfPresent(String.self, forKey: .description_text)
-        price_level = try container.decodeIfPresent(String.self, forKey: .price_level)
+        website = try container.decodeIfPresent(String.self, forKey: .website)
+        menu_url = try container.decodeIfPresent(String.self, forKey: .menu_url)
+        instagram = try container.decodeIfPresent(String.self, forKey: .instagram)
+        twitter = try container.decodeIfPresent(String.self, forKey: .twitter)
+        google_places_id = try container.decodeIfPresent(String.self, forKey: .google_places_id)
+        mapbox_id = try container.decodeIfPresent(String.self, forKey: .mapbox_id)
+        fid = try container.decodeIfPresent(String.self, forKey: .fid)
+        cid = try container.decodeIfPresent(String.self, forKey: .cid)
+        thumbnail_url = try container.decodeIfPresent(String.self, forKey: .thumbnail_url)
+        photo_urls = try container.decodeIfPresent([String].self, forKey: .photo_urls)
         reservable = try container.decodeIfPresent(Bool.self, forKey: .reservable)
         serves_breakfast = try container.decodeIfPresent(Bool.self, forKey: .serves_breakfast)
         serves_lunch = try container.decodeIfPresent(Bool.self, forKey: .serves_lunch)
         serves_dinner = try container.decodeIfPresent(Bool.self, forKey: .serves_dinner)
-        instagram = try container.decodeIfPresent(String.self, forKey: .instagram)
-        x = try container.decodeIfPresent(String.self, forKey: .x)
-        photo_urls = try container.decodeIfPresent([String].self, forKey: .photo_urls)
-        google_place_id = try container.decodeIfPresent(String.self, forKey: .google_place_id)
         source = try container.decodeIfPresent(String.self, forKey: .source)
-        created_at = try container.decodeIfPresent(String.self, forKey: .created_at)
+        updated_at = try container.decodeIfPresent(String.self, forKey: .updated_at)
         is_custom = try container.decodeIfPresent(Bool.self, forKey: .is_custom)
         
         // Handle open_hours - skip if it can't be decoded as [String]
