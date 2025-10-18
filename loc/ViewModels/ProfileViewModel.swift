@@ -2307,21 +2307,36 @@ class ProfileViewModel: ObservableObject {
 
         // Asynchronously delete from backend
         Task {
-            do {
-                placeService.deletePlaceFromMyPlaces(userId: userId, placeId: place.id.uuidString) { error in
-                    if let error = error {
-                        print("❌ Error deleting place from my places: \(error)")
-                    }
+            var myPlacesDeleteSuccess = false
+            var allPlacesDeleteSuccess = false
+            
+            // Delete from my_places
+            placeService.deletePlaceFromMyPlaces(userId: userId, placeId: place.id.uuidString) { error in
+                if let error = error {
+                    print("❌ Error deleting place from my places: \(error)")
+                } else {
+                    myPlacesDeleteSuccess = true
                 }
-                try await placeService.deletePlaceFromAllPlaces(placeId: place.id.uuidString)
-                
-                // On success, call completion on main thread
-                await MainActor.run {
+            }
+            
+            // Delete from all_places (only for custom places)
+            placeService.deletePlaceFromAllPlaces(placeId: place.id.uuidString) { error in
+                if let error = error {
+                    print("❌ Error deleting place from all places: \(error)")
+                } else {
+                    allPlacesDeleteSuccess = true
+                }
+            }
+            
+            // Wait a moment for both operations to complete
+            try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+            
+            // On success, call completion on main thread
+            await MainActor.run {
+                if myPlacesDeleteSuccess {
                     completion(true)
-                }
-            } catch {
-                // If deletion fails, add it back to the local array
-                await MainActor.run {
+                } else {
+                    // If deletion fails, add it back to the local array
                     myPlaces.append(place.id.uuidString)
                     completion(false)
                 }

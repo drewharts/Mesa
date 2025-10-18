@@ -14,7 +14,65 @@ class SupabasePlaceService: ObservableObject {
     static let shared = SupabasePlaceService()
     private let supabase = SupabaseManager.shared
     
-    private init() {}
+    private init() {    }
+    
+    // MARK: - Place Deletion
+    
+    func deletePlaceFromMyPlaces(userId: String, placeId: String, completion: @escaping (Error?) -> Void) {
+        Task {
+            do {
+                print("🗑️ [Supabase] Deleting place from my_places for user: \(userId), place: \(placeId)")
+                
+                try await supabase.client
+                    .from("my_places")
+                    .delete()
+                    .eq("user_id", value: userId)
+                    .eq("place_id", value: placeId)
+                    .execute()
+                
+                print("✅ [Supabase] Successfully deleted place from my_places")
+                completion(nil)
+            } catch {
+                print("❌ [Supabase] Error deleting place from my_places: \(error)")
+                completion(error)
+            }
+        }
+    }
+    
+    func deletePlaceFromAllPlaces(placeId: String, completion: @escaping (Error?) -> Void) {
+        Task {
+            do {
+                print("🗑️ [Supabase] Deleting place from all_places: \(placeId)")
+                
+                // First check if this is a custom place
+                let placeRecord: PlaceRecord = try await supabase.client
+                    .from("places")
+                    .select()
+                    .eq("id", value: placeId)
+                    .single()
+                    .execute()
+                    .value
+                
+                // Only delete custom places from all_places
+                if placeRecord.is_custom == true {
+                    try await supabase.client
+                        .from("places")
+                        .delete()
+                        .eq("id", value: placeId)
+                        .execute()
+                    
+                    print("✅ [Supabase] Successfully deleted custom place from all_places")
+                } else {
+                    print("⚠️ [Supabase] Cannot delete non-custom place from all_places")
+                }
+                
+                completion(nil)
+            } catch {
+                print("❌ [Supabase] Error deleting place from all_places: \(error)")
+                completion(error)
+            }
+        }
+    }
     
     // MARK: - Helper Functions
     

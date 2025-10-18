@@ -295,12 +295,16 @@ class PlaceService: ObservableObject {
     }
     
     func deletePlaceFromMyPlaces(userId: String, placeId: String, completion: @escaping (Error?) -> Void) {
-        print("⚠️ [PlaceService] deletePlaceFromMyPlaces not fully implemented")
-        completion(nil)
+        print("🔄 [PlaceService] Delegating deletePlaceFromMyPlaces to Supabase...")
+        Task { @MainActor in
+            SupabasePlaceService.shared.deletePlaceFromMyPlaces(userId: userId, placeId: placeId, completion: completion)
+        }
     }
     
-    func deletePlaceFromAllPlaces(placeId: String) async throws {
-        print("⚠️ [PlaceService] deletePlaceFromAllPlaces not fully implemented")
-        // TODO: Implement with Supabase
+    func deletePlaceFromAllPlaces(placeId: String, completion: @escaping (Error?) -> Void) {
+        print("🔄 [PlaceService] Delegating deletePlaceFromAllPlaces to Supabase...")
+        Task { @MainActor in
+            SupabasePlaceService.shared.deletePlaceFromAllPlaces(placeId: placeId, completion: completion)
+        }
     }
 }
