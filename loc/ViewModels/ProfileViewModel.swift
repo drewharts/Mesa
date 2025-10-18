@@ -2301,8 +2301,29 @@ class ProfileViewModel: ObservableObject {
             return
         }
 
+        let placeId = place.id.uuidString
+        
         // Optimistically remove from local array
-        myPlaces.removeAll { $0 == place.id.uuidString }
+        myPlaces.removeAll { $0 == placeId }
+        
+        // Remove from map annotations immediately (optimistic update)
+        detailPlaceViewModel.places.removeValue(forKey: placeId)
+        
+        // Remove from placeSavers (so it doesn't appear on map)
+        if var savers = detailPlaceViewModel.placeSavers[placeId] {
+            savers.removeAll { $0 == userId }
+            if savers.isEmpty {
+                detailPlaceViewModel.placeSavers.removeValue(forKey: placeId)
+            } else {
+                detailPlaceViewModel.placeSavers[placeId] = savers
+            }
+        }
+        
+        // Recalculate map annotations
+        detailPlaceViewModel.calculateAnnotationPlaces()
+        
+        // Send notification to refresh map annotations
+        NotificationCenter.default.post(name: NSNotification.Name("RefreshMapAnnotations"), object: nil)
 
         // Asynchronously delete from backend
         Task {
@@ -2310,7 +2331,7 @@ class ProfileViewModel: ObservableObject {
             var allPlacesDeleteSuccess = false
             
             // Delete from my_places
-            placeService.deletePlaceFromMyPlaces(userId: userId, placeId: place.id.uuidString) { error in
+            placeService.deletePlaceFromMyPlaces(userId: userId, placeId: placeId) { error in
                 if let error = error {
                     print("❌ Error deleting place from my places: \(error)")
                 } else {
@@ -2319,7 +2340,7 @@ class ProfileViewModel: ObservableObject {
             }
             
             // Delete from all_places (only for custom places)
-            placeService.deletePlaceFromAllPlaces(placeId: place.id.uuidString) { error in
+            placeService.deletePlaceFromAllPlaces(placeId: placeId) { error in
                 if let error = error {
                     print("❌ Error deleting place from all places: \(error)")
                 } else {
@@ -2333,10 +2354,27 @@ class ProfileViewModel: ObservableObject {
             // On success, call completion on main thread
             await MainActor.run {
                 if myPlacesDeleteSuccess {
+                    print("✅ [ProfileViewModel] Successfully deleted custom place: \(place.name)")
                     completion(true)
                 } else {
-                    // If deletion fails, add it back to the local array
-                    myPlaces.append(place.id.uuidString)
+                    // If deletion fails, revert the optimistic updates
+                    print("❌ [ProfileViewModel] Failed to delete custom place, reverting changes")
+                    myPlaces.append(placeId)
+                    detailPlaceViewModel.places[placeId] = place
+                    
+                    // Re-add to placeSavers
+                    if detailPlaceViewModel.placeSavers[placeId] == nil {
+                        detailPlaceViewModel.placeSavers[placeId] = [userId]
+                    } else if !detailPlaceViewModel.placeSavers[placeId]!.contains(userId) {
+                        detailPlaceViewModel.placeSavers[placeId]!.append(userId)
+                    }
+                    
+                    // Recalculate map annotations
+                    detailPlaceViewModel.calculateAnnotationPlaces()
+                    
+                    // Send notification to refresh map annotations
+                    NotificationCenter.default.post(name: NSNotification.Name("RefreshMapAnnotations"), object: nil)
+                    
                     completion(false)
                 }
             }
