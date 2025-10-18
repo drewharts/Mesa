@@ -6,6 +6,7 @@ struct SearchResultsView: View {
     let userResults: [ProfileData]
     let showNoPlaceFound: Bool
     let searchText: String
+    let isSearching: Bool
     let onSelectPlace: (MesaPlaceSuggestion) -> Void
     let onSelectUser: (ProfileData) -> Void
 
@@ -13,16 +14,29 @@ struct SearchResultsView: View {
         GeometryReader { geometry in
             ScrollView {
                 VStack(spacing: 10) {
-                    UserResultsView(userResults: userResults, onSelectUser: onSelectUser)
-                    PlaceResultsView(
-                        placeResults: placeResults,
-                        showNoPlaceFound: showNoPlaceFound,
-                        searchText: searchText,
-                        onSelectPlace: onSelectPlace
-                    )
+                    if isSearching {
+                        // Show loading indicator
+                        VStack(spacing: 12) {
+                            ProgressView()
+                                .scaleEffect(1.2)
+                            Text("Searching...")
+                                .font(.subheadline)
+                                .foregroundColor(.gray)
+                        }
+                        .padding()
+                        .frame(maxWidth: .infinity)
+                    } else {
+                        UserResultsView(userResults: userResults, onSelectUser: onSelectUser)
+                        PlaceResultsView(
+                            placeResults: placeResults,
+                            showNoPlaceFound: showNoPlaceFound,
+                            searchText: searchText,
+                            onSelectPlace: onSelectPlace
+                        )
+                    }
                 }
             }
-            .frame(height: CGFloat((userResults.count + placeResults.count) * 120 + (showNoPlaceFound ? 120 : 0)))
+            .frame(height: isSearching ? 100 : CGFloat((userResults.count + placeResults.count) * 120 + (showNoPlaceFound ? 120 : 0)))
         }
     }
 }

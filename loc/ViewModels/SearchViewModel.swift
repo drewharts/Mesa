@@ -11,12 +11,13 @@ import MapboxSearch
 import CoreLocation
 
 class SearchViewModel: ObservableObject {
-    @Published var searchText = ""  // User's search input
+    @Published var searchText = ""
     @Published var searchResults: [MesaPlaceSuggestion] = []
     @Published var userResults: [ProfileData] = []
     @Published var searchError: String?
     @Published var selectedUser: ProfileData?
     @Published var showNoPlaceFound: Bool = false  // Track when search returns no results
+    @Published var isSearching: Bool = false  // Track when search is in progress
 
     weak var selectedPlaceVM: SelectedPlaceViewModel?
     weak var placeTypeFilterVM: PlaceTypeFilterViewModel?
@@ -26,6 +27,14 @@ class SearchViewModel: ObservableObject {
     private let locationManager: LocationManager
 //    private let mapboxSearchService = MapboxSearchService()
     private let searchService = PlaceSearchService()
+    private let objectId = UUID()  // For debugging instance tracking
+    
+    // Simple cache for instant repeat searches
+    private var searchCache: [String: [MesaPlaceSuggestion]] = [:]
+
+    var debugObjectId: String {
+        objectId.uuidString.prefix(8).description
+    }
 
     private var cancellables = Set<AnyCancellable>()
 
@@ -35,77 +44,149 @@ class SearchViewModel: ObservableObject {
         self.userService = userService
         self.locationManager = locationManager
         
-        // ✅ Debounce to limit API calls while typing
+        // ✅ Optimized pipeline for responsive text input
         $searchText
-            .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main) // 300ms delay
-            .removeDuplicates() // Avoid duplicate searches
-            .filter { !$0.isEmpty } // Only search for non-empty queries
+            .debounce(for: .milliseconds(100), scheduler: DispatchQueue.main)
+            .removeDuplicates()
+            .filter { !$0.isEmpty && $0.count >= 1 }
             .sink { [weak self] text in
-                print("🔍 [SearchViewModel] Search text changed: '\(text)'")
-                self?.searchPlaces(query: text)
-                self?.searchUsers(query: text)
-                // Update place type filters based on search text
-                Task { @MainActor in
-                    self?.placeTypeFilterVM?.filterBySearchText(text)
+                // Show loading state immediately on main thread
+                self?.isSearching = true
+                
+                // Move heavy operations to background thread
+                Task {
+                    await self?.performSearch(query: text)
                 }
             }
+            .store(in: &cancellables) // 🔧 FIX: This was missing!
 
         // Handle empty search text separately to clear results immediately
         $searchText
             .filter { $0.isEmpty }
             .sink { [weak self] _ in
-                print("🔍 [SearchViewModel] Search text is empty, clearing all results")
                 self?.searchResults = []
                 self?.userResults = []
                 self?.searchError = nil
                 self?.showNoPlaceFound = false
+                self?.isSearching = false
+                // Clear filters
                 Task { @MainActor in
                     self?.placeTypeFilterVM?.filterBySearchText("")
                 }
             }
             .store(in: &cancellables)
     }
-
-    func searchPlaces(query: String) {
-        print("🔍 [SearchViewModel] searchPlaces called with query: '\(query)'")
-
-        // Clear previous results first
+    
+    // MARK: - Optimized Search Methods
+    
+    @MainActor
+    private func performSearch(query: String) async {
+        // Check cache first for instant results
+        if let cachedResults = searchCache[query] {
+            searchResults = cachedResults
+            showNoPlaceFound = cachedResults.isEmpty && !query.isEmpty
+            isSearching = false
+            return
+        }
+        
+        // Clear previous results
         searchResults = []
         searchError = nil
         showNoPlaceFound = false
         
+        // Perform search operations
+        await withTaskGroup(of: Void.self) { group in
+            group.addTask { [weak self] in
+                await self?.searchPlacesAsync(query: query)
+            }
+            group.addTask { [weak self] in
+                await self?.searchUsersAsync(query: query)
+            }
+            group.addTask { [weak self] in
+                await self?.updatePlaceTypeFilters(query: query)
+            }
+        }
+    }
+    
+    private func searchPlacesAsync(query: String) async {
         // Get current location for location-aware search
         let latitude = locationManager.currentLocation?.coordinate.latitude
         let longitude = locationManager.currentLocation?.coordinate.longitude
-
-        print("🔍 [SearchViewModel] Calling searchService.searchPlaces...")
-        print("🔍 [SearchViewModel] Using location: lat=\(latitude ?? 0), lng=\(longitude ?? 0)")
-        searchService.searchPlaces(
-            query: query,
-            latitude: latitude,
-            longitude: longitude,
-            onResultsUpdated: { [weak self] results in
-                print("🔍 [SearchViewModel] Received \(results.count) place results")
-                for (index, result) in results.enumerated() {
-                    print("🔍 [SearchViewModel] Result \(index + 1): \(result.name) - \(result.address ?? "No address")")
+        
+        await withCheckedContinuation { continuation in
+            searchService.searchPlaces(
+                query: query,
+                latitude: latitude,
+                longitude: longitude,
+                onResultsUpdated: { [weak self] results in
+                    Task { @MainActor in
+                        self?.searchResults = results
+                        self?.showNoPlaceFound = results.isEmpty && !query.isEmpty
+                        self?.isSearching = false
+                        
+                        // Cache the results
+                        self?.searchCache[query] = results
+                        if let cache = self?.searchCache, cache.count > 50 {
+                            let keysToRemove = Array(cache.keys.prefix(cache.count - 50))
+                            keysToRemove.forEach { self?.searchCache.removeValue(forKey: $0) }
+                        }
+                    }
+                    continuation.resume()
+                },
+                onError: { [weak self] error in
+                    Task { @MainActor in
+                        self?.searchError = error
+                        self?.showNoPlaceFound = false
+                        self?.isSearching = false
+                    }
+                    continuation.resume()
                 }
-                DispatchQueue.main.async {
-                    self?.searchResults = results
-                    // Show "no place found" message if search was performed but no results found
-                    self?.showNoPlaceFound = results.isEmpty && !query.isEmpty
-                    print("🔍 [SearchViewModel] Updated searchResults with \(results.count) items")
-                    print("🔍 [SearchViewModel] showNoPlaceFound: \(self?.showNoPlaceFound ?? false)")
+            )
+        }
+    }
+    
+    private func searchUsersAsync(query: String) async {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            userService.searchUsers(query: query) { [weak self] users, error in
+                Task { @MainActor in
+                    if let error = error {
+                        // User search error - silently handle
+                    } else {
+                        let profileData = users?.compactMap { user in
+                            ProfileData(
+                                id: user.id,
+                                firstName: user.firstName,
+                                lastName: user.lastName,
+                                email: user.email,
+                                profilePhotoURL: user.profilePhotoURL,
+                                phoneNumber: "",
+                                fullNameLower: user.fullName.lowercased(),
+                                fullName: user.fullName,
+                                fcmToken: nil,
+                                firebaseUid: nil,
+                                supabaseUid: nil
+                            )
+                        } ?? []
+                        self?.userResults = profileData
+                    }
                 }
-            },
-            onError: { [weak self] error in
-                print("❌ [SearchViewModel] Search error: \(error)")
-                DispatchQueue.main.async {
-                    self?.searchError = error
-                    self?.showNoPlaceFound = false  // Don't show "no place found" on error
-                    print("❌ [SearchViewModel] Updated searchError: \(error)")
-                }
+                continuation.resume()
             }
-        )
+        }
+    }
+    
+    private func updatePlaceTypeFilters(query: String) async {
+        await MainActor.run {
+            placeTypeFilterVM?.filterBySearchText(query)
+        }
+    }
+
+    // Legacy searchPlaces function - kept for compatibility but not used
+    func searchPlaces(query: String) {
+        // This function is deprecated - use performSearch instead
+        Task {
+            await performSearch(query: query)
+        }
     }
     
     private func searchResultToDetailPlace(place: SearchResult, completion: @escaping (DetailPlace) -> Void) {
@@ -143,59 +224,22 @@ class SearchViewModel: ObservableObject {
     }
     
     func selectSuggestion(_ suggestion: MesaPlaceSuggestion) {
-        print("🔍 User selected suggestion: \(suggestion.id) - \(suggestion.name)")
         searchService.selectSuggestion(
             suggestion,
             onResultResolved: { [weak self] result in
                 DispatchQueue.main.async {
                     self?.selectedPlaceVM?.selectedPlace = result
                     self?.selectedPlaceVM?.isDetailSheetPresented = true
-                    
-                    // Print detailed information about the place
-                    print("✅ Place Details Result:")
-                    print("  ID: \(result.id)")
-                    print("  Name: \(result.name)")
-                    print("  Address: \(result.address ?? "Not available")")
-                    print("  Location: (\(result.coordinate?.latitude ?? 0), \(result.coordinate?.longitude ?? 0))")
-                    print("  Source: local")
-                    print("  Open Hours: \(result.openHours?.joined(separator: ", ") ?? "Not available")")
-                    print("  Phone: \(result.phone ?? "Not available")")
-                    print("  Description: \(result.description ?? "Not available")")
-                    print("  Categories: \(result.categories?.joined(separator: ", ") ?? "None")")
-                    print("  Rating: \(result.rating ?? 0)")
-                    print("  Price Level: \(result.priceLevel ?? "Not available")")
                 }
             }
         )
     }
     
+    // Legacy searchUsers function - kept for compatibility but not used
     private func searchUsers(query: String) {
-        print("👥 [SearchViewModel] searchUsers called with query: '\(query)'")
-
-        print("👥 [SearchViewModel] Calling userService.searchUsers...")
-        userService.searchUsers(query: query) { [weak self] users, error in
-            if let error = error {
-                print("❌ [SearchViewModel] User search error: \(error.localizedDescription)")
-                return
-            }
-            print("👥 [SearchViewModel] Received \(users?.count ?? 0) user results")
-            DispatchQueue.main.async {
-                // Convert User to ProfileData if needed
-                let profileData = users?.compactMap { user in
-                    ProfileData(
-                        id: user.id,
-                        firstName: user.firstName,
-                        lastName: user.lastName,
-                        email: user.email,
-                        profilePhotoURL: user.profilePhotoURL,
-                        phoneNumber: "",
-                        fullNameLower: "\(user.firstName) \(user.lastName)".lowercased(),
-                        fullName: "\(user.firstName) \(user.lastName)"
-                    )
-                } ?? []
-                self?.userResults = profileData
-                print("👥 [SearchViewModel] Updated userResults with \(users?.count ?? 0) items")
-            }
+        // This function is deprecated - use searchUsersAsync instead
+        Task {
+            await searchUsersAsync(query: query)
         }
     }
 }

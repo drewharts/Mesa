@@ -81,9 +81,11 @@ struct MainView: View {
             viewModel.selectedPlaceVM = selectedPlaceVM
             viewModel.placeTypeFilterVM = placeTypeFilterVM
             viewModel.searchText = ""
-            
+
             // Trigger immediate calculation of most frequent types
             placeTypeFilterVM.refreshMostFrequentTypes()
+
+            // SearchViewModel is properly initialized
         }
         .onChange(of: selectedPlaceVM.isDetailSheetPresented) { _, newValue in
             if newValue {
@@ -190,12 +192,13 @@ struct MainView: View {
     // MARK: - Search Results Container
     private var searchResultsContainer: some View {
         Group {
-            if !viewModel.searchResults.isEmpty || !viewModel.userResults.isEmpty || viewModel.showNoPlaceFound {
+            if !viewModel.searchResults.isEmpty || !viewModel.userResults.isEmpty || viewModel.showNoPlaceFound || viewModel.isSearching {
                 SearchResultsView(
                     placeResults: viewModel.searchResults,
                     userResults: viewModel.userResults,
                     showNoPlaceFound: viewModel.showNoPlaceFound,
                     searchText: viewModel.searchText,
+                    isSearching: viewModel.isSearching,
                     onSelectPlace: { prediction in
                         viewModel.selectSuggestion(prediction)
                         withAnimation {
@@ -234,11 +237,10 @@ struct MainView: View {
             .padding(.horizontal, 20)
             .padding(.top, 10)
             .padding(.bottom, -10)
-            .onChange(of: viewModel.searchText) { oldValue, newValue in
-                Task { @MainActor in
-                    placeTypeFilterVM.filterBySearchText(newValue)
-                }
+            .onTapGesture {
+                searchIsFocused = true
             }
+            // REMOVED: Duplicate onChange handler - SearchViewModel already handles this with debouncing
     }
     
     // MARK: - Place Type Filter Buttons
