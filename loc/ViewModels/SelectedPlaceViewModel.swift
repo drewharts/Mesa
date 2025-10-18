@@ -1138,6 +1138,7 @@ class SelectedPlaceViewModel: ObservableObject {
             latitude: coordinate.latitude,
             longitude: coordinate.longitude
         )
+        newPlace.isCustom = true // Mark as custom place
         
         // Immediately update local state for instant UI feedback
         DispatchQueue.main.async {

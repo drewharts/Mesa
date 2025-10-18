@@ -36,6 +36,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
     var googlePlaceId: String?
     var source: String?
     var createdAt: String?
+    var isCustom: Bool?
     
     enum CodingKeys: String, CodingKey {
         case id
@@ -66,6 +67,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         case createdAt = "created_at"
         case photoUrls
         case thumbnailUrl  // Firestore uses "thumbnailUrl"
+        case isCustom = "is_custom"
     }
     
     // Custom decoding to handle backend's coordinates format
@@ -99,6 +101,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         self.googlePlaceId = nil
         self.source = nil
         self.createdAt = nil
+        self.isCustom = nil
         
         // Now decode all the optional properties
         try decodeBasicProperties(from: container)
@@ -166,6 +169,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         }
         
         self.createdAt = try container.decodeIfPresent(String.self, forKey: .createdAt)
+        self.isCustom = try container.decodeIfPresent(Bool.self, forKey: .isCustom)
         
         // Try to decode photoUrls, or use thumbnailUrl as fallback
         self.photoUrls = try container.decodeIfPresent([String].self, forKey: .photoUrls)
@@ -229,6 +233,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         try container.encodeIfPresent(source, forKey: .source)
         try container.encodeIfPresent(createdAt, forKey: .createdAt)
         try container.encodeIfPresent(photoUrls, forKey: .photoUrls)
+        try container.encodeIfPresent(isCustom, forKey: .isCustom)
     }
 
     // Existing initializers unchanged
@@ -256,6 +261,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         self.googlePlaceId = nil
         self.source = nil
         self.createdAt = nil
+        self.isCustom = nil
     }
     
     init(place: Place) {
@@ -282,6 +288,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         self.googlePlaceId = nil
         self.source = nil
         self.createdAt = nil
+        self.isCustom = nil
     }
     
     init(id: UUID, name: String, address: String?, city: String?) {
@@ -309,6 +316,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         self.googlePlaceId = nil
         self.source = nil
         self.createdAt = nil
+        self.isCustom = nil
     }
 
     init(from searchResult: SearchResult) {
@@ -346,6 +354,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         self.googlePlaceId = nil
         self.source = nil
         self.createdAt = nil
+        self.isCustom = nil
     }
 
     // MARK: - Conversion Methods

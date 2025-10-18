@@ -18,6 +18,48 @@ class SupabasePlaceService: ObservableObject {
     
     // MARK: - Helper Functions
     
+    /// Converts DetailPlace to PlaceRecord for Supabase insertion
+    private func convertToPlaceRecord(_ place: DetailPlace) -> PlaceRecord {
+        // Convert coordinate to PostGIS geometry string
+        var locationString: String? = nil
+        if let coordinate = place.coordinate {
+            locationString = "POINT(\(coordinate.longitude) \(coordinate.latitude))"
+        }
+        
+        return PlaceRecord(
+            id: place.id.uuidString,
+            name: place.name,
+            address: place.address,
+            city: place.city,
+            description: place.description,
+            location: locationString,
+            geohash: nil, // Will be calculated by database trigger
+            rating: place.rating,
+            rating_count: place.userRatingsTotal,
+            price_level: place.priceLevel,
+            categories: place.categories,
+            phone: place.phone,
+            website: nil, // Not in DetailPlace model
+            menu_url: nil, // Not in DetailPlace model
+            instagram: place.Instagram,
+            twitter: place.X,
+            google_places_id: place.googlePlaceId,
+            mapbox_id: place.mapboxId,
+            fid: nil, // Not in DetailPlace model
+            cid: nil, // Not in DetailPlace model
+            thumbnail_url: place.photoUrls?.first,
+            photo_urls: place.photoUrls,
+            open_hours: place.openHours?.map { ["day": "Unknown", "hours": $0] }, // Convert to JSONB format
+            reservable: place.reservable,
+            serves_breakfast: place.servesBreakfast,
+            serves_lunch: place.serversLunch,
+            serves_dinner: place.serversDinner,
+            source: place.source ?? "custom",
+            updated_at: ISO8601DateFormatter().string(from: Date()),
+            is_custom: place.isCustom ?? true // Default to true for custom places
+        )
+    }
+    
     /// Parses PostGIS geometry string (WKT format) to CLLocationCoordinate2D
     private func parseGeometryToCoordinate(_ geometryString: String?) -> CLLocationCoordinate2D? {
         guard let geometryString = geometryString else { return nil }
@@ -446,6 +488,62 @@ class SupabasePlaceService: ObservableObject {
         }
     }
     
+    // MARK: - Place Creation
+    
+    func addToAllPlaces(place: DetailPlace, completion: @escaping (Error?) -> Void) {
+        Task {
+            do {
+                print("📍 [Supabase] Adding place to all_places: \(place.name)")
+                
+                // Convert DetailPlace to PlaceRecord for Supabase
+                let placeRecord = convertToPlaceRecord(place)
+                
+                let response: PlaceRecord = try await supabase.client
+                    .from("places")
+                    .insert(placeRecord)
+                    .select()
+                    .single()
+                    .execute()
+                    .value
+                
+                print("✅ [Supabase] Successfully added place to all_places: \(place.name)")
+                completion(nil)
+            } catch {
+                print("❌ [Supabase] Error adding place to all_places: \(error)")
+                completion(error)
+            }
+        }
+    }
+    
+    func addToMyPlaces(userId: String, place: DetailPlace, completion: @escaping (Error?) -> Void) {
+        Task {
+            do {
+                print("📍 [Supabase] Adding place to my_places for user: \(userId)")
+                
+                let myPlaceRecord = MyPlaceRecord(
+                    id: UUID().uuidString,
+                    user_id: userId,
+                    place_id: place.id.uuidString,
+                    created_at: ISO8601DateFormatter().string(from: Date())
+                )
+                
+                let response: MyPlaceRecord = try await supabase.client
+                    .from("my_places")
+                    .insert(myPlaceRecord)
+                    .select()
+                    .single()
+                    .execute()
+                    .value
+                
+                print("✅ [Supabase] Successfully added place to my_places for user: \(userId)")
+                completion(nil)
+            } catch {
+                print("❌ [Supabase] Error adding place to my_places: \(error)")
+                completion(error)
+            }
+        }
+    }
+    
     // MARK: - Viewport Queries
     
     /// Fetch places within a geographic viewport (bounding box)
@@ -642,6 +740,7 @@ class SupabasePlaceService: ObservableObject {
         place.googlePlaceId = record.google_place_id
         place.source = record.source
         place.createdAt = record.created_at
+        place.isCustom = record.is_custom
         
         // Handle coordinate from PostGIS geometry
         if let locationData = record.location {
@@ -810,9 +909,6 @@ class SupabasePlaceService: ObservableObject {
                     .value
 
                 print("🔍 [Supabase] Raw database response: \(records.count) records")
-                for (index, record) in records.enumerated() {
-                    print("🔍 [Supabase] Record \(index + 1): id=\(record.id), name=\(record.name), user_id=\(record.user_id)")
-                }
 
                 // Convert records to PlaceLists WITHOUT fetching places
                 // Places will be loaded lazily when lists are opened
@@ -882,10 +978,6 @@ class SupabasePlaceService: ObservableObject {
                 }
 
                 print("🔍 [Supabase] Raw database response: \(records.count) records")
-                for (index, record) in records.enumerated() {
-                    let distance = record.distance_meters != nil ? String(format: "%.1f km", record.distance_meters! / 1000) : "unknown"
-                    print("🔍 [Supabase] Record \(index + 1): id=\(record.id), name=\(record.name), distance=\(distance)")
-                }
 
                 // Convert records to PlaceLists WITHOUT fetching places
                 // Places will be loaded lazily when lists are opened
@@ -1010,10 +1102,6 @@ class SupabasePlaceService: ObservableObject {
             }
 
             print("🔍 [Supabase] Raw database response: \(records.count) records")
-            for (index, record) in records.enumerated() {
-                let distance = record.distance_meters != nil ? String(format: "%.1f km", record.distance_meters! / 1000) : "unknown"
-                print("🔍 [Supabase] Record \(index + 1): id=\(record.id), name=\(record.name), distance=\(distance)")
-            }
 
             // Convert records to PlaceLists WITHOUT fetching places
             // Places will be loaded lazily when lists are opened
@@ -1068,13 +1156,14 @@ struct PlaceRecord: Codable {
     let google_place_id: String?
     let source: String?
     let created_at: String?
+    let is_custom: Bool?
     
     enum CodingKeys: String, CodingKey {
         case id, name, address, city, mapbox_id
         case location, categories, phone, rating
         case user_ratings_total, open_hours, description_text, price_level, reservable
         case serves_breakfast, serves_lunch, serves_dinner, instagram, x, photo_urls
-        case google_place_id, source, created_at
+        case google_place_id, source, created_at, is_custom
     }
     
     init(from decoder: Decoder) throws {
@@ -1102,6 +1191,7 @@ struct PlaceRecord: Codable {
         google_place_id = try container.decodeIfPresent(String.self, forKey: .google_place_id)
         source = try container.decodeIfPresent(String.self, forKey: .source)
         created_at = try container.decodeIfPresent(String.self, forKey: .created_at)
+        is_custom = try container.decodeIfPresent(Bool.self, forKey: .is_custom)
         
         // Handle open_hours - skip if it can't be decoded as [String]
         do {
