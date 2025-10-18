@@ -1179,27 +1179,29 @@ class SelectedPlaceViewModel: ObservableObject {
         
         // Test Supabase connection first
         print("🔍 [SelectedPlaceViewModel] Testing Supabase connection...")
-        SupabasePlaceService.shared.testSupabaseConnection { isConnected, error in
-            if !isConnected {
-                print("❌ [SelectedPlaceViewModel] Supabase connection failed: \(error?.localizedDescription ?? "Unknown error")")
-                return
-            }
-            
-            // Save to main places collection
-            print("💾 [SelectedPlaceViewModel] Starting to save place to database...")
-            self.placeService.addToAllPlaces(place: newPlace) { error in
-                if let error = error {
-                    print("❌ [SelectedPlaceViewModel] Error saving place to main collection: \(error.localizedDescription)")
-                } else {
-                    print("✅ [SelectedPlaceViewModel] Successfully saved place to main collection")
-                    
-                    // Save to user's myPlaces collection
-                    print("💾 [SelectedPlaceViewModel] Starting to save place to user's myPlaces...")
-                    self.placeService.addToMyPlaces(userId: userId, place: newPlace) { error in
-                        if let error = error {
-                            print("❌ [SelectedPlaceViewModel] Error saving place to user's collection: \(error.localizedDescription)")
-                        } else {
-                            print("✅ [SelectedPlaceViewModel] Successfully saved place to user's myPlaces collection")
+        Task { @MainActor in
+            SupabasePlaceService.shared.testSupabaseConnection { isConnected, error in
+                if !isConnected {
+                    print("❌ [SelectedPlaceViewModel] Supabase connection failed: \(error?.localizedDescription ?? "Unknown error")")
+                    return
+                }
+                
+                // Save to main places collection
+                print("💾 [SelectedPlaceViewModel] Starting to save place to database...")
+                self.placeService.addToAllPlaces(place: newPlace) { error in
+                    if let error = error {
+                        print("❌ [SelectedPlaceViewModel] Error saving place to main collection: \(error.localizedDescription)")
+                    } else {
+                        print("✅ [SelectedPlaceViewModel] Successfully saved place to main collection")
+                        
+                        // Save to user's myPlaces collection
+                        print("💾 [SelectedPlaceViewModel] Starting to save place to user's myPlaces...")
+                        self.placeService.addToMyPlaces(userId: userId, place: newPlace) { error in
+                            if let error = error {
+                                print("❌ [SelectedPlaceViewModel] Error saving place to user's collection: \(error.localizedDescription)")
+                            } else {
+                                print("✅ [SelectedPlaceViewModel] Successfully saved place to user's myPlaces collection")
+                            }
                         }
                     }
                 }
