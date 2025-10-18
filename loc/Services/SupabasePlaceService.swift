@@ -643,8 +643,7 @@ class SupabasePlaceService: ObservableObject {
                 if let coordinate = place.coordinate {
                     locationData = LocationData(
                         type: "Point",
-                        coordinates: [coordinate.longitude, coordinate.latitude],
-                        wkt: "POINT(\(coordinate.longitude) \(coordinate.latitude))"
+                        coordinates: [coordinate.longitude, coordinate.latitude]
                     )
                 }
                 
