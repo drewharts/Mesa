@@ -190,8 +190,11 @@ class DataManager: ObservableObject {
         profileViewModel.isMyPlacesLoading = true
         do {
             let places = try await placeService.fetchMyPlaces(userId: userId)
+            
+            // Clear existing myPlaces and set new ones (avoid duplicates)
+            self.profileViewModel.myPlaces = places.map { $0.id.uuidString }
+            
             for place in places {
-                self.profileViewModel.myPlaces.append(place.id.uuidString)
                 self.detailPlaceViewModel.places[place.id.uuidString] = place
                 self.detailPlaceViewModel.fetchPlaceImage(for: place.id.uuidString)
                 // Add the current user as a saver for their own place
@@ -202,8 +205,10 @@ class DataManager: ObservableObject {
                     self.detailPlaceViewModel.placeSavers[placeId]!.append(userId)
                 }
             }
+            
+            print("✅ [DataManager] Loaded \(places.count) myPlaces for user: \(userId)")
         } catch {
-            print("Error loading my places: \(error.localizedDescription)")
+            print("❌ [DataManager] Error loading my places: \(error.localizedDescription)")
         }
         profileViewModel.isMyPlacesLoading = false
     }

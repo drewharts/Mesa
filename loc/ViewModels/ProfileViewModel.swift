@@ -44,7 +44,6 @@ class ProfileViewModel: ObservableObject {
     @Published var userFavorites: [String] = []
     @Published var userFollowing: [ProfileData] = []
     @Published var userFollowers: [ProfileData] = []
-    //TODO: Implement my places
     @Published var myPlaces: [String] = []
     @Published var userExternalPlaces: [String: ExternalPlace] = [:] // PlaceId -> ExternalPlace
     @Published var recentlyCreatedListId: UUID?
