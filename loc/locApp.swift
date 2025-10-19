@@ -120,8 +120,9 @@ struct locApp: App {
         // Wire up MapViewModel to PlaceTypeFilterViewModel
         placeTypeFilterVM.mapViewModel = mapVM
         
-        // Wire up ProfileViewModel to MapViewModel (for friends' places viewport filtering)
+        // Wire up ProfileViewModel to MapViewModel (for friends' places viewport filtering and profile photos)
         profileVM.mapViewModel = mapVM
+        mapVM.profileViewModel = profileVM
         
         // Setup observer for viewport changes (must be after mapViewModel is set)
         placeTypeFilterVM.observeMapViewModel()

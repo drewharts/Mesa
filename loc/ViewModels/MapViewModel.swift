@@ -22,6 +22,7 @@ class MapViewModel: ObservableObject {
     private let detailPlaceVM: DetailPlaceViewModel
     private var lastLoadedRegion: MKCoordinateRegion?
     private var placeDetailsCache: [String: DetailPlace] = [:] // Cache for full place details
+    weak var profileViewModel: ProfileViewModel? // To access current user's profile
     
     // Minimum movement threshold to trigger reload (in degrees)
     private let minMovementThreshold: Double = 0.01 // ~1km at equator
@@ -33,32 +34,23 @@ class MapViewModel: ObservableObject {
     
     /// Load profile photos for followed users (for custom annotation views)
     func loadFollowedUsersPhotos() async {
-        guard let authUserId = await SupabaseAuthService.shared.currentUserId else {
-            print("⚠️ [MapViewModel] No auth userId available for loading followed users' photos")
+        // Use cached profile data instead of fetching again
+        guard let currentUser = profileViewModel?.user else {
+            print("⚠️ [MapViewModel] No user profile available for loading photos")
             return
         }
         
-        // Get the profile user ID (not auth UID)
-        let profileUserId: String
-        let currentUserPhotoUrl: String?
-        do {
-            let profile = try await UserService.shared.fetchUserById(userId: authUserId)
-            profileUserId = profile.id
-            currentUserPhotoUrl = profile.profilePhotoURL
-        } catch {
-            print("⚠️ [MapViewModel] Could not fetch profile, using auth UID as fallback")
-            profileUserId = authUserId
-            currentUserPhotoUrl = nil
-        }
+        let profileUserId = currentUser.id
+        let currentUserPhotoUrl = currentUser.profilePhotoURL
         
         do {
             var photos = try await placeService.fetchFollowedUsersPhotos(userId: profileUserId)
             
-            // Add current user's photo to the list
+            // Add current user's photo to the list (using cached data)
             if let photoUrl = currentUserPhotoUrl {
                 let currentUserPhoto = FollowedUserPhoto(userId: profileUserId, profilePhotoUrl: photoUrl)
                 photos.append(currentUserPhoto)
-                print("📸 [MapViewModel] Added current user's photo to annotation list")
+                print("📸 [MapViewModel] Added current user's photo to annotation list (from cache)")
             }
             
             self.followedUsersPhotos = photos
