@@ -40,18 +40,29 @@ class MapViewModel: ObservableObject {
         
         // Get the profile user ID (not auth UID)
         let profileUserId: String
+        let currentUserPhotoUrl: String?
         do {
             let profile = try await UserService.shared.fetchUserById(userId: authUserId)
             profileUserId = profile.id
+            currentUserPhotoUrl = profile.profilePhotoURL
         } catch {
             print("⚠️ [MapViewModel] Could not fetch profile, using auth UID as fallback")
             profileUserId = authUserId
+            currentUserPhotoUrl = nil
         }
         
         do {
-            let photos = try await placeService.fetchFollowedUsersPhotos(userId: profileUserId)
+            var photos = try await placeService.fetchFollowedUsersPhotos(userId: profileUserId)
+            
+            // Add current user's photo to the list
+            if let photoUrl = currentUserPhotoUrl {
+                let currentUserPhoto = FollowedUserPhoto(userId: profileUserId, profilePhotoUrl: photoUrl)
+                photos.append(currentUserPhoto)
+                print("📸 [MapViewModel] Added current user's photo to annotation list")
+            }
+            
             self.followedUsersPhotos = photos
-            print("📸 [MapViewModel] Loaded \(photos.count) followed users' photos for annotations")
+            print("📸 [MapViewModel] Loaded \(photos.count) total photos for annotations (including current user)")
             
             // Load profile pictures from URLs
             await loadProfilePictures(from: photos)
