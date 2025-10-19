@@ -31,15 +31,25 @@ class MapViewModel: ObservableObject {
     
     /// Load profile photos for followed users (for custom annotation views)
     func loadFollowedUsersPhotos() async {
-        guard let userId = await SupabaseAuthService.shared.currentUserId else {
-            print("⚠️ [MapViewModel] No userId available for loading followed users' photos")
+        guard let authUserId = await SupabaseAuthService.shared.currentUserId else {
+            print("⚠️ [MapViewModel] No auth userId available for loading followed users' photos")
             return
         }
         
+        // Get the profile user ID (not auth UID)
+        let profileUserId: String
         do {
-            let photos = try await placeService.fetchFollowedUsersPhotos(userId: userId)
+            let profile = try await UserService.shared.fetchUserById(userId: authUserId)
+            profileUserId = profile.id
+        } catch {
+            print("⚠️ [MapViewModel] Could not fetch profile, using auth UID as fallback")
+            profileUserId = authUserId
+        }
+        
+        do {
+            let photos = try await placeService.fetchFollowedUsersPhotos(userId: profileUserId)
             self.followedUsersPhotos = photos
-            print("📸 [MapViewModel] Loaded \(photos.count) followed users' photos")
+            print("📸 [MapViewModel] Loaded \(photos.count) followed users' photos for annotations")
         } catch {
             print("❌ [MapViewModel] Error loading followed users' photos: \(error)")
         }

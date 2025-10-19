@@ -62,14 +62,15 @@ struct MapView: View {
         }
     }
     
-    // Annotation marker view
+    // Annotation marker view with user photos
     private func annotationMarkerView(for annotation: PlaceAnnotation) -> some View {
-        Image(systemName: "mappin.circle.fill")
-            .font(.title)
-            .foregroundColor(.red)
-            .onTapGesture {
-                handleAnnotationTap(annotation)
-            }
+        CustomPlaceAnnotationView(
+            annotation: annotation,
+            userPhotos: mapViewModel.followedUsersPhotos
+        )
+        .onTapGesture {
+            handleAnnotationTap(annotation)
+        }
     }
     
     // User location marker
@@ -238,6 +239,9 @@ struct MapView: View {
              removeNotificationObservers()
          }
         .task {
+            // Load followed users' photos for custom annotations
+            await mapViewModel.loadFollowedUsersPhotos()
+            
             // 🚀 CRITICAL: Load viewport places FIRST (instant map rendering)
             if !hasLoadedInitialViewport {
                 // Give the map a moment to settle and provide a region
