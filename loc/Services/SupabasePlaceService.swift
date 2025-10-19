@@ -870,10 +870,14 @@ class SupabasePlaceService: ObservableObject {
         print("📸 [Supabase] Fetching followed users' photos for user: \(userId)")
         
         do {
+            struct UserPhotoParams: Encodable {
+                let p_user_id: String
+            }
+            
+            let params = UserPhotoParams(p_user_id: userId)
+            
             let response: [FollowedUserPhoto] = try await supabase.client
-                .rpc("get_followed_users_photos", params: [
-                    "p_user_id": userId
-                ])
+                .rpc("get_followed_users_photos", params: params)
                 .execute()
                 .value
             
