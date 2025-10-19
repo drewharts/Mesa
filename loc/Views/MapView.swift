@@ -32,60 +32,77 @@ struct MapView: View {
     
     var onMapTap: (() -> Void)?
     
+    // Helper computed property to simplify type checking
+    private var annotationsToDisplay: [PlaceAnnotation] {
+        return mapViewModel.viewportAnnotations
+    }
+    
+    // Map content extracted to help Swift type checker
+    private var mapContentView: some View {
+        Map(position: $mapPosition) {
+            ForEach(annotationsToDisplay) { annotation in
+                Annotation(
+                    annotation.name,
+                    coordinate: annotation.coordinate,
+                    anchor: .bottom
+                ) {
+                    annotationMarkerView(for: annotation)
+                }
+            }
+            // Current location dot
+            if let userLocation = locationManager.currentLocation?.coordinate {
+                Annotation(
+                    "",
+                    coordinate: userLocation,
+                    anchor: .center
+                ) {
+                    userLocationMarker
+                }
+            }
+        }
+    }
+    
+    // Annotation marker view
+    private func annotationMarkerView(for annotation: PlaceAnnotation) -> some View {
+        Image(systemName: "mappin.circle.fill")
+            .font(.title)
+            .foregroundColor(.red)
+            .onTapGesture {
+                handleAnnotationTap(annotation)
+            }
+    }
+    
+    // User location marker
+    private var userLocationMarker: some View {
+        Circle()
+            .fill(Color.blue)
+            .frame(width: 18, height: 18)
+            .overlay(
+                Circle()
+                    .stroke(Color.white, lineWidth: 4)
+                    .frame(width: 18, height: 18)
+            )
+            .shadow(radius: 4)
+    }
+    
+    // Handle annotation tap
+    private func handleAnnotationTap(_ annotation: PlaceAnnotation) {
+        Task {
+            if let place = await mapViewModel.loadPlaceDetails(for: annotation) {
+                await MainActor.run {
+                    selectedPlaceVM.selectedPlace = place
+                    selectedPlaceVM.isDetailSheetPresented = true
+                }
+            }
+        }
+    }
+    
     var body: some View {
         let currentCoords = locationManager.currentLocation?.coordinate ?? defaultCenter
         
         ZStack {
             MapReader { mapProxy in
-                Map(position: $mapPosition) {
-                    ForEach(placeTypeFilterVM.filteredPlaces.compactMap { place -> PlaceAnnotationItem? in
-                        guard let coordinate = place.coordinate else {
-                            return nil
-                        }
-                        return PlaceAnnotationItem(
-                            id: place.id,
-                            coordinate: CLLocationCoordinate2D(latitude: coordinate.latitude, longitude: coordinate.longitude),
-                            place: place
-                        )
-                    }) { place in
-                        Annotation(
-                            "",
-                            coordinate: place.coordinate,
-                            anchor: .bottom
-                        ) {
-                            PlaceAnnotationView(
-                                place: place.place,
-                                image: detailPlaceVM.placeAnnotations[place.place.id.uuidString],
-                                annotationImage: detailPlaceVM.placeAnnotations[place.place.id.uuidString]
-                            )
-                            .onTapGesture {
-                                // Set selected place first (instant, shows cached data)
-                                selectedPlaceVM.selectedPlace = place.place
-                                // Show sheet immediately for instant feedback
-                                selectedPlaceVM.isDetailSheetPresented = true
-                                // Background data fetching and loading happens automatically via didSet
-                            }
-                        }
-                    }
-                    // Current location dot
-                    if let userLocation = locationManager.currentLocation?.coordinate {
-                        Annotation(
-                            "",
-                            coordinate: userLocation,
-                            anchor: .center
-                        ) {
-                            Circle()
-                                .fill(Color.blue)
-                                .frame(width: 18, height: 18)
-                                .overlay(
-                                    Circle()
-                                        .stroke(Color.white, lineWidth: 4)
-                                        .frame(width: 18, height: 18)
-                                )
-                                .shadow(radius: 4)
-                        }
-                    }
-                }
+                mapContentView
                 .mapControlVisibility(.hidden)
                 .ignoresSafeArea()
                 .onMapCameraChange { context in
@@ -212,10 +229,8 @@ struct MapView: View {
             
             // 🚀 Load initial viewport places
             if !hasLoadedInitialViewport, let region = currentMapRegion {
-                Task {
-                    await mapViewModel.loadInitialViewportPlaces(region)
-                    hasLoadedInitialViewport = true
-                }
+                mapViewModel.onMapRegionChange(region)
+                hasLoadedInitialViewport = true
             }
         }
          .onDisappear {
@@ -229,7 +244,7 @@ struct MapView: View {
                 try? await Task.sleep(nanoseconds: 300_000_000) // 0.3 seconds
                 
                 if let region = currentMapRegion {
-                    await mapViewModel.loadInitialViewportPlaces(region)
+                    mapViewModel.onMapRegionChange(region)
                     hasLoadedInitialViewport = true
                     print("✅ [MapView] Initial viewport loaded")
                 } else {
@@ -239,7 +254,7 @@ struct MapView: View {
                         center: coords,
                         span: MKCoordinateSpan(latitudeDelta: 0.1, longitudeDelta: 0.1)
                     )
-                    await mapViewModel.loadInitialViewportPlaces(region)
+                    mapViewModel.onMapRegionChange(region)
                     hasLoadedInitialViewport = true
                     print("✅ [MapView] Initial viewport loaded with default region")
                 }

@@ -142,6 +142,21 @@ class PlaceService: ObservableObject {
         return try await supabase.fetchLists(userId: userId)
     }
     
+    /// ✅ NEW: Fetch favorite place IDs only (not full place documents) - SUPER FAST!
+    func fetchFavoritePlaceIds(userId: String) async throws -> [String] {
+        return try await supabase.fetchFavoritePlaceIds(userId: userId)
+    }
+    
+    /// ✅ NEW: Fetch my place IDs only (not full place documents) - SUPER FAST!
+    func fetchMyPlaceIds(userId: String) async throws -> [String] {
+        return try await supabase.fetchMyPlaceIds(userId: userId)
+    }
+    
+    /// ✅ NEW: Fetch list metadata only (not full place documents) - SUPER FAST!
+    func fetchListMetadata(userId: String) async throws -> [PlaceList] {
+        return try await supabase.fetchListMetadata(userId: userId)
+    }
+    
     /// Fetches place lists sorted by proximity to user's current location
     func fetchListsByProximity(userId: String, userLocation: CLLocationCoordinate2D?, completion: @escaping ([PlaceList]) -> Void) {
         print("🔄 [PlaceService] Delegating fetchListsByProximity to Supabase...")
@@ -168,31 +183,85 @@ class PlaceService: ObservableObject {
         return try await supabase.getPlaceCountsForLists(listIds: listIds)
     }
     
-    func fetchPlacesInViewport(viewport: (minLat: Double, maxLat: Double, minLng: Double, maxLng: Double), completion: @escaping ([DetailPlace]?, Error?) -> Void) {
+    func fetchPlacesInViewport(viewport: (minLat: Double, maxLat: Double, minLng: Double, maxLng: Double), completion: @escaping ([PlaceAnnotation]?, Error?) -> Void) {
         print("🔄 [PlaceService] Delegating fetchPlacesInViewport to Supabase...")
         Task { @MainActor in
-            guard let userId = await SupabaseAuthService.shared.currentUserId else {
-                print("⚠️ [PlaceService] No userId available for viewport query")
+            guard let authUserId = await SupabaseAuthService.shared.currentUserId else {
+                print("⚠️ [PlaceService] No auth userId available for viewport query")
                 completion([], nil)
                 return
             }
+            
+            // Get the profile user ID (not auth UID)
+            let profileUserId: String
+            do {
+                let profile = try await UserService.shared.fetchUserById(userId: authUserId)
+                profileUserId = profile.id
+                print("✅ [PlaceService] Using profile user ID: \(profileUserId)")
+            } catch {
+                print("⚠️ [PlaceService] Could not fetch profile, using auth UID as fallback: \(authUserId)")
+                profileUserId = authUserId
+            }
+            
             await supabase.fetchPlacesInViewport(
                 northLat: viewport.maxLat,
                 southLat: viewport.minLat,
                 eastLng: viewport.maxLng,
                 westLng: viewport.minLng,
-                userId: userId,
+                userId: profileUserId,
                 completion: completion
             )
         }
     }
     
-    func fetchPlacesInViewport(northLat: Double, southLat: Double, eastLng: Double, westLng: Double) async throws -> [DetailPlace] {
+    func fetchPlacesInViewport(northLat: Double, southLat: Double, eastLng: Double, westLng: Double) async throws -> [PlaceAnnotation] {
         print("🔄 [PlaceService] Delegating fetchPlacesInViewport async to Supabase...")
-        guard let userId = await SupabaseAuthService.shared.currentUserId else {
-            print("⚠️ [PlaceService] No userId available for viewport query")
+        guard let authUserId = await SupabaseAuthService.shared.currentUserId else {
+            print("⚠️ [PlaceService] No auth userId available for viewport query")
             return []
         }
+        
+        // Get the profile user ID (not auth UID)
+        let profileUserId: String
+        do {
+            let profile = try await UserService.shared.fetchUserById(userId: authUserId)
+            profileUserId = profile.id
+            print("✅ [PlaceService] Using profile user ID: \(profileUserId)")
+        } catch {
+            print("⚠️ [PlaceService] Could not fetch profile, using auth UID as fallback: \(authUserId)")
+            profileUserId = authUserId
+        }
+        
+        return try await supabase.fetchPlacesInViewport(
+            northLat: northLat,
+            southLat: southLat,
+            eastLng: eastLng,
+            westLng: westLng,
+            userId: profileUserId
+        )
+    }
+    
+    /// Fetch full place details on demand (when user taps a marker)
+    func fetchPlaceDetails(placeId: String) async throws -> DetailPlace? {
+        print("🔄 [PlaceService] Delegating fetchPlaceDetails to Supabase...")
+        return try await supabase.fetchPlaceDetails(placeId: placeId)
+    }
+    
+    /// Batch fetch full place details for multiple places
+    func fetchPlaceDetailsBatch(placeIds: [String]) async throws -> [DetailPlace] {
+        print("🔄 [PlaceService] Delegating fetchPlaceDetailsBatch to Supabase...")
+        return try await supabase.fetchPlaceDetailsBatch(placeIds: placeIds)
+    }
+    
+    /// Fetch profile photos for all followed users (for custom annotation views)
+    func fetchFollowedUsersPhotos(userId: String) async throws -> [FollowedUserPhoto] {
+        print("🔄 [PlaceService] Delegating fetchFollowedUsersPhotos to Supabase...")
+        return try await supabase.fetchFollowedUsersPhotos(userId: userId)
+    }
+    
+    /// ✅ NEW: Fetch places in viewport with explicit user ID (for DataManager)
+    func fetchPlacesInViewportWithUserId(northLat: Double, southLat: Double, eastLng: Double, westLng: Double, userId: String) async throws -> [PlaceAnnotation] {
+        print("🔄 [PlaceService] Delegating fetchPlacesInViewportWithUserId async to Supabase...")
         return try await supabase.fetchPlacesInViewport(
             northLat: northLat,
             southLat: southLat,
@@ -202,52 +271,8 @@ class PlaceService: ObservableObject {
         )
     }
     
-    func fetchFriendsPlacesInViewport(viewport: (minLat: Double, maxLat: Double, minLng: Double, maxLng: Double), friendIds: [String], completion: @escaping ([DetailPlace]?, Error?) -> Void) {
-        print("🔄 [PlaceService] Delegating fetchFriendsPlacesInViewport to Supabase...")
-        Task { @MainActor in
-            do {
-                var allPlaces: [DetailPlace] = []
-                // Fetch places for each friend
-                for friendId in friendIds {
-                    let friendPlaces = try await supabase.fetchPlacesInViewport(
-                        northLat: viewport.maxLat,
-                        southLat: viewport.minLat,
-                        eastLng: viewport.maxLng,
-                        westLng: viewport.minLng,
-                        userId: friendId
-                    )
-                    allPlaces.append(contentsOf: friendPlaces)
-                }
-                // Remove duplicates by place ID
-                let uniquePlaces = Dictionary(grouping: allPlaces, by: { $0.id })
-                    .compactMap { $0.value.first }
-                completion(uniquePlaces, nil)
-            } catch {
-                print("❌ [PlaceService] Error fetching friends' viewport places: \(error)")
-                completion(nil, error)
-            }
-        }
-    }
-    
-    func fetchFriendsPlacesInViewport(northLat: Double, southLat: Double, eastLng: Double, westLng: Double, friendIds: [String]) async throws -> [DetailPlace] {
-        print("🔄 [PlaceService] Delegating fetchFriendsPlacesInViewport async to Supabase...")
-        var allPlaces: [DetailPlace] = []
-        // Fetch places for each friend
-        for friendId in friendIds {
-            let friendPlaces = try await supabase.fetchPlacesInViewport(
-                northLat: northLat,
-                southLat: southLat,
-                eastLng: eastLng,
-                westLng: westLng,
-                userId: friendId
-            )
-            allPlaces.append(contentsOf: friendPlaces)
-        }
-        // Remove duplicates by place ID
-        let uniquePlaces = Dictionary(grouping: allPlaces, by: { $0.id })
-            .compactMap { $0.value.first }
-        return uniquePlaces
-    }
+    // fetchFriendsPlacesInViewport methods removed - the main get_visible_annotations_with_users function
+    // now handles both user and friends' places in a single optimized query
     
     func addToAllPlaces(place: DetailPlace, completion: @escaping (Error?) -> Void) {
         print("🔄 [PlaceService] Delegating addToAllPlaces to Supabase...")

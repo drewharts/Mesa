@@ -622,6 +622,11 @@ class UserService: ObservableObject {
         return try await supabase.getNumberFollowing(forUserId: userId)
     }
     
+    /// ✅ NEW: Fetch following user IDs only (not full profiles) - SUPER FAST!
+    func fetchFollowingUserIds(userId: String) async throws -> [String] {
+        return try await supabase.fetchFollowingUserIds(userId: userId)
+    }
+    
     func isFollowingUser(followerId: String, followingId: String, completion: @escaping (Bool) -> Void) {
         print("⚠️ [UserService] isFollowingUser not fully implemented")
         completion(false)

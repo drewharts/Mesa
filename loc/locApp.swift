@@ -196,9 +196,11 @@ struct locApp: App {
                         do {
                             let profile = try await UserService.shared.fetchUserById(userId: session.user.id.uuidString)
                             let userId = profile.id
+                            
+                            // ✅ Set user logged in IMMEDIATELY - don't wait for data
                             userSession.setUserLoggedIn(uid: userId)
                             
-                            // ✅ NON-BLOCKING: Start data loading in background
+                            // ✅ Load data in background - UI is already shown
                             Task.detached(priority: .background) {
                                 await dataManager.initializeProfileData(userId: userId)
                             }
@@ -207,9 +209,11 @@ struct locApp: App {
                         } catch {
                             // Fallback to Supabase auth UID if profile lookup fails
                             let userId = session.user.id.uuidString
+                            
+                            // ✅ Set user logged in IMMEDIATELY - don't wait for data
                             userSession.setUserLoggedIn(uid: userId)
                             
-                            // ✅ NON-BLOCKING: Start data loading in background
+                            // ✅ Load data in background - UI is already shown
                             Task.detached(priority: .background) {
                                 await dataManager.initializeProfileData(userId: userId)
                             }

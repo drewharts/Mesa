@@ -8,6 +8,7 @@
 import Foundation
 import UIKit
 import CoreLocation
+import MapKit
 
 @MainActor
 class DataManager: ObservableObject {
@@ -46,24 +47,160 @@ class DataManager: ObservableObject {
     }
 
     func initializeProfileData(userId: String) async {
+        let startTime = CFAbsoluteTimeGetCurrent()
+        print("🚀 [DataManager] Starting MINIMAL profile data initialization")
+        
         startDataLoadingFlags()
         
-        // PHASE 0: Load ALL user places immediately (single optimized query!)
-        // This ensures map shows all places instantly
-        await loadAllUserPlacesOptimized(userId: userId)
-        
-        // PHASE 1: Load critical user data in parallel (fastest to show something to user)
-        await loadCriticalUserData(userId: userId)
-        
-        // PHASE 2: Load remaining user data in parallel
-        await loadRemainingUserData(userId: userId)
-        
-        // PHASE 3: Load social data in background (non-blocking)
-        Task.detached { [weak self] in
-            await self?.loadSocialDataInBackground(userId: userId)
+        // ✅ PHASE 1: Load ONLY essential data for immediate UI display
+        await measureLoadingTime("Essential Data") {
+            await loadEssentialDataOnly(userId: userId)
         }
         
-        calculateMapAnnotations()
+        // ✅ PHASE 2: Load viewport places in background (non-blocking)
+        Task.detached { [weak self] in
+            await self?.measureLoadingTime("Viewport Places") {
+                await self?.loadViewportPlacesOnly(userId: userId)
+            }
+        }
+        
+        let endTime = CFAbsoluteTimeGetCurrent()
+        print("✅ [DataManager] Essential data loaded in \(String(format: "%.2f", endTime - startTime))s - UI ready!")
+    }
+    
+    /// Helper to measure loading time for performance monitoring
+    private func measureLoadingTime<T>(_ operation: String, block: () async throws -> T) async rethrows -> T {
+        let start = CFAbsoluteTimeGetCurrent()
+        let result = try await block()
+        let end = CFAbsoluteTimeGetCurrent()
+        print("⏱️ [DataManager] \(operation) took \(String(format: "%.2f", end - start))s")
+        return result
+    }
+    
+    /// Load essential user profile data and all place annotations at startup
+    /// Uses the optimized PostgreSQL function to get user + friends' places in one call
+    private func loadEssentialDataOnly(userId: String) async {
+        // Load essential profile data in parallel
+        async let profileData: () = loadProfileData(userId: userId)
+        async let followingIds: () = loadFollowingUserIds(userId: userId)
+        async let followCounts: () = fetchFollowerAndFollowingCountsAsync(userId: userId)
+        
+        // Wait for essential data to complete
+        await profileData
+        await followingIds
+        await followCounts
+        
+        print("✅ [DataManager] Essential profile data loaded - UI ready for interaction!")
+        
+        // Note: Place annotations are now loaded on-demand via viewport queries
+        // No need to preload all annotations - the MapViewModel handles this
+    }
+    
+    /// Load following user IDs only (not full profiles)
+    private func loadFollowingUserIds(userId: String) async {
+        do {
+            let followingIds = try await userService.fetchFollowingUserIds(userId: userId)
+            await MainActor.run {
+                // Store just the IDs for viewport filtering
+                self.profileViewModel.userFollowing = followingIds.map { ProfileData(id: $0, firstName: "", lastName: "", email: "", profilePhotoURL: nil, phoneNumber: "", fullNameLower: "", fullName: "", fcmToken: nil, firebaseUid: nil, supabaseUid: nil) }
+                print("✅ [DataManager] Loaded \(followingIds.count) following user IDs")
+                // Note: Friend tracking is now handled by PostgreSQL function - no need to update MapViewModel
+            }
+        } catch {
+            print("❌ [DataManager] Error loading following user IDs: \(error.localizedDescription)")
+        }
+    }
+    
+    /// Load place IDs only (not full place documents) - MUCH faster!
+    private func loadUserPlaceIdsOnly(userId: String) async {
+        do {
+            // Load just the IDs/metadata, not full place documents
+            async let favoriteIds = try? await placeService.fetchFavoritePlaceIds(userId: userId)
+            async let myPlaceIds = try? await placeService.fetchMyPlaceIds(userId: userId)
+            async let listMetadata = try? await placeService.fetchListMetadata(userId: userId)
+            
+            let (favIds, myPlaceIdsResult, listMetadataResult) = await (favoriteIds, myPlaceIds, listMetadata)
+            
+            await MainActor.run {
+                // Store just the IDs - full place data loads on-demand
+                self.profileViewModel.userFavorites = favIds ?? []
+                self.profileViewModel.myPlaces = myPlaceIdsResult ?? []
+                self.profileViewModel.userLists = listMetadataResult ?? []
+                
+                print("✅ [DataManager] Loaded place IDs only:")
+                print("   - Favorites: \(favIds?.count ?? 0)")
+                print("   - My Places: \(myPlaceIdsResult?.count ?? 0)")
+                print("   - Lists: \(listMetadataResult?.count ?? 0)")
+            }
+        } catch {
+            print("❌ [DataManager] Error loading place IDs: \(error.localizedDescription)")
+        }
+    }
+    
+    /// ✅ NEW: Load only places in the current viewport (much faster!)
+    private func loadViewportPlacesOnly(userId: String) async {
+        let startTime = Date()
+        
+        // Get the current map region from LocationManager
+        guard let userLocation = locationManager.currentLocation?.coordinate else {
+            print("⚠️ [DataManager] No location available, skipping viewport loading")
+            return
+        }
+        
+        // Create a reasonable viewport around user's location
+        let viewportRegion = MKCoordinateRegion(
+            center: userLocation,
+            span: MKCoordinateSpan(latitudeDelta: 0.1, longitudeDelta: 0.1) // ~11km radius
+        )
+        
+        do {
+            // Use the existing viewport loading logic
+            let bounds = getViewportBounds(from: viewportRegion)
+            
+            // Load places in viewport (much faster than all places!)
+            // ✅ Use the correct user ID (profile ID, not Supabase auth UID)
+            let viewportPlaces = try await placeService.fetchPlacesInViewportWithUserId(
+                northLat: bounds.northLat,
+                southLat: bounds.southLat,
+                eastLng: bounds.eastLng,
+                westLng: bounds.westLng,
+                userId: userId
+            )
+            
+            await MainActor.run {
+                // Note: viewportPlaces now returns PlaceAnnotation objects, not DetailPlace
+                // These are lightweight annotations for map display only
+                // Full place details are loaded on-demand when user taps markers
+                let duration = Date().timeIntervalSince(startTime)
+                print("⚡ [DataManager] Loaded \(viewportPlaces.count) place annotations in \(String(format: "%.2f", duration))s")
+            }
+            
+            // Trigger map annotation calculation for viewport places
+            calculateMapAnnotations()
+            
+        } catch {
+            print("❌ [DataManager] Error loading viewport places: \(error.localizedDescription)")
+        }
+    }
+    
+    /// Helper to convert region to bounds (same as MapViewModel)
+    private func getViewportBounds(from region: MKCoordinateRegion) -> (
+        northLat: Double,
+        southLat: Double,
+        eastLng: Double,
+        westLng: Double
+    ) {
+        let centerLat = region.center.latitude
+        let centerLng = region.center.longitude
+        let latDelta = region.span.latitudeDelta
+        let lngDelta = region.span.longitudeDelta
+        
+        return (
+            northLat: centerLat + (latDelta / 2),
+            southLat: centerLat - (latDelta / 2),
+            eastLng: centerLng + (lngDelta / 2),
+            westLng: centerLng - (lngDelta / 2)
+        )
     }
     
     /// PHASE 0: Load ALL user places in a single optimized query
@@ -121,42 +258,88 @@ class DataManager: ObservableObject {
         }
     }
     
-    // PHASE 1: Load most important user data first (parallel)
-    private func loadCriticalUserData(userId: String) async {
-        async let profileData: () = loadProfileData(userId: userId)
-        async let myPlaces: () = loadUserMyPlaces(userId: userId)
-        async let favorites: () = loadUserFavoritePlaces(userId: userId)
+    // ❌ REMOVED: Old heavy loading phases - replaced with minimal essential data loading
+    // The following methods are now LAZY and load on-demand when user interacts with UI:
+    // - loadUserMyPlaces() - loads when user opens "My Places" tab
+    // - loadUserFavoritePlaces() - loads when user opens "Favorites" tab  
+    // - loadUserPlaceLists() - loads when user opens "Lists" tab
+    // - loadUserReviewedPlaces() - loads when user opens "Reviews" tab
+    // - loadSocialDataInBackground() - loads when user opens "Followers/Following" tabs
+    
+    // MARK: - Lazy Loading Methods (Load on-demand when user interacts with UI)
+    
+    /// ✅ LAZY: Load full place details for user's saved places (only when user opens "My Places" tab)
+    func loadUserMyPlacesLazy(userId: String) async {
+        guard profileViewModel.myPlaces.isEmpty else {
+            print("✅ [DataManager] My Places already loaded, skipping lazy load")
+            return
+        }
         
-        // Wait for critical data to complete
-        await profileData
-        await myPlaces
-        await favorites
+        print("🔄 [DataManager] LAZY LOADING: My Places (user opened My Places tab)")
+        await loadUserMyPlaces(userId: userId)
     }
     
-    // PHASE 2: Load remaining user data (parallel)
-    private func loadRemainingUserData(userId: String) async {
-        async let placeLists: () = loadUserPlaceLists(userId: userId)
-        async let reviewedPlaces: () = loadUserReviewedPlaces(userId: userId)
-        async let followCounts: () = fetchFollowerAndFollowingCountsAsync(userId: userId)
-        async let externalPlaces: () = loadUserExternalPlaces(userId: userId)
+    /// ✅ LAZY: Load full place details for user's favorites (only when user opens "Favorites" tab)
+    func loadUserFavoritePlacesLazy(userId: String) async {
+        guard profileViewModel.userFavorites.isEmpty else {
+            print("✅ [DataManager] Favorites already loaded, skipping lazy load")
+            return
+        }
         
-        // Wait for remaining user data
-        await placeLists
-        await reviewedPlaces
-        await followCounts
-        await externalPlaces
+        print("🔄 [DataManager] LAZY LOADING: Favorites (user opened Favorites tab)")
+        await loadUserFavoritePlaces(userId: userId)
     }
     
-    // PHASE 3: Load social data WITHOUT blocking UI
-    // NOTE: Full follower/following profiles are NOW LAZY - only loaded when user clicks!
-    // Counts are loaded in Phase 2, profile data loads on-demand
+    /// ✅ LAZY: Load full place details for user's place lists (only when user opens "Lists" tab)
+    func loadUserPlaceListsLazy(userId: String) async {
+        guard profileViewModel.userLists.isEmpty else {
+            print("✅ [DataManager] Place Lists already loaded, skipping lazy load")
+            return
+        }
+        
+        print("🔄 [DataManager] LAZY LOADING: Place Lists (user opened Lists tab)")
+        await loadUserPlaceLists(userId: userId)
+    }
+    
+    /// ✅ LAZY: Load full place details for user's reviewed places (only when user opens "Reviews" tab)
+    func loadUserReviewedPlacesLazy(userId: String) async {
+        guard profileViewModel.allReviewedPlaceIds.isEmpty else {
+            print("✅ [DataManager] Reviewed Places already loaded, skipping lazy load")
+            return
+        }
+        
+        print("🔄 [DataManager] LAZY LOADING: Reviewed Places (user opened Reviews tab)")
+        await loadUserReviewedPlaces(userId: userId)
+    }
+    
+    /// ✅ LAZY: Load follower/following profiles (only when user opens "Followers/Following" tabs)
+    func loadSocialDataLazy(userId: String) async {
+        print("🔄 [DataManager] LAZY LOADING: Social Data (user opened Followers/Following tabs)")
+        
+        // Load follower/following profiles on-demand
+        await MainActor.run {
+            profileViewModel.isFollowersListLoading = true
+            profileViewModel.isFollowingListLoading = true
+        }
+        
+        // Load profiles in background
+        Task.detached { [weak self] in
+            await self?.loadSocialDataInBackground(userId: userId)
+        }
+    }
+    
+    /// ✅ LAZY: Load all places from people the user follows (when user wants to refresh or load more)
+    func loadFollowingUsersPlacesLazy(userId: String) async {
+        print("🔄 [DataManager] LAZY LOADING: Following Users' Places (user requested refresh)")
+        await loadFollowingUsersPlaces(userId: userId)
+    }
+    
+    /// Load social data in background (follower/following profiles)
     private func loadSocialDataInBackground(userId: String) async {
-        // Skip loading follower/following profiles here
-        // They will load lazily when user clicks on "Followers" or "Following"
-        print("💤 [DataManager] Skipping follower/following profile loading (LAZY - loads on click)")
+        // Load follower/following profiles lazily
+        print("💤 [DataManager] Loading follower/following profiles in background...")
         
-        // Reset the list loading flags since we're not loading profiles here
-        // This allows the lazy loading to work when user clicks on followers/following
+        // Reset the list loading flags since we're loading profiles here
         await MainActor.run {
             profileViewModel.isFollowersListLoading = false
             profileViewModel.isFollowingListLoading = false
@@ -164,7 +347,6 @@ class DataManager: ObservableObject {
         }
         
         // Only load reviewed places for following users if we already have the following list
-        // Otherwise this will also be lazy
         if !profileViewModel.userFollowing.isEmpty {
             await loadReviewedPlacesForFollowing(userId: userId)
         }
@@ -201,7 +383,8 @@ class DataManager: ObservableObject {
             
             for place in places {
                 self.detailPlaceViewModel.places[place.id.uuidString] = place
-                self.detailPlaceViewModel.fetchPlaceImage(for: place.id.uuidString)
+                // ✅ REMOVED: fetchPlaceImage() - let images load lazily when views appear
+                // self.detailPlaceViewModel.fetchPlaceImage(for: place.id.uuidString)
                 // Add the current user as a saver for their own place
                 let placeId = place.id.uuidString
                 if self.detailPlaceViewModel.placeSavers[placeId] == nil {
@@ -261,6 +444,106 @@ class DataManager: ObservableObject {
             print("❌ [DataManager] Error loading external places: \(error.localizedDescription)")
         }
     }
+    
+    /// Load all places from people the user follows (saved, reviewed, imported from TikTok)
+    /// This is essential for social discovery and should load in background after essential data
+    private func loadFollowingUsersPlaces(userId: String) async {
+        let startTime = Date()
+        print("👥 [DataManager] Loading all places from people user follows...")
+        
+        // Get the following user IDs (should already be loaded)
+        let followingIds = profileViewModel.userFollowing.map { $0.id }
+        
+        guard !followingIds.isEmpty else {
+            print("👥 [DataManager] No following users to load places from")
+            return
+        }
+        
+        print("👥 [DataManager] Loading places from \(followingIds.count) following users...")
+        
+        do {
+            // Load all places from each following user in parallel
+            var allFollowingPlaces: [DetailPlace] = []
+            var placeSavers: [String: [String]] = [:] // Track who saved each place
+            
+            // Process following users in batches to avoid overwhelming the database
+            let batchSize = 5
+            for i in stride(from: 0, to: followingIds.count, by: batchSize) {
+                let batch = Array(followingIds[i..<min(i + batchSize, followingIds.count)])
+                
+                // Load places for this batch in parallel
+                let batchResults = await withTaskGroup(of: (String, [DetailPlace]).self) { group in
+                    for followingId in batch {
+                        group.addTask {
+                            do {
+                                let places = try await self.placeService.fetchAllUserPlaces(userId: followingId)
+                                return (followingId, places)
+                            } catch {
+                                print("❌ [DataManager] Error loading places for following user \(followingId): \(error.localizedDescription)")
+                                return (followingId, [])
+                            }
+                        }
+                    }
+                    
+                    var results: [(String, [DetailPlace])] = []
+                    for await result in group {
+                        results.append(result)
+                    }
+                    return results
+                }
+                
+                // Process batch results
+                for (followingId, places) in batchResults {
+                    allFollowingPlaces.append(contentsOf: places)
+                    
+                    // Track who saved each place
+                    for place in places {
+                        let placeId = place.id.uuidString
+                        if placeSavers[placeId] == nil {
+                            placeSavers[placeId] = [followingId]
+                        } else if !placeSavers[placeId]!.contains(followingId) {
+                            placeSavers[placeId]!.append(followingId)
+                        }
+                    }
+                }
+            }
+            
+            // Update the DetailPlaceViewModel with all following users' places
+            await MainActor.run {
+                for place in allFollowingPlaces {
+                    let placeId = place.id.uuidString
+                    self.detailPlaceViewModel.places[placeId] = place
+                    self.detailPlaceViewModel.generateColorForPlace(placeId)
+                    self.detailPlaceViewModel.calculateRestaurantType(for: place)
+                }
+                
+                // Update place savers information
+                for (placeId, savers) in placeSavers {
+                    if self.detailPlaceViewModel.placeSavers[placeId] == nil {
+                        self.detailPlaceViewModel.placeSavers[placeId] = savers
+                    } else {
+                        // Merge with existing savers, avoiding duplicates
+                        let existingSavers = Set(self.detailPlaceViewModel.placeSavers[placeId] ?? [])
+                        let newSavers = Set(savers)
+                        self.detailPlaceViewModel.placeSavers[placeId] = Array(existingSavers.union(newSavers))
+                    }
+                }
+                
+                let duration = Date().timeIntervalSince(startTime)
+                print("✅ [DataManager] Loaded \(allFollowingPlaces.count) places from \(followingIds.count) following users in \(String(format: "%.2f", duration))s")
+                print("👥 [DataManager] Updated placeSavers for \(placeSavers.count) unique places")
+                
+                // Force update of filtered places for map display
+                if let placeTypeFilterVM = self.placeTypeFilterViewModel {
+                    placeTypeFilterVM.updateFilteredPlaces()
+                    print("🗺️ [DataManager] Forced filteredPlaces update after loading friends' places, now showing: \(placeTypeFilterVM.filteredPlaces.count) places")
+                }
+            }
+            
+        } catch {
+            print("❌ [DataManager] Error loading following users' places: \(error.localizedDescription)")
+        }
+    }
 
     func downloadImage(from url: URL, completion: @escaping (UIImage?) -> Void) {
         URLSession.shared.dataTask(with: url) { data, response, error in
@@ -277,15 +560,24 @@ class DataManager: ObservableObject {
     }
 
     func AddProfilePicture(userId: String, profilePhotoUrl: URL, isCurrentUser: Bool = false) {
-        downloadImage(from: profilePhotoUrl) { image in
-            if let image = image {
-                if isCurrentUser {
-                    self.profileViewModel.userPicture = image
+        // ✅ Move to background thread to avoid blocking UI
+        Task.detached(priority: .background) {
+            do {
+                let (data, _) = try await URLSession.shared.data(from: profilePhotoUrl)
+                if let image = UIImage(data: data) {
+                    await MainActor.run {
+                        if isCurrentUser {
+                            self.profileViewModel.userPicture = image
+                        }
+                        self.detailPlaceViewModel.userProfilePicture[userId] = image
+                        // ✅ DON'T call calculateAnnotationPlaces here - batch it instead
+                        // self.detailPlaceViewModel.calculateAnnotationPlaces()
+                    }
+                } else {
+                    print("Failed to create UIImage from data for profile picture: \(profilePhotoUrl)")
                 }
-                self.detailPlaceViewModel.userProfilePicture[userId] = image
-                self.detailPlaceViewModel.calculateAnnotationPlaces()
-            } else {
-                print("Failed to download profile picture from URL: \(profilePhotoUrl)")
+            } catch {
+                print("Failed to download profile picture from URL: \(profilePhotoUrl) - \(error.localizedDescription)")
             }
         }
     }
@@ -752,7 +1044,8 @@ class DataManager: ObservableObject {
                 let detailPlace = try await placeService.fetchPlace(withId: placeId)
                 await MainActor.run {
                     self.detailPlaceViewModel.places[placeId] = detailPlace
-                    self.detailPlaceViewModel.fetchPlaceImage(for: placeId)
+                    // ✅ REMOVED: fetchPlaceImage() - let images load lazily when views appear
+                    // self.detailPlaceViewModel.fetchPlaceImage(for: placeId)
                 }
             } catch {
                 print("Error fetching place for reviewed placeId \(placeId): \(error.localizedDescription)")

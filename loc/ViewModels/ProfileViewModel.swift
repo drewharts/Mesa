@@ -286,8 +286,7 @@ class ProfileViewModel: ObservableObject {
                 self.followingCount = max(0, self.followingCount - 1)
             }
             
-            // Update friend IDs in MapViewModel for viewport filtering
-            updateMapViewModelFriendIds()
+            // Note: Friend tracking is now handled by PostgreSQL function - no need to update MapViewModel
             
             // Make the actual API call
             userService.unfollowUser(followerId: currentUserId, followingId: userId) { [weak self] success, error in
@@ -296,7 +295,6 @@ class ProfileViewModel: ObservableObject {
                     DispatchQueue.main.async {
                         self?.userFollowing = originalUserFollowing
                         self?.followingCount = originalFollowingCount
-                        self?.updateMapViewModelFriendIds()
                         // Show error alert
                         self?.showFollowError = true
                         self?.followErrorMessage = "Failed to unfollow user. Please try again."
@@ -317,8 +315,7 @@ class ProfileViewModel: ObservableObject {
                         if case .success(let profileData) = result {
                             DispatchQueue.main.async {
                                 self?.userFollowing.append(profileData)
-                                // Update friend IDs in MapViewModel for viewport filtering
-                                self?.updateMapViewModelFriendIds()
+                                // Note: Friend tracking is now handled by PostgreSQL function
                             }
                         }
                     }
@@ -337,12 +334,7 @@ class ProfileViewModel: ObservableObject {
     }
     
     /// Update friend IDs in MapViewModel for viewport filtering
-    private func updateMapViewModelFriendIds() {
-        let friendIds = userFollowing.map { $0.id }
-        Task { @MainActor in
-            mapViewModel?.updateFriendIds(friendIds)
-        }
-    }
+    // updateMapViewModelFriendIds removed - friend tracking is now handled by the PostgreSQL function
     
      private func combinedCircularImage(image1: UIImage?, image2: UIImage? = nil, image3: UIImage? = nil) -> UIImage {
          let totalSize = CGSize(width: 80, height: 40)

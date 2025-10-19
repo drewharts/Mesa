@@ -346,6 +346,26 @@ class SupabaseUserService: ObservableObject {
         return profiles
     }
     
+    /// ✅ NEW: Fetch following user IDs only (not full profiles) - SUPER FAST!
+    func fetchFollowingUserIds(userId: String) async throws -> [String] {
+        print("👥 [Supabase] Fetching following user IDs only for user: \(userId)")
+        let startTime = Date()
+        
+        let followRecords: [FollowingRecord] = try await supabase.client
+            .from("following")
+            .select("follower_id, following_id, created_at")
+            .eq("follower_id", value: userId)
+            .execute()
+            .value
+        
+        let followingIds = followRecords.map { $0.following_id }
+        
+        let duration = Date().timeIntervalSince(startTime)
+        print("✅ [Supabase] Fetched \(followingIds.count) following user IDs in \(String(format: "%.2f", duration))s")
+        
+        return followingIds
+    }
+    
     // MARK: - Helper: Convert UserRecord to ProfileData
     
     private func convertToProfileData(_ record: ProfileDataRecord) -> ProfileData {

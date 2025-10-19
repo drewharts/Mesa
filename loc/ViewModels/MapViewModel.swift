@@ -7,17 +7,19 @@
 
 import Foundation
 import MapKit
+import SwiftUI
 
 @MainActor
 class MapViewModel: ObservableObject {
-    @Published var viewportPlaces: [String: DetailPlace] = [:] // Places in current viewport
+    @Published var viewportAnnotations: [PlaceAnnotation] = [] // Place annotations in current viewport
     @Published var isLoadingViewportPlaces: Bool = false
+    @Published var followedUsersPhotos: [FollowedUserPhoto] = [] // Profile photos for custom annotations
     
     private var debounceTimer: Timer?
     private let placeService: PlaceService
     private let detailPlaceVM: DetailPlaceViewModel
     private var lastLoadedRegion: MKCoordinateRegion?
-    private var friendUserIds: [String] = []  // Store friend IDs for viewport queries
+    private var placeDetailsCache: [String: DetailPlace] = [:] // Cache for full place details
     
     // Minimum movement threshold to trigger reload (in degrees)
     private let minMovementThreshold: Double = 0.01 // ~1km at equator
@@ -27,10 +29,42 @@ class MapViewModel: ObservableObject {
         self.detailPlaceVM = detailPlaceVM
     }
     
-    /// Update friend IDs when they change (call this from ProfileViewModel)
-    func updateFriendIds(_ friendIds: [String]) {
-        self.friendUserIds = friendIds
-        print("👥 [MapViewModel] Updated friend IDs count: \(friendIds.count)")
+    /// Load profile photos for followed users (for custom annotation views)
+    func loadFollowedUsersPhotos() async {
+        guard let userId = await SupabaseAuthService.shared.currentUserId else {
+            print("⚠️ [MapViewModel] No userId available for loading followed users' photos")
+            return
+        }
+        
+        do {
+            let photos = try await placeService.fetchFollowedUsersPhotos(userId: userId)
+            self.followedUsersPhotos = photos
+            print("📸 [MapViewModel] Loaded \(photos.count) followed users' photos")
+        } catch {
+            print("❌ [MapViewModel] Error loading followed users' photos: \(error)")
+        }
+    }
+    
+    /// Load full place details on demand (when user taps an annotation)
+    func loadPlaceDetails(for annotation: PlaceAnnotation) async -> DetailPlace? {
+        let placeId = annotation.id
+        
+        // Check cache first
+        if let cached = placeDetailsCache[placeId] {
+            return cached
+        }
+        
+        // Load from database
+        do {
+            let details = try await placeService.fetchPlaceDetails(placeId: placeId)
+            if let details = details {
+                placeDetailsCache[placeId] = details
+            }
+            return details
+        } catch {
+            print("❌ [MapViewModel] Error loading place details: \(error)")
+            return nil
+        }
     }
     
     /// Call this when the map region changes (pan or zoom)
@@ -44,7 +78,7 @@ class MapViewModel: ObservableObject {
         debounceTimer?.invalidate()
         
         debounceTimer = Timer.scheduledTimer(
-            withTimeInterval: 0.8,  // Increased to 800ms for smoother experience
+            withTimeInterval: 0.8,  // 800ms for smoother experience
             repeats: false
         ) { [weak self] _ in
             Task { @MainActor in
@@ -53,13 +87,8 @@ class MapViewModel: ObservableObject {
         }
     }
     
-    /// Load places in the initial viewport (on app startup)
-    func loadInitialViewportPlaces(_ region: MKCoordinateRegion) async {
-        await loadPlacesForViewport(region)
-    }
-    
-    /// Main method to load places for a given viewport
-    /// Loads BOTH regular places AND friends' places in parallel (10x faster!)
+    /// Main method to load place annotations for a given viewport
+    /// Uses the optimized PostgreSQL function for ultra-fast loading
     private func loadPlacesForViewport(_ region: MKCoordinateRegion) async {
         let startTime = Date()
         isLoadingViewportPlaces = true
@@ -67,51 +96,46 @@ class MapViewModel: ObservableObject {
         let bounds = getViewportBounds(from: region)
         
         do {
-            // Load both regular places AND friends' places in parallel
-            async let regularPlaces = placeService.fetchPlacesInViewport(
+            // Use the optimized PostgreSQL function
+            let annotations = try await placeService.fetchPlacesInViewport(
                 northLat: bounds.northLat,
                 southLat: bounds.southLat,
                 eastLng: bounds.eastLng,
                 westLng: bounds.westLng
             )
             
-            async let friendsPlaces = placeService.fetchFriendsPlacesInViewport(
-                northLat: bounds.northLat,
-                southLat: bounds.southLat,
-                eastLng: bounds.eastLng,
-                westLng: bounds.westLng,
-                friendIds: friendUserIds
-            )
-            
-            // Wait for both queries to complete
-            let (regular, friends) = try await (regularPlaces, friendsPlaces)
-            
-            // Merge and deduplicate places
-            var newViewportPlaces: [String: DetailPlace] = [:]
-            for place in (regular + friends) {
-                let placeId = place.id.uuidString
-                newViewportPlaces[placeId] = place
-                
-                // Also update the main detailPlaceVM cache if not already present
-                if detailPlaceVM.places[placeId] == nil {
-                    detailPlaceVM.places[placeId] = place
-                    detailPlaceVM.generateColorForPlace(placeId)
-                    detailPlaceVM.calculateRestaurantType(for: place)
-                }
-            }
-            
-            self.viewportPlaces = newViewportPlaces
+            self.viewportAnnotations = annotations
             self.lastLoadedRegion = region
             
             let loadTime = Date().timeIntervalSince(startTime)
-            print("⏱️ [MapViewModel] Loaded \(regular.count) regular + \(friends.count) friends' places in \(String(format: "%.2f", loadTime))s")
-            print("📊 [MapViewModel] Total viewport places: \(newViewportPlaces.count)")
+            print("⏱️ [MapViewModel] Loaded \(annotations.count) place annotations in \(String(format: "%.2f", loadTime))s")
+            
+            // Debug: Log the annotations that were loaded
+            print("🔍 [MapViewModel] Viewport annotations loaded:")
+            for annotation in annotations {
+                print("   - \(annotation.name) (\(annotation.id)) - saved by \(annotation.userIds.count) users")
+            }
             
         } catch {
-            print("❌ [MapViewModel] Error loading viewport places: \(error.localizedDescription)")
+            print("❌ [MapViewModel] Error loading viewport annotations: \(error.localizedDescription)")
         }
         
         isLoadingViewportPlaces = false
+    }
+    
+    // loadAllPlaceAnnotations method removed - we now use viewport-based loading exclusively
+    
+    /// Filter annotations for current viewport (client-side filtering)
+    func getAnnotationsForViewport(_ region: MKCoordinateRegion) -> [PlaceAnnotation] {
+        let bounds = getViewportBounds(from: region)
+        
+        return viewportAnnotations.filter { annotation in
+            let lat = annotation.coordinate.latitude
+            let lng = annotation.coordinate.longitude
+            
+            return lat >= bounds.southLat && lat <= bounds.northLat &&
+                   lng >= bounds.westLng && lng <= bounds.eastLng
+        }
     }
     
     /// Convert map region to lat/lng bounds
@@ -154,22 +178,9 @@ class MapViewModel: ObservableObject {
         return centerMoved || zoomChanged
     }
     
-    /// Get all places to display on map (viewport + user's saved places)
-    func getAllDisplayPlaces() -> [DetailPlace] {
-        // Combine viewport places with user's saved places
-        var allPlaces = viewportPlaces
-        
-        // Merge in saved places from detailPlaceVM
-        for (placeId, place) in detailPlaceVM.places {
-            if allPlaces[placeId] == nil {
-                // Only add if it's a user's saved place
-                if detailPlaceVM.placeSavers[placeId] != nil {
-                    allPlaces[placeId] = place
-                }
-            }
-        }
-        
-        return Array(allPlaces.values)
+    /// Get all place annotations to display on map
+    func getAllDisplayAnnotations() -> [PlaceAnnotation] {
+        return viewportAnnotations
     }
     
     deinit {
