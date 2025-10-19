@@ -14,6 +14,8 @@ class MapViewModel: ObservableObject {
     @Published var viewportAnnotations: [PlaceAnnotation] = [] // Place annotations in current viewport
     @Published var isLoadingViewportPlaces: Bool = false
     @Published var followedUsersPhotos: [FollowedUserPhoto] = [] // Profile photos for custom annotations
+    @Published var annotationImages: [String: UIImage] = [:] // Combined profile images for annotations
+    @Published var userProfilePictures: [String: UIImage] = [:] // Cache of user profile pictures
     
     private var debounceTimer: Timer?
     private let placeService: PlaceService
@@ -50,8 +52,95 @@ class MapViewModel: ObservableObject {
             let photos = try await placeService.fetchFollowedUsersPhotos(userId: profileUserId)
             self.followedUsersPhotos = photos
             print("📸 [MapViewModel] Loaded \(photos.count) followed users' photos for annotations")
+            
+            // Load profile pictures from URLs
+            await loadProfilePictures(from: photos)
+            
+            // Generate annotation images for current annotations
+            generateAnnotationImages()
+            
         } catch {
             print("❌ [MapViewModel] Error loading followed users' photos: \(error)")
+        }
+    }
+    
+    /// Load profile pictures from URLs
+    private func loadProfilePictures(from photos: [FollowedUserPhoto]) async {
+        await withTaskGroup(of: (String, UIImage?).self) { group in
+            for photo in photos {
+                guard let urlString = photo.profilePhotoUrl,
+                      let url = URL(string: urlString) else { continue }
+                
+                group.addTask {
+                    do {
+                        let (data, _) = try await URLSession.shared.data(from: url)
+                        return (photo.userId, UIImage(data: data))
+                    } catch {
+                        print("⚠️ Failed to load image for user \(photo.userId)")
+                        return (photo.userId, nil)
+                    }
+                }
+            }
+            
+            for await (userId, image) in group {
+                if let image = image {
+                    self.userProfilePictures[userId] = image
+                }
+            }
+        }
+    }
+    
+    /// Generate combined annotation images for all annotations
+    func generateAnnotationImages() {
+        for annotation in viewportAnnotations {
+            // Get up to 3 profile pictures for users who saved this place
+            let profilePictures = annotation.userIds.prefix(3).compactMap { userProfilePictures[$0] }
+            
+            // Create combined image
+            let combinedImage: UIImage
+            switch profilePictures.count {
+            case 1:
+                combinedImage = combinedCircularImage(image1: profilePictures[0])
+            case 2:
+                combinedImage = combinedCircularImage(image1: profilePictures[0], image2: profilePictures[1])
+            case 3:
+                combinedImage = combinedCircularImage(image1: profilePictures[0], image2: profilePictures[1], image3: profilePictures[2])
+            default:
+                // If no profile pictures, use a default image
+                combinedImage = combinedCircularImage(image1: nil)
+            }
+            
+            annotationImages[annotation.id] = combinedImage
+        }
+        print("✅ [MapViewModel] Generated \(annotationImages.count) annotation images")
+    }
+    
+    /// Create combined circular image from profile pictures (matching existing implementation)
+    private func combinedCircularImage(image1: UIImage?, image2: UIImage? = nil, image3: UIImage? = nil) -> UIImage {
+        let totalSize = CGSize(width: 80, height: 40)
+        let singleCircleSize = CGSize(width: 40, height: 40)
+        let renderer = UIGraphicsImageRenderer(size: totalSize)
+       
+        return renderer.image { context in
+            let firstRect = CGRect(x: 0, y: 0, width: singleCircleSize.width, height: singleCircleSize.height)
+            let secondRect = CGRect(x: 15, y: 0, width: singleCircleSize.width, height: singleCircleSize.height)
+            let thirdRect = CGRect(x: 30, y: 0, width: singleCircleSize.width, height: singleCircleSize.height)
+           
+            func drawCircularImage(_ image: UIImage?, in rect: CGRect) {
+                guard let image = image else { return }
+                context.cgContext.saveGState()
+                let circlePath = UIBezierPath(ovalIn: rect)
+                circlePath.addClip()
+                image.draw(in: rect)
+                context.cgContext.setStrokeColor(UIColor.white.cgColor)
+                context.cgContext.setLineWidth(1.0)
+                context.cgContext.strokeEllipse(in: rect.insetBy(dx: 0.5, dy: 0.5))
+                context.cgContext.restoreGState()
+            }
+           
+            if image3 != nil { drawCircularImage(image3, in: thirdRect) }
+            if image2 != nil { drawCircularImage(image2, in: secondRect) }
+            if image1 != nil { drawCircularImage(image1, in: firstRect) }
         }
     }
     
@@ -116,6 +205,9 @@ class MapViewModel: ObservableObject {
             
             self.viewportAnnotations = annotations
             self.lastLoadedRegion = region
+            
+            // Generate annotation images for new annotations
+            generateAnnotationImages()
             
             let loadTime = Date().timeIntervalSince(startTime)
             print("⏱️ [MapViewModel] Loaded \(annotations.count) place annotations in \(String(format: "%.2f", loadTime))s")

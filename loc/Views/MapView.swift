@@ -66,7 +66,7 @@ struct MapView: View {
     private func annotationMarkerView(for annotation: PlaceAnnotation) -> some View {
         CustomPlaceAnnotationView(
             annotation: annotation,
-            userPhotos: mapViewModel.followedUsersPhotos
+            annotationImage: mapViewModel.annotationImages[annotation.id]
         )
         .onTapGesture {
             handleAnnotationTap(annotation)
