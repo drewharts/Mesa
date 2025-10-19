@@ -9,7 +9,7 @@ import Foundation
 
 // MARK: - ExternalPlace Models
 struct ExternalPlace: Codable, Identifiable {
-    let id: String // Document ID from Firebase
+    let id: String // Document ID
     let addedAt: Date
     let address: String
     let coordinates: ExternalPlaceCoordinates
@@ -32,7 +32,7 @@ struct ExternalPlace: Codable, Identifiable {
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         
-        // Document ID will be set separately when fetching from Firebase
+        // Document ID will be set separately when fetching
         self.id = try container.decodeIfPresent(String.self, forKey: .id) ?? ""
         self.addedAt = try container.decode(Date.self, forKey: .addedAt)
         self.address = try container.decode(String.self, forKey: .address)

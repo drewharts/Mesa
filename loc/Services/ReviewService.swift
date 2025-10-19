@@ -142,8 +142,16 @@ class ReviewService: ObservableObject {
         completion(.success(()))
     }
     
-    func addComment(reviewId: String, userId: String, text: String, completion: @escaping (Result<Void, Error>) -> Void) {
-        print("⚠️ [ReviewService] addComment not fully implemented")
-        completion(.success(()))
+    func addComment(reviewId: String, userId: String, text: String, photoUrls: [String] = [], completion: @escaping (Result<Void, Error>) -> Void) {
+        print("🔄 [ReviewService] Delegating addComment to Supabase...")
+        Task { @MainActor in
+            await supabase.addComment(reviewId: reviewId, userId: userId, text: text, photoUrls: photoUrls) { error in
+                if let error = error {
+                    completion(.failure(error))
+                } else {
+                    completion(.success(()))
+                }
+            }
+        }
     }
 } 

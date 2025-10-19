@@ -61,8 +61,8 @@ struct InlineCommentsView: View {
                                     )
                                     .focused($isTextFieldFocused)
                                     .onAppear {
-                                        // Automatically focus when shown
-                                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                        // ✅ Faster focus to reduce keyboard delay
+                                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                                             isTextFieldFocused = true
                                             // Scroll to ensure input field is visible
                                             scrollProxy.scrollTo("commentInputField", anchor: .bottom)
@@ -150,8 +150,8 @@ struct InlineCommentsView: View {
                                 
                                 Button(action: {
                                     showingReplyField = true
-                                    // Add a small delay to ensure view updates first
-                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                    // ✅ Immediate focus for better responsiveness
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
                                         isTextFieldFocused = true
                                     }
                                 }) {
@@ -306,8 +306,8 @@ struct InlineCommentsView: View {
                                 
                                 Button(action: {
                                     showingReplyField = true
-                                    // Add a small delay to ensure view updates first
-                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                    // ✅ Immediate focus for better responsiveness
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
                                         isTextFieldFocused = true
                                     }
                                 }) {

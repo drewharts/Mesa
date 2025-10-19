@@ -33,24 +33,31 @@ class UserSession: ObservableObject {
     func checkSupabaseSession() async {
         do {
             let session = try await authService.getSession()
-            self.isUserLoggedIn = true
             
             // Look up the actual user profile ID instead of using Supabase auth UID
             do {
                 let profile = try await userService.fetchUserById(userId: session.user.id.uuidString)
-                self.currentUserId = profile.id
+                await MainActor.run {
+                    self.isUserLoggedIn = true
+                    self.currentUserId = profile.id
+                }
                 print("✅ Found existing Supabase session: \(profile.id)")
             } catch {
                 // Fallback to Supabase auth UID if profile lookup fails
-                self.currentUserId = session.user.id.uuidString
+                await MainActor.run {
+                    self.isUserLoggedIn = true
+                    self.currentUserId = session.user.id.uuidString
+                }
                 print("✅ Found Supabase session (fallback): \(session.user.id)")
             }
             
             self.registerForFCMToken()
         } catch {
             print("ℹ️ No existing Supabase session: \(error.localizedDescription)")
-            self.isUserLoggedIn = false
-            self.profileViewModel = nil
+            await MainActor.run {
+                self.isUserLoggedIn = false
+                self.profileViewModel = nil
+            }
         }
     }
     
@@ -84,11 +91,11 @@ class UserSession: ObservableObject {
         }
     }
     
-    // MARK: - Push Notifications (Firebase FCM removed)
+    // MARK: - Push Notifications
     func registerForFCMToken() {
-        // TODO: Implement push notifications without Firebase
+        // TODO: Implement push notifications
         // Options: APNs directly, OneSignal, Pusher Beams, or other service
-        print("⚠️ Push notifications need to be implemented (Firebase FCM removed)")
+        print("⚠️ Push notifications need to be implemented")
     }
     
 //    func fetchProfile(for uid: String) {

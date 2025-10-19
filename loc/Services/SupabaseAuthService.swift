@@ -206,15 +206,15 @@ class SupabaseAuthService: ObservableObject {
     
     // MARK: - Migration Helpers
     
-    /// Helper to get Firebase-compatible user ID string
+    /// Helper to get user ID string
     var uid: String? {
         currentUserId
     }
     
-    /// Check if this is a migrated Firebase user
-    func isMigratedFromFirebase() -> Bool {
+    /// Check if this is a migrated user
+    func isMigratedUser() -> Bool {
         guard let metadata = currentUser?.userMetadata else { return false }
-        return metadata["firebase_migrated"] as? Bool ?? false
+        return metadata["migrated"] as? Bool ?? false
     }
 }
 

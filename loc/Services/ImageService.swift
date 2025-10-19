@@ -25,37 +25,19 @@ class ImageService {
             throw NSError(domain: "ImageService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to convert image to JPEG data"])
         }
         
-        print("🔍 [ImageService] Image converted to data, size: \(imageData.count) bytes")
-        
         do {
             // Get the authenticated Supabase user ID (this is what RLS policies expect)
             let currentUser = try await supabase.auth.user()
             let supabaseUserId = currentUser.id.uuidString
             
-            print("🔍 [ImageService] Current authenticated user: \(currentUser.id)")
-            print("🔍 [ImageService] Supabase user ID: \(supabaseUserId)")
-            print("🔍 [ImageService] Original user ID (Firebase): \(userId)")
-            print("🔍 [ImageService] Using Supabase user ID for file path")
-            
             // Create filename - use simple profile.jpg for easy replacement
             let fileName = "profile.jpg"
-            let filePath = "\(supabaseUserId)/\(fileName)"  // Use Supabase user ID instead of Firebase UID
-            
-            print("🔍 [ImageService] File path: \(filePath)")
-            print("🔍 [ImageService] File name: \(fileName)")
+            let filePath = "\(supabaseUserId)/\(fileName)"  // Use Supabase user ID
             
             // Get the bucket reference
-            print("🔍 [ImageService] Getting bucket reference for 'profile_photos'...")
             let bucket = await supabase.storage.from("profile_photos")
-            print("🔍 [ImageService] Bucket reference created successfully")
             
             // Upload the new profile photo with upsert to replace existing
-            print("🔍 [ImageService] Starting upload with options:")
-            print("🔍 [ImageService] - Path: \(filePath)")
-            print("🔍 [ImageService] - Data size: \(imageData.count) bytes")
-            print("🔍 [ImageService] - Content type: image/jpeg")
-            print("🔍 [ImageService] - Upsert: true")
-            
             let uploadedPath = try await bucket.upload(
                 filePath,
                 data: imageData,
@@ -66,14 +48,9 @@ class ImageService {
                 )
             )
             
-            print("✅ [ImageService] Upload successful, path: \(uploadedPath)")
-            
             // Get the public URL
-            print("🔍 [ImageService] Getting public URL...")
             let publicURL = try bucket.getPublicURL(path: filePath)
-            print("✅ [ImageService] Public URL: \(publicURL)")
             
-            print("✅ [ImageService] Successfully uploaded profile photo for Supabase user \(supabaseUserId)")
             return publicURL
             
         } catch {
@@ -125,7 +102,6 @@ class ImageService {
             return
         }
         
-        print("📸 [ImageService] Fetching \(urls.count) images from URLs...")
         
         Task {
             var loadedImages: [UIImage] = []
@@ -146,7 +122,6 @@ class ImageService {
             }
             
             await MainActor.run {
-                print("📸 [ImageService] Completed loading \(loadedImages.count) images")
                 completion(loadedImages.isEmpty ? nil : loadedImages, nil)
             }
         }
@@ -154,6 +129,12 @@ class ImageService {
     
     /// Load image directly from URL (same approach as ProfileViewModel)
     private func loadImageFromURL(imageUrl: String) async -> UIImage? {
+        // ✅ COMPLETE Firebase elimination - block ALL Firebase URLs, only use Supabase
+        if imageUrl.contains("firebasestorage.googleapis.com") {
+            print("🚫 [ImageService] BLOCKING Firebase Storage URL - Firebase migration complete, use Supabase only: \(imageUrl)")
+            return nil
+        }
+        
         guard let url = URL(string: imageUrl) else {
             print("⚠️ [ImageService] Invalid image URL: \(imageUrl)")
             return nil
@@ -162,13 +143,12 @@ class ImageService {
         do {
             // Use the same efficient URLSession configuration as ProfileViewModel
             let config = URLSessionConfiguration.default
-            config.timeoutIntervalForRequest = 10.0
-            config.timeoutIntervalForResource = 30.0
+            config.timeoutIntervalForRequest = 5.0  // ✅ Reduced timeout to prevent hanging
+            config.timeoutIntervalForResource = 10.0  // ✅ Reduced timeout to prevent hanging
             let session = URLSession(configuration: config)
             
             let (data, _) = try await session.data(from: url)
             if let image = UIImage(data: data) {
-                print("✅ [ImageService] Successfully loaded image from \(imageUrl)")
                 return image
             } else {
                 print("⚠️ [ImageService] Failed to create UIImage from data for \(imageUrl)")
@@ -265,13 +245,12 @@ class ImageService {
             }
         }
         
-        print("📸 Compressed image from original to \(imageData.count) bytes (target: \(maxFileSize) bytes)")
         return imageData
     }
 
     func fetchPhotosFromStorage(placeId: String, returnFirstImageOnly: Bool = false, completion: @escaping ([UIImage]?, Error?) -> Void) {
         // TODO: Implement with Supabase Storage
-        print("⚠️ fetchPhotosFromStorage(placeId:) temporarily disabled - Firebase removed")
+        print("🚫 [ImageService] fetchPhotosFromStorage(placeId:) - Firebase completely removed, use Supabase only")
         completion([], nil)
     }
 
@@ -280,24 +259,159 @@ class ImageService {
         images: [UIImage],
         completion: @escaping (Result<[String], Error>) -> Void
     ) {
-        // TODO: Implement with Supabase Storage
-        print("⚠️ uploadImagesForReview temporarily disabled - Firebase removed")
-        let error = NSError(domain: "ImageService", code: -1, userInfo: [NSLocalizedDescriptionKey: "ImageService temporarily disabled - Firebase removed"])
-        completion(.failure(error))
+        Task {
+            do {
+                let urls = try await uploadImagesForReviewAsync(review: review, images: images)
+                await MainActor.run {
+                    completion(.success(urls))
+                }
+            } catch {
+                await MainActor.run {
+                    completion(.failure(error))
+                }
+            }
+        }
+    }
+    
+    /// Async version of uploadImagesForReview
+    func uploadImagesForReviewAsync<T: ReviewProtocol>(
+        review: T,
+        images: [UIImage]
+    ) async throws -> [String] {
+        let supabase = await SupabaseManager.shared
+        
+        guard !images.isEmpty else {
+            return []
+        }
+        
+        do {
+            let currentUser = try await supabase.auth.user()
+            let supabaseUserId = currentUser.id.uuidString
+            
+            let bucket = await supabase.storage.from("review-photos")
+            
+            var uploadedUrls: [String] = []
+            
+            // Upload images sequentially to maintain order
+            for (index, image) in images.enumerated() {
+                guard let imageData = image.jpegData(compressionQuality: 0.8) else {
+                    print("❌ [ImageService] Failed to convert image \(index + 1) to JPEG data")
+                    continue
+                }
+                
+                // Compress image if needed
+                let compressedData = compressImageTo1MB(image) ?? imageData
+                
+                // Create file path: review-photos/{supabase_user_id}/{review_id}/{image_index}.jpg
+                let fileName = "image_\(index + 1).jpg"
+                let filePath = "\(supabaseUserId)/\(review.id)/\(fileName)"
+                
+                let uploadedPath = try await bucket.upload(
+                    filePath,
+                    data: compressedData,
+                    options: FileOptions(
+                        cacheControl: "3600",
+                        contentType: "image/jpeg",
+                        upsert: true
+                    )
+                )
+                
+                let publicURL = try bucket.getPublicURL(path: filePath)
+                uploadedUrls.append(publicURL.absoluteString)
+            }
+            
+            return uploadedUrls
+            
+        } catch {
+            print("❌ [ImageService] Failed to upload review images: \(error)")
+            print("❌ [ImageService] Error details: \(error.localizedDescription)")
+            if let storageError = error as? StorageError {
+                print("❌ [ImageService] StorageError statusCode: \(String(describing: storageError.statusCode))")
+                print("❌ [ImageService] StorageError message: \(storageError.message)")
+                print("❌ [ImageService] StorageError error: \(String(describing: storageError.error))")
+            }
+            throw error
+        }
     }
 
     // Function to upload an image and update the PlaceList's image field
     func uploadImageAndUpdatePlaceList(userId: String, placeList: PlaceList, image: UIImage, completion: @escaping (Error?) -> Void) {
         // TODO: Implement with Supabase Storage
-        print("⚠️ uploadImageAndUpdatePlaceList temporarily disabled - Firebase removed")
-        let error = NSError(domain: "ImageService", code: -1, userInfo: [NSLocalizedDescriptionKey: "ImageService temporarily disabled - Firebase removed"])
+        print("🚫 [ImageService] uploadImageAndUpdatePlaceList - Firebase completely removed, use Supabase only")
+        let error = NSError(domain: "ImageService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Firebase completely removed - use Supabase only"])
         completion(error)
     }
 
     func uploadImagesForComment(comment: Comment, images: [UIImage], completion: @escaping (Result<[String], Error>) -> Void) {
-        // TODO: Implement with Supabase Storage
-        print("⚠️ uploadImagesForComment temporarily disabled - Firebase removed")
-        let error = NSError(domain: "ImageService", code: -1, userInfo: [NSLocalizedDescriptionKey: "ImageService temporarily disabled - Firebase removed"])
-        completion(.failure(error))
+        Task {
+            do {
+                let urls = try await uploadImagesForCommentAsync(comment: comment, images: images)
+                await MainActor.run {
+                    completion(.success(urls))
+                }
+            } catch {
+                await MainActor.run {
+                    completion(.failure(error))
+                }
+            }
+        }
+    }
+    
+    /// Async version of uploadImagesForComment
+    func uploadImagesForCommentAsync(comment: Comment, images: [UIImage]) async throws -> [String] {
+        let supabase = await SupabaseManager.shared
+        
+        guard !images.isEmpty else {
+            return []
+        }
+        
+        do {
+            let currentUser = try await supabase.auth.user()
+            let supabaseUserId = currentUser.id.uuidString
+            
+            let bucket = await supabase.storage.from("comment_photos")
+            
+            var uploadedUrls: [String] = []
+            
+            // Upload images sequentially to maintain order
+            for (index, image) in images.enumerated() {
+                guard let imageData = image.jpegData(compressionQuality: 0.8) else {
+                    print("❌ [ImageService] Failed to convert comment image \(index + 1) to JPEG data")
+                    continue
+                }
+                
+                // Compress image if needed
+                let compressedData = compressImageTo1MB(image) ?? imageData
+                
+                // Create file path: comment-photos/{supabase_user_id}/{comment_id}/{image_index}.jpg
+                let fileName = "image_\(index + 1).jpg"
+                let filePath = "\(supabaseUserId)/\(comment.id)/\(fileName)"
+                
+                let uploadedPath = try await bucket.upload(
+                    filePath,
+                    data: compressedData,
+                    options: FileOptions(
+                        cacheControl: "3600",
+                        contentType: "image/jpeg",
+                        upsert: true
+                    )
+                )
+                
+                let publicURL = try bucket.getPublicURL(path: filePath)
+                uploadedUrls.append(publicURL.absoluteString)
+            }
+            
+            return uploadedUrls
+            
+        } catch {
+            print("❌ [ImageService] Failed to upload comment images: \(error)")
+            print("❌ [ImageService] Error details: \(error.localizedDescription)")
+            if let storageError = error as? StorageError {
+                print("❌ [ImageService] StorageError statusCode: \(String(describing: storageError.statusCode))")
+                print("❌ [ImageService] StorageError message: \(storageError.message)")
+                print("❌ [ImageService] StorageError error: \(String(describing: storageError.error))")
+            }
+            throw error
+        }
     }
 }

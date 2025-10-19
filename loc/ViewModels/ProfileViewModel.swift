@@ -908,6 +908,12 @@ class ProfileViewModel: ObservableObject {
     
     /// Load image directly from URL and add to placeImages
     private func loadImageFromURL(imageUrl: String, placeId: String) async {
+        // ✅ COMPLETE Firebase elimination - block ALL Firebase URLs, only use Supabase
+        if imageUrl.contains("firebasestorage.googleapis.com") {
+            print("🚫 [ProfileViewModel] BLOCKING Firebase Storage URL - Firebase migration complete, use Supabase only: \(imageUrl)")
+            return
+        }
+        
         guard let url = URL(string: imageUrl) else {
             print("⚠️ [ProfileViewModel] Invalid image URL: \(imageUrl)")
             return
@@ -916,8 +922,8 @@ class ProfileViewModel: ObservableObject {
         do {
             // Use a more efficient URLSession configuration for image loading
             let config = URLSessionConfiguration.default
-            config.timeoutIntervalForRequest = 10.0
-            config.timeoutIntervalForResource = 30.0
+            config.timeoutIntervalForRequest = 5.0  // ✅ Reduced timeout
+            config.timeoutIntervalForResource = 10.0  // ✅ Reduced timeout
             let session = URLSession(configuration: config)
             
             let (data, _) = try await session.data(from: url)

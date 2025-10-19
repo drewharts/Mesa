@@ -183,7 +183,12 @@ class DataManager: ObservableObject {
     }
     
     func calculateMapAnnotations() {
-        detailPlaceViewModel.calculateAnnotationPlaces()
+        // ✅ Move to background thread to avoid blocking UI
+        Task.detached(priority: .background) {
+            await MainActor.run {
+                self.detailPlaceViewModel.calculateAnnotationPlaces()
+            }
+        }
     }
     
     func loadUserMyPlaces(userId: String) async {
@@ -383,7 +388,7 @@ class DataManager: ObservableObject {
             }
         }
         
-        // Process in batches to avoid overwhelming Firebase
+        // Process in batches to avoid overwhelming the system
         let batchSize = 10
         for batch in allPlaceIds.chunked(into: batchSize) {
             await withTaskGroup(of: Void.self) { group in

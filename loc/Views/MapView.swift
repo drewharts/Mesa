@@ -245,10 +245,12 @@ struct MapView: View {
                 }
             }
             
-            // Move expensive operations to background (non-blocking)
+            // ✅ REMOVED: Duplicate operations already handled in DataManager
+            // profile.refreshUserPlaces() - Already done in DataManager.initializeProfileData()
+            // detailPlaceVM.calculateAnnotationPlaces() - Already done in DataManager.calculateMapAnnotations()
+            
+            // Only refresh place types (not done elsewhere)
             Task.detached(priority: .background) {
-                await profile.refreshUserPlaces()
-                await detailPlaceVM.calculateAnnotationPlaces()
                 await placeTypeFilterVM.refreshMostFrequentTypes()
             }
         }
@@ -269,12 +271,10 @@ struct MapView: View {
             object: nil,
             queue: .main
         ) { _ in
-            // Refresh places when notified
+            // ✅ OPTIMIZED: Only refresh what's needed when notified
             Task {
-                await profile.refreshUserPlaces()
-                await detailPlaceVM.calculateAnnotationPlaces()
+                // Only refresh place types and filtered places (other data already loaded)
                 await placeTypeFilterVM.refreshMostFrequentTypes()
-                // Also update filtered places to ensure new annotations appear
                 await MainActor.run {
                     placeTypeFilterVM.updateFilteredPlaces()
                 }

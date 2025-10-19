@@ -186,7 +186,7 @@ class TikTokService: ObservableObject {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         
-        // Add Firebase authentication token
+        // Add authentication token
         await addAuthenticationToken(to: &request)
         
         // Set request body

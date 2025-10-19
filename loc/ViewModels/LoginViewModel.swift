@@ -162,11 +162,11 @@ class LoginViewModel: ObservableObject {
             print("🔍 Query returned \(profiles.count) results")
 
             // If multiple profiles with same email, prioritize:
-            // 1. Original Firebase users (have firebase_uid set)
+            // 1. Original users (have firebase_uid set)
             // 2. Users without supabase_uid set (not fully migrated)
             // 3. Any remaining user
             let prioritizedProfiles = profiles.sorted { (a, b) -> Bool in
-                // Prefer users with firebase_uid (original Firebase users)
+                // Prefer users with firebase_uid (original users)
                 if a.firebaseUid != nil && b.firebaseUid == nil {
                     return true
                 }
@@ -253,7 +253,7 @@ class LoginViewModel: ObservableObject {
 
             print("✅ User linking completed successfully")
             Task { @MainActor in
-                // For existing users, keep using the original Firebase UID as the session ID
+                // For existing users, keep using the original UID as the session ID
                 // but they're now authenticated via Supabase
                 userSession.setUserLoggedIn(uid: existingUser.id)
                 await self.dataManager.initializeProfileData(userId: existingUser.id)

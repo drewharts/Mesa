@@ -484,7 +484,7 @@ class MesaBackendService {
     /// Fetch review photos from Supabase for a place
     func getReviewPhotos(for placeId: String, completion: @escaping ([String]) -> Void) {
         // TODO: Implement with Supabase
-        // For now, return empty array to prevent Firebase crash
+        // For now, return empty array
         print("⚠️ getReviewPhotos not yet implemented for Supabase - returning empty array")
         completion([])
         return

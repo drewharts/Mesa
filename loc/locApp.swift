@@ -25,7 +25,7 @@ struct locApp: App {
     
     init() {
         // Supabase is initialized via SupabaseManager.shared
-        print("🚀 Initializing app with Supabase (Firebase removed)")
+        print("🚀 Initializing app with Supabase")
         
         // Get services from container
         let services = ServiceContainer.shared
@@ -197,13 +197,23 @@ struct locApp: App {
                             let profile = try await UserService.shared.fetchUserById(userId: session.user.id.uuidString)
                             let userId = profile.id
                             userSession.setUserLoggedIn(uid: userId)
-                            await dataManager.initializeProfileData(userId: userId)
+                            
+                            // ✅ NON-BLOCKING: Start data loading in background
+                            Task.detached(priority: .background) {
+                                await dataManager.initializeProfileData(userId: userId)
+                            }
+                            
                             print("✅ Found existing Supabase session: \(userId)")
                         } catch {
                             // Fallback to Supabase auth UID if profile lookup fails
                             let userId = session.user.id.uuidString
                             userSession.setUserLoggedIn(uid: userId)
-                            await dataManager.initializeProfileData(userId: userId)
+                            
+                            // ✅ NON-BLOCKING: Start data loading in background
+                            Task.detached(priority: .background) {
+                                await dataManager.initializeProfileData(userId: userId)
+                            }
+                            
                             print("✅ Found existing Supabase session (fallback): \(userId)")
                         }
                     } catch {
@@ -279,9 +289,9 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
         print("📱 APNS token received: \(deviceToken.map { String(format: "%02.2hhx", $0) }.joined())")
         
-        // TODO: Implement push notifications without Firebase
+        // TODO: Implement push notifications
         // You can use this token for APNs directly or another push service
-        print("⚠️ Push notifications need to be implemented (Firebase FCM removed)")
+        print("⚠️ Push notifications need to be implemented")
     }
     
     // Called when registration for remote notifications fails
@@ -369,5 +379,5 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
     }
 }
 
-// Firebase completely removed - using Supabase for all backend services
+// Using Supabase for all backend services
 

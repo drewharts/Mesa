@@ -717,13 +717,25 @@ class SelectedPlaceViewModel: ObservableObject {
     
     /// Load image directly from URL
     private func loadImageFromURL(imageUrl: String) async -> UIImage? {
+        // ✅ COMPLETE Firebase elimination - block ALL Firebase URLs, only use Supabase
+        if imageUrl.contains("firebasestorage.googleapis.com") {
+            print("🚫 [SelectedPlaceViewModel] BLOCKING Firebase Storage URL - Firebase migration complete, use Supabase only: \(imageUrl)")
+            return nil
+        }
+        
         guard let url = URL(string: imageUrl) else {
             print("⚠️ [SelectedPlaceViewModel] Invalid image URL: \(imageUrl)")
             return nil
         }
         
         do {
-            let (data, _) = try await URLSession.shared.data(from: url)
+            // ✅ Use background queue and shorter timeout
+            let config = URLSessionConfiguration.default
+            config.timeoutIntervalForRequest = 5.0
+            config.timeoutIntervalForResource = 10.0
+            let session = URLSession(configuration: config)
+            
+            let (data, _) = try await session.data(from: url)
             return UIImage(data: data)
         } catch {
             print("⚠️ [SelectedPlaceViewModel] Failed to load image from URL: \(error.localizedDescription)")
@@ -836,9 +848,16 @@ class SelectedPlaceViewModel: ObservableObject {
                     
                     self.commentLoadingStates[reviewId] = .loaded
                     
-                    // Efficiently load photos only for comments that have them
-                    for comment in fetchedComments where !comment.images.isEmpty {
-                        self.loadCommentPhotos(for: comment)
+                    // ✅ Load photos in background with delay to prevent UI blocking
+                    Task.detached(priority: .background) { [weak self] in
+                        guard let self = self else { return }
+                        
+                        // Small delay to let UI settle first
+                        try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+                        
+                        for comment in fetchedComments where !comment.images.isEmpty {
+                            await self.loadCommentPhotos(for: comment)
+                        }
                     }
                 }
             }
@@ -870,7 +889,7 @@ class SelectedPlaceViewModel: ObservableObject {
             case .success(let downloadURLs):
                 comment.images = downloadURLs
                 
-                ReviewService.shared.addComment(reviewId: reviewId, userId: userId, text: comment.commentText) { [weak self] result in
+                ReviewService.shared.addComment(reviewId: reviewId, userId: userId, text: comment.commentText, photoUrls: comment.images) { [weak self] result in
                     guard let self = self else { return }
                     
                     DispatchQueue.main.async {
@@ -910,14 +929,19 @@ class SelectedPlaceViewModel: ObservableObject {
             return
         }
         
-        imageService.fetchPhotosFromStorage(urls: comment.images) { [weak self] images, error in
+        // ✅ Move to background thread to prevent UI blocking
+        Task.detached(priority: .background) { [weak self] in
             guard let self = self else { return }
             
-            DispatchQueue.main.async {
-                if let error = error {
-                    print("Error loading comment photos: \(error.localizedDescription)")
-                } else if let images = images {
-                    self.commentPhotos[comment.id] = images
+            await self.imageService.fetchPhotosFromStorage(urls: comment.images) { [weak self] images, error in
+                guard let self = self else { return }
+                
+                DispatchQueue.main.async {
+                    if let error = error {
+                        print("Error loading comment photos: \(error.localizedDescription)")
+                    } else if let images = images {
+                        self.commentPhotos[comment.id] = images
+                    }
                 }
             }
         }

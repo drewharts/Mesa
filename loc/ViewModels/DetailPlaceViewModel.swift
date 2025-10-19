@@ -54,6 +54,9 @@ class DetailPlaceViewModel: ObservableObject {
     }
     
     func calculateAnnotationPlaces() {
+        var newAnnotations: [String: UIImage] = [:]
+        
+        // ✅ Process all places first (off main thread)
         for (placeId, userIds) in placeSavers {
             // Get up to 3 profile pictures for this place's savers
             let profilePictures = userIds.prefix(3).compactMap { userProfilePicture[$0] }
@@ -72,11 +75,13 @@ class DetailPlaceViewModel: ObservableObject {
                 combinedImage = combinedCircularImage(image1: nil)
             }
             
-            // Store the combined image in placeAnnotations
-            DispatchQueue.main.async {
-                self.placeAnnotations[placeId] = combinedImage
-                self.objectWillChange.send()
-            }
+            newAnnotations[placeId] = combinedImage
+        }
+        
+        // ✅ Single UI update for all places (reduces UI lag)
+        DispatchQueue.main.async {
+            self.placeAnnotations = newAnnotations
+            self.objectWillChange.send()
         }
     }
     
@@ -165,7 +170,6 @@ class DetailPlaceViewModel: ObservableObject {
         if let place = places[placeId], 
            let photoUrls = place.photoUrls, 
            !photoUrls.isEmpty {
-            print("📸 [DetailPlaceViewModel] Place \(placeId) has its own photoUrls, loading directly")
             ImageService.shared.fetchPhotosFromStorage(urls: photoUrls) { [weak self] images, error in
                 guard let self = self else { return }
                 
@@ -174,7 +178,6 @@ class DetailPlaceViewModel: ObservableObject {
                         print("❌ [DetailPlaceViewModel] Error loading place's own images for \(placeId): \(error.localizedDescription)")
                         self.placeImages[placeId] = UIImage()
                     } else if let images = images, !images.isEmpty {
-                        print("✅ [DetailPlaceViewModel] Successfully loaded place's own image for \(placeId)")
                         self.placeImages[placeId] = images[0]
                     } else {
                         print("⚠️ [DetailPlaceViewModel] No images found in place's photoUrls for \(placeId)")
@@ -229,7 +232,6 @@ class DetailPlaceViewModel: ObservableObject {
                     return
                 }
                 
-                print("📸 [DetailPlaceViewModel] Loading first image from most recent review for place \(placeId)")
                 
                 // Load only the first image from the most recent review
                 ImageService.shared.fetchPhotosFromStorage(urls: [firstImageUrl]) { [weak self] images, error in
@@ -240,7 +242,6 @@ class DetailPlaceViewModel: ObservableObject {
                             print("❌ [DetailPlaceViewModel] Error fetching place image for \(placeId): \(error.localizedDescription)")
                             self.placeImages[placeId] = UIImage()
                         } else if let images = images, !images.isEmpty {
-                            print("✅ [DetailPlaceViewModel] Successfully loaded image from most recent review for place \(placeId)")
                             self.placeImages[placeId] = images[0]
                         } else {
                             print("⚠️ [DetailPlaceViewModel] No images loaded for place \(placeId)")
@@ -288,7 +289,6 @@ class DetailPlaceViewModel: ObservableObject {
             return
         }
         
-        print("📸 [DetailPlaceViewModel] Fetching TikTok thumbnail for place \(placeId) from: \(thumbnailURL)")
         
         // Create a URLRequest with timeout
         var request = URLRequest(url: url)
@@ -305,7 +305,6 @@ class DetailPlaceViewModel: ObservableObject {
                 } else if let httpResponse = response as? HTTPURLResponse {
                     if httpResponse.statusCode == 200, let data = data, !data.isEmpty {
                         if let image = UIImage(data: data) {
-                            print("✅ [DetailPlaceViewModel] Successfully loaded TikTok thumbnail for place \(placeId)")
                             self.placeImages[placeId] = image
                         } else {
                             print("❌ [DetailPlaceViewModel] Failed to create UIImage from data for place \(placeId)")

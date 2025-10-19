@@ -91,8 +91,11 @@ struct UserProfileListPlacesPopupView: View {
                                                     .clipped()
                                             } else {
                                                 Rectangle()
-                                                    .foregroundColor(placeColors[place.id] ?? .gray)
+                                                    .foregroundColor(detailPlaceViewModel.colorForPlace(placeId: place.id.uuidString))
                                                     .frame(width: cardWidth, height: cardHeight)
+                                                    .onAppear {
+                                                        detailPlaceViewModel.fetchPlaceImage(for: place.id.uuidString)
+                                                    }
                                             }
                                             
                                             LinearGradient(

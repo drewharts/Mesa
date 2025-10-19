@@ -146,13 +146,16 @@ struct GenericReviewView: View {
                     
                     // Comment button positioned to the left
                     Button(action: {
-                        // Load comments if needed before showing
+                        // ✅ Optimize comment loading to prevent UI blocking
                         if !showComments {
                             // Only fetch comments if we don't already have them
                             if selectedPlaceVM.commentLoadingState(for: review.id) == .idle {
-                                selectedPlaceVM.loadCommentsForReview(reviewId: review.id)
+                                // Load comments in background to prevent UI blocking
+                                Task.detached(priority: .background) {
+                                    await selectedPlaceVM.loadCommentsForReview(reviewId: review.id)
+                                }
                             }
-                            withAnimation {
+                            withAnimation(.easeInOut(duration: 0.2)) {
                                 showComments.toggle()
                             }
                         }

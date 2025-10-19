@@ -249,7 +249,7 @@ class UserService: ObservableObject {
         print("🔄 [UserService] Fetching user profile async from Supabase: \(userId)")
 
         do {
-            // First try to fetch by id (works for Firebase UIDs and new Supabase users)
+            // First try to fetch by id (works for UIDs and new Supabase users)
             let profile: ProfileData = try await SupabaseManager.shared.client
                 .from("users")
                 .select()

@@ -36,7 +36,6 @@ class SupabaseReviewService: ObservableObject {
                 
                 // For now, return empty array as we need to handle ReviewProtocol conversion
                 // The app will need to be updated to work with the new data structure
-                print("✅ [Supabase] Fetched \(response.count) reviews")
                 completion([] as? [T], nil)
             } catch {
                 print("❌ [Supabase] Error fetching reviews: \(error)")
@@ -48,12 +47,49 @@ class SupabaseReviewService: ObservableObject {
     func saveReview(placeId: String, review: ReviewProtocol, images: [Data], completion: @escaping (Error?) -> Void) {
         Task {
             do {
-                // TODO: Upload images to Supabase Storage
-                // For now, return success without actually saving
-                print("✅ [Supabase] Review save placeholder - not yet fully implemented")
+                print("🔄 [Supabase] Saving review to database...")
+                print("🔍 [Supabase] Review ID: \(review.id)")
+                print("🔍 [Supabase] Place ID: \(review.placeId)")
+                print("🔍 [Supabase] User ID: \(review.userId)")
+                print("🔍 [Supabase] Review type: \(review.type.rawValue)")
+                print("🔍 [Supabase] Images count: \(review.images.count)")
+                
+                // Create a proper ReviewRecord for database insertion
+                let reviewRecord = ReviewRecord(
+                    id: review.id,
+                    place_id: review.placeId,
+                    user_id: review.userId,
+                    user_first_name: review.userFirstName,
+                    user_last_name: review.userLastName,
+                    profile_photo_url: review.profilePhotoUrl,
+                    place_name: review.placeName,
+                    food_rating: (review as? RestaurantReview)?.foodRating,
+                    service_rating: (review as? RestaurantReview)?.serviceRating,
+                    ambience_rating: (review as? RestaurantReview)?.ambienceRating,
+                    favorite_dishes: (review as? RestaurantReview)?.favoriteDishes,
+                    review_text: review.reviewText,
+                    images: review.images,
+                    timestamp: review.timestamp,  // Now passing Date directly instead of string
+                    likes: review.likes,
+                    type: review.type.rawValue
+                )
+                
+                // Log restaurant-specific fields if it's a restaurant review
+                if let restaurantReview = review as? RestaurantReview {
+                    print("🔍 [Supabase] Restaurant review - Food: \(restaurantReview.foodRating), Service: \(restaurantReview.serviceRating), Ambience: \(restaurantReview.ambienceRating)")
+                }
+                
+                // Insert the review into the database
+                try await supabase.client
+                    .from("reviews")
+                    .insert(reviewRecord)
+                    .execute()
+                
                 completion(nil)
+                
             } catch {
                 print("❌ [Supabase] Error saving review: \(error)")
+                print("❌ [Supabase] Error details: \(error.localizedDescription)")
                 completion(error)
             }
         }
@@ -72,7 +108,6 @@ class SupabaseReviewService: ObservableObject {
                     ])
                     .execute()
                 
-                print("✅ [Supabase] Review liked")
                 completion(nil)
             } catch {
                 print("❌ [Supabase] Error liking review: \(error)")
@@ -91,7 +126,6 @@ class SupabaseReviewService: ObservableObject {
                     .eq("user_id", value: userId)
                     .execute()
                 
-                print("✅ [Supabase] Review unliked")
                 completion(nil)
             } catch {
                 print("❌ [Supabase] Error unliking review: \(error)")
@@ -115,29 +149,8 @@ class SupabaseReviewService: ObservableObject {
             .value
         
         let reviews = response.compactMap { record -> RestaurantReview? in
-            // Parse timestamp - it could be ISO8601 string or PostgreSQL timestamp
-            // Parsing timestamp for review
-            let timestamp: Date
-            if let isoDate = ISO8601DateFormatter().date(from: record.timestamp) {
-                timestamp = isoDate
-            } else {
-                // Try parsing as PostgreSQL timestamp format
-                let formatter = DateFormatter()
-                formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSSSS"
-                formatter.timeZone = TimeZone(secondsFromGMT: 0)
-                if let pgDate = formatter.date(from: record.timestamp) {
-                    timestamp = pgDate
-                } else {
-                    // Try alternative PostgreSQL format
-                    formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
-                    if let altDate = formatter.date(from: record.timestamp) {
-                        timestamp = altDate
-                    } else {
-                        print("⚠️ [Supabase] Invalid timestamp for review \(record.id): \(record.timestamp)")
-                        return nil
-                    }
-                }
-            }
+            // Use timestamp directly since it's now a Date object
+            let timestamp = record.timestamp
             
             return RestaurantReview(
                 id: record.id,
@@ -158,7 +171,6 @@ class SupabaseReviewService: ObservableObject {
             )
         }
         
-        print("✅ [Supabase] Fetched \(reviews.count) restaurant reviews for user")
         return reviews
     }
     
@@ -175,28 +187,8 @@ class SupabaseReviewService: ObservableObject {
             .value
         
         let reviews = response.compactMap { record -> GenericReview? in
-            // Parse timestamp - it could be ISO8601 string or PostgreSQL timestamp
-            let timestamp: Date
-            if let isoDate = ISO8601DateFormatter().date(from: record.timestamp) {
-                timestamp = isoDate
-            } else {
-                // Try parsing as PostgreSQL timestamp format
-                let formatter = DateFormatter()
-                formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSSSS"
-                formatter.timeZone = TimeZone(secondsFromGMT: 0)
-                if let pgDate = formatter.date(from: record.timestamp) {
-                    timestamp = pgDate
-                } else {
-                    // Try alternative PostgreSQL format
-                    formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
-                    if let altDate = formatter.date(from: record.timestamp) {
-                        timestamp = altDate
-                    } else {
-                        print("⚠️ [Supabase] Invalid timestamp for review \(record.id): \(record.timestamp)")
-                        return nil
-                    }
-                }
-            }
+            // Use timestamp directly since it's now a Date object
+            let timestamp = record.timestamp
             
             return GenericReview(
                 id: record.id,
@@ -213,7 +205,6 @@ class SupabaseReviewService: ObservableObject {
             )
         }
         
-        print("✅ [Supabase] Fetched \(reviews.count) generic reviews for user")
         return reviews
     }
     
@@ -235,28 +226,8 @@ class SupabaseReviewService: ObservableObject {
         let response: [ReviewRecord] = try await query.execute().value
         
         let reviews = response.compactMap { record -> ReviewProtocol? in
-            // Parse timestamp - it could be ISO8601 string or PostgreSQL timestamp
-            let timestamp: Date
-            if let isoDate = ISO8601DateFormatter().date(from: record.timestamp) {
-                timestamp = isoDate
-            } else {
-                // Try parsing as PostgreSQL timestamp format
-                let formatter = DateFormatter()
-                formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSSSS"
-                formatter.timeZone = TimeZone(secondsFromGMT: 0)
-                if let pgDate = formatter.date(from: record.timestamp) {
-                    timestamp = pgDate
-                } else {
-                    // Try alternative PostgreSQL format
-                    formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
-                    if let altDate = formatter.date(from: record.timestamp) {
-                        timestamp = altDate
-                    } else {
-                        print("⚠️ [Supabase] Invalid timestamp for review \(record.id): \(record.timestamp)")
-                        return nil
-                    }
-                }
-            }
+            // Use timestamp directly since it's now a Date object
+            let timestamp = record.timestamp
             
             // Create appropriate review type based on record.type
             if record.type == "restaurant" {
@@ -294,7 +265,6 @@ class SupabaseReviewService: ObservableObject {
             }
         }
         
-        print("✅ [Supabase] Fetched \(reviews.count) reviews for place")
         return reviews
     }
     
@@ -303,9 +273,40 @@ class SupabaseReviewService: ObservableObject {
     func fetchComments(reviewId: String, completion: @escaping ([Comment]?, Error?) -> Void) {
         Task {
             do {
-                // TODO: Implement comment fetching when Comment model is properly mapped
-                print("✅ [Supabase] Comment fetch placeholder - not yet fully implemented")
-                completion([], nil)
+                print("📝 [Supabase] Fetching comments for review \(reviewId)")
+                
+                let response: [CommentRecord] = try await supabase.client
+                    .from("comments")
+                    .select()
+                    .eq("review_id", value: reviewId)
+                    .order("timestamp", ascending: true)
+                    .execute()
+                    .value
+                
+                let comments = response.compactMap { record -> Comment? in
+                    // Parse timestamp from string
+                    let formatter = ISO8601DateFormatter()
+                    guard let timestamp = formatter.date(from: record.timestamp) else {
+                        print("⚠️ [Supabase] Failed to parse timestamp for comment \(record.id)")
+                        return nil
+                    }
+                    
+                    return Comment(
+                        id: record.id,
+                        reviewId: record.review_id,
+                        userId: record.user_id,
+                        profilePhotoUrl: "", // Will be populated from user data
+                        userFirstName: "", // Will be populated from user data
+                        userLastName: "", // Will be populated from user data
+                        commentText: record.text,
+                        timestamp: timestamp,
+                        images: record.photo_urls ?? [],
+                        likes: 0 // Comments don't have likes in current schema
+                    )
+                }
+                
+                print("✅ [Supabase] Fetched \(comments.count) comments")
+                completion(comments, nil)
             } catch {
                 print("❌ [Supabase] Error fetching comments: \(error)")
                 completion(nil, error)
@@ -313,20 +314,25 @@ class SupabaseReviewService: ObservableObject {
         }
     }
     
-    func addComment(reviewId: String, userId: String, text: String, completion: @escaping (Error?) -> Void) {
+    func addComment(reviewId: String, userId: String, text: String, photoUrls: [String] = [], completion: @escaping (Error?) -> Void) {
         Task {
             do {
+                let commentRecord = CommentRecord(
+                    id: UUID().uuidString,
+                    review_id: reviewId,
+                    user_id: userId,
+                    text: text,
+                    photo_urls: photoUrls,
+                    timestamp: ISO8601DateFormatter().string(from: Date()),
+                    created_at: ISO8601DateFormatter().string(from: Date())
+                )
+                
                 try await supabase.client
                     .from("comments")
-                    .insert([
-                        "review_id": reviewId,
-                        "user_id": userId,
-                        "text": text,
-                        "timestamp": ISO8601DateFormatter().string(from: Date())
-                    ])
+                    .insert(commentRecord)
                     .execute()
                 
-                print("✅ [Supabase] Comment added")
+                print("✅ [Supabase] Comment added with \(photoUrls.count) photos")
                 completion(nil)
             } catch {
                 print("❌ [Supabase] Error adding comment: \(error)")
@@ -352,9 +358,9 @@ struct ReviewRecord: Codable {
     let favorite_dishes: [String]?
     let review_text: String?
     let images: [String]?
-    let timestamp: String
-    let likes: Int?
-    let type: String?
+    let timestamp: Date  // Changed from String to Date to match database schema
+    let likes: Int?      // Database defaults to 0, but we'll send explicit value
+    let type: String?    // Database defaults to 'restaurant', but we'll send explicit value
 }
 
 struct CommentRecord: Codable {
@@ -364,4 +370,5 @@ struct CommentRecord: Codable {
     let text: String
     let photo_urls: [String]?
     let timestamp: String
+    let created_at: String?
 }
