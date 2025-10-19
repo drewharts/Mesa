@@ -18,29 +18,51 @@ struct FollowersListView: View {
     var body: some View {
         NavigationView {
             VStack {
-                if profile.isFollowersListLoading {
-                    Spacer()
-                    ProgressView()
-                    Spacer()
-                } else if profile.userFollowers.isEmpty {
-                    VStack(spacing: 16) {
+                if profile.userFollowers.isEmpty {
+                    if profile.isFollowersListLoading {
                         Spacer()
-                        Text("No Followers Yet")
-                            .font(.title3)
-                            .fontWeight(.medium)
-                            .foregroundColor(.gray)
-                        
-                        Text("When someone follows you, they'll appear here.")
-                            .font(.body)
-                            .foregroundColor(.gray)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal)
+                        ProgressView()
                         Spacer()
+                    } else {
+                        VStack(spacing: 16) {
+                            Spacer()
+                            Text("No Followers Yet")
+                                .font(.title3)
+                                .fontWeight(.medium)
+                                .foregroundColor(.gray)
+                            
+                            Text("When someone follows you, they'll appear here.")
+                                .font(.body)
+                                .foregroundColor(.gray)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal)
+                            Spacer()
+                        }
                     }
                 } else {
                     List {
                         ForEach(profile.userFollowers) { user in
                             UserRow(user: user)
+                                .onAppear {
+                                    // Load more when user scrolls to the last few items
+                                    if let index = profile.userFollowers.firstIndex(where: { $0.id == user.id }),
+                                       index >= profile.userFollowers.count - 3 && !profile.isFollowersListLoading {
+                                        Task {
+                                            await dataManager.loadMoreFollowers(userId: userSession.currentUserId ?? "")
+                                        }
+                                    }
+                                }
+                        }
+                        
+                        // Loading indicator at bottom while loading more
+                        if profile.isFollowersListLoading {
+                            HStack {
+                                Spacer()
+                                ProgressView()
+                                    .padding()
+                                Spacer()
+                            }
+                            .listRowSeparator(.hidden)
                         }
                     }
                     .listStyle(PlainListStyle())
@@ -49,15 +71,11 @@ struct FollowersListView: View {
             .navigationTitle("Followers")
             .navigationBarTitleDisplayMode(.inline)
             .onAppear {
-                print("📱 [FollowersListView] Sheet appeared - triggering follower load")
                 // Trigger follower loading when sheet appears
                 if profile.userFollowers.isEmpty && !profile.isFollowersListLoading {
-                    print("👥 [FollowersListView] Starting follower load...")
                     Task {
                         await dataManager.loadFollowers(userId: userSession.currentUserId ?? "")
                     }
-                } else {
-                    print("👥 [FollowersListView] Skipping load - already loaded or loading")
                 }
             }
             .toolbar {

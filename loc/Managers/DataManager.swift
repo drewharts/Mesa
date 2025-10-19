@@ -92,6 +92,12 @@ class DataManager: ObservableObject {
         
         print("✅ [DataManager] Essential profile data loaded - UI ready for interaction!")
         
+        // Reset loading flags since we're not loading follower/following profiles yet
+        await MainActor.run {
+            profileViewModel.isFollowersListLoading = false
+            profileViewModel.isFollowingListLoading = false
+        }
+        
         // Note: Place annotations are now loaded on-demand via viewport queries
         // No need to preload all annotations - the MapViewModel handles this
     }
@@ -258,85 +264,10 @@ class DataManager: ObservableObject {
         }
     }
     
-    // ❌ REMOVED: Old heavy loading phases - replaced with minimal essential data loading
-    // The following methods are now LAZY and load on-demand when user interacts with UI:
-    // - loadUserMyPlaces() - loads when user opens "My Places" tab
-    // - loadUserFavoritePlaces() - loads when user opens "Favorites" tab  
-    // - loadUserPlaceLists() - loads when user opens "Lists" tab
-    // - loadUserReviewedPlaces() - loads when user opens "Reviews" tab
-    // - loadSocialDataInBackground() - loads when user opens "Followers/Following" tabs
-    
-    // MARK: - Lazy Loading Methods (Load on-demand when user interacts with UI)
-    
-    /// ✅ LAZY: Load full place details for user's saved places (only when user opens "My Places" tab)
-    func loadUserMyPlacesLazy(userId: String) async {
-        guard profileViewModel.myPlaces.isEmpty else {
-            print("✅ [DataManager] My Places already loaded, skipping lazy load")
-            return
-        }
-        
-        print("🔄 [DataManager] LAZY LOADING: My Places (user opened My Places tab)")
-        await loadUserMyPlaces(userId: userId)
-    }
-    
-    /// ✅ LAZY: Load full place details for user's favorites (only when user opens "Favorites" tab)
-    func loadUserFavoritePlacesLazy(userId: String) async {
-        guard profileViewModel.userFavorites.isEmpty else {
-            print("✅ [DataManager] Favorites already loaded, skipping lazy load")
-            return
-        }
-        
-        print("🔄 [DataManager] LAZY LOADING: Favorites (user opened Favorites tab)")
-        await loadUserFavoritePlaces(userId: userId)
-    }
-    
-    /// ✅ LAZY: Load full place details for user's place lists (only when user opens "Lists" tab)
-    func loadUserPlaceListsLazy(userId: String) async {
-        guard profileViewModel.userLists.isEmpty else {
-            print("✅ [DataManager] Place Lists already loaded, skipping lazy load")
-            return
-        }
-        
-        print("🔄 [DataManager] LAZY LOADING: Place Lists (user opened Lists tab)")
-        await loadUserPlaceLists(userId: userId)
-    }
-    
-    /// ✅ LAZY: Load full place details for user's reviewed places (only when user opens "Reviews" tab)
-    func loadUserReviewedPlacesLazy(userId: String) async {
-        guard profileViewModel.allReviewedPlaceIds.isEmpty else {
-            print("✅ [DataManager] Reviewed Places already loaded, skipping lazy load")
-            return
-        }
-        
-        print("🔄 [DataManager] LAZY LOADING: Reviewed Places (user opened Reviews tab)")
-        await loadUserReviewedPlaces(userId: userId)
-    }
-    
-    /// ✅ LAZY: Load follower/following profiles (only when user opens "Followers/Following" tabs)
-    func loadSocialDataLazy(userId: String) async {
-        print("🔄 [DataManager] LAZY LOADING: Social Data (user opened Followers/Following tabs)")
-        
-        // Load follower/following profiles on-demand
-        await MainActor.run {
-            profileViewModel.isFollowersListLoading = true
-            profileViewModel.isFollowingListLoading = true
-        }
-        
-        // Load profiles in background
-        Task.detached { [weak self] in
-            await self?.loadSocialDataInBackground(userId: userId)
-        }
-    }
-    
-    /// ✅ LAZY: Load all places from people the user follows (when user wants to refresh or load more)
-    func loadFollowingUsersPlacesLazy(userId: String) async {
-        print("🔄 [DataManager] LAZY LOADING: Following Users' Places (user requested refresh)")
-        await loadFollowingUsersPlaces(userId: userId)
-    }
+    // MARK: - Data Loading Methods
     
     /// Load social data in background (follower/following profiles)
     private func loadSocialDataInBackground(userId: String) async {
-        // Load follower/following profiles lazily
         print("💤 [DataManager] Loading follower/following profiles in background...")
         
         // Reset the list loading flags since we're loading profiles here
@@ -896,23 +827,18 @@ class DataManager: ObservableObject {
     }
 
     
-    /// PROGRESSIVE: Load follower profiles (first 10 instantly, rest on scroll)
+    /// Load follower profiles (10 at a time, paginated on scroll)
     func loadFollowers(userId: String) async {
-        let startTime = Date()
-        print("👥 [DataManager] Loading first 10 follower profiles (PROGRESSIVE)...")
         profileViewModel.isFollowersListLoading = true
         
         do {
-            // Load first 10 profiles for instant display
+            // Load first 10 profiles
             let initialProfiles = try await userService.fetchFollowerProfilesData(for: userId, limit: 10, offset: 0)
             
-            let duration = Date().timeIntervalSince(startTime)
-            print("⚡ [DataManager] Loaded first \(initialProfiles.count) follower profiles in \(String(format: "%.2f", duration))s")
-            
-            // Store the initial profiles immediately for fast UI display
+            // Store the profiles
             self.profileViewModel.userFollowers = initialProfiles
             
-            // Load profile pictures for initial batch
+            // Load profile pictures
             for profile in initialProfiles {
                 if let profilePhotoURL = profile.profilePhotoURL {
                     self.AddProfilePicture(userId: profile.id, profilePhotoUrl: profilePhotoURL)
@@ -920,40 +846,36 @@ class DataManager: ObservableObject {
             }
             
             profileViewModel.isFollowersListLoading = false
-            
-            // Load remaining profiles in background if there are more
-            if initialProfiles.count == 10 {
-                Task {
-                    await loadRemainingFollowerProfiles(userId: userId, alreadyLoaded: 10)
-                }
-            }
         } catch {
             print("Error loading follower profiles: \(error.localizedDescription)")
             profileViewModel.isFollowersListLoading = false
         }
     }
     
-    /// Load remaining follower profiles after initial 10
-    private func loadRemainingFollowerProfiles(userId: String, alreadyLoaded: Int) async {
-        print("📄 [DataManager] Loading remaining follower profiles in background...")
+    /// Load next 10 follower profiles (for pagination on scroll)
+    func loadMoreFollowers(userId: String) async {
+        let currentCount = profileViewModel.userFollowers.count
+        profileViewModel.isFollowersListLoading = true
         
         do {
-            let remainingProfiles = try await userService.fetchFollowerProfilesData(for: userId, limit: 1000, offset: alreadyLoaded)
+            let nextProfiles = try await userService.fetchFollowerProfilesData(for: userId, limit: 10, offset: currentCount)
             
             await MainActor.run {
-                // Append remaining profiles to the list
-                self.profileViewModel.userFollowers.append(contentsOf: remainingProfiles)
-                print("✅ [DataManager] Loaded \(remainingProfiles.count) additional follower profiles")
+                // Append next profiles to the list
+                self.profileViewModel.userFollowers.append(contentsOf: nextProfiles)
             }
             
-            // Load profile pictures for remaining profiles
-            for profile in remainingProfiles {
+            // Load profile pictures for new profiles
+            for profile in nextProfiles {
                 if let profilePhotoURL = profile.profilePhotoURL {
                     self.AddProfilePicture(userId: profile.id, profilePhotoUrl: profilePhotoURL)
                 }
             }
+            
+            profileViewModel.isFollowersListLoading = false
         } catch {
-            print("Error loading remaining follower profiles: \(error.localizedDescription)")
+            print("Error loading more follower profiles: \(error.localizedDescription)")
+            profileViewModel.isFollowersListLoading = false
         }
     }
     
