@@ -9,6 +9,28 @@ import Foundation
 import MapKit
 import SwiftUI
 
+/// Represents a region we've already loaded annotations for
+struct LoadedRegion {
+    let northLat: Double
+    let southLat: Double
+    let eastLng: Double
+    let westLng: Double
+    
+    /// Check if this region fully contains another region
+    func contains(_ other: (northLat: Double, southLat: Double, eastLng: Double, westLng: Double)) -> Bool {
+        return other.northLat <= northLat &&
+               other.southLat >= southLat &&
+               other.eastLng <= eastLng &&
+               other.westLng >= westLng
+    }
+    
+    /// Check if this region overlaps with another region
+    func overlaps(with other: (northLat: Double, southLat: Double, eastLng: Double, westLng: Double)) -> Bool {
+        return !(other.eastLng < westLng || other.westLng > eastLng ||
+                 other.northLat < southLat || other.southLat > northLat)
+    }
+}
+
 @MainActor
 class MapViewModel: ObservableObject {
     @Published var viewportAnnotations: [PlaceAnnotation] = [] // Place annotations in current viewport
@@ -23,6 +45,10 @@ class MapViewModel: ObservableObject {
     private var lastLoadedRegion: MKCoordinateRegion?
     private var placeDetailsCache: [String: DetailPlace] = [:] // Cache for full place details
     weak var profileViewModel: ProfileViewModel? // To access current user's profile
+    
+    // Spatial caching - track loaded regions and all annotations
+    private var loadedRegions: [LoadedRegion] = [] // Regions we've already loaded
+    private var allAnnotations: [String: PlaceAnnotation] = [:] // All loaded annotations by ID
     
     // Minimum movement threshold to trigger reload (in degrees)
     private let minMovementThreshold: Double = 0.01 // ~1km at equator
@@ -48,7 +74,7 @@ class MapViewModel: ObservableObject {
             
             // Add current user's photo to the list (using cached data)
             if let photoUrl = currentUserPhotoUrl {
-                let currentUserPhoto = FollowedUserPhoto(userId: profileUserId, profilePhotoUrl: photoUrl)
+                let currentUserPhoto = FollowedUserPhoto(userId: profileUserId, profilePhotoUrl: photoUrl.absoluteString)
                 photos.append(currentUserPhoto)
                 print("📸 [MapViewModel] Added current user's photo to annotation list (from cache)")
             }
@@ -95,7 +121,14 @@ class MapViewModel: ObservableObject {
     
     /// Generate combined annotation images for all annotations
     func generateAnnotationImages() {
+        var newImagesCount = 0
+        
         for annotation in viewportAnnotations {
+            // Skip if we already have an image for this annotation
+            if annotationImages[annotation.id] != nil {
+                continue
+            }
+            
             // Get up to 3 profile pictures for users who saved this place
             let profilePictures = annotation.userIds.prefix(3).compactMap { userProfilePictures[$0] }
             
@@ -114,8 +147,12 @@ class MapViewModel: ObservableObject {
             }
             
             annotationImages[annotation.id] = combinedImage
+            newImagesCount += 1
         }
-        print("✅ [MapViewModel] Generated \(annotationImages.count) annotation images")
+        
+        if newImagesCount > 0 {
+            print("✅ [MapViewModel] Generated \(newImagesCount) new annotation images (total: \(annotationImages.count))")
+        }
     }
     
     /// Create combined circular image from profile pictures (matching existing implementation)
@@ -191,11 +228,25 @@ class MapViewModel: ObservableObject {
     
     /// Main method to load place annotations for a given viewport
     /// Uses the optimized PostgreSQL function for ultra-fast loading
+    /// Caches loaded regions to avoid redundant API calls
     private func loadPlacesForViewport(_ region: MKCoordinateRegion) async {
         let startTime = Date()
         isLoadingViewportPlaces = true
         
         let bounds = getViewportBounds(from: region)
+        
+        // Check if we've already loaded this region
+        let alreadyLoaded = loadedRegions.contains { loadedRegion in
+            loadedRegion.contains(bounds)
+        }
+        
+        if alreadyLoaded {
+            print("✅ [MapViewModel] Region already cached - using existing annotations")
+            // Just update the visible annotations for this viewport
+            updateVisibleAnnotations(for: bounds)
+            isLoadingViewportPlaces = false
+            return
+        }
         
         do {
             // Use the optimized PostgreSQL function
@@ -206,26 +257,49 @@ class MapViewModel: ObservableObject {
                 westLng: bounds.westLng
             )
             
-            self.viewportAnnotations = annotations
+            // Add new annotations to our cache
+            for annotation in annotations {
+                allAnnotations[annotation.id] = annotation
+            }
+            
+            // Mark this region as loaded
+            let loadedRegion = LoadedRegion(
+                northLat: bounds.northLat,
+                southLat: bounds.southLat,
+                eastLng: bounds.eastLng,
+                westLng: bounds.westLng
+            )
+            loadedRegions.append(loadedRegion)
+            
+            // Update visible annotations
+            updateVisibleAnnotations(for: bounds)
+            
             self.lastLoadedRegion = region
             
             // Generate annotation images for new annotations
             generateAnnotationImages()
             
             let loadTime = Date().timeIntervalSince(startTime)
-            print("⏱️ [MapViewModel] Loaded \(annotations.count) place annotations in \(String(format: "%.2f", loadTime))s")
-            
-            // Debug: Log the annotations that were loaded
-            print("🔍 [MapViewModel] Viewport annotations loaded:")
-            for annotation in annotations {
-                print("   - \(annotation.name) (\(annotation.id)) - saved by \(annotation.userIds.count) users")
-            }
+            print("⏱️ [MapViewModel] Loaded \(annotations.count) new annotations in \(String(format: "%.2f", loadTime))s")
+            print("📦 [MapViewModel] Total cached annotations: \(allAnnotations.count), Cached regions: \(loadedRegions.count)")
             
         } catch {
             print("❌ [MapViewModel] Error loading viewport annotations: \(error.localizedDescription)")
         }
         
         isLoadingViewportPlaces = false
+    }
+    
+    /// Update visible annotations for the current viewport from cache
+    private func updateVisibleAnnotations(for bounds: (northLat: Double, southLat: Double, eastLng: Double, westLng: Double)) {
+        viewportAnnotations = allAnnotations.values.filter { annotation in
+            let lat = annotation.coordinate.latitude
+            let lng = annotation.coordinate.longitude
+            
+            return lat >= bounds.southLat && lat <= bounds.northLat &&
+                   lng >= bounds.westLng && lng <= bounds.eastLng
+        }
+        print("🗺️ [MapViewModel] Showing \(viewportAnnotations.count) cached annotations in viewport")
     }
     
     // loadAllPlaceAnnotations method removed - we now use viewport-based loading exclusively
