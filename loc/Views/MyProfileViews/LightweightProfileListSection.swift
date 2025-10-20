@@ -107,28 +107,13 @@ struct LightweightProfileListSection: View {
         }
         .padding(.horizontal, 20)
         .sheet(isPresented: $showingListPopup) {
-            // Convert LightweightPlaceList to PlaceList for the popup
-            SwipeableListPopupView(
-                lists: [convertToPlaceList()],
-                initialListIndex: 0,
+            // Use lightweight popup directly with lightweight data
+            LightweightListPopupView(
+                list: list,
+                places: places,
                 placeColors: $placeColors
             )
         }
-    }
-    
-    /// Convert LightweightPlaceList to PlaceList for the popup
-    private func convertToPlaceList() -> PlaceList {
-        return PlaceList(
-            id: UUID(uuidString: list.list_id) ?? UUID(),
-            name: list.name,
-            places: [], // Empty - places will be loaded by the popup
-            city: "", // Not available in lightweight data
-            emoji: "📋", // Default emoji
-            image: list.image,
-            sortOrder: 0,
-            averageCoordinate: nil, // Not available in lightweight data
-            lastCoordinateUpdate: nil
-        )
     }
 }
 
