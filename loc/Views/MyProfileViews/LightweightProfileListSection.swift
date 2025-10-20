@@ -16,9 +16,9 @@ struct LightweightProfileListSection: View {
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @Environment(\.presentationMode) var presentationMode
     
-    // Get total place count for the list
+    // Get total place count from the list (from SQL function)
     private var totalPlaceCount: Int {
-        return places.count
+        return list.place_count
     }
     
     var body: some View {

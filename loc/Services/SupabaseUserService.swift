@@ -525,6 +525,7 @@ struct LightweightPlaceList: Codable, Identifiable {
     let created_at: String?
     let updated_at: String?
     let distance_meters: Double?
+    let place_count: Int
     
     var id: String { list_id }
     
@@ -536,6 +537,7 @@ struct LightweightPlaceList: Codable, Identifiable {
         case created_at
         case updated_at
         case distance_meters
+        case place_count
         // Intentionally omitting average_location - we don't need it
     }
 }
