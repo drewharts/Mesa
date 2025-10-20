@@ -71,5 +71,7 @@ struct FloatingActionButtons: View {
                     .shadow(radius: 4)
             }
         }
+        .buttonStyle(.plain) // Use plain style for immediate response
+        .simultaneousGesture(TapGesture()) // Prevent gesture conflicts
     }
 } 
