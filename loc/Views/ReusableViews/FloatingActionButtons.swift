@@ -72,6 +72,9 @@ struct FloatingActionButtons: View {
             }
         }
         .buttonStyle(.plain) // Use plain style for immediate response
-        .highPriorityGesture(TapGesture()) // Ensure tap wins over underlying map gestures
+        .highPriorityGesture(TapGesture().onEnded { _ in
+            // High priority tap to bypass gesture gate and prevent timeout
+            shouldNavigateToProfile = true
+        })
     }
 } 
