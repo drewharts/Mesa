@@ -17,7 +17,8 @@ struct ProfileContentView: View {
     @State private var deleteAccountError: String?
     
     var body: some View {
-        ZStack {
+        let _ = print("👤 [ProfileContentView] Body computed at \(Date())")
+        return ZStack {
             ScrollView {
                 VStack(spacing: 12) {
                     // Profile Picture
