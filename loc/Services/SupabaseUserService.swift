@@ -290,7 +290,7 @@ class SupabaseUserService: ObservableObject {
     /// Fetch user's place lists sorted by proximity to user's location
     /// Returns lightweight list data with pagination support
     func fetchPlaceListsByProximity(userId: String, userLatitude: Double, userLongitude: Double, page: Int = 1, pageSize: Int = 10) async throws -> [LightweightPlaceList] {
-        print("📋 [Supabase] Fetching place lists by proximity - userId: \(userId), page: \(page), pageSize: \(pageSize)")
+        print("📋 [Supabase] Fetching place lists by proximity - userId: \(userId), lat: \(userLatitude), lng: \(userLongitude), page: \(page), pageSize: \(pageSize)")
         
         struct Params: Encodable {
             let p_user_id: String
@@ -301,6 +301,7 @@ class SupabaseUserService: ObservableObject {
         
         // Convert lat/lng to PostGIS POINT geometry in WKT format
         let userLocation = "POINT(\(userLongitude) \(userLatitude))"
+        print("📍 [Supabase] Using PostGIS POINT: \(userLocation)")
         
         let params = Params(
             p_user_id: userId,
@@ -309,17 +310,25 @@ class SupabaseUserService: ObservableObject {
             p_page_size: pageSize
         )
         
-        let lists: [LightweightPlaceList] = try await supabase.client
-            .rpc("get_paginated_user_place_lists_by_proximity", params: params)
-            .execute()
-            .value
-        
-        print("✅ [Supabase] Fetched \(lists.count) place lists")
-        if lists.count > 0 {
-            print("   First list: \(lists[0].name) (ID: \(lists[0].list_id), distance: \(lists[0].distance_meters ?? 0)m)")
+        do {
+            let lists: [LightweightPlaceList] = try await supabase.client
+                .rpc("get_paginated_user_place_lists_by_proximity", params: params)
+                .execute()
+                .value
+            
+            print("✅ [Supabase] Fetched \(lists.count) place lists")
+            if lists.count > 0 {
+                print("   First list: \(lists[0].name) (ID: \(lists[0].list_id), distance: \(lists[0].distance_meters ?? 0)m)")
+            } else {
+                print("⚠️ [Supabase] No place lists found for user \(userId)")
+            }
+            
+            return lists
+        } catch {
+            print("❌ [Supabase] Error fetching place lists: \(error)")
+            print("   Error details: \(error.localizedDescription)")
+            throw error
         }
-        
-        return lists
     }
     
     /// Fetch places within a place list with pagination
