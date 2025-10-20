@@ -73,8 +73,15 @@ struct FloatingActionButtons: View {
         .gesture(
             TapGesture()
                 .onEnded { _ in
+                    let tapTime = Date()
+                    print("👆 [ProfileButton] TAP at \(tapTime.timeIntervalSince1970)")
                     // Exclusive gesture - takes priority over map tap
                     shouldNavigateToProfile = true
+                    
+                    // Log when binding actually changes
+                    DispatchQueue.main.async {
+                        print("👆 [ProfileButton] Binding set to true at \(Date().timeIntervalSince1970) (delay: \(Date().timeIntervalSince(tapTime))s)")
+                    }
                 },
             including: .all // This gesture blocks all lower-priority gestures
         )

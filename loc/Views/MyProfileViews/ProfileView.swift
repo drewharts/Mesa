@@ -16,11 +16,11 @@ struct ProfileView: View {
     @EnvironmentObject var userProfileViewModel: UserProfileViewModel
     @EnvironmentObject var deepLinkViewModel: DeepLinkViewModel
     @StateObject private var photoImportVM = PhotoImportViewModel()
+    @StateObject private var tikTokService = TikTokService()
     
     @State private var showCreateReview = false
     @State private var selectedReviewType: CreatePlaceReviewView.ReviewType = .restaurant
     @State private var reviewWasSubmitted = false
-    @StateObject private var tikTokService = TikTokService()
     
     // Track if we've already done initial data refresh
     @State private var hasRefreshedPlaces = false
@@ -32,6 +32,7 @@ struct ProfileView: View {
     }
 
     var body: some View {
+        let _ = print("📱 [ProfileView] body evaluated at \(Date().timeIntervalSince1970)")
         mainContent
             .navigationBarBackButtonHidden(true)
             .preferredColorScheme(.light)
@@ -363,6 +364,7 @@ struct StateChangesModifier: ViewModifier {
                 }
             }
             .onAppear {
+                print("📱 [ProfileView] onAppear fired at \(Date().timeIntervalSince1970)")
                 setupCallbacks()
                 profile.checkPendingTikTokURL(
                     tikTokService: tikTokService,
