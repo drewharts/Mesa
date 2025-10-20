@@ -311,14 +311,12 @@ struct StateChangesModifier: ViewModifier {
                 // Places are already loaded in Phase 0, so this is usually redundant
                 if !hasRefreshedPlaces {
                     hasRefreshedPlaces = true
-                    // Run in background to not block UI - use Task.detached for true background execution
+                    // External places are now loaded during app startup in DataManager
+                    // No need to fetch them here anymore
+                    
+                    // Run refresh in background to not block UI
                     Task.detached(priority: .background) {
                         await profile.refreshUserPlaces()
-                        
-        // Fetch external places (TikTok places) to ensure they're available
-        await MainActor.run {
-            profile.fetchUserExternalPlaces()
-        }
                         
                         // After refreshing places, trigger prioritized image loading for visible tiles
                         await MainActor.run {

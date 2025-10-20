@@ -57,11 +57,16 @@ class DataManager: ObservableObject {
             await loadEssentialDataOnly(userId: userId)
         }
         
-        // ✅ PHASE 2: Load viewport places in background (non-blocking)
-        Task.detached { [weak self] in
+        // ✅ PHASE 2: Load viewport places and external places in background (non-blocking)
+        Task.detached(priority: .background) { [weak self] in
             await self?.measureLoadingTime("Viewport Places") {
                 await self?.loadViewportPlacesOnly(userId: userId)
             }
+        }
+        
+        // ✅ PHASE 3: Load external places (TikTok places) in background (non-blocking)
+        Task.detached(priority: .background) { [weak self] in
+            await self?.loadUserExternalPlaces(userId: userId)
         }
         
         let endTime = CFAbsoluteTimeGetCurrent()
