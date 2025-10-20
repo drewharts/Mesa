@@ -36,6 +36,7 @@ struct ProfileFavoriteListView: View {
                 .padding(.horizontal, 20)
         }
         .onAppear {
+            print("📱 [ProfileFavoriteListView] View appeared - lightweightFavorites count: \(profile.lightweightFavorites.count)")
             // Preload images for the first 6 priority tiles immediately
             preloadPriorityFavoriteImages()
         }

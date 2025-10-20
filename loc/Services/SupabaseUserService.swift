@@ -252,7 +252,6 @@ class SupabaseUserService: ObservableObject {
     
     /// Get my places count - FAST! (count query only, no place data)
     func getNumberMyPlaces(forUserId userId: String) async throws -> Int {
-        print("🔢 [Supabase] Fetching my places COUNT for user: \(userId)")
         
         let response = try await supabase.client
             .from("my_places")
@@ -261,13 +260,14 @@ class SupabaseUserService: ObservableObject {
             .execute()
         
         let count = response.count ?? 0
-        print("✅ [Supabase] User has \(count) my places")
         return count
     }
     
     /// Fetch user favorites using optimized SQL function
     /// Returns lightweight favorite data for display without full place details
-    func fetchUserFavorites(userId: String) async throws -> [FavoritePlace] {        
+    func fetchUserFavorites(userId: String) async throws -> [FavoritePlace] {
+        print("⭐ [Supabase] Fetching favorite places for user: \(userId)")
+        
         struct Params: Encodable {
             let p_user_id: String
         }
@@ -278,6 +278,11 @@ class SupabaseUserService: ObservableObject {
             .rpc("get_user_favorite_places", params: params)
             .execute()
             .value
+        
+        print("✅ [Supabase] Fetched \(favorites.count) favorite places")
+        if favorites.count > 0 {
+            print("   First favorite: \(favorites[0].name) (ID: \(favorites[0].place_id))")
+        }
         
         return favorites
     }
@@ -426,7 +431,17 @@ struct FavoritePlace: Codable, Identifiable {
     let place_id: String
     let name: String
     let latest_review_photo: String?
+    // Note: coordinate is returned by SQL but we don't need it for display
+    // Ignoring it during decoding by not declaring it here won't work with strict Codable
+    // So we'll need to make it optional or use CodingKeys
     
     var id: String { place_id }
+    
+    enum CodingKeys: String, CodingKey {
+        case place_id
+        case name
+        case latest_review_photo
+        // Intentionally omitting coordinate - we don't need it
+    }
 }
 
