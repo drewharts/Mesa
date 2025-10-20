@@ -55,13 +55,9 @@ struct MainView: View {
                     .presentationDragIndicator(.visible)
             }
             .navigationDestination(isPresented: $shouldNavigateToProfile) {
-                let _ = print("🚀 [MainView] navigationDestination creating ProfileView at \(Date().timeIntervalSince1970)")
                 ProfileView()
                     .environmentObject(userProfileViewModel)
                     .environmentObject(deepLinkViewModel)
-            }
-            .onChange(of: shouldNavigateToProfile) { oldValue, newValue in
-                print("🔄 [MainView] shouldNavigateToProfile changed from \(oldValue) to \(newValue) at \(Date().timeIntervalSince1970)")
             }
             // Present external user profiles
             .sheet(isPresented: $userProfileViewModel.isUserDetailPresented) {

@@ -32,7 +32,6 @@ struct ProfileView: View {
     }
 
     var body: some View {
-        let _ = print("📱 [ProfileView] body evaluated at \(Date().timeIntervalSince1970)")
         mainContent
             .navigationBarBackButtonHidden(true)
             .preferredColorScheme(.light)
@@ -364,7 +363,6 @@ struct StateChangesModifier: ViewModifier {
                 }
             }
             .onAppear {
-                print("📱 [ProfileView] onAppear fired at \(Date().timeIntervalSince1970)")
                 setupCallbacks()
                 profile.checkPendingTikTokURL(
                     tikTokService: tikTokService,
