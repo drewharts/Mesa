@@ -363,6 +363,7 @@ struct StateChangesModifier: ViewModifier {
                 }
             }
             .onAppear {
+                print("📱 [ProfileView] APPEARED at \(Date().timeIntervalSince1970)")
                 setupCallbacks()
                 profile.checkPendingTikTokURL(
                     tikTokService: tikTokService,
