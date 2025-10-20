@@ -49,7 +49,9 @@ struct FloatingActionButtons: View {
     }
     
     private var profileButton: some View {
-        Group {
+        Button(action: {
+            shouldNavigateToProfile = true
+        }) {
             if let profilePhoto = profileViewModel.userPicture {
                 Image(uiImage: profilePhoto)
                     .resizable()
@@ -69,10 +71,7 @@ struct FloatingActionButtons: View {
                     .shadow(radius: 4)
             }
         }
-        .contentShape(Circle()) // Make entire circle tappable
-        .onTapGesture {
-            // Use direct tap gesture to bypass Button's gesture recognition
-            shouldNavigateToProfile = true
-        }
+        .buttonStyle(.plain) // Use plain style for immediate response
+        .simultaneousGesture(TapGesture()) // Prevent gesture conflicts
     }
 } 
