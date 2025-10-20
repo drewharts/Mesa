@@ -70,9 +70,13 @@ struct FloatingActionButtons: View {
             }
         }
         .contentShape(Circle()) // Make entire circle tappable
-        .onTapGesture {
-            // Direct tap gesture - no Button wrapper, no gesture gate
-            shouldNavigateToProfile = true
-        }
+        .gesture(
+            TapGesture()
+                .onEnded { _ in
+                    // Exclusive gesture - takes priority over map tap
+                    shouldNavigateToProfile = true
+                },
+            including: .all // This gesture blocks all lower-priority gestures
+        )
     }
 } 
