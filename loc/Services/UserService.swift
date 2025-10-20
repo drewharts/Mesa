@@ -549,42 +549,12 @@ class UserService: ObservableObject {
         return externalPlaces
     }
     
-    // LAZY Loading - Only load when user clicks!
-    func fetchFollowingProfilesData(for userId: String, completion: @escaping (Result<[ProfileData], Error>) -> Void) {
-        Task { @MainActor in
-            do {
-                let profiles = try await supabase.fetchFollowingProfilesData(for: userId)
-                completion(.success(profiles))
-            } catch {
-                completion(.failure(error))
-            }
-        }
-    }
-    
-    func fetchFollowingProfilesData(for userId: String) async throws -> [ProfileData] {
-        return try await supabase.fetchFollowingProfilesData(for: userId, limit: nil, offset: 0)
-    }
-    
-    // Paginated version for progressive loading
-    func fetchFollowingProfilesData(for userId: String, limit: Int, offset: Int) async throws -> [ProfileData] {
+    func fetchFollowingProfilesData(for userId: String, limit: Int, offset: Int = 0) async throws -> [ProfileData] {
         return try await supabase.fetchFollowingProfilesData(for: userId, limit: limit, offset: offset)
     }
     
     func fetchFollowerProfilesData(for userId: String, limit: Int, offset: Int = 0) async throws -> [ProfileData] {
         return try await supabase.fetchFollowerProfilesData(for: userId, limit: limit, offset: offset)
-    }
-    
-    // Legacy completion-based version for backward compatibility
-    func fetchFollowerProfilesData(for userId: String, completion: @escaping (Result<[ProfileData], Error>) -> Void) {
-        Task { @MainActor in
-            do {
-                // Use a reasonable default limit for legacy calls
-                let profiles = try await fetchFollowerProfilesData(for: userId, limit: 1000)
-                completion(.success(profiles))
-            } catch {
-                completion(.failure(error))
-            }
-        }
     }
     
     // COUNT ONLY - Super fast! (~20-50ms)

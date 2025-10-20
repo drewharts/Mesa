@@ -18,29 +18,51 @@ struct FollowingListView: View {
     var body: some View {
         NavigationView {
             VStack {
-                if profile.isFollowingListLoading {
-                    Spacer()
-                    ProgressView()
-                    Spacer()
-                } else if profile.userFollowing.isEmpty {
-                    VStack(spacing: 16) {
+                if profile.userFollowing.isEmpty {
+                    if profile.isFollowingListLoading {
                         Spacer()
-                        Text("Not Following Anyone Yet")
-                            .font(.title3)
-                            .fontWeight(.medium)
-                            .foregroundColor(.gray)
-                        
-                        Text("When you follow someone, they'll appear here.")
-                            .font(.body)
-                            .foregroundColor(.gray)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal)
+                        ProgressView()
                         Spacer()
+                    } else {
+                        VStack(spacing: 16) {
+                            Spacer()
+                            Text("Not Following Anyone Yet")
+                                .font(.title3)
+                                .fontWeight(.medium)
+                                .foregroundColor(.gray)
+                            
+                            Text("When you follow someone, they'll appear here.")
+                                .font(.body)
+                                .foregroundColor(.gray)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal)
+                            Spacer()
+                        }
                     }
                 } else {
                     List {
                         ForEach(profile.userFollowing) { profileData in
                             UserRow(user: profileData)
+                                .onAppear {
+                                    // Load more when user scrolls to the last few items
+                                    if let index = profile.userFollowing.firstIndex(where: { $0.id == profileData.id }),
+                                       index >= profile.userFollowing.count - 3 && !profile.isFollowingListLoading {
+                                        Task {
+                                            await dataManager.loadFollowing(userId: userSession.currentUserId ?? "", offset: profile.userFollowing.count)
+                                        }
+                                    }
+                                }
+                        }
+                        
+                        // Loading indicator at bottom while loading more
+                        if profile.isFollowingListLoading {
+                            HStack {
+                                Spacer()
+                                ProgressView()
+                                    .padding()
+                                Spacer()
+                            }
+                            .listRowSeparator(.hidden)
                         }
                     }
                     .listStyle(PlainListStyle())
@@ -49,15 +71,11 @@ struct FollowingListView: View {
             .navigationTitle("Following")
             .navigationBarTitleDisplayMode(.inline)
             .onAppear {
-                print("📱 [FollowingListView] Sheet appeared - triggering following load")
-                // Trigger following loading when sheet appears
-                if profile.userFollowing.isEmpty && !profile.isFollowingListLoading {
-                    print("👥 [FollowingListView] Starting following load...")
+                // Always load following profiles when sheet appears
+                if !profile.isFollowingListLoading {
                     Task {
                         await dataManager.loadFollowing(userId: userSession.currentUserId ?? "")
                     }
-                } else {
-                    print("👥 [FollowingListView] Skipping load - already loaded or loading")
                 }
             }
             .toolbar {

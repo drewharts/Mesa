@@ -278,48 +278,26 @@ class SupabaseUserService: ObservableObject {
     }
     
     /// Fetch following profiles - LAZY! Only call when user clicks "Following"
-    /// With optional pagination for progressive loading
-    func fetchFollowingProfilesData(for userId: String, limit: Int? = nil, offset: Int = 0) async throws -> [ProfileData] {
-        let limitStr = limit.map { " (first \($0))" } ?? ""
-        print("👥 [Supabase] Fetching following PROFILES for user\(limitStr)...")
-        let startTime = Date()
+    /// Uses pagination for optimal performance
+    func fetchFollowingProfilesData(for userId: String, limit: Int, offset: Int = 0) async throws -> [ProfileData] {
+        let pageNumber = (offset / limit) + 1
         
-        // Step 1: Get following IDs from following table (with pagination)
-        var query = supabase.client
-            .from("following")
-            .select()
-            .eq("follower_id", value: userId)
-            .order("created_at", ascending: false) // Most recent first
-        
-        if let limit = limit {
-            query = query.limit(limit).range(from: offset, to: offset + limit - 1)
+        struct PaginatedParams: Encodable {
+            let user_id: String
+            let page_size: Int
+            let page_number: Int
         }
         
-        let followRecords: [FollowingRecord] = try await query
+        let params = PaginatedParams(
+            user_id: userId,
+            page_size: limit,
+            page_number: pageNumber
+        )
+        
+        let profiles: [ProfileData] = try await supabase.client
+            .rpc("get_following_profiles_paginated", params: params)
             .execute()
             .value
-        
-        let followingIds = followRecords.map { $0.following_id }
-        
-        guard !followingIds.isEmpty else {
-            print("✅ [Supabase] User is not following anyone")
-            return []
-        }
-        
-        print("🔍 [Supabase] Found \(followingIds.count) following IDs, fetching profiles...")
-        
-        // Step 2: Fetch user profiles for those IDs
-        let userRecords: [ProfileDataRecord] = try await supabase.client
-            .from("users")
-            .select()
-            .in("id", values: followingIds)
-            .execute()
-            .value
-        
-        let profiles = userRecords.map { convertToProfileData($0) }
-        
-        let duration = Date().timeIntervalSince(startTime)
-        print("✅ [Supabase] Fetched \(profiles.count) following profiles in \(String(format: "%.2f", duration))s")
         
         return profiles
     }

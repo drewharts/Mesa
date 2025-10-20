@@ -48,7 +48,7 @@ struct FollowersListView: View {
                                     if let index = profile.userFollowers.firstIndex(where: { $0.id == user.id }),
                                        index >= profile.userFollowers.count - 3 && !profile.isFollowersListLoading {
                                         Task {
-                                            await dataManager.loadMoreFollowers(userId: userSession.currentUserId ?? "")
+                                            await dataManager.loadFollowers(userId: userSession.currentUserId ?? "", offset: profile.userFollowers.count)
                                         }
                                     }
                                 }
@@ -71,8 +71,8 @@ struct FollowersListView: View {
             .navigationTitle("Followers")
             .navigationBarTitleDisplayMode(.inline)
             .onAppear {
-                // Trigger follower loading when sheet appears
-                if profile.userFollowers.isEmpty && !profile.isFollowersListLoading {
+                // Always load follower profiles when sheet appears
+                if !profile.isFollowersListLoading {
                     Task {
                         await dataManager.loadFollowers(userId: userSession.currentUserId ?? "")
                     }
