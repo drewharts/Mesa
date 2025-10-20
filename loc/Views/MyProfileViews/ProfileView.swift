@@ -32,14 +32,16 @@ struct ProfileView: View {
     }
 
     var body: some View {
-        mainContent
-            .navigationBarBackButtonHidden(true)
-            .preferredColorScheme(.light)
-            .navigationBarTitleDisplayMode(.inline)
-            .modifier(ToolbarModifier(
-                presentationMode: presentationMode,
-                photoImportVM: photoImportVM
-            ))
+        NavigationStack {
+            mainContent
+                .navigationBarBackButtonHidden(true)
+                .preferredColorScheme(.light)
+                .navigationBarTitleDisplayMode(.inline)
+                .modifier(ToolbarModifier(
+                    presentationMode: presentationMode,
+                    photoImportVM: photoImportVM
+                ))
+        }
             .modifier(SheetsModifier(
                 photoImportVM: photoImportVM,
                 profile: profile,
