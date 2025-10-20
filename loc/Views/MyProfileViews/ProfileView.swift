@@ -311,8 +311,8 @@ struct StateChangesModifier: ViewModifier {
                 // Places are already loaded in Phase 0, so this is usually redundant
                 if !hasRefreshedPlaces {
                     hasRefreshedPlaces = true
-                    // External places are now loaded during app startup in DataManager
-                    // No need to fetch them here anymore
+                    // Note: External places (TikTok) are loaded on-demand when user swipes to that tab
+                    // No need to preload them here
                     
                     // Run refresh in background to not block UI
                     Task.detached(priority: .background) {

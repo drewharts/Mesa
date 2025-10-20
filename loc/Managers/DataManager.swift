@@ -57,17 +57,14 @@ class DataManager: ObservableObject {
             await loadEssentialDataOnly(userId: userId)
         }
         
-        // ✅ PHASE 2: Load viewport places and external places in background (non-blocking)
+        // ✅ PHASE 2: Load viewport places in background (non-blocking)
         Task.detached(priority: .background) { [weak self] in
             await self?.measureLoadingTime("Viewport Places") {
                 await self?.loadViewportPlacesOnly(userId: userId)
             }
         }
         
-        // ✅ PHASE 3: Load external places (TikTok places) in background (non-blocking)
-        Task.detached(priority: .background) { [weak self] in
-            await self?.loadUserExternalPlaces(userId: userId)
-        }
+        // Note: External places (TikTok) are loaded on-demand when user swipes to that tab
         
         let endTime = CFAbsoluteTimeGetCurrent()
         print("✅ [DataManager] Essential data loaded in \(String(format: "%.2f", endTime - startTime))s - UI ready!")
