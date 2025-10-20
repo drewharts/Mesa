@@ -299,8 +299,9 @@ class SupabaseUserService: ObservableObject {
             let p_page_size: Int
         }
         
-        // Convert lat/lng to PostGIS POINT geometry in WKT format
-        let userLocation = "POINT(\(userLongitude) \(userLatitude))"
+        // Convert lat/lng to PostGIS POINT geometry in EWKT format with SRID
+        // Use SRID 4326 (WGS84) for GPS coordinates
+        let userLocation = "SRID=4326;POINT(\(userLongitude) \(userLatitude))"
         print("📍 [Supabase] Using PostGIS POINT: \(userLocation)")
         
         let params = Params(
