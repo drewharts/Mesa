@@ -507,10 +507,6 @@ struct PlaceGridCell: View {
         .frame(width: cardWidth, height: cardHeight)
         .background(Color.white)
         .cornerRadius(20)
-        .overlay(
-            RoundedRectangle(cornerRadius: 20)
-                .stroke(Color.white, lineWidth: 2)
-        )
         .shadow(color: Color.black.opacity(0.2), radius: 5, x: 0, y: 2)
         .onTapGesture {
             selectedPlaceVM.selectPlaceAndFetchDetails(place)
@@ -708,10 +704,6 @@ struct TikTokPlaceGridCell: View {
         .frame(width: cardWidth, height: cardHeight)
         .background(Color.white)
         .cornerRadius(20)
-        .overlay(
-            RoundedRectangle(cornerRadius: 20)
-                .stroke(Color.white, lineWidth: 2)
-        )
         .shadow(color: Color.black.opacity(0.2), radius: 5, x: 0, y: 2)
         .onTapGesture {
             selectedPlaceVM.selectPlaceAndFetchDetails(place)
