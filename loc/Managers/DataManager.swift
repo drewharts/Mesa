@@ -773,14 +773,33 @@ class DataManager: ObservableObject {
     private func loadPlacesForLists(_ lists: [LightweightPlaceList]) async {
         print("📋 [DataManager] Loading places for \(lists.count) lists...")
         
-        for list in lists {
-            do {
-                let places = try await userService.fetchPlacesForPlaceList(listId: list.list_id, page: 1, pageSize: 6)
-                await MainActor.run {
-                    profileViewModel.lightweightPlaceListPlaces[list.list_id] = places
+        // Load all places in parallel, then batch update on main thread
+        var allPlaces: [String: [LightweightPlaceListPlace]] = [:]
+        
+        await withTaskGroup(of: (String, [LightweightPlaceListPlace]?).self) { group in
+            for list in lists {
+                group.addTask {
+                    do {
+                        let places = try await self.userService.fetchPlacesForPlaceList(listId: list.list_id, page: 1, pageSize: 6)
+                        return (list.list_id, places)
+                    } catch {
+                        print("❌ [DataManager] Error loading places for list \(list.list_id): \(error.localizedDescription)")
+                        return (list.list_id, nil)
+                    }
                 }
-            } catch {
-                print("❌ [DataManager] Error loading places for list \(list.list_id): \(error.localizedDescription)")
+            }
+            
+            for await (listId, places) in group {
+                if let places = places {
+                    allPlaces[listId] = places
+                }
+            }
+        }
+        
+        // Single main thread update - prevents multiple view re-renders
+        await MainActor.run {
+            for (listId, places) in allPlaces {
+                profileViewModel.lightweightPlaceListPlaces[listId] = places
             }
         }
         
