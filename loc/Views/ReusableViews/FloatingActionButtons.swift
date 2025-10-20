@@ -72,6 +72,6 @@ struct FloatingActionButtons: View {
             }
         }
         .buttonStyle(.plain) // Use plain style for immediate response
-        .simultaneousGesture(TapGesture()) // Prevent gesture conflicts
+        .highPriorityGesture(TapGesture()) // Ensure tap wins over underlying map gestures
     }
 } 
