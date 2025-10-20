@@ -199,7 +199,6 @@ class SupabaseUserService: ObservableObject {
                     .eq("id", value: userId)
                     .execute()
                 
-                print("✅ [Supabase] FCM token updated for user \(userId)")
                 // Ensure completion is called on main thread
                 await MainActor.run {
                     completion(nil)
@@ -218,7 +217,6 @@ class SupabaseUserService: ObservableObject {
     
     /// Get follower count - FAST! (count query only, no profile data)
     func getNumberFollowers(forUserId userId: String) async throws -> Int {
-        print("🔢 [Supabase] Fetching follower COUNT for user: \(userId)")
         
         struct CountResult: Codable {
             let count: Int
@@ -231,13 +229,11 @@ class SupabaseUserService: ObservableObject {
             .execute()
         
         let count = response.count ?? 0
-        print("✅ [Supabase] User has \(count) followers")
         return count
     }
     
     /// Get following count - FAST! (count query only, no profile data)
     func getNumberFollowing(forUserId userId: String) async throws -> Int {
-        print("🔢 [Supabase] Fetching following COUNT for user: \(userId)")
         
         let response = try await supabase.client
             .from("following")
@@ -246,7 +242,6 @@ class SupabaseUserService: ObservableObject {
             .execute()
         
         let count = response.count ?? 0
-        print("✅ [Supabase] User is following \(count) people")
         return count
     }
     
@@ -266,7 +261,6 @@ class SupabaseUserService: ObservableObject {
     /// Fetch user favorites using optimized SQL function
     /// Returns lightweight favorite data for display without full place details
     func fetchUserFavorites(userId: String) async throws -> [FavoritePlace] {
-        print("⭐ [Supabase] Fetching favorite places for user: \(userId)")
         
         struct Params: Encodable {
             let p_user_id: String
@@ -278,11 +272,6 @@ class SupabaseUserService: ObservableObject {
             .rpc("get_user_favorite_places", params: params)
             .execute()
             .value
-        
-        print("✅ [Supabase] Fetched \(favorites.count) favorite places")
-        if favorites.count > 0 {
-            print("   First favorite: \(favorites[0].name) (ID: \(favorites[0].place_id))")
-        }
         
         return favorites
     }
@@ -341,7 +330,6 @@ class SupabaseUserService: ObservableObject {
     
     /// ✅ NEW: Fetch following user IDs only (not full profiles) - SUPER FAST!
     func fetchFollowingUserIds(userId: String) async throws -> [String] {
-        print("👥 [Supabase] Fetching following user IDs only for user: \(userId)")
         let startTime = Date()
         
         let followRecords: [FollowingRecord] = try await supabase.client
@@ -354,7 +342,6 @@ class SupabaseUserService: ObservableObject {
         let followingIds = followRecords.map { $0.following_id }
         
         let duration = Date().timeIntervalSince(startTime)
-        print("✅ [Supabase] Fetched \(followingIds.count) following user IDs in \(String(format: "%.2f", duration))s")
         
         return followingIds
     }
@@ -388,7 +375,6 @@ class SupabaseUserService: ObservableObject {
                     .eq("id", value: userId)
                     .execute()
                 
-                print("✅ [Supabase] Account deleted for user \(userId)")
                 completion(nil)
             } catch {
                 print("❌ [Supabase] Error deleting account: \(error)")
