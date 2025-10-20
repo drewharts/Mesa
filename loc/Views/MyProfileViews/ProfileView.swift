@@ -308,55 +308,9 @@ struct StateChangesModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .onAppear {
-                // Only refresh if we haven't already (avoid blocking UI on every appearance)
-                // Places are already loaded in Phase 0, so this is usually redundant
-                if !hasRefreshedPlaces {
-                    hasRefreshedPlaces = true
-                    // Note: External places (TikTok) are loaded on-demand when user swipes to that tab
-                    // No need to preload them here
-                    
-                    // Run refresh in background to not block UI
-                    Task.detached(priority: .background) {
-                        await profile.refreshUserPlaces()
-                        
-                        // After refreshing places, trigger prioritized image loading for visible tiles
-                        await MainActor.run {
-                            // Get all places from favorites and lists for prioritized image loading
-                            var allPlaces: [DetailPlace] = []
-                            
-                            // Add favorite places
-                            for placeId in profile.userFavorites {
-                                if let place = profile.detailPlaceViewModel.places[placeId] {
-                                    allPlaces.append(place)
-                                }
-                            }
-                            
-                            // Add places from lists
-                            for listPlaces in profile.userListsPlaces.values {
-                                for placeId in listPlaces {
-                                    if let place = profile.detailPlaceViewModel.places[placeId] {
-                                        allPlaces.append(place)
-                                    }
-                                }
-                            }
-                            
-                            // Remove duplicates while preserving order
-                            var seenPlaceIds = Set<String>()
-                            let uniquePlaces = allPlaces.filter { place in
-                                if seenPlaceIds.contains(place.id.uuidString) {
-                                    return false
-                                }
-                                seenPlaceIds.insert(place.id.uuidString)
-                                return true
-                            }
-                            
-            // Trigger prioritized image loading for the first 8 places
-            if !uniquePlaces.isEmpty {
-                profile.loadPriorityImagesForPlaces(uniquePlaces, priorityCount: 8)
-            }
-                        }
-                    }
-                }
+                // Places are already loaded in startup phase - no need to refresh again
+                // This was causing 1.7s delay on profile view appearance
+                // External places (TikTok) are loaded on-demand when user swipes to that tab
             }
             .onChange(of: photoImportVM.selectedItems) {
                 Task {
