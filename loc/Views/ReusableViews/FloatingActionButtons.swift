@@ -50,7 +50,6 @@ struct FloatingActionButtons: View {
     
     private var profileButton: some View {
         Button(action: {
-            print("👤 [ProfileButton] Tapped at \(Date())")
             shouldNavigateToProfile = true
         }) {
             if let profilePhoto = profileViewModel.userPicture {

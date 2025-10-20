@@ -32,8 +32,7 @@ struct ProfileView: View {
     }
 
     var body: some View {
-        let _ = print("👤 [ProfileView] Body computed at \(Date())")
-        return mainContent
+        mainContent
             .navigationBarBackButtonHidden(true)
             .preferredColorScheme(.light)
             .navigationBarTitleDisplayMode(.inline)
