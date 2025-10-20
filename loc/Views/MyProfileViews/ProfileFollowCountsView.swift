@@ -108,11 +108,12 @@ struct ProfileFollowCountsView: View {
         .padding(.vertical, 10)
         .onAppear {
             print("⏱️ [TIMING] ProfileFollowCountsView.onAppear at \(Date().timeIntervalSince1970)")
-            // Load counts when profile view appears - completely non-blocking
-            Task(priority: .userInitiated) {
-                print("⏱️ [TIMING] loadProfileCounts Task STARTED at \(Date().timeIntervalSince1970)")
-                await dataManager.loadProfileCounts(userId: userSession.currentUserId ?? "")
-                print("⏱️ [TIMING] loadProfileCounts Task COMPLETED at \(Date().timeIntervalSince1970)")
+            let userId = userSession.currentUserId ?? ""
+            // CRITICAL: Use Task.detached to run on separate thread, not blocked by main thread
+            Task.detached(priority: .userInitiated) { [dataManager] in
+                print("⏱️ [TIMING] loadProfileCounts Task.detached STARTED at \(Date().timeIntervalSince1970)")
+                await dataManager.loadProfileCounts(userId: userId)
+                print("⏱️ [TIMING] loadProfileCounts Task.detached COMPLETED at \(Date().timeIntervalSince1970)")
             }
         }
         .onChange(of: profile.userFollowing.count) {
