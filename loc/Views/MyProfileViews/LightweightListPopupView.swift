@@ -162,50 +162,50 @@ struct LightweightPlaceGridCell: View {
                         image
                             .resizable()
                             .aspectRatio(contentMode: .fill)
-                            .frame(width: cardWidth, height: cardHeight - 40)
+                            .frame(width: cardWidth, height: cardHeight)
                             .clipped()
                     } placeholder: {
                         Rectangle()
                             .foregroundColor(placeColor)
-                            .frame(width: cardWidth, height: cardHeight - 40)
+                            .frame(width: cardWidth, height: cardHeight)
                     }
                 } else {
                     Rectangle()
                         .foregroundColor(placeColor)
-                        .frame(width: cardWidth, height: cardHeight - 40)
+                        .frame(width: cardWidth, height: cardHeight)
                 }
                 
-                // Gradient overlay for text readability
+                // Gradient overlay for text readability (matching my places style)
                 LinearGradient(
-                    gradient: Gradient(colors: [
-                        Color.black.opacity(0.0),
-                        Color.black.opacity(0.1),
-                        Color.black.opacity(0.2),
-                        Color.black.opacity(1.0)
-                    ]),
+                    gradient: Gradient(colors: [.clear, .black.opacity(0.7)]),
                     startPoint: .top,
                     endPoint: .bottom
                 )
-                .frame(height: cardHeight - 40)
+                .frame(height: 60)
                 
-                // Place name overlay
-                VStack(alignment: .leading, spacing: 2) {
+                // Place name and city (matching my places style)
+                VStack(alignment: .leading, spacing: 4) {
                     Text(place.name)
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
+                        .font(.headline)
                         .foregroundColor(.white)
-                        .lineLimit(2)
+                        .lineLimit(1)
                         .multilineTextAlignment(.leading)
+                    
+                    // Note: city not available in lightweight data, so we'll skip it
                 }
                 .padding(.horizontal, 12)
-                .padding(.bottom, 12)
+                .padding(.bottom, 8)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .frame(width: cardWidth, height: cardHeight - 40)
-            .clipped()
-            .cornerRadius(12)
         }
         .frame(width: cardWidth, height: cardHeight)
+        .background(Color.white)
+        .cornerRadius(20)
+        .overlay(
+            RoundedRectangle(cornerRadius: 20)
+                .stroke(Color.white, lineWidth: 2)
+        )
+        .shadow(color: Color.black.opacity(0.2), radius: 5, x: 0, y: 2)
         .contentShape(Rectangle())
         .onTapGesture {
             // When tapped, load the full place details and navigate
