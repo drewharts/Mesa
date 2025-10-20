@@ -215,11 +215,6 @@ class MapViewModel: ObservableObject {
             let loadTime = Date().timeIntervalSince(startTime)
             print("⏱️ [MapViewModel] Loaded \(annotations.count) place annotations in \(String(format: "%.2f", loadTime))s")
             
-            // Debug: Log the annotations that were loaded
-            print("🔍 [MapViewModel] Viewport annotations loaded:")
-            for annotation in annotations {
-                print("   - \(annotation.name) (\(annotation.id)) - saved by \(annotation.userIds.count) users")
-            }
             
         } catch {
             print("❌ [MapViewModel] Error loading viewport annotations: \(error.localizedDescription)")

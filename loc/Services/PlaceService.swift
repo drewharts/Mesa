@@ -215,9 +215,7 @@ class PlaceService: ObservableObject {
     }
     
     func fetchPlacesInViewport(northLat: Double, southLat: Double, eastLng: Double, westLng: Double) async throws -> [PlaceAnnotation] {
-        print("🔄 [PlaceService] Delegating fetchPlacesInViewport async to Supabase...")
         guard let authUserId = await SupabaseAuthService.shared.currentUserId else {
-            print("⚠️ [PlaceService] No auth userId available for viewport query")
             return []
         }
         
@@ -261,7 +259,6 @@ class PlaceService: ObservableObject {
     
     /// ✅ NEW: Fetch places in viewport with explicit user ID (for DataManager)
     func fetchPlacesInViewportWithUserId(northLat: Double, southLat: Double, eastLng: Double, westLng: Double, userId: String) async throws -> [PlaceAnnotation] {
-        print("🔄 [PlaceService] Delegating fetchPlacesInViewportWithUserId async to Supabase...")
         return try await supabase.fetchPlacesInViewport(
             northLat: northLat,
             southLat: southLat,

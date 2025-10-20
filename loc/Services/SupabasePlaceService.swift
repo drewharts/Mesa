@@ -680,8 +680,6 @@ class SupabasePlaceService: ObservableObject {
     /// Fetch place annotations for map markers within a geographic viewport
     /// Uses the optimized PostgreSQL function with user tracking
     func fetchPlacesInViewport(northLat: Double, southLat: Double, eastLng: Double, westLng: Double, userId: String) async throws -> [PlaceAnnotation] {
-        print("🗺️ [Supabase] Fetching place annotations in viewport: N=\(northLat), S=\(southLat), E=\(eastLng), W=\(westLng)")
-        
         do {
             // Use the optimized PostgreSQL function
             struct ViewportParams: Encodable {
@@ -704,8 +702,6 @@ class SupabasePlaceService: ObservableObject {
                 .rpc("get_visible_annotations_with_users", params: params)
                 .execute()
                 .value
-            
-            print("✅ [Supabase] Found \(response.count) place annotations in viewport")
             
             return response
         } catch {

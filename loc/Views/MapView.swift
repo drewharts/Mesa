@@ -250,7 +250,6 @@ struct MapView: View {
                 if let region = currentMapRegion {
                     mapViewModel.onMapRegionChange(region)
                     hasLoadedInitialViewport = true
-                    print("✅ [MapView] Initial viewport loaded")
                 } else {
                     // Create a region from the current map position
                     let coords = locationManager.currentLocation?.coordinate ?? defaultCenter
@@ -260,7 +259,6 @@ struct MapView: View {
                     )
                     mapViewModel.onMapRegionChange(region)
                     hasLoadedInitialViewport = true
-                    print("✅ [MapView] Initial viewport loaded with default region")
                 }
             }
             
