@@ -745,15 +745,18 @@ class DataManager: ObservableObject {
         let (followersCount, followingCount, myPlacesCount, favoritePlaces) = await (followers, following, myPlaces, favorites)
         let placeLists = await placeListsTask.value
         
-        profileViewModel.followersCount = followersCount
-        profileViewModel.followingCount = followingCount
-        // Update my places count - we'll store this as the count of myPlaces array
-        profileViewModel.myPlaces = Array(repeating: "", count: myPlacesCount) // Placeholder IDs
-        profileViewModel.lightweightFavorites = favoritePlaces
-        profileViewModel.lightweightPlaceLists = placeLists
-        profileViewModel.isFollowersLoading = false
-        profileViewModel.isFollowingLoading = false
-        profileViewModel.isMyPlacesLoading = false
+        // Batch all updates together to minimize view re-renders
+        await MainActor.run {
+            profileViewModel.followersCount = followersCount
+            profileViewModel.followingCount = followingCount
+            // Update my places count - we'll store this as the count of myPlaces array
+            profileViewModel.myPlaces = Array(repeating: "", count: myPlacesCount) // Placeholder IDs
+            profileViewModel.lightweightFavorites = favoritePlaces
+            profileViewModel.lightweightPlaceLists = placeLists
+            profileViewModel.isFollowersLoading = false
+            profileViewModel.isFollowingLoading = false
+            profileViewModel.isMyPlacesLoading = false
+        }
         
         let duration = Date().timeIntervalSince(startTime)
         print("⚡ [DataManager] Loaded counts in \(String(format: "%.2f", duration))s (Followers: \(followersCount), Following: \(followingCount), My Places: \(myPlacesCount), Favorites: \(favoritePlaces.count), Lists: \(placeLists.count))")
