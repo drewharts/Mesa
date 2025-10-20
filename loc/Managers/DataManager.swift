@@ -725,47 +725,51 @@ class DataManager: ObservableObject {
         async let myPlaces: Int = (try? await userService.getNumberMyPlaces(forUserId: userId)) ?? 0
         async let favorites: [FavoritePlace] = (try? await userService.fetchUserFavorites(userId: userId)) ?? []
         
-        // Fetch place lists if we have user location
-        let placeListsTask: Task<[LightweightPlaceList], Never> = Task {
-            if let location = userLocation {
-                print("📍 [DataManager] User location available: \(location.latitude), \(location.longitude)")
-                return (try? await userService.fetchPlaceListsByProximity(
-                    userId: userId,
-                    userLatitude: location.latitude,
-                    userLongitude: location.longitude,
-                    page: 1,
-                    pageSize: 5
-                )) ?? []
-            } else {
-                print("⚠️ [DataManager] No user location available for place list sorting")
-                return []
-            }
-        }
-        
         let (followersCount, followingCount, myPlacesCount, favoritePlaces) = await (followers, following, myPlaces, favorites)
-        let placeLists = await placeListsTask.value
         
-        // Batch all updates together to minimize view re-renders
+        // Update counts and favorites immediately - don't wait for place lists
         await MainActor.run {
             profileViewModel.followersCount = followersCount
             profileViewModel.followingCount = followingCount
             // Update my places count - we'll store this as the count of myPlaces array
             profileViewModel.myPlaces = Array(repeating: "", count: myPlacesCount) // Placeholder IDs
             profileViewModel.lightweightFavorites = favoritePlaces
-            profileViewModel.lightweightPlaceLists = placeLists
             profileViewModel.isFollowersLoading = false
             profileViewModel.isFollowingLoading = false
             profileViewModel.isMyPlacesLoading = false
         }
         
         let duration = Date().timeIntervalSince(startTime)
-        print("⚡ [DataManager] Loaded counts in \(String(format: "%.2f", duration))s (Followers: \(followersCount), Following: \(followingCount), My Places: \(myPlacesCount), Favorites: \(favoritePlaces.count), Lists: \(placeLists.count))")
+        print("⚡ [DataManager] Loaded counts in \(String(format: "%.2f", duration))s (Followers: \(followersCount), Following: \(followingCount), My Places: \(myPlacesCount), Favorites: \(favoritePlaces.count))")
         
-        // Load first 6 places for each list in background
-        if !placeLists.isEmpty {
+        // Load place lists in background - don't block UI
+        if let location = userLocation {
             Task.detached(priority: .userInitiated) { [weak self] in
-                await self?.loadPlacesForLists(placeLists)
+                guard let self = self else { return }
+                
+                print("📍 [DataManager] User location available: \(location.latitude), \(location.longitude)")
+                let placeLists = (try? await self.userService.fetchPlaceListsByProximity(
+                    userId: userId,
+                    userLatitude: location.latitude,
+                    userLongitude: location.longitude,
+                    page: 1,
+                    pageSize: 5
+                )) ?? []
+                
+                print("✅ [DataManager] Loaded \(placeLists.count) place lists in background")
+                
+                // Update place lists on main thread
+                await MainActor.run {
+                    self.profileViewModel.lightweightPlaceLists = placeLists
+                }
+                
+                // Load places for each list
+                if !placeLists.isEmpty {
+                    await self.loadPlacesForLists(placeLists)
+                }
             }
+        } else {
+            print("⚠️ [DataManager] No user location available for place list sorting")
         }
     }
     

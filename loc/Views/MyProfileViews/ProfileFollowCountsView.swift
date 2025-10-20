@@ -107,8 +107,8 @@ struct ProfileFollowCountsView: View {
         }
         .padding(.vertical, 10)
         .onAppear {
-            // Load counts when profile view appears - use detached task to avoid blocking UI
-            Task.detached(priority: .userInitiated) { [dataManager, userSession] in
+            // Load counts when profile view appears - completely non-blocking
+            Task(priority: .userInitiated) {
                 await dataManager.loadProfileCounts(userId: userSession.currentUserId ?? "")
             }
         }
