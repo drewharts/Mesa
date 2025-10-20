@@ -363,7 +363,6 @@ struct StateChangesModifier: ViewModifier {
                 }
             }
             .onAppear {
-                print("📱 [ProfileView] APPEARED at \(Date().timeIntervalSince1970)")
                 setupCallbacks()
                 profile.checkPendingTikTokURL(
                     tikTokService: tikTokService,
@@ -384,7 +383,7 @@ struct StateChangesModifier: ViewModifier {
     
     private func setupCallbacks() {
         photoImportVM.onPlaceSaved = {
-            Task {
+            Task.detached(priority: .utility) {
                 await profile.refreshUserPlaces()
             }
         }

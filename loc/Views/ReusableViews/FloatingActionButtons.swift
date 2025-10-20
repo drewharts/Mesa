@@ -73,7 +73,6 @@ struct FloatingActionButtons: View {
         .gesture(
             TapGesture()
                 .onEnded { _ in
-                    print("👆 [ProfileButton] TAP DETECTED at \(Date().timeIntervalSince1970)")
                     // Exclusive gesture - takes priority over map tap
                     shouldNavigateToProfile = true
                 },
