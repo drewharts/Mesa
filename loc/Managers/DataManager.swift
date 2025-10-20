@@ -80,13 +80,8 @@ class DataManager: ObservableObject {
     /// Load essential user profile data and all place annotations at startup
     /// Uses the optimized PostgreSQL function to get user + friends' places in one call
     private func loadEssentialDataOnly(userId: String) async {
-        // Load essential profile data in parallel
-        async let profileData: () = loadProfileData(userId: userId)
-        async let followingIds: () = loadFollowingUserIds(userId: userId)
-        
-        // Wait for essential data to complete
-        await profileData
-        await followingIds
+        // Load only the user's profile data
+        await loadProfileData(userId: userId)
         
         print("✅ [DataManager] Essential profile data loaded - UI ready for interaction!")
         
@@ -97,24 +92,11 @@ class DataManager: ObservableObject {
         }
         
         // Note: Counts (followers/following/myplaces) are loaded on-demand when profile view appears
+        // Note: Following profiles are loaded on-demand when user opens following sheet
         // Note: Place annotations are now loaded on-demand via viewport queries
         // No need to preload all annotations - the MapViewModel handles this
     }
     
-    /// Load following user IDs only (not full profiles)
-    private func loadFollowingUserIds(userId: String) async {
-        do {
-            let followingIds = try await userService.fetchFollowingUserIds(userId: userId)
-            await MainActor.run {
-                // Store just the IDs for viewport filtering
-                self.profileViewModel.userFollowing = followingIds.map { ProfileData(id: $0, firstName: "", lastName: "", email: "", profilePhotoURL: nil, phoneNumber: "", fullNameLower: "", fullName: "", fcmToken: nil, firebaseUid: nil, supabaseUid: nil) }
-                print("✅ [DataManager] Loaded \(followingIds.count) following user IDs")
-                // Note: Friend tracking is now handled by PostgreSQL function - no need to update MapViewModel
-            }
-        } catch {
-            print("❌ [DataManager] Error loading following user IDs: \(error.localizedDescription)")
-        }
-    }
     
     /// Load place IDs only (not full place documents) - MUCH faster!
     private func loadUserPlaceIdsOnly(userId: String) async {
@@ -264,28 +246,6 @@ class DataManager: ObservableObject {
     }
     
     // MARK: - Data Loading Methods
-    
-    /// Load social data in background (follower/following profiles)
-    private func loadSocialDataInBackground(userId: String) async {
-        print("💤 [DataManager] Loading follower/following profiles in background...")
-        
-        // Reset the list loading flags since we're loading profiles here
-        await MainActor.run {
-            profileViewModel.isFollowersListLoading = false
-            profileViewModel.isFollowingListLoading = false
-            print("✅ [DataManager] Reset follower/following list loading flags to false")
-        }
-        
-        // Only load reviewed places for following users if we already have the following list
-        if !profileViewModel.userFollowing.isEmpty {
-            await loadReviewedPlacesForFollowing(userId: userId)
-        }
-        
-        // Update annotations after social data loads
-        await MainActor.run {
-            calculateMapAnnotations()
-        }
-    }
 
     // Sets all relevant loading flags to true before data loading begins
     func startDataLoadingFlags() {
@@ -375,105 +335,6 @@ class DataManager: ObservableObject {
         }
     }
     
-    /// Load all places from people the user follows (saved, reviewed, imported from TikTok)
-    /// This is essential for social discovery and should load in background after essential data
-    private func loadFollowingUsersPlaces(userId: String) async {
-        let startTime = Date()
-        print("👥 [DataManager] Loading all places from people user follows...")
-        
-        // Get the following user IDs (should already be loaded)
-        let followingIds = profileViewModel.userFollowing.map { $0.id }
-        
-        guard !followingIds.isEmpty else {
-            print("👥 [DataManager] No following users to load places from")
-            return
-        }
-        
-        print("👥 [DataManager] Loading places from \(followingIds.count) following users...")
-        
-        do {
-            // Load all places from each following user in parallel
-            var allFollowingPlaces: [DetailPlace] = []
-            var placeSavers: [String: [String]] = [:] // Track who saved each place
-            
-            // Process following users in batches to avoid overwhelming the database
-            let batchSize = 5
-            for i in stride(from: 0, to: followingIds.count, by: batchSize) {
-                let batch = Array(followingIds[i..<min(i + batchSize, followingIds.count)])
-                
-                // Load places for this batch in parallel
-                let batchResults = await withTaskGroup(of: (String, [DetailPlace]).self) { group in
-                    for followingId in batch {
-                        group.addTask {
-                            do {
-                                let places = try await self.placeService.fetchAllUserPlaces(userId: followingId)
-                                return (followingId, places)
-                            } catch {
-                                print("❌ [DataManager] Error loading places for following user \(followingId): \(error.localizedDescription)")
-                                return (followingId, [])
-                            }
-                        }
-                    }
-                    
-                    var results: [(String, [DetailPlace])] = []
-                    for await result in group {
-                        results.append(result)
-                    }
-                    return results
-                }
-                
-                // Process batch results
-                for (followingId, places) in batchResults {
-                    allFollowingPlaces.append(contentsOf: places)
-                    
-                    // Track who saved each place
-                    for place in places {
-                        let placeId = place.id.uuidString
-                        if placeSavers[placeId] == nil {
-                            placeSavers[placeId] = [followingId]
-                        } else if !placeSavers[placeId]!.contains(followingId) {
-                            placeSavers[placeId]!.append(followingId)
-                        }
-                    }
-                }
-            }
-            
-            // Update the DetailPlaceViewModel with all following users' places
-            await MainActor.run {
-                for place in allFollowingPlaces {
-                    let placeId = place.id.uuidString
-                    self.detailPlaceViewModel.places[placeId] = place
-                    self.detailPlaceViewModel.generateColorForPlace(placeId)
-                    self.detailPlaceViewModel.calculateRestaurantType(for: place)
-                }
-                
-                // Update place savers information
-                for (placeId, savers) in placeSavers {
-                    if self.detailPlaceViewModel.placeSavers[placeId] == nil {
-                        self.detailPlaceViewModel.placeSavers[placeId] = savers
-                    } else {
-                        // Merge with existing savers, avoiding duplicates
-                        let existingSavers = Set(self.detailPlaceViewModel.placeSavers[placeId] ?? [])
-                        let newSavers = Set(savers)
-                        self.detailPlaceViewModel.placeSavers[placeId] = Array(existingSavers.union(newSavers))
-                    }
-                }
-                
-                let duration = Date().timeIntervalSince(startTime)
-                print("✅ [DataManager] Loaded \(allFollowingPlaces.count) places from \(followingIds.count) following users in \(String(format: "%.2f", duration))s")
-                print("👥 [DataManager] Updated placeSavers for \(placeSavers.count) unique places")
-                
-                // Force update of filtered places for map display
-                if let placeTypeFilterVM = self.placeTypeFilterViewModel {
-                    placeTypeFilterVM.updateFilteredPlaces()
-                    print("🗺️ [DataManager] Forced filteredPlaces update after loading friends' places, now showing: \(placeTypeFilterVM.filteredPlaces.count) places")
-                }
-            }
-            
-        } catch {
-            print("❌ [DataManager] Error loading following users' places: \(error.localizedDescription)")
-        }
-    }
 
     func downloadImage(from url: URL, completion: @escaping (UIImage?) -> Void) {
         URLSession.shared.dataTask(with: url) { data, response, error in
@@ -944,22 +805,6 @@ class DataManager: ObservableObject {
         }
     }
     
-    // Loads reviewed places only for following users (separated from main user)
-    private func loadReviewedPlacesForFollowing(userId: String) async {
-        let followingIds = profileViewModel.userFollowing.map { $0.id }
-        
-        // Process following users in batches
-        let batchSize = 3
-        for batch in followingIds.chunked(into: batchSize) {
-            await withTaskGroup(of: Void.self) { group in
-                for uid in batch {
-                    group.addTask {
-                        await self.loadUserReviewedPlaces(userId: uid)
-                    }
-                }
-            }
-        }
-    }
     
     // Loads all reviewed places for the current user and their following
     func loadReviewedPlacesForUserAndFollowing(userId: String) async {
