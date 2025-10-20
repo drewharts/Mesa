@@ -595,7 +595,7 @@ class UserService: ObservableObject {
     }
     
     /// Fetch user favorites using optimized SQL function
-    func fetchUserFavorites(userId: String) async throws -> [String] {
+    func fetchUserFavorites(userId: String) async throws -> [FavoritePlace] {
         return try await supabase.fetchUserFavorites(userId: userId)
     }
     

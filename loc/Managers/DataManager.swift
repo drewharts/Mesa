@@ -718,21 +718,21 @@ class DataManager: ObservableObject {
         async let followers: Int = (try? await userService.getNumberFollowers(forUserId: userId)) ?? 0
         async let following: Int = (try? await userService.getNumberFollowing(forUserId: userId)) ?? 0
         async let myPlaces: Int = (try? await userService.getNumberMyPlaces(forUserId: userId)) ?? 0
-        async let favorites: [String] = (try? await userService.fetchUserFavorites(userId: userId)) ?? []
+        async let favorites: [FavoritePlace] = (try? await userService.fetchUserFavorites(userId: userId)) ?? []
         
-        let (followersCount, followingCount, myPlacesCount, favoriteIds) = await (followers, following, myPlaces, favorites)
+        let (followersCount, followingCount, myPlacesCount, favoritePlaces) = await (followers, following, myPlaces, favorites)
         
         profileViewModel.followersCount = followersCount
         profileViewModel.followingCount = followingCount
         // Update my places count - we'll store this as the count of myPlaces array
         profileViewModel.myPlaces = Array(repeating: "", count: myPlacesCount) // Placeholder IDs
-        profileViewModel.userFavorites = favoriteIds
+        profileViewModel.lightweightFavorites = favoritePlaces
         profileViewModel.isFollowersLoading = false
         profileViewModel.isFollowingLoading = false
         profileViewModel.isMyPlacesLoading = false
         
         let duration = Date().timeIntervalSince(startTime)
-        print("⚡ [DataManager] Loaded counts in \(String(format: "%.2f", duration))s (Followers: \(followersCount), Following: \(followingCount), My Places: \(myPlacesCount), Favorites: \(favoriteIds.count))")
+        print("⚡ [DataManager] Loaded counts in \(String(format: "%.2f", duration))s (Followers: \(followersCount), Following: \(followingCount), My Places: \(myPlacesCount), Favorites: \(favoritePlaces.count))")
     }
     
     // Loads all places the user has reviewed, even if not in favorites or lists

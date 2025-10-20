@@ -266,29 +266,20 @@ class SupabaseUserService: ObservableObject {
     }
     
     /// Fetch user favorites using optimized SQL function
-    func fetchUserFavorites(userId: String) async throws -> [String] {
-        print("⭐ [Supabase] Fetching favorite places for user: \(userId)")
-        
-        struct FavoriteResponse: Codable {
-            let place_id: String
-            let name: String
-            let latest_review_photo: String?
-        }
-        
+    /// Returns lightweight favorite data for display without full place details
+    func fetchUserFavorites(userId: String) async throws -> [FavoritePlace] {        
         struct Params: Encodable {
             let p_user_id: String
         }
         
         let params = Params(p_user_id: userId)
         
-        let favorites: [FavoriteResponse] = try await supabase.client
+        let favorites: [FavoritePlace] = try await supabase.client
             .rpc("get_user_favorite_places", params: params)
             .execute()
             .value
         
-        let placeIds = favorites.map { $0.place_id }
-        print("✅ [Supabase] Fetched \(placeIds.count) favorite places")
-        return placeIds
+        return favorites
     }
     
     // MARK: - Follower/Following Profile Data (Lazy - Load on Demand!)
@@ -428,5 +419,14 @@ struct ProfileDataRecord: Codable {
     let phone_number: String?
     let full_name: String
     let fcm_token: String?
+}
+
+/// Lightweight favorite place data for display
+struct FavoritePlace: Codable, Identifiable {
+    let place_id: String
+    let name: String
+    let latest_review_photo: String?
+    
+    var id: String { place_id }
 }
 

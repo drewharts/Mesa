@@ -168,8 +168,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/supabase/supabase-swift.git",
       "state" : {
-        "revision" : "21425be5a493bb24bfde51808ccfa82a56111430",
-        "version" : "2.34.0"
+        "revision" : "0e8b8f6dd0c1d17a2a49f16857a64a13c158ef60",
+        "version" : "2.36.0"
       }
     },
     {
@@ -177,8 +177,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-asn1.git",
       "state" : {
-        "revision" : "f70225981241859eb4aa1a18a75531d26637c8cc",
-        "version" : "1.4.0"
+        "revision" : "40d25bbb2fc5b557a9aa8512210bded327c0f60d",
+        "version" : "1.5.0"
       }
     },
     {
@@ -204,8 +204,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-crypto.git",
       "state" : {
-        "revision" : "95ba0316a9b733e92bb6b071255ff46263bbe7dc",
-        "version" : "3.15.1"
+        "revision" : "bcd2b89f2a4446395830b82e4e192765edd71e18",
+        "version" : "4.0.0"
       }
     },
     {
@@ -213,8 +213,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-http-types.git",
       "state" : {
-        "revision" : "a0a57e949a8903563aba4615869310c0ebf14c03",
-        "version" : "1.4.0"
+        "revision" : "9410f6b9a3d418a5416cfe30d8de4227bc6890a0",
+        "version" : "1.5.0"
       }
     },
     {
@@ -222,8 +222,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-protobuf.git",
       "state" : {
-        "revision" : "2547102afd04fe49f1b286090f13ebce07284980",
-        "version" : "1.31.1"
+        "revision" : "c6fe6442e6a64250495669325044052e113e990c",
+        "version" : "1.32.0"
       }
     },
     {
