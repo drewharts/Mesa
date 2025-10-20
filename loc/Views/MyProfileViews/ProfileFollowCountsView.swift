@@ -106,6 +106,12 @@ struct ProfileFollowCountsView: View {
             }
         }
         .padding(.vertical, 10)
+        .onAppear {
+            // Load counts when profile view appears
+            Task {
+                await dataManager.loadProfileCounts(userId: userSession.currentUserId ?? "")
+            }
+        }
         .onChange(of: profile.userFollowing.count) {
             refreshToggle.toggle()
         }

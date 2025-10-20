@@ -83,12 +83,10 @@ class DataManager: ObservableObject {
         // Load essential profile data in parallel
         async let profileData: () = loadProfileData(userId: userId)
         async let followingIds: () = loadFollowingUserIds(userId: userId)
-        async let followCounts: () = fetchFollowerAndFollowingCountsAsync(userId: userId)
         
         // Wait for essential data to complete
         await profileData
         await followingIds
-        await followCounts
         
         print("✅ [DataManager] Essential profile data loaded - UI ready for interaction!")
         
@@ -98,6 +96,7 @@ class DataManager: ObservableObject {
             profileViewModel.isFollowingListLoading = false
         }
         
+        // Note: Counts (followers/following/myplaces) are loaded on-demand when profile view appears
         // Note: Place annotations are now loaded on-demand via viewport queries
         // No need to preload all annotations - the MapViewModel handles this
     }
@@ -844,28 +843,33 @@ class DataManager: ObservableObject {
         }
     }
     
-    /// FAST: Load follower/following COUNTS only (~20-50ms total!)
-    /// Profile data loads lazily when user clicks
-    func fetchFollowerAndFollowingCountsAsync(userId: String) async {
+    /// FAST: Load all profile counts (followers/following/myplaces) in parallel (~20-50ms total!)
+    /// Called when profile view appears
+    func loadProfileCounts(userId: String) async {
         let startTime = Date()
-        print("🔢 [DataManager] Loading follower/following COUNTS (fast)...")
+        print("🔢 [DataManager] Loading profile COUNTS (fast)...")
         
         profileViewModel.isFollowersLoading = true
         profileViewModel.isFollowingLoading = true
+        profileViewModel.isMyPlacesLoading = true
         
-        // Run both count queries in parallel
+        // Run all three count queries in parallel
         async let followers: Int = (try? await userService.getNumberFollowers(forUserId: userId)) ?? 0
         async let following: Int = (try? await userService.getNumberFollowing(forUserId: userId)) ?? 0
+        async let myPlaces: Int = (try? await userService.getNumberMyPlaces(forUserId: userId)) ?? 0
         
-        let (followersCount, followingCount) = await (followers, following)
+        let (followersCount, followingCount, myPlacesCount) = await (followers, following, myPlaces)
         
         profileViewModel.followersCount = followersCount
         profileViewModel.followingCount = followingCount
+        // Update my places count - we'll store this as the count of myPlaces array
+        profileViewModel.myPlaces = Array(repeating: "", count: myPlacesCount) // Placeholder IDs
         profileViewModel.isFollowersLoading = false
         profileViewModel.isFollowingLoading = false
+        profileViewModel.isMyPlacesLoading = false
         
         let duration = Date().timeIntervalSince(startTime)
-        print("⚡ [DataManager] Loaded counts in \(String(format: "%.2f", duration))s (Followers: \(followersCount), Following: \(followingCount))")
+        print("⚡ [DataManager] Loaded counts in \(String(format: "%.2f", duration))s (Followers: \(followersCount), Following: \(followingCount), My Places: \(myPlacesCount))")
     }
     
     // Loads all places the user has reviewed, even if not in favorites or lists

@@ -250,6 +250,21 @@ class SupabaseUserService: ObservableObject {
         return count
     }
     
+    /// Get my places count - FAST! (count query only, no place data)
+    func getNumberMyPlaces(forUserId userId: String) async throws -> Int {
+        print("🔢 [Supabase] Fetching my places COUNT for user: \(userId)")
+        
+        let response = try await supabase.client
+            .from("my_places")
+            .select("*", head: false, count: .exact)
+            .eq("user_id", value: userId)
+            .execute()
+        
+        let count = response.count ?? 0
+        print("✅ [Supabase] User has \(count) my places")
+        return count
+    }
+    
     // MARK: - Follower/Following Profile Data (Lazy - Load on Demand!)
     
     /// Fetch follower profiles - LAZY! Only call when user clicks "Followers"

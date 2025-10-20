@@ -589,6 +589,11 @@ class UserService: ObservableObject {
         return try await supabase.getNumberFollowing(forUserId: userId)
     }
     
+    // COUNT ONLY - Super fast! (~20-50ms)
+    func getNumberMyPlaces(forUserId userId: String) async throws -> Int {
+        return try await supabase.getNumberMyPlaces(forUserId: userId)
+    }
+    
     /// ✅ NEW: Fetch following user IDs only (not full profiles) - SUPER FAST!
     func fetchFollowingUserIds(userId: String) async throws -> [String] {
         return try await supabase.fetchFollowingUserIds(userId: userId)
