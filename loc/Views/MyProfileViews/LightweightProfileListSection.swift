@@ -16,6 +16,8 @@ struct LightweightProfileListSection: View {
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @Environment(\.presentationMode) var presentationMode
     
+    @State private var showingListPopup = false
+    
     // Get total place count from the list (from SQL function)
     private var totalPlaceCount: Int {
         return list.place_count
@@ -42,7 +44,7 @@ struct LightweightProfileListSection: View {
             
             // Card with places grid
             Button(action: {
-                // TODO: Navigate to list detail view
+                showingListPopup = true
             }) {
                 VStack(spacing: 0) {
                     if !places.isEmpty {
@@ -104,6 +106,29 @@ struct LightweightProfileListSection: View {
             .scaleEffect(1.0)
         }
         .padding(.horizontal, 20)
+        .sheet(isPresented: $showingListPopup) {
+            // Convert LightweightPlaceList to PlaceList for the popup
+            SwipeableListPopupView(
+                lists: [convertToPlaceList()],
+                initialListIndex: 0,
+                placeColors: $placeColors
+            )
+        }
+    }
+    
+    /// Convert LightweightPlaceList to PlaceList for the popup
+    private func convertToPlaceList() -> PlaceList {
+        return PlaceList(
+            id: UUID(uuidString: list.list_id) ?? UUID(),
+            name: list.name,
+            places: [], // Empty - places will be loaded by the popup
+            city: "", // Not available in lightweight data
+            emoji: "📋", // Default emoji
+            image: list.image,
+            sortOrder: 0,
+            averageCoordinate: nil, // Not available in lightweight data
+            lastCoordinateUpdate: nil
+        )
     }
 }
 
