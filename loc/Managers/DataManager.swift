@@ -726,6 +726,7 @@ class DataManager: ObservableObject {
         // Fetch place lists if we have user location
         let placeListsTask: Task<[LightweightPlaceList], Never> = Task {
             if let location = userLocation {
+                print("📍 [DataManager] User location available: \(location.latitude), \(location.longitude)")
                 return (try? await userService.fetchPlaceListsByProximity(
                     userId: userId,
                     userLatitude: location.latitude,
