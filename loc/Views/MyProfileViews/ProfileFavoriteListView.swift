@@ -214,7 +214,8 @@ struct LightweightFavoritePlaceCard: View {
             
             // Navigate to the place detail view
             await MainActor.run {
-                selectedPlaceVM.selectedPlaceId = place.id.uuidString
+                selectedPlaceVM.selectedPlace = place
+                selectedPlaceVM.isDetailSheetPresented = true
                 presentationMode.wrappedValue.dismiss()
             }
         } catch {
