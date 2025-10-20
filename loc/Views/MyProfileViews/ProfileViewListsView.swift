@@ -13,6 +13,8 @@ struct ProfileViewListsView: View {
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
     @EnvironmentObject var deepLinkManager: DeepLinkManager
+    @EnvironmentObject var dataManager: DataManager
+    @EnvironmentObject var userSession: UserSession
     @Environment(\.presentationMode) private var presentationMode
 
     @State private var showingImagePicker = false
@@ -43,12 +45,28 @@ struct ProfileViewListsView: View {
 
             if !filteredLists.isEmpty {
                 LazyVStack(spacing: 16) {
-                    ForEach(filteredLists, id: \.id) { list in
+                    ForEach(Array(filteredLists.enumerated()), id: \.element.id) { index, list in
                         LightweightProfileListSection(
                             list: list,
                             places: profile.lightweightPlaceListPlaces[list.list_id] ?? [],
                             placeColors: $placeColors
                         )
+                        .onAppear {
+                            // Load more when we reach the 3rd-to-last item
+                            if index == filteredLists.count - 3 && searchText.isEmpty {
+                                loadMoreListsIfNeeded()
+                            }
+                        }
+                    }
+                    
+                    // Loading indicator at the bottom
+                    if profile.isLoadingMorePlaceLists {
+                        HStack {
+                            Spacer()
+                            ProgressView()
+                                .padding()
+                            Spacer()
+                        }
                     }
                 }
             } else {
@@ -92,6 +110,14 @@ struct ProfileViewListsView: View {
             if selectedPlaceVM.isDetailSheetPresented == true {
                 presentationMode.wrappedValue.dismiss()
             }
+        }
+    }
+    
+    private func loadMoreListsIfNeeded() {
+        guard !profile.isLoadingMorePlaceLists && profile.hasMorePlaceLists else { return }
+        
+        Task {
+            await dataManager.loadMorePlaceLists(userId: userSession.currentUserId ?? "")
         }
     }
 }
