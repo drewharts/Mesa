@@ -704,15 +704,18 @@ class DataManager: ObservableObject {
         }
     }
     
-    /// FAST: Load all profile counts and favorites in parallel (~20-50ms total!)
+    /// FAST: Load all profile counts, favorites, and place lists in parallel (~20-50ms total!)
     /// Called when profile view appears
     func loadProfileCounts(userId: String) async {
         let startTime = Date()
-        print("🔢 [DataManager] Loading profile COUNTS and favorites (fast)...")
+        print("🔢 [DataManager] Loading profile COUNTS, favorites, and place lists (fast)...")
         
         profileViewModel.isFollowersLoading = true
         profileViewModel.isFollowingLoading = true
         profileViewModel.isMyPlacesLoading = true
+        
+        // Get user location for proximity-based list sorting
+        let userLocation = locationManager.currentLocation?.coordinate
         
         // Run all queries in parallel
         async let followers: Int = (try? await userService.getNumberFollowers(forUserId: userId)) ?? 0
@@ -720,19 +723,62 @@ class DataManager: ObservableObject {
         async let myPlaces: Int = (try? await userService.getNumberMyPlaces(forUserId: userId)) ?? 0
         async let favorites: [FavoritePlace] = (try? await userService.fetchUserFavorites(userId: userId)) ?? []
         
+        // Fetch place lists if we have user location
+        let placeListsTask: Task<[LightweightPlaceList], Never> = Task {
+            if let location = userLocation {
+                return (try? await userService.fetchPlaceListsByProximity(
+                    userId: userId,
+                    userLatitude: location.latitude,
+                    userLongitude: location.longitude,
+                    page: 1,
+                    pageSize: 10
+                )) ?? []
+            } else {
+                print("⚠️ [DataManager] No user location available for place list sorting")
+                return []
+            }
+        }
+        
         let (followersCount, followingCount, myPlacesCount, favoritePlaces) = await (followers, following, myPlaces, favorites)
+        let placeLists = await placeListsTask.value
         
         profileViewModel.followersCount = followersCount
         profileViewModel.followingCount = followingCount
         // Update my places count - we'll store this as the count of myPlaces array
         profileViewModel.myPlaces = Array(repeating: "", count: myPlacesCount) // Placeholder IDs
         profileViewModel.lightweightFavorites = favoritePlaces
+        profileViewModel.lightweightPlaceLists = placeLists
         profileViewModel.isFollowersLoading = false
         profileViewModel.isFollowingLoading = false
         profileViewModel.isMyPlacesLoading = false
         
         let duration = Date().timeIntervalSince(startTime)
-        print("⚡ [DataManager] Loaded counts in \(String(format: "%.2f", duration))s (Followers: \(followersCount), Following: \(followingCount), My Places: \(myPlacesCount), Favorites: \(favoritePlaces.count))")
+        print("⚡ [DataManager] Loaded counts in \(String(format: "%.2f", duration))s (Followers: \(followersCount), Following: \(followingCount), My Places: \(myPlacesCount), Favorites: \(favoritePlaces.count), Lists: \(placeLists.count))")
+        
+        // Load first 6 places for each list in background
+        if !placeLists.isEmpty {
+            Task.detached(priority: .userInitiated) { [weak self] in
+                await self?.loadPlacesForLists(placeLists)
+            }
+        }
+    }
+    
+    /// Load the first 6 places for each place list (background task)
+    private func loadPlacesForLists(_ lists: [LightweightPlaceList]) async {
+        print("📋 [DataManager] Loading places for \(lists.count) lists...")
+        
+        for list in lists {
+            do {
+                let places = try await userService.fetchPlacesForPlaceList(listId: list.list_id, page: 1, pageSize: 6)
+                await MainActor.run {
+                    profileViewModel.lightweightPlaceListPlaces[list.list_id] = places
+                }
+            } catch {
+                print("❌ [DataManager] Error loading places for list \(list.list_id): \(error.localizedDescription)")
+            }
+        }
+        
+        print("✅ [DataManager] Finished loading places for all lists")
     }
     
     // Loads all places the user has reviewed, even if not in favorites or lists

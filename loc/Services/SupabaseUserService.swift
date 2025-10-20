@@ -199,6 +199,7 @@ class SupabaseUserService: ObservableObject {
                     .eq("id", value: userId)
                     .execute()
                 
+                print("✅ [Supabase] FCM token updated for user \(userId)")
                 // Ensure completion is called on main thread
                 await MainActor.run {
                     completion(nil)
@@ -217,6 +218,7 @@ class SupabaseUserService: ObservableObject {
     
     /// Get follower count - FAST! (count query only, no profile data)
     func getNumberFollowers(forUserId userId: String) async throws -> Int {
+        print("🔢 [Supabase] Fetching follower COUNT for user: \(userId)")
         
         struct CountResult: Codable {
             let count: Int
@@ -229,11 +231,13 @@ class SupabaseUserService: ObservableObject {
             .execute()
         
         let count = response.count ?? 0
+        print("✅ [Supabase] User has \(count) followers")
         return count
     }
     
     /// Get following count - FAST! (count query only, no profile data)
     func getNumberFollowing(forUserId userId: String) async throws -> Int {
+        print("🔢 [Supabase] Fetching following COUNT for user: \(userId)")
         
         let response = try await supabase.client
             .from("following")
@@ -242,6 +246,7 @@ class SupabaseUserService: ObservableObject {
             .execute()
         
         let count = response.count ?? 0
+        print("✅ [Supabase] User is following \(count) people")
         return count
     }
     
@@ -261,6 +266,7 @@ class SupabaseUserService: ObservableObject {
     /// Fetch user favorites using optimized SQL function
     /// Returns lightweight favorite data for display without full place details
     func fetchUserFavorites(userId: String) async throws -> [FavoritePlace] {
+        print("⭐ [Supabase] Fetching favorite places for user: \(userId)")
         
         struct Params: Encodable {
             let p_user_id: String
@@ -273,7 +279,73 @@ class SupabaseUserService: ObservableObject {
             .execute()
             .value
         
+        print("✅ [Supabase] Fetched \(favorites.count) favorite places")
+        if favorites.count > 0 {
+            print("   First favorite: \(favorites[0].name) (ID: \(favorites[0].place_id))")
+        }
+        
         return favorites
+    }
+    
+    /// Fetch user's place lists sorted by proximity to user's location
+    /// Returns lightweight list data with pagination support
+    func fetchPlaceListsByProximity(userId: String, userLatitude: Double, userLongitude: Double, page: Int = 1, pageSize: Int = 10) async throws -> [LightweightPlaceList] {
+        print("📋 [Supabase] Fetching place lists by proximity - userId: \(userId), page: \(page), pageSize: \(pageSize)")
+        
+        struct Params: Encodable {
+            let p_user_id: String
+            let p_user_location: String // PostGIS geometry as WKT
+            let p_page: Int
+            let p_page_size: Int
+        }
+        
+        // Convert lat/lng to PostGIS POINT geometry in WKT format
+        let userLocation = "POINT(\(userLongitude) \(userLatitude))"
+        
+        let params = Params(
+            p_user_id: userId,
+            p_user_location: userLocation,
+            p_page: page,
+            p_page_size: pageSize
+        )
+        
+        let lists: [LightweightPlaceList] = try await supabase.client
+            .rpc("get_paginated_user_place_lists_by_proximity", params: params)
+            .execute()
+            .value
+        
+        print("✅ [Supabase] Fetched \(lists.count) place lists")
+        if lists.count > 0 {
+            print("   First list: \(lists[0].name) (ID: \(lists[0].list_id), distance: \(lists[0].distance_meters ?? 0)m)")
+        }
+        
+        return lists
+    }
+    
+    /// Fetch places within a place list with pagination
+    func fetchPlacesForPlaceList(listId: String, page: Int = 1, pageSize: Int = 6) async throws -> [LightweightPlaceListPlace] {
+        print("📍 [Supabase] Fetching places for list: \(listId), page: \(page), pageSize: \(pageSize)")
+        
+        struct Params: Encodable {
+            let p_list_id: String
+            let p_page: Int
+            let p_page_size: Int
+        }
+        
+        let params = Params(
+            p_list_id: listId,
+            p_page: page,
+            p_page_size: pageSize
+        )
+        
+        let places: [LightweightPlaceListPlace] = try await supabase.client
+            .rpc("get_paginated_place_list_places", params: params)
+            .execute()
+            .value
+        
+        print("✅ [Supabase] Fetched \(places.count) places for list")
+        
+        return places
     }
     
     // MARK: - Follower/Following Profile Data (Lazy - Load on Demand!)
@@ -330,6 +402,7 @@ class SupabaseUserService: ObservableObject {
     
     /// ✅ NEW: Fetch following user IDs only (not full profiles) - SUPER FAST!
     func fetchFollowingUserIds(userId: String) async throws -> [String] {
+        print("👥 [Supabase] Fetching following user IDs only for user: \(userId)")
         let startTime = Date()
         
         let followRecords: [FollowingRecord] = try await supabase.client
@@ -342,6 +415,7 @@ class SupabaseUserService: ObservableObject {
         let followingIds = followRecords.map { $0.following_id }
         
         let duration = Date().timeIntervalSince(startTime)
+        print("✅ [Supabase] Fetched \(followingIds.count) following user IDs in \(String(format: "%.2f", duration))s")
         
         return followingIds
     }
@@ -375,6 +449,7 @@ class SupabaseUserService: ObservableObject {
                     .eq("id", value: userId)
                     .execute()
                 
+                print("✅ [Supabase] Account deleted for user \(userId)")
                 completion(nil)
             } catch {
                 print("❌ [Supabase] Error deleting account: \(error)")
@@ -420,6 +495,46 @@ struct FavoritePlace: Codable, Identifiable {
     // Note: coordinate is returned by SQL but we don't need it for display
     // Ignoring it during decoding by not declaring it here won't work with strict Codable
     // So we'll need to make it optional or use CodingKeys
+    
+    var id: String { place_id }
+    
+    enum CodingKeys: String, CodingKey {
+        case place_id
+        case name
+        case latest_review_photo
+        // Intentionally omitting coordinate - we don't need it
+    }
+}
+
+/// Lightweight place list data for display (sorted by proximity)
+struct LightweightPlaceList: Codable, Identifiable {
+    let list_id: String
+    let name: String
+    let is_public: Bool
+    let image: String?
+    let created_at: String?
+    let updated_at: String?
+    let distance_meters: Double?
+    
+    var id: String { list_id }
+    
+    enum CodingKeys: String, CodingKey {
+        case list_id
+        case name
+        case is_public
+        case image
+        case created_at
+        case updated_at
+        case distance_meters
+        // Intentionally omitting average_location - we don't need it
+    }
+}
+
+/// Lightweight place data for place list items
+struct LightweightPlaceListPlace: Codable, Identifiable {
+    let place_id: String
+    let name: String
+    let latest_review_photo: String?
     
     var id: String { place_id }
     

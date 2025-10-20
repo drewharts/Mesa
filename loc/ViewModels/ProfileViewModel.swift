@@ -42,6 +42,8 @@ class ProfileViewModel: ObservableObject {
     @Published var placeListCounts: [UUID: Int] = [:]
     @Published var userFavorites: [String] = [] // Legacy - full place IDs
     @Published var lightweightFavorites: [FavoritePlace] = [] // New - lightweight data for display
+    @Published var lightweightPlaceLists: [LightweightPlaceList] = [] // New - lightweight place lists by proximity
+    @Published var lightweightPlaceListPlaces: [String: [LightweightPlaceListPlace]] = [:] // [listId: places]
     @Published var userFollowing: [ProfileData] = []
     @Published var userFollowers: [ProfileData] = []
     @Published var myPlaces: [String] = []

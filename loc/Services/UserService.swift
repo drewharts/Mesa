@@ -599,6 +599,16 @@ class UserService: ObservableObject {
         return try await supabase.fetchUserFavorites(userId: userId)
     }
     
+    /// Fetch user's place lists sorted by proximity to user's location
+    func fetchPlaceListsByProximity(userId: String, userLatitude: Double, userLongitude: Double, page: Int = 1, pageSize: Int = 10) async throws -> [LightweightPlaceList] {
+        return try await supabase.fetchPlaceListsByProximity(userId: userId, userLatitude: userLatitude, userLongitude: userLongitude, page: page, pageSize: pageSize)
+    }
+    
+    /// Fetch places within a place list with pagination
+    func fetchPlacesForPlaceList(listId: String, page: Int = 1, pageSize: Int = 6) async throws -> [LightweightPlaceListPlace] {
+        return try await supabase.fetchPlacesForPlaceList(listId: listId, page: page, pageSize: pageSize)
+    }
+    
     /// ✅ NEW: Fetch following user IDs only (not full profiles) - SUPER FAST!
     func fetchFollowingUserIds(userId: String) async throws -> [String] {
         return try await supabase.fetchFollowingUserIds(userId: userId)
