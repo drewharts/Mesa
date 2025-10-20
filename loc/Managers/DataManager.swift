@@ -774,23 +774,17 @@ class DataManager: ObservableObject {
     }
     
     /// Load more place lists (pagination)
+    @MainActor
     func loadMorePlaceLists(userId: String) async {
-        guard !profileViewModel.isLoadingMorePlaceLists && profileViewModel.hasMorePlaceLists else {
-            print("⚠️ [DataManager] Already loading or no more place lists to load")
-            return
-        }
+        // Early returns for guard conditions
+        guard !profileViewModel.isLoadingMorePlaceLists && profileViewModel.hasMorePlaceLists else { return }
+        guard let location = locationManager.currentLocation?.coordinate else { return }
         
-        guard let location = locationManager.currentLocation?.coordinate else {
-            print("⚠️ [DataManager] No user location available for place list pagination")
-            return
-        }
-        
-        await MainActor.run {
-            profileViewModel.isLoadingMorePlaceLists = true
-        }
+        // Set loading state
+        profileViewModel.isLoadingMorePlaceLists = true
+        defer { profileViewModel.isLoadingMorePlaceLists = false }
         
         let nextPage = profileViewModel.placeListsCurrentPage + 1
-        print("📋 [DataManager] Loading more place lists - page \(nextPage)...")
         
         do {
             let moreLists = try await userService.fetchPlaceListsByProximity(
@@ -801,33 +795,21 @@ class DataManager: ObservableObject {
                 pageSize: 5
             )
             
-            print("✅ [DataManager] Loaded \(moreLists.count) more place lists")
+            // Update pagination state
+            profileViewModel.hasMorePlaceLists = moreLists.count >= 5
             
-            await MainActor.run {
-                if moreLists.count < 5 {
-                    // Got fewer than requested - no more lists available
-                    profileViewModel.hasMorePlaceLists = false
-                }
-                
-                if !moreLists.isEmpty {
-                    profileViewModel.lightweightPlaceLists.append(contentsOf: moreLists)
-                    profileViewModel.placeListsCurrentPage = nextPage
-                }
-                
-                profileViewModel.isLoadingMorePlaceLists = false
-            }
-            
-            // Load places for the new lists in background
+            // Append new lists if any
             if !moreLists.isEmpty {
+                profileViewModel.lightweightPlaceLists.append(contentsOf: moreLists)
+                profileViewModel.placeListsCurrentPage = nextPage
+                
+                // Load places for new lists in background
                 Task.detached(priority: .userInitiated) { [weak self] in
                     await self?.loadPlacesForLists(moreLists)
                 }
             }
         } catch {
             print("❌ [DataManager] Error loading more place lists: \(error.localizedDescription)")
-            await MainActor.run {
-                profileViewModel.isLoadingMorePlaceLists = false
-            }
         }
     }
     
