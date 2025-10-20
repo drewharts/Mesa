@@ -594,6 +594,11 @@ class UserService: ObservableObject {
         return try await supabase.getNumberMyPlaces(forUserId: userId)
     }
     
+    /// Fetch user favorites using optimized SQL function
+    func fetchUserFavorites(userId: String) async throws -> [String] {
+        return try await supabase.fetchUserFavorites(userId: userId)
+    }
+    
     /// ✅ NEW: Fetch following user IDs only (not full profiles) - SUPER FAST!
     func fetchFollowingUserIds(userId: String) async throws -> [String] {
         return try await supabase.fetchFollowingUserIds(userId: userId)

@@ -704,33 +704,35 @@ class DataManager: ObservableObject {
         }
     }
     
-    /// FAST: Load all profile counts (followers/following/myplaces) in parallel (~20-50ms total!)
+    /// FAST: Load all profile counts and favorites in parallel (~20-50ms total!)
     /// Called when profile view appears
     func loadProfileCounts(userId: String) async {
         let startTime = Date()
-        print("🔢 [DataManager] Loading profile COUNTS (fast)...")
+        print("🔢 [DataManager] Loading profile COUNTS and favorites (fast)...")
         
         profileViewModel.isFollowersLoading = true
         profileViewModel.isFollowingLoading = true
         profileViewModel.isMyPlacesLoading = true
         
-        // Run all three count queries in parallel
+        // Run all queries in parallel
         async let followers: Int = (try? await userService.getNumberFollowers(forUserId: userId)) ?? 0
         async let following: Int = (try? await userService.getNumberFollowing(forUserId: userId)) ?? 0
         async let myPlaces: Int = (try? await userService.getNumberMyPlaces(forUserId: userId)) ?? 0
+        async let favorites: [String] = (try? await userService.fetchUserFavorites(userId: userId)) ?? []
         
-        let (followersCount, followingCount, myPlacesCount) = await (followers, following, myPlaces)
+        let (followersCount, followingCount, myPlacesCount, favoriteIds) = await (followers, following, myPlaces, favorites)
         
         profileViewModel.followersCount = followersCount
         profileViewModel.followingCount = followingCount
         // Update my places count - we'll store this as the count of myPlaces array
         profileViewModel.myPlaces = Array(repeating: "", count: myPlacesCount) // Placeholder IDs
+        profileViewModel.userFavorites = favoriteIds
         profileViewModel.isFollowersLoading = false
         profileViewModel.isFollowingLoading = false
         profileViewModel.isMyPlacesLoading = false
         
         let duration = Date().timeIntervalSince(startTime)
-        print("⚡ [DataManager] Loaded counts in \(String(format: "%.2f", duration))s (Followers: \(followersCount), Following: \(followingCount), My Places: \(myPlacesCount))")
+        print("⚡ [DataManager] Loaded counts in \(String(format: "%.2f", duration))s (Followers: \(followersCount), Following: \(followingCount), My Places: \(myPlacesCount), Favorites: \(favoriteIds.count))")
     }
     
     // Loads all places the user has reviewed, even if not in favorites or lists

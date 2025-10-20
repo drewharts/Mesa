@@ -265,6 +265,32 @@ class SupabaseUserService: ObservableObject {
         return count
     }
     
+    /// Fetch user favorites using optimized SQL function
+    func fetchUserFavorites(userId: String) async throws -> [String] {
+        print("⭐ [Supabase] Fetching favorite places for user: \(userId)")
+        
+        struct FavoriteResponse: Codable {
+            let place_id: String
+            let name: String
+            let latest_review_photo: String?
+        }
+        
+        struct Params: Encodable {
+            let p_user_id: String
+        }
+        
+        let params = Params(p_user_id: userId)
+        
+        let favorites: [FavoriteResponse] = try await supabase.client
+            .rpc("get_user_favorite_places", params: params)
+            .execute()
+            .value
+        
+        let placeIds = favorites.map { $0.place_id }
+        print("✅ [Supabase] Fetched \(placeIds.count) favorite places")
+        return placeIds
+    }
+    
     // MARK: - Follower/Following Profile Data (Lazy - Load on Demand!)
     
     /// Fetch follower profiles - LAZY! Only call when user clicks "Followers"
