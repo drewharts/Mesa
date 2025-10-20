@@ -107,13 +107,10 @@ struct ProfileFollowCountsView: View {
         }
         .padding(.vertical, 10)
         .onAppear {
-            print("⏱️ [TIMING] ProfileFollowCountsView.onAppear at \(Date().timeIntervalSince1970)")
             let userId = userSession.currentUserId ?? ""
             // CRITICAL: Use Task.detached to run on separate thread, not blocked by main thread
             Task.detached(priority: .userInitiated) { [dataManager] in
-                print("⏱️ [TIMING] loadProfileCounts Task.detached STARTED at \(Date().timeIntervalSince1970)")
                 await dataManager.loadProfileCounts(userId: userId)
-                print("⏱️ [TIMING] loadProfileCounts Task.detached COMPLETED at \(Date().timeIntervalSince1970)")
             }
         }
         .onChange(of: profile.userFollowing.count) {
