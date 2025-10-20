@@ -22,10 +22,9 @@ struct ProfileViewListsView: View {
     @State private var searchText = ""
     @State private var placeColors: [UUID: Color] = [:]
     
-    // Filtered and sorted lists based on search
-    var filteredLists: [PlaceList] {
-        print("📋 [ProfileViewListsView] userLists count: \(profile.userLists.count), lightweightPlaceLists count: \(profile.lightweightPlaceLists.count)")
-        let sorted = profile.userLists
+    // Filtered lightweight lists based on search
+    var filteredLists: [LightweightPlaceList] {
+        let sorted = profile.lightweightPlaceLists
         if searchText.isEmpty {
             return sorted
         } else {
@@ -45,23 +44,11 @@ struct ProfileViewListsView: View {
             if !filteredLists.isEmpty {
                 LazyVStack(spacing: 16) {
                     ForEach(filteredLists, id: \.id) { list in
-                        ProfileListSection(
+                        LightweightProfileListSection(
                             list: list,
-                            placeIds: profile.userListsPlaces[list.id.uuidString],
-                            detailPlaceViewModel: detailPlaceViewModel,
-                            placeColors: $placeColors,
-                            isLoading: profile.loadingListIds.contains(list.id)
+                            places: profile.lightweightPlaceListPlaces[list.list_id] ?? [],
+                            placeColors: $placeColors
                         )
-                        .onAppear {
-                            // Load list data only when it becomes visible
-                            profile.loadListDataIfNeeded(listId: list.id)
-                            
-                            // Trigger lazy loading when we're near the end of visible lists
-                            let currentIndex = filteredLists.firstIndex(where: { $0.id == list.id }) ?? 0
-                            if currentIndex >= filteredLists.count - 2 { // Load more when 2 lists from the end
-                                profile.loadMoreListsIfNeeded()
-                            }
-                        }
                     }
                 }
             } else {

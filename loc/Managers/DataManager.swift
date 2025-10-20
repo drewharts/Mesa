@@ -732,7 +732,7 @@ class DataManager: ObservableObject {
                     userLatitude: location.latitude,
                     userLongitude: location.longitude,
                     page: 1,
-                    pageSize: 10
+                    pageSize: 5
                 )) ?? []
             } else {
                 print("⚠️ [DataManager] No user location available for place list sorting")
