@@ -710,6 +710,7 @@ class DataManager: ObservableObject {
     /// Called when profile view appears
     func loadProfileCounts(userId: String) async {
         let startTime = Date()
+        print("⏱️ [TIMING] loadProfileCounts START at \(startTime.timeIntervalSince1970)")
         print("🔢 [DataManager] Loading profile COUNTS, favorites, and place lists (fast)...")
         
         profileViewModel.isFollowersLoading = true
@@ -725,10 +726,14 @@ class DataManager: ObservableObject {
         async let myPlaces: Int = (try? await userService.getNumberMyPlaces(forUserId: userId)) ?? 0
         async let favorites: [FavoritePlace] = (try? await userService.fetchUserFavorites(userId: userId)) ?? []
         
+        print("⏱️ [TIMING] Awaiting counts/favorites at \(Date().timeIntervalSince1970)")
         let (followersCount, followingCount, myPlacesCount, favoritePlaces) = await (followers, following, myPlaces, favorites)
+        print("⏱️ [TIMING] Got counts/favorites at \(Date().timeIntervalSince1970)")
         
         // Update counts and favorites immediately - don't wait for place lists
+        print("⏱️ [TIMING] About to update UI (MainActor.run) at \(Date().timeIntervalSince1970)")
         await MainActor.run {
+            print("⏱️ [TIMING] Inside MainActor.run at \(Date().timeIntervalSince1970)")
             profileViewModel.followersCount = followersCount
             profileViewModel.followingCount = followingCount
             // Update my places count - we'll store this as the count of myPlaces array
@@ -737,9 +742,11 @@ class DataManager: ObservableObject {
             profileViewModel.isFollowersLoading = false
             profileViewModel.isFollowingLoading = false
             profileViewModel.isMyPlacesLoading = false
+            print("⏱️ [TIMING] MainActor.run COMPLETED at \(Date().timeIntervalSince1970)")
         }
         
         let duration = Date().timeIntervalSince(startTime)
+        print("⏱️ [TIMING] loadProfileCounts END at \(Date().timeIntervalSince1970) (total: \(duration * 1000)ms)")
         print("⚡ [DataManager] Loaded counts in \(String(format: "%.2f", duration))s (Followers: \(followersCount), Following: \(followingCount), My Places: \(myPlacesCount), Favorites: \(favoritePlaces.count))")
         
         // Load place lists in background - don't block UI
