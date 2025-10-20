@@ -24,6 +24,7 @@ struct ProfileViewListsView: View {
     
     // Filtered and sorted lists based on search
     var filteredLists: [PlaceList] {
+        print("📋 [ProfileViewListsView] userLists count: \(profile.userLists.count), lightweightPlaceLists count: \(profile.lightweightPlaceLists.count)")
         let sorted = profile.userLists
         if searchText.isEmpty {
             return sorted
