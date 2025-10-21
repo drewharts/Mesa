@@ -610,3 +610,51 @@ struct LightweightPlace: Codable, Identifiable {
     }
 }
 
+// MARK: - Place List Management
+
+extension SupabaseUserService {
+    /// Add a place to a list
+    func addPlaceToList(listId: String, placeId: String) async throws {
+        // First, get the current max sort_order for this list
+        let maxOrderResponse = try await supabase
+            .from("place_list_items")
+            .select("sort_order")
+            .eq("list_id", listId)
+            .order("sort_order", ascending: false)
+            .limit(1)
+            .execute()
+        
+        let maxOrder = (try? JSONDecoder().decode([SortOrder].self, from: maxOrderResponse.data).first?.sort_order) ?? -1
+        let nextOrder = maxOrder + 1
+        
+        // Insert the new item
+        try await supabase
+            .from("place_list_items")
+            .insert([
+                "list_id": listId,
+                "place_id": placeId,
+                "sort_order": nextOrder
+            ])
+            .execute()
+        
+        print("✅ [Supabase] Added place \(placeId) to list \(listId) at position \(nextOrder)")
+    }
+    
+    /// Remove a place from a list
+    func removePlaceFromList(listId: String, placeId: String) async throws {
+        try await supabase
+            .from("place_list_items")
+            .delete()
+            .eq("list_id", listId)
+            .eq("place_id", placeId)
+            .execute()
+        
+        print("✅ [Supabase] Removed place \(placeId) from list \(listId)")
+    }
+    
+    // Helper struct for decoding sort_order
+    private struct SortOrder: Codable {
+        let sort_order: Int
+    }
+}
+

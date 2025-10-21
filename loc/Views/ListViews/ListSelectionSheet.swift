@@ -105,52 +105,102 @@ struct ListSelectionRowView: View {
 }
 
 // LightweightListSelectionRowView - NEW (for LightweightPlaceList)
-// TODO: Implement add/remove functionality with SQL functions later
 struct LightweightListSelectionRowView: View {
     @EnvironmentObject var profile: ProfileViewModel
+    @EnvironmentObject var dataManager: DataManager
     let list: LightweightPlaceList
     let place: DetailPlace
     @State private var backgroundColor: Color = Color(.systemGray5)
+    @State private var isInList: Bool = false
 
     var body: some View {
-        HStack {
-            // Display colored rectangle (or list image if available)
-            Group {
-                Rectangle()
-                    .foregroundColor(backgroundColor)
-                    .onAppear {
-                        backgroundColor = Color(
-                            red: Double.random(in: 0.5...0.9),
-                            green: Double.random(in: 0.5...0.9),
-                            blue: Double.random(in: 0.5...0.9)
-                        )
+        Button(action: {
+            togglePlaceInList()
+        }) {
+            HStack {
+                // Display colored rectangle (or list image if available)
+                Group {
+                    Rectangle()
+                        .foregroundColor(backgroundColor)
+                        .onAppear {
+                            backgroundColor = Color(
+                                red: Double.random(in: 0.5...0.9),
+                                green: Double.random(in: 0.5...0.9),
+                                blue: Double.random(in: 0.5...0.9)
+                            )
+                            // Check initial state
+                            updateIsInList()
+                        }
+                }
+                .frame(width: 75, height: 75)
+                .clipped()
+                .cornerRadius(4)
+
+                LightweightListDescription(list: list)
+
+                Spacer()
+
+                ZStack {
+                    if isInList {
+                        Circle()
+                            .fill(Color.primary)
+                            .frame(width: 24, height: 24)
+                    } else {
+                        Circle()
+                            .stroke(Color.primary, lineWidth: 2)
+                            .frame(width: 24, height: 24)
                     }
-            }
-            .frame(width: 75, height: 75)
-            .clipped()
-            .cornerRadius(4)
-
-            LightweightListDescription(list: list)
-
-            Spacer()
-
-            ZStack {
-                // Check if place is in list using lightweight data
-                if let places = profile.lightweightPlaceListPlaces[list.list_id],
-                   places.contains(where: { $0.place_id == place.id.uuidString }) {
-                    Circle()
-                        .fill(Color.primary)
-                        .frame(width: 24, height: 24)
-                } else {
-                    Circle()
-                        .stroke(Color.primary, lineWidth: 2)
-                        .frame(width: 24, height: 24)
                 }
             }
+            .padding(.top, 20)
+            .padding(.horizontal, 15)
         }
-        .padding(.top, 20)
-        .padding(.horizontal, 15)
-        .opacity(0.5) // Dim to show it's not interactive yet
+        .buttonStyle(PlainButtonStyle())
+    }
+    
+    private func updateIsInList() {
+        isInList = profile.lightweightPlaceListPlaces[list.list_id]?.contains(where: { $0.place_id == place.id.uuidString }) ?? false
+    }
+    
+    private func togglePlaceInList() {
+        Task {
+            do {
+                if isInList {
+                    // Remove from list
+                    try await dataManager.userService.removePlaceFromList(listId: list.list_id, placeId: place.id.uuidString)
+                    
+                    // Update local state
+                    await MainActor.run {
+                        if var places = profile.lightweightPlaceListPlaces[list.list_id] {
+                            places.removeAll { $0.place_id == place.id.uuidString }
+                            profile.lightweightPlaceListPlaces[list.list_id] = places
+                        }
+                        isInList = false
+                    }
+                } else {
+                    // Add to list
+                    try await dataManager.userService.addPlaceToList(listId: list.list_id, placeId: place.id.uuidString)
+                    
+                    // Update local state (add lightweight place object)
+                    await MainActor.run {
+                        let lightweightPlace = LightweightPlace(
+                            place_id: place.id.uuidString,
+                            name: place.name,
+                            latest_review_photo: nil // Will be loaded later if needed
+                        )
+                        
+                        if profile.lightweightPlaceListPlaces[list.list_id] != nil {
+                            profile.lightweightPlaceListPlaces[list.list_id]?.append(lightweightPlace)
+                        } else {
+                            profile.lightweightPlaceListPlaces[list.list_id] = [lightweightPlace]
+                        }
+                        isInList = true
+                    }
+                }
+            } catch {
+                print("❌ Error toggling place in list: \(error.localizedDescription)")
+            }
+        }
     }
 }
 
@@ -188,8 +238,24 @@ struct ListsInSelectionSheet: View {
                 }
                 .padding()
             } else if !filteredLists.isEmpty {
-                ForEach(filteredLists) { list in
+                ForEach(Array(filteredLists.enumerated()), id: \.element.id) { index, list in
                     LightweightListSelectionRowView(list: list, place: place)
+                        .onAppear {
+                            // Load more when user scrolls to 3rd-to-last item
+                            if index == filteredLists.count - 3 {
+                                loadMoreIfNeeded()
+                            }
+                        }
+                }
+                
+                // Loading indicator at bottom
+                if profile.isLoadingMoreSaveSheetLists {
+                    HStack {
+                        Spacer()
+                        ProgressView()
+                            .padding()
+                        Spacer()
+                    }
                 }
             } else {
                 VStack(spacing: 8) {
@@ -221,6 +287,20 @@ struct ListsInSelectionSheet: View {
                     )
                 }
             }
+        }
+    }
+    
+    private func loadMoreIfNeeded() {
+        guard !profile.isLoadingMoreSaveSheetLists && profile.hasMoreSaveSheetLists else { return }
+        guard let userId = userSession.currentUserId,
+              let coord = place.coordinate else { return }
+        
+        Task {
+            await dataManager.loadMoreSaveSheetLists(
+                userId: userId,
+                placeLatitude: coord.latitude,
+                placeLongitude: coord.longitude
+            )
         }
     }
 }

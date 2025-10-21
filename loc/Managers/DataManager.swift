@@ -895,7 +895,8 @@ class DataManager: ObservableObject {
             
             await MainActor.run {
                 profileViewModel.lightweightPlaceLists = lists
-                profileViewModel.placeListsCurrentPage = 1
+                profileViewModel.saveSheetListsCurrentPage = 1
+                profileViewModel.hasMoreSaveSheetLists = lists.count >= 6
             }
             
             print("✅ [DataManager] Loaded \(lists.count) place lists closest to place at (\(placeLatitude), \(placeLongitude))")
@@ -906,6 +907,42 @@ class DataManager: ObservableObject {
             }
         } catch {
             print("❌ [DataManager] Error loading place lists by coordinates: \(error.localizedDescription)")
+        }
+    }
+    
+    /// Load more place lists for save-to-list sheet (pagination)
+    func loadMoreSaveSheetLists(userId: String, placeLatitude: Double, placeLongitude: Double) async {
+        guard !profileViewModel.isLoadingMoreSaveSheetLists && profileViewModel.hasMoreSaveSheetLists else { return }
+        
+        profileViewModel.isLoadingMoreSaveSheetLists = true
+        defer { profileViewModel.isLoadingMoreSaveSheetLists = false }
+        
+        let nextPage = profileViewModel.saveSheetListsCurrentPage + 1
+        
+        do {
+            let moreLists = try await userService.fetchPlaceListsByProximity(
+                userId: userId,
+                userLatitude: placeLatitude,
+                userLongitude: placeLongitude,
+                page: nextPage,
+                pageSize: 6
+            )
+            
+            profileViewModel.hasMoreSaveSheetLists = moreLists.count >= 6
+            
+            if !moreLists.isEmpty {
+                profileViewModel.lightweightPlaceLists.append(contentsOf: moreLists)
+                profileViewModel.saveSheetListsCurrentPage = nextPage
+                
+                // Load places for new lists in background
+                Task.detached(priority: .userInitiated) { [weak self] in
+                    await self?.loadPlacesForLists(moreLists)
+                }
+            }
+            
+            print("✅ [DataManager] Loaded \(moreLists.count) more save sheet lists (page \(nextPage))")
+        } catch {
+            print("❌ [DataManager] Error loading more save sheet lists: \(error.localizedDescription)")
         }
     }
     

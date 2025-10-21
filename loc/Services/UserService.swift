@@ -732,4 +732,14 @@ class UserService: ObservableObject {
         print("⚠️ [UserService] deleteUserAccount not fully implemented")
         completion(nil)
     }
+    
+    // MARK: - Place List Management
+    
+    func addPlaceToList(listId: String, placeId: String) async throws {
+        try await supabase.addPlaceToList(listId: listId, placeId: placeId)
+    }
+    
+    func removePlaceFromList(listId: String, placeId: String) async throws {
+        try await supabase.removePlaceFromList(listId: listId, placeId: placeId)
+    }
 } 

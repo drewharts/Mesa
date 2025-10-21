@@ -53,6 +53,11 @@ class ProfileViewModel: ObservableObject {
     @Published var isLoadingMorePlaceLists: Bool = false
     @Published var hasMorePlaceLists: Bool = true
     var placeListsCurrentPage: Int = 1
+    
+    // Save-to-list sheet pagination (separate from profile view pagination)
+    @Published var isLoadingMoreSaveSheetLists: Bool = false
+    @Published var hasMoreSaveSheetLists: Bool = true
+    var saveSheetListsCurrentPage: Int = 1
     @Published var userFollowing: [ProfileData] = []
     @Published var userFollowers: [ProfileData] = []
     @Published var myPlaces: [String] = [] // Legacy - keep for compatibility
