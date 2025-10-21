@@ -463,7 +463,8 @@ struct LightweightPlaceGridCell: View {
             
             // Navigate to the place detail view
             await MainActor.run {
-                selectedPlaceVM.selectedPlace = fullPlace
+                // Animate map to place location when tapping from tile
+                selectedPlaceVM.selectPlace(fullPlace, shouldAnimateMap: true)
                 selectedPlaceVM.isDetailSheetPresented = true
                 presentationMode.wrappedValue.dismiss()
             }

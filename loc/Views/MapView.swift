@@ -16,6 +16,7 @@ struct MapView: View {
     @EnvironmentObject var mapViewModel: MapViewModel
 
     @Binding var recenterMap: Bool
+    @Binding var mapPosition: MapCameraPosition
     var isSearchBarMinimized: Bool = true
     @Binding var isCreatePlacePopupActive: Bool
 
@@ -24,7 +25,6 @@ struct MapView: View {
     @State private var newPlaceName = ""
     @State private var newPlaceDescription = ""
     @State private var newPlaceCoordinate: CLLocationCoordinate2D?
-    @State private var mapPosition = MapCameraPosition.automatic
     @State private var mapRefreshToggle = false
     @State private var showVisiblePlacesPopup = false
     @State private var currentMapRegion: MKCoordinateRegion?
@@ -64,9 +64,11 @@ struct MapView: View {
     
     // Annotation marker view with user photos
     private func annotationMarkerView(for annotation: PlaceAnnotation) -> some View {
-        CustomPlaceAnnotationView(
+        let isSelected = selectedPlaceVM.selectedPlace?.id.uuidString == annotation.id
+        return CustomPlaceAnnotationView(
             annotation: annotation,
-            annotationImage: mapViewModel.annotationImages[annotation.id]
+            annotationImage: mapViewModel.annotationImages[annotation.id],
+            isSelected: isSelected
         )
         .onTapGesture {
             handleAnnotationTap(annotation)
@@ -91,7 +93,8 @@ struct MapView: View {
         Task {
             if let place = await mapViewModel.loadPlaceDetails(for: annotation) {
                 await MainActor.run {
-                    selectedPlaceVM.selectedPlace = place
+                    // Don't animate map when tapping annotation - user is already looking at it
+                    selectedPlaceVM.selectPlace(place, shouldAnimateMap: false)
                     selectedPlaceVM.isDetailSheetPresented = true
                 }
             }

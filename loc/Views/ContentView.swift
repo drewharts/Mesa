@@ -62,8 +62,8 @@ struct ContentView: View {
             if let place = place {
                 print("✅ Found place: \(place.name)")
                 
-                // Set the selected place and show the detail sheet
-                selectedPlaceVM.selectedPlace = place
+                // Animate map to place location when navigating from notification
+                selectedPlaceVM.selectPlace(place, shouldAnimateMap: true)
                 selectedPlaceVM.isDetailSheetPresented = true
                 
                 // Clear the pending navigation but keep the highlighted review ID

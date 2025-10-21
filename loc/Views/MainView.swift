@@ -7,6 +7,7 @@
 
 
 import SwiftUI
+import MapKit
 
 
 struct MainView: View {
@@ -30,6 +31,7 @@ struct MainView: View {
     @State private var triggerFocus = false
     @State private var recenterMap = false
     @State private var isCreatePlacePopupActive = false
+    @State private var mapPosition = MapCameraPosition.automatic
 
     var body: some View {
         NavigationStack {
@@ -100,11 +102,26 @@ struct MainView: View {
             // Recalculate filters when user lists change
             placeTypeFilterVM.refreshMostFrequentTypes()
         }
+        .onChange(of: selectedPlaceVM.shouldAnimateMapToPlace) { oldValue, newValue in
+            if newValue, let place = selectedPlaceVM.selectedPlace, let coordinate = place.coordinate {
+                // Animate map to place location with smooth animation
+                withAnimation(.easeInOut(duration: 0.6)) {
+                    mapPosition = .region(MKCoordinateRegion(
+                        center: coordinate,
+                        span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
+                    ))
+                }
+                // Reset the flag after animation
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    selectedPlaceVM.shouldAnimateMapToPlace = false
+                }
+            }
+        }
     }
     
     // MARK: - Map Layer
     private var mapLayer: some View {
-        MapView(recenterMap: $recenterMap, isSearchBarMinimized: isSearchBarMinimized, isCreatePlacePopupActive: $isCreatePlacePopupActive, onMapTap: {
+        MapView(recenterMap: $recenterMap, mapPosition: $mapPosition, isSearchBarMinimized: isSearchBarMinimized, isCreatePlacePopupActive: $isCreatePlacePopupActive, onMapTap: {
             withAnimation {
                 isSearchBarMinimized = true
                 searchIsFocused = false

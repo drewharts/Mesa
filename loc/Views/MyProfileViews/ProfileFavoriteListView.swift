@@ -215,7 +215,8 @@ struct LightweightFavoritePlaceCard: View {
             
             // Navigate to the place detail view
             await MainActor.run {
-                selectedPlaceVM.selectedPlace = place
+                // Animate map to favorite place location when tapping from tile
+                selectedPlaceVM.selectPlace(place, shouldAnimateMap: true)
                 selectedPlaceVM.isDetailSheetPresented = true
                 presentationMode.wrappedValue.dismiss()
             }
@@ -323,7 +324,9 @@ struct FavoritePlaceCard: View {
         )
         .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
         .onTapGesture {
-            selectedPlaceVM.selectedPlace = detailPlace
+            // Animate map to favorite place location when tapping from card
+            guard let place = detailPlace else { return }
+            selectedPlaceVM.selectPlace(place, shouldAnimateMap: true)
             selectedPlaceVM.isDetailSheetPresented = true
             presentationMode.wrappedValue.dismiss()
         }

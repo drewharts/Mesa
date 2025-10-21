@@ -195,7 +195,8 @@ class SearchViewModel: ObservableObject {
             suggestion,
             onResultResolved: { [weak self] result in
                 DispatchQueue.main.async {
-                    self?.selectedPlaceVM?.selectedPlace = result
+                    // Animate map to searched place location
+                    self?.selectedPlaceVM?.selectPlace(result, shouldAnimateMap: true)
                     self?.selectedPlaceVM?.isDetailSheetPresented = true
                 }
             }

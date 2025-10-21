@@ -127,6 +127,7 @@ class SelectedPlaceViewModel: ObservableObject {
     @Published var isDetailSheetPresented: Bool = false
     @Published var isRestaurantOpen: Bool = false // New property to track open status
     @Published var allowAutoPresent: Bool = true
+    @Published var shouldAnimateMapToPlace: Bool = false // Track if map should animate to place location
     @Published private var placePhotos: [String: [UIImage]] = [:] // Cache for place-level photos by placeId
     @Published private var placeReviews: [String: [any ReviewProtocol]] = [:] // Cache for reviews by placeId
     @Published private var reviewPhotos: [String: [UIImage]] = [:] // Cache for review photos by reviewId
@@ -309,8 +310,12 @@ class SelectedPlaceViewModel: ObservableObject {
     
     /// Select a place and fetch fresh details from backend
     /// Use this when a user clicks on a place from lists, maps, etc.
-    func selectPlaceAndFetchDetails(_ place: DetailPlace) {
+    func selectPlaceAndFetchDetails(_ place: DetailPlace, shouldAnimateMap: Bool = true) {
         print("🎯 [SelectedPlaceViewModel] Selecting place: '\(place.name)' with ID: \(place.id)")
+        print("🗺️ [SelectedPlaceViewModel] shouldAnimateMap: \(shouldAnimateMap)")
+        
+        // Set the animation flag
+        shouldAnimateMapToPlace = shouldAnimateMap
         
         // Backend now accepts UUID and handles everything automatically
         // Just send the UUID as place_id and "google" as provider
@@ -348,6 +353,16 @@ class SelectedPlaceViewModel: ObservableObject {
                 }
             }
         }
+    }
+    
+    /// Select a place directly without fetching details
+    /// Use this for map annotations where we already have the place data
+    func selectPlace(_ place: DetailPlace, shouldAnimateMap: Bool = true) {
+        print("🎯 [SelectedPlaceViewModel] Selecting place directly: '\(place.name)'")
+        print("🗺️ [SelectedPlaceViewModel] shouldAnimateMap: \(shouldAnimateMap)")
+        
+        shouldAnimateMapToPlace = shouldAnimateMap
+        selectedPlace = place
     }
     
     func isRestaurantOpenNow(_ place: DetailPlace) -> Bool {
