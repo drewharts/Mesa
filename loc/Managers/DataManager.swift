@@ -882,6 +882,33 @@ class DataManager: ObservableObject {
         }
     }
     
+    /// Load place lists by proximity to a specific place's coordinates (for save-to-list sheet)
+    func loadPlaceListsByPlaceCoordinates(userId: String, placeLatitude: Double, placeLongitude: Double) async {
+        do {
+            let lists = try await userService.fetchPlaceListsByProximity(
+                userId: userId,
+                userLatitude: placeLatitude,
+                userLongitude: placeLongitude,
+                page: 1,
+                pageSize: 6
+            )
+            
+            await MainActor.run {
+                profileViewModel.lightweightPlaceLists = lists
+                profileViewModel.placeListsCurrentPage = 1
+            }
+            
+            print("✅ [DataManager] Loaded \(lists.count) place lists closest to place at (\(placeLatitude), \(placeLongitude))")
+            
+            // Load places for each list in background
+            Task.detached(priority: .userInitiated) { [weak self] in
+                await self?.loadPlacesForLists(lists)
+            }
+        } catch {
+            print("❌ [DataManager] Error loading place lists by coordinates: \(error.localizedDescription)")
+        }
+    }
+    
     /// Load the first 6 places for each place list (background task)
     private func loadPlacesForLists(_ lists: [LightweightPlaceList]) async {
         print("📋 [DataManager] Loading places for \(lists.count) lists...")

@@ -7,7 +7,7 @@
 
 import SwiftUI
 
-// ListDescription
+// ListDescription - OLD (for PlaceList)
 struct ListDescription: View {
     @EnvironmentObject var profile: ProfileViewModel
     let placeList: PlaceList
@@ -26,7 +26,25 @@ struct ListDescription: View {
     }
 }
 
-// ListSelectionRowView
+// LightweightListDescription - NEW (for LightweightPlaceList)
+struct LightweightListDescription: View {
+    let list: LightweightPlaceList
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(list.name)
+                .font(.body)
+                .foregroundStyle(Color.primary.opacity(1.0))
+
+            Text("\(list.place_count) Places")
+                .font(.caption)
+                .foregroundStyle(Color.secondary.opacity(1.0))
+        }
+        .padding(.horizontal, 15)
+    }
+}
+
+// ListSelectionRowView - OLD (for PlaceList)
 struct ListSelectionRowView: View {
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
@@ -86,26 +104,103 @@ struct ListSelectionRowView: View {
     }
 }
 
-// MARK: - ListsInSelectionSheet
+// LightweightListSelectionRowView - NEW (for LightweightPlaceList)
+struct LightweightListSelectionRowView: View {
+    @EnvironmentObject var profile: ProfileViewModel
+    let list: LightweightPlaceList
+    let place: DetailPlace
+    @State private var backgroundColor: Color = Color(.systemGray5)
+
+    var body: some View {
+        Button(action: {
+            togglePlaceInList()
+        }) {
+            HStack {
+                // Display colored rectangle (or list image if available)
+                Group {
+                    Rectangle()
+                        .foregroundColor(backgroundColor)
+                        .onAppear {
+                            backgroundColor = Color(
+                                red: Double.random(in: 0.5...0.9),
+                                green: Double.random(in: 0.5...0.9),
+                                blue: Double.random(in: 0.5...0.9)
+                            )
+                        }
+                }
+                .frame(width: 75, height: 75)
+                .clipped()
+                .cornerRadius(4)
+
+                LightweightListDescription(list: list)
+
+                Spacer()
+
+                ZStack {
+                    // Check if place is in list using lightweight data
+                    if let places = profile.lightweightPlaceListPlaces[list.list_id],
+                       places.contains(where: { $0.place_id == place.id.uuidString }) {
+                        Circle()
+                            .fill(Color.primary)
+                            .frame(width: 24, height: 24)
+                    } else {
+                        Circle()
+                            .stroke(Color.primary, lineWidth: 2)
+                            .frame(width: 24, height: 24)
+                    }
+                }
+            }
+            .padding(.top, 20)
+            .padding(.horizontal, 15)
+        }
+    }
+
+    private func togglePlaceInList() {
+        // Convert LightweightPlaceList to PlaceList for compatibility with existing add/remove functions
+        let placeList = PlaceList(
+            id: UUID(uuidString: list.list_id) ?? UUID(),
+            name: list.name,
+            places: [],
+            isPublic: list.is_public
+        )
+        
+        // Check if place is already in list
+        let isInList = profile.lightweightPlaceListPlaces[list.list_id]?.contains(where: { $0.place_id == place.id.uuidString }) ?? false
+        
+        if isInList {
+            profile.removePlaceFromList(listId: placeList.id, place: place)
+            // Also remove from lightweight data
+            if var places = profile.lightweightPlaceListPlaces[list.list_id] {
+                places.removeAll { $0.place_id == place.id.uuidString }
+                profile.lightweightPlaceListPlaces[list.list_id] = places
+            }
+        } else {
+            profile.addPlaceToList(listId: placeList.id, place: place)
+            // Note: The add function should also update lightweight data, but we'll update it here for immediate UI feedback
+        }
+    }
+}
+
+// MARK: - ListsInSelectionSheet (Lightweight - uses place coordinates!)
 struct ListsInSelectionSheet: View {
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
+    @EnvironmentObject var dataManager: DataManager
+    @EnvironmentObject var userSession: UserSession
     let place: DetailPlace
     @Binding var searchText: String
     
-    // Filtered lists based on search text and sorted with recently created list first, then by proximity to the place
-    var filteredLists: [PlaceList] {
-        let sortedLists = profile.sortListsWithRecentFirstFromPlace(place)
-        
+    // Filtered lightweight lists based on search text (already sorted by proximity from SQL)
+    var filteredLists: [LightweightPlaceList] {
         if searchText.isEmpty {
-            return sortedLists
+            return profile.lightweightPlaceLists
         } else {
-            return sortedLists.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
+            return profile.lightweightPlaceLists.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
         }
     }
     
     var isLoading: Bool {
-        profile.userLists.isEmpty || profile.isLoading
+        profile.lightweightPlaceLists.isEmpty && profile.isLoading
     }
 
     var body: some View {
@@ -121,7 +216,7 @@ struct ListsInSelectionSheet: View {
                 .padding()
             } else if !filteredLists.isEmpty {
                 ForEach(filteredLists) { list in
-                    ListSelectionRowView(list: list, place: place)
+                    LightweightListSelectionRowView(list: list, place: place)
                 }
             } else {
                 VStack(spacing: 8) {
@@ -142,9 +237,17 @@ struct ListsInSelectionSheet: View {
             }
         }
         .onAppear {
-            print("🔍 [ListSelectionSheet] Lists count: \(profile.userLists.count)")
-            print("🔍 [ListSelectionSheet] Filtered lists count: \(filteredLists.count)")
-            print("🔍 [ListSelectionSheet] Is loading: \(isLoading)")
+            // Load lists by proximity to the place's coordinates
+            if let userId = userSession.currentUserId {
+                let coord = place.coordinate
+                Task {
+                    await dataManager.loadPlaceListsByPlaceCoordinates(
+                        userId: userId,
+                        placeLatitude: coord.latitude,
+                        placeLongitude: coord.longitude
+                    )
+                }
+            }
         }
     }
 }
@@ -196,8 +299,5 @@ struct ListSelectionSheet: View {
         }
         .cornerRadius(20)
         .padding()
-        .onAppear {
-            profile.ensureListsLoaded()
-        }
     }
 }
