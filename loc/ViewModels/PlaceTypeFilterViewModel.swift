@@ -97,7 +97,6 @@ class PlaceTypeFilterViewModel: ObservableObject {
         
         mapVM.$viewportAnnotations
             .sink { [weak self] _ in
-                print("🔄 [PlaceTypeFilterVM] MapViewModel viewport annotations changed - updating filtered places")
                 self?.updateFilteredPlaces()
             }
             .store(in: &cancellables)
@@ -222,14 +221,9 @@ class PlaceTypeFilterViewModel: ObservableObject {
         // Get all places to display (viewport + saved places)
         let allPlaces = getAllDisplayPlaces()
         
-        print("🔍 [PlaceTypeFilterVM] updateFilteredPlaces called - \(allPlaces.count) total places")
-        if let mapVM = mapViewModel {
-            print("🔍 [PlaceTypeFilterVM] MapViewModel has \(mapVM.viewportAnnotations.count) viewport annotations")
-        }
         
         guard !selectedPlaceTypes.isEmpty else {
             filteredPlaces = allPlaces
-            print("🔍 [PlaceTypeFilterVM] No filters selected - showing all \(allPlaces.count) places")
             return
         }
         
@@ -268,7 +262,6 @@ class PlaceTypeFilterViewModel: ObservableObject {
         // If we have a MapViewModel, get annotations and load details for them
         if let mapVM = mapViewModel {
             let annotations = mapVM.getAllDisplayAnnotations()
-            print("🔍 [PlaceTypeFilterVM] getAllDisplayPlaces via MapViewModel: \(annotations.count) annotations")
             
             // For now, return empty array since we're using on-demand loading
             // The map will handle displaying annotations directly
@@ -277,7 +270,6 @@ class PlaceTypeFilterViewModel: ObservableObject {
         
         // Fallback to saved places only (for non-map views)
         let places = detailPlaceVM.savedDetailPlaces
-        print("🔍 [PlaceTypeFilterVM] getAllDisplayPlaces via fallback: \(places.count) places")
         return places
     }
     
