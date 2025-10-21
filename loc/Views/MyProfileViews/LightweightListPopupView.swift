@@ -13,7 +13,7 @@ struct LightweightListPopupView: View {
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     
     let list: LightweightPlaceList
-    let places: [LightweightPlaceListPlace]
+    let places: [LightweightPlace]
     @Binding var placeColors: [UUID: Color]
     
     @State private var showOnlyUnvisited: Bool = false
@@ -28,7 +28,7 @@ struct LightweightListPopupView: View {
     ]
     
     // Filtered places based on visited status
-    var filteredPlaces: [LightweightPlaceListPlace] {
+    var filteredPlaces: [LightweightPlace] {
         guard showOnlyUnvisited else { return places }
         
         // Filter out places that the current user has reviewed
@@ -139,7 +139,7 @@ struct LightweightListPopupView: View {
 
 /// Lightweight place grid cell - displays place without needing full DetailPlace object
 struct LightweightPlaceGridCell: View {
-    let place: LightweightPlaceListPlace
+    let place: LightweightPlace
     let cardWidth: CGFloat
     let cardHeight: CGFloat
     
@@ -243,12 +243,12 @@ struct LightweightListPopupView_Previews: PreviewProvider {
                 place_count: 5
             ),
             places: [
-                LightweightPlaceListPlace(
+                LightweightPlace(
                     place_id: "place-1",
                     name: "Test Place 1",
                     latest_review_photo: nil
                 ),
-                LightweightPlaceListPlace(
+                LightweightPlace(
                     place_id: "place-2",
                     name: "Test Place 2",
                     latest_review_photo: nil

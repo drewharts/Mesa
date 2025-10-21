@@ -9,7 +9,7 @@ import SwiftUI
 
 struct LightweightProfileListSection: View {
     let list: LightweightPlaceList
-    let places: [LightweightPlaceListPlace]
+    let places: [LightweightPlace]
     @Binding var placeColors: [UUID: Color]
     
     @EnvironmentObject var profile: ProfileViewModel
@@ -119,7 +119,7 @@ struct LightweightProfileListSection: View {
 
 /// Lightweight place preview card - displays place without needing full DetailPlace object
 struct LightweightPlacePreviewCard: View {
-    let place: LightweightPlaceListPlace
+    let place: LightweightPlace
     @Binding var placeColors: [UUID: Color]
     
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
