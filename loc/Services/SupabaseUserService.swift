@@ -616,7 +616,7 @@ extension SupabaseUserService {
     /// Add a place to a list
     func addPlaceToList(listId: String, placeId: String) async throws {
         // First, get the current max sort_order for this list
-        let maxOrderResponse = try await supabase
+        let maxOrderResponse = try await supabase.client
             .from("place_list_items")
             .select("sort_order")
             .eq("list_id", listId)
@@ -628,7 +628,7 @@ extension SupabaseUserService {
         let nextOrder = maxOrder + 1
         
         // Insert the new item
-        try await supabase
+        try await supabase.client
             .from("place_list_items")
             .insert([
                 "list_id": listId,
@@ -642,7 +642,7 @@ extension SupabaseUserService {
     
     /// Remove a place from a list
     func removePlaceFromList(listId: String, placeId: String) async throws {
-        try await supabase
+        try await supabase.client
             .from("place_list_items")
             .delete()
             .eq("list_id", listId)

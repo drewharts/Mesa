@@ -167,7 +167,7 @@ struct LightweightListSelectionRowView: View {
             do {
                 if isInList {
                     // Remove from list
-                    try await dataManager.userService.removePlaceFromList(listId: list.list_id, placeId: place.id.uuidString)
+                    try await dataManager.removePlaceFromList(listId: list.list_id, placeId: place.id.uuidString)
                     
                     // Update local state
                     await MainActor.run {
@@ -179,7 +179,7 @@ struct LightweightListSelectionRowView: View {
                     }
                 } else {
                     // Add to list
-                    try await dataManager.userService.addPlaceToList(listId: list.list_id, placeId: place.id.uuidString)
+                    try await dataManager.addPlaceToList(listId: list.list_id, placeId: place.id.uuidString)
                     
                     // Update local state (add lightweight place object)
                     await MainActor.run {

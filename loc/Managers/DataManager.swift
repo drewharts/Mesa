@@ -946,6 +946,18 @@ class DataManager: ObservableObject {
         }
     }
     
+    // MARK: - Place List Management
+    
+    /// Add a place to a list
+    func addPlaceToList(listId: String, placeId: String) async throws {
+        try await userService.addPlaceToList(listId: listId, placeId: placeId)
+    }
+    
+    /// Remove a place from a list
+    func removePlaceFromList(listId: String, placeId: String) async throws {
+        try await userService.removePlaceFromList(listId: listId, placeId: placeId)
+    }
+    
     /// Load the first 6 places for each place list (background task)
     private func loadPlacesForLists(_ lists: [LightweightPlaceList]) async {
         print("📋 [DataManager] Loading places for \(lists.count) lists...")
