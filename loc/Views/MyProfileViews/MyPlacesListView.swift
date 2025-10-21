@@ -158,8 +158,13 @@ struct MyPlacesListView: View {
                                 print("🎵 [MyPlacesListView] User ID: \(userId), isEmpty: \(profile.lightweightExternalPlaces.isEmpty)")
                                 if profile.lightweightExternalPlaces.isEmpty {
                                     print("🎵 [MyPlacesListView] Calling loadUserExternalPlaces...")
-                                    Task {
-                                        await profile.detailPlaceViewModel.dataManager?.loadUserExternalPlaces(userId: userId)
+                                    if let dataManager = profile.detailPlaceViewModel.dataManager {
+                                        print("🎵 [MyPlacesListView] DataManager found, calling loadUserExternalPlaces")
+                                        Task {
+                                            await dataManager.loadUserExternalPlaces(userId: userId)
+                                        }
+                                    } else {
+                                        print("❌ [MyPlacesListView] DataManager is nil!")
                                     }
                                 } else {
                                     print("🎵 [MyPlacesListView] Already have \(profile.lightweightExternalPlaces.count) external places, skipping load")
