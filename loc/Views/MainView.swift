@@ -92,10 +92,9 @@ struct MainView: View {
             if newValue {
                 isSearchBarMinimized = true
                 searchIsFocused = false
-            } else {
-                // Clear the selected place when detail sheet is dismissed to remove annotation highlight
-                selectedPlaceVM.selectedPlace = nil
             }
+            // Note: We don't clear selectedPlace on dismissal to avoid unwanted map movements
+            // The annotation highlight will be controlled by both selectedPlace AND isDetailSheetPresented
         }
         .onChange(of: profileViewModel.userFavorites) {
             // Recalculate filters when user favorites change

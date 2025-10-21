@@ -64,7 +64,9 @@ struct MapView: View {
     
     // Annotation marker view with user photos
     private func annotationMarkerView(for annotation: PlaceAnnotation) -> some View {
-        let isSelected = selectedPlaceVM.selectedPlace?.id.uuidString == annotation.id
+        // Only highlight annotation if detail sheet is presented AND this is the selected place
+        let isSelected = selectedPlaceVM.isDetailSheetPresented && 
+                        selectedPlaceVM.selectedPlace?.id.uuidString == annotation.id
         return CustomPlaceAnnotationView(
             annotation: annotation,
             annotationImage: mapViewModel.annotationImages[annotation.id],
