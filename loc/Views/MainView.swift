@@ -92,6 +92,9 @@ struct MainView: View {
             if newValue {
                 isSearchBarMinimized = true
                 searchIsFocused = false
+            } else {
+                // Clear the selected place when detail sheet is dismissed to remove annotation highlight
+                selectedPlaceVM.selectedPlace = nil
             }
         }
         .onChange(of: profileViewModel.userFavorites) {
