@@ -18,10 +18,9 @@ struct MyPlacesListView: View {
     private let cardWidth: CGFloat = UIScreen.main.bounds.width / 2 - 35
     private let cardHeight: CGFloat = 180
     
-    var createdPlaces: [DetailPlace] {
-        profile.myPlaces.compactMap { id in
-            profile.detailPlaceViewModel.places[id]
-        }
+    // Use lightweight places for Created tab (no Firebase needed!)
+    var lightweightCreatedPlaces: [LightweightPlace] {
+        return profile.lightweightMyPlaces
     }
     
     // Get places that the current user has reviewed (similar to external user profile)
@@ -116,14 +115,13 @@ struct MyPlacesListView: View {
                     
                     // Content based on selected tab
                     if selectedTab == 0 {
-                        // Created Places
-                        CreatedPlacesView(
-                            createdPlaces: createdPlaces,
+                        // Created Places (lightweight - no Firebase!)
+                        LightweightCreatedPlacesView(
+                            lightweightPlaces: lightweightCreatedPlaces,
                             isLoading: profile.isMyPlacesLoading,
                             columns: columns,
                             cardWidth: cardWidth,
-                            cardHeight: cardHeight,
-                            colorForPlace: colorForPlace
+                            cardHeight: cardHeight
                         )
                         .transition(.asymmetric(
                             insertion: .move(edge: .leading).combined(with: .opacity),
@@ -215,10 +213,15 @@ struct MyPlacesListView: View {
             }
         }
         .onAppear {
-            // Trigger My Places and Reviewed Places data refresh when sheet appears
+            // Trigger data refresh when sheet appears
             if let userId = profile.user?.id {
                 Task {
-                    await profile.detailPlaceViewModel.dataManager?.refreshMyPlaces(userId: userId)
+                    // Load lightweight my places (already happens on profile view, but ensure it's loaded)
+                    if profile.lightweightMyPlaces.isEmpty {
+                        await profile.detailPlaceViewModel.dataManager?.loadUserMyPlaces(userId: userId)
+                    }
+                    
+                    // Load reviewed places
                     await profile.detailPlaceViewModel.dataManager?.refreshReviewedPlaces(userId: userId)
                     
                     // Load TikTok places with pagination
@@ -226,16 +229,17 @@ struct MyPlacesListView: View {
                         profile.loadTikTokPlacesWithPagination()
                     }
                     
-                    // Preload images after data is loaded
+                    // Preload images for reviewed and TikTok (created uses AsyncImage directly!)
                     await MainActor.run {
-                        preloadPriorityMyPlacesImages()
+                        profile.loadPriorityImagesForPlaces(profile.getMyReviewedPlaces(), priorityCount: 8)
+                        profile.loadPriorityImagesForPlaces(profile.getTikTokPlaces(), priorityCount: 8)
                     }
                 }
             }
             
-            // Generate colors for created, reviewed, and TikTok places
-            let allPlaces = createdPlaces + reviewedPlaces + tikTokPlaces
-            for place in allPlaces {
+            // Generate colors for reviewed and TikTok places (created uses place ID hash)
+            let reviewedAndTikTok = reviewedPlaces + tikTokPlaces
+            for place in reviewedAndTikTok {
                 if placeColors[place.id] == nil {
                     placeColors[place.id] = randomColor()
                 }
@@ -264,30 +268,22 @@ struct MyPlacesListView: View {
     private func colorForPlace(_ place: DetailPlace) -> Color {
         placeColors[place.id] ?? .gray
     }
-    
-    // Preload images for the first 8 priority tiles across all tabs
-    private func preloadPriorityMyPlacesImages() {
-        // Use the optimized priority loading method for each category
-        profile.loadPriorityImagesForPlaces(createdPlaces, priorityCount: 8)
-        profile.loadPriorityImagesForPlaces(profile.getMyReviewedPlaces(), priorityCount: 8)
-        profile.loadPriorityImagesForPlaces(profile.getTikTokPlaces(), priorityCount: 8)
-    }
 }
 
-// MARK: - Created Places View
-struct CreatedPlacesView: View {
-    let createdPlaces: [DetailPlace]
+// MARK: - Lightweight Created Places View (No Firebase!)
+struct LightweightCreatedPlacesView: View {
+    let lightweightPlaces: [LightweightPlace]
     let isLoading: Bool
     let columns: [GridItem]
     let cardWidth: CGFloat
     let cardHeight: CGFloat
-    let colorForPlace: (DetailPlace) -> Color
     
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
+    @EnvironmentObject var dataManager: DataManager
     @Environment(\.presentationMode) var presentationMode
     
-    @State private var placeToDelete: DetailPlace?
+    @State private var placeToDelete: String? // Store place ID
     
     var body: some View {
         if isLoading {
@@ -296,7 +292,7 @@ struct CreatedPlacesView: View {
                 ProgressView()
                 Spacer()
             }
-        } else if createdPlaces.isEmpty {
+        } else if lightweightPlaces.isEmpty {
             VStack(spacing: 16) {
                 Spacer()
                 Text("No Places Created Yet")
@@ -314,36 +310,58 @@ struct CreatedPlacesView: View {
         } else {
             ScrollView {
                 LazyVGrid(columns: columns, spacing: 15) {
-                    ForEach(Array(createdPlaces.enumerated()), id: \.element.id) { index, place in
-                        PlaceGridCell(
+                    ForEach(Array(lightweightPlaces.enumerated()), id: \.element.id) { index, place in
+                        LightweightPlaceGridCell(
                             place: place,
                             cardWidth: cardWidth,
                             cardHeight: cardHeight,
-                            colorForPlace: colorForPlace,
-                            isPriorityTile: index < 8, // First 8 tiles are priority
                             onLongPress: {
-                                placeToDelete = place
+                                placeToDelete = place.place_id
                             }
                         )
+                        .onAppear {
+                            // Trigger pagination when reaching the last item
+                            if index == lightweightPlaces.count - 1 && profile.hasMoreMyPlaces {
+                                if let userId = profile.user?.id {
+                                    Task {
+                                        await dataManager.loadMoreMyPlaces(userId: userId)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Loading indicator for pagination
+                    if profile.isLoadingMoreMyPlaces {
+                        HStack {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                            Text("Loading more...")
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 20)
+                        .gridCellColumns(2)
                     }
                 }
                 .padding(.horizontal, 20)
                 .padding(.vertical, 10)
             }
-        .onAppear {
-            // Ensure images are loaded for created places when this view appears
-            if !createdPlaces.isEmpty {
-                profile.loadPriorityImagesForPlaces(createdPlaces, priorityCount: 8)
-            }
-        }
-            .alert(item: $placeToDelete) { place in
+            .alert(item: Binding(
+                get: { placeToDelete.map { AlertIdentifier(id: $0) } },
+                set: { placeToDelete = $0?.id }
+            )) { alertId in
                 Alert(
                     title: Text("Delete Place"),
                     message: Text("Are you sure you want to delete this place?"),
                     primaryButton: .destructive(Text("Delete")) {
-                        profile.deleteMyPlace(place) { success in
-                            if !success {
-                                // Handle error if needed, e.g., show an error alert
+                        // Find the DetailPlace to delete
+                        if let detailPlace = profile.detailPlaceViewModel.places[alertId.id] {
+                            profile.deleteMyPlace(detailPlace) { success in
+                                if !success {
+                                    print("❌ Failed to delete place")
+                                }
                             }
                         }
                     },
@@ -353,6 +371,110 @@ struct CreatedPlacesView: View {
         }
     }
 }
+
+// Helper struct for alert binding
+struct AlertIdentifier: Identifiable {
+    let id: String
+}
+
+// MARK: - Lightweight Place Grid Cell
+struct LightweightPlaceGridCell: View {
+    let place: LightweightPlace
+    let cardWidth: CGFloat
+    let cardHeight: CGFloat
+    var onLongPress: (() -> Void)? = nil
+    
+    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
+    @Environment(\.presentationMode) var presentationMode
+    
+    // Generate a consistent color for this place based on its ID
+    private var placeColor: Color {
+        let hash = place.place_id.hashValue
+        let hue = Double(abs(hash) % 360) / 360.0
+        return Color(hue: hue, saturation: 0.6, brightness: 0.8)
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ZStack(alignment: .bottom) {
+                // Load image directly from Supabase URL (no Firebase!)
+                if let photoUrl = place.latest_review_photo, let url = URL(string: photoUrl) {
+                    AsyncImage(url: url) { image in
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(width: cardWidth, height: cardHeight)
+                            .clipped()
+                    } placeholder: {
+                        Rectangle()
+                            .foregroundColor(placeColor)
+                            .frame(width: cardWidth, height: cardHeight)
+                            .overlay(
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                    .scaleEffect(0.8)
+                            )
+                    }
+                } else {
+                    // No photo - show colored background
+                    Rectangle()
+                        .foregroundColor(placeColor)
+                        .frame(width: cardWidth, height: cardHeight)
+                }
+                
+                // Gradient overlay
+                LinearGradient(
+                    gradient: Gradient(colors: [.clear, .black.opacity(0.7)]),
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: 60)
+                
+                // Place name
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(place.name)
+                        .font(.headline)
+                        .foregroundColor(.white)
+                        .lineLimit(1)
+                        .multilineTextAlignment(.leading)
+                }
+                .padding(.horizontal, 12)
+                .padding(.bottom, 8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .frame(width: cardWidth, height: cardHeight)
+        .background(Color.white)
+        .cornerRadius(20)
+        .shadow(color: Color.black.opacity(0.2), radius: 5, x: 0, y: 2)
+        .onTapGesture {
+            // Load full place details when tapped
+            Task {
+                await loadPlaceAndNavigate()
+            }
+        }
+        .onLongPressGesture {
+            onLongPress?()
+        }
+    }
+    
+    private func loadPlaceAndNavigate() async {
+        do {
+            // Fetch the full place details using PlaceService
+            let fullPlace = try await PlaceService.shared.fetchPlace(withId: place.place_id)
+            
+            // Navigate to the place detail view
+            await MainActor.run {
+                selectedPlaceVM.selectedPlace = fullPlace
+                selectedPlaceVM.isDetailSheetPresented = true
+                presentationMode.wrappedValue.dismiss()
+            }
+        } catch {
+            print("❌ Error loading place details: \(error)")
+        }
+    }
+}
+
 
 // MARK: - Reviewed Places View
 struct PaginatedReviewedPlacesView: View {
