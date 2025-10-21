@@ -619,7 +619,7 @@ extension SupabaseUserService {
         let maxOrderResponse = try await supabase.client
             .from("place_list_items")
             .select("sort_order")
-            .eq("list_id", listId)
+            .eq("list_id", value: listId)
             .order("sort_order", ascending: false)
             .limit(1)
             .execute()
@@ -645,8 +645,8 @@ extension SupabaseUserService {
         try await supabase.client
             .from("place_list_items")
             .delete()
-            .eq("list_id", listId)
-            .eq("place_id", placeId)
+            .eq("list_id", value: listId)
+            .eq("place_id", value: placeId)
             .execute()
         
         print("✅ [Supabase] Removed place \(placeId) from list \(listId)")
