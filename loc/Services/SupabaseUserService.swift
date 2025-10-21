@@ -358,15 +358,21 @@ class SupabaseUserService: ObservableObject {
         return places
     }
     
-    /// Fetch user's created places (lightweight data for tiles)
-    func fetchUserCreatedPlaces(userId: String) async throws -> [LightweightPlace] {
-        print("🏠 [Supabase] Fetching user created places for user: \(userId)")
+    /// Fetch user's created places (lightweight data for tiles, paginated)
+    func fetchUserCreatedPlaces(userId: String, limit: Int = 8, offset: Int = 0) async throws -> [LightweightPlace] {
+        print("🏠 [Supabase] Fetching user created places - userId: \(userId), limit: \(limit), offset: \(offset)")
         
         struct Params: Encodable {
             let p_user_id: String
+            let p_limit: Int
+            let p_offset: Int
         }
         
-        let params = Params(p_user_id: userId)
+        let params = Params(
+            p_user_id: userId,
+            p_limit: limit,
+            p_offset: offset
+        )
         
         let places: [LightweightPlace] = try await supabase.client
             .rpc("get_user_created_places", params: params)

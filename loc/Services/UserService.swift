@@ -609,9 +609,9 @@ class UserService: ObservableObject {
         return try await supabase.fetchPlacesForPlaceList(listId: listId, page: page, pageSize: pageSize)
     }
     
-    /// Fetch user's created places (lightweight data for tiles)
-    func fetchUserCreatedPlaces(userId: String) async throws -> [LightweightPlace] {
-        return try await supabase.fetchUserCreatedPlaces(userId: userId)
+    /// Fetch user's created places (lightweight data for tiles, paginated)
+    func fetchUserCreatedPlaces(userId: String, limit: Int = 8, offset: Int = 0) async throws -> [LightweightPlace] {
+        return try await supabase.fetchUserCreatedPlaces(userId: userId, limit: limit, offset: offset)
     }
     
     /// ✅ NEW: Fetch following user IDs only (not full profiles) - SUPER FAST!

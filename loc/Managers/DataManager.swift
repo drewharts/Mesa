@@ -265,16 +265,23 @@ class DataManager: ObservableObject {
         }
     }
     
-    func loadUserMyPlaces(userId: String) async {
+    func loadUserMyPlaces(userId: String, offset: Int = 0) async {
         profileViewModel.isMyPlacesLoading = true
         do {
-            let lightweightPlaces = try await userService.fetchUserCreatedPlaces(userId: userId)
+            // Load 8 places at a time
+            let lightweightPlaces = try await userService.fetchUserCreatedPlaces(userId: userId, limit: 8, offset: offset)
             
             // Store lightweight places in ProfileViewModel
             await MainActor.run {
-                self.profileViewModel.lightweightMyPlaces = lightweightPlaces
-                // Also update legacy myPlaces array for compatibility
-                self.profileViewModel.myPlaces = lightweightPlaces.map { $0.place_id }
+                if offset == 0 {
+                    // Initial load - replace existing
+                    self.profileViewModel.lightweightMyPlaces = lightweightPlaces
+                    self.profileViewModel.myPlaces = lightweightPlaces.map { $0.place_id }
+                } else {
+                    // Pagination - append new places
+                    self.profileViewModel.lightweightMyPlaces.append(contentsOf: lightweightPlaces)
+                    self.profileViewModel.myPlaces.append(contentsOf: lightweightPlaces.map { $0.place_id })
+                }
             }
             
             // Add the current user as a saver for their own places (for map display)
@@ -287,7 +294,7 @@ class DataManager: ObservableObject {
                 }
             }
             
-            print("✅ [DataManager] Loaded \(lightweightPlaces.count) lightweight my places for user: \(userId)")
+            print("✅ [DataManager] Loaded \(lightweightPlaces.count) lightweight my places (offset: \(offset))")
         } catch {
             print("❌ [DataManager] Error loading my places: \(error.localizedDescription)")
         }
