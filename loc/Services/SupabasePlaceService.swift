@@ -580,6 +580,42 @@ class SupabasePlaceService: ObservableObject {
         }
     }
     
+    // MARK: - Image Loading
+    
+    /// Batch fetch place images from reviews or TikTok thumbnails
+    /// Uses the get_latest_review_photo SQL function for efficiency
+    func fetchPlaceImages(for placeIds: [String]) async throws -> [String: String] {
+        guard !placeIds.isEmpty else {
+            return [:]
+        }
+        
+        print("📸 [Supabase] Fetching images for \(placeIds.count) places")
+        
+        // Call the RPC function
+        let response = try await supabase.client
+            .rpc("get_latest_review_photo", params: ["p_place_ids": placeIds])
+            .execute()
+        
+        // Parse the response
+        struct ImageResult: Decodable {
+            let place_id: String
+            let image_url: String?
+        }
+        
+        let results = try JSONDecoder().decode([ImageResult].self, from: response.data)
+        
+        // Convert to dictionary, filtering out nil image_urls
+        var imageMap: [String: String] = [:]
+        for result in results {
+            if let imageUrl = result.image_url {
+                imageMap[result.place_id] = imageUrl
+            }
+        }
+        
+        print("✅ [Supabase] Fetched \(imageMap.count) images for places")
+        return imageMap
+    }
+    
     // MARK: - Place Creation
     
     /// Test method to verify Supabase connection

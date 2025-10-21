@@ -17,6 +17,8 @@ struct VisiblePlacesPopupView: View {
     @EnvironmentObject var mapViewModel: MapViewModel
     
     @State private var placeColors: [String: Color] = [:]
+    @State private var loadedImageCount = 0
+    @State private var isLoadingImages = false
     
     // Get all places currently visible on the map from viewport annotations
     var visiblePlaces: [PlaceAnnotation] {
@@ -74,13 +76,17 @@ struct VisiblePlacesPopupView: View {
                 if !visiblePlaces.isEmpty {
                     ScrollView {
                         LazyVGrid(columns: columns, spacing: 15) {
-                            ForEach(visiblePlaces) { annotation in
+                            ForEach(Array(visiblePlaces.enumerated()), id: \.element.id) { index, annotation in
                                 VisiblePlaceGridCell(
                                     annotation: annotation,
                                     cardWidth: cardWidth,
                                     cardHeight: cardHeight,
                                     placeColors: $placeColors
                                 )
+                                .onAppear {
+                                    // Load next batch when user scrolls near the end
+                                    loadImagesIfNeeded(for: index)
+                                }
                             }
                         }
                         .padding(.horizontal, 20)
@@ -111,6 +117,8 @@ struct VisiblePlacesPopupView: View {
         .onAppear {
             // Generate colors for all visible places
             generateColorsForPlaces()
+            // Load first batch of images
+            loadNextBatch()
         }
     }
     
@@ -122,6 +130,70 @@ struct VisiblePlacesPopupView: View {
                     green: Double.random(in: 0.3...0.9),
                     blue: Double.random(in: 0.3...0.9)
                 )
+            }
+        }
+    }
+    
+    private func loadImagesIfNeeded(for index: Int) {
+        // Load next batch when we're 3 items away from the last loaded item
+        if index >= loadedImageCount - 3 && !isLoadingImages {
+            loadNextBatch()
+        }
+    }
+    
+    private func loadNextBatch() {
+        guard !isLoadingImages else { return }
+        
+        // Get the next 6 place IDs that haven't been loaded yet
+        let startIndex = loadedImageCount
+        let endIndex = min(startIndex + 6, visiblePlaces.count)
+        
+        guard startIndex < endIndex else { return }
+        
+        let placesToLoad = Array(visiblePlaces[startIndex..<endIndex])
+        let placeIds = placesToLoad.map { $0.id }
+        
+        isLoadingImages = true
+        
+        Task {
+            do {
+                let imageMap = try await SupabasePlaceService.shared.fetchPlaceImages(for: placeIds)
+                
+                // Load the images from URLs
+                await MainActor.run {
+                    for (placeId, imageUrl) in imageMap {
+                        loadImage(from: imageUrl, for: placeId)
+                    }
+                    
+                    loadedImageCount = endIndex
+                    isLoadingImages = false
+                }
+            } catch {
+                print("❌ Error batch loading images: \(error)")
+                await MainActor.run {
+                    loadedImageCount = endIndex
+                    isLoadingImages = false
+                }
+            }
+        }
+    }
+    
+    private func loadImage(from urlString: String, for placeId: String) {
+        guard let url = URL(string: urlString) else { return }
+        
+        // Check if already loaded
+        guard detailPlaceViewModel.placeImages[placeId] == nil else { return }
+        
+        Task {
+            do {
+                let (data, _) = try await URLSession.shared.data(from: url)
+                if let image = UIImage(data: data) {
+                    await MainActor.run {
+                        detailPlaceViewModel.placeImages[placeId] = image
+                    }
+                }
+            } catch {
+                print("❌ Error loading image for place \(placeId): \(error)")
             }
         }
     }
@@ -164,13 +236,11 @@ struct VisiblePlaceGridCell: View {
                             .frame(width: cardWidth, height: cardHeight)
                             .clipped()
                     } else {
-                        // Show colored rectangle fallback
+                        // Show colored rectangle fallback while batch loading
                         Rectangle()
                             .foregroundColor(placeColor)
                             .frame(width: cardWidth, height: cardHeight)
-                            .onAppear {
-                                detailPlaceViewModel.fetchPlaceImage(for: annotation.id)
-                            }
+                            // Images are batch loaded by parent view, no individual loading needed
                     }
                     
                     // Gradient overlay
