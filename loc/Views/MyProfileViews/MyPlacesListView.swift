@@ -153,10 +153,19 @@ struct MyPlacesListView: View {
                         ))
                         .onAppear {
                             // Load external places when TikTok tab appears
-                            if let userId = profile.user?.id, profile.lightweightExternalPlaces.isEmpty {
-                                Task {
-                                    await profile.detailPlaceViewModel.dataManager?.loadUserExternalPlaces(userId: userId)
+                            print("🎵 [MyPlacesListView] TikTok tab appeared - lightweightExternalPlaces.count: \(profile.lightweightExternalPlaces.count)")
+                            if let userId = profile.user?.id {
+                                print("🎵 [MyPlacesListView] User ID: \(userId), isEmpty: \(profile.lightweightExternalPlaces.isEmpty)")
+                                if profile.lightweightExternalPlaces.isEmpty {
+                                    print("🎵 [MyPlacesListView] Calling loadUserExternalPlaces...")
+                                    Task {
+                                        await profile.detailPlaceViewModel.dataManager?.loadUserExternalPlaces(userId: userId)
+                                    }
+                                } else {
+                                    print("🎵 [MyPlacesListView] Already have \(profile.lightweightExternalPlaces.count) external places, skipping load")
                                 }
+                            } else {
+                                print("❌ [MyPlacesListView] No user ID available")
                             }
                         }
                     }
