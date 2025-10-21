@@ -410,22 +410,6 @@ class DataManager: ObservableObject {
         }
     }
     
-    // Load user's external places (TikTok-sourced places)
-    func loadUserExternalPlaces(userId: String) async {
-        do {
-            let externalPlaces = try await userService.fetchUserExternalPlaces(userId: userId)
-            // Convert array to dictionary with place IDs as keys
-            let externalPlacesDict = Dictionary(uniqueKeysWithValues: externalPlaces.map { ($0.placeId, $0) })
-            profileViewModel.userExternalPlaces = externalPlacesDict
-            
-            // Note: DetailPlace objects will be loaded via pagination when TikTok tab is accessed
-            
-        } catch {
-            print("❌ [DataManager] Error loading external places: \(error.localizedDescription)")
-        }
-    }
-    
-
     func downloadImage(from url: URL, completion: @escaping (UIImage?) -> Void) {
         URLSession.shared.dataTask(with: url) { data, response, error in
             guard let data = data, error == nil else {
