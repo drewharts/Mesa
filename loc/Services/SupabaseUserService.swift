@@ -627,16 +627,23 @@ extension SupabaseUserService {
         let maxOrder = (try? JSONDecoder().decode([SortOrder].self, from: maxOrderResponse.data).first?.sort_order) ?? -1
         let nextOrder = maxOrder + 1
         
-        // Insert the new item
-        let insertData: [String: Any] = [
-            "list_id": listId,
-            "place_id": placeId,
-            "sort_order": nextOrder
-        ]
+        // Create insert struct
+        struct PlaceListItem: Encodable {
+            let list_id: String
+            let place_id: String
+            let sort_order: Int
+        }
         
+        let newItem = PlaceListItem(
+            list_id: listId,
+            place_id: placeId,
+            sort_order: nextOrder
+        )
+        
+        // Insert the new item
         try await supabase.client
             .from("place_list_items")
-            .insert(insertData)
+            .insert(newItem)
             .execute()
         
         print("✅ [Supabase] Added place \(placeId) to list \(listId) at position \(nextOrder)")
