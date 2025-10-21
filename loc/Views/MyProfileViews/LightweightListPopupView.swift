@@ -173,7 +173,7 @@ struct LightweightListPopupView: View {
         
         Task {
             do {
-                let morePlaces = try await dataManager.userService.fetchPlacesForPlaceList(
+                let morePlaces = try await dataManager.fetchPlacesForPlaceList(
                     listId: list.list_id,
                     page: nextPage,
                     pageSize: 6

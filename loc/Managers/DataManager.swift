@@ -958,6 +958,11 @@ class DataManager: ObservableObject {
         try await userService.removePlaceFromList(listId: listId, placeId: placeId)
     }
     
+    /// Fetch places for a specific place list (pagination support)
+    func fetchPlacesForPlaceList(listId: String, page: Int = 1, pageSize: Int = 6) async throws -> [LightweightPlace] {
+        return try await userService.fetchPlacesForPlaceList(listId: listId, page: page, pageSize: pageSize)
+    }
+    
     /// Load the first 6 places for each place list (background task)
     private func loadPlacesForLists(_ lists: [LightweightPlaceList]) async {
         print("📋 [DataManager] Loading places for \(lists.count) lists...")
