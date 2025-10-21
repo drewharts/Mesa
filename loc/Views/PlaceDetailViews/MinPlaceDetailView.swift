@@ -52,7 +52,7 @@ struct MinPlaceDetailView: View {
             VStack(alignment: .leading, spacing: 5) {
                 // MARK: - Top Row: Title + Icons
                 HStack(alignment: .center) {
-                    Text(selectedPlaceVM.selectedPlace!.name)
+                    Text(selectedPlaceVM.selectedPlace?.name ?? "Loading...")
                         .font(.largeTitle)
                         .fontWeight(.bold)
                         .foregroundColor(.black)
@@ -63,9 +63,12 @@ struct MinPlaceDetailView: View {
                 
                 // MARK: - Row: Type / Google Maps / Drive Time
                 HStack(spacing: 10) {
-                    Text(viewModel.getRestaurantType(for: selectedPlaceVM.selectedPlace!)!)
-                        .font(.subheadline)
-                        .foregroundColor(.gray)
+                    if let place = selectedPlaceVM.selectedPlace,
+                       let restaurantType = viewModel.getRestaurantType(for: place) {
+                        Text(restaurantType)
+                            .font(.subheadline)
+                            .foregroundColor(.gray)
+                    }
                     
                     Button(action: {
                         if let place = selectedPlaceVM.selectedPlace {
@@ -209,7 +212,7 @@ struct MinPlaceDetailView: View {
                         .padding(.bottom, 8)
                     }
                     
-                    Text(selectedPlaceVM.selectedPlace!.description ?? "No description available")
+                    Text(selectedPlaceVM.selectedPlace?.description ?? "No description available")
                         .font(.footnote)
                         .foregroundColor(.black)
                         .fixedSize(horizontal: false, vertical: true)
@@ -297,9 +300,11 @@ struct MinPlaceDetailView: View {
                     
                     // TikTok Place Flagging (only for TikTok places)
                     if profile.hasTikTokVideos(for: selectedPlaceVM.selectedPlace?.id.uuidString ?? "") {
-                        TikTokPlaceFlaggingView(place: selectedPlaceVM.selectedPlace!)
-                            .environmentObject(profile)
-                            .padding(.top, 15)
+                        if let place = selectedPlaceVM.selectedPlace {
+                            TikTokPlaceFlaggingView(place: place)
+                                .environmentObject(profile)
+                                .padding(.top, 15)
+                        }
                     }
 
                     MaxPlaceDetailView(
