@@ -211,8 +211,8 @@ struct ListsInSelectionSheet: View {
         }
         .onAppear {
             // Load lists by proximity to the place's coordinates
-            if let userId = userSession.currentUserId {
-                let coord = place.coordinate
+            if let userId = userSession.currentUserId,
+               let coord = place.coordinate {
                 Task {
                     await dataManager.loadPlaceListsByPlaceCoordinates(
                         userId: userId,
