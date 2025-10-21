@@ -105,6 +105,7 @@ struct ListSelectionRowView: View {
 }
 
 // LightweightListSelectionRowView - NEW (for LightweightPlaceList)
+// TODO: Implement add/remove functionality with SQL functions later
 struct LightweightListSelectionRowView: View {
     @EnvironmentObject var profile: ProfileViewModel
     let list: LightweightPlaceList
@@ -112,72 +113,44 @@ struct LightweightListSelectionRowView: View {
     @State private var backgroundColor: Color = Color(.systemGray5)
 
     var body: some View {
-        Button(action: {
-            togglePlaceInList()
-        }) {
-            HStack {
-                // Display colored rectangle (or list image if available)
-                Group {
-                    Rectangle()
-                        .foregroundColor(backgroundColor)
-                        .onAppear {
-                            backgroundColor = Color(
-                                red: Double.random(in: 0.5...0.9),
-                                green: Double.random(in: 0.5...0.9),
-                                blue: Double.random(in: 0.5...0.9)
-                            )
-                        }
-                }
-                .frame(width: 75, height: 75)
-                .clipped()
-                .cornerRadius(4)
-
-                LightweightListDescription(list: list)
-
-                Spacer()
-
-                ZStack {
-                    // Check if place is in list using lightweight data
-                    if let places = profile.lightweightPlaceListPlaces[list.list_id],
-                       places.contains(where: { $0.place_id == place.id.uuidString }) {
-                        Circle()
-                            .fill(Color.primary)
-                            .frame(width: 24, height: 24)
-                    } else {
-                        Circle()
-                            .stroke(Color.primary, lineWidth: 2)
-                            .frame(width: 24, height: 24)
+        HStack {
+            // Display colored rectangle (or list image if available)
+            Group {
+                Rectangle()
+                    .foregroundColor(backgroundColor)
+                    .onAppear {
+                        backgroundColor = Color(
+                            red: Double.random(in: 0.5...0.9),
+                            green: Double.random(in: 0.5...0.9),
+                            blue: Double.random(in: 0.5...0.9)
+                        )
                     }
+            }
+            .frame(width: 75, height: 75)
+            .clipped()
+            .cornerRadius(4)
+
+            LightweightListDescription(list: list)
+
+            Spacer()
+
+            ZStack {
+                // Check if place is in list using lightweight data
+                if let places = profile.lightweightPlaceListPlaces[list.list_id],
+                   places.contains(where: { $0.place_id == place.id.uuidString }) {
+                    Circle()
+                        .fill(Color.primary)
+                        .frame(width: 24, height: 24)
+                } else {
+                    Circle()
+                        .stroke(Color.primary, lineWidth: 2)
+                        .frame(width: 24, height: 24)
                 }
             }
-            .padding(.top, 20)
-            .padding(.horizontal, 15)
         }
-    }
-
-    private func togglePlaceInList() {
-        // Convert LightweightPlaceList to PlaceList for compatibility with existing add/remove functions
-        let placeList = PlaceList(
-            id: UUID(uuidString: list.list_id) ?? UUID(),
-            name: list.name,
-            places: [],
-            isPublic: list.is_public
-        )
-        
-        // Check if place is already in list
-        let isInList = profile.lightweightPlaceListPlaces[list.list_id]?.contains(where: { $0.place_id == place.id.uuidString }) ?? false
-        
-        if isInList {
-            profile.removePlaceFromList(listId: placeList.id, place: place)
-            // Also remove from lightweight data
-            if var places = profile.lightweightPlaceListPlaces[list.list_id] {
-                places.removeAll { $0.place_id == place.id.uuidString }
-                profile.lightweightPlaceListPlaces[list.list_id] = places
-            }
-        } else {
-            profile.addPlaceToList(listId: placeList.id, place: place)
-            // Note: The add function should also update lightweight data, but we'll update it here for immediate UI feedback
-        }
+        .padding(.top, 20)
+        .padding(.horizontal, 15)
+        .opacity(0.5) // Dim to show it's not interactive yet
     }
 }
 
