@@ -135,7 +135,18 @@ struct MesaPlaceResult: PlaceResult {
 /// Service class for the Mesa backend API
 class MesaBackendService {
     private let baseURL = "https://mesa-backend-staging.up.railway.app"
-    private let session = URLSession.shared
+    private let session: URLSession
+    
+    init() {
+        // Create custom URLSession configuration to avoid connection pooling issues
+        let configuration = URLSessionConfiguration.default
+        configuration.timeoutIntervalForRequest = 30
+        configuration.timeoutIntervalForResource = 60
+        configuration.httpMaximumConnectionsPerHost = 4
+        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+        configuration.waitsForConnectivity = true
+        self.session = URLSession(configuration: configuration)
+    }
     
     /// Fetch place suggestions from Mesa backend
     func fetchSuggestions(
