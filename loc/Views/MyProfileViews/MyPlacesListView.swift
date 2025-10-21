@@ -160,9 +160,13 @@ struct MyPlacesListView: View {
                                     print("🎵 [MyPlacesListView] Calling loadUserExternalPlaces...")
                                     if let dataManager = profile.detailPlaceViewModel.dataManager {
                                         print("🎵 [MyPlacesListView] DataManager found, calling loadUserExternalPlaces")
+                                        print("🎵 [MyPlacesListView] Creating Task to call loadUserExternalPlaces...")
                                         Task {
+                                            print("🎵 [MyPlacesListView] Inside Task, about to await loadUserExternalPlaces")
                                             await dataManager.loadUserExternalPlaces(userId: userId)
+                                            print("🎵 [MyPlacesListView] Finished awaiting loadUserExternalPlaces")
                                         }
+                                        print("🎵 [MyPlacesListView] Task created")
                                     } else {
                                         print("❌ [MyPlacesListView] DataManager is nil!")
                                     }
