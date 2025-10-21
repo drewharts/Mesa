@@ -995,151 +995,17 @@ class ProfileViewModel: ObservableObject {
         }
     }
     
-    // MARK: - TikTok Places Pagination
-    
-    func loadTikTokPlacesWithPagination() {
-        guard let userId = user?.id else {
-            return
-        }
-        
-        if allTikTokPlaceIds.isEmpty {
-            isLoadingTikTokPlaces = true
-            Task {
-                // Get all external places (TikTok imports) sorted by date
-                let externalPlaces = Array(userExternalPlaces.values)
-                    .sorted { $0.addedAt > $1.addedAt } // Most recent first
-                
-                allTikTokPlaceIds = externalPlaces.map { $0.placeId }
-                
-                if allTikTokPlaceIds.isEmpty {
-                    isLoadingTikTokPlaces = false
-                    return
-                }
-                await self.loadNextBatchOfTikTokPlaces()
-            }
-        } else {
-            Task { await self.loadNextBatchOfTikTokPlaces() }
-        }
-    }
-    
-    private func loadNextBatchOfTikTokPlaces() async {
-        guard !isLoadingMoreTikTokPlaces && _hasMoreTikTokPlaces else {
-            isLoadingTikTokPlaces = false
-            return
-        }
-        
-        isLoadingMoreTikTokPlaces = true
-        let startIndex = currentTikTokPage * tikTokPlacesPerPage
-        let endIndex = min(startIndex + tikTokPlacesPerPage, allTikTokPlaceIds.count)
-        
-        guard startIndex < allTikTokPlaceIds.count else {
-            _hasMoreTikTokPlaces = false
-            isLoadingMoreTikTokPlaces = false
-            isLoadingTikTokPlaces = false
-            return
-        }
-        
-        let placeIdsToLoad = Array(allTikTokPlaceIds[startIndex..<endIndex])
-        var successfullyLoadedPlaceIds: [String] = []
-        guard let currentUserId = user?.id else {
-            isLoadingMoreTikTokPlaces = false
-            isLoadingTikTokPlaces = false
-            return
-        }
-        
-        for placeId in placeIdsToLoad {
-            if detailPlaceViewModel.places[placeId] == nil {
-                // Get the actual place_id from the external place to fetch from main places table
-                if let externalPlace = userExternalPlaces[placeId] {
-                    let actualPlaceId = externalPlace.placeId
-                    print("🔄 [ProfileViewModel] Fetching place data for external place '\(externalPlace.name)' using place_id: \(actualPlaceId)")
-                    
-                    // Retry logic for failed TikTok place loads
-                    var retryCount = 0
-                    let maxRetries = 2
-
-                    while retryCount <= maxRetries {
-                        do {
-                            let detailPlace = try await placeService.fetchPlace(withId: actualPlaceId)
-                            
-                            await MainActor.run {
-                                detailPlaceViewModel.places[placeId] = detailPlace
-                                detailPlaceViewModel.fetchPlaceImage(for: placeId)
-                                successfullyLoadedPlaceIds.append(placeId)
-                            }
-                            break // Success, exit retry loop
-                        } catch {
-                            retryCount += 1
-                            print("⚠️ [ProfileViewModel] Failed to fetch place \(actualPlaceId) (attempt \(retryCount)/\(maxRetries + 1)): \(error.localizedDescription)")
-                            if retryCount <= maxRetries {
-                                try? await Task.sleep(nanoseconds: 500_000_000 * UInt64(retryCount)) // Exponential backoff
-                            } else {
-                                print("❌ [ProfileViewModel] Failed to fetch place \(actualPlaceId) after \(maxRetries + 1) attempts")
-                            }
-                        }
-                    }
-                } else {
-                    print("⚠️ [ProfileViewModel] External place not found for placeId: \(placeId)")
-                }
-            } else {
-                successfullyLoadedPlaceIds.append(placeId)
-            }
-            
-            // Add current user as saver so TikTok places appear on map with profile picture
-            if detailPlaceViewModel.placeSavers[placeId] == nil {
-                detailPlaceViewModel.placeSavers[placeId] = [currentUserId]
-            } else if !detailPlaceViewModel.placeSavers[placeId]!.contains(currentUserId) {
-                detailPlaceViewModel.placeSavers[placeId]!.append(currentUserId)
-            }
-        }
-        
-        // Only add new place IDs
-        let newPlaceIds = successfullyLoadedPlaceIds.filter { !loadedTikTokPlaceIds.contains($0) }
-        loadedTikTokPlaceIds.append(contentsOf: newPlaceIds)
-        currentTikTokPage += 1
-        _hasMoreTikTokPlaces = endIndex < allTikTokPlaceIds.count
-        isLoadingMoreTikTokPlaces = false
-        isLoadingTikTokPlaces = false
-        
-        // Recalculate map annotations to include new TikTok places
-        detailPlaceViewModel.calculateAnnotationPlaces()
-    }
-    
-    func loadMoreTikTokPlaces() {
-        Task { await self.loadNextBatchOfTikTokPlaces() }
-    }
-    
-    func getTikTokPlaces() -> [DetailPlace] {
-        // Return places in the order they were loaded (most recent first)
-        let places = loadedTikTokPlaceIds.compactMap { detailPlaceViewModel.places[$0] }
-        return places
-    }
-    
-    func resetTikTokPlacesPagination() {
-        isLoadingTikTokPlaces = false
-        isLoadingMoreTikTokPlaces = false
-        _hasMoreTikTokPlaces = true
-        currentTikTokPage = 0
-        allTikTokPlaceIds = []
-        loadedTikTokPlaceIds = []
-    }
-    
-    var hasMoreTikTokPlaces: Bool { _hasMoreTikTokPlaces }
-    
     // MARK: - TikTok Places Refresh After Import
     
     /// Refresh TikTok places list after a successful import
     func refreshTikTokPlacesAfterImport() {
         print("🔄 [ProfileViewModel] Refreshing TikTok places after import...")
         
-        // Reset pagination state
-        resetTikTokPlacesPagination()
+        // Clear lightweight external places to trigger reload
+        lightweightExternalPlaces = []
         
-        // Fetch fresh external places data
-        fetchUserExternalPlaces()
-        
-        // Reload TikTok places with pagination
-        loadTikTokPlacesWithPagination()
+        // The TikTok tab will auto-reload when user navigates to it next time
+        print("✅ [ProfileViewModel] TikTok places will reload when tab is opened")
     }
     
     // MARK: - TikTok Place Deletion
@@ -2202,9 +2068,10 @@ class ProfileViewModel: ObservableObject {
         }
     }
     
-    // MARK: - External Places (TikTok-sourced places)
+    // MARK: - External Places (TikTok-sourced places) - OLD CODE, KEEP FOR TikTok deletion
     
-    /// Fetch user's external places and populate the dictionary
+    /// OLD: This function is no longer used for loading - we use lightweight loading now
+    /// KEEP: Still needed for TikTok place deletion to work with userExternalPlaces dictionary
     func fetchUserExternalPlaces() {
         guard let userId = user?.id else { 
             print("❌ [ProfileViewModel] No user ID available for fetching external places")

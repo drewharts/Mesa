@@ -39,11 +39,6 @@ struct MyPlacesListView: View {
         }
     }
     
-    // Get places added from TikTok imports (now uses pagination)
-    var tikTokPlaces: [DetailPlace] {
-        return profile.getTikTokPlaces()
-    }
-    
     var body: some View {
         NavigationView {
             ZStack {
