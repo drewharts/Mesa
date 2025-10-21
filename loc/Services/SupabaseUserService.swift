@@ -333,7 +333,7 @@ class SupabaseUserService: ObservableObject {
     }
     
     /// Fetch places within a place list with pagination
-    func fetchPlacesForPlaceList(listId: String, page: Int = 1, pageSize: Int = 6) async throws -> [LightweightPlaceListPlace] {
+    func fetchPlacesForPlaceList(listId: String, page: Int = 1, pageSize: Int = 6) async throws -> [LightweightPlace] {
         print("📍 [Supabase] Fetching places for list: \(listId), page: \(page), pageSize: \(pageSize)")
         
         struct Params: Encodable {
@@ -348,13 +348,32 @@ class SupabaseUserService: ObservableObject {
             p_page_size: pageSize
         )
         
-        let places: [LightweightPlaceListPlace] = try await supabase.client
+        let places: [LightweightPlace] = try await supabase.client
             .rpc("get_paginated_place_list_places", params: params)
             .execute()
             .value
         
         print("✅ [Supabase] Fetched \(places.count) places for list")
         
+        return places
+    }
+    
+    /// Fetch user's created places (lightweight data for tiles)
+    func fetchUserCreatedPlaces(userId: String) async throws -> [LightweightPlace] {
+        print("🏠 [Supabase] Fetching user created places for user: \(userId)")
+        
+        struct Params: Encodable {
+            let p_user_id: String
+        }
+        
+        let params = Params(p_user_id: userId)
+        
+        let places: [LightweightPlace] = try await supabase.client
+            .rpc("get_user_created_places", params: params)
+            .execute()
+            .value
+        
+        print("✅ [Supabase] Fetched \(places.count) user created places")
         return places
     }
     
@@ -542,8 +561,8 @@ struct LightweightPlaceList: Codable, Identifiable {
     }
 }
 
-/// Lightweight place data for place list items
-struct LightweightPlaceListPlace: Codable, Identifiable {
+/// Lightweight place data for tiles (used for both place list items and my places)
+struct LightweightPlace: Codable, Identifiable {
     let place_id: String
     let name: String
     let latest_review_photo: String?
@@ -554,7 +573,7 @@ struct LightweightPlaceListPlace: Codable, Identifiable {
         case place_id
         case name
         case latest_review_photo
-        // Intentionally omitting coordinate - we don't need it
+        // Intentionally omitting coordinate - we don't need it for tiles
     }
 }
 

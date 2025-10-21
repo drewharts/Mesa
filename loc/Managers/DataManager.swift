@@ -268,17 +268,18 @@ class DataManager: ObservableObject {
     func loadUserMyPlaces(userId: String) async {
         profileViewModel.isMyPlacesLoading = true
         do {
-            let places = try await placeService.fetchMyPlaces(userId: userId)
+            let lightweightPlaces = try await userService.fetchUserCreatedPlaces(userId: userId)
             
-            // Clear existing myPlaces and set new ones (avoid duplicates)
-            self.profileViewModel.myPlaces = places.map { $0.id.uuidString }
+            // Store lightweight places in ProfileViewModel
+            await MainActor.run {
+                self.profileViewModel.lightweightMyPlaces = lightweightPlaces
+                // Also update legacy myPlaces array for compatibility
+                self.profileViewModel.myPlaces = lightweightPlaces.map { $0.place_id }
+            }
             
-            for place in places {
-                self.detailPlaceViewModel.places[place.id.uuidString] = place
-                // ✅ REMOVED: fetchPlaceImage() - let images load lazily when views appear
-                // self.detailPlaceViewModel.fetchPlaceImage(for: place.id.uuidString)
-                // Add the current user as a saver for their own place
-                let placeId = place.id.uuidString
+            // Add the current user as a saver for their own places (for map display)
+            for place in lightweightPlaces {
+                let placeId = place.place_id
                 if self.detailPlaceViewModel.placeSavers[placeId] == nil {
                     self.detailPlaceViewModel.placeSavers[placeId] = [userId]
                 } else if !self.detailPlaceViewModel.placeSavers[placeId]!.contains(userId) {
@@ -286,7 +287,7 @@ class DataManager: ObservableObject {
                 }
             }
             
-            print("✅ [DataManager] Loaded \(places.count) myPlaces for user: \(userId)")
+            print("✅ [DataManager] Loaded \(lightweightPlaces.count) lightweight my places for user: \(userId)")
         } catch {
             print("❌ [DataManager] Error loading my places: \(error.localizedDescription)")
         }

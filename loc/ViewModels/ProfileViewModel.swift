@@ -43,13 +43,14 @@ class ProfileViewModel: ObservableObject {
     @Published var userFavorites: [String] = [] // Legacy - full place IDs
     @Published var lightweightFavorites: [FavoritePlace] = [] // New - lightweight data for display
     @Published var lightweightPlaceLists: [LightweightPlaceList] = [] // New - lightweight place lists by proximity
-    @Published var lightweightPlaceListPlaces: [String: [LightweightPlaceListPlace]] = [:] // [listId: places]
+    @Published var lightweightPlaceListPlaces: [String: [LightweightPlace]] = [:] // [listId: places]
+    @Published var lightweightMyPlaces: [LightweightPlace] = [] // New - lightweight my places for tiles
     @Published var isLoadingMorePlaceLists: Bool = false
     @Published var hasMorePlaceLists: Bool = true
     var placeListsCurrentPage: Int = 1
     @Published var userFollowing: [ProfileData] = []
     @Published var userFollowers: [ProfileData] = []
-    @Published var myPlaces: [String] = []
+    @Published var myPlaces: [String] = [] // Legacy - keep for compatibility
     @Published var userExternalPlaces: [String: ExternalPlace] = [:] // PlaceId -> ExternalPlace
     @Published var recentlyCreatedListId: UUID?
     
