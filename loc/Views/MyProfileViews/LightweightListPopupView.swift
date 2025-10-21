@@ -11,12 +11,16 @@ struct LightweightListPopupView: View {
     @Environment(\.presentationMode) var presentationMode
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
+    @EnvironmentObject var dataManager: DataManager
     
     let list: LightweightPlaceList
     let places: [LightweightPlace]
     @Binding var placeColors: [UUID: Color]
     
     @State private var showOnlyUnvisited: Bool = false
+    @State private var isLoadingMore: Bool = false
+    @State private var hasMorePlaces: Bool = true
+    @State private var currentPage: Int = 1
     
     // Same layout as original popup
     private let cardWidth: CGFloat = UIScreen.main.bounds.width / 2 - 35
@@ -27,12 +31,17 @@ struct LightweightListPopupView: View {
         GridItem(.flexible(), spacing: 15)
     ]
     
+    // Get all places for this list (from profile state)
+    var allPlaces: [LightweightPlace] {
+        return profile.lightweightPlaceListPlaces[list.list_id] ?? places
+    }
+    
     // Filtered places based on visited status
     var filteredPlaces: [LightweightPlace] {
-        guard showOnlyUnvisited else { return places }
+        guard showOnlyUnvisited else { return allPlaces }
         
         // Filter out places that the current user has reviewed
-        return places.filter { place in
+        return allPlaces.filter { place in
             !profile.hasReviewedPlace(placeId: place.place_id)
         }
     }
@@ -99,16 +108,32 @@ struct LightweightListPopupView: View {
                 if !filteredPlaces.isEmpty {
                     ScrollView {
                         LazyVGrid(columns: columns, spacing: 15) {
-                            ForEach(filteredPlaces, id: \.id) { place in
+                            ForEach(Array(filteredPlaces.enumerated()), id: \.element.id) { index, place in
                                 LightweightPlaceGridCell(
                                     place: place,
                                     cardWidth: cardWidth,
                                     cardHeight: cardHeight
                                 )
+                                .onAppear {
+                                    // Load more when user scrolls to 3rd-to-last item
+                                    if index == allPlaces.count - 3 {
+                                        loadMoreIfNeeded()
+                                    }
+                                }
                             }
                         }
                         .padding(.horizontal, 20)
                         .padding(.vertical, 10)
+                        
+                        // Loading indicator at bottom
+                        if isLoadingMore {
+                            HStack {
+                                Spacer()
+                                ProgressView()
+                                    .padding()
+                                Spacer()
+                            }
+                        }
                     }
                 } else {
                     VStack(spacing: 8) {
@@ -133,6 +158,48 @@ struct LightweightListPopupView: View {
         .onAppear {
             // Ensure reviewed places are loaded for filtering
             profile.loadMyReviewedPlacesWithPagination()
+            
+            // Initialize pagination state based on initial places
+            hasMorePlaces = places.count >= 6
+            currentPage = 1
+        }
+    }
+    
+    private func loadMoreIfNeeded() {
+        guard !isLoadingMore && hasMorePlaces else { return }
+        
+        isLoadingMore = true
+        let nextPage = currentPage + 1
+        
+        Task {
+            do {
+                let morePlaces = try await dataManager.userService.fetchPlacesForPlaceList(
+                    listId: list.list_id,
+                    page: nextPage,
+                    pageSize: 6
+                )
+                
+                await MainActor.run {
+                    // Append new places to the profile state
+                    if var existingPlaces = profile.lightweightPlaceListPlaces[list.list_id] {
+                        existingPlaces.append(contentsOf: morePlaces)
+                        profile.lightweightPlaceListPlaces[list.list_id] = existingPlaces
+                    } else {
+                        profile.lightweightPlaceListPlaces[list.list_id] = morePlaces
+                    }
+                    
+                    currentPage = nextPage
+                    hasMorePlaces = morePlaces.count >= 6
+                    isLoadingMore = false
+                }
+                
+                print("✅ [LightweightListPopupView] Loaded \(morePlaces.count) more places for list (page \(nextPage))")
+            } catch {
+                await MainActor.run {
+                    isLoadingMore = false
+                }
+                print("❌ [LightweightListPopupView] Error loading more places: \(error.localizedDescription)")
+            }
         }
     }
 }
