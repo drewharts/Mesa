@@ -377,6 +377,25 @@ class SupabaseUserService: ObservableObject {
         return places
     }
     
+    /// Fetch user's reviewed places (lightweight data for tiles)
+    func fetchUserReviewedPlaces(userId: String) async throws -> [LightweightPlace] {
+        print("⭐ [Supabase] Fetching user reviewed places for user: \(userId)")
+        
+        struct Params: Encodable {
+            let p_user_id: String
+        }
+        
+        let params = Params(p_user_id: userId)
+        
+        let places: [LightweightPlace] = try await supabase.client
+            .rpc("get_user_reviewed_places", params: params)
+            .execute()
+            .value
+        
+        print("✅ [Supabase] Fetched \(places.count) user reviewed places")
+        return places
+    }
+    
     // MARK: - Follower/Following Profile Data (Lazy - Load on Demand!)
     
     /// Fetch follower profiles - LAZY! Only call when user clicks "Followers"

@@ -854,44 +854,28 @@ class DataManager: ObservableObject {
     // Loads all places the user has reviewed, even if not in favorites or lists
     func loadUserReviewedPlaces(userId: String) async {
         do {
-            // Fetch all reviews (RestaurantReview and GenericReview) in parallel
-            async let restaurantReviews: [RestaurantReview] = try await reviewService.fetchUserReviews(userId: userId)
-            async let genericReviews: [GenericReview] = try await reviewService.fetchUserGenericReviews(userId: userId)
+            let lightweightPlaces = try await userService.fetchUserReviewedPlaces(userId: userId)
             
-            let allReviews: [ReviewProtocol] = (try await restaurantReviews) + (try await genericReviews)
-
-            // Sort reviews by timestamp (most recent first) and get unique place IDs while preserving order
-            let sortedReviews = allReviews.sorted { $0.timestamp > $1.timestamp }
-
-            // Get unique place IDs while preserving the order of most recently reviewed places
-            var seenPlaceIds = Set<String>()
-            let placeIds: [String] = sortedReviews.compactMap { review in
-                if seenPlaceIds.contains(review.placeId) {
-                    return nil
-                }
-                seenPlaceIds.insert(review.placeId)
-                return review.placeId
-            }
-            
-            // Update the ProfileViewModel with the reviewed place IDs for count display
+            // Store lightweight places in ProfileViewModel
             await MainActor.run {
-                profileViewModel.allReviewedPlaceIds = placeIds
+                self.profileViewModel.lightweightReviewedPlaces = lightweightPlaces
+                // Also update legacy allReviewedPlaceIds for compatibility
+                self.profileViewModel.allReviewedPlaceIds = lightweightPlaces.map { $0.place_id }
             }
-
-            // Process place details in batches
-            let batchSize = 10
             
-            for batch in placeIds.chunked(into: batchSize) {
-                await withTaskGroup(of: Void.self) { group in
-                    for placeId in batch {
-                        group.addTask {
-                            await self.processReviewedPlace(placeId: placeId, userId: userId)
-                        }
-                    }
+            // Add the current user as a saver for their reviewed places (for map display)
+            for place in lightweightPlaces {
+                let placeId = place.place_id
+                if self.detailPlaceViewModel.placeSavers[placeId] == nil {
+                    self.detailPlaceViewModel.placeSavers[placeId] = [userId]
+                } else if !self.detailPlaceViewModel.placeSavers[placeId]!.contains(userId) {
+                    self.detailPlaceViewModel.placeSavers[placeId]!.append(userId)
                 }
             }
+            
+            print("✅ [DataManager] Loaded \(lightweightPlaces.count) lightweight reviewed places for user: \(userId)")
         } catch {
-            print("Error loading user reviewed places: \(error.localizedDescription)")
+            print("❌ [DataManager] Error loading reviewed places: \(error.localizedDescription)")
         }
     }
     
