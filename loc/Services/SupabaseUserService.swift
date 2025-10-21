@@ -628,13 +628,15 @@ extension SupabaseUserService {
         let nextOrder = maxOrder + 1
         
         // Insert the new item
+        let insertData: [String: Any] = [
+            "list_id": listId,
+            "place_id": placeId,
+            "sort_order": nextOrder
+        ]
+        
         try await supabase.client
             .from("place_list_items")
-            .insert([
-                "list_id": listId,
-                "place_id": placeId,
-                "sort_order": nextOrder
-            ])
+            .insert(insertData)
             .execute()
         
         print("✅ [Supabase] Added place \(placeId) to list \(listId) at position \(nextOrder)")
