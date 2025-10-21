@@ -327,6 +327,57 @@ class DataManager: ObservableObject {
         await loadUserMyPlaces(userId: userId, offset: offset)
     }
     
+    /// Load user external places (TikTok places) - lightweight with pagination
+    func loadUserExternalPlaces(userId: String, offset: Int = 0) async {
+        if offset == 0 {
+            profileViewModel.isLoadingTikTokPlaces = true
+        } else {
+            await MainActor.run {
+                profileViewModel.isLoadingMoreExternalPlaces = true
+            }
+        }
+        
+        do {
+            // Load 8 places at a time
+            let lightweightPlaces = try await userService.fetchUserExternalPlaces(userId: userId, limit: 8, offset: offset)
+            
+            // Store lightweight places in ProfileViewModel
+            await MainActor.run {
+                if offset == 0 {
+                    // Initial load - replace existing
+                    self.profileViewModel.lightweightExternalPlaces = lightweightPlaces
+                } else {
+                    // Pagination - append new places
+                    self.profileViewModel.lightweightExternalPlaces.append(contentsOf: lightweightPlaces)
+                }
+                
+                // Update hasMore flag
+                self.profileViewModel.hasMoreExternalPlaces = lightweightPlaces.count >= 8
+            }
+            
+            print("✅ [DataManager] Loaded \(lightweightPlaces.count) lightweight external places (offset: \(offset), hasMore: \(profileViewModel.hasMoreExternalPlaces))")
+        } catch {
+            print("❌ [DataManager] Error loading external places: \(error.localizedDescription)")
+        }
+        
+        if offset == 0 {
+            profileViewModel.isLoadingTikTokPlaces = false
+        } else {
+            await MainActor.run {
+                profileViewModel.isLoadingMoreExternalPlaces = false
+            }
+        }
+    }
+    
+    /// Load more external places (pagination)
+    @MainActor
+    func loadMoreExternalPlaces(userId: String) async {
+        guard !profileViewModel.isLoadingMoreExternalPlaces && profileViewModel.hasMoreExternalPlaces else { return }
+        
+        let offset = profileViewModel.lightweightExternalPlaces.count
+        await loadUserExternalPlaces(userId: userId, offset: offset)
+    }
+    
     /// Refresh My Places data (for when user clicks on My Places)
     func refreshMyPlaces(userId: String) async {
         print("🔄 [DataManager] Refreshing My Places data...")

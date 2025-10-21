@@ -286,7 +286,7 @@
             endingColumnNumber = "9223372036854775807"
             startingLineNumber = "832"
             endingLineNumber = "832"
-            landmarkName = "loadMorePlaceLists(userId:)"
+            landmarkName = "loadProfileCounts(userId:)"
             landmarkType = "7">
          </BreakpointContent>
       </BreakpointProxy>

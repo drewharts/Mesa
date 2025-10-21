@@ -44,9 +44,12 @@ class ProfileViewModel: ObservableObject {
     @Published var lightweightFavorites: [FavoritePlace] = [] // New - lightweight data for display
     @Published var lightweightPlaceLists: [LightweightPlaceList] = [] // New - lightweight place lists by proximity
     @Published var lightweightPlaceListPlaces: [String: [LightweightPlace]] = [:] // [listId: places]
-    @Published var lightweightMyPlaces: [LightweightPlace] = [] // New - lightweight my places for tiles
+    @Published var lightweightMyPlaces: [LightweightPlace] = [] // Lightweight my places for tiles
     @Published var isLoadingMoreMyPlaces: Bool = false
     @Published var hasMoreMyPlaces: Bool = true
+    @Published var lightweightExternalPlaces: [LightweightPlace] = [] // Lightweight external/TikTok places for tiles
+    @Published var isLoadingMoreExternalPlaces: Bool = false
+    @Published var hasMoreExternalPlaces: Bool = true
     @Published var isLoadingMorePlaceLists: Bool = false
     @Published var hasMorePlaceLists: Bool = true
     var placeListsCurrentPage: Int = 1

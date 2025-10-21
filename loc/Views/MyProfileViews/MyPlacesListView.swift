@@ -140,7 +140,7 @@ struct MyPlacesListView: View {
                             removal: .move(edge: .leading).combined(with: .opacity)
                         ))
                     } else {
-                        // TikTok Places (with pagination)
+                        // TikTok Places (lightweight - no Firebase!)
                         PaginatedTikTokPlacesView(
                             columns: columns,
                             cardWidth: cardWidth,
@@ -151,6 +151,14 @@ struct MyPlacesListView: View {
                             insertion: .move(edge: .trailing).combined(with: .opacity),
                             removal: .move(edge: .leading).combined(with: .opacity)
                         ))
+                        .onAppear {
+                            // Load external places when TikTok tab appears
+                            if let userId = profile.user?.id, profile.lightweightExternalPlaces.isEmpty {
+                                Task {
+                                    await profile.detailPlaceViewModel.dataManager?.loadUserExternalPlaces(userId: userId)
+                                }
+                            }
+                        }
                     }
                 }
                 .gesture(
@@ -224,22 +232,15 @@ struct MyPlacesListView: View {
                     // Load reviewed places
                     await profile.detailPlaceViewModel.dataManager?.refreshReviewedPlaces(userId: userId)
                     
-                    // Load TikTok places with pagination
-                    await MainActor.run {
-                        profile.loadTikTokPlacesWithPagination()
-                    }
-                    
-                    // Preload images for reviewed and TikTok (created uses AsyncImage directly!)
+                    // Preload images for reviewed (created and TikTok use AsyncImage directly!)
                     await MainActor.run {
                         profile.loadPriorityImagesForPlaces(profile.getMyReviewedPlaces(), priorityCount: 8)
-                        profile.loadPriorityImagesForPlaces(profile.getTikTokPlaces(), priorityCount: 8)
                     }
                 }
             }
             
-            // Generate colors for reviewed and TikTok places (created uses place ID hash)
-            let reviewedAndTikTok = reviewedPlaces + tikTokPlaces
-            for place in reviewedAndTikTok {
+            // Generate colors for reviewed places (created and TikTok use place ID hash)
+            for place in reviewedPlaces {
                 if placeColors[place.id] == nil {
                     placeColors[place.id] = randomColor()
                 }
@@ -641,7 +642,7 @@ struct PlaceGridCell: View {
     }
 }
 
-// MARK: - Paginated TikTok Places View
+// MARK: - Paginated TikTok Places View (Lightweight - No Firebase!)
 struct PaginatedTikTokPlacesView: View {
     let columns: [GridItem]
     let cardWidth: CGFloat
@@ -650,19 +651,17 @@ struct PaginatedTikTokPlacesView: View {
     
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
+    @EnvironmentObject var dataManager: DataManager
     @Environment(\.presentationMode) var presentationMode
     
     var body: some View {
-        if profile.isLoadingTikTokPlaces || (profile.getTikTokPlaces().isEmpty && !profile.isLoadingTikTokPlaces) {
+        if profile.isLoadingTikTokPlaces {
             VStack {
                 Spacer()
                 ProgressView()
                 Spacer()
             }
-            .onAppear {
-                profile.loadTikTokPlacesWithPagination()
-            }
-        } else if profile.getTikTokPlaces().isEmpty {
+        } else if profile.lightweightExternalPlaces.isEmpty {
             VStack(spacing: 20) {
                 Image(systemName: "video.slash")
                     .font(.system(size: 50))
@@ -682,29 +681,29 @@ struct PaginatedTikTokPlacesView: View {
                 }
             }
             .padding(.top, 100)
-            .onAppear {
-                profile.loadTikTokPlacesWithPagination()
-            }
         } else {
             ScrollView {
                 LazyVGrid(columns: columns, spacing: 15) {
-                    ForEach(Array(profile.getTikTokPlaces().enumerated()), id: \.element.id) { index, place in
-                        TikTokPlaceGridCell(
+                    ForEach(Array(profile.lightweightExternalPlaces.enumerated()), id: \.element.id) { index, place in
+                        LightweightPlaceGridCell(
                             place: place,
                             cardWidth: cardWidth,
-                            cardHeight: cardHeight,
-                            color: colorForPlace(place),
-                            externalPlace: profile.userExternalPlaces[place.id.uuidString],
-                            isPriorityTile: index < 8 // First 8 tiles are priority
+                            cardHeight: cardHeight
                         )
                         .onAppear {
-                            let lastIndex = profile.getTikTokPlaces().count - 1
-                            if index == lastIndex && profile.hasMoreTikTokPlaces {
-                                profile.loadMoreTikTokPlaces()
+                            // Trigger pagination when reaching the last item
+                            if index == profile.lightweightExternalPlaces.count - 1 && profile.hasMoreExternalPlaces {
+                                if let userId = profile.user?.id {
+                                    Task {
+                                        await dataManager.loadMoreExternalPlaces(userId: userId)
+                                    }
+                                }
                             }
                         }
                     }
-                    if profile.isLoadingMoreTikTokPlaces {
+                    
+                    // Loading indicator for pagination
+                    if profile.isLoadingMoreExternalPlaces {
                         HStack {
                             ProgressView()
                                 .scaleEffect(0.8)
@@ -719,9 +718,6 @@ struct PaginatedTikTokPlacesView: View {
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 10)
-            }
-            .onAppear {
-                profile.loadTikTokPlacesWithPagination()
             }
         }
     }
