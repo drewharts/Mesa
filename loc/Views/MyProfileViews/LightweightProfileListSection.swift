@@ -195,29 +195,7 @@ struct LightweightPlacePreviewCard: View {
             RoundedRectangle(cornerRadius: 8)
                 .stroke(Color.gray.opacity(0.2), lineWidth: 1)
         )
-        .contentShape(Rectangle())
-        .onTapGesture {
-            // When tapped, load the full place details and navigate
-            Task {
-                await loadPlaceAndNavigate()
-            }
-        }
-    }
-    
-    private func loadPlaceAndNavigate() async {
-        do {
-            // Fetch the full place details using PlaceService
-            let fullPlace = try await PlaceService.shared.fetchPlace(withId: place.place_id)
-            
-            // Navigate to the place detail view
-            await MainActor.run {
-                selectedPlaceVM.selectedPlace = fullPlace
-                selectedPlaceVM.isDetailSheetPresented = true
-                presentationMode.wrappedValue.dismiss()
-            }
-        } catch {
-            print("❌ Error loading place details: \(error)")
-        }
+        // Individual places are NOT tappable - only the whole list button is tappable
     }
 }
 
