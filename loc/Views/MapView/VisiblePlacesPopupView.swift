@@ -74,7 +74,7 @@ struct VisiblePlacesPopupView: View {
                 if !visiblePlaces.isEmpty {
                     ScrollView {
                         LazyVGrid(columns: columns, spacing: 15) {
-                            ForEach(visiblePlaces, id: \.place_id) { annotation in
+                            ForEach(visiblePlaces) { annotation in
                                 VisiblePlaceGridCell(
                                     annotation: annotation,
                                     cardWidth: cardWidth,
@@ -116,8 +116,8 @@ struct VisiblePlacesPopupView: View {
     
     private func generateColorsForPlaces() {
         for annotation in visiblePlaces {
-            if placeColors[annotation.place_id] == nil {
-                placeColors[annotation.place_id] = Color(
+            if placeColors[annotation.id] == nil {
+                placeColors[annotation.id] = Color(
                     red: Double.random(in: 0.3...0.9),
                     green: Double.random(in: 0.3...0.9),
                     blue: Double.random(in: 0.3...0.9)
@@ -139,10 +139,10 @@ struct VisiblePlaceGridCell: View {
     
     // Generate a consistent color for this place based on its ID
     private var placeColor: Color {
-        if let color = placeColors[annotation.place_id] {
+        if let color = placeColors[annotation.id] {
             return color
         }
-        let hash = annotation.place_id.hashValue
+        let hash = annotation.id.hashValue
         let hue = Double(abs(hash) % 360) / 360.0
         return Color(hue: hue, saturation: 0.6, brightness: 0.8)
     }
@@ -157,7 +157,7 @@ struct VisiblePlaceGridCell: View {
             VStack(alignment: .leading, spacing: 0) {
                 ZStack(alignment: .bottom) {
                     // Try to show cached image, otherwise show color
-                    if let image = detailPlaceViewModel.placeImages[annotation.place_id] {
+                    if let image = detailPlaceViewModel.placeImages[annotation.id] {
                         Image(uiImage: image)
                             .resizable()
                             .aspectRatio(contentMode: .fill)
@@ -169,7 +169,7 @@ struct VisiblePlaceGridCell: View {
                             .foregroundColor(placeColor)
                             .frame(width: cardWidth, height: cardHeight)
                             .onAppear {
-                                detailPlaceViewModel.fetchPlaceImage(for: annotation.place_id)
+                                detailPlaceViewModel.fetchPlaceImage(for: annotation.id)
                             }
                     }
                     
@@ -210,7 +210,7 @@ struct VisiblePlaceGridCell: View {
     private func loadPlaceAndNavigate() async {
         do {
             // Fetch the full place details
-            let fullPlace = try await PlaceService.shared.fetchPlace(withId: annotation.place_id)
+            let fullPlace = try await PlaceService.shared.fetchPlace(withId: annotation.id)
             
             // Navigate to the place detail view
             await MainActor.run {
