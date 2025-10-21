@@ -380,6 +380,11 @@ class SupabaseUserService: ObservableObject {
             .value
         
         print("✅ [Supabase] Fetched \(places.count) user created places")
+        // Log each place with photo status for debugging
+        for (index, place) in places.enumerated() {
+            let hasPhoto = place.latest_review_photo != nil && !place.latest_review_photo!.isEmpty
+            print("   [\(index)] \(place.name) - Photo: \(hasPhoto ? "✅ \(place.latest_review_photo!)" : "❌ None")")
+        }
         return places
     }
     

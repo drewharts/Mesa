@@ -266,7 +266,14 @@ class DataManager: ObservableObject {
     }
     
     func loadUserMyPlaces(userId: String, offset: Int = 0) async {
-        profileViewModel.isMyPlacesLoading = true
+        if offset == 0 {
+            profileViewModel.isMyPlacesLoading = true
+        } else {
+            await MainActor.run {
+                profileViewModel.isLoadingMoreMyPlaces = true
+            }
+        }
+        
         do {
             // Load 8 places at a time
             let lightweightPlaces = try await userService.fetchUserCreatedPlaces(userId: userId, limit: 8, offset: offset)
@@ -282,6 +289,9 @@ class DataManager: ObservableObject {
                     self.profileViewModel.lightweightMyPlaces.append(contentsOf: lightweightPlaces)
                     self.profileViewModel.myPlaces.append(contentsOf: lightweightPlaces.map { $0.place_id })
                 }
+                
+                // Update hasMore flag
+                self.profileViewModel.hasMoreMyPlaces = lightweightPlaces.count >= 8
             }
             
             // Add the current user as a saver for their own places (for map display)
@@ -294,11 +304,27 @@ class DataManager: ObservableObject {
                 }
             }
             
-            print("✅ [DataManager] Loaded \(lightweightPlaces.count) lightweight my places (offset: \(offset))")
+            print("✅ [DataManager] Loaded \(lightweightPlaces.count) lightweight my places (offset: \(offset), hasMore: \(profileViewModel.hasMoreMyPlaces))")
         } catch {
             print("❌ [DataManager] Error loading my places: \(error.localizedDescription)")
         }
-        profileViewModel.isMyPlacesLoading = false
+        
+        if offset == 0 {
+            profileViewModel.isMyPlacesLoading = false
+        } else {
+            await MainActor.run {
+                profileViewModel.isLoadingMoreMyPlaces = false
+            }
+        }
+    }
+    
+    /// Load more my places (pagination)
+    @MainActor
+    func loadMoreMyPlaces(userId: String) async {
+        guard !profileViewModel.isLoadingMoreMyPlaces && profileViewModel.hasMoreMyPlaces else { return }
+        
+        let offset = profileViewModel.lightweightMyPlaces.count
+        await loadUserMyPlaces(userId: userId, offset: offset)
     }
     
     /// Refresh My Places data (for when user clicks on My Places)
