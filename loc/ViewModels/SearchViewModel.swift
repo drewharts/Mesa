@@ -30,6 +30,9 @@ class SearchViewModel: ObservableObject {
     
     // Simple cache for instant repeat searches
     private var searchCache: [String: [MesaPlaceSuggestion]] = [:]
+    
+    // Track current search task to allow cancellation
+    private var currentSearchTask: Task<Void, Never>?
 
     var debugObjectId: String {
         objectId.uuidString.prefix(8).description
@@ -45,15 +48,18 @@ class SearchViewModel: ObservableObject {
         
         // ✅ Optimized pipeline for responsive text input
         $searchText
-            .debounce(for: .milliseconds(100), scheduler: DispatchQueue.main)
+            .debounce(for: .milliseconds(150), scheduler: DispatchQueue.main)
             .removeDuplicates()
-            .filter { !$0.isEmpty && $0.count >= 1 }
+            .filter { !$0.isEmpty && $0.count >= 2 }
             .sink { [weak self] text in
+                // Cancel any ongoing search
+                self?.currentSearchTask?.cancel()
+                
                 // Show loading state immediately on main thread
                 self?.isSearching = true
                 
                 // Move heavy operations to background thread
-                Task {
+                self?.currentSearchTask = Task {
                     await self?.performSearch(query: text)
                 }
             }
@@ -63,6 +69,10 @@ class SearchViewModel: ObservableObject {
         $searchText
             .filter { $0.isEmpty }
             .sink { [weak self] _ in
+                // Cancel any ongoing search
+                self?.currentSearchTask?.cancel()
+                self?.currentSearchTask = nil
+                
                 self?.searchResults = []
                 self?.userResults = []
                 self?.searchError = nil
@@ -80,6 +90,9 @@ class SearchViewModel: ObservableObject {
     
     @MainActor
     private func performSearch(query: String) async {
+        // Check if task was cancelled
+        if Task.isCancelled { return }
+        
         // Check cache first for instant results
         if let cachedResults = searchCache[query] {
             searchResults = cachedResults
@@ -87,6 +100,9 @@ class SearchViewModel: ObservableObject {
             isSearching = false
             return
         }
+        
+        // Check again before clearing results
+        if Task.isCancelled { return }
         
         // Clear previous results
         searchResults = []
