@@ -500,8 +500,6 @@ class SupabaseUserService: ObservableObject {
     
     /// Fetch user's external places (TikTok places, lightweight data for tiles, paginated)
     func fetchUserExternalPlaces(userId: String, limit: Int = 8, offset: Int = 0) async throws -> [LightweightPlace] {
-        print("🎵 [Supabase] Fetching user external places - userId: \(userId), limit: \(limit), offset: \(offset)")
-        
         struct Params: Encodable {
             let p_user_id: String
             let p_limit: Int
@@ -519,12 +517,6 @@ class SupabaseUserService: ObservableObject {
             .execute()
             .value
         
-        print("✅ [Supabase] Fetched \(places.count) external places")
-        // Log each place with photo status for debugging
-        for (index, place) in places.enumerated() {
-            let hasPhoto = place.latest_review_photo != nil && !place.latest_review_photo!.isEmpty
-            print("   [\(index)] \(place.name) - Photo: \(hasPhoto ? "✅ \(place.latest_review_photo!)" : "❌ None")")
-        }
         return places
     }
 }

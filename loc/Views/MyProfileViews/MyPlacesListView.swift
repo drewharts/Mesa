@@ -153,28 +153,12 @@ struct MyPlacesListView: View {
                         ))
                         .onAppear {
                             // Load external places when TikTok tab appears
-                            print("🎵 [MyPlacesListView] TikTok tab appeared - lightweightExternalPlaces.count: \(profile.lightweightExternalPlaces.count)")
-                            if let userId = profile.user?.id {
-                                print("🎵 [MyPlacesListView] User ID: \(userId), isEmpty: \(profile.lightweightExternalPlaces.isEmpty)")
-                                if profile.lightweightExternalPlaces.isEmpty {
-                                    print("🎵 [MyPlacesListView] Calling loadUserExternalPlaces...")
-                                    if let dataManager = profile.detailPlaceViewModel.dataManager {
-                                        print("🎵 [MyPlacesListView] DataManager found, calling loadUserExternalPlaces")
-                                        print("🎵 [MyPlacesListView] Creating Task to call loadUserExternalPlaces...")
-                                        Task {
-                                            print("🎵 [MyPlacesListView] Inside Task, about to await loadUserExternalPlaces")
-                                            await dataManager.loadUserExternalPlaces(userId: userId)
-                                            print("🎵 [MyPlacesListView] Finished awaiting loadUserExternalPlaces")
-                                        }
-                                        print("🎵 [MyPlacesListView] Task created")
-                                    } else {
-                                        print("❌ [MyPlacesListView] DataManager is nil!")
+                            if let userId = profile.user?.id, profile.lightweightExternalPlaces.isEmpty {
+                                if let dataManager = profile.detailPlaceViewModel.dataManager {
+                                    Task {
+                                        await dataManager.loadUserExternalPlaces(userId: userId)
                                     }
-                                } else {
-                                    print("🎵 [MyPlacesListView] Already have \(profile.lightweightExternalPlaces.count) external places, skipping load")
                                 }
-                            } else {
-                                print("❌ [MyPlacesListView] No user ID available")
                             }
                         }
                     }

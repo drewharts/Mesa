@@ -329,8 +329,6 @@ class DataManager: ObservableObject {
     
     /// Load user external places (TikTok places) - lightweight with pagination
     func loadUserExternalPlaces(userId: String, offset: Int = 0) async {
-        print("🎵 [DataManager] loadUserExternalPlaces called - userId: \(userId), offset: \(offset)")
-        
         if offset == 0 {
             profileViewModel.isLoadingTikTokPlaces = true
         } else {
@@ -359,8 +357,7 @@ class DataManager: ObservableObject {
             
             print("✅ [DataManager] Loaded \(lightweightPlaces.count) lightweight external places (offset: \(offset), hasMore: \(profileViewModel.hasMoreExternalPlaces))")
         } catch {
-            print("❌ [DataManager] Error loading external places: \(error)")
-            print("❌ [DataManager] Error details: \(error.localizedDescription)")
+            print("❌ [DataManager] Error loading external places: \(error.localizedDescription)")
         }
         
         if offset == 0 {
