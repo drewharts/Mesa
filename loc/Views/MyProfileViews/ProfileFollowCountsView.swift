@@ -13,6 +13,7 @@ struct ProfileFollowCountsView: View {
     @EnvironmentObject var dataManager: DataManager
     @EnvironmentObject var userSession: UserSession
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
+    @EnvironmentObject var detailPlaceVM: DetailPlaceViewModel
     @State private var showingFollowers = false
     @State private var showingFollowing = false
     @State private var showingMyPlaces = false
@@ -46,6 +47,7 @@ struct ProfileFollowCountsView: View {
                     .environmentObject(userProfileViewModel)
                     .environmentObject(dataManager)
                     .environmentObject(userSession)
+                    .environmentObject(detailPlaceVM)
             }
             
             // Following count
@@ -74,6 +76,7 @@ struct ProfileFollowCountsView: View {
                     .environmentObject(userProfileViewModel)
                     .environmentObject(dataManager)
                     .environmentObject(userSession)
+                    .environmentObject(detailPlaceVM)
             }
             
             // My Places count (Created places only)

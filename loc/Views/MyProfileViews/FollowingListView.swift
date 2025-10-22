@@ -13,6 +13,7 @@ struct FollowingListView: View {
     @EnvironmentObject var userProfileViewModel: UserProfileViewModel
     @EnvironmentObject var dataManager: DataManager
     @EnvironmentObject var userSession: UserSession
+    @EnvironmentObject var detailPlaceVM: DetailPlaceViewModel
     @Environment(\.presentationMode) var presentationMode
     
     var body: some View {
@@ -77,6 +78,13 @@ struct FollowingListView: View {
                         await dataManager.loadFollowing(userId: userSession.currentUserId ?? "")
                     }
                 }
+            }
+            .sheet(isPresented: $userProfileViewModel.isUserDetailPresented) {
+                UserProfileView(
+                    userId: userSession.currentUserId ?? "",
+                    UserProfileVM: userProfileViewModel
+                )
+                .environmentObject(profile)
             }
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
