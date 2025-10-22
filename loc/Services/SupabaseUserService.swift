@@ -218,12 +218,6 @@ class SupabaseUserService: ObservableObject {
     
     /// Get follower count - FAST! (count query only, no profile data)
     func getNumberFollowers(forUserId userId: String) async throws -> Int {
-        print("🔢 [Supabase] Fetching follower COUNT for user: \(userId)")
-        
-        struct CountResult: Codable {
-            let count: Int
-        }
-        
         let response = try await supabase.client
             .from("following")
             .select("*", head: false, count: .exact)
@@ -231,14 +225,11 @@ class SupabaseUserService: ObservableObject {
             .execute()
         
         let count = response.count ?? 0
-        print("✅ [Supabase] User has \(count) followers")
         return count
     }
     
     /// Get following count - FAST! (count query only, no profile data)
     func getNumberFollowing(forUserId userId: String) async throws -> Int {
-        print("🔢 [Supabase] Fetching following COUNT for user: \(userId)")
-        
         let response = try await supabase.client
             .from("following")
             .select("*", head: false, count: .exact)
@@ -246,7 +237,6 @@ class SupabaseUserService: ObservableObject {
             .execute()
         
         let count = response.count ?? 0
-        print("✅ [Supabase] User is following \(count) people")
         return count
     }
     
@@ -263,11 +253,55 @@ class SupabaseUserService: ObservableObject {
         return count
     }
     
+    /// Check if a user is following another user
+    func isFollowingUser(followerId: String, followingId: String) async throws -> Bool {
+        struct FollowingRecord: Codable {
+            let follower_id: String
+            let following_id: String
+        }
+        
+        let response: [FollowingRecord] = try await supabase.client
+            .from("following")
+            .select()
+            .eq("follower_id", value: followerId)
+            .eq("following_id", value: followingId)
+            .execute()
+            .value
+        
+        return !response.isEmpty
+    }
+    
+    /// Follow a user
+    func followUser(followerId: String, followingId: String) async throws {
+        struct FollowRecord: Codable {
+            let follower_id: String
+            let following_id: String
+        }
+        
+        let record = FollowRecord(
+            follower_id: followerId,
+            following_id: followingId
+        )
+        
+        try await supabase.client
+            .from("following")
+            .insert(record)
+            .execute()
+    }
+    
+    /// Unfollow a user
+    func unfollowUser(followerId: String, followingId: String) async throws {
+        try await supabase.client
+            .from("following")
+            .delete()
+            .eq("follower_id", value: followerId)
+            .eq("following_id", value: followingId)
+            .execute()
+    }
+    
     /// Fetch user favorites using optimized SQL function
     /// Returns lightweight favorite data for display without full place details
     func fetchUserFavorites(userId: String) async throws -> [FavoritePlace] {
-        print("⭐ [Supabase] Fetching favorite places for user: \(userId)")
-        
         struct Params: Encodable {
             let p_user_id: String
         }
@@ -279,18 +313,12 @@ class SupabaseUserService: ObservableObject {
             .execute()
             .value
         
-        print("✅ [Supabase] Fetched \(favorites.count) favorite places")
-        if favorites.count > 0 {
-            print("   First favorite: \(favorites[0].name) (ID: \(favorites[0].place_id))")
-        }
-        
         return favorites
     }
     
     /// Fetch user's place lists sorted by proximity to user's location
     /// Returns lightweight list data with pagination support
     func fetchPlaceListsByProximity(userId: String, userLatitude: Double, userLongitude: Double, page: Int = 1, pageSize: Int = 10) async throws -> [LightweightPlaceList] {
-        print("📋 [Supabase] Fetching place lists by proximity - userId: \(userId), lat: \(userLatitude), lng: \(userLongitude), page: \(page), pageSize: \(pageSize)")
         
         struct Params: Encodable {
             let p_user_id: String

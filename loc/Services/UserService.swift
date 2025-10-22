@@ -625,18 +625,39 @@ class UserService: ObservableObject {
     }
     
     func isFollowingUser(followerId: String, followingId: String, completion: @escaping (Bool) -> Void) {
-        print("⚠️ [UserService] isFollowingUser not fully implemented")
-        completion(false)
+        Task {
+            do {
+                let isFollowing = try await supabase.isFollowingUser(followerId: followerId, followingId: followingId)
+                completion(isFollowing)
+            } catch {
+                print("❌ [UserService] Error checking follow status: \(error)")
+                completion(false)
+            }
+        }
     }
     
     func followUser(followerId: String, followingId: String, completion: @escaping (Bool, Error?) -> Void) {
-        print("⚠️ [UserService] followUser not fully implemented")
-                            completion(true, nil)
+        Task {
+            do {
+                try await supabase.followUser(followerId: followerId, followingId: followingId)
+                completion(true, nil)
+            } catch {
+                print("❌ [UserService] Error following user: \(error)")
+                completion(false, error)
+            }
+        }
     }
     
     func unfollowUser(followerId: String, followingId: String, completion: @escaping (Bool, Error?) -> Void) {
-        print("⚠️ [UserService] unfollowUser not fully implemented")
+        Task {
+            do {
+                try await supabase.unfollowUser(followerId: followerId, followingId: followingId)
                 completion(true, nil)
+            } catch {
+                print("❌ [UserService] Error unfollowing user: \(error)")
+                completion(false, error)
+            }
+        }
     }
     
     func addOrUpdateMapPlace(userId: String, place: DetailPlace, completion: @escaping (Error?) -> Void) {
