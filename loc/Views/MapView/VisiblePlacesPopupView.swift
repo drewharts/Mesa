@@ -11,7 +11,7 @@ import MapKit
 struct VisiblePlacesPopupView: View {
     let mapRegion: MKCoordinateRegion?
     
-    @Environment(\.presentationMode) var presentationMode
+    @Environment(\.dismiss) var dismiss
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
     @EnvironmentObject var mapViewModel: MapViewModel
@@ -81,7 +81,8 @@ struct VisiblePlacesPopupView: View {
                                     annotation: annotation,
                                     cardWidth: cardWidth,
                                     cardHeight: cardHeight,
-                                    placeColors: $placeColors
+                                    placeColors: $placeColors,
+                                    onDismiss: { dismiss() }
                                 )
                                 .onAppear {
                                     // Load next batch when user scrolls near the end
@@ -204,10 +205,10 @@ struct VisiblePlaceGridCell: View {
     let cardWidth: CGFloat
     let cardHeight: CGFloat
     @Binding var placeColors: [String: Color]
+    let onDismiss: () -> Void
     
     @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
-    @Environment(\.presentationMode) var presentationMode
     
     // Generate a consistent color for this place based on its ID
     private var placeColor: Color {
@@ -287,7 +288,7 @@ struct VisiblePlaceGridCell: View {
                 // Animate map to place location when tapping from popup tile
                 selectedPlaceVM.selectPlace(fullPlace, shouldAnimateMap: true)
                 selectedPlaceVM.isDetailSheetPresented = true
-                presentationMode.wrappedValue.dismiss()
+                onDismiss()
             }
         } catch {
             print("❌ Error loading place details: \(error)")
