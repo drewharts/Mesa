@@ -14,16 +14,31 @@ struct ProfileFollowCountsView: View {
     @EnvironmentObject var userSession: UserSession
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var detailPlaceVM: DetailPlaceViewModel
-    @State private var showingFollowers = false
-    @State private var showingFollowing = false
-    @State private var showingMyPlaces = false
+    
+    enum SheetType: Identifiable {
+        case followers
+        case following
+        case myPlaces
+        case userProfile
+        
+        var id: Int {
+            switch self {
+            case .followers: return 0
+            case .following: return 1
+            case .myPlaces: return 2
+            case .userProfile: return 3
+            }
+        }
+    }
+    
+    @State private var activeSheet: SheetType?
     @State private var refreshToggle = false
     
     var body: some View {
         HStack(spacing: 24) {
             // Followers count
             Button(action: {
-                showingFollowers = true
+                activeSheet = .followers
             }) {
                 VStack {
                     if profile.isFollowersLoading {
@@ -41,18 +56,10 @@ struct ProfileFollowCountsView: View {
                         .foregroundColor(.gray)
                 }
             }
-            .sheet(isPresented: $showingFollowers) {
-                FollowersListView()
-                    .environmentObject(profile)
-                    .environmentObject(userProfileViewModel)
-                    .environmentObject(dataManager)
-                    .environmentObject(userSession)
-                    .environmentObject(detailPlaceVM)
-            }
             
             // Following count
             Button(action: {
-                showingFollowing = true
+                activeSheet = .following
             }) {
                 VStack {
                     if profile.isFollowingLoading {
@@ -70,18 +77,10 @@ struct ProfileFollowCountsView: View {
                         .foregroundColor(.gray)
                 }
             }
-            .sheet(isPresented: $showingFollowing) {
-                FollowingListView()
-                    .environmentObject(profile)
-                    .environmentObject(userProfileViewModel)
-                    .environmentObject(dataManager)
-                    .environmentObject(userSession)
-                    .environmentObject(detailPlaceVM)
-            }
             
             // My Places count (Created places only)
             Button(action: {
-                showingMyPlaces = true
+                activeSheet = .myPlaces
             }) {
                 VStack {
                     if profile.isMyPlacesLoading {
@@ -99,16 +98,45 @@ struct ProfileFollowCountsView: View {
                         .foregroundColor(.gray)
                 }
             }
-            .sheet(isPresented: $showingMyPlaces) {
+        }
+        .padding(.vertical, 10)
+        .sheet(item: $activeSheet) { sheetType in
+            switch sheetType {
+            case .followers:
+                FollowersListView(onSelectUser: {
+                    // Replace sheet with user profile
+                    activeSheet = .userProfile
+                })
+                    .environmentObject(profile)
+                    .environmentObject(userProfileViewModel)
+                    .environmentObject(dataManager)
+                    .environmentObject(userSession)
+                    .environmentObject(detailPlaceVM)
+            case .following:
+                FollowingListView(onSelectUser: {
+                    // Replace sheet with user profile
+                    activeSheet = .userProfile
+                })
+                    .environmentObject(profile)
+                    .environmentObject(userProfileViewModel)
+                    .environmentObject(dataManager)
+                    .environmentObject(userSession)
+                    .environmentObject(detailPlaceVM)
+            case .myPlaces:
                 MyPlacesListView()
                     .environmentObject(profile)
                     .environmentObject(userProfileViewModel)
                     .environmentObject(dataManager)
                     .environmentObject(userSession)
                     .environmentObject(selectedPlaceVM)
+            case .userProfile:
+                UserProfileView(
+                    userId: userSession.currentUserId ?? "",
+                    UserProfileVM: userProfileViewModel
+                )
+                .environmentObject(profile)
             }
         }
-        .padding(.vertical, 10)
         .onAppear {
             let userId = userSession.currentUserId ?? ""
             // CRITICAL: Use Task.detached to run on separate thread, not blocked by main thread

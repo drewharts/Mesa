@@ -9,6 +9,8 @@ import SwiftUI
 import UIKit
 
 struct FollowingListView: View {
+    let onSelectUser: () -> Void
+    
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var userProfileViewModel: UserProfileViewModel
     @EnvironmentObject var dataManager: DataManager
@@ -43,7 +45,7 @@ struct FollowingListView: View {
                 } else {
                     List {
                         ForEach(profile.userFollowing) { profileData in
-                            UserRow(user: profileData)
+                            UserRow(user: profileData, onSelectUser: onSelectUser)
                                 .onAppear {
                                     // Load more when user scrolls to the last few items
                                     if let index = profile.userFollowing.firstIndex(where: { $0.id == profileData.id }),
@@ -78,13 +80,6 @@ struct FollowingListView: View {
                         await dataManager.loadFollowing(userId: userSession.currentUserId ?? "")
                     }
                 }
-            }
-            .sheet(isPresented: $userProfileViewModel.isUserDetailPresented) {
-                UserProfileView(
-                    userId: userSession.currentUserId ?? "",
-                    UserProfileVM: userProfileViewModel
-                )
-                .environmentObject(profile)
             }
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
