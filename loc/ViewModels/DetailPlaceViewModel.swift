@@ -142,12 +142,12 @@ class DetailPlaceViewModel: ObservableObject {
                 return
             }
             switch result {
-            case .success(let detailPlace):
+                case .success(let detailPlace):
                 DispatchQueue.main.async {
                     self.places[placeId] = detailPlace
-                    self.fetchPlaceImage(for: placeId) // Fetch image if not already present
-                    self.calculateRestaurantType(for: detailPlace) // Calculate restaurant type
-                    self.generateColorForPlace(placeId) // Generate color for fetched place
+                    self.fetchPlaceImage(for: placeId)
+                    self.calculateRestaurantType(for: detailPlace)
+                    self.generateColorForPlace(placeId)
                     completion(detailPlace)
                 }
             case .failure(let error):
@@ -216,7 +216,6 @@ class DetailPlaceViewModel: ObservableObject {
                 
                 // Get the most recent review with images
                 guard let mostRecentReview = reviewsWithImages.first else {
-                    print("⚠️ [DetailPlaceViewModel] No reviews with images found for place \(placeId)")
                     await MainActor.run {
                         self.tryTikTokThumbnailAsCover(placeId: placeId)
                     }
@@ -225,7 +224,6 @@ class DetailPlaceViewModel: ObservableObject {
                 
                 // Only get the first image from the most recent review (most efficient)
                 guard let firstImageUrl = mostRecentReview.images.first else {
-                    print("⚠️ [DetailPlaceViewModel] Most recent review has no images for place \(placeId)")
                     await MainActor.run {
                         self.tryTikTokThumbnailAsCover(placeId: placeId)
                     }

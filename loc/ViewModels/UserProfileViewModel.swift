@@ -177,39 +177,29 @@ class UserProfileViewModel: ObservableObject {
         userService.followUser(followerId: currentUserId, followingId: targetUserId) { success, error in
             if let error = error {
                 print("Error following user: \(error.localizedDescription)")
-            } else if success {
-                print("Successfully followed user \(targetUserId).")
             }
         }
     }
     
     private func fetchProfileFavorites(userId: String) {
-        print("Fetching favorites for userId: \(userId)")
         placeService.fetchProfileFavorites(userId: userId) { [weak self] favorites, error in
             guard let self = self else { return }
             if let error = error {
                 print("Error fetching favorites: \(error)")
                 self.userFavorites = []
-            } else if favorites.isEmpty {
-                print("No favorites found for userId: \(userId)")
-                self.userFavorites = []
             } else {
-                print("Fetched \(favorites.count) favorites for userId: \(userId)")
                 self.userFavorites = favorites
             }
         }
     }
     
     func fetchFavoritePlaceImages() {
-        print("Starting fetchFavoritePlaceImages for \(userFavorites.count) favorites")
         for place in userFavorites {
             fetchImage(for: place) { [weak self] placeId, image in
                 guard let self = self else { return }
                 if let image = image {
                     self.favoritePlaceImages[placeId] = image
-                    // Explicitly trigger UI update
                     self.objectWillChange.send()
-                    print("Updated image for place \(placeId) in favoritePlaceImages")
                 }
             }
         }
@@ -224,10 +214,8 @@ class UserProfileViewModel: ObservableObject {
                 let lists: [PlaceList]
                 
                 if let userLocation = userLocation {
-                    print("📍 [UserProfileViewModel] Loading place lists with proximity sorting")
                     lists = try await placeService.fetchListsByProximity(userId: userId, userLocation: userLocation)
                 } else {
-                    print("📍 [UserProfileViewModel] Loading place lists with regular sorting (no location)")
                     lists = try await placeService.fetchLists(userId: userId)
                 }
                 
@@ -311,11 +299,9 @@ class UserProfileViewModel: ObservableObject {
     // Helper method to fetch images with completion handler
     private func fetchImage(for place: DetailPlace, completion: @escaping (String, UIImage?) -> Void) {
         let placeId = place.id.uuidString
-        print("Starting image fetch for place: \(place.name) (\(placeId))")
         
         // Skip if image already exists in either dictionary
         if favoritePlaceImages[placeId] != nil || placeImages[placeId] != nil {
-            print("Image already cached for place \(placeId)")
             completion(placeId, favoritePlaceImages[placeId] ?? placeImages[placeId])
             return
         }
@@ -325,7 +311,6 @@ class UserProfileViewModel: ObservableObject {
            let firstTikTokVideo = externalPlace.tiktokVideos.first,
            !firstTikTokVideo.thumbnailUrl.isEmpty {
             
-            print("Found TikTok thumbnail for place \(placeId), loading...")
             self.loadTikTokThumbnailAsPlaceImage(placeId: placeId, thumbnailURL: firstTikTokVideo.thumbnailUrl, completion: completion)
             return
         }
@@ -342,15 +327,11 @@ class UserProfileViewModel: ObservableObject {
                 return
             }
             
-            print("Found \(reviews?.count ?? 0) reviews for place \(placeId)")
-            
             // Collect all image URLs from all reviews as strings (same as review images)
             var imageURLStrings: [String] = []
             for review in reviews ?? [] {
                 imageURLStrings.append(contentsOf: review.images)
             }
-            
-            print("Found \(imageURLStrings.count) image URLs for place \(placeId)")
             
             if !imageURLStrings.isEmpty {
                 // Use the same ImageService method that review images use for consistent processing
@@ -364,17 +345,14 @@ class UserProfileViewModel: ObservableObject {
                         } else if let images = images, !images.isEmpty {
                             // Use the first successfully loaded image as the place cover image
                             let image = images[0]
-                            print("Successfully cached image for place \(placeId)")
                             self.placeImages[placeId] = image
                             completion(placeId, image)
                         } else {
-                            print("No images returned for place \(placeId)")
                             completion(placeId, nil)
                         }
                     }
                 }
             } else {
-                print("No image URLs found for place \(placeId)")
                 DispatchQueue.main.async {
                     completion(placeId, nil)
                 }
@@ -441,8 +419,6 @@ class UserProfileViewModel: ObservableObject {
                     print("❌ [UserProfileViewModel] Error loading TikTok thumbnail for \(placeId): \(error.localizedDescription)")
                     completion(placeId, nil)
                 } else if let data = data, let image = UIImage(data: data) {
-                    // Successfully loaded TikTok thumbnail
-                    // Store in both dictionaries to ensure consistency
                     self.placeImages[placeId] = image
                     completion(placeId, image)
                 } else {

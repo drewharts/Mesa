@@ -20,8 +20,6 @@ class SupabaseReviewService: ObservableObject {
     func fetchReviews<T>(placeId: String, latestOnly: Bool = false, completion: @escaping ([T]?, Error?) -> Void) {
         Task {
             do {
-                print("📝 [Supabase] Fetching reviews for place \(placeId)")
-                
                 var query = supabase.client
                     .from("reviews")
                     .select()
@@ -47,13 +45,6 @@ class SupabaseReviewService: ObservableObject {
     func saveReview(placeId: String, review: ReviewProtocol, images: [Data], completion: @escaping (Error?) -> Void) {
         Task {
             do {
-                print("🔄 [Supabase] Saving review to database...")
-                print("🔍 [Supabase] Review ID: \(review.id)")
-                print("🔍 [Supabase] Place ID: \(review.placeId)")
-                print("🔍 [Supabase] User ID: \(review.userId)")
-                print("🔍 [Supabase] Review type: \(review.type.rawValue)")
-                print("🔍 [Supabase] Images count: \(review.images.count)")
-                
                 // Create a proper ReviewRecord for database insertion
                 let reviewRecord = ReviewRecord(
                     id: review.id,
@@ -73,11 +64,6 @@ class SupabaseReviewService: ObservableObject {
                     likes: review.likes,
                     type: review.type.rawValue
                 )
-                
-                // Log restaurant-specific fields if it's a restaurant review
-                if let restaurantReview = review as? RestaurantReview {
-                    print("🔍 [Supabase] Restaurant review - Food: \(restaurantReview.foodRating), Service: \(restaurantReview.serviceRating), Ambience: \(restaurantReview.ambienceRating)")
-                }
                 
                 // Insert the review into the database
                 try await supabase.client
@@ -137,8 +123,6 @@ class SupabaseReviewService: ObservableObject {
     // MARK: - User Reviews
     
     func fetchUserReviews(userId: String) async throws -> [RestaurantReview] {
-        print("📝 [Supabase] Fetching restaurant reviews for user \(userId)")
-        
         let response: [ReviewRecord] = try await supabase.client
             .from("reviews")
             .select()
@@ -175,8 +159,6 @@ class SupabaseReviewService: ObservableObject {
     }
     
     func fetchUserGenericReviews(userId: String) async throws -> [GenericReview] {
-        print("📝 [Supabase] Fetching generic reviews for user \(userId)")
-        
         let response: [ReviewRecord] = try await supabase.client
             .from("reviews")
             .select()
@@ -211,8 +193,6 @@ class SupabaseReviewService: ObservableObject {
     // MARK: - Place Reviews
     
     func fetchPlaceReviews(placeId: String, latestOnly: Bool = false) async throws -> [ReviewProtocol] {
-        print("📝 [Supabase] Fetching reviews for place \(placeId)")
-        
         var query = supabase.client
             .from("reviews")
             .select()
@@ -273,8 +253,6 @@ class SupabaseReviewService: ObservableObject {
     func fetchComments(reviewId: String, completion: @escaping ([Comment]?, Error?) -> Void) {
         Task {
             do {
-                print("📝 [Supabase] Fetching comments for review \(reviewId)")
-                
                 let response: [CommentRecord] = try await supabase.client
                     .from("comments")
                     .select()
@@ -305,7 +283,6 @@ class SupabaseReviewService: ObservableObject {
                     )
                 }
                 
-                print("✅ [Supabase] Fetched \(comments.count) comments")
                 completion(comments, nil)
             } catch {
                 print("❌ [Supabase] Error fetching comments: \(error)")
@@ -332,7 +309,6 @@ class SupabaseReviewService: ObservableObject {
                     .insert(commentRecord)
                     .execute()
                 
-                print("✅ [Supabase] Comment added with \(photoUrls.count) photos")
                 completion(nil)
             } catch {
                 print("❌ [Supabase] Error adding comment: \(error)")
