@@ -10,6 +10,11 @@
 --        not the external_places table where TikToks are stored
 --
 -- Performance: Only ~10.62% of places (89/838) have TikToks, so overhead is minimal
+--
+-- ⚠️  ARCHITECTURE NOTE:
+-- Map annotations are LIGHTWEIGHT (PlaceAnnotation - just id, name, coordinates)
+-- TikToks are ONLY fetched when user TAPS an annotation (on-demand)
+-- This keeps map performance fast while loading TikToks when actually needed
 -- ============================================================================
 
 -- ============================================================================
@@ -122,59 +127,72 @@ FROM get_place_with_tiktoks('YOUR_PLACE_ID_HERE');
 /*
 UPDATE: loc/Services/SupabasePlaceService.swift
 
-Change the fetchPlace(withId:) function to use the new SQL function:
+⚠️  IMPORTANT: Update fetchPlaceDetails() NOT fetchPlace(withId:)!
 
-OLD CODE:
+fetchPlaceDetails() is only called when user TAPS an annotation (on-demand)
+fetchPlace(withId:) is called in many places and should stay lightweight
+
+Change the fetchPlaceDetails(placeId:) function to use the new SQL function:
+
+OLD CODE (around line 927):
 ```swift
-func fetchPlace(withId placeId: String, completion: @escaping (Result<DetailPlace, Error>) -> Void) {
-    Task {
-        do {
-            let response: PlaceRecord = try await supabase.client
-                .from("places")
-                .select()
-                .eq("id", value: placeId)
-                .single()
-                .execute()
-                .value
-            
-            let place = convertToDetailPlace(response)
-            completion(.success(place))
-        } catch {
-            print("❌ [Supabase] Error fetching place \(placeId): \(error)")
-            completion(.failure(error))
+func fetchPlaceDetails(placeId: String) async throws -> DetailPlace? {
+    print("🔍 [Supabase] Fetching full details for place: \(placeId)")
+    
+    do {
+        let response: [PlaceRecord] = try await supabase.client
+            .from("places")
+            .select()
+            .eq("id", value: placeId)
+            .execute()
+            .value
+        
+        guard let placeRecord = response.first else {
+            print("⚠️ [Supabase] No place found with ID: \(placeId)")
+            return nil
         }
+        
+        let place = convertToDetailPlace(placeRecord)
+        print("✅ [Supabase] Fetched full details for: \(place.name)")
+        
+        return place
+    } catch {
+        print("❌ [Supabase] Error fetching place details: \(error)")
+        throw error
     }
 }
 ```
 
 NEW CODE:
 ```swift
-func fetchPlace(withId placeId: String, completion: @escaping (Result<DetailPlace, Error>) -> Void) {
-    Task {
-        do {
-            struct Params: Encodable {
-                let p_place_id: String
-            }
-            
-            let params = Params(p_place_id: placeId)
-            
-            // Use the optimized SQL function that includes TikTok videos
-            let response: [PlaceWithTikToksRecord] = try await supabase.client
-                .rpc("get_place_with_tiktoks", params: params)
-                .execute()
-                .value
-            
-            guard let placeRecord = response.first else {
-                throw NSError(domain: "SupabasePlaceService", code: 404, 
-                             userInfo: [NSLocalizedDescriptionKey: "Place not found"])
-            }
-            
-            let place = convertToDetailPlace(placeRecord)
-            completion(.success(place))
-        } catch {
-            print("❌ [Supabase] Error fetching place \(placeId): \(error)")
-            completion(.failure(error))
+func fetchPlaceDetails(placeId: String) async throws -> DetailPlace? {
+    print("🔍 [Supabase] Fetching full details for place: \(placeId)")
+    
+    do {
+        struct Params: Encodable {
+            let p_place_id: String
         }
+        
+        let params = Params(p_place_id: placeId)
+        
+        // Use the optimized SQL function that includes TikTok videos
+        let response: [PlaceWithTikToksRecord] = try await supabase.client
+            .rpc("get_place_with_tiktoks", params: params)
+            .execute()
+            .value
+        
+        guard let placeRecord = response.first else {
+            print("⚠️ [Supabase] No place found with ID: \(placeId)")
+            return nil
+        }
+        
+        let place = convertToDetailPlaceWithTikToks(placeRecord)
+        print("✅ [Supabase] Fetched full details for: \(place.name)")
+        
+        return place
+    } catch {
+        print("❌ [Supabase] Error fetching place details: \(error)")
+        throw error
     }
 }
 ```
@@ -205,9 +223,12 @@ struct PlaceWithTikToksRecord: Codable {
 }
 ```
 
-UPDATE convertToDetailPlace to handle TikTok videos:
+ADD NEW CONVERSION FUNCTION for places with TikTok videos:
 ```swift
-private func convertToDetailPlace(_ record: PlaceWithTikToksRecord) -> DetailPlace {
+// Keep the existing convertToDetailPlace() for PlaceRecord unchanged
+// Add a NEW function for converting PlaceWithTikToksRecord
+
+private func convertToDetailPlaceWithTikToks(_ record: PlaceWithTikToksRecord) -> DetailPlace {
     var place = DetailPlace(
         id: UUID(uuidString: record.id) ?? UUID(),
         name: record.name
