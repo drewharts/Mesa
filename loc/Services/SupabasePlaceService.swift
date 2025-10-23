@@ -979,19 +979,26 @@ class SupabasePlaceService: ObservableObject {
     func addFavorite(userId: String, placeId: String, placeName: String?, placeAddress: String?, placePhotoUrl: String?, completion: @escaping (Error?) -> Void) {
         Task {
             do {
-                var insertData: [String: Any] = [
-                    "id": UUID().uuidString,
-                    "user_id": userId,
-                    "place_id": placeId,
-                    "name": placeName ?? "",
-                    "address": placeAddress ?? "",
-                    "timestamp": ISO8601DateFormatter().string(from: Date())
-                ]
-                
-                // Only add photo URL if it exists
-                if let photoUrl = placePhotoUrl {
-                    insertData["latest_review_photo"] = photoUrl
+                // Create a struct that conforms to Encodable
+                struct FavoriteInsert: Encodable {
+                    let id: String
+                    let user_id: String
+                    let place_id: String
+                    let name: String
+                    let address: String
+                    let latest_review_photo: String?
+                    let timestamp: String
                 }
+                
+                let insertData = FavoriteInsert(
+                    id: UUID().uuidString,
+                    user_id: userId,
+                    place_id: placeId,
+                    name: placeName ?? "",
+                    address: placeAddress ?? "",
+                    latest_review_photo: placePhotoUrl,
+                    timestamp: ISO8601DateFormatter().string(from: Date())
+                )
                 
                 try await supabase.client
                     .from("favorites")
