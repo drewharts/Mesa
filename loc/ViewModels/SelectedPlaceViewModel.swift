@@ -581,35 +581,55 @@ class SelectedPlaceViewModel: ObservableObject {
             self.reviewPhotosForAboutLoadingStates[placeId] = .loading
         }
 
-        // Get review photo URLs from Firestore
-        mesaBackendService.getReviewPhotos(for: placeId) { [weak self] photoUrls in
-            guard let self = self else { return }
-
-            if photoUrls.isEmpty {
-                // No review photos found
-                DispatchQueue.main.async {
+        // Use cached reviews to get photo URLs
+        Task {
+            // Wait a brief moment for reviews to be loaded if not already
+            var reviews = await MainActor.run { self.placeReviews[placeId] ?? [] }
+            
+            // If no cached reviews yet, wait a bit and try again (race condition)
+            if reviews.isEmpty {
+                try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
+                reviews = await MainActor.run { self.placeReviews[placeId] ?? [] }
+            }
+            
+            // Extract photo URLs from reviews
+            var photoURLs: [String] = []
+            for review in reviews {
+                photoURLs.append(contentsOf: review.images)
+            }
+            
+            // If no photos found, mark as loaded with empty array
+            if photoURLs.isEmpty {
+                await MainActor.run {
                     self.reviewPhotosForAbout[placeId] = []
                     self.reviewPhotosForAboutLoadingStates[placeId] = .loaded
                     self.updateCurrentPlaceFullyLoaded()
                 }
                 return
             }
-
-            // Fetch the actual images from storage
-            self.imageService.fetchPhotosFromStorage(urls: photoUrls) { [weak self] images, error in
-                guard let self = self else { return }
-
-                DispatchQueue.main.async {
-                    if let error = error {
-                        print("Error fetching review photos for about section: \(error.localizedDescription)")
-                        self.reviewPhotosForAboutLoadingStates[placeId] = .error(error)
-                        self.reviewPhotosForAbout[placeId] = []
-                    } else {
-                        self.reviewPhotosForAbout[placeId] = images ?? []
-                        self.reviewPhotosForAboutLoadingStates[placeId] = .loaded
+            
+            // Load the first few images for the about section (limit to avoid loading too many)
+            let urlsToLoad = Array(photoURLs.prefix(6))
+            var loadedImages: [UIImage] = []
+            
+            await withTaskGroup(of: UIImage?.self) { group in
+                for imageUrl in urlsToLoad {
+                    group.addTask {
+                        await self.loadImageFromURL(imageUrl: imageUrl)
                     }
-                    self.updateCurrentPlaceFullyLoaded()
                 }
+                
+                for await image in group {
+                    if let image = image {
+                        loadedImages.append(image)
+                    }
+                }
+            }
+            
+            await MainActor.run {
+                self.reviewPhotosForAbout[placeId] = loadedImages
+                self.reviewPhotosForAboutLoadingStates[placeId] = .loaded
+                self.updateCurrentPlaceFullyLoaded()
             }
         }
     }
