@@ -742,17 +742,9 @@ class SelectedPlaceViewModel: ObservableObject {
     
     private func loadProfilePhoto<T: ReviewProtocol>(for review: T) {
         let userId = review.userId
-        let photoUrlString = review.profilePhotoUrl
         
-        guard !photoUrlString.isEmpty else {
-            DispatchQueue.main.async {
-                self.profilePhotoLoadingStates[userId] = .loaded
-                self.userProfilePhotos[userId] = nil
-            }
-            return
-        }
-        
-        if userProfilePhotos[userId] != nil {
+        // Skip if already loaded
+        if userProfilePhotos[userId] != nil || detailPlaceViewModel?.userProfilePicture[userId] != nil {
             return
         }
         
@@ -760,32 +752,58 @@ class SelectedPlaceViewModel: ObservableObject {
             self.profilePhotoLoadingStates[userId] = .loading
         }
         
-        guard let url = URL(string: photoUrlString) else {
-            DispatchQueue.main.async {
-                self.profilePhotoLoadingStates[userId] = .error(NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid profile photo URL"]))
-                self.userProfilePhotos[userId] = nil
-            }
-            return
-        }
-        
-        URLSession.shared.dataTask(with: url) { [weak self] data, response, error in
-            guard let self = self else { return }
-            
-            DispatchQueue.main.async {
-                if let error = error {
-                    self.profilePhotoLoadingStates[userId] = .error(error)
-                    self.userProfilePhotos[userId] = nil
-                } else if let data = data, let image = UIImage(data: data) {
-                    self.userProfilePhotos[userId] = image
+        // Fetch current profile photo from users table (not denormalized review data)
+        Task {
+            do {
+                // Define a minimal UserRecord struct for fetching profile photos
+                struct UserRecord: Codable {
+                    let profile_photo_url: String?
+                }
+                
+                // Fetch user profile from Supabase users table
+                let user: UserRecord = try await SupabaseClient.shared.supabase.client
+                    .from("users")
+                    .select("profile_photo_url")
+                    .eq("id", value: userId)
+                    .single()
+                    .execute()
+                    .value
+                
+                guard let photoUrlString = user.profile_photo_url, !photoUrlString.isEmpty else {
+                    await MainActor.run {
+                        self.profilePhotoLoadingStates[userId] = .loaded
+                        self.userProfilePhotos[userId] = nil
+                    }
+                    return
+                }
+                
+                guard let url = URL(string: photoUrlString) else {
+                    await MainActor.run {
+                        self.profilePhotoLoadingStates[userId] = .loaded
+                        self.userProfilePhotos[userId] = nil
+                    }
+                    return
+                }
+                
+                // Download the image
+                let (data, _) = try await URLSession.shared.data(from: url)
+                
+                if let image = UIImage(data: data) {
+                    await MainActor.run {
+                        self.userProfilePhotos[userId] = image
+                        self.profilePhotoLoadingStates[userId] = .loaded
+                        // Also store in DetailPlaceViewModel for UI access
+                        self.detailPlaceViewModel?.userProfilePicture[userId] = image
+                    }
+                }
+            } catch {
+                print("❌ Error loading profile photo for user \(userId): \(error.localizedDescription)")
+                await MainActor.run {
                     self.profilePhotoLoadingStates[userId] = .loaded
-                    // Also store in DetailPlaceViewModel for UI access
-                    self.detailPlaceViewModel?.userProfilePicture[userId] = image
-                } else {
-                    self.profilePhotoLoadingStates[userId] = .error(NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to decode profile photo"]))
                     self.userProfilePhotos[userId] = nil
                 }
             }
-        }.resume()
+        }
     }
     
     // Update the method to take userId as parameter
