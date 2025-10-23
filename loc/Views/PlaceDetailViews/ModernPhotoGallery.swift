@@ -71,13 +71,6 @@ struct ModernPhotoGallery: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            // Header
-            Text("PHOTOS")
-                .font(.subheadline)
-                .foregroundColor(.black)
-                .fontWeight(.semibold)
-                .padding(.bottom, 5)
-
             if images.isEmpty {
                 // Empty state
                 VStack(spacing: 16) {
