@@ -201,37 +201,32 @@ class SupabaseReviewService: ObservableObject {
         
         // Extract TikToks from the first row (they're the same for all rows)
         var tiktokVideos: [TikTokVideo] = []
+        
+        // If no reviews, fetch TikToks separately (place might have TikToks but no reviews)
+        if response.isEmpty {
+            struct TikTokArrayRecord: Codable {
+                let tiktok_videos: [AnyCodable]?
+            }
+            
+            let tiktokResponse: [TikTokArrayRecord] = try await supabase.client
+                .rpc("get_place_tiktoks", params: ["p_place_id": placeId])
+                .execute()
+                .value
+            
+            if let firstRecord = tiktokResponse.first,
+               let tiktokArray = firstRecord.tiktok_videos {
+                // Convert [AnyCodable] to [[String: Any]]
+                let tiktokData = tiktokArray.compactMap { $0.value as? [String: Any] }
+                tiktokVideos = parseTikTokData(tiktokData)
+            }
+            
+            return ([], tiktokVideos) // No reviews, but may have TikToks
+        }
+        
+        // Extract TikToks from reviews response
         if let firstRecord = response.first,
            let tiktokData = firstRecord.tiktok_videos?.value as? [[String: Any]] {
-            tiktokVideos = tiktokData.compactMap { dict -> TikTokVideo? in
-                // Only require video_id and url - other fields can be empty
-                guard let videoId = dict["video_id"] as? String,
-                      let videoUrl = dict["url"] as? String else {
-                    return nil
-                }
-                
-                // Parse author (may be empty)
-                var author = TikTokAuthor(displayName: "", url: "", username: "")
-                if let authorDict = dict["author"] as? [String: Any] {
-                    author = TikTokAuthor(
-                        displayName: authorDict["display_name"] as? String ?? "",
-                        url: authorDict["url"] as? String ?? "",
-                        username: authorDict["username"] as? String ?? ""
-                    )
-                }
-                
-                return TikTokVideo(
-                    videoID: videoId,
-                    url: videoUrl,
-                    title: dict["title"] as? String,
-                    caption: dict["caption"] as? String,
-                    embedHTML: dict["embed_html"] as? String ?? "", // Can be empty
-                    thumbnailURL: dict["thumbnail_url"] as? String ?? "", // Can be empty
-                    author: author,
-                    hashtags: dict["hashtags"] as? [String] ?? [],
-                    createdAt: dict["created_at"] as? String ?? ""
-                )
-            }
+            tiktokVideos = parseTikTokData(tiktokData)
         }
         
         // Convert records to ReviewProtocol objects
@@ -331,6 +326,40 @@ class SupabaseReviewService: ObservableObject {
                 print("❌ [Supabase] Error adding comment: \(error)")
                 completion(error)
             }
+        }
+    }
+    
+    // MARK: - Helper Methods
+    
+    private func parseTikTokData(_ tiktokData: [[String: Any]]) -> [TikTokVideo] {
+        return tiktokData.compactMap { dict -> TikTokVideo? in
+            // Only require video_id and url - other fields can be empty
+            guard let videoId = dict["video_id"] as? String,
+                  let videoUrl = dict["url"] as? String else {
+                return nil
+            }
+            
+            // Parse author (may be empty)
+            var author = TikTokAuthor(displayName: "", url: "", username: "")
+            if let authorDict = dict["author"] as? [String: Any] {
+                author = TikTokAuthor(
+                    displayName: authorDict["display_name"] as? String ?? "",
+                    url: authorDict["url"] as? String ?? "",
+                    username: authorDict["username"] as? String ?? ""
+                )
+            }
+            
+            return TikTokVideo(
+                videoID: videoId,
+                url: videoUrl,
+                title: dict["title"] as? String,
+                caption: dict["caption"] as? String,
+                embedHTML: dict["embed_html"] as? String ?? "", // Can be empty
+                thumbnailURL: dict["thumbnail_url"] as? String ?? "", // Can be empty
+                author: author,
+                hashtags: dict["hashtags"] as? [String] ?? [],
+                createdAt: dict["created_at"] as? String ?? ""
+            )
         }
     }
 }
