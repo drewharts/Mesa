@@ -755,13 +755,8 @@ class SelectedPlaceViewModel: ObservableObject {
         // Fetch current profile photo from users table (not denormalized review data)
         Task {
             do {
-                // Define a minimal UserRecord struct for fetching profile photos
-                struct UserRecord: Codable {
-                    let profile_photo_url: String?
-                }
-                
                 // Fetch user profile from Supabase users table
-                let user: UserRecord = try await SupabaseManager.shared.client
+                let user: UserProfilePhotoRecord = try await SupabaseManager.shared.client
                     .from("users")
                     .select("profile_photo_url")
                     .eq("id", value: userId)
@@ -1247,4 +1242,11 @@ class SelectedPlaceViewModel: ObservableObject {
             isDetailSheetPresented = true
         }
     }
+}
+
+// MARK: - Helper Structs
+
+/// Minimal user record for fetching profile photos
+private struct UserProfilePhotoRecord: Codable {
+    let profile_photo_url: String?
 }
