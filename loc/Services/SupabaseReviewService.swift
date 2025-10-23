@@ -233,9 +233,10 @@ class SupabaseReviewService: ObservableObject {
         
         // Convert records to ReviewProtocol objects
         let reviews: [ReviewProtocol] = response.compactMap { record -> ReviewProtocol? in
-            // Parse timestamp string to Date
-            let dateFormatter = ISO8601DateFormatter()
-            dateFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            // Parse PostgreSQL TIMESTAMP format to Date
+            let dateFormatter = DateFormatter()
+            dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+            dateFormatter.timeZone = TimeZone(identifier: "UTC")
             let timestamp = dateFormatter.date(from: record.review_timestamp) ?? Date()
             
             // Create GenericReview with user information from the SQL function
