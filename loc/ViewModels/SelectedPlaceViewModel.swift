@@ -41,11 +41,8 @@ class SelectedPlaceViewModel: ObservableObject {
 
     @Published var selectedPlace: DetailPlace? {
         didSet {
-            print("🔄 [SelectedPlaceViewModel] selectedPlace didSet triggered for: \(selectedPlace?.name ?? "nil")")
-            
             // Prevent infinite loop when updating place details
             guard !isUpdatingPlaceDetails else {
-                print("⚠️ [SelectedPlaceViewModel] Skipping didSet - isUpdatingPlaceDetails = true")
                 return
             }
 
@@ -96,11 +93,9 @@ class SelectedPlaceViewModel: ObservableObject {
     }
 
     private func continueWithPlaceSetup(place: DetailPlace, currentLocation: CLLocationCoordinate2D) {
-        print("🎬 [SelectedPlaceViewModel] continueWithPlaceSetup for '\(place.name)'")
         loadData(for: place, currentLocation: currentLocation)
         
         // Reset photo loading state for new place
-        print("🔄 [SelectedPlaceViewModel] Resetting photo loading state")
         resetPhotoLoading()
         
         // Load reviews first, then photos will be loaded after reviews complete
@@ -221,9 +216,7 @@ class SelectedPlaceViewModel: ObservableObject {
         isCurrentPlaceFullyLoaded = photosReady && reviewsReady
         
         // Debug logging when the state changes
-        if !wasLoaded && isCurrentPlaceFullyLoaded {
-            print("✅ [SelectedPlaceViewModel] Place '\(selectedPlace?.name ?? "Unknown")' is now fully loaded")
-        }
+        // Place is now fully loaded
     }
     
     // Calculate restaurant type and store in dictionary
@@ -314,17 +307,12 @@ class SelectedPlaceViewModel: ObservableObject {
     /// Select a place and fetch fresh details from backend
     /// Use this when a user clicks on a place from lists, maps, etc.
     func selectPlaceAndFetchDetails(_ place: DetailPlace, shouldAnimateMap: Bool = true) {
-        print("🎯 [SelectedPlaceViewModel] Selecting place: '\(place.name)' with ID: \(place.id)")
-        print("🗺️ [SelectedPlaceViewModel] shouldAnimateMap: \(shouldAnimateMap)")
-        
         // Set the animation flag
         shouldAnimateMapToPlace = shouldAnimateMap
         
         // Backend now accepts UUID and handles everything automatically
         // Just send the UUID as place_id and "google" as provider
         let placeId = place.id.uuidString
-        
-        print("🌐 [SelectedPlaceViewModel] Fetching fresh details for '\(place.name)' using UUID: \(placeId)")
         
         // Fetch fresh details from backend first
         mesaBackendService.fetchPlaceDetails(placeId: placeId, source: "google") { [weak self] result in
@@ -336,9 +324,6 @@ class SelectedPlaceViewModel: ObservableObject {
                     // Preserve the original ID and merge fresh data
                     var updatedPlace = freshPlace
                     updatedPlace.id = place.id
-                    
-                    print("✅ [SelectedPlaceViewModel] Fetched fresh details for '\(place.name)'")
-                    print("   - Rating: \(updatedPlace.rating ?? 0) (\(updatedPlace.userRatingsTotal ?? 0) reviews)")
                     
                     // Update selected place with fresh data
                     // This will trigger didSet which handles loading reviews/photos
@@ -667,7 +652,6 @@ class SelectedPlaceViewModel: ObservableObject {
             await MainActor.run {
                 self.reviewPhotos[reviewId] = loadedImages
                 self.reviewPhotoLoadingStates[reviewId] = .loaded
-                print("✅ [SelectedPlaceViewModel] Loaded \(loadedImages.count) initial images for review \(reviewId) (total available: \(review.images.count))")
             }
         }
     }
@@ -683,7 +667,7 @@ class SelectedPlaceViewModel: ObservableObject {
         let endIndex = min(startIndex + 4, allImageUrls.count) // Load 4 more at a time
         let urlsToLoad = Array(allImageUrls[startIndex..<endIndex])
         
-        print("📸 [SelectedPlaceViewModel] Loading more photos for review \(reviewId): \(startIndex) to \(endIndex-1)")
+        // Loading more photos for review
         
         Task {
             var newImages: [UIImage] = []
@@ -704,7 +688,6 @@ class SelectedPlaceViewModel: ObservableObject {
             
             await MainActor.run {
                 self.reviewPhotos[reviewId]?.append(contentsOf: newImages)
-                print("✅ [SelectedPlaceViewModel] Loaded \(newImages.count) more images for review \(reviewId) (total: \(self.reviewPhotos[reviewId]?.count ?? 0))")
             }
         }
     }
@@ -731,12 +714,10 @@ class SelectedPlaceViewModel: ObservableObject {
     private func loadImageFromURL(imageUrl: String) async -> UIImage? {
         // ✅ COMPLETE Firebase elimination - block ALL Firebase URLs, only use Supabase
         if imageUrl.contains("firebasestorage.googleapis.com") {
-            print("🚫 [SelectedPlaceViewModel] BLOCKING Firebase Storage URL - Firebase migration complete, use Supabase only: \(imageUrl)")
             return nil
         }
         
         guard let url = URL(string: imageUrl) else {
-            print("⚠️ [SelectedPlaceViewModel] Invalid image URL: \(imageUrl)")
             return nil
         }
         
@@ -750,7 +731,6 @@ class SelectedPlaceViewModel: ObservableObject {
             let (data, _) = try await session.data(from: url)
             return UIImage(data: data)
         } catch {
-            print("⚠️ [SelectedPlaceViewModel] Failed to load image from URL: \(error.localizedDescription)")
             return nil
         }
     }
@@ -793,7 +773,6 @@ class SelectedPlaceViewModel: ObservableObject {
             
             DispatchQueue.main.async {
                 if let error = error {
-                    print("Error fetching profile photo for user \(userId): \(error.localizedDescription)")
                     self.profilePhotoLoadingStates[userId] = .error(error)
                     self.userProfilePhotos[userId] = nil
                 } else if let data = data, let image = UIImage(data: data) {
@@ -848,7 +827,6 @@ class SelectedPlaceViewModel: ObservableObject {
             
             DispatchQueue.main.async {
                 if let error = error {
-                    print("Error loading comments: \(error.localizedDescription)")
                     self.commentLoadingStates[reviewId] = .error(error)
                 } else {
                     let fetchedComments = comments ?? []
@@ -1122,7 +1100,6 @@ class SelectedPlaceViewModel: ObservableObject {
     }
     
     func likeReview<T: ReviewProtocol>(_ review: T, userId: String) {
-        print("⚠️ [SelectedPlaceViewModel] likeReview not fully implemented")
         // TODO: Implement proper like/unlike logic with Supabase
     }
 
@@ -1133,7 +1110,6 @@ class SelectedPlaceViewModel: ObservableObject {
     
     // Load comment count for a review (without loading all comments)
     func loadCommentCountForReview(placeId: String, reviewId: String) {
-        print("⚠️ [SelectedPlaceViewModel] loadCommentCountForReview not fully implemented")
         // TODO: Implement with Supabase
     }
 
@@ -1149,7 +1125,6 @@ class SelectedPlaceViewModel: ObservableObject {
             
             DispatchQueue.main.async {
                 if let error = error {
-                    print("Error loading more comments: \(error.localizedDescription)")
                     // Don't update loading state to error to preserve existing comments
                 } else if let fetchedComments = comments {
                     self.placeReviewComments[reviewId] = fetchedComments
@@ -1169,8 +1144,6 @@ class SelectedPlaceViewModel: ObservableObject {
     }
 
     func createNewPlace(idString: String?, name: String, description: String?, coordinate: CLLocationCoordinate2D, userId: String, profileVM: ProfileViewModel? = nil, detailPlaceVM: DetailPlaceViewModel? = nil) {
-        print("🎬 [SelectedPlaceViewModel] createNewPlace called")
-        print("🎬 [SelectedPlaceViewModel] Name: \(name)")
         print("🎬 [SelectedPlaceViewModel] Description: \(description ?? "nil")")
         print("🎬 [SelectedPlaceViewModel] Coordinate: \(coordinate.latitude), \(coordinate.longitude)")
         print("🎬 [SelectedPlaceViewModel] User ID: \(userId)")
