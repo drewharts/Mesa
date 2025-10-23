@@ -45,7 +45,7 @@ BEGIN
             ep.place_id,
             ep.tiktok_videos
         FROM external_places ep
-        WHERE ep.place_id = p_place_id
+        WHERE ep.place_id = p_place_id::uuid
         LIMIT 1
     )
     SELECT 
@@ -71,7 +71,7 @@ BEGIN
     FROM reviews r
     LEFT JOIN place_tiktoks pt ON pt.place_id = r.place_id
     LEFT JOIN users u ON u.id = r.user_id
-    WHERE r.place_id = p_place_id
+    WHERE r.place_id = p_place_id::uuid
     ORDER BY r.timestamp DESC;
 END;
 $$ LANGUAGE plpgsql;
