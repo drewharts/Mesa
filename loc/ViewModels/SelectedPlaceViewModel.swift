@@ -420,7 +420,7 @@ class SelectedPlaceViewModel: ObservableObject {
                     
                     reviews.forEach { review in
                         self.loadReviewPhotos(for: review)
-                        // Profile photos now come from SQL JOIN with users table
+                        self.loadProfilePhotoFromURL(userId: review.userId, photoUrl: review.profilePhotoUrl)
                         self.loadCommentCountForReview(placeId: placeId, reviewId: review.id)
                     }
                     self.reviewLoadingStates[placeId] = .loaded
@@ -740,6 +740,35 @@ class SelectedPlaceViewModel: ObservableObject {
         self.loadReviewPhotos(for: review)
     }
     
+    /// Load profile photo from URL (URL comes from SQL JOIN with users table)
+    private func loadProfilePhotoFromURL(userId: String, photoUrl: String) {
+        // Skip if already loaded or empty URL
+        guard !photoUrl.isEmpty else { return }
+        if userProfilePhotos[userId] != nil || detailPlaceViewModel?.userProfilePicture[userId] != nil {
+            return
+        }
+        
+        Task {
+            guard let url = URL(string: photoUrl) else { return }
+            
+            do {
+                let (data, _) = try await URLSession.shared.data(from: url)
+                if let image = UIImage(data: data) {
+                    await MainActor.run {
+                        self.userProfilePhotos[userId] = image
+                        self.detailPlaceViewModel?.userProfilePicture[userId] = image
+                        self.profilePhotoLoadingStates[userId] = .loaded
+                    }
+                }
+            } catch {
+                // Silently fail - profile photo is optional
+                await MainActor.run {
+                    self.profilePhotoLoadingStates[userId] = .loaded
+                }
+            }
+        }
+    }
+    
     // Update the method to take userId as parameter
     func checkLikeStatuses(userId: String) {
         guard let placeId = selectedPlace?.id.uuidString,
@@ -925,7 +954,7 @@ class SelectedPlaceViewModel: ObservableObject {
             currentReviews.insert(review, at: 0) // Insert at the beginning instead of appending
             self.placeReviews[placeId] = currentReviews
             self.loadReviewPhotos(for: review)
-            // Profile photos now come from SQL JOIN with users table
+            self.loadProfilePhotoFromURL(userId: review.userId, photoUrl: review.profilePhotoUrl)
         }
     }
     
