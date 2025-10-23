@@ -307,9 +307,6 @@ class SelectedPlaceViewModel: ObservableObject {
     /// Select a place and fetch fresh details from backend
     /// Use this when a user clicks on a place from lists, maps, etc.
     func selectPlaceAndFetchDetails(_ place: DetailPlace, shouldAnimateMap: Bool = true) {
-        // Set the animation flag
-        shouldAnimateMapToPlace = shouldAnimateMap
-        
         // Backend now accepts UUID and handles everything automatically
         // Just send the UUID as place_id and "google" as provider
         let placeId = place.id.uuidString
@@ -331,6 +328,10 @@ class SelectedPlaceViewModel: ObservableObject {
                     
                     // Update Firestore in background
                     self.updatePlaceInFirestore(updatedPlace)
+                    
+                    // Set the animation flag AFTER selectedPlace is set
+                    // This ensures MainView's onChange sees both the place and the flag together
+                    self.shouldAnimateMapToPlace = shouldAnimateMap
                 }
                 
             case .failure(let error):
@@ -338,6 +339,9 @@ class SelectedPlaceViewModel: ObservableObject {
                 // Set cached data - didSet will handle loading reviews/photos
                 DispatchQueue.main.async {
                     self.selectedPlace = place
+                    
+                    // Set the animation flag AFTER selectedPlace is set
+                    self.shouldAnimateMapToPlace = shouldAnimateMap
                 }
             }
         }
