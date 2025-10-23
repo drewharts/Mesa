@@ -13,8 +13,6 @@ struct TikTokVideoView: View {
     @State private var refreshAttempted: Bool = false
     @State private var isPressed: Bool = false
     @State private var showingDeleteConfirmation = false
-    @State private var associatedPlaces: [TikTokAssociatedPlace] = []
-    @State private var isLoadingPlaces = false
 
     // Optional place for navigation instead of opening video
     let associatedPlace: DetailPlace?
@@ -33,12 +31,6 @@ struct TikTokVideoView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             videoThumbnailButton
-            
-            // Show associated places if any
-            if !associatedPlaces.isEmpty {
-                associatedPlacesView
-            }
-            
             authorInfoSection
         }
         .fullScreenCover(isPresented: $viewModel.showingFullVideo) {
@@ -60,51 +52,6 @@ struct TikTokVideoView: View {
             if oldValue != newValue {
                 refreshAttempted = false
             }
-        }
-        .task {
-            await loadAssociatedPlaces()
-        }
-    }
-    
-    private var associatedPlacesView: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("\(associatedPlaces.count) place\(associatedPlaces.count > 1 ? "s" : "")")
-                .font(.caption2)
-                .foregroundColor(.gray)
-            
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(associatedPlaces) { place in
-                        Button(action: {
-                            // Navigate to this place
-                            if let onNavigate = onNavigateToPlace {
-                                // Would need to convert TikTokAssociatedPlace to DetailPlace
-                                // For now just show the place
-                            }
-                        }) {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(place.name)
-                                    .font(.caption)
-                                    .fontWeight(.medium)
-                                    .foregroundColor(.primary)
-                                    .lineLimit(1)
-                                
-                                if let address = place.address {
-                                    Text(address)
-                                        .font(.caption2)
-                                        .foregroundColor(.secondary)
-                                        .lineLimit(1)
-                                }
-                            }
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(Color.gray.opacity(0.1))
-                            .cornerRadius(6)
-                        }
-                    }
-                }
-            }
-            .frame(maxWidth: 192)
         }
     }
     
@@ -177,29 +124,6 @@ struct TikTokVideoView: View {
             .foregroundColor(.gray)
             .frame(maxWidth: 192, alignment: .leading)
             .lineLimit(1)
-    }
-    
-    private func loadAssociatedPlaces() async {
-        guard !isLoadingPlaces, let userId = userSession.currentUserId else { return }
-        
-        isLoadingPlaces = true
-        
-        do {
-            let places = try await TikTokPlaceService.shared.fetchPlacesForTikTok(
-                videoId: viewModel.tikTokVideo.videoID,
-                userId: userId
-            )
-            
-            await MainActor.run {
-                self.associatedPlaces = places
-                self.isLoadingPlaces = false
-            }
-        } catch {
-            print("❌ Error loading associated places for TikTok: \(error)")
-            await MainActor.run {
-                self.isLoadingPlaces = false
-            }
-        }
     }
 }
 
