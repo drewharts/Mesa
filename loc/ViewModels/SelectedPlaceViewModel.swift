@@ -130,6 +130,7 @@ class SelectedPlaceViewModel: ObservableObject {
     @Published var shouldAnimateMapToPlace: Bool = false // Track if map should animate to place location
     @Published private var placePhotos: [String: [UIImage]] = [:] // Cache for place-level photos by placeId
     @Published private var placeReviews: [String: [any ReviewProtocol]] = [:] // Cache for reviews by placeId
+    @Published private var placeTikToks: [String: [TikTokVideo]] = [:] // Cache for TikToks by placeId
     @Published private var reviewPhotos: [String: [UIImage]] = [:] // Cache for review photos by reviewId
     @Published private var userProfilePhotos: [String: UIImage] = [:] // Cache for profile photos by userId
     @Published private var restaurantTypes: [String: String] = [:] // Dictionary to store restaurant types by placeId
@@ -430,13 +431,14 @@ class SelectedPlaceViewModel: ObservableObject {
     
     private func loadReviewsWithUserId(placeId: String, currentUserId: String) {
         
-        // Fetch reviews for the specific place
+        // Fetch reviews AND TikToks for the specific place in a single query
         Task {
             do {
-                let reviews = try await reviewService.fetchPlaceReviews(placeId: placeId, latestOnly: false)
+                let (reviews, tiktoks) = try await reviewService.fetchPlaceReviews(placeId: placeId, latestOnly: false)
                 
                 await MainActor.run {
                     self.placeReviews[placeId] = reviews
+                    self.placeTikToks[placeId] = tiktoks // Store TikToks
                     
                     reviews.forEach { review in
                         self.loadReviewPhotos(for: review)
@@ -445,13 +447,14 @@ class SelectedPlaceViewModel: ObservableObject {
                     }
                     self.reviewLoadingStates[placeId] = .loaded
                     self.updateCurrentPlaceFullyLoaded()
-                    print("✅ [SelectedPlaceViewModel] Loaded \(reviews.count) reviews for place \(placeId)")
+                    print("✅ [SelectedPlaceViewModel] Loaded \(reviews.count) reviews and \(tiktoks.count) TikToks for place \(placeId)")
                 }
             } catch {
                 await MainActor.run {
-                    print("❌ [SelectedPlaceViewModel] Error fetching reviews for place \(placeId): \(error.localizedDescription)")
+                    print("❌ [SelectedPlaceViewModel] Error fetching reviews/TikToks for place \(placeId): \(error.localizedDescription)")
                     self.reviewLoadingStates[placeId] = .error(error)
                     self.placeReviews[placeId] = []
+                    self.placeTikToks[placeId] = []
                     self.updateCurrentPlaceFullyLoaded()
                 }
             }
@@ -1073,6 +1076,11 @@ class SelectedPlaceViewModel: ObservableObject {
     var reviews: [any ReviewProtocol] {
         guard let placeId = selectedPlace?.id.uuidString else { return [] }
         return placeReviews[placeId] ?? []
+    }
+    
+    var tiktokVideos: [TikTokVideo] {
+        guard let placeId = selectedPlace?.id.uuidString else { return [] }
+        return placeTikToks[placeId] ?? []
     }
     
     var photoLoadingState: LoadingState {

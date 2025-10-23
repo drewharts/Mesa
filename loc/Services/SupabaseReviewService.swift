@@ -192,60 +192,75 @@ class SupabaseReviewService: ObservableObject {
     
     // MARK: - Place Reviews
     
-    func fetchPlaceReviews(placeId: String, latestOnly: Bool = false) async throws -> [ReviewProtocol] {
-        var query = supabase.client
-            .from("reviews")
-            .select()
-            .eq("place_id", value: placeId)
-            .order("timestamp", ascending: false)
+    func fetchPlaceReviews(placeId: String, latestOnly: Bool = false) async throws -> ([ReviewProtocol], [TikTokVideo]) {
+        // Call the new SQL function that returns reviews + TikToks in a single query
+        let response: [ReviewWithTikToksRecord] = try await supabase.client
+            .rpc("get_place_reviews_with_tiktoks", params: ["p_place_id": placeId])
+            .execute()
+            .value
         
-        if latestOnly {
-            query = query.limit(1)
-        }
-        
-        let response: [ReviewRecord] = try await query.execute().value
-        
-        let reviews = response.compactMap { record -> ReviewProtocol? in
-            // Use timestamp directly since it's now a Date object
-            let timestamp = record.timestamp
-            
-            // Create appropriate review type based on record.type
-            if record.type == "restaurant" {
-                return RestaurantReview(
-                    id: record.id,
-                    userId: record.user_id,
-                    profilePhotoUrl: record.profile_photo_url ?? "",
-                    userFirstName: record.user_first_name ?? "",
-                    userLastName: record.user_last_name ?? "",
-                    placeId: record.place_id,
-                    placeName: record.place_name ?? "",
-                    foodRating: record.food_rating ?? 0,
-                    serviceRating: record.service_rating ?? 0,
-                    ambienceRating: record.ambience_rating ?? 0,
-                    favoriteDishes: record.favorite_dishes ?? [],
-                    reviewText: record.review_text ?? "",
-                    timestamp: timestamp,
-                    images: record.images ?? [],
-                    likes: record.likes ?? 0
-                )
-            } else {
-                return GenericReview(
-                    id: record.id,
-                    userId: record.user_id,
-                    profilePhotoUrl: record.profile_photo_url ?? "",
-                    userFirstName: record.user_first_name ?? "",
-                    userLastName: record.user_last_name ?? "",
-                    placeId: record.place_id,
-                    placeName: record.place_name ?? "",
-                    reviewText: record.review_text ?? "",
-                    timestamp: timestamp,
-                    images: record.images ?? [],
-                    likes: record.likes ?? 0
+        // Extract TikToks from the first row (they're the same for all rows)
+        var tiktokVideos: [TikTokVideo] = []
+        if let firstRecord = response.first,
+           let tiktokData = firstRecord.tiktok_videos?.value as? [[String: Any]] {
+            tiktokVideos = tiktokData.compactMap { dict -> TikTokVideo? in
+                guard let videoId = dict["video_id"] as? String,
+                      let videoUrl = dict["url"] as? String,
+                      let embedHtml = dict["embed_html"] as? String,
+                      let thumbnailUrl = dict["thumbnail_url"] as? String else {
+                    return nil
+                }
+                
+                // Parse author
+                var author = TikTokAuthor(displayName: "", url: "", username: "")
+                if let authorDict = dict["author"] as? [String: Any] {
+                    author = TikTokAuthor(
+                        displayName: authorDict["display_name"] as? String ?? "",
+                        url: authorDict["url"] as? String ?? "",
+                        username: authorDict["username"] as? String ?? ""
+                    )
+                }
+                
+                return TikTokVideo(
+                    videoID: videoId,
+                    url: videoUrl,
+                    title: dict["title"] as? String,
+                    caption: dict["caption"] as? String,
+                    embedHTML: embedHtml,
+                    thumbnailURL: thumbnailUrl,
+                    author: author,
+                    hashtags: dict["hashtags"] as? [String] ?? [],
+                    createdAt: dict["created_at"] as? String ?? ""
                 )
             }
         }
         
-        return reviews
+        // Convert records to ReviewProtocol objects
+        let reviews: [ReviewProtocol] = response.compactMap { record -> ReviewProtocol? in
+            let timestamp = record.review_timestamp
+            
+            // Create GenericReview for all reviews (simplified version)
+            return GenericReview(
+                id: record.review_id,
+                userId: record.review_user_id,
+                profilePhotoUrl: "",
+                userFirstName: "",
+                userLastName: "",
+                placeId: placeId,
+                placeName: "",
+                reviewText: record.review_text,
+                timestamp: timestamp,
+                images: record.review_images ?? [],
+                likes: 0
+            )
+        }
+        
+        // Apply latestOnly filter if needed
+        if latestOnly && !reviews.isEmpty {
+            return ([reviews[0]], tiktokVideos)
+        }
+        
+        return (reviews, tiktokVideos)
     }
     
     // MARK: - Comments
@@ -337,6 +352,20 @@ struct ReviewRecord: Codable {
     let timestamp: Date  // Changed from String to Date to match database schema
     let likes: Int?      // Database defaults to 0, but we'll send explicit value
     let type: String?    // Database defaults to 'restaurant', but we'll send explicit value
+}
+
+struct ReviewWithTikToksRecord: Codable {
+    let review_id: String
+    let review_user_id: String
+    let review_text: String
+    let review_images: [String]?
+    let review_rating: Double?
+    let review_timestamp: Date
+    let review_type: String?
+    let review_price_paid: Double?
+    let review_created_at: Date
+    let review_updated_at: Date
+    let tiktok_videos: AnyCodable? // JSONB array of TikTok videos
 }
 
 struct CommentRecord: Codable {

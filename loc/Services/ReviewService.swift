@@ -117,7 +117,7 @@ class ReviewService: ObservableObject {
         completion([], nil)
     }
     
-    func fetchPlaceReviews(placeId: String, latestOnly: Bool = false) async throws -> [ReviewProtocol] {
+    func fetchPlaceReviews(placeId: String, latestOnly: Bool = false) async throws -> ([ReviewProtocol], [TikTokVideo]) {
         return try await supabase.fetchPlaceReviews(placeId: placeId, latestOnly: latestOnly)
     }
     
