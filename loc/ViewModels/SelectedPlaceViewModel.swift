@@ -92,20 +92,16 @@ class SelectedPlaceViewModel: ObservableObject {
     private func continueWithPlaceSetup(place: DetailPlace, currentLocation: CLLocationCoordinate2D) {
         print("🎬 [SelectedPlaceViewModel] continueWithPlaceSetup for '\(place.name)'")
         loadData(for: place, currentLocation: currentLocation)
+        
+        // Reset photo loading state for new place
+        print("🔄 [SelectedPlaceViewModel] Resetting photo loading state")
+        resetPhotoLoading()
+        
+        // Load reviews first, then photos will be loaded after reviews complete
         loadReviews(for: place)
 
         // Set Google rating from the place data
         placeRating = place.rating ?? 0
-
-        // Reset photo loading state for new place
-        print("🔄 [SelectedPlaceViewModel] Resetting photo loading state")
-        resetPhotoLoading()
-        print("📸 [SelectedPlaceViewModel] Starting to get place photos")
-        getPlacePhotos(for: place)
-        
-        // Load review photos for about section
-        print("📸 [SelectedPlaceViewModel] Starting to load review photos for about section")
-        loadReviewPhotosForAbout(for: place)
 
         // Clear previous likes when loading a new place
         likedReviews.removeAll()
@@ -446,6 +442,14 @@ class SelectedPlaceViewModel: ObservableObject {
                         self.loadCommentCountForReview(placeId: placeId, reviewId: review.id)
                     }
                     self.reviewLoadingStates[placeId] = .loaded
+                    
+                    // Now that reviews are loaded, load photos from them
+                    if let place = self.selectedPlace, place.id.uuidString == placeId {
+                        print("📸 [SelectedPlaceViewModel] Reviews loaded, now loading photos")
+                        self.getPlacePhotos(for: place)
+                        self.loadReviewPhotosForAbout(for: place)
+                    }
+                    
                     self.updateCurrentPlaceFullyLoaded()
                 }
             } catch {
@@ -454,6 +458,13 @@ class SelectedPlaceViewModel: ObservableObject {
                     self.reviewLoadingStates[placeId] = .error(error)
                     self.placeReviews[placeId] = []
                     self.placeTikToks[placeId] = []
+                    
+                    // Even if reviews fail, try to load photos (will result in empty)
+                    if let place = self.selectedPlace, place.id.uuidString == placeId {
+                        self.getPlacePhotos(for: place)
+                        self.loadReviewPhotosForAbout(for: place)
+                    }
+                    
                     self.updateCurrentPlaceFullyLoaded()
                 }
             }
@@ -494,16 +505,9 @@ class SelectedPlaceViewModel: ObservableObject {
             self.photoLoadingStates[placeId] = .loading
         }
         
-        // Use cached reviews instead of fetching again
+        // Use cached reviews to get photos (reviews are already loaded at this point)
         Task {
-            // Wait a brief moment for reviews to be loaded if not already
-            var reviews = await MainActor.run { self.placeReviews[placeId] ?? [] }
-            
-            // If no cached reviews yet, wait a bit and try again (race condition)
-            if reviews.isEmpty {
-                try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
-                reviews = await MainActor.run { self.placeReviews[placeId] ?? [] }
-            }
+            let reviews = await MainActor.run { self.placeReviews[placeId] ?? [] }
             
             var photoURLs: [String] = []
             for review in reviews {
@@ -581,16 +585,9 @@ class SelectedPlaceViewModel: ObservableObject {
             self.reviewPhotosForAboutLoadingStates[placeId] = .loading
         }
 
-        // Use cached reviews to get photo URLs
+        // Use cached reviews to get photo URLs (reviews are already loaded at this point)
         Task {
-            // Wait a brief moment for reviews to be loaded if not already
-            var reviews = await MainActor.run { self.placeReviews[placeId] ?? [] }
-            
-            // If no cached reviews yet, wait a bit and try again (race condition)
-            if reviews.isEmpty {
-                try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
-                reviews = await MainActor.run { self.placeReviews[placeId] ?? [] }
-            }
+            let reviews = await MainActor.run { self.placeReviews[placeId] ?? [] }
             
             // Extract photo URLs from reviews
             var photoURLs: [String] = []
