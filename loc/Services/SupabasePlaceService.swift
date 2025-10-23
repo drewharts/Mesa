@@ -979,17 +979,23 @@ class SupabasePlaceService: ObservableObject {
     func addFavorite(userId: String, placeId: String, placeName: String?, placeAddress: String?, placePhotoUrl: String?, completion: @escaping (Error?) -> Void) {
         Task {
             do {
+                var insertData: [String: Any] = [
+                    "id": UUID().uuidString,
+                    "user_id": userId,
+                    "place_id": placeId,
+                    "name": placeName ?? "",
+                    "address": placeAddress ?? "",
+                    "timestamp": ISO8601DateFormatter().string(from: Date())
+                ]
+                
+                // Only add photo URL if it exists
+                if let photoUrl = placePhotoUrl {
+                    insertData["latest_review_photo"] = photoUrl
+                }
+                
                 try await supabase.client
                     .from("favorites")
-                    .insert([
-                        "id": UUID().uuidString,
-                        "user_id": userId,
-                        "place_id": placeId,
-                        "name": placeName ?? "",
-                        "address": placeAddress ?? "",
-                        "latest_review_photo": placePhotoUrl as Any,
-                        "timestamp": ISO8601DateFormatter().string(from: Date())
-                    ])
+                    .insert(insertData)
                     .execute()
                 
                 print("✅ [Supabase] Added favorite for place \(placeId)")
