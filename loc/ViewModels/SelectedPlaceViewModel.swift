@@ -447,7 +447,6 @@ class SelectedPlaceViewModel: ObservableObject {
                     }
                     self.reviewLoadingStates[placeId] = .loaded
                     self.updateCurrentPlaceFullyLoaded()
-                    print("✅ [SelectedPlaceViewModel] Loaded \(reviews.count) reviews and \(tiktoks.count) TikToks for place \(placeId)")
                 }
             } catch {
                 await MainActor.run {
@@ -486,22 +485,15 @@ class SelectedPlaceViewModel: ObservableObject {
     private func getPlacePhotos(for place: DetailPlace, loadMore: Bool = false) {
         let placeId = place.id.uuidString
         
-        print("📸 [getPlacePhotos] Called for place: \(place.name) (ID: \(placeId))")
-        print("   - loadMore: \(loadMore)")
-        print("   - Current state: \(photoLoadingStates[placeId] ?? .idle)")
-        
         // Don't fetch if already loading
         if photoLoadingStates[placeId] == .loading && !loadMore {
-            print("⚠️ [getPlacePhotos] Already loading, skipping")
             return
         }
         
         DispatchQueue.main.async {
-            print("📸 [getPlacePhotos] Setting state to .loading")
             self.photoLoadingStates[placeId] = .loading
         }
         
-        print("📸 [getPlacePhotos] Using cached reviews for photos...")
         // Use cached reviews instead of fetching again
         Task {
             // Wait a brief moment for reviews to be loaded if not already
@@ -513,18 +505,13 @@ class SelectedPlaceViewModel: ObservableObject {
                 reviews = await MainActor.run { self.placeReviews[placeId] ?? [] }
             }
             
-            print("📸 [getPlacePhotos] Using \(reviews.count) cached reviews for photos")
-            
             var photoURLs: [String] = []
             for review in reviews {
                 photoURLs.append(contentsOf: review.images)
             }
             
-            print("📸 [getPlacePhotos] Extracted \(photoURLs.count) photo URLs from reviews")
-            
             // If no photos found in any reviews, mark as loaded
             if photoURLs.isEmpty {
-                print("📸 [getPlacePhotos] No photos found, marking as loaded with empty array")
                 await MainActor.run {
                     self.photoLoadingStates[placeId] = .loaded
                     self.placePhotos[placeId] = []
@@ -538,11 +525,8 @@ class SelectedPlaceViewModel: ObservableObject {
             let startIndex = await MainActor.run { self.placePhotos[placeId]?.count ?? 0 }
             let endIndex = min(startIndex + self.photoPageLimit, photoURLs.count)
             
-            print("📸 [getPlacePhotos] Pagination: startIndex=\(startIndex), endIndex=\(endIndex), total=\(photoURLs.count)")
-            
             guard startIndex < endIndex else {
                 // No more photos to load
-                print("📸 [getPlacePhotos] No more photos to load, marking as complete")
                 await MainActor.run {
                     self.allPhotosLoaded = true
                     self.photoLoadingStates[placeId] = .loaded
@@ -552,7 +536,6 @@ class SelectedPlaceViewModel: ObservableObject {
             }
             
             let urlsToFetch = Array(photoURLs[startIndex..<endIndex])
-            print("📸 [getPlacePhotos] Fetching \(urlsToFetch.count) images from URLs...")
             
             // Load images in parallel using TaskGroup
             var loadedImages: [UIImage] = []
@@ -576,8 +559,6 @@ class SelectedPlaceViewModel: ObservableObject {
                 currentPhotos.append(contentsOf: loadedImages)
                 self.placePhotos[placeId] = currentPhotos
                 self.photoLoadingStates[placeId] = .loaded
-                
-                print("✅ [getPlacePhotos] Successfully loaded \(loadedImages.count) photos. Total now: \(currentPhotos.count)")
                 
                 // Check if all photos have been loaded
                 if currentPhotos.count >= photoURLs.count {
