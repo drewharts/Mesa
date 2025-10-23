@@ -743,10 +743,7 @@ class SelectedPlaceViewModel: ObservableObject {
     /// Load profile photo from URL (URL comes from SQL JOIN with users table)
     private func loadProfilePhotoFromURL(userId: String, photoUrl: String) {
         // Skip if already loaded or empty URL
-        guard !photoUrl.isEmpty else { return }
-        if userProfilePhotos[userId] != nil || detailPlaceViewModel?.userProfilePicture[userId] != nil {
-            return
-        }
+        guard !photoUrl.isEmpty, userProfilePhotos[userId] == nil else { return }
         
         Task {
             guard let url = URL(string: photoUrl) else { return }
