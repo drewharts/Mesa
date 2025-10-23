@@ -209,7 +209,7 @@ class DetailPlaceViewModel: ObservableObject {
         // Fetch ALL reviews for this place (not just friends' reviews) to get images for tiles
         Task {
             do {
-                let reviews = try await ReviewService.shared.fetchPlaceReviews(placeId: placeId, latestOnly: false)
+                let (reviews, _) = try await ReviewService.shared.fetchPlaceReviews(placeId: placeId, latestOnly: false)
                 
                 // Find reviews with images
                 let reviewsWithImages = reviews.filter { !$0.images.isEmpty }

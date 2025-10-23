@@ -885,7 +885,7 @@ class ProfileViewModel: ObservableObject {
         for placeId in placeIds {
             do {
                 // Get the most recent review for this place by this user
-                let reviews = try await reviewService.fetchPlaceReviews(placeId: placeId, latestOnly: false)
+                let (reviews, _) = try await reviewService.fetchPlaceReviews(placeId: placeId, latestOnly: false)
                 let userReviews = reviews.filter { $0.userId == userId }
                 
                 if let mostRecentReview = userReviews.first(where: { !$0.images.isEmpty }),

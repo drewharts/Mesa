@@ -505,7 +505,7 @@ class SelectedPlaceViewModel: ObservableObject {
         // Fetch reviews for the specific place to get photos
         Task {
             do {
-                let reviews = try await reviewService.fetchPlaceReviews(placeId: placeId, latestOnly: false)
+                let (reviews, _) = try await reviewService.fetchPlaceReviews(placeId: placeId, latestOnly: false)
                 
                 print("📸 [getPlacePhotos] Fetched \(reviews.count) reviews for place \(placeId)")
                 
