@@ -233,11 +233,12 @@ class SupabaseReviewService: ObservableObject {
         
         // Convert records to ReviewProtocol objects
         let reviews: [ReviewProtocol] = response.compactMap { record -> ReviewProtocol? in
-            // Parse PostgreSQL TIMESTAMP format to Date (includes milliseconds)
+            // Parse PostgreSQL TIMESTAMP WITHOUT TIME ZONE format to Date
+            // Since the DB uses "timestamp without time zone", we don't set a timezone
+            // This will interpret the timestamp in the system's local timezone
             let dateFormatter = DateFormatter()
-            dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
-            dateFormatter.timeZone = TimeZone(identifier: "UTC")
             dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+            dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
             
             // Try with milliseconds first, fallback to without if it fails
             var timestamp = dateFormatter.date(from: record.review_timestamp)
@@ -246,12 +247,14 @@ class SupabaseReviewService: ObservableObject {
                 timestamp = dateFormatter.date(from: record.review_timestamp)
             }
             
-            // DEBUG: Log if parsing failed
-            if timestamp == nil {
-                print("❌ [SupabaseReviewService] Failed to parse timestamp: '\(record.review_timestamp)'")
-            }
-            
             let finalTimestamp = timestamp ?? Date()
+            
+            // DEBUG: Log parsing result
+            if timestamp == nil {
+                print("❌ Failed to parse timestamp: '\(record.review_timestamp)'")
+            } else {
+                print("✅ Parsed timestamp: '\(record.review_timestamp)' -> \(finalTimestamp)")
+            }
             
             // Create GenericReview with user information from the SQL function
             return GenericReview(
