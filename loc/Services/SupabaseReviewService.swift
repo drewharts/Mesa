@@ -233,15 +233,27 @@ class SupabaseReviewService: ObservableObject {
         
         // Convert records to ReviewProtocol objects
         let reviews: [ReviewProtocol] = response.compactMap { record -> ReviewProtocol? in
-            // Parse PostgreSQL TIMESTAMP WITHOUT TIME ZONE format to Date
-            // Since the DB uses "timestamp without time zone", we don't set a timezone
-            // This will interpret the timestamp in the system's local timezone
+            // Parse PostgreSQL TIMESTAMP - can come in ISO 8601 format or space-separated
             let dateFormatter = DateFormatter()
             dateFormatter.locale = Locale(identifier: "en_US_POSIX")
-            dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
             
-            // Try with milliseconds first, fallback to without if it fails
+            // Try ISO 8601 format with 'T' separator first (e.g., "2025-09-18T19:36:45.709")
+            dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSS"
             var timestamp = dateFormatter.date(from: record.review_timestamp)
+            
+            // Fallback to space-separated with milliseconds
+            if timestamp == nil {
+                dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
+                timestamp = dateFormatter.date(from: record.review_timestamp)
+            }
+            
+            // Fallback to ISO 8601 without milliseconds
+            if timestamp == nil {
+                dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+                timestamp = dateFormatter.date(from: record.review_timestamp)
+            }
+            
+            // Final fallback to space-separated without milliseconds
             if timestamp == nil {
                 dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
                 timestamp = dateFormatter.date(from: record.review_timestamp)
@@ -249,11 +261,9 @@ class SupabaseReviewService: ObservableObject {
             
             let finalTimestamp = timestamp ?? Date()
             
-            // DEBUG: Log parsing result
+            // DEBUG: Log parsing failures only
             if timestamp == nil {
                 print("❌ Failed to parse timestamp: '\(record.review_timestamp)'")
-            } else {
-                print("✅ Parsed timestamp: '\(record.review_timestamp)' -> \(finalTimestamp)")
             }
             
             // Create GenericReview with user information from the SQL function
