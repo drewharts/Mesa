@@ -243,10 +243,13 @@ struct MapView: View {
              // Remove notification observers
              removeNotificationObservers()
          }
+        .task(id: scenePhase) {
+            // Reload photos when app becomes active
+            if scenePhase == .active {
+                await mapViewModel.loadFollowedUsersPhotos()
+            }
+        }
         .task {
-            // Load followed users' photos for custom annotations
-            await mapViewModel.loadFollowedUsersPhotos()
-            
             // 🚀 CRITICAL: Load viewport places FIRST (instant map rendering)
             if !hasLoadedInitialViewport {
                 // Give the map a moment to settle and provide a region
