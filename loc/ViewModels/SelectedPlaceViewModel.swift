@@ -21,14 +21,20 @@ class SelectedPlaceViewModel: ObservableObject {
     private let mesaBackendService: MesaBackendService
 
     private let locationManager: LocationManager
+    private weak var detailPlaceViewModel: DetailPlaceViewModel?
 
-    init(locationManager: LocationManager, reviewService: ReviewService, placeService: PlaceService, userService: UserService, imageService: ImageService, mesaBackendService: MesaBackendService = MesaBackendService()) {
+    init(locationManager: LocationManager, reviewService: ReviewService, placeService: PlaceService, userService: UserService, imageService: ImageService, mesaBackendService: MesaBackendService = MesaBackendService(), detailPlaceViewModel: DetailPlaceViewModel? = nil) {
         self.locationManager = locationManager
         self.reviewService = reviewService
         self.placeService = placeService
         self.userService = userService
         self.imageService = imageService
         self.mesaBackendService = mesaBackendService
+        self.detailPlaceViewModel = detailPlaceViewModel
+    }
+    
+    func setDetailPlaceViewModel(_ viewModel: DetailPlaceViewModel) {
+        self.detailPlaceViewModel = viewModel
     }
 
     private var isUpdatingPlaceDetails = false
@@ -802,6 +808,8 @@ class SelectedPlaceViewModel: ObservableObject {
                 } else if let data = data, let image = UIImage(data: data) {
                     self.userProfilePhotos[userId] = image
                     self.profilePhotoLoadingStates[userId] = .loaded
+                    // Also store in DetailPlaceViewModel for UI access
+                    self.detailPlaceViewModel?.userProfilePicture[userId] = image
                 } else {
                     self.profilePhotoLoadingStates[userId] = .error(NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to decode profile photo"]))
                     self.userProfilePhotos[userId] = nil

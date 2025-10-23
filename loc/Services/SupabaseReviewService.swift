@@ -236,13 +236,13 @@ class SupabaseReviewService: ObservableObject {
             dateFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
             let timestamp = dateFormatter.date(from: record.review_timestamp) ?? Date()
             
-            // Create GenericReview for all reviews (simplified version)
+            // Create GenericReview with user information from the SQL function
             return GenericReview(
                 id: record.review_id,
                 userId: record.review_user_id,
-                profilePhotoUrl: "",
-                userFirstName: "",
-                userLastName: "",
+                profilePhotoUrl: record.user_profile_photo_url ?? "",
+                userFirstName: record.user_first_name ?? "",
+                userLastName: record.user_last_name ?? "",
                 placeId: placeId,
                 placeName: "",
                 reviewText: record.review_text,
@@ -394,6 +394,9 @@ struct ReviewWithTikToksRecord: Codable {
     let review_timestamp: String
     let review_type: String?
     let review_likes: Int?
+    let user_first_name: String?
+    let user_last_name: String?
+    let user_profile_photo_url: String?
     let tiktok_videos: AnyCodable? // JSONB array of TikTok videos
 }
 

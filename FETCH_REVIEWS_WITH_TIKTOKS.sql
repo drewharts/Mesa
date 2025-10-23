@@ -29,6 +29,11 @@ RETURNS TABLE (
     review_created_at TIMESTAMPTZ,
     review_updated_at TIMESTAMPTZ,
     
+    -- User information
+    user_first_name TEXT,
+    user_last_name TEXT,
+    user_profile_photo_url TEXT,
+    
     -- TikTok videos (as JSONB array, NULL if no TikToks exist)
     tiktok_videos JSONB
 ) AS $$
@@ -56,10 +61,16 @@ BEGIN
         r.created_at AS review_created_at,
         r.updated_at AS review_updated_at,
         
+        -- User information from users table
+        u.first_name AS user_first_name,
+        u.last_name AS user_last_name,
+        u.profile_photo_url AS user_profile_photo_url,
+        
         -- TikTok videos (same for all rows, or NULL if none exist)
         COALESCE(pt.tiktok_videos, '[]'::jsonb) AS tiktok_videos
     FROM reviews r
     LEFT JOIN place_tiktoks pt ON pt.place_id = r.place_id
+    LEFT JOIN users u ON u.id = r.user_id
     WHERE r.place_id = p_place_id
     ORDER BY r.timestamp DESC;
 END;
