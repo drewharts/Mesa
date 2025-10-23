@@ -27,7 +27,7 @@ struct MinPlaceDetailView: View {
     }
     
     private var tikTokVideos: [TikTokVideo] {
-        let placeTikTokVideos = selectedPlaceVM.selectedPlace?.tikTokVideos ?? []
+        let placeTikTokVideos = selectedPlaceVM.tiktokVideos // Use the cached TikToks from ViewModel
         let userTikTokVideos = profile.getTikTokVideos(for: selectedPlaceVM.selectedPlace?.id.uuidString ?? "")
         
         // Combine and deduplicate based on videoID or URL
