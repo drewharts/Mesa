@@ -288,8 +288,16 @@ struct MinPlaceDetailView: View {
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 12) {
                                     ForEach(tikTokVideos, id: \.videoID) { video in
-                                        TikTokVideoView(tikTokVideo: video)
-                                            .id("tiktok_\(video.videoID)")
+                                        TikTokVideoView(
+                                            tikTokVideo: video,
+                                            onDelete: {
+                                                Task {
+                                                    await deleteTikTok(video: video)
+                                                }
+                                            },
+                                            showDeleteOption: true
+                                        )
+                                        .id("tiktok_\(video.videoID)")
                                     }
                                 }
                                 .padding(.horizontal, 1)
@@ -350,6 +358,30 @@ struct MinPlaceDetailView: View {
             Button("OK", role: .cancel) { }
         } message: {
             Text("You already have 6 favorites. Remove one before adding a new one.")
+        }
+    }
+    
+    // MARK: - Helper Functions
+    
+    private func deleteTikTok(video: TikTokVideo) async {
+        guard let placeId = selectedPlaceVM.selectedPlace?.id.uuidString,
+              let userId = UserSession.shared.currentUserId else {
+            return
+        }
+        
+        do {
+            try await TikTokPlaceService.shared.deleteTikTokFromPlace(
+                placeId: placeId,
+                videoId: video.videoID,
+                userId: userId
+            )
+            
+            // Refresh the profile to update the UI
+            await MainActor.run {
+                profile.fetchUserExternalPlaces()
+            }
+        } catch {
+            print("❌ Error deleting TikTok: \(error)")
         }
     }
 }
