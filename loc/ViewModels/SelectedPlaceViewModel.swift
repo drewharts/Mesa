@@ -501,90 +501,89 @@ class SelectedPlaceViewModel: ObservableObject {
             self.photoLoadingStates[placeId] = .loading
         }
         
-        print("📸 [getPlacePhotos] Fetching reviews for place...")
-        // Fetch reviews for the specific place to get photos
+        print("📸 [getPlacePhotos] Using cached reviews for photos...")
+        // Use cached reviews instead of fetching again
         Task {
-            do {
-                let (reviews, _) = try await reviewService.fetchPlaceReviews(placeId: placeId, latestOnly: false)
-                
-                print("📸 [getPlacePhotos] Fetched \(reviews.count) reviews for place \(placeId)")
-                
-                var photoURLs: [String] = []
-                for review in reviews {
-                    photoURLs.append(contentsOf: review.images)
-                }
-                
-                print("📸 [getPlacePhotos] Extracted \(photoURLs.count) photo URLs from reviews")
-                
-                // If no photos found in any reviews, mark as loaded
-                if photoURLs.isEmpty {
-                    print("📸 [getPlacePhotos] No photos found, marking as loaded with empty array")
-                    await MainActor.run {
-                        self.photoLoadingStates[placeId] = .loaded
-                        self.placePhotos[placeId] = []
-                        self.allPhotosLoaded = true
-                        self.updateCurrentPlaceFullyLoaded()
-                    }
-                    return
-                }
-                
-                // Paginate the photo URLs
-                let startIndex = self.placePhotos[placeId]?.count ?? 0
-                let endIndex = min(startIndex + self.photoPageLimit, photoURLs.count)
-                
-                print("📸 [getPlacePhotos] Pagination: startIndex=\(startIndex), endIndex=\(endIndex), total=\(photoURLs.count)")
-                
-                guard startIndex < endIndex else {
-                    // No more photos to load
-                    print("📸 [getPlacePhotos] No more photos to load, marking as complete")
-                    await MainActor.run {
-                        self.allPhotosLoaded = true
-                        self.photoLoadingStates[placeId] = .loaded
-                        self.updateCurrentPlaceFullyLoaded()
-                    }
-                    return
-                }
-                
-                let urlsToFetch = Array(photoURLs[startIndex..<endIndex])
-                print("📸 [getPlacePhotos] Fetching \(urlsToFetch.count) images from URLs...")
-                
-                // Load images in parallel using TaskGroup
-                var loadedImages: [UIImage] = []
-                
-                await withTaskGroup(of: UIImage?.self) { group in
-                    for imageUrl in urlsToFetch {
-                        group.addTask {
-                            await self.loadImageFromURL(imageUrl: imageUrl)
-                        }
-                    }
-                    
-                    for await image in group {
-                        if let image = image {
-                            loadedImages.append(image)
-                        }
-                    }
-                }
-                
+            // Wait a brief moment for reviews to be loaded if not already
+            var reviews = await MainActor.run { self.placeReviews[placeId] ?? [] }
+            
+            // If no cached reviews yet, wait a bit and try again (race condition)
+            if reviews.isEmpty {
+                try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
+                reviews = await MainActor.run { self.placeReviews[placeId] ?? [] }
+            }
+            
+            print("📸 [getPlacePhotos] Using \(reviews.count) cached reviews for photos")
+            
+            var photoURLs: [String] = []
+            for review in reviews {
+                photoURLs.append(contentsOf: review.images)
+            }
+            
+            print("📸 [getPlacePhotos] Extracted \(photoURLs.count) photo URLs from reviews")
+            
+            // If no photos found in any reviews, mark as loaded
+            if photoURLs.isEmpty {
+                print("📸 [getPlacePhotos] No photos found, marking as loaded with empty array")
                 await MainActor.run {
-                    var currentPhotos = self.placePhotos[placeId] ?? []
-                    currentPhotos.append(contentsOf: loadedImages)
-                    self.placePhotos[placeId] = currentPhotos
                     self.photoLoadingStates[placeId] = .loaded
-                    
-                    print("✅ [getPlacePhotos] Successfully loaded \(loadedImages.count) photos. Total now: \(currentPhotos.count)")
-                    
-                    // Check if all photos have been loaded
-                    if currentPhotos.count >= photoURLs.count {
-                        self.allPhotosLoaded = true
-                    }
+                    self.placePhotos[placeId] = []
+                    self.allPhotosLoaded = true
                     self.updateCurrentPlaceFullyLoaded()
                 }
-            } catch {
+                return
+            }
+            
+            // Paginate the photo URLs
+            let startIndex = await MainActor.run { self.placePhotos[placeId]?.count ?? 0 }
+            let endIndex = min(startIndex + self.photoPageLimit, photoURLs.count)
+            
+            print("📸 [getPlacePhotos] Pagination: startIndex=\(startIndex), endIndex=\(endIndex), total=\(photoURLs.count)")
+            
+            guard startIndex < endIndex else {
+                // No more photos to load
+                print("📸 [getPlacePhotos] No more photos to load, marking as complete")
                 await MainActor.run {
-                    print("❌ [getPlacePhotos] Error fetching reviews for place \(placeId): \(error.localizedDescription)")
-                    self.photoLoadingStates[placeId] = .error(error)
+                    self.allPhotosLoaded = true
+                    self.photoLoadingStates[placeId] = .loaded
                     self.updateCurrentPlaceFullyLoaded()
                 }
+                return
+            }
+            
+            let urlsToFetch = Array(photoURLs[startIndex..<endIndex])
+            print("📸 [getPlacePhotos] Fetching \(urlsToFetch.count) images from URLs...")
+            
+            // Load images in parallel using TaskGroup
+            var loadedImages: [UIImage] = []
+            
+            await withTaskGroup(of: UIImage?.self) { group in
+                for imageUrl in urlsToFetch {
+                    group.addTask {
+                        await self.loadImageFromURL(imageUrl: imageUrl)
+                    }
+                }
+                
+                for await image in group {
+                    if let image = image {
+                        loadedImages.append(image)
+                    }
+                }
+            }
+            
+            await MainActor.run {
+                var currentPhotos = self.placePhotos[placeId] ?? []
+                currentPhotos.append(contentsOf: loadedImages)
+                self.placePhotos[placeId] = currentPhotos
+                self.photoLoadingStates[placeId] = .loaded
+                
+                print("✅ [getPlacePhotos] Successfully loaded \(loadedImages.count) photos. Total now: \(currentPhotos.count)")
+                
+                // Check if all photos have been loaded
+                if currentPhotos.count >= photoURLs.count {
+                    self.allPhotosLoaded = true
+                }
+                self.updateCurrentPlaceFullyLoaded()
             }
         }
     }
