@@ -217,6 +217,7 @@ struct MinPlaceDetailView: View {
                         .font(.footnote)
                         .foregroundColor(.black)
                         .fixedSize(horizontal: false, vertical: true)
+                        .padding(.bottom, 20)
 
                     // TikTok Videos Section
                     if !tikTokVideos.isEmpty {
