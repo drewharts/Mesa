@@ -50,7 +50,8 @@ struct locApp: App {
             reviewService: services.reviewService,
             placeService: services.placeService,
             userService: services.userService,
-            imageService: services.imageService
+            imageService: services.imageService,
+            detailPlaceViewModel: detailVM
         )
         
         let deepLinkMgr = DeepLinkManager(
