@@ -8,6 +8,7 @@ import SwiftUI
 import MapKit
 
 struct MapView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var locationManager: LocationManager
     @EnvironmentObject var profile: ProfileViewModel
