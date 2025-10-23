@@ -271,8 +271,8 @@ class DeepLinkManager: ObservableObject {
     private func navigateToPlace(_ place: DetailPlace) async {
         await MainActor.run {
             detailPlaceViewModel.places[place.id.uuidString] = place
-            // Animate map to place location when navigating from deep link
-            selectedPlaceViewModel.selectPlace(place, shouldAnimateMap: true)
+            // Animate map to place location when navigating from deep link and fetch fresh details
+            selectedPlaceViewModel.selectPlaceAndFetchDetails(place, shouldAnimateMap: true)
             selectedPlaceViewModel.isDetailSheetPresented = true
             pendingPlace = nil
         }

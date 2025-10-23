@@ -77,8 +77,8 @@ class DeepLinkViewModel: ObservableObject {
         deepLinkedPlace = detailPlace
         isShowingPlaceFromDeepLink = true
         
-        // Also update the main selected place view model - animate map to deep linked place
-        selectedPlaceViewModel.selectPlace(detailPlace, shouldAnimateMap: true)
+        // Also update the main selected place view model - animate map to deep linked place and fetch fresh details
+        selectedPlaceViewModel.selectPlaceAndFetchDetails(detailPlace, shouldAnimateMap: true)
         selectedPlaceViewModel.isDetailSheetPresented = true
         
         // Clear pending place
@@ -136,8 +136,8 @@ class DeepLinkViewModel: ObservableObject {
     func navigateToDeepLinkedPlace() {
         guard let place = deepLinkedPlace else { return }
         
-        // Update the main view model to show this place - animate map to deep linked place
-        selectedPlaceViewModel.selectPlace(place, shouldAnimateMap: true)
+        // Update the main view model to show this place - animate map to deep linked place and fetch fresh details
+        selectedPlaceViewModel.selectPlaceAndFetchDetails(place, shouldAnimateMap: true)
         
         // Navigate to the place detail view
         isShowingPlaceFromDeepLink = true
