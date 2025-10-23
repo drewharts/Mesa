@@ -533,7 +533,7 @@ class ProfileViewModel: ObservableObject {
         let newFavorite = FavoritePlace(
             place_id: place.id.uuidString,
             name: place.name,
-            latest_review_photo: place.imageUrl
+            latest_review_photo: place.photoUrls?.first
         )
         lightweightFavorites.append(newFavorite)
         
