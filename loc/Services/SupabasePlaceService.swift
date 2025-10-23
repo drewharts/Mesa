@@ -976,7 +976,7 @@ class SupabasePlaceService: ObservableObject {
 
     // MARK: - Add/Remove Favorites
     
-    func addFavorite(userId: String, placeId: String, completion: @escaping (Error?) -> Void) {
+    func addFavorite(userId: String, placeId: String, placeName: String?, placeAddress: String?, placePhotoUrl: String?, completion: @escaping (Error?) -> Void) {
         Task {
             do {
                 try await supabase.client
@@ -985,6 +985,9 @@ class SupabasePlaceService: ObservableObject {
                         "id": UUID().uuidString,
                         "user_id": userId,
                         "place_id": placeId,
+                        "name": placeName ?? "",
+                        "address": placeAddress ?? "",
+                        "latest_review_photo": placePhotoUrl as Any,
                         "timestamp": ISO8601DateFormatter().string(from: Date())
                     ])
                     .execute()
