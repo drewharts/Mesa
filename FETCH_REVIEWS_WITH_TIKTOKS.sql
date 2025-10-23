@@ -11,12 +11,17 @@
 -- This is more efficient than fetching TikToks separately with place details.
 -- ============================================================================
 
--- Drop existing function if it exists (both UUID and TEXT versions to avoid ambiguity)
+-- Drop existing function versions to avoid ambiguity
 DROP FUNCTION IF EXISTS get_place_reviews_with_tiktoks(UUID);
 DROP FUNCTION IF EXISTS get_place_reviews_with_tiktoks(TEXT);
+DROP FUNCTION IF EXISTS get_place_reviews_with_tiktoks(TEXT, INTEGER, INTEGER);
 
--- Create the function with TEXT parameter (reviews table uses TEXT for IDs, not UUID)
-CREATE OR REPLACE FUNCTION get_place_reviews_with_tiktoks(p_place_id TEXT)
+-- Create the function with TEXT parameter and pagination support
+CREATE OR REPLACE FUNCTION get_place_reviews_with_tiktoks(
+    p_place_id TEXT,
+    p_limit INTEGER DEFAULT 4,
+    p_offset INTEGER DEFAULT 0
+)
 RETURNS TABLE (
     -- Reviews data (note: IDs are TEXT, not UUID in the reviews table)
     review_id TEXT,
@@ -27,7 +32,7 @@ RETURNS TABLE (
     review_type TEXT,
     review_likes INTEGER,
     
-    -- User information (already in reviews table)
+    -- User information (CURRENT data from users table, not denormalized)
     user_first_name TEXT,
     user_last_name TEXT,
     user_profile_photo_url TEXT,
@@ -56,17 +61,20 @@ BEGIN
         r.type AS review_type,
         r.likes AS review_likes,
         
-        -- User information (already in reviews table)
-        r.user_first_name,
-        r.user_last_name,
-        r.profile_photo_url AS user_profile_photo_url,
+        -- User information (CURRENT from users table via JOIN)
+        u.first_name AS user_first_name,
+        u.last_name AS user_last_name,
+        u.profile_photo_url AS user_profile_photo_url,
         
-        -- TikTok videos (same for all rows, or empty array if none exist)
+        -- TikTok videos
         COALESCE(pt.tiktok_videos, '{}'::jsonb[]) AS tiktok_videos
     FROM reviews r
+    INNER JOIN users u ON r.user_id = u.id  -- JOIN with users table for current data
     LEFT JOIN place_tiktoks pt ON pt.place_id = r.place_id
     WHERE r.place_id = p_place_id
-    ORDER BY r.timestamp DESC;
+    ORDER BY r.timestamp DESC
+    LIMIT p_limit
+    OFFSET p_offset;
 END;
 $$ LANGUAGE plpgsql;
 

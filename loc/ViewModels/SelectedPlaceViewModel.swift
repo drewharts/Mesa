@@ -420,7 +420,7 @@ class SelectedPlaceViewModel: ObservableObject {
                     
                     reviews.forEach { review in
                         self.loadReviewPhotos(for: review)
-                        self.loadProfilePhoto(for: review)
+                        // Profile photos now come from SQL JOIN with users table
                         self.loadCommentCountForReview(placeId: placeId, reviewId: review.id)
                     }
                     self.reviewLoadingStates[placeId] = .loaded
@@ -740,67 +740,6 @@ class SelectedPlaceViewModel: ObservableObject {
         self.loadReviewPhotos(for: review)
     }
     
-    private func loadProfilePhoto<T: ReviewProtocol>(for review: T) {
-        let userId = review.userId
-        
-        // Skip if already loaded
-        if userProfilePhotos[userId] != nil {
-            return
-        }
-        
-        DispatchQueue.main.async {
-            self.profilePhotoLoadingStates[userId] = .loading
-        }
-        
-        // Fetch current profile photo from users table (not denormalized review data)
-        Task {
-            do {
-                // Fetch user profile from Supabase users table
-                let user: UserProfilePhotoRecord = try await SupabaseManager.shared.client
-                    .from("users")
-                    .select("profile_photo_url")
-                    .eq("id", value: userId)
-                    .single()
-                    .execute()
-                    .value
-                
-                guard let photoUrlString = user.profile_photo_url, !photoUrlString.isEmpty else {
-                    await MainActor.run {
-                        self.profilePhotoLoadingStates[userId] = .loaded
-                        self.userProfilePhotos[userId] = nil
-                    }
-                    return
-                }
-                
-                guard let url = URL(string: photoUrlString) else {
-                    await MainActor.run {
-                        self.profilePhotoLoadingStates[userId] = .loaded
-                        self.userProfilePhotos[userId] = nil
-                    }
-                    return
-                }
-                
-                // Download the image
-                let (data, _) = try await URLSession.shared.data(from: url)
-                
-                if let image = UIImage(data: data) {
-                    await MainActor.run {
-                        self.userProfilePhotos[userId] = image
-                        self.profilePhotoLoadingStates[userId] = .loaded
-                        // Also store in DetailPlaceViewModel for UI access
-                        self.detailPlaceViewModel?.userProfilePicture[userId] = image
-                    }
-                }
-            } catch {
-                print("❌ Error loading profile photo for user \(userId): \(error.localizedDescription)")
-                await MainActor.run {
-                    self.profilePhotoLoadingStates[userId] = .loaded
-                    self.userProfilePhotos[userId] = nil
-                }
-            }
-        }
-    }
-    
     // Update the method to take userId as parameter
     func checkLikeStatuses(userId: String) {
         guard let placeId = selectedPlace?.id.uuidString,
@@ -986,7 +925,7 @@ class SelectedPlaceViewModel: ObservableObject {
             currentReviews.insert(review, at: 0) // Insert at the beginning instead of appending
             self.placeReviews[placeId] = currentReviews
             self.loadReviewPhotos(for: review)
-            self.loadProfilePhoto(for: review)
+            // Profile photos now come from SQL JOIN with users table
         }
     }
     
