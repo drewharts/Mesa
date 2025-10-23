@@ -67,10 +67,11 @@ class TikTokPlaceService {
                 .eq("id", value: currentRecord.id)
                 .execute()
         } else {
-            // Update with remaining TikToks
+            // Update with remaining TikToks (convert to AnyCodable for encoding)
+            let encodableVideos = updatedVideos.map { AnyCodable($0) }
             try await supabase.client
                 .from("external_places")
-                .update(["tiktok_videos": updatedVideos])
+                .update(["tiktok_videos": encodableVideos])
                 .eq("id", value: currentRecord.id)
                 .execute()
         }

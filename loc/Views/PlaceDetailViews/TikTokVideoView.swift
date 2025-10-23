@@ -9,6 +9,7 @@ import SwiftUI
 
 struct TikTokVideoView: View {
     @StateObject private var viewModel: TikTokVideoViewModel
+    @EnvironmentObject var userSession: UserSession
     @State private var refreshAttempted: Bool = false
     @State private var isPressed: Bool = false
     @State private var showingDeleteConfirmation = false
@@ -179,7 +180,7 @@ struct TikTokVideoView: View {
     }
     
     private func loadAssociatedPlaces() async {
-        guard !isLoadingPlaces, let userId = UserSession.shared.currentUserId else { return }
+        guard !isLoadingPlaces, let userId = userSession.currentUserId else { return }
         
         isLoadingPlaces = true
         

@@ -15,6 +15,7 @@ struct MinPlaceDetailView: View {
     @EnvironmentObject var locationManager: LocationManager
     @EnvironmentObject var userProfileViewModel: UserProfileViewModel
     @EnvironmentObject var notificationManager: NotificationManager
+    @EnvironmentObject var userSession: UserSession
     @Environment(\.isScrollingEnabled) var isScrollingEnabled // Access scroll state
 
     @Binding var showNoPhoneNumberAlert: Bool
@@ -365,7 +366,7 @@ struct MinPlaceDetailView: View {
     
     private func deleteTikTok(video: TikTokVideo) async {
         guard let placeId = selectedPlaceVM.selectedPlace?.id.uuidString,
-              let userId = UserSession.shared.currentUserId else {
+              let userId = userSession.currentUserId else {
             return
         }
         
