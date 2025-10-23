@@ -11,11 +11,12 @@
 -- This is more efficient than fetching TikToks separately with place details.
 -- ============================================================================
 
--- Drop existing function if it exists
+-- Drop existing function if it exists (both UUID and TEXT versions to avoid ambiguity)
 DROP FUNCTION IF EXISTS get_place_reviews_with_tiktoks(UUID);
+DROP FUNCTION IF EXISTS get_place_reviews_with_tiktoks(TEXT);
 
--- Create the function
-CREATE OR REPLACE FUNCTION get_place_reviews_with_tiktoks(p_place_id UUID)
+-- Create the function with TEXT parameter (Swift passes strings, we cast to UUID internally)
+CREATE OR REPLACE FUNCTION get_place_reviews_with_tiktoks(p_place_id TEXT)
 RETURNS TABLE (
     -- Reviews data
     review_id UUID,
