@@ -218,55 +218,6 @@ struct MinPlaceDetailView: View {
                         .foregroundColor(.black)
                         .fixedSize(horizontal: false, vertical: true)
 
-                    // Review Photos Section
-                    let reviewPhotos = selectedPlaceVM.reviewPhotosForAbout(forPlaceId: selectedPlaceVM.selectedPlace?.id.uuidString ?? "")
-                    if !reviewPhotos.isEmpty {
-                        VStack(alignment: .leading, spacing: 12) {
-                            HStack {
-                                Text("Review Photos")
-                                    .font(.headline)
-                                    .fontWeight(.bold)
-
-                                Spacer()
-
-                                Text("\(reviewPhotos.count)")
-                                    .font(.caption)
-                                    .foregroundColor(.gray)
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 4)
-                                    .background(Color.gray.opacity(0.2))
-                                    .cornerRadius(12)
-                            }
-
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 12) {
-                                    ForEach(Array(reviewPhotos.enumerated()), id: \.offset) { index, photo in
-                                        Image(uiImage: photo)
-                                            .resizable()
-                                            .aspectRatio(contentMode: .fill)
-                                            .frame(width: 120, height: 120)
-                                            .clipped()
-                                            .cornerRadius(8)
-                                            .onTapGesture {
-                                                onPhotoTapped(reviewPhotos, index)
-                                            }
-                                            .onAppear {
-                                                // Load more photos when user scrolls to the last visible photo
-                                                if index == reviewPhotos.count - 1 {
-                                                    // For the about section, we need to load more photos from all reviews
-                                                    if let placeId = selectedPlaceVM.selectedPlace?.id.uuidString {
-                                                        selectedPlaceVM.loadMorePhotosForAbout(placeId: placeId)
-                                                    }
-                                                }
-                                            }
-                                    }
-                                }
-                                .padding(.horizontal, 1)
-                            }
-                        }
-                        .padding(.top, 15)
-                    }
-
                     // TikTok Videos Section
                     if !tikTokVideos.isEmpty {
                         VStack(alignment: .leading, spacing: 12) {
