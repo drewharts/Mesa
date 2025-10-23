@@ -744,7 +744,7 @@ class SelectedPlaceViewModel: ObservableObject {
         let userId = review.userId
         
         // Skip if already loaded
-        if userProfilePhotos[userId] != nil || detailPlaceViewModel?.userProfilePicture[userId] != nil {
+        if userProfilePhotos[userId] != nil {
             return
         }
         
@@ -761,7 +761,7 @@ class SelectedPlaceViewModel: ObservableObject {
                 }
                 
                 // Fetch user profile from Supabase users table
-                let user: UserRecord = try await SupabaseClient.shared.supabase.client
+                let user: UserRecord = try await SupabaseManager.shared.client
                     .from("users")
                     .select("profile_photo_url")
                     .eq("id", value: userId)
