@@ -1182,10 +1182,3 @@ class SelectedPlaceViewModel: ObservableObject {
         }
     }
 }
-
-// MARK: - Helper Structs
-
-/// Minimal user record for fetching profile photos
-private struct UserProfilePhotoRecord: Codable {
-    let profile_photo_url: String?
-}
