@@ -233,11 +233,18 @@ class SupabaseReviewService: ObservableObject {
         
         // Convert records to ReviewProtocol objects
         let reviews: [ReviewProtocol] = response.compactMap { record -> ReviewProtocol? in
-            // Parse PostgreSQL TIMESTAMP format to Date
+            // Parse PostgreSQL TIMESTAMP format to Date (includes milliseconds)
             let dateFormatter = DateFormatter()
-            dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+            dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
             dateFormatter.timeZone = TimeZone(identifier: "UTC")
-            let timestamp = dateFormatter.date(from: record.review_timestamp) ?? Date()
+            
+            // Try with milliseconds first, fallback to without if it fails
+            var timestamp = dateFormatter.date(from: record.review_timestamp)
+            if timestamp == nil {
+                dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+                timestamp = dateFormatter.date(from: record.review_timestamp)
+            }
+            let finalTimestamp = timestamp ?? Date()
             
             // Create GenericReview with user information from the SQL function
             return GenericReview(
@@ -249,7 +256,7 @@ class SupabaseReviewService: ObservableObject {
                 placeId: placeId,
                 placeName: "",
                 reviewText: record.review_text,
-                timestamp: timestamp,
+                timestamp: finalTimestamp,
                 images: record.review_images ?? [],
                 likes: record.review_likes ?? 0
             )
