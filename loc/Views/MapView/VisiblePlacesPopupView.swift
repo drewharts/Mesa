@@ -286,7 +286,7 @@ struct VisiblePlaceGridCell: View {
             // Navigate to the place detail view
             await MainActor.run {
                 // Animate map to place location when tapping from popup tile
-                selectedPlaceVM.selectPlace(fullPlace, shouldAnimateMap: true)
+                selectedPlaceVM.selectPlaceAndFetchDetails(fullPlace, shouldAnimateMap: true)
                 selectedPlaceVM.isDetailSheetPresented = true
                 onDismiss()
             }

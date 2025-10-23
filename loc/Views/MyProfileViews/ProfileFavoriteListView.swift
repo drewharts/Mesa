@@ -216,7 +216,7 @@ struct LightweightFavoritePlaceCard: View {
             // Navigate to the place detail view
             await MainActor.run {
                 // Animate map to favorite place location when tapping from tile
-                selectedPlaceVM.selectPlace(place, shouldAnimateMap: true)
+                selectedPlaceVM.selectPlaceAndFetchDetails(place, shouldAnimateMap: true)
                 selectedPlaceVM.isDetailSheetPresented = true
                 presentationMode.wrappedValue.dismiss()
             }
@@ -326,7 +326,7 @@ struct FavoritePlaceCard: View {
         .onTapGesture {
             // Animate map to favorite place location when tapping from card
             guard let place = detailPlace else { return }
-            selectedPlaceVM.selectPlace(place, shouldAnimateMap: true)
+            selectedPlaceVM.selectPlaceAndFetchDetails(place, shouldAnimateMap: true)
             selectedPlaceVM.isDetailSheetPresented = true
             presentationMode.wrappedValue.dismiss()
         }

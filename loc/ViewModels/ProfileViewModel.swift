@@ -1313,8 +1313,8 @@ class ProfileViewModel: ObservableObject {
                         placeVM.placeSavers[detailPlace.id.uuidString] = [uid]
                     }
                     placeVM.calculateAnnotationPlaces()
-                    // Animate map to imported TikTok place location
-                    selectedPlaceVM.selectPlace(detailPlace, shouldAnimateMap: true)
+                    // Animate map to imported TikTok place location and fetch fresh details
+                    selectedPlaceVM.selectPlaceAndFetchDetails(detailPlace, shouldAnimateMap: true)
                     selectedPlaceVM.isDetailSheetPresented = true
                     
                     // Set waiting state to keep loading screen until place detail is ready
