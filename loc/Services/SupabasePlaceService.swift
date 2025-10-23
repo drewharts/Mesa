@@ -982,8 +982,10 @@ class SupabasePlaceService: ObservableObject {
                 try await supabase.client
                     .from("favorites")
                     .insert([
+                        "id": UUID().uuidString,
                         "user_id": userId,
-                        "place_id": placeId
+                        "place_id": placeId,
+                        "timestamp": ISO8601DateFormatter().string(from: Date())
                     ])
                     .execute()
                 
