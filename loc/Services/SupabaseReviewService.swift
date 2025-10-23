@@ -204,14 +204,13 @@ class SupabaseReviewService: ObservableObject {
         if let firstRecord = response.first,
            let tiktokData = firstRecord.tiktok_videos?.value as? [[String: Any]] {
             tiktokVideos = tiktokData.compactMap { dict -> TikTokVideo? in
+                // Only require video_id and url - other fields can be empty
                 guard let videoId = dict["video_id"] as? String,
-                      let videoUrl = dict["url"] as? String,
-                      let embedHtml = dict["embed_html"] as? String,
-                      let thumbnailUrl = dict["thumbnail_url"] as? String else {
+                      let videoUrl = dict["url"] as? String else {
                     return nil
                 }
                 
-                // Parse author
+                // Parse author (may be empty)
                 var author = TikTokAuthor(displayName: "", url: "", username: "")
                 if let authorDict = dict["author"] as? [String: Any] {
                     author = TikTokAuthor(
@@ -226,8 +225,8 @@ class SupabaseReviewService: ObservableObject {
                     url: videoUrl,
                     title: dict["title"] as? String,
                     caption: dict["caption"] as? String,
-                    embedHTML: embedHtml,
-                    thumbnailURL: thumbnailUrl,
+                    embedHTML: dict["embed_html"] as? String ?? "", // Can be empty
+                    thumbnailURL: dict["thumbnail_url"] as? String ?? "", // Can be empty
                     author: author,
                     hashtags: dict["hashtags"] as? [String] ?? [],
                     createdAt: dict["created_at"] as? String ?? ""
@@ -237,7 +236,10 @@ class SupabaseReviewService: ObservableObject {
         
         // Convert records to ReviewProtocol objects
         let reviews: [ReviewProtocol] = response.compactMap { record -> ReviewProtocol? in
-            let timestamp = record.review_timestamp
+            // Parse timestamp string to Date
+            let dateFormatter = ISO8601DateFormatter()
+            dateFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            let timestamp = dateFormatter.date(from: record.review_timestamp) ?? Date()
             
             // Create GenericReview for all reviews (simplified version)
             return GenericReview(
@@ -251,7 +253,7 @@ class SupabaseReviewService: ObservableObject {
                 reviewText: record.review_text,
                 timestamp: timestamp,
                 images: record.review_images ?? [],
-                likes: 0
+                likes: record.review_likes ?? 0
             )
         }
         
@@ -360,11 +362,9 @@ struct ReviewWithTikToksRecord: Codable {
     let review_text: String
     let review_images: [String]?
     let review_rating: Double?
-    let review_timestamp: Date
+    let review_timestamp: String
     let review_type: String?
-    let review_price_paid: Double?
-    let review_created_at: Date
-    let review_updated_at: Date
+    let review_likes: Int?
     let tiktok_videos: AnyCodable? // JSONB array of TikTok videos
 }
 
