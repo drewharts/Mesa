@@ -196,7 +196,7 @@ struct MinPlaceDetailView: View {
                                     .fontWeight(.semibold)
                                     .foregroundColor(.black)
                                 
-                                if let count = selectedPlaceVM.selectedPlace?.userRatingsTotal {
+                                if let count = selectedPlaceVM.selectedPlace?.userRatingsTotal, count > 0 {
                                     Text("(\(count.formatted()) reviews)")
                                         .font(.subheadline)
                                         .foregroundColor(.gray)
