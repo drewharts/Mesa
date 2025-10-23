@@ -45,16 +45,10 @@ struct ProfileFavoriteListView: View {
     
     private var favoritesHeader: some View {
         HStack {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("FAVORITES")
-                    .font(.headline)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.primary)
-                
-                Text("\(profile.lightweightFavorites.count) place\(profile.lightweightFavorites.count == 1 ? "" : "s")")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
+            Text("FAVORITES")
+                .font(.headline)
+                .fontWeight(.semibold)
+                .foregroundColor(.primary)
             
             Spacer()
         }

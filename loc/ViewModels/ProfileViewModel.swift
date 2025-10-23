@@ -519,48 +519,81 @@ class ProfileViewModel: ObservableObject {
      func addFavoritePlace(place: DetailPlace) {
         guard let userId = userSession.currentUserId else { return }
         // Prevent duplicates and enforce max 6 favorites
-        if userFavorites.count >= 6 {
+        if lightweightFavorites.count >= 6 {
             showMaxFavoritesAlert = true
             return
         }
+        
+        // Check if already favorited
+        if lightweightFavorites.contains(where: { $0.place_id == place.id.uuidString }) {
+            return
+        }
+        
+        // Optimistic UI update - add immediately to lightweightFavorites
+        let newFavorite = FavoritePlace(
+            place_id: place.id.uuidString,
+            name: place.name,
+            latest_review_photo: place.imageUrl
+        )
+        lightweightFavorites.append(newFavorite)
+        
+        // Also update legacy userFavorites array
         if !userFavorites.contains(place.id.uuidString) {
             userFavorites.append(place.id.uuidString)
-            userService.addProfileFavorite(userId: userId, placeId: place.id.uuidString) { error in
-                if let error = error {
-                    print("❌ Error adding profile favorite: \(error)")
-                } else {
-                    print("✅ Successfully added profile favorite")
+        }
+        
+        // Persist to Supabase favorites table
+        placeService.addFavorite(userId: userId, placeId: place.id.uuidString) { [weak self] error in
+            if let error = error {
+                print("❌ Error adding profile favorite: \(error)")
+                // Revert optimistic update on failure
+                DispatchQueue.main.async {
+                    self?.lightweightFavorites.removeAll { $0.place_id == place.id.uuidString }
+                    self?.userFavorites.removeAll { $0 == place.id.uuidString }
                 }
             }
-            
-            // Add current user as saver so favorite places appear on map with profile picture
-            if detailPlaceViewModel.placeSavers[place.id.uuidString] == nil {
-                detailPlaceViewModel.placeSavers[place.id.uuidString] = [userId]
-            } else if !detailPlaceViewModel.placeSavers[place.id.uuidString]!.contains(userId) {
-                detailPlaceViewModel.placeSavers[place.id.uuidString]!.append(userId)
-            }
-            
-            // Recalculate map annotations to include the new favorite place
-            detailPlaceViewModel.calculateAnnotationPlaces()
         }
+        
+        // Add current user as saver so favorite places appear on map with profile picture
+        if detailPlaceViewModel.placeSavers[place.id.uuidString] == nil {
+            detailPlaceViewModel.placeSavers[place.id.uuidString] = [userId]
+        } else if !detailPlaceViewModel.placeSavers[place.id.uuidString]!.contains(userId) {
+            detailPlaceViewModel.placeSavers[place.id.uuidString]!.append(userId)
+        }
+        
+        // Recalculate map annotations to include the new favorite place
+        detailPlaceViewModel.calculateAnnotationPlaces()
     }
     
     func removeFavoritePlace(place: DetailPlace) {
         guard let userId = userSession.currentUserId else { return }
-        if let index = userFavorites.firstIndex(of: place.id.uuidString) {
-            userFavorites.remove(at: index)
-            userService.removeProfileFavorite(userId: userId, placeId: place.id.uuidString) { error in
-                if let error = error {
-                    print("❌ Error removing profile favorite: \(error)")
-                } else {
-                    print("✅ Successfully removed profile favorite")
+        
+        // Optimistic UI update - remove immediately from lightweightFavorites
+        let removedFavorite = lightweightFavorites.first { $0.place_id == place.id.uuidString }
+        lightweightFavorites.removeAll { $0.place_id == place.id.uuidString }
+        
+        // Also remove from legacy userFavorites array
+        userFavorites.removeAll { $0 == place.id.uuidString }
+        
+        // Persist to Supabase favorites table
+        placeService.removeFavorite(userId: userId, placeId: place.id.uuidString) { [weak self] error in
+            if let error = error {
+                print("❌ Error removing profile favorite: \(error)")
+                // Revert optimistic update on failure
+                DispatchQueue.main.async {
+                    if let favorite = removedFavorite {
+                        self?.lightweightFavorites.append(favorite)
+                    }
+                    if let self = self, !self.userFavorites.contains(place.id.uuidString) {
+                        self.userFavorites.append(place.id.uuidString)
+                    }
                 }
             }
         }
     }
     
     func isPlaceFavorite(placeId: String) -> Bool {
-        return userFavorites.contains(placeId)
+        return lightweightFavorites.contains(where: { $0.place_id == placeId }) || userFavorites.contains(placeId)
     }
     
     // MARK: - Place Notes
