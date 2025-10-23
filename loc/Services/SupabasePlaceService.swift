@@ -976,17 +976,15 @@ class SupabasePlaceService: ObservableObject {
 
     // MARK: - Add/Remove Favorites
     
-    func addFavorite(userId: String, placeId: String, placeName: String?, placeAddress: String?, placePhotoUrl: String?, completion: @escaping (Error?) -> Void) {
+    func addFavorite(userId: String, placeId: String, completion: @escaping (Error?) -> Void) {
         Task {
             do {
-                // Create a struct that conforms to Encodable
+                // Only store the minimal required data - IDs and timestamp
+                // Full place details can be fetched via JOIN when needed
                 struct FavoriteInsert: Encodable {
                     let id: String
                     let user_id: String
                     let place_id: String
-                    let name: String
-                    let address: String
-                    let latest_review_photo: String?
                     let timestamp: String
                 }
                 
@@ -994,9 +992,6 @@ class SupabasePlaceService: ObservableObject {
                     id: UUID().uuidString,
                     user_id: userId,
                     place_id: placeId,
-                    name: placeName ?? "",
-                    address: placeAddress ?? "",
-                    latest_review_photo: placePhotoUrl,
                     timestamp: ISO8601DateFormatter().string(from: Date())
                 )
                 

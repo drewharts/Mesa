@@ -542,14 +542,8 @@ class ProfileViewModel: ObservableObject {
             userFavorites.append(place.id.uuidString)
         }
         
-        // Persist to Supabase favorites table with place details
-        placeService.addFavorite(
-            userId: userId,
-            placeId: place.id.uuidString,
-            placeName: place.name,
-            placeAddress: place.address,
-            placePhotoUrl: place.photoUrls?.first
-        ) { [weak self] error in
+        // Persist to Supabase favorites table (only IDs, not full place data)
+        placeService.addFavorite(userId: userId, placeId: place.id.uuidString) { [weak self] error in
             if let error = error {
                 print("❌ Error adding profile favorite: \(error)")
                 // Revert optimistic update on failure
