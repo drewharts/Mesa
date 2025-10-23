@@ -237,6 +237,7 @@ class SupabaseReviewService: ObservableObject {
             let dateFormatter = DateFormatter()
             dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
             dateFormatter.timeZone = TimeZone(identifier: "UTC")
+            dateFormatter.locale = Locale(identifier: "en_US_POSIX")
             
             // Try with milliseconds first, fallback to without if it fails
             var timestamp = dateFormatter.date(from: record.review_timestamp)
@@ -244,6 +245,12 @@ class SupabaseReviewService: ObservableObject {
                 dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
                 timestamp = dateFormatter.date(from: record.review_timestamp)
             }
+            
+            // DEBUG: Log if parsing failed
+            if timestamp == nil {
+                print("❌ [SupabaseReviewService] Failed to parse timestamp: '\(record.review_timestamp)'")
+            }
+            
             let finalTimestamp = timestamp ?? Date()
             
             // Create GenericReview with user information from the SQL function
