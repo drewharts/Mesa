@@ -358,15 +358,6 @@ class SelectedPlaceViewModel: ObservableObject {
         }
     }
     
-    /// Select a place directly without fetching details
-    /// Use this for map annotations where we already have the place data
-    func selectPlace(_ place: DetailPlace, shouldAnimateMap: Bool = true) {
-        print("🎯 [SelectedPlaceViewModel] Selecting place directly: '\(place.name)'")
-        print("🗺️ [SelectedPlaceViewModel] shouldAnimateMap: \(shouldAnimateMap)")
-        
-        shouldAnimateMapToPlace = shouldAnimateMap
-        selectedPlace = place
-    }
     
     func isRestaurantOpenNow(_ place: DetailPlace) -> Bool {
         guard let openHours = place.openHours, !openHours.isEmpty else { return false }

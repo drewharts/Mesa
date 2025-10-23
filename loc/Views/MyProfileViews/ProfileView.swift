@@ -369,8 +369,8 @@ struct StateChangesModifier: ViewModifier {
            let place = photoImportVM.createdPlaceForDetail,
            !photoImportVM.isInPhotoImportFlow {
             
-            // Animate map to newly created place location
-            selectedPlaceVM.selectPlace(place, shouldAnimateMap: true)
+            // Animate map to newly created place location and fetch fresh details
+            selectedPlaceVM.selectPlaceAndFetchDetails(place, shouldAnimateMap: true)
             selectedPlaceVM.isDetailSheetPresented = true
             
             photoImportVM.shouldNavigateToPlaceDetail = false

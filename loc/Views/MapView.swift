@@ -96,7 +96,7 @@ struct MapView: View {
             if let place = await mapViewModel.loadPlaceDetails(for: annotation) {
                 await MainActor.run {
                     // Don't animate map when tapping annotation - user is already looking at it
-                    selectedPlaceVM.selectPlace(place, shouldAnimateMap: false)
+                    selectedPlaceVM.selectPlaceAndFetchDetails(place, shouldAnimateMap: false)
                     selectedPlaceVM.isDetailSheetPresented = true
                 }
             }
