@@ -194,6 +194,7 @@ struct MainView: View {
                     minSheetHeight: minSheetHeight
                 )
                 .environmentObject(profileViewModel)
+                .environmentObject(viewModel.mapViewModel)
             }
         }
     }
