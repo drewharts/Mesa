@@ -15,28 +15,25 @@
 DROP FUNCTION IF EXISTS get_place_reviews_with_tiktoks(UUID);
 DROP FUNCTION IF EXISTS get_place_reviews_with_tiktoks(TEXT);
 
--- Create the function with TEXT parameter (Swift passes strings, we cast to UUID internally)
+-- Create the function with TEXT parameter (reviews table uses TEXT for IDs, not UUID)
 CREATE OR REPLACE FUNCTION get_place_reviews_with_tiktoks(p_place_id TEXT)
 RETURNS TABLE (
-    -- Reviews data
-    review_id UUID,
-    review_user_id UUID,
+    -- Reviews data (note: IDs are TEXT, not UUID in the reviews table)
+    review_id TEXT,
+    review_user_id TEXT,
     review_text TEXT,
     review_images TEXT[],
-    review_rating DOUBLE PRECISION,
-    review_timestamp TIMESTAMPTZ,
+    review_timestamp TIMESTAMP,
     review_type TEXT,
-    review_price_paid DOUBLE PRECISION,
-    review_created_at TIMESTAMPTZ,
-    review_updated_at TIMESTAMPTZ,
+    review_likes INTEGER,
     
-    -- User information
+    -- User information (already in reviews table)
     user_first_name TEXT,
     user_last_name TEXT,
     user_profile_photo_url TEXT,
     
-    -- TikTok videos (as JSONB array, NULL if no TikToks exist)
-    tiktok_videos JSONB
+    -- TikTok videos (as JSONB array)
+    tiktok_videos JSONB[]
 ) AS $$
 BEGIN
     RETURN QUERY
@@ -46,33 +43,29 @@ BEGIN
             ep.place_id,
             ep.tiktok_videos
         FROM external_places ep
-        WHERE ep.place_id = p_place_id::uuid
+        WHERE ep.place_id = p_place_id
         LIMIT 1
     )
     SELECT 
         -- Reviews columns
         r.id AS review_id,
         r.user_id AS review_user_id,
-        r.text AS review_text,
+        r.review_text,
         r.images AS review_images,
-        r.rating AS review_rating,
         r.timestamp AS review_timestamp,
         r.type AS review_type,
-        r.price_paid AS review_price_paid,
-        r.created_at AS review_created_at,
-        r.updated_at AS review_updated_at,
+        r.likes AS review_likes,
         
-        -- User information from users table
-        u.first_name AS user_first_name,
-        u.last_name AS user_last_name,
-        u.profile_photo_url AS user_profile_photo_url,
+        -- User information (already in reviews table)
+        r.user_first_name,
+        r.user_last_name,
+        r.profile_photo_url AS user_profile_photo_url,
         
-        -- TikTok videos (same for all rows, or NULL if none exist)
-        COALESCE(pt.tiktok_videos, '[]'::jsonb) AS tiktok_videos
+        -- TikTok videos (same for all rows, or empty array if none exist)
+        COALESCE(pt.tiktok_videos, '{}'::jsonb[]) AS tiktok_videos
     FROM reviews r
     LEFT JOIN place_tiktoks pt ON pt.place_id = r.place_id
-    LEFT JOIN users u ON u.id = r.user_id
-    WHERE r.place_id = p_place_id::uuid
+    WHERE r.place_id = p_place_id
     ORDER BY r.timestamp DESC;
 END;
 $$ LANGUAGE plpgsql;

@@ -225,7 +225,9 @@ class SupabaseReviewService: ObservableObject {
         
         // Extract TikToks from reviews response
         if let firstRecord = response.first,
-           let tiktokData = firstRecord.tiktok_videos?.value as? [[String: Any]] {
+           let tiktokArray = firstRecord.tiktok_videos {
+            // Convert [AnyCodable] to [[String: Any]]
+            let tiktokData = tiktokArray.compactMap { $0.value as? [String: Any] }
             tiktokVideos = parseTikTokData(tiktokData)
         }
         
@@ -390,14 +392,13 @@ struct ReviewWithTikToksRecord: Codable {
     let review_user_id: String
     let review_text: String
     let review_images: [String]?
-    let review_rating: Double?
     let review_timestamp: String
     let review_type: String?
     let review_likes: Int?
     let user_first_name: String?
     let user_last_name: String?
     let user_profile_photo_url: String?
-    let tiktok_videos: AnyCodable? // JSONB array of TikTok videos
+    let tiktok_videos: [AnyCodable]? // JSONB[] array of TikTok videos
 }
 
 struct CommentRecord: Codable {
