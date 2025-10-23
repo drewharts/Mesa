@@ -24,6 +24,9 @@ class MapViewModel: ObservableObject {
     private var placeDetailsCache: [String: DetailPlace] = [:] // Cache for full place details
     weak var profileViewModel: ProfileViewModel? // To access current user's profile
     
+    // Task cancellation for performance
+    private var viewportLoadingTask: Task<Void, Never>?
+    
     // Minimum movement threshold to trigger reload (in degrees)
     private let minMovementThreshold: Double = 0.01 // ~1km at equator
     
@@ -169,12 +172,23 @@ class MapViewModel: ObservableObject {
         }
     }
     
+    /// Cancel all ongoing map-related background tasks
+    func cancelBackgroundTasks() {
+        debounceTimer?.invalidate()
+        viewportLoadingTask?.cancel()
+        viewportLoadingTask = nil
+        isLoadingViewportPlaces = false
+    }
+    
     /// Call this when the map region changes (pan or zoom)
     func onMapRegionChange(_ newRegion: MKCoordinateRegion) {
         // Check if the region change is significant enough to warrant a reload
         if let lastRegion = lastLoadedRegion, !shouldReloadForRegion(newRegion, lastRegion: lastRegion) {
             return
         }
+        
+        // Cancel any existing viewport loading task
+        viewportLoadingTask?.cancel()
         
         // Debounce to avoid excessive queries while user is actively panning
         debounceTimer?.invalidate()
@@ -183,8 +197,9 @@ class MapViewModel: ObservableObject {
             withTimeInterval: 0.8,  // 800ms for smoother experience
             repeats: false
         ) { [weak self] _ in
-            Task { @MainActor in
-                await self?.loadPlacesForViewport(newRegion)
+            guard let self = self else { return }
+            self.viewportLoadingTask = Task { @MainActor in
+                await self.loadPlacesForViewport(newRegion)
             }
         }
     }
@@ -198,6 +213,9 @@ class MapViewModel: ObservableObject {
         let bounds = getViewportBounds(from: region)
         
         do {
+            // Check if task was cancelled before making network call
+            try Task.checkCancellation()
+            
             // Use the optimized PostgreSQL function
             let annotations = try await placeService.fetchPlacesInViewport(
                 northLat: bounds.northLat,
@@ -205,6 +223,9 @@ class MapViewModel: ObservableObject {
                 eastLng: bounds.eastLng,
                 westLng: bounds.westLng
             )
+            
+            // Check if task was cancelled before updating UI
+            try Task.checkCancellation()
             
             self.viewportAnnotations = annotations
             self.lastLoadedRegion = region
@@ -216,6 +237,9 @@ class MapViewModel: ObservableObject {
             print("⏱️ [MapViewModel] Loaded \(annotations.count) place annotations in \(String(format: "%.2f", loadTime))s")
             
             
+        } catch is CancellationError {
+            // Task was cancelled - this is expected, don't log as error
+            print("⏹️ [MapViewModel] Viewport loading cancelled")
         } catch {
             print("❌ [MapViewModel] Error loading viewport annotations: \(error.localizedDescription)")
         }
