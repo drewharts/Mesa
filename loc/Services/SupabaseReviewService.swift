@@ -30,7 +30,7 @@ class SupabaseReviewService: ObservableObject {
                     query = query.limit(1)
                 }
                 
-                let response: [ReviewRecord] = try await query.execute().value
+                let _: [ReviewRecord] = try await query.execute().value
                 
                 // For now, return empty array as we need to handle ReviewProtocol conversion
                 // The app will need to be updated to work with the new data structure

@@ -174,7 +174,7 @@
             endingColumnNumber = "9223372036854775807"
             startingLineNumber = "267"
             endingLineNumber = "267"
-            landmarkName = "handleMapboxPlaceDetails(_:)"
+            landmarkName = "handleGooglePlaceDetails(_:)"
             landmarkType = "7">
          </BreakpointContent>
       </BreakpointProxy>
@@ -284,8 +284,8 @@
             filePath = "loc/Managers/DataManager.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "832"
-            endingLineNumber = "832"
+            startingLineNumber = "800"
+            endingLineNumber = "800"
             landmarkName = "loadProfileCounts(userId:)"
             landmarkType = "7">
          </BreakpointContent>

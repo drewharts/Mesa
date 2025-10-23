@@ -47,9 +47,6 @@ class DataManager: ObservableObject {
     }
 
     func initializeProfileData(userId: String) async {
-        let startTime = CFAbsoluteTimeGetCurrent()
-        print("🚀 [DataManager] Starting MINIMAL profile data initialization")
-        
         startDataLoadingFlags()
         
         // ✅ PHASE 1: Load ONLY essential data for immediate UI display
@@ -63,11 +60,6 @@ class DataManager: ObservableObject {
                 await self?.loadViewportPlacesOnly(userId: userId)
             }
         }
-        
-        // Note: External places (TikTok) are loaded on-demand when user swipes to that tab
-        
-        let endTime = CFAbsoluteTimeGetCurrent()
-        print("✅ [DataManager] Essential data loaded in \(String(format: "%.2f", endTime - startTime))s - UI ready!")
     }
     
     /// Helper to measure loading time for performance monitoring
@@ -84,45 +76,31 @@ class DataManager: ObservableObject {
     private func loadEssentialDataOnly(userId: String) async {
         // Load only the user's profile data
         await loadProfileData(userId: userId)
-        
-        print("✅ [DataManager] Essential profile data loaded - UI ready for interaction!")
-        
+                
         // Reset loading flags since we're not loading follower/following profiles yet
         await MainActor.run {
             profileViewModel.isFollowersListLoading = false
             profileViewModel.isFollowingListLoading = false
         }
         
-        // Note: Counts (followers/following/myplaces) are loaded on-demand when profile view appears
-        // Note: Following profiles are loaded on-demand when user opens following sheet
-        // Note: Place annotations are now loaded on-demand via viewport queries
-        // No need to preload all annotations - the MapViewModel handles this
     }
     
     
     /// Load place IDs only (not full place documents) - MUCH faster!
     private func loadUserPlaceIdsOnly(userId: String) async {
-        do {
-            // Load just the IDs/metadata, not full place documents
-            async let favoriteIds = try? await placeService.fetchFavoritePlaceIds(userId: userId)
-            async let myPlaceIds = try? await placeService.fetchMyPlaceIds(userId: userId)
-            async let listMetadata = try? await placeService.fetchListMetadata(userId: userId)
+        // Load just the IDs/metadata, not full place documents
+        async let favoriteIds = try? await placeService.fetchFavoritePlaceIds(userId: userId)
+        async let myPlaceIds = try? await placeService.fetchMyPlaceIds(userId: userId)
+        async let listMetadata = try? await placeService.fetchListMetadata(userId: userId)
+        
+        let (favIds, myPlaceIdsResult, listMetadataResult) = await (favoriteIds, myPlaceIds, listMetadata)
+        
+        await MainActor.run {
+            // Store just the IDs - full place data loads on-demand
+            self.profileViewModel.userFavorites = favIds ?? []
+            self.profileViewModel.myPlaces = myPlaceIdsResult ?? []
+            self.profileViewModel.userLists = listMetadataResult ?? []
             
-            let (favIds, myPlaceIdsResult, listMetadataResult) = await (favoriteIds, myPlaceIds, listMetadata)
-            
-            await MainActor.run {
-                // Store just the IDs - full place data loads on-demand
-                self.profileViewModel.userFavorites = favIds ?? []
-                self.profileViewModel.myPlaces = myPlaceIdsResult ?? []
-                self.profileViewModel.userLists = listMetadataResult ?? []
-                
-                print("✅ [DataManager] Loaded place IDs only:")
-                print("   - Favorites: \(favIds?.count ?? 0)")
-                print("   - My Places: \(myPlaceIdsResult?.count ?? 0)")
-                print("   - Lists: \(listMetadataResult?.count ?? 0)")
-            }
-        } catch {
-            print("❌ [DataManager] Error loading place IDs: \(error.localizedDescription)")
         }
     }
     
@@ -147,7 +125,6 @@ class DataManager: ObservableObject {
             let bounds = getViewportBounds(from: viewportRegion)
             
             // Load places in viewport (much faster than all places!)
-            // ✅ Use the correct user ID (profile ID, not Supabase auth UID)
             let viewportPlaces = try await placeService.fetchPlacesInViewportWithUserId(
                 northLat: bounds.northLat,
                 southLat: bounds.southLat,
@@ -155,14 +132,6 @@ class DataManager: ObservableObject {
                 westLng: bounds.westLng,
                 userId: userId
             )
-            
-            await MainActor.run {
-                // Note: viewportPlaces now returns PlaceAnnotation objects, not DetailPlace
-                // These are lightweight annotations for map display only
-                // Full place details are loaded on-demand when user taps markers
-                let duration = Date().timeIntervalSince(startTime)
-                print("⚡ [DataManager] Loaded \(viewportPlaces.count) place annotations in \(String(format: "%.2f", duration))s")
-            }
             
             // Trigger map annotation calculation for viewport places
             calculateMapAnnotations()
@@ -304,7 +273,6 @@ class DataManager: ObservableObject {
                 }
             }
             
-            print("✅ [DataManager] Loaded \(lightweightPlaces.count) lightweight my places (offset: \(offset), hasMore: \(profileViewModel.hasMoreMyPlaces))")
         } catch {
             print("❌ [DataManager] Error loading my places: \(error.localizedDescription)")
         }

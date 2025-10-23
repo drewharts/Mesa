@@ -191,7 +191,7 @@ class SupabaseAuthService: ObservableObject {
     
     /// Delete the current user account
     func deleteAccount() async throws {
-        guard let userId = currentUserId else {
+        guard currentUserId != nil else {
             throw NSError(domain: "SupabaseAuth", code: -1, userInfo: [
                 NSLocalizedDescriptionKey: "No user is currently signed in"
             ])

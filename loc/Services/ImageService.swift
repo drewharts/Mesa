@@ -38,7 +38,7 @@ class ImageService {
             let bucket = await supabase.storage.from("profile_photos")
             
             // Upload the new profile photo with upsert to replace existing
-            let uploadedPath = try await bucket.upload(
+            _ = try await bucket.upload(
                 filePath,
                 data: imageData,
                 options: FileOptions(
@@ -306,7 +306,7 @@ class ImageService {
                 let fileName = "image_\(index + 1).jpg"
                 let filePath = "\(supabaseUserId)/\(review.id)/\(fileName)"
                 
-                let uploadedPath = try await bucket.upload(
+                _ = try await bucket.upload(
                     filePath,
                     data: compressedData,
                     options: FileOptions(
@@ -387,7 +387,7 @@ class ImageService {
                 let fileName = "image_\(index + 1).jpg"
                 let filePath = "\(supabaseUserId)/\(comment.id)/\(fileName)"
                 
-                let uploadedPath = try await bucket.upload(
+                _ = try await bucket.upload(
                     filePath,
                     data: compressedData,
                     options: FileOptions(

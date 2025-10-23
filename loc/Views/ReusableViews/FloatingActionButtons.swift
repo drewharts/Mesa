@@ -2,7 +2,6 @@ import SwiftUI
 
 struct FloatingActionButtons: View {
     @EnvironmentObject var profileViewModel: ProfileViewModel
-    @EnvironmentObject var mapViewModel: MapViewModel
     @Binding var isSearchBarMinimized: Bool
     @Binding var searchIsFocused: Bool
     @Binding var sheetHeight: CGFloat
@@ -28,9 +27,6 @@ struct FloatingActionButtons: View {
     
     private var searchButton: some View {
         Button(action: {
-            // Cancel background map tasks for better search performance
-            mapViewModel.cancelBackgroundTasks()
-            
             withAnimation(.easeInOut(duration: 0.3)) {
                 if sheetHeight == maxSheetHeight {
                     sheetHeight = minSheetHeight

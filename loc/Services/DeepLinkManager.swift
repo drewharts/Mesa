@@ -65,7 +65,7 @@ class DeepLinkManager: ObservableObject {
         userService.fetchUserLists(userId: shareableList.userId) { [weak self] lists, error in
             guard let self = self else { return }
             
-            if let error = error {
+            if error != nil {
                 return
             }
             

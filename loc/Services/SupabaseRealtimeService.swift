@@ -71,14 +71,9 @@ class SupabaseRealtimeService: ObservableObject {
     /// Cleanup all channels
     func cleanup() async {
         for (channelName, _) in activeChannels {
-            do {
-                try await supabase.realtime.channel(channelName).unsubscribe()
-            } catch {
-                print("❌ [Realtime] Error unsubscribing from channel \(channelName): \(error)")
-            }
+            await supabase.realtime.channel(channelName).unsubscribe()
         }
         activeChannels.removeAll()
-        print("✅ [Realtime] Cleaned up all channels")
     }
     
     deinit {

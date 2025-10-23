@@ -373,7 +373,7 @@ class MesaBackendService {
                 return
             }
 
-            guard let httpResponse = response as? HTTPURLResponse else {
+            guard response is HTTPURLResponse else {
                 completion(.failure(NSError(domain: "MesaBackend", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid server response"])))
                 return
             }

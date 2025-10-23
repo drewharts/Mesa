@@ -70,7 +70,7 @@ class PlaceSearchService {
                 DispatchQueue.main.async {
                     onResultResolved(details)
                 }
-            case .failure(let error):
+            case .failure(_):
                 // Error fetching place details - silently handle
                 break
             }
