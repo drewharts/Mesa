@@ -21,6 +21,7 @@ struct MainView: View {
     @EnvironmentObject var placeTypeFilterVM: PlaceTypeFilterViewModel
     @EnvironmentObject var deepLinkViewModel: DeepLinkViewModel
     @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
+    @EnvironmentObject var mapViewModel: MapViewModel
 
     @FocusState private var searchIsFocused: Bool
     @State private var isSearchBarMinimized = true
@@ -118,6 +119,23 @@ struct MainView: View {
                     selectedPlaceVM.shouldAnimateMapToPlace = false
                 }
             }
+        }
+        .onChange(of: isSearchBarMinimized) { oldValue, newValue in
+            // Pause loading when search is expanded, resume when minimized
+            if !newValue {
+                // Search is expanded - pause loading
+                mapViewModel.pauseLoading()
+            } else {
+                // Search is minimized - resume loading
+                mapViewModel.resumeLoading()
+            }
+        }
+        .onChange(of: searchIsFocused) { oldValue, newValue in
+            // Also pause when search gains focus (even if already expanded)
+            if newValue {
+                mapViewModel.pauseLoading()
+            }
+            // Don't resume here - let isSearchBarMinimized handle that
         }
     }
     

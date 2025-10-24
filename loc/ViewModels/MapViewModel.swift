@@ -16,6 +16,7 @@ class MapViewModel: ObservableObject {
     @Published var followedUsersPhotos: [FollowedUserPhoto] = [] // Profile photos for custom annotations
     @Published var annotationImages: [String: UIImage] = [:] // Combined profile images for annotations
     @Published var userProfilePictures: [String: UIImage] = [:] // Cache of user profile pictures
+    @Published var isLoadingPaused: Bool = false // Pause loading when user is interacting with search
     
     private var debounceTimer: Timer?
     private let placeService: PlaceService
@@ -171,6 +172,11 @@ class MapViewModel: ObservableObject {
     
     /// Call this when the map region changes (pan or zoom)
     func onMapRegionChange(_ newRegion: MKCoordinateRegion) {
+        // 🚫 Skip loading if paused (e.g., when search is active)
+        if isLoadingPaused {
+            return
+        }
+        
         // Check if the region change is significant enough to warrant a reload
         if let lastRegion = lastLoadedRegion, !shouldReloadForRegion(newRegion, lastRegion: lastRegion) {
             return
@@ -187,6 +193,19 @@ class MapViewModel: ObservableObject {
                 await self?.loadPlacesForViewport(newRegion)
             }
         }
+    }
+    
+    /// Pause viewport loading (call when user starts interacting with search)
+    func pauseLoading() {
+        isLoadingPaused = true
+        debounceTimer?.invalidate() // Cancel any pending loads
+        print("⏸️ [MapViewModel] Annotation loading paused")
+    }
+    
+    /// Resume viewport loading (call when user dismisses search)
+    func resumeLoading() {
+        isLoadingPaused = false
+        print("▶️ [MapViewModel] Annotation loading resumed")
     }
     
     /// Main method to load place annotations for a given viewport
