@@ -56,15 +56,40 @@ class SupabaseReviewService: ObservableObject {
                     .value
                 
                 if placeExists.isEmpty {
-                    // Place doesn't exist - this should trigger a backend call to fetch and insert it
+                    // Place doesn't exist - need to ensure it's saved first
                     print("⚠️ [Supabase] Place \(review.placeId) doesn't exist in database yet")
-                    print("⚠️ [Supabase] You need to ensure the place is saved before adding a review")
-                    completion(NSError(
-                        domain: "SupabaseReviewService",
-                        code: -1,
-                        userInfo: [NSLocalizedDescriptionKey: "Place must be saved to database before adding a review. Please try again."]
-                    ))
-                    return
+                    print("🔄 [Supabase] Attempting to fetch and save place from backend first...")
+                    
+                    // Call backend to fetch place details, which will automatically save it to database
+                    let backendService = MesaBackendService()
+                    var placeSaved = false
+                    
+                    // Use a semaphore to wait for backend call (since we're already in a Task)
+                    await withCheckedContinuation { continuation in
+                        backendService.fetchPlaceDetails(placeId: review.placeId, source: "google") { result in
+                            switch result {
+                            case .success(_):
+                                print("✅ [Supabase] Place saved successfully from backend")
+                                placeSaved = true
+                            case .failure(let error):
+                                print("❌ [Supabase] Failed to fetch place from backend: \(error)")
+                                placeSaved = false
+                            }
+                            continuation.resume()
+                        }
+                    }
+                    
+                    // If place still couldn't be saved, return error
+                    if !placeSaved {
+                        completion(NSError(
+                            domain: "SupabaseReviewService",
+                            code: -1,
+                            userInfo: [NSLocalizedDescriptionKey: "Failed to save place to database. Please try again."]
+                        ))
+                        return
+                    }
+                    
+                    print("✅ [Supabase] Place now exists in database, continuing with review save...")
                 }
                 
                 // Create a proper ReviewRecord for database insertion
