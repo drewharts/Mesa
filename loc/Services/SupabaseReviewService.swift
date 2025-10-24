@@ -45,6 +45,28 @@ class SupabaseReviewService: ObservableObject {
     func saveReview(placeId: String, review: ReviewProtocol, images: [Data], completion: @escaping (Error?) -> Void) {
         Task {
             do {
+                // IMPORTANT: Ensure place exists in database before inserting review
+                // Check if place exists in places table
+                let placeExists: [PlaceExistsRecord] = try await supabase.client
+                    .from("places")
+                    .select("id")
+                    .eq("id", value: review.placeId)
+                    .limit(1)
+                    .execute()
+                    .value
+                
+                if placeExists.isEmpty {
+                    // Place doesn't exist - this should trigger a backend call to fetch and insert it
+                    print("⚠️ [Supabase] Place \(review.placeId) doesn't exist in database yet")
+                    print("⚠️ [Supabase] You need to ensure the place is saved before adding a review")
+                    completion(NSError(
+                        domain: "SupabaseReviewService",
+                        code: -1,
+                        userInfo: [NSLocalizedDescriptionKey: "Place must be saved to database before adding a review. Please try again."]
+                    ))
+                    return
+                }
+                
                 // Create a proper ReviewRecord for database insertion
                 let reviewRecord = ReviewRecord(
                     id: review.id,
@@ -71,6 +93,7 @@ class SupabaseReviewService: ObservableObject {
                     .insert(reviewRecord)
                     .execute()
                 
+                print("✅ [Supabase] Successfully saved review for place \(review.placeId)")
                 completion(nil)
                 
             } catch {
@@ -79,6 +102,11 @@ class SupabaseReviewService: ObservableObject {
                 completion(error)
             }
         }
+    }
+    
+    // Helper struct to check if place exists
+    private struct PlaceExistsRecord: Codable {
+        let id: String
     }
     
     // MARK: - Review Likes
