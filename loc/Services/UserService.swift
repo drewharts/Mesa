@@ -594,6 +594,11 @@ class UserService: ObservableObject {
         return try await supabase.getNumberMyPlaces(forUserId: userId)
     }
     
+    // COUNT ONLY - Super fast! (~20-50ms)
+    func getTotalListCount(forUserId userId: String) async throws -> Int {
+        return try await supabase.getTotalListCount(forUserId: userId)
+    }
+    
     /// Fetch user favorites using optimized SQL function
     func fetchUserFavorites(userId: String) async throws -> [FavoritePlace] {
         return try await supabase.fetchUserFavorites(userId: userId)

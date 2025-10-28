@@ -253,6 +253,20 @@ class SupabaseUserService: ObservableObject {
         return count
     }
     
+    /// Get total list count for a user - FAST! (count query only)
+    func getTotalListCount(forUserId userId: String) async throws -> Int {
+        struct UserStats: Codable {
+            let lists_count: Int
+        }
+        
+        let response: [UserStats] = try await supabase.client
+            .rpc("get_user_stats", params: ["p_user_id": userId])
+            .execute()
+            .value
+        
+        return response.first?.lists_count ?? 0
+    }
+    
     /// Check if a user is following another user
     func isFollowingUser(followerId: String, followingId: String) async throws -> Bool {
         struct FollowingRecord: Codable {
@@ -597,46 +611,6 @@ struct FavoritePlace: Codable, Identifiable {
 }
 
 /// Lightweight place list data for display (sorted by proximity)
-struct LightweightPlaceList: Codable, Identifiable {
-    let list_id: String
-    let name: String
-    let is_public: Bool
-    let image: String?
-    let created_at: String?
-    let updated_at: String?
-    let distance_meters: Double?
-    let place_count: Int
-    
-    var id: String { list_id }
-    
-    enum CodingKeys: String, CodingKey {
-        case list_id
-        case name
-        case is_public
-        case image
-        case created_at
-        case updated_at
-        case distance_meters
-        case place_count
-        // Intentionally omitting average_location - we don't need it
-    }
-}
-
-/// Lightweight place data for tiles (used for both place list items and my places)
-struct LightweightPlace: Codable, Identifiable {
-    let place_id: String
-    let name: String
-    let latest_review_photo: String?
-    
-    var id: String { place_id }
-    
-    enum CodingKeys: String, CodingKey {
-        case place_id
-        case name
-        case latest_review_photo
-        // Intentionally omitting coordinate - we don't need it for tiles
-    }
-}
 
 // MARK: - Place List Management
 

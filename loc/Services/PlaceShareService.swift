@@ -89,6 +89,17 @@ class PlaceShareService: ObservableObject {
         
         presentShareSheet(with: activityItems)
     }
+    
+    @MainActor
+    func shareLightweightList(_ lightweightList: LightweightPlaceList, userId: String) {
+        let shareableList = ShareableLightweightList(from: lightweightList, userId: userId)
+
+        let shareText = createShareText(for: shareableList)
+
+        // Use share sheet - Mesa share extension will now handle list sharing properly
+        let activityItems: [Any] = [shareText]
+        presentShareSheet(with: activityItems)
+    }
 
     // MARK: - Share Text Generation
     
@@ -116,6 +127,17 @@ class PlaceShareService: ObservableObject {
         return shareText
     }
     
+    private func createShareText(for list: ShareableLightweightList) -> String {
+        var shareText = "Check out my list \"\(list.name)\""
+        
+        if !list.city.isEmpty {
+            shareText += " in \(list.city)"
+        }
+        
+        shareText += " on Mesa!"
+        return shareText
+    }
+    
     // MARK: - Activity Sheet Presentation
     
     @MainActor
@@ -128,12 +150,12 @@ class PlaceShareService: ObservableObject {
         }
 
         let topViewController = rootViewController.topMostViewController()
-        
+
         let activityViewController = UIActivityViewController(
             activityItems: items,
             applicationActivities: nil
         )
-        
+
         // Configure for iPad
         if let popover = activityViewController.popoverPresentationController {
             popover.sourceView = topViewController.view
@@ -145,10 +167,10 @@ class PlaceShareService: ObservableObject {
             )
             popover.permittedArrowDirections = []
         }
-        
+
         topViewController.present(activityViewController, animated: true)
     }
-    
+
     // MARK: - URL Generation
     
     func generateShareURL(for detailPlace: DetailPlace) -> URL? {
@@ -201,6 +223,23 @@ class PlaceShareService: ObservableObject {
     }
     
     private func generateWebURL(for shareableList: ShareableList) -> URL {
+        var components = URLComponents()
+        components.scheme = "https"
+        components.host = "us-central1-locc-7598c.cloudfunctions.net"
+        components.path = "/serveWebPreview"
+        
+        var queryItems: [URLQueryItem] = []
+        queryItems.append(URLQueryItem(name: "type", value: "list"))
+        queryItems.append(URLQueryItem(name: "id", value: shareableList.id))
+        queryItems.append(URLQueryItem(name: "name", value: shareableList.name))
+        queryItems.append(URLQueryItem(name: "city", value: shareableList.city))
+        queryItems.append(URLQueryItem(name: "userId", value: shareableList.userId))
+        
+        components.queryItems = queryItems
+        return components.url ?? URL(string: "https://mesa-backend-staging.up.railway.app")!
+    }
+    
+    private func generateWebURL(for shareableList: ShareableLightweightList) -> URL {
         var components = URLComponents()
         components.scheme = "https"
         components.host = "us-central1-locc-7598c.cloudfunctions.net"

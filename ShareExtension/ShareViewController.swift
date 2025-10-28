@@ -49,7 +49,7 @@ class ShareViewController: UIViewController {
                         }
                         return
                     }
-                    // Handle text sharing (TikTok sometimes shares as text)
+                    // Handle text sharing (TikTok shares or Mesa list shares)
                     else if attachment.hasItemConformingToTypeIdentifier(UTType.plainText.identifier) {
                         print("🔍 ShareExtension: Found text attachment")
                         attachment.loadItem(forTypeIdentifier: UTType.plainText.identifier, options: nil) { [weak self] (item, error) in
@@ -62,8 +62,10 @@ class ShareViewController: UIViewController {
                                 print("🔍 ShareExtension: Loaded text: \(text)")
                                 if let url = self?.extractTikTokURL(from: text) {
                                     self?.handleTikTokURL(url)
+                                } else if self?.isMesaListShare(text) == true {
+                                    self?.handleMesaListShare(text)
                                 } else {
-                                    print("🔍 ShareExtension: No TikTok URL found in text")
+                                    print("🔍 ShareExtension: No TikTok URL or Mesa list found in text")
                                     self?.completeRequest()
                                 }
                             } else {
@@ -123,7 +125,7 @@ class ShareViewController: UIViewController {
             "https?://vm\\.tiktok\\.com/[^\\s]+",
             "https?://(?:www\\.)?tiktok\\.com/@[^/]+/video/\\d+"
         ]
-        
+
         for pattern in patterns {
             if let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive) {
                 let matches = regex.matches(in: text, options: [], range: NSRange(location: 0, length: text.count))
@@ -134,8 +136,42 @@ class ShareViewController: UIViewController {
                 }
             }
         }
-        
+
         return nil
+    }
+
+    private func isMesaListShare(_ text: String) -> Bool {
+        // Check if the text contains Mesa list sharing patterns
+        return text.contains("on Mesa!") || text.contains("Check out my list")
+    }
+
+    private func handleMesaListShare(_ text: String) {
+        print("📋 ShareExtension: Processing Mesa list share: \(text)")
+
+        // Create deep link to main app for list sharing
+        var components = URLComponents()
+        components.scheme = "loc"
+        components.host = "share"
+        components.path = "/list"
+        components.queryItems = [
+            URLQueryItem(name: "text", value: text)
+        ]
+
+        guard let appURL = components.url else {
+            print("❌ Failed to create app deep link for list")
+            completeRequest()
+            return
+        }
+
+        print("🔗 Opening app with list share URL: \(appURL.absoluteString)")
+
+        // Open the main app
+        DispatchQueue.main.async { [weak self] in
+            self?.openURL(appURL) { success in
+                print(success ? "✅ Successfully opened main app for list share" : "❌ Failed to open main app for list share")
+                self?.completeRequest()
+            }
+        }
     }
     
     private func openURL(_ url: URL, completion: @escaping (Bool) -> Void) {

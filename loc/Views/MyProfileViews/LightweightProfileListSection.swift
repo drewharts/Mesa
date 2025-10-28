@@ -10,6 +10,8 @@ import SwiftUI
 struct LightweightProfileListSection: View {
     let list: LightweightPlaceList
     let places: [LightweightPlace]
+    let allLists: [LightweightPlaceList]
+    let currentIndex: Int
     @Binding var placeColors: [UUID: Color]
     
     @EnvironmentObject var profile: ProfileViewModel
@@ -107,10 +109,10 @@ struct LightweightProfileListSection: View {
         }
         .padding(.horizontal, 20)
         .sheet(isPresented: $showingListPopup) {
-            // Use lightweight popup directly with lightweight data
+            // Use lightweight popup with swiping support between all lists
             LightweightListPopupView(
-                list: list,
-                places: places,
+                lists: allLists,
+                initialListIndex: currentIndex,
                 placeColors: $placeColors
             )
         }

@@ -59,8 +59,11 @@ class DeepLinkManager: ObservableObject {
             if url.path == "/tiktok" {
                 print("🎵 [DeepLinkManager] Path is '/tiktok', routing to handleTikTokDeepLink")
                 await handleTikTokDeepLink(url)
+            } else if url.path == "/list" {
+                print("📋 [DeepLinkManager] Path is '/list', routing to handleListShareDeepLink")
+                await handleListShareDeepLink(url)
             } else {
-                print("❌ [DeepLinkManager] Path is '\(url.path)', not '/tiktok'")
+                print("❌ [DeepLinkManager] Path is '\(url.path)', not '/tiktok' or '/list'")
             }
         default:
             print("❌ [DeepLinkManager] Unknown host: \(url.host ?? "nil")")
@@ -103,18 +106,41 @@ class DeepLinkManager: ObservableObject {
     
     private func handleTikTokDeepLink(_ url: URL) async {
         print("🔗 [DeepLinkManager] handleTikTokDeepLink called with URL: \(url)")
-        
+
         guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
               let urlItem = components.queryItems?.first(where: { $0.name == "url" }),
               let tiktokURLString = urlItem.value else {
             print("❌ [DeepLinkManager] Failed to extract TikTok URL from deep link")
             return
         }
-        
+
         print("✅ [DeepLinkManager] Extracted TikTok URL: \(tiktokURLString)")
         isProcessingDeepLink = true
         await processTikTokURL(tiktokURLString)
         isProcessingDeepLink = false
+    }
+
+    private func handleListShareDeepLink(_ url: URL) async {
+        print("🔗 [DeepLinkManager] handleListShareDeepLink called with URL: \(url)")
+
+        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              let textItem = components.queryItems?.first(where: { $0.name == "text" }),
+              let sharedText = textItem.value else {
+            print("❌ [DeepLinkManager] Failed to extract shared text from deep link")
+            return
+        }
+
+        print("✅ [DeepLinkManager] Extracted shared text: \(sharedText)")
+
+        // Show a confirmation that the list was shared
+        await MainActor.run {
+            // Post a notification that can be handled by any view controller to show a toast/alert
+            NotificationCenter.default.post(
+                name: NSNotification.Name("ListSharedViaExtension"),
+                object: nil,
+                userInfo: ["message": "Your list has been shared successfully!"]
+            )
+        }
     }
     
     private func processTikTokURL(_ urlString: String) async {

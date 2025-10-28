@@ -760,14 +760,16 @@ class DataManager: ObservableObject {
         async let followers: Int = (try? await userService.getNumberFollowers(forUserId: userId)) ?? 0
         async let following: Int = (try? await userService.getNumberFollowing(forUserId: userId)) ?? 0
         async let myPlaces: Int = (try? await userService.getNumberMyPlaces(forUserId: userId)) ?? 0
+        async let totalLists: Int = (try? await userService.getTotalListCount(forUserId: userId)) ?? 0
         async let favorites: [FavoritePlace] = (try? await userService.fetchUserFavorites(userId: userId)) ?? []
         
-        let (followersCount, followingCount, myPlacesCount, favoritePlaces) = await (followers, following, myPlaces, favorites)
+        let (followersCount, followingCount, myPlacesCount, totalListCount, favoritePlaces) = await (followers, following, myPlaces, totalLists, favorites)
         
         // Update counts and favorites immediately - don't wait for place lists
         await MainActor.run {
             profileViewModel.followersCount = followersCount
             profileViewModel.followingCount = followingCount
+            profileViewModel.totalListCount = totalListCount
             // Update my places count - we'll store this as the count of myPlaces array
             profileViewModel.myPlaces = Array(repeating: "", count: myPlacesCount) // Placeholder IDs
             profileViewModel.lightweightFavorites = favoritePlaces
@@ -777,7 +779,7 @@ class DataManager: ObservableObject {
         }
         
         let duration = Date().timeIntervalSince(startTime)
-        print("⚡ [DataManager] Loaded counts in \(String(format: "%.2f", duration))s (Followers: \(followersCount), Following: \(followingCount), My Places: \(myPlacesCount), Favorites: \(favoritePlaces.count))")
+        print("⚡ [DataManager] Loaded counts in \(String(format: "%.2f", duration))s (Followers: \(followersCount), Following: \(followingCount), My Places: \(myPlacesCount), Total Lists: \(totalListCount), Favorites: \(favoritePlaces.count))")
         
         // Load place lists in background - don't block UI
         if let location = userLocation {
@@ -947,6 +949,22 @@ class DataManager: ObservableObject {
     }
     
     /// Load the first 6 places for each place list (background task)
+    func loadPlacesForLightweightList(listId: String) async {
+        print("📋 [DataManager] Loading places for list \(listId)...")
+        
+        do {
+            let places = try await userService.fetchPlacesForPlaceList(listId: listId, page: 1, pageSize: 6)
+            
+            await MainActor.run {
+                profileViewModel.lightweightPlaceListPlaces[listId] = places
+            }
+            
+            print("✅ [DataManager] Loaded \(places.count) places for list \(listId)")
+        } catch {
+            print("❌ [DataManager] Error loading places for list \(listId): \(error.localizedDescription)")
+        }
+    }
+    
     private func loadPlacesForLists(_ lists: [LightweightPlaceList]) async {
         print("📋 [DataManager] Loading places for \(lists.count) lists...")
         

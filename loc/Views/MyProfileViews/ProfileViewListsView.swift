@@ -49,6 +49,8 @@ struct ProfileViewListsView: View {
                         LightweightProfileListSection(
                             list: list,
                             places: profile.lightweightPlaceListPlaces[list.list_id] ?? [],
+                            allLists: filteredLists,
+                            currentIndex: index,
                             placeColors: $placeColors
                         )
                         .onAppear {

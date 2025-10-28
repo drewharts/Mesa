@@ -78,6 +78,7 @@ class ProfileViewModel: ObservableObject {
      private var loadingTasks: Int = 0
      @Published var followersCount: Int = 0
      @Published var followingCount: Int = 0
+     @Published var totalListCount: Int = 0
      
      // Follow error handling
      @Published var showFollowError: Bool = false
