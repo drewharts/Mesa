@@ -689,6 +689,25 @@ extension SupabaseUserService {
         print("✅ [Supabase] Removed place \(placeId) from list \(listId)")
     }
     
+    /// Check if a place is in a list
+    func checkPlaceInList(listId: String, placeId: String) async throws -> Bool {
+        let response = try await supabase.client
+            .from("place_list_items")
+            .select("place_id")
+            .eq("list_id", value: listId)
+            .eq("place_id", value: placeId)
+            .limit(1)
+            .execute()
+        
+        let items = try JSONDecoder().decode([PlaceListItemCheck].self, from: response.data)
+        return !items.isEmpty
+    }
+    
+    // Helper struct for checking if place exists in list
+    private struct PlaceListItemCheck: Codable {
+        let place_id: String
+    }
+    
     // Helper struct for decoding sort_order
     private struct SortOrder: Codable {
         let sort_order: Int

@@ -23,11 +23,7 @@ class UserSession: ObservableObject {
         self.userService = userService
         self.locationManager = locationManager
         self.detailPlaceVM = detailPlaceVM
-        
-        // Check for existing Supabase session
-        Task { @MainActor in
-            await checkSupabaseSession()
-        }
+        // Session check is now handled by SplashScreenView for faster startup
     }
 
     func checkSupabaseSession() async {
@@ -77,18 +73,8 @@ class UserSession: ObservableObject {
     }
     
     func setUserLoggedIn(uid: String) {
-        print("🔐 Setting user as logged in: \(uid)")
-        print("🔍 [UserSession] Call stack:")
-        print("   - Thread: \(Thread.isMainThread ? "Main" : "Background")")
-        print("   - Current currentUserId: \(self.currentUserId ?? "nil")")
-        print("   - New currentUserId: \(uid)")
-        
-        // Ensure we're on the main thread for @Published property updates
-        Task { @MainActor in
-            self.isUserLoggedIn = true
-            self.currentUserId = uid
-            print("✅ User session updated - isUserLoggedIn: \(self.isUserLoggedIn), currentUserId: \(self.currentUserId ?? "nil")")
-        }
+        self.isUserLoggedIn = true
+        self.currentUserId = uid
     }
     
     // MARK: - Push Notifications

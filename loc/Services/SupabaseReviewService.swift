@@ -199,36 +199,28 @@ class SupabaseReviewService: ObservableObject {
             .execute()
             .value
         
-        // Extract TikToks from the first row (they're the same for all rows)
-        var tiktokVideos: [TikTokVideo] = []
-        
-        // If no reviews, fetch TikToks separately (place might have TikToks but no reviews)
-        if response.isEmpty {
-            struct TikTokArrayRecord: Codable {
-                let tiktok_videos: [AnyCodable]?
-            }
-            
-            let tiktokResponse: [TikTokArrayRecord] = try await supabase.client
-                .rpc("get_place_tiktoks", params: ["p_place_id": placeId])
-                .execute()
-                .value
-            
-            if let firstRecord = tiktokResponse.first,
-               let tiktokArray = firstRecord.tiktok_videos {
-                // Convert [AnyCodable] to [[String: Any]]
-                let tiktokData = tiktokArray.compactMap { $0.value as? [String: Any] }
-                tiktokVideos = parseTikTokData(tiktokData)
-            }
-            
-            return ([], tiktokVideos) // No reviews, but may have TikToks
+        // Extract TikToks from external_places table (places have TikToks in external_places table)
+        struct TikTokArrayRecord: Codable {
+            let tiktok_videos: [AnyCodable]?
         }
         
-        // Extract TikToks from reviews response
-        if let firstRecord = response.first,
+        let tiktokResponse: [TikTokArrayRecord] = try await supabase.client
+            .rpc("get_place_tiktoks", params: ["p_place_id": placeId])
+            .execute()
+            .value
+        
+        var tiktokVideos: [TikTokVideo] = []
+        
+        if let firstRecord = tiktokResponse.first,
            let tiktokArray = firstRecord.tiktok_videos {
             // Convert [AnyCodable] to [[String: Any]]
             let tiktokData = tiktokArray.compactMap { $0.value as? [String: Any] }
             tiktokVideos = parseTikTokData(tiktokData)
+        }
+        
+        // If no reviews, return just TikToks
+        if response.isEmpty {
+            return ([], tiktokVideos)
         }
         
         // Convert records to ReviewProtocol objects

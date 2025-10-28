@@ -55,9 +55,6 @@ class ProfileViewModel: ObservableObject {
     var placeListsCurrentPage: Int = 1
     
     // Save-to-list sheet pagination (separate from profile view pagination)
-    @Published var isLoadingMoreSaveSheetLists: Bool = false
-    @Published var hasMoreSaveSheetLists: Bool = true
-    var saveSheetListsCurrentPage: Int = 1
     @Published var userFollowing: [ProfileData] = []
     @Published var userFollowers: [ProfileData] = []
     @Published var myPlaces: [String] = [] // Legacy - keep for compatibility
@@ -420,10 +417,19 @@ class ProfileViewModel: ObservableObject {
         // Update the places array in the PlaceList
         if !userLists[listIndex].places.contains(where: { $0.id == updatedPlace.id }) {
             userLists[listIndex].places.append(placeForList)
+            
+            // Immediately update the place count for this list
+            placeListCounts[listId] = userLists[listIndex].places.count
         }
 
-        // Persist to Firestore
-        placeService.addPlaceToList(userId: userId, listName: listIdString, place: placeForList)
+        // Persist to Supabase
+        Task {
+            do {
+                try await SupabaseUserService.shared.addPlaceToList(listId: listIdString, placeId: updatedPlace.id.uuidString)
+            } catch {
+                print("❌ [ProfileViewModel] Failed to add place to list: \(error)")
+            }
+        }
 
         // Update DetailPlaceViewModel's places dictionary for immediate UI update
         // Always update the place to ensure TikTok data and other properties are current
@@ -447,7 +453,95 @@ class ProfileViewModel: ObservableObject {
         
         // Skip sorting for individual place additions to avoid frequent re-sorting
     }
-
+    
+    /// Add a place to a lightweight list (new format)
+    func addPlaceToLightweightList(listId: String, place: DetailPlace) {
+        guard let userId = userSession.currentUserId else {
+            return
+        }
+        
+        // Check if this place has associated external place data (TikTok data)
+        var updatedPlace = place
+        if place.tikTokVideos == nil || place.tikTokVideos?.isEmpty == true {
+            if let externalPlace = userExternalPlaces[place.id.uuidString] {
+                updatedPlace = mergeTikTokData(into: place, from: externalPlace)
+            }
+        }
+        
+        // Create lightweight place object
+        let lightweightPlace = LightweightPlace(
+            place_id: updatedPlace.id.uuidString,
+            name: updatedPlace.name,
+            latest_review_photo: updatedPlace.photoUrls?.first
+        )
+        
+        // Update local lightweightPlaceListPlaces
+        if lightweightPlaceListPlaces[listId] != nil {
+            if !lightweightPlaceListPlaces[listId]!.contains(where: { $0.place_id == updatedPlace.id.uuidString }) {
+                lightweightPlaceListPlaces[listId]!.append(lightweightPlace)
+            }
+        } else {
+            lightweightPlaceListPlaces[listId] = [lightweightPlace]
+        }
+        
+        // Update DetailPlaceViewModel's places dictionary for immediate UI update
+        detailPlaceViewModel.places[updatedPlace.id.uuidString] = updatedPlace
+        
+        // Add current user as saver so places appear on map with profile picture
+        if detailPlaceViewModel.placeSavers[updatedPlace.id.uuidString] == nil {
+            detailPlaceViewModel.placeSavers[updatedPlace.id.uuidString] = [userId]
+        } else if !detailPlaceViewModel.placeSavers[updatedPlace.id.uuidString]!.contains(userId) {
+            detailPlaceViewModel.placeSavers[updatedPlace.id.uuidString]!.append(userId)
+        }
+        
+        // Recalculate map annotations to include the new place
+        detailPlaceViewModel.calculateAnnotationPlaces()
+        
+        // Persist to Supabase
+        Task {
+            do {
+                try await SupabaseUserService.shared.addPlaceToList(listId: listId, placeId: updatedPlace.id.uuidString)
+            } catch {
+                print("❌ [ProfileViewModel] Failed to add place to lightweight list: \(error)")
+            }
+        }
+    }
+    
+    /// Remove a place from a lightweight list (new format)
+    func removePlaceFromLightweightList(listId: String, place: DetailPlace) {
+        guard let userId = userSession.currentUserId else {
+            return
+        }
+        
+        // Update local lightweightPlaceListPlaces
+        if var places = lightweightPlaceListPlaces[listId] {
+            places.removeAll { $0.place_id == place.id.uuidString }
+            lightweightPlaceListPlaces[listId] = places
+        }
+        
+        // Remove current user as saver
+        if var savers = detailPlaceViewModel.placeSavers[place.id.uuidString] {
+            savers.removeAll { $0 == userId }
+            if savers.isEmpty {
+                detailPlaceViewModel.placeSavers.removeValue(forKey: place.id.uuidString)
+            } else {
+                detailPlaceViewModel.placeSavers[place.id.uuidString] = savers
+            }
+        }
+        
+        // Recalculate map annotations
+        detailPlaceViewModel.calculateAnnotationPlaces()
+        
+        // Persist to Supabase
+        Task {
+            do {
+                try await SupabaseUserService.shared.removePlaceFromList(listId: listId, placeId: place.id.uuidString)
+            } catch {
+                print("❌ [ProfileViewModel] Failed to remove place from lightweight list: \(error)")
+            }
+        }
+    }
+    
     /// Merge TikTok data from an ExternalPlace into a DetailPlace
     private func mergeTikTokData(into detailPlace: DetailPlace, from externalPlace: ExternalPlace) -> DetailPlace {
         // Create a copy of the DetailPlace with TikTok data merged in
@@ -1346,19 +1440,15 @@ class ProfileViewModel: ObservableObject {
                         placeVM.placeSavers[detailPlace.id.uuidString] = [uid]
                     }
                     placeVM.calculateAnnotationPlaces()
-                    // Animate map to imported TikTok place location and fetch fresh details
                     selectedPlaceVM.selectPlaceAndFetchDetails(detailPlace, shouldAnimateMap: true)
                     selectedPlaceVM.isDetailSheetPresented = true
                     
-                    // Set waiting state to keep loading screen until place detail is ready
-                    isWaitingForPlaceDetail = true
-                    print("⏳ [ProfileViewModel] Set isWaitingForPlaceDetail = true, waiting for DetailPlaceView to load...")
+                    // Clear loading states immediately
+                    isProcessingTikTok = false
+                    isWaitingForPlaceDetail = false
+                    deepLinkManager?.isProcessingDeepLink = false
                     
-                    // Refresh TikTok places list after successful import
                     refreshTikTokPlacesAfterImport()
-                    
-                    // Don't clear isWaitingForPlaceDetail here - let the DetailPlaceView control when it's ready
-                    // The DetailPlaceView will call placeDetailViewReady() when fully loaded
                 
                 } else if detailPlaces.count > 1 {
                     // Multiple places - show selection screen
@@ -1388,9 +1478,12 @@ class ProfileViewModel: ObservableObject {
                     
                     importedPlaces = validPlaces
                     isShowingPlaceSelection = true
-                    print("🎯 [ProfileViewModel] Set isShowingPlaceSelection = true, importedPlaces count = \(validPlaces.count)")
                     
-                    // Refresh TikTok places list after successful import (even for multiple places)
+                    // Clear loading states
+                    isProcessingTikTok = false
+                    isWaitingForPlaceDetail = false
+                    deepLinkManager?.isProcessingDeepLink = false
+                    
                     refreshTikTokPlacesAfterImport()
                 } else {
                     // No places found - show flagging interface
@@ -1398,25 +1491,11 @@ class ProfileViewModel: ObservableObject {
                     noPlacesFoundTikTokUrl = urlString
                     isShowingNoPlacesFound = true
                     isProcessingTikTok = false
-                    isWaitingForPlaceDetail = false  // Ensure waiting state is also cleared
+                    isWaitingForPlaceDetail = false
                     deepLinkManager?.isProcessingDeepLink = false
-                    deepLinkViewModel?.isProcessingDeepLink = false  // Direct update to ensure sync
-                    print("✅ [ProfileViewModel] Cleared all loading states for no places found")
-                    print("   - isProcessingTikTok: \(isProcessingTikTok)")
-                    print("   - isWaitingForPlaceDetail: \(isWaitingForPlaceDetail)")
-                    print("   - deepLinkManager?.isProcessingDeepLink: \(deepLinkManager?.isProcessingDeepLink ?? false)")
-                    print("   - deepLinkViewModel?.isProcessingDeepLink: \(deepLinkViewModel?.isProcessingDeepLink ?? false)")
                 }
             }
             
-            
-            if detailPlaces.count == 1 {
-                print("⏳ [ProfileViewModel] Adding delay to ensure DetailPlaceView has time to start loading...")
-                try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
-                print("⏳ [ProfileViewModel] Delay completed, TikTok processing will now finish")
-            }
-            
-            // NOTE: Place saving is handled by backend during URL processing
             return true
             
         case .failure(let error):
@@ -1437,17 +1516,6 @@ class ProfileViewModel: ObservableObject {
             
             return false
         }
-    }
-    
-    // NOTE: Place saving is handled by backend during URL processing
-    // Frontend does not save to Firestore - removed saveTikTokPlaceToFirestore method
-    
-    /// Called when the place detail view is fully loaded and ready
-    func placeDetailViewReady() {
-        print("✅ [ProfileViewModel] DetailPlaceView is fully loaded, clearing waiting state")
-        isWaitingForPlaceDetail = false
-        isProcessingTikTok = false
-        deepLinkManager?.isProcessingDeepLink = false
     }
     
     /// Clear TikTok import error
@@ -2395,3 +2463,4 @@ class ProfileViewModel: ObservableObject {
         }
     }
 }
+

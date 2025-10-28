@@ -109,15 +109,7 @@ struct PlaceDetailView: View {
             }
             .onChange(of: selectedPlaceVM.selectedPlace) { _, newPlace in
                 if let place = newPlace {
-                    print("🔄 [PlaceDetailView] Selected place changed, updating view model")
                     viewModel.updatePlaceData(place)
-                }
-            }
-            .onChange(of: selectedPlaceVM.isCurrentPlaceFullyLoaded) { _, isLoaded in
-                if isLoaded {
-                    // Clear the waiting state when the place detail is fully loaded
-                    print("✅ [PlaceDetailView] Place is fully loaded, calling placeDetailViewReady()")
-                    profile.placeDetailViewReady()
                 }
             }
 

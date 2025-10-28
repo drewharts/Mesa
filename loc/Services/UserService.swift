@@ -763,4 +763,8 @@ class UserService: ObservableObject {
     func removePlaceFromList(listId: String, placeId: String) async throws {
         try await supabase.removePlaceFromList(listId: listId, placeId: placeId)
     }
+    
+    func checkPlaceInList(listId: String, placeId: String) async throws -> Bool {
+        return try await supabase.checkPlaceInList(listId: listId, placeId: placeId)
+    }
 } 

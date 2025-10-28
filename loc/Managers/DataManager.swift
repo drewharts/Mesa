@@ -829,11 +829,11 @@ class DataManager: ObservableObject {
                 userLatitude: location.latitude,
                 userLongitude: location.longitude,
                 page: nextPage,
-                pageSize: 5
+                pageSize: 6
             )
             
             // Update pagination state
-            profileViewModel.hasMorePlaceLists = moreLists.count >= 5
+            profileViewModel.hasMorePlaceLists = moreLists.count >= 6
             
             // Append new lists if any
             if !moreLists.isEmpty {
@@ -863,8 +863,8 @@ class DataManager: ObservableObject {
             
             await MainActor.run {
                 profileViewModel.lightweightPlaceLists = lists
-                profileViewModel.saveSheetListsCurrentPage = 1
-                profileViewModel.hasMoreSaveSheetLists = lists.count >= 6
+                profileViewModel.placeListsCurrentPage = 1
+                profileViewModel.hasMorePlaceLists = lists.count >= 6  // Keep loading if we got 6 or more lists
             }
             
             print("✅ [DataManager] Loaded \(lists.count) place lists closest to place at (\(placeLatitude), \(placeLongitude))")
@@ -878,39 +878,54 @@ class DataManager: ObservableObject {
         }
     }
     
-    /// Load more place lists for save-to-list sheet (pagination)
-    func loadMoreSaveSheetLists(userId: String, placeLatitude: Double, placeLongitude: Double) async {
-        guard !profileViewModel.isLoadingMoreSaveSheetLists && profileViewModel.hasMoreSaveSheetLists else { return }
-        
-        profileViewModel.isLoadingMoreSaveSheetLists = true
-        defer { profileViewModel.isLoadingMoreSaveSheetLists = false }
-        
-        let nextPage = profileViewModel.saveSheetListsCurrentPage + 1
-        
+    
+    /// Check if a specific place is in a list (for black dot functionality)
+    private func checkPlaceInList(listId: String, placeId: String) async -> Bool {
         do {
-            let moreLists = try await userService.fetchPlaceListsByProximity(
-                userId: userId,
-                userLatitude: placeLatitude,
-                userLongitude: placeLongitude,
-                page: nextPage,
-                pageSize: 6
-            )
-            
-            profileViewModel.hasMoreSaveSheetLists = moreLists.count >= 6
-            
-            if !moreLists.isEmpty {
-                profileViewModel.lightweightPlaceLists.append(contentsOf: moreLists)
-                profileViewModel.saveSheetListsCurrentPage = nextPage
-                
-                // Load places for new lists in background
-                Task.detached(priority: .userInitiated) { [weak self] in
-                    await self?.loadPlacesForLists(moreLists)
+            // Use a simple query to check if the place exists in the list
+            let exists = try await userService.checkPlaceInList(listId: listId, placeId: placeId)
+            return exists
+        } catch {
+            print("❌ [DataManager] Error checking if place \(placeId) is in list \(listId): \(error.localizedDescription)")
+            return false
+        }
+    }
+    
+    /// Check if the current place is in any of the newly loaded lists and update lightweightPlaceListPlaces
+    private func checkCurrentPlaceInNewLists(_ lists: [LightweightPlaceList], placeId: String) async {
+        print("🔍 [DataManager] Checking if place \(placeId) is in \(lists.count) new lists...")
+        
+        await withTaskGroup(of: (String, Bool).self) { group in
+            for list in lists {
+                group.addTask {
+                    let exists = await self.checkPlaceInList(listId: list.list_id, placeId: placeId)
+                    return (list.list_id, exists)
                 }
             }
             
-            print("✅ [DataManager] Loaded \(moreLists.count) more save sheet lists (page \(nextPage))")
-        } catch {
-            print("❌ [DataManager] Error loading more save sheet lists: \(error.localizedDescription)")
+            for await (listId, exists) in group {
+                if exists {
+                    print("✅ [DataManager] Place \(placeId) found in list \(listId)")
+                    
+                    // Add the place to lightweightPlaceListPlaces if it's not already there
+                    await MainActor.run {
+                        let lightweightPlace = LightweightPlace(
+                            place_id: placeId,
+                            name: "Current Place", // We don't have the name here, but it's not critical
+                            latest_review_photo: nil
+                        )
+                        
+                        if profileViewModel.lightweightPlaceListPlaces[listId] != nil {
+                            // Check if it's already in the list
+                            if !profileViewModel.lightweightPlaceListPlaces[listId]!.contains(where: { $0.place_id == placeId }) {
+                                profileViewModel.lightweightPlaceListPlaces[listId]!.append(lightweightPlace)
+                            }
+                        } else {
+                            profileViewModel.lightweightPlaceListPlaces[listId] = [lightweightPlace]
+                        }
+                    }
+                }
+            }
         }
     }
     

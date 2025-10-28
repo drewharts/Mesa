@@ -159,9 +159,11 @@ struct LightweightListPopupView: View {
             // Ensure reviewed places are loaded for filtering
             profile.loadMyReviewedPlacesWithPagination()
             
-            // Initialize pagination state based on initial places
-            hasMorePlaces = places.count >= 6
+            // Initialize pagination state based on actual loaded places
+            let actualPlacesCount = profile.lightweightPlaceListPlaces[list.list_id]?.count ?? 0
+            hasMorePlaces = actualPlacesCount >= 6  // Keep loading if we got 6 or more places
             currentPage = 1
+            print("🔍 [LightweightListPopupView] Initial load - actualPlacesCount: \(actualPlacesCount), hasMorePlaces: \(hasMorePlaces)")
         }
     }
     
@@ -189,6 +191,7 @@ struct LightweightListPopupView: View {
                     }
                     
                     currentPage = nextPage
+                    // Keep loading if we got 6 or more places, stop if we got fewer than 6
                     hasMorePlaces = morePlaces.count >= 6
                     isLoadingMore = false
                 }

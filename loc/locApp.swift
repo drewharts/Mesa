@@ -189,48 +189,12 @@ struct locApp: App {
                         }
                     }
                 }
-                .task {
-                    // Check for existing Supabase session
-                    do {
-                        let session = try await SupabaseAuthService.shared.getSession()
-                        
-                        // Look up the actual user profile ID instead of using Supabase auth UID
-                        do {
-                            let profile = try await UserService.shared.fetchUserById(userId: session.user.id.uuidString)
-                            let userId = profile.id
-                            
-                            // ✅ Set user logged in IMMEDIATELY - don't wait for data
-                            userSession.setUserLoggedIn(uid: userId)
-                            
-                            // ✅ Load data in background - UI is already shown
-                            Task.detached(priority: .background) {
-                                await dataManager.initializeProfileData(userId: userId)
-                            }
-                            
-                            print("✅ Found existing Supabase session: \(userId)")
-                        } catch {
-                            // Fallback to Supabase auth UID if profile lookup fails
-                            let userId = session.user.id.uuidString
-                            
-                            // ✅ Set user logged in IMMEDIATELY - don't wait for data
-                            userSession.setUserLoggedIn(uid: userId)
-                            
-                            // ✅ Load data in background - UI is already shown
-                            Task.detached(priority: .background) {
-                                await dataManager.initializeProfileData(userId: userId)
-                            }
-                            
-                            print("✅ Found existing Supabase session (fallback): \(userId)")
-                        }
-                    } catch {
-                        print("ℹ️ No existing session, user needs to sign in")
-                    }
-                    
-                    // Check for shared TikTok URLs
+                .onAppear {
+                    // Check for shared TikTok URLs on app launch
                     checkForSharedTikTokURL()
                 }
                 .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
-                    // Check again when app becomes active
+                    // Check for shared TikTok URLs when app becomes active
                     checkForSharedTikTokURL()
                 }
         }

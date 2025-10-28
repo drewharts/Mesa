@@ -34,7 +34,10 @@ class TikTokService: ObservableObject {
     @Published var errorMessage: String?
     
     func processTikTokURL(_ url: String) async -> Result<[DetailPlace], Error> {
+        print("🎬 [TikTokService] processTikTokURL called for: \(url)")
+        
         guard let requestURL = URL(string: "\(baseURL)/process-url") else {
+            print("❌ [TikTokService] Invalid base URL")
             return .failure(TikTokError.invalidURL)
         }
         
@@ -42,25 +45,32 @@ class TikTokService: ObservableObject {
         defer { isProcessing = false }
         
         let request = await createRequest(url: requestURL, tikTokURL: url)
+        print("📤 [TikTokService] Sending request to backend...")
         
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
             
             if let error = validateResponse(response) {
+                print("❌ [TikTokService] Response validation failed")
                 return .failure(error)
             }
+            
+            print("✅ [TikTokService] Got response, parsing...")
             
             // Parse the response - could be single place or array of places
             do {
                 // First try to parse as an array of DetailPlace objects
                 let detailPlaces = try JSONDecoder().decode([DetailPlace].self, from: data)
+                print("✅ [TikTokService] Parsed as DetailPlace array: \(detailPlaces.count) places")
                 return .success(detailPlaces)
             } catch {
                 // Try to parse as a single DetailPlace
                 do {
                     let detailPlace = try JSONDecoder().decode(DetailPlace.self, from: data)
+                    print("✅ [TikTokService] Parsed as single DetailPlace")
                     return .success([detailPlace]) // Wrap in array
                 } catch {
+                    print("⚠️ [TikTokService] Trying wrapped format parsing...")
                     // If that fails, try to parse as wrapped format like other backend responses
                     do {
                         let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
@@ -70,18 +80,6 @@ class TikTokService: ObservableObject {
                            let locationFound = processingStatus["location_found"] as? Bool,
                            !locationFound {
                             return .success([]) // Return empty array to indicate no places found
-                        }
-                        
-                        // First check if it's the TikTok response format with location_info array (all detected places)
-                        if let locationInfoArray = json?["location_info"] as? [[String: Any]], locationInfoArray.count > 0 {
-                            var detailPlaces: [DetailPlace] = []
-                            
-                            for locationDict in locationInfoArray {
-                                let detailPlace = try parseLocationInfoToDetailPlace(locationDict, tikTokData: json?["data"] as? [String: Any])
-                                detailPlaces.append(detailPlace)
-                            }
-                            
-                            return .success(detailPlaces)
                         }
                         
                         // Check if it's the TikTok response format with saved_places array (multiple places)
@@ -130,7 +128,7 @@ class TikTokService: ObservableObject {
                             return .success([detailPlace]) // Wrap in array
                         }
                         
-                        throw NSError(domain: "TikTokService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Unable to parse response as DetailPlace"])
+                        throw NSError(domain: "TikTokService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Unable to parse response"])
                     } catch {
                         return .failure(error)
                     }
@@ -205,7 +203,6 @@ class TikTokService: ObservableObject {
             request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
         } catch {
             // Continue without auth token - backend supports unauthenticated requests
-            print("⚠️ No auth session available, continuing without auth token")
         }
     }
     
@@ -225,41 +222,6 @@ class TikTokService: ObservableObject {
     }
     
     // MARK: - Helper Methods
-    
-    private func parseLocationInfoToDetailPlace(_ locationDict: [String: Any], tikTokData: [String: Any]?) throws -> DetailPlace {
-        // Extract basic info from location_info format
-        let name = locationDict["business_name"] as? String ?? locationDict["location_name"] as? String ?? ""
-        
-        // CRITICAL: TikTok place_id must be a valid UUID from backend
-        // Never create a new UUID - this will orphan the place
-        guard let placeIdString = locationDict["place_id"] as? String,
-              let placeId = UUID(uuidString: placeIdString) else {
-            throw NSError(domain: "TikTokService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid place_id from TikTok"])
-        }
-        
-        // Extract address
-        let address = locationDict["formatted_address"] as? String
-        
-        // Create DetailPlace with basic initializer
-        var detailPlace = DetailPlace(
-            id: placeId,
-            name: name,
-            address: address,
-            city: nil
-        )
-        
-        // Set coordinate separately
-        if let coordinatesArray = locationDict["coordinates"] as? [Double], coordinatesArray.count >= 2 {
-            detailPlace.coordinate = CLLocationCoordinate2D(latitude: coordinatesArray[0], longitude: coordinatesArray[1])
-        }
-        
-        // Add TikTok video data if available
-        if let tikTokData = tikTokData, let tikTokVideo = createTikTokVideoFromResponseData(tikTokData) {
-            detailPlace.tikTokVideos = [tikTokVideo]
-        }
-        
-        return detailPlace
-    }
     
     /// Parse DetailPlace from dictionary (for handling backend responses that might be wrapped)
     private func parseDetailPlaceFromDictionary(_ dict: [String: Any]) throws -> DetailPlace {
