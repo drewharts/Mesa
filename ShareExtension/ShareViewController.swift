@@ -17,12 +17,16 @@ class ShareViewController: UIViewController {
         super.viewDidLoad()
         print("🔍 MesaShare: viewDidLoad called")
         
+        // Hide the UI completely - we want automatic processing
+        view.isHidden = true
+        
         // Process the shared content immediately without showing UI
         processSharedContent()
     }
     
     private func processSharedContent() {
-        print("🔍 MesaShare: didSelectPost called")
+        print("🔍 MesaShare: Processing shared content automatically")
+        
         // Process the shared content
         if let item = extensionContext?.inputItems.first as? NSExtensionItem {
             print("🔍 MesaShare: Found input item")
@@ -31,9 +35,9 @@ class ShareViewController: UIViewController {
                 for (index, attachment) in attachments.enumerated() {
                     print("🔍 MesaShare: Processing attachment \(index)")
                     
-                    // Handle URL sharing (TikTok shares video URLs)
+                    // Handle URL sharing (TikTok shares video URLs) - PRIORITY 1
                     if attachment.hasItemConformingToTypeIdentifier(UTType.url.identifier) {
-                        print("🔍 MesaShare: Found URL attachment")
+                        print("🔍 MesaShare: Found URL attachment - processing immediately")
                         attachment.loadItem(forTypeIdentifier: UTType.url.identifier, options: nil) { [weak self] (item, error) in
                             if let error = error {
                                 print("❌ MesaShare: Error loading URL: \(error)")
@@ -42,7 +46,13 @@ class ShareViewController: UIViewController {
                             }
                             if let url = item as? URL {
                                 print("🔍 MesaShare: Loaded URL: \(url)")
-                                self?.handleTikTokURL(url)
+                                // Check if it's a TikTok URL and process immediately
+                                if self?.isTikTokURL(url) == true {
+                                    self?.handleTikTokURL(url)
+                                } else {
+                                    print("🔍 MesaShare: Not a TikTok URL, completing")
+                                    self?.completeRequest()
+                                }
                             } else {
                                 print("🔍 MesaShare: URL item is not a URL")
                                 self?.completeRequest()
@@ -50,9 +60,9 @@ class ShareViewController: UIViewController {
                         }
                         return
                     }
-                    // Handle text sharing (TikTok shares or Mesa list shares)
+                    // Handle text sharing (TikTok shares or Mesa list shares) - PRIORITY 2
                     else if attachment.hasItemConformingToTypeIdentifier(UTType.plainText.identifier) {
-                        print("🔍 MesaShare: Found text attachment")
+                        print("🔍 MesaShare: Found text attachment - processing immediately")
                         attachment.loadItem(forTypeIdentifier: UTType.plainText.identifier, options: nil) { [weak self] (item, error) in
                             if let error = error {
                                 print("❌ MesaShare: Error loading text: \(error)")
@@ -125,6 +135,13 @@ class ShareViewController: UIViewController {
                 }
             }
         }
+    }
+    
+    private func isTikTokURL(_ url: URL) -> Bool {
+        let urlString = url.absoluteString.lowercased()
+        return urlString.contains("tiktok.com") || 
+               urlString.contains("vm.tiktok.com") || 
+               urlString.contains("vt.tiktok.com")
     }
     
     private func extractTikTokURL(from text: String) -> URL? {
