@@ -11,16 +11,64 @@ import Social
 import MobileCoreServices
 import UniformTypeIdentifiers
 
-class ShareViewController: UIViewController {
-
+class ShareViewController: SLComposeServiceViewController {
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         print("🔍 MesaShare: viewDidLoad called")
         
-        // Hide the UI completely - we want automatic processing
-        view.isHidden = true
-        
         // Process the shared content immediately without showing UI
+        processSharedContent()
+    }
+    
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        
+        // Auto-trigger Post if we detect TikTok content
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            self.autoPostIfTikTok()
+        }
+    }
+    
+    private func autoPostIfTikTok() {
+        // Check if we have TikTok content and auto-post
+        if let item = extensionContext?.inputItems.first as? NSExtensionItem,
+           let attachments = item.attachments {
+            
+            for attachment in attachments {
+                if attachment.hasItemConformingToTypeIdentifier(UTType.url.identifier) {
+                    attachment.loadItem(forTypeIdentifier: UTType.url.identifier, options: nil) { [weak self] (item, error) in
+                        if let url = item as? URL, self?.isTikTokURL(url) == true {
+                            print("🔍 MesaShare: Auto-posting TikTok URL")
+                            DispatchQueue.main.async {
+                                self?.didSelectPost()
+                            }
+                        }
+                    }
+                    return
+                } else if attachment.hasItemConformingToTypeIdentifier(UTType.plainText.identifier) {
+                    attachment.loadItem(forTypeIdentifier: UTType.plainText.identifier, options: nil) { [weak self] (item, error) in
+                        if let text = item as? String, self?.extractTikTokURL(from: text) != nil {
+                            print("🔍 MesaShare: Auto-posting TikTok text")
+                            DispatchQueue.main.async {
+                                self?.didSelectPost()
+                            }
+                        }
+                    }
+                    return
+                }
+            }
+        }
+    }
+    
+    // Override to make the Post button always enabled
+    override var isContentValid: Bool {
+        return true
+    }
+    
+    // This is called when user taps Post
+    override func didSelectPost() {
+        print("🔍 MesaShare: didSelectPost called")
         processSharedContent()
     }
     

@@ -13,6 +13,8 @@
 				<key>NSExtensionActivationSupportsText</key>
 				<true/>
 			</dict>
+			<key>NSExtensionActivationSupportsFileWithMaxCount</key>
+			<integer>0</integer>
 		</dict>
 		<key>NSExtensionPrincipalClass</key>
 		<string>$(PRODUCT_MODULE_NAME).ShareViewController</string>
