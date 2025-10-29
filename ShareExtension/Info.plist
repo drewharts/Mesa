@@ -17,8 +17,6 @@
 		<string>$(PRODUCT_MODULE_NAME).ShareViewController</string>
 		<key>NSExtensionPointIdentifier</key>
 		<string>com.apple.share-services</string>
-		<key>NSExtensionMainStoryboard</key>
-		<string>MainInterface</string>
 	</dict>
 </dict>
 </plist>

@@ -21,6 +21,7 @@
 		B054DC7E2C42F5DB00C98088 /* locUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B054DC7D2C42F5DB00C98088 /* locUITestsLaunchTests.swift */; };
 		B054DC902C4301FB00C98088 /* GoogleMaps in Frameworks */ = {isa = PBXBuildFile; productRef = B054DC8F2C4301FB00C98088 /* GoogleMaps */; };
 		B061F1DE2C5815FA00042CB0 /* GooglePlaces in Frameworks */ = {isa = PBXBuildFile; productRef = B061F1DD2C5815FA00042CB0 /* GooglePlaces */; };
+		B06679022EB1BDB200879683 /* MesaShare.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = B06678F82EB1BDB200879683 /* MesaShare.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		B067944A2E9C439600B9D273 /* Auth in Frameworks */ = {isa = PBXBuildFile; productRef = B06794492E9C439600B9D273 /* Auth */; };
 		B067944C2E9C439600B9D273 /* Functions in Frameworks */ = {isa = PBXBuildFile; productRef = B067944B2E9C439600B9D273 /* Functions */; };
 		B067944E2E9C439600B9D273 /* PostgREST in Frameworks */ = {isa = PBXBuildFile; productRef = B067944D2E9C439600B9D273 /* PostgREST */; };
@@ -52,6 +53,13 @@
 			remoteGlobalIDString = B054DC5C2C42F5DA00C98088;
 			remoteInfo = loc;
 		};
+		B06679002EB1BDB200879683 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = B054DC552C42F5DA00C98088 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = B06678F72EB1BDB200879683;
+			remoteInfo = MesaShare;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -61,6 +69,7 @@
 			dstPath = "";
 			dstSubfolderSpec = 13;
 			files = (
+				B06679022EB1BDB200879683 /* MesaShare.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -79,6 +88,7 @@
 		B054DC7B2C42F5DB00C98088 /* locUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = locUITests.swift; sourceTree = "<group>"; };
 		B054DC7D2C42F5DB00C98088 /* locUITestsLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = locUITestsLaunchTests.swift; sourceTree = "<group>"; };
 		B061F1E22C581A3A00042CB0 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		B06678F82EB1BDB200879683 /* MesaShare.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = MesaShare.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		B0821C672C641B9100BA126E /* CoreLocationUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreLocationUI.framework; path = System/Library/Frameworks/CoreLocationUI.framework; sourceTree = SDKROOT; };
 		B0A819142CEA5F2A0041416F /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		B0C31A862D94CB6400E481F4 /* .gitignore */ = {isa = PBXFileReference; lastKnownFileType = text; path = .gitignore; sourceTree = "<group>"; };
@@ -92,6 +102,8 @@
 		B00311FE2CDACD8B002AE03B /* Services */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Services; sourceTree = "<group>"; };
 		B00311FF2CDACE01002AE03B /* Managers */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Managers; sourceTree = "<group>"; };
 		B05FEF2C2E1F28FB002436B7 /* Mesa Share */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = "Mesa Share"; sourceTree = "<group>"; };
+		B06678E62EB1BD8800879683 /* MesaShare */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = MesaShare; sourceTree = "<group>"; };
+		B06678F92EB1BDB200879683 /* MesaShare */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = MesaShare; sourceTree = "<group>"; };
 		B0E659872D39D54300F8527E /* Extensions */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Extensions; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
@@ -138,6 +150,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		B06678F52EB1BDB200879683 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -149,6 +168,8 @@
 				B054DC702C42F5DB00C98088 /* locTests */,
 				B054DC7A2C42F5DB00C98088 /* locUITests */,
 				B05FEF2C2E1F28FB002436B7 /* Mesa Share */,
+				B06678E62EB1BD8800879683 /* MesaShare */,
+				B06678F92EB1BDB200879683 /* MesaShare */,
 				B054DC5E2C42F5DA00C98088 /* Products */,
 				B0821C662C641B9100BA126E /* Frameworks */,
 				B021AF4B2CED816500642586 /* loc copy-Info.plist */,
@@ -162,6 +183,7 @@
 				B054DC5D2C42F5DA00C98088 /* loc.app */,
 				B054DC6D2C42F5DB00C98088 /* locTests.xctest */,
 				B054DC772C42F5DB00C98088 /* locUITests.xctest */,
+				B06678F82EB1BDB200879683 /* MesaShare.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -233,6 +255,7 @@
 			buildRules = (
 			);
 			dependencies = (
+				B06679012EB1BDB200879683 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				B00311FA2CDACD4B002AE03B /* Models */,
@@ -305,6 +328,28 @@
 			productReference = B054DC772C42F5DB00C98088 /* locUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
+		B06678F72EB1BDB200879683 /* MesaShare */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B06679042EB1BDB200879683 /* Build configuration list for PBXNativeTarget "MesaShare" */;
+			buildPhases = (
+				B06678F42EB1BDB200879683 /* Sources */,
+				B06678F52EB1BDB200879683 /* Frameworks */,
+				B06678F62EB1BDB200879683 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				B06678F92EB1BDB200879683 /* MesaShare */,
+			);
+			name = MesaShare;
+			packageProductDependencies = (
+			);
+			productName = MesaShare;
+			productReference = B06678F82EB1BDB200879683 /* MesaShare.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -312,7 +357,7 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 1640;
+				LastSwiftUpdateCheck = 2600;
 				LastUpgradeCheck = 1640;
 				TargetAttributes = {
 					B054DC5C2C42F5DA00C98088 = {
@@ -325,6 +370,9 @@
 					B054DC762C42F5DB00C98088 = {
 						CreatedOnToolsVersion = 15.4;
 						TestTargetID = B054DC5C2C42F5DA00C98088;
+					};
+					B06678F72EB1BDB200879683 = {
+						CreatedOnToolsVersion = 26.0.1;
 					};
 				};
 			};
@@ -351,6 +399,7 @@
 				B054DC5C2C42F5DA00C98088 /* loc */,
 				B054DC6C2C42F5DB00C98088 /* locTests */,
 				B054DC762C42F5DB00C98088 /* locUITests */,
+				B06678F72EB1BDB200879683 /* MesaShare */,
 			);
 		};
 /* End PBXProject section */
@@ -374,6 +423,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		B054DC752C42F5DB00C98088 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B06678F62EB1BDB200879683 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -408,6 +464,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		B06678F42EB1BDB200879683 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -420,6 +483,11 @@
 			isa = PBXTargetDependency;
 			target = B054DC5C2C42F5DA00C98088 /* loc */;
 			targetProxy = B054DC782C42F5DB00C98088 /* PBXContainerItemProxy */;
+		};
+		B06679012EB1BDB200879683 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = B06678F72EB1BDB200879683 /* MesaShare */;
+			targetProxy = B06679002EB1BDB200879683 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -693,6 +761,64 @@
 			};
 			name = Release;
 		};
+		B06679052EB1BDB200879683 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = MesaShare/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = MesaShare;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = drewharts.locc.MesaShare;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		B06679062EB1BDB200879683 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = MesaShare/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = MesaShare;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = drewharts.locc.MesaShare;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -728,6 +854,15 @@
 			buildConfigurations = (
 				B054DC882C42F5DB00C98088 /* Debug */,
 				B054DC892C42F5DB00C98088 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		B06679042EB1BDB200879683 /* Build configuration list for PBXNativeTarget "MesaShare" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B06679052EB1BDB200879683 /* Debug */,
+				B06679062EB1BDB200879683 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
