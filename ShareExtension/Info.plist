@@ -13,11 +13,15 @@
 				<key>NSExtensionActivationSupportsText</key>
 				<true/>
 			</dict>
+			<key>NSExtensionActivationSupportsFileWithMaxCount</key>
+			<integer>0</integer>
 		</dict>
 		<key>NSExtensionPrincipalClass</key>
 		<string>$(PRODUCT_MODULE_NAME).ShareViewController</string>
 		<key>NSExtensionPointIdentifier</key>
 		<string>com.apple.share-services</string>
+		<key>NSExtensionMainStoryboard</key>
+		<string>MainInterface</string>
 	</dict>
 </dict>
 </plist>

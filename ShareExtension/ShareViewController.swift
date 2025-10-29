@@ -13,23 +13,76 @@ import UniformTypeIdentifiers
 
 class ShareViewController: UIViewController {
     
+    private var hasProcessed = false
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         print("🔍 MesaShare: viewDidLoad called")
         
-        // Hide the entire view - we want completely headless processing
+        // Make view completely transparent and hidden
+        view.backgroundColor = .clear
+        view.alpha = 0
         view.isHidden = true
         
-        // Process the shared content immediately
-        processSharedItem()
+        // Process immediately
+        if !hasProcessed {
+            hasProcessed = true
+            processSharedItem()
+        }
+    }
+    
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        
+        // Ensure UI is completely hidden
+        view.alpha = 0
+        view.isHidden = true
+        view.backgroundColor = .clear
+        
+        // Process if not already processed
+        if !hasProcessed {
+            hasProcessed = true
+            processSharedItem()
+        }
     }
     
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         
-        // Auto-complete if we detect TikTok content
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            self.autoCompleteIfTikTok()
+        // Force completion immediately
+        DispatchQueue.main.async {
+            self.forceCompleteForTikTok()
+        }
+    }
+    
+    private func forceCompleteForTikTok() {
+        // Check if we have TikTok content and force complete
+        if let item = extensionContext?.inputItems.first as? NSExtensionItem,
+           let attachments = item.attachments {
+            
+            for attachment in attachments {
+                if attachment.hasItemConformingToTypeIdentifier(UTType.url.identifier) {
+                    attachment.loadItem(forTypeIdentifier: UTType.url.identifier, options: nil) { [weak self] (item, error) in
+                        if let url = item as? URL, self?.isTikTokURL(url) == true {
+                            print("🔍 MesaShare: Force completing TikTok URL")
+                            DispatchQueue.main.async {
+                                self?.closeExtension()
+                            }
+                        }
+                    }
+                    return
+                } else if attachment.hasItemConformingToTypeIdentifier(UTType.plainText.identifier) {
+                    attachment.loadItem(forTypeIdentifier: UTType.plainText.identifier, options: nil) { [weak self] (item, error) in
+                        if let text = item as? String, self?.extractTikTokURL(from: text) != nil {
+                            print("🔍 MesaShare: Force completing TikTok text")
+                            DispatchQueue.main.async {
+                                self?.closeExtension()
+                            }
+                        }
+                    }
+                    return
+                }
+            }
         }
     }
     
