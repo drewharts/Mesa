@@ -11,37 +11,57 @@ import Social
 import MobileCoreServices
 import UniformTypeIdentifiers
 
-class ShareViewController: SLComposeServiceViewController {
+class ShareViewController: UIViewController {
     
     override func viewDidLoad() {
         super.viewDidLoad()
         print("🔍 MesaShare: viewDidLoad called")
         
-        // Hide text view and post button immediately
-        hideDefaultUI()
+        // Hide the entire view - we want completely headless processing
+        view.isHidden = true
         
-        // Process the shared TikTok URL right away
+        // Process the shared content immediately
         processSharedItem()
     }
     
-    private func hideDefaultUI() {
-        // Hide text input
-        textView?.isHidden = true
-        textView?.alpha = 0
-        textView?.isUserInteractionEnabled = false
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
         
-        // Hide placeholder, characters remaining, etc.
-        placeholderLabel?.isHidden = true
-        charactersRemainingLabel?.isHidden = true
-        
-        // Hide "Post" button (via private API – safe in practice)
-        if let postButton = navigationController?.navigationBar.topItem?.rightBarButtonItem?.customView as? UIButton {
-            postButton.isHidden = true
-            postButton.alpha = 0
+        // Auto-complete if we detect TikTok content
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            self.autoCompleteIfTikTok()
         }
-        
-        // Optional: make background transparent or minimal
-        view.backgroundColor = .clear
+    }
+    
+    private func autoCompleteIfTikTok() {
+        // Check if we have TikTok content and auto-complete
+        if let item = extensionContext?.inputItems.first as? NSExtensionItem,
+           let attachments = item.attachments {
+            
+            for attachment in attachments {
+                if attachment.hasItemConformingToTypeIdentifier(UTType.url.identifier) {
+                    attachment.loadItem(forTypeIdentifier: UTType.url.identifier, options: nil) { [weak self] (item, error) in
+                        if let url = item as? URL, self?.isTikTokURL(url) == true {
+                            print("🔍 MesaShare: Auto-completing TikTok URL")
+                            DispatchQueue.main.async {
+                                self?.closeExtension()
+                            }
+                        }
+                    }
+                    return
+                } else if attachment.hasItemConformingToTypeIdentifier(UTType.plainText.identifier) {
+                    attachment.loadItem(forTypeIdentifier: UTType.plainText.identifier, options: nil) { [weak self] (item, error) in
+                        if let text = item as? String, self?.extractTikTokURL(from: text) != nil {
+                            print("🔍 MesaShare: Auto-completing TikTok text")
+                            DispatchQueue.main.async {
+                                self?.closeExtension()
+                            }
+                        }
+                    }
+                    return
+                }
+            }
+        }
     }
     
     // MARK: - Process Shared TikTok URL
@@ -129,10 +149,6 @@ class ShareViewController: SLComposeServiceViewController {
         }
     }
     
-    // Disable validation – we don't need user input
-    override func isContentValid() -> Bool { return true }
-    override func didSelectPost() { /* no-op */ }
-    override func configurationItems() -> [Any]! { return [] }
     
     
     private func isTikTokURL(_ url: URL) -> Bool {
