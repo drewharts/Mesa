@@ -3,6 +3,7 @@
 //  ShareExtension
 //
 //  Created by Andrew Hartsfield II on 7/2/25.
+//  Updated: Consolidated Mesa Share functionality
 //
 
 import UIKit
@@ -14,36 +15,36 @@ class ShareViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        print("🔍 ShareExtension: viewDidLoad called")
+        print("🔍 MesaShare: viewDidLoad called")
         
         // Process the shared content immediately without showing UI
         processSharedContent()
     }
     
     private func processSharedContent() {
-        print("🔍 ShareExtension: didSelectPost called")
+        print("🔍 MesaShare: didSelectPost called")
         // Process the shared content
         if let item = extensionContext?.inputItems.first as? NSExtensionItem {
-            print("🔍 ShareExtension: Found input item")
+            print("🔍 MesaShare: Found input item")
             if let attachments = item.attachments {
-                print("🔍 ShareExtension: Found \(attachments.count) attachments")
+                print("🔍 MesaShare: Found \(attachments.count) attachments")
                 for (index, attachment) in attachments.enumerated() {
-                    print("🔍 ShareExtension: Processing attachment \(index)")
+                    print("🔍 MesaShare: Processing attachment \(index)")
                     
                     // Handle URL sharing (TikTok shares video URLs)
                     if attachment.hasItemConformingToTypeIdentifier(UTType.url.identifier) {
-                        print("🔍 ShareExtension: Found URL attachment")
+                        print("🔍 MesaShare: Found URL attachment")
                         attachment.loadItem(forTypeIdentifier: UTType.url.identifier, options: nil) { [weak self] (item, error) in
                             if let error = error {
-                                print("❌ ShareExtension: Error loading URL: \(error)")
+                                print("❌ MesaShare: Error loading URL: \(error)")
                                 self?.completeRequest()
                                 return
                             }
                             if let url = item as? URL {
-                                print("🔍 ShareExtension: Loaded URL: \(url)")
+                                print("🔍 MesaShare: Loaded URL: \(url)")
                                 self?.handleTikTokURL(url)
                             } else {
-                                print("🔍 ShareExtension: URL item is not a URL")
+                                print("🔍 MesaShare: URL item is not a URL")
                                 self?.completeRequest()
                             }
                         }
@@ -51,38 +52,38 @@ class ShareViewController: UIViewController {
                     }
                     // Handle text sharing (TikTok shares or Mesa list shares)
                     else if attachment.hasItemConformingToTypeIdentifier(UTType.plainText.identifier) {
-                        print("🔍 ShareExtension: Found text attachment")
+                        print("🔍 MesaShare: Found text attachment")
                         attachment.loadItem(forTypeIdentifier: UTType.plainText.identifier, options: nil) { [weak self] (item, error) in
                             if let error = error {
-                                print("❌ ShareExtension: Error loading text: \(error)")
+                                print("❌ MesaShare: Error loading text: \(error)")
                                 self?.completeRequest()
                                 return
                             }
                             if let text = item as? String {
-                                print("🔍 ShareExtension: Loaded text: \(text)")
+                                print("🔍 MesaShare: Loaded text: \(text)")
                                 if let url = self?.extractTikTokURL(from: text) {
                                     self?.handleTikTokURL(url)
                                 } else if self?.isMesaListShare(text) == true {
                                     self?.handleMesaListShare(text)
                                 } else {
-                                    print("🔍 ShareExtension: No TikTok URL or Mesa list found in text")
+                                    print("🔍 MesaShare: No TikTok URL or Mesa list found in text")
                                     self?.completeRequest()
                                 }
                             } else {
-                                print("🔍 ShareExtension: Text item is not a string")
+                                print("🔍 MesaShare: Text item is not a string")
                                 self?.completeRequest()
                             }
                         }
                         return
                     } else {
-                        print("🔍 ShareExtension: Attachment \(index) has no matching type identifier")
+                        print("🔍 MesaShare: Attachment \(index) has no matching type identifier")
                     }
                 }
             } else {
-                print("🔍 ShareExtension: No attachments found")
+                print("🔍 MesaShare: No attachments found")
             }
         } else {
-            print("🔍 ShareExtension: No input items found")
+            print("🔍 MesaShare: No input items found")
         }
         
         // If no URL found, just complete
@@ -90,9 +91,12 @@ class ShareViewController: UIViewController {
     }
     
     private func handleTikTokURL(_ url: URL) {
-        print("🎵 ShareExtension: Processing TikTok URL: \(url.absoluteString)")
+        print("🎵 MesaShare: Processing TikTok URL: \(url.absoluteString)")
         
-        // Create deep link to main app
+        // Method 1: Store URL in shared storage and launch app
+        self.storeSharedTikTokURL(url.absoluteString)
+        
+        // Method 2: Try direct URL opening
         var components = URLComponents()
         components.scheme = "loc"
         components.host = "share"
@@ -109,11 +113,16 @@ class ShareViewController: UIViewController {
         
         print("🔗 Opening app with URL: \(appURL.absoluteString)")
         
-        // Open the main app
+        // Try opening with URL first
         DispatchQueue.main.async { [weak self] in
             self?.openURL(appURL) { success in
-                print(success ? "✅ Successfully opened main app" : "❌ Failed to open main app")
-                self?.completeRequest()
+                if success {
+                    print("✅ Successfully opened main app")
+                    self?.completeRequest()
+                } else {
+                    print("❌ URL opening failed, trying NSUserActivity")
+                    self?.openAppWithUserActivity(tikTokURL: url.absoluteString)
+                }
             }
         }
     }
@@ -146,7 +155,7 @@ class ShareViewController: UIViewController {
     }
 
     private func handleMesaListShare(_ text: String) {
-        print("📋 ShareExtension: Processing Mesa list share: \(text)")
+        print("📋 MesaShare: Processing Mesa list share: \(text)")
 
         // Create deep link to main app for list sharing
         var components = URLComponents()
@@ -174,14 +183,67 @@ class ShareViewController: UIViewController {
         }
     }
     
+    private func storeSharedTikTokURL(_ urlString: String) {
+        // Only use regular UserDefaults to avoid App Group errors
+        UserDefaults.standard.set(urlString, forKey: "sharedTikTokURL")
+        UserDefaults.standard.synchronize()
+        print("💾 Stored TikTok URL in UserDefaults")
+    }
+    
+    private func openAppWithUserActivity(tikTokURL: String) {
+        // Method 2: Use NSUserActivity as fallback
+        let userActivity = NSUserActivity(activityType: "com.mesa.share.tiktok")
+        userActivity.title = "Share TikTok Video"
+        userActivity.userInfo = ["tikTokURL": tikTokURL]
+        userActivity.isEligibleForHandoff = true
+        
+        if let context = self.extensionContext {
+            context.completeRequest(returningItems: [userActivity], completionHandler: nil)
+        } else {
+            completeRequest()
+        }
+    }
+    
     private func openURL(_ url: URL, completion: @escaping (Bool) -> Void) {
-        // Use the extension context to open the URL
+        // Try multiple methods to open the URL
+        
+        // Method 1: Try extension context first
         if let context = self.extensionContext {
             context.open(url) { success in
-                completion(success)
+                if success {
+                    completion(true)
+                } else {
+                    print("❌ MesaShare: Extension context failed, trying UIApplication")
+                    self.openURLWithUIApplication(url, completion: completion)
+                }
             }
         } else {
-            completion(false)
+            print("❌ MesaShare: No extension context, trying UIApplication")
+            self.openURLWithUIApplication(url, completion: completion)
+        }
+    }
+    
+    private func openURLWithUIApplication(_ url: URL, completion: @escaping (Bool) -> Void) {
+        // Method 2: Use UIApplication.shared.open (if available)
+        DispatchQueue.main.async {
+            if let application = UIApplication.value(forKeyPath: "sharedApplication") as? UIApplication {
+                if application.canOpenURL(url) {
+                    if #available(iOS 10.0, *) {
+                        application.open(url, options: [:]) { success in
+                            completion(success)
+                        }
+                    } else {
+                        let success = application.openURL(url)
+                        completion(success)
+                    }
+                } else {
+                    print("❌ MesaShare: Cannot open URL: \(url)")
+                    completion(false)
+                }
+            } else {
+                print("❌ MesaShare: Cannot access UIApplication")
+                completion(false)
+            }
         }
     }
     
