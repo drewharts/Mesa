@@ -54,6 +54,9 @@ class DeepLinkManager: ObservableObject {
         case "list":
             print("📋 [DeepLinkManager] Routing to handleListDeepLink")
             await handleListDeepLink(url)
+        case "tiktok-shared":
+            print("🎵 [DeepLinkManager] host is 'tiktok-shared', routing to handleTikTokFromExtension")
+            await handleTikTokFromExtension()
         case "share":
             print("📤 [DeepLinkManager] host is 'share', checking path...")
             if url.path == "/tiktok" {
@@ -141,6 +144,26 @@ class DeepLinkManager: ObservableObject {
                 userInfo: ["message": "Your list has been shared successfully!"]
             )
         }
+    }
+    
+    private func handleTikTokFromExtension() async {
+        print("🎵 [DeepLinkManager] handleTikTokFromExtension called")
+        
+        // Get TikTok URL from App Group
+        let shared = UserDefaults(suiteName: "group.com.mesa.loc")
+        guard let tiktokURLString = shared?.string(forKey: "sharedTikTokURL"),
+              let tiktokURL = URL(string: tiktokURLString) else {
+            print("❌ [DeepLinkManager] No TikTok URL found in App Group")
+            return
+        }
+        
+        print("✅ [DeepLinkManager] Found TikTok URL: \(tiktokURLString)")
+        
+        // Clear the stored URL
+        shared?.removeObject(forKey: "sharedTikTokURL")
+        
+        // Process the TikTok URL
+        await processTikTokURL(tiktokURLString)
     }
     
     private func processTikTokURL(_ urlString: String) async {
