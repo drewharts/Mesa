@@ -147,8 +147,7 @@ class ShareViewController: SLComposeServiceViewController {
         }
     }
     
-    
-    
+    // MARK: - TikTok Detection
     private func isTikTokURL(_ url: URL) -> Bool {
         let urlString = url.absoluteString.lowercased()
         return urlString.contains("tiktok.com") || 
@@ -178,6 +177,7 @@ class ShareViewController: SLComposeServiceViewController {
         return nil
     }
 
+    // MARK: - Mesa Share Detection
     private func isMesaListShare(_ text: String) -> Bool {
         // Check if the text contains Mesa list sharing patterns
         return text.contains("on Mesa!") || text.contains("Check out my list")
@@ -188,6 +188,7 @@ class ShareViewController: SLComposeServiceViewController {
         return text.contains("Check out this place") || text.contains("on Mesa!")
     }
 
+    // MARK: - Mesa Share Handlers
     private func handleMesaListShare(_ text: String) {
         let components = URLComponents(string: "loc://share/list")!
             .addingQueryItem(name: "text", value: text)
@@ -201,5 +202,4 @@ class ShareViewController: SLComposeServiceViewController {
         guard let url = components.url else { closeExtension(); return }
         _ = openURL(url) { _ in self.closeExtension() }
     }
-    
 }
