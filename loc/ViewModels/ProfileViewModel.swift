@@ -1960,6 +1960,28 @@ class ProfileViewModel: ObservableObject {
         }
     }
     
+    // MARK: - Place List Pagination (for lists themselves, not places within lists)
+    
+    /// Check if we should load more place lists based on current scroll position
+    func shouldLoadMorePlaceLists(currentItem: LightweightPlaceList, filteredLists: [LightweightPlaceList], isSearching: Bool) -> Bool {
+        // Don't load during search
+        guard !isSearching else { return false }
+        
+        // Check loading state and availability
+        guard !isLoadingMorePlaceLists && hasMorePlaceLists else { return false }
+        
+        // Calculate threshold (3 items from the end)
+        let threshold = max(0, filteredLists.count - 3)
+        
+        // Find current item's index
+        guard let currentIndex = filteredLists.firstIndex(where: { $0.id == currentItem.id }) else {
+            return false
+        }
+        
+        // Load more when at or past threshold
+        return currentIndex >= threshold
+    }
+    
     /// Smart image preloading for visible places (simplified)
     func preloadImagesForVisiblePlaces(listId: UUID) {
         let displayedPlaceIds = getDisplayedPlaceIds(for: listId)

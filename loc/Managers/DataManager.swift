@@ -786,20 +786,23 @@ class DataManager: ObservableObject {
             Task.detached(priority: .userInitiated) { [weak self] in
                 guard let self = self else { return }
                 
+                let pageSize = 6 // Consistent page size for initial load and pagination
                 print("📍 [DataManager] User location available: \(location.latitude), \(location.longitude)")
                 let placeLists = (try? await self.userService.fetchPlaceListsByProximity(
                     userId: userId,
                     userLatitude: location.latitude,
                     userLongitude: location.longitude,
                     page: 1,
-                    pageSize: 5
+                    pageSize: pageSize
                 )) ?? []
                 
-                print("✅ [DataManager] Loaded \(placeLists.count) place lists in background")
+                print("✅ [DataManager] Loaded \(placeLists.count) place lists in background (page 1)")
                 
                 // Update place lists on main thread
                 await MainActor.run {
                     self.profileViewModel.lightweightPlaceLists = placeLists
+                    // Set hasMore based on whether we got a full page
+                    self.profileViewModel.hasMorePlaceLists = placeLists.count >= pageSize
                 }
                 
                 // Load places for each list
@@ -815,15 +818,35 @@ class DataManager: ObservableObject {
     /// Load more place lists (pagination)
     @MainActor
     func loadMorePlaceLists(userId: String) async {
-        // Early returns for guard conditions
-        guard !profileViewModel.isLoadingMorePlaceLists && profileViewModel.hasMorePlaceLists else { return }
-        guard let location = locationManager.currentLocation?.coordinate else { return }
+        // Guard: Already loading
+        guard !profileViewModel.isLoadingMorePlaceLists else {
+            print("⚠️ [DataManager] Already loading more place lists, skipping duplicate request")
+            return
+        }
         
-        // Set loading state
+        // Guard: No more lists to load
+        guard profileViewModel.hasMorePlaceLists else {
+            print("ℹ️ [DataManager] No more place lists to load")
+            return
+        }
+        
+        // Guard: Location required for proximity sorting
+        guard let location = locationManager.currentLocation?.coordinate else {
+            print("⚠️ [DataManager] No location available for loading more place lists")
+            return
+        }
+        
+        // Set loading state with guaranteed cleanup
         profileViewModel.isLoadingMorePlaceLists = true
-        defer { profileViewModel.isLoadingMorePlaceLists = false }
+        defer { 
+            profileViewModel.isLoadingMorePlaceLists = false
+            print("✅ [DataManager] Pagination loading state cleaned up")
+        }
         
         let nextPage = profileViewModel.placeListsCurrentPage + 1
+        let pageSize = 6
+        
+        print("📄 [DataManager] Loading page \(nextPage) of place lists...")
         
         do {
             let moreLists = try await userService.fetchPlaceListsByProximity(
@@ -831,24 +854,33 @@ class DataManager: ObservableObject {
                 userLatitude: location.latitude,
                 userLongitude: location.longitude,
                 page: nextPage,
-                pageSize: 6
+                pageSize: pageSize
             )
             
+            print("✅ [DataManager] Fetched \(moreLists.count) lists for page \(nextPage)")
+            
             // Update pagination state
-            profileViewModel.hasMorePlaceLists = moreLists.count >= 6
+            // If we got fewer than pageSize items, we've reached the end
+            profileViewModel.hasMorePlaceLists = moreLists.count >= pageSize
             
             // Append new lists if any
             if !moreLists.isEmpty {
                 profileViewModel.lightweightPlaceLists.append(contentsOf: moreLists)
                 profileViewModel.placeListsCurrentPage = nextPage
                 
+                print("✅ [DataManager] Added \(moreLists.count) more lists. Total: \(profileViewModel.lightweightPlaceLists.count)")
+                
                 // Load places for new lists in background
                 Task.detached(priority: .userInitiated) { [weak self] in
                     await self?.loadPlacesForLists(moreLists)
                 }
+            } else {
+                print("ℹ️ [DataManager] No more lists returned, reached end of pagination")
+                profileViewModel.hasMorePlaceLists = false
             }
         } catch {
             print("❌ [DataManager] Error loading more place lists: \(error.localizedDescription)")
+            // Don't set hasMorePlaceLists to false on error - allow retry
         }
     }
     

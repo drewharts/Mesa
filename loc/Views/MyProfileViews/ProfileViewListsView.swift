@@ -45,18 +45,24 @@ struct ProfileViewListsView: View {
 
             if !filteredLists.isEmpty {
                 LazyVStack(spacing: 16) {
-                    ForEach(Array(filteredLists.enumerated()), id: \.element.id) { index, list in
+                    ForEach(filteredLists, id: \.id) { list in
                         LightweightProfileListSection(
                             list: list,
                             places: profile.lightweightPlaceListPlaces[list.list_id] ?? [],
                             allLists: filteredLists,
-                            currentIndex: index,
+                            currentIndex: filteredLists.firstIndex(where: { $0.id == list.id }) ?? 0,
                             placeColors: $placeColors
                         )
                         .onAppear {
-                            // Load more when we reach the 3rd-to-last item
-                            if index == filteredLists.count - 3 && searchText.isEmpty {
-                                loadMoreListsIfNeeded()
+                            // Trigger pagination when approaching the end
+                            if profile.shouldLoadMorePlaceLists(
+                                currentItem: list,
+                                filteredLists: filteredLists,
+                                isSearching: !searchText.isEmpty
+                            ) {
+                                Task {
+                                    await dataManager.loadMorePlaceLists(userId: userSession.currentUserId ?? "")
+                                }
                             }
                         }
                     }
@@ -115,11 +121,4 @@ struct ProfileViewListsView: View {
         }
     }
     
-    private func loadMoreListsIfNeeded() {
-        guard !profile.isLoadingMorePlaceLists && profile.hasMorePlaceLists else { return }
-        
-        Task {
-            await dataManager.loadMorePlaceLists(userId: userSession.currentUserId ?? "")
-        }
-    }
 }
