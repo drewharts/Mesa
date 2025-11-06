@@ -994,6 +994,15 @@ class DataManager: ObservableObject {
             }
         }
         
+        // Prefetch TikTok metadata for all TikTok URLs
+        let allTiktokUrls = allPlaces.values.flatMap { $0.compactMap { $0.tiktok_url } }.filter { !$0.isEmpty }
+        if !allTiktokUrls.isEmpty {
+            Task {
+                await TikTokMetadataCache.shared.prefetchMetadata(for: Array(allTiktokUrls))
+                print("✅ [DataManager] Prefetched TikTok metadata for \(allTiktokUrls.count) URLs from place lists")
+            }
+        }
+        
         // Single main thread update - prevents multiple view re-renders
         await MainActor.run {
             for (listId, places) in allPlaces {

@@ -1,9 +1,11 @@
 -- ============================================================================
--- Function: get_paginated_place_list_places
+-- Update get_paginated_place_list_places to include tiktok_url
 -- ============================================================================
--- Returns paginated list of places in a place list with their details
--- Includes latest review photo and TikTok URL for places where list owner has TikTok videos
+-- This allows place list tiles to display TikTok thumbnails for places where
+-- the list owner has saved TikTok videos
 -- ============================================================================
+
+DROP FUNCTION IF EXISTS get_paginated_place_list_places(text, integer, integer);
 
 CREATE OR REPLACE FUNCTION public.get_paginated_place_list_places(
     p_list_id text, 
@@ -40,3 +42,4 @@ BEGIN
   LIMIT p_page_size;
 END;
 $function$;
+

@@ -143,7 +143,26 @@ struct LightweightPlacePreviewCard: View {
                 .frame(height: 80)
                 .overlay(
                     Group {
-                        if let photoUrl = place.latest_review_photo, let url = URL(string: photoUrl) {
+                        // Check for TikTok thumbnail first, then review photo, then colored rectangle
+                        if let tiktokUrl = place.tiktok_url,
+                           let thumbnailURL = TikTokMetadataCache.shared.getCachedThumbnailUrl(for: tiktokUrl) {
+                            AsyncImage(url: URL(string: thumbnailURL)) { image in
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .frame(maxWidth: .infinity, maxHeight: 80)
+                                    .clipped()
+                            } placeholder: {
+                                Rectangle()
+                                    .foregroundColor(.gray.opacity(0.3))
+                                    .frame(maxWidth: .infinity, maxHeight: 80)
+                                    .onAppear {
+                                        Task {
+                                            _ = await TikTokMetadataCache.shared.getMetadata(for: tiktokUrl)
+                                        }
+                                    }
+                            }
+                        } else if let photoUrl = place.latest_review_photo, let url = URL(string: photoUrl) {
                             AsyncImage(url: url) { image in
                                 image
                                     .resizable()
@@ -159,6 +178,13 @@ struct LightweightPlacePreviewCard: View {
                             Rectangle()
                                 .foregroundColor(placeColor)
                                 .frame(maxWidth: .infinity, maxHeight: 80)
+                                .onAppear {
+                                    if let tiktokUrl = place.tiktok_url {
+                                        Task {
+                                            _ = await TikTokMetadataCache.shared.getMetadata(for: tiktokUrl)
+                                        }
+                                    }
+                                }
                         }
                     }
                     .clipped()
