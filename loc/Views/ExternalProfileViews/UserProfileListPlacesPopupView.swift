@@ -30,8 +30,8 @@ struct UserProfileListPlacesPopupView: View {
             return firstVideo.thumbnailURL
         }
         
-        // Check external places (user's TikTok videos for this place)
-        return viewModel.getFirstTikTokThumbnailURL(for: place.id.uuidString)
+        // Check external places (user's TikTok videos for this place) - uses cached data
+        return viewModel.getFirstTikTokThumbnailURLSync(for: place.id.uuidString)
     }
     
     var body: some View {

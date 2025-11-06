@@ -385,100 +385,26 @@ class ProfileViewModel: ObservableObject {
          return places.contains(placeId)
      }
     
-     func addPlaceToList(listId: UUID, place: DetailPlace) {
-        let listIdString = listId.uuidString
-        guard let userId = userSession.currentUserId else {
-            return
-        }
-        // Find the list in userLists
-        guard let listIndex = userLists.firstIndex(where: { $0.id == listId }) else {
-            return
-        }
-
-        // Check if this place has associated external place data (TikTok data)
-        // and merge it if the current place doesn't have TikTok videos
-        var updatedPlace = place
-        if place.tikTokVideos == nil || place.tikTokVideos?.isEmpty == true {
-            if let externalPlace = userExternalPlaces[place.id.uuidString] {
-                // Merge TikTok data from external place
-                updatedPlace = mergeTikTokData(into: place, from: externalPlace)
-            }
-        }
-
-        // Convert DetailPlace to Place for FirestoreService
-        let placeForList = updatedPlace.toPlace()
-
-        // Update local userListsPlaces
-        var places = userListsPlaces[listIdString] ?? []
-        if !places.contains(updatedPlace.id.uuidString) {
-            places.append(updatedPlace.id.uuidString)
-            userListsPlaces[listIdString] = places
-        }
-
-        // Update the places array in the PlaceList
-        if !userLists[listIndex].places.contains(where: { $0.id == updatedPlace.id }) {
-            userLists[listIndex].places.append(placeForList)
-            
-            // Immediately update the place count for this list
-            placeListCounts[listId] = userLists[listIndex].places.count
-        }
-
-        // Persist to Supabase
-        Task {
-            do {
-                try await SupabaseUserService.shared.addPlaceToList(listId: listIdString, placeId: updatedPlace.id.uuidString)
-            } catch {
-                print("❌ [ProfileViewModel] Failed to add place to list: \(error)")
-            }
-        }
-
-        // Update DetailPlaceViewModel's places dictionary for immediate UI update
-        // Always update the place to ensure TikTok data and other properties are current
-        detailPlaceViewModel.places[updatedPlace.id.uuidString] = updatedPlace
-        
-        // Add current user as saver so places appear on map with profile picture
-        if detailPlaceViewModel.placeSavers[updatedPlace.id.uuidString] == nil {
-            detailPlaceViewModel.placeSavers[updatedPlace.id.uuidString] = [userId]
-        } else if !detailPlaceViewModel.placeSavers[updatedPlace.id.uuidString]!.contains(userId) {
-            detailPlaceViewModel.placeSavers[updatedPlace.id.uuidString]!.append(userId)
-        }
-
-        // Recalculate map annotations to include the new place
-        detailPlaceViewModel.calculateAnnotationPlaces()
-        
-        // Recalculate average coordinates for this list
-        recalculateAverageCoordinates(for: listId)
-        
-        // Reset pagination to include the new place
-        resetListPagination(listId: listId)
-        
-        // Skip sorting for individual place additions to avoid frequent re-sorting
-    }
+    // MARK: - Add to List Functions
     
-    /// Add a place to a lightweight list (new format)
+    /// Add a place to a lightweight list (current format)
     func addPlaceToLightweightList(listId: String, place: DetailPlace) {
-        guard let userId = userSession.currentUserId else {
-            return
-        }
+        guard let userId = userSession.currentUserId else { return }
         
-        // Check if this place has associated external place data (TikTok data)
-        var updatedPlace = place
-        if place.tikTokVideos == nil || place.tikTokVideos?.isEmpty == true {
-            if let externalPlace = userExternalPlaces[place.id.uuidString] {
-                updatedPlace = mergeTikTokData(into: place, from: externalPlace)
-            }
-        }
+        let placeId = place.id.uuidString
         
         // Create lightweight place object
         let lightweightPlace = LightweightPlace(
-            place_id: updatedPlace.id.uuidString,
-            name: updatedPlace.name,
-            latest_review_photo: updatedPlace.photoUrls?.first
+            place_id: placeId,
+            name: place.name,
+            latest_review_photo: place.photoUrls?.first,
+            external_place_id: nil, // Not a TikTok external place
+            tiktok_url: nil
         )
         
         // Update local lightweightPlaceListPlaces
         if lightweightPlaceListPlaces[listId] != nil {
-            if !lightweightPlaceListPlaces[listId]!.contains(where: { $0.place_id == updatedPlace.id.uuidString }) {
+            if !lightweightPlaceListPlaces[listId]!.contains(where: { $0.place_id == placeId }) {
                 lightweightPlaceListPlaces[listId]!.append(lightweightPlace)
             }
         } else {
@@ -486,13 +412,13 @@ class ProfileViewModel: ObservableObject {
         }
         
         // Update DetailPlaceViewModel's places dictionary for immediate UI update
-        detailPlaceViewModel.places[updatedPlace.id.uuidString] = updatedPlace
+        detailPlaceViewModel.places[placeId] = place
         
         // Add current user as saver so places appear on map with profile picture
-        if detailPlaceViewModel.placeSavers[updatedPlace.id.uuidString] == nil {
-            detailPlaceViewModel.placeSavers[updatedPlace.id.uuidString] = [userId]
-        } else if !detailPlaceViewModel.placeSavers[updatedPlace.id.uuidString]!.contains(userId) {
-            detailPlaceViewModel.placeSavers[updatedPlace.id.uuidString]!.append(userId)
+        if detailPlaceViewModel.placeSavers[placeId] == nil {
+            detailPlaceViewModel.placeSavers[placeId] = [userId]
+        } else if !detailPlaceViewModel.placeSavers[placeId]!.contains(userId) {
+            detailPlaceViewModel.placeSavers[placeId]!.append(userId)
         }
         
         // Recalculate map annotations to include the new place
@@ -501,11 +427,38 @@ class ProfileViewModel: ObservableObject {
         // Persist to Supabase
         Task {
             do {
-                try await SupabaseUserService.shared.addPlaceToList(listId: listId, placeId: updatedPlace.id.uuidString)
+                try await SupabaseUserService.shared.addPlaceToList(listId: listId, placeId: placeId)
             } catch {
-                print("❌ [ProfileViewModel] Failed to add place to lightweight list: \(error)")
+                print("❌ [ProfileViewModel] Failed to add place to list: \(error)")
             }
         }
+    }
+    
+    /// Add a place to a list (old UUID-based format) - delegates to addPlaceToLightweightList
+    /// DEPRECATED: Use addPlaceToLightweightList directly for new code
+    func addPlaceToList(listId: UUID, place: DetailPlace) {
+        let listIdString = listId.uuidString
+        guard let listIndex = userLists.firstIndex(where: { $0.id == listId }) else { return }
+
+        // Delegate to new implementation for core functionality
+        addPlaceToLightweightList(listId: listIdString, place: place)
+        
+        // Legacy-specific: Update old PlaceList format
+        let placeForList = place.toPlace()
+        var places = userListsPlaces[listIdString] ?? []
+        if !places.contains(place.id.uuidString) {
+            places.append(place.id.uuidString)
+            userListsPlaces[listIdString] = places
+        }
+        
+        if !userLists[listIndex].places.contains(where: { $0.id == place.id }) {
+            userLists[listIndex].places.append(placeForList)
+            placeListCounts[listId] = userLists[listIndex].places.count
+        }
+        
+        // Legacy-specific: Update average coordinates and pagination
+        recalculateAverageCoordinates(for: listId)
+        resetListPagination(listId: listId)
     }
     
     /// Remove a place from a lightweight list (new format)
@@ -543,39 +496,19 @@ class ProfileViewModel: ObservableObject {
         }
     }
     
-    /// Merge TikTok data from an ExternalPlace into a DetailPlace
-    private func mergeTikTokData(into detailPlace: DetailPlace, from externalPlace: ExternalPlace) -> DetailPlace {
+    /// Merge TikTok data from an ExternalPlace into a DetailPlace (async)
+    func mergeTikTokData(into detailPlace: DetailPlace, from externalPlace: ExternalPlace) async -> DetailPlace {
         // Create a copy of the DetailPlace with TikTok data merged in
         var mergedPlace = detailPlace
 
-        // If the external place has TikTok videos, convert and add them to the detail place
-        if !externalPlace.tiktokVideos.isEmpty {
-            let tikTokVideos = externalPlace.tiktokVideos.compactMap { convertExternalTikTokVideoToTikTokVideo($0) }
-            mergedPlace.tikTokVideos = tikTokVideos
+        // If the external place has a TikTok URL, fetch metadata from cache
+        if let url = externalPlace.url, !url.isEmpty {
+            if let tikTokVideo = await TikTokMetadataCache.shared.getMetadata(for: url) {
+                mergedPlace.tikTokVideos = [tikTokVideo]
+            }
         }
 
         return mergedPlace
-    }
-    
-    /// Convert ExternalTikTokVideo to TikTokVideo
-    private func convertExternalTikTokVideoToTikTokVideo(_ externalVideo: ExternalTikTokVideo) -> TikTokVideo? {
-        let tikTokAuthor = TikTokAuthor(
-            displayName: externalVideo.author.displayName,
-            url: "", // Not available in external format
-            username: externalVideo.author.username
-        )
-        
-        return TikTokVideo(
-            videoID: externalVideo.videoId,
-            url: externalVideo.url,
-            title: nil, // Not available in external format
-            caption: nil, // Not available in external format
-            embedHTML: externalVideo.embedHtml,
-            thumbnailURL: externalVideo.thumbnailUrl,
-            author: tikTokAuthor,
-            hashtags: externalVideo.hashtags,
-            createdAt: externalVideo.createdAt
-        )
     }
 
      func removePlaceFromList(listId: UUID, place: DetailPlace) {
@@ -2202,59 +2135,49 @@ class ProfileViewModel: ObservableObject {
     
     /// OLD: This function is no longer used for loading - we use lightweight loading now
     /// KEEP: Still needed for TikTok place deletion to work with userExternalPlaces dictionary
-    func fetchUserExternalPlaces() {
+    /// Note: This populates the dictionary for quick lookups, but getTikTokVideos() queries directly for accuracy
+    func fetchUserExternalPlaces() async {
         guard let userId = user?.id else { 
             print("❌ [ProfileViewModel] No user ID available for fetching external places")
             return 
         }
         
         print("🔍 [ProfileViewModel] Starting fetchUserExternalPlaces for user: \(userId)")
-        print("🔍 [ProfileViewModel] User object: \(String(describing: user))")
-        print("🔍 [ProfileViewModel] User ID type: \(type(of: userId))")
         
-        userService.fetchUserExternalPlaces(userId: userId) { [weak self] result in
-            guard let self = self else { 
-                print("❌ [ProfileViewModel] Self is nil in fetchUserExternalPlaces callback")
-                return 
+        do {
+            let externalPlaces = try await userService.fetchAllUserExternalPlaces(userId: userId)
+            print("✅ [ProfileViewModel] Successfully fetched \(externalPlaces.count) external places")
+            
+            // Convert array to dictionary (note: if multiple external places exist for same placeId,
+            // only the last one will be stored - this is okay for quick lookups)
+            let externalPlacesDict = Dictionary(uniqueKeysWithValues: externalPlaces.map { ($0.placeId, $0) })
+            
+            // Update on main thread
+            await MainActor.run {
+                self.userExternalPlaces = externalPlacesDict
+                print("📚 [ProfileViewModel] Updated userExternalPlaces dictionary with \(externalPlacesDict.count) entries")
             }
             
-            print("📨 [ProfileViewModel] Received result from userService.fetchUserExternalPlaces")
+            // Prefetch TikTok metadata for external places
+            print("🖼️ [ProfileViewModel] Starting to prefetch TikTok metadata...")
+            let urls = externalPlaces.compactMap { $0.url }.filter { !$0.isEmpty }
+            await TikTokMetadataCache.shared.prefetchMetadata(for: urls)
             
-            switch result {
-            case .success(let externalPlaces):
-                print("✅ [ProfileViewModel] Successfully fetched \(externalPlaces.count) external places")
-                
-                // Convert array to dictionary
-                let externalPlacesDict = Dictionary(uniqueKeysWithValues: externalPlaces.map { ($0.placeId, $0) })
-                
-                // Update on main thread to avoid UI threading issues
-                Task { @MainActor in
-                    // External places details loaded
-                    self.userExternalPlaces = externalPlacesDict
-                    print("📚 [ProfileViewModel] Updated userExternalPlaces dictionary with \(externalPlacesDict.count) entries")
-                    
-                    // Load TikTok thumbnail images for external places
-                    print("🖼️ [ProfileViewModel] Starting to load TikTok thumbnails...")
-                    for externalPlace in externalPlaces {
-                        // Get the first TikTok video's thumbnail as the place image
-                        if let firstTikTokVideo = externalPlace.tiktokVideos.first,
-                           !firstTikTokVideo.thumbnailUrl.isEmpty {
-                            // Loading TikTok thumbnail for \(externalPlace.name)
-                            self.loadTikTokThumbnailAsPlaceImage(
-                                placeId: externalPlace.placeId,
-                                thumbnailURL: firstTikTokVideo.thumbnailUrl
-                            )
-                        } else {
-                            print("⚠️ [ProfileViewModel] No thumbnail available for \(externalPlace.name)")
-                        }
+            // Load thumbnails after metadata is fetched
+            await MainActor.run {
+                for externalPlace in externalPlaces {
+                    if let url = externalPlace.url,
+                       let thumbnailURL = TikTokMetadataCache.shared.getCachedThumbnailUrl(for: url) {
+                        self.loadTikTokThumbnailAsPlaceImage(
+                            placeId: externalPlace.placeId,
+                            thumbnailURL: thumbnailURL
+                        )
                     }
-                    print("✅ [ProfileViewModel] Completed TikTok thumbnail loading")
                 }
-                
-            case .failure(let error):
-                print("❌ [ProfileViewModel] Error fetching external places: \(error.localizedDescription)")
-                print("🔍 [ProfileViewModel] Error details: \(error)")
             }
+            print("✅ [ProfileViewModel] TikTok metadata prefetch complete")
+        } catch {
+            print("❌ [ProfileViewModel] Error fetching external places: \(error.localizedDescription)")
         }
     }
     
@@ -2289,27 +2212,67 @@ class ProfileViewModel: ObservableObject {
         }.resume()
     }
     
-    /// Get TikTok videos for a specific place ID
-    func getTikTokVideos(for placeId: String) -> [TikTokVideo] {
-        guard let externalPlace = userExternalPlaces[placeId] else {
+    /// Get TikTok videos for a specific place ID (async)
+    /// Fetches all external_places for the place and returns TikTok videos with metadata
+    /// Returns a dictionary mapping URL to external_place_id for deletion purposes
+    func getTikTokVideos(for placeId: String) async -> [TikTokVideo] {
+        guard let userId = user?.id else {
             return []
         }
         
-        // Convert ExternalTikTokVideos to TikTokVideos for compatibility
-        return externalPlace.tiktokVideos.compactMap { convertExternalTikTokVideoToTikTokVideo($0) }
+        // Fetch all TikTok URLs and their external_place_ids for this place
+        do {
+            let urlPairs = try await userService.fetchExternalPlaceURLs(placeId: placeId, userId: userId)
+            
+            // Fetch metadata for each URL (using cache when available)
+            var tikTokVideos: [TikTokVideo] = []
+            for pair in urlPairs {
+                if let tikTokVideo = await TikTokMetadataCache.shared.getMetadata(for: pair.url) {
+                    tikTokVideos.append(tikTokVideo)
+                }
+            }
+            
+            return tikTokVideos
+        } catch {
+            print("❌ [ProfileViewModel] Error fetching TikTok videos for place \(placeId): \(error)")
+            return []
+        }
+    }
+    
+    /// Get external_place_id for a TikTok video URL at a specific place
+    func getExternalPlaceId(for placeId: String, videoUrl: String) async -> String? {
+        guard let userId = user?.id else {
+            return nil
+        }
+        
+        do {
+            let urlPairs = try await userService.fetchExternalPlaceURLs(placeId: placeId, userId: userId)
+            return urlPairs.first(where: { $0.url == videoUrl })?.id
+        } catch {
+            print("❌ [ProfileViewModel] Error fetching external_place_id: \(error)")
+            return nil
+        }
     }
     
     /// Check if user has TikTok videos for a specific place
+    /// Note: This is a quick check using cached data. For accurate results, use getTikTokVideos() instead.
     func hasTikTokVideos(for placeId: String) -> Bool {
-        guard let externalPlace = userExternalPlaces[placeId] else {
-            return false
-        }
-        return !externalPlace.tiktokVideos.isEmpty
+        // Check if any external place exists for this place in the cached dictionary
+        return userExternalPlaces.values.contains { $0.placeId == placeId && $0.url != nil && !$0.url!.isEmpty }
     }
     
     /// Get the external place data for a specific place ID
     func getExternalPlace(for placeId: String) -> ExternalPlace? {
         return userExternalPlaces[placeId]
+    }
+    
+    /// Get first TikTok thumbnail URL for a place (synchronous, uses cache only)
+    func getFirstTikTokThumbnailURL(for placeId: String) -> String? {
+        guard let externalPlace = userExternalPlaces[placeId],
+              let url = externalPlace.url else {
+            return nil
+        }
+        return TikTokMetadataCache.shared.getCachedThumbnailUrl(for: url)
     }
 
     func loadPlaceImageWithFallback(for place: DetailPlace) {
@@ -2321,13 +2284,15 @@ class ProfileViewModel: ObservableObject {
         }
         
         // If there's no review image, try to load a TikTok thumbnail
-        if let externalPlace = getExternalPlace(for: placeId),
-           let firstTikTokVideo = externalPlace.tiktokVideos.first,
-           !firstTikTokVideo.thumbnailUrl.isEmpty {
-            
-            userProfileViewModel?.loadTikTokThumbnailAsPlaceImage(placeId: placeId, thumbnailURL: firstTikTokVideo.thumbnailUrl) { [weak self] placeId, image in
-                if let image = image {
-                    self?.detailPlaceViewModel.placeImages[placeId] = image
+        Task {
+            if let externalPlace = getExternalPlace(for: placeId),
+               let url = externalPlace.url,
+               let thumbnailURL = await TikTokMetadataCache.shared.getThumbnailUrl(for: url) {
+                
+                userProfileViewModel?.loadTikTokThumbnailAsPlaceImage(placeId: placeId, thumbnailURL: thumbnailURL) { [weak self] placeId, image in
+                    if let image = image {
+                        self?.detailPlaceViewModel.placeImages[placeId] = image
+                    }
                 }
             }
         }

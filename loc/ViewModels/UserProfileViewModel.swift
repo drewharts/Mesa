@@ -306,12 +306,12 @@ class UserProfileViewModel: ObservableObject {
             return
         }
         
-        // First check if this place has TikTok videos from external places
+        // First check if this place has TikTok video from external places (uses cached metadata)
         if let externalPlace = dataManager.getExternalPlace(for: placeId),
-           let firstTikTokVideo = externalPlace.tiktokVideos.first,
-           !firstTikTokVideo.thumbnailUrl.isEmpty {
+           let url = externalPlace.url,
+           let thumbnailURL = TikTokMetadataCache.shared.getCachedThumbnailUrl(for: url) {
             
-            self.loadTikTokThumbnailAsPlaceImage(placeId: placeId, thumbnailURL: firstTikTokVideo.thumbnailUrl, completion: completion)
+            self.loadTikTokThumbnailAsPlaceImage(placeId: placeId, thumbnailURL: thumbnailURL, completion: completion)
             return
         }
         
@@ -360,41 +360,33 @@ class UserProfileViewModel: ObservableObject {
         }
     }
     
-    /// Get TikTok videos for a specific place
-    func getTikTokVideos(for placeId: String) -> [TikTokVideo] {
-        if let externalPlace = dataManager.getExternalPlace(for: placeId) {
-            return externalPlace.tiktokVideos.compactMap { convertExternalTikTokVideoToTikTokVideo($0) }
+    /// Get TikTok videos for a specific place (async)
+    func getTikTokVideos(for placeId: String) async -> [TikTokVideo] {
+        if let externalPlace = dataManager.getExternalPlace(for: placeId),
+           let url = externalPlace.url,
+           !url.isEmpty {
+            // Fetch metadata from cache (will fetch from backend if not cached)
+            if let tikTokVideo = await TikTokMetadataCache.shared.getMetadata(for: url) {
+                return [tikTokVideo]
+            }
         }
         return []
     }
     
-    /// Convert ExternalTikTokVideo to TikTokVideo
-    private func convertExternalTikTokVideoToTikTokVideo(_ externalVideo: ExternalTikTokVideo) -> TikTokVideo? {
-        let tikTokAuthor = TikTokAuthor(
-            displayName: externalVideo.author.displayName,
-            url: "", // Not available in external format
-            username: externalVideo.author.username
-        )
-        
-        return TikTokVideo(
-            videoID: externalVideo.videoId,
-            url: externalVideo.url,
-            title: nil, // Not available in external format
-            caption: nil, // Not available in external format
-            embedHTML: externalVideo.embedHtml,
-            thumbnailURL: externalVideo.thumbnailUrl,
-            author: tikTokAuthor,
-            hashtags: externalVideo.hashtags,
-            createdAt: externalVideo.createdAt
-        )
+    /// Get first TikTok thumbnail URL for a place (async)
+    func getFirstTikTokThumbnailURL(for placeId: String) async -> String? {
+        if let externalPlace = dataManager.getExternalPlace(for: placeId),
+           let url = externalPlace.url {
+            return await TikTokMetadataCache.shared.getThumbnailUrl(for: url)
+        }
+        return nil
     }
     
-    /// Get first TikTok thumbnail URL for a place
-    func getFirstTikTokThumbnailURL(for placeId: String) -> String? {
+    /// Get first TikTok thumbnail URL for a place (synchronous, uses cache only)
+    func getFirstTikTokThumbnailURLSync(for placeId: String) -> String? {
         if let externalPlace = dataManager.getExternalPlace(for: placeId),
-           let firstTikTokVideo = externalPlace.tiktokVideos.first,
-           !firstTikTokVideo.thumbnailUrl.isEmpty {
-            return firstTikTokVideo.thumbnailUrl
+           let url = externalPlace.url {
+            return TikTokMetadataCache.shared.getCachedThumbnailUrl(for: url)
         }
         return nil
     }

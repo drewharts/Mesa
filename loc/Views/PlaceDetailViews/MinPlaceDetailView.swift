@@ -22,30 +22,11 @@ struct MinPlaceDetailView: View {
     let onPhotoTapped: ([UIImage], Int) -> Void
     
     @State private var selectedTab: DetailTab = .about
+    @State private var tikTokVideos: [TikTokVideo] = []
+    @State private var isLoadingTikToks: Bool = false
     
     private var defaultTab: DetailTab {
         return selectedPlaceVM.reviews.isEmpty ? .about : .reviews
-    }
-    
-    private var tikTokVideos: [TikTokVideo] {
-        let placeTikTokVideos = selectedPlaceVM.tiktokVideos // Use the cached TikToks from ViewModel
-        let userTikTokVideos = profile.getTikTokVideos(for: selectedPlaceVM.selectedPlace?.id.uuidString ?? "")
-        
-        // Combine and deduplicate based on videoID or URL
-        var allVideos = placeTikTokVideos
-        
-        for userVideo in userTikTokVideos {
-            // Check if this video already exists (by videoID or URL)
-            let alreadyExists = allVideos.contains { existingVideo in
-                existingVideo.videoID == userVideo.videoID || existingVideo.url == userVideo.url
-            }
-            
-            if !alreadyExists {
-                allVideos.append(userVideo)
-            }
-        }
-        
-        return allVideos
     }
     
     var body: some View {
@@ -241,8 +222,11 @@ struct MinPlaceDetailView: View {
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 12) {
                                     ForEach(tikTokVideos, id: \.videoID) { video in
+                                        let externalPlaceId = profile.getExternalPlace(for: selectedPlaceVM.selectedPlace?.id.uuidString ?? "")?.id
+                                        let _ = print("🔍 [MinPlaceDetailView] Creating TikTokVideoView for video \(video.videoID) with external_place_id: \(externalPlaceId ?? "nil")")
                                         TikTokVideoView(
                                             tikTokVideo: video,
+                                            externalPlaceId: externalPlaceId,
                                             onDelete: {
                                                 Task {
                                                     await deleteTikTok(video: video)
@@ -294,6 +278,9 @@ struct MinPlaceDetailView: View {
                 selectedPlaceVM.loadReviewPhotosForAbout(for: place)
             }
         }
+        .task(id: selectedPlaceVM.selectedPlace?.id) {
+            await loadTikTokVideos()
+        }
         .onReceive(notificationManager.$highlightedReviewId) { reviewId in
             if reviewId != nil {
                 // Switch to reviews tab when there's a highlighted review
@@ -316,23 +303,61 @@ struct MinPlaceDetailView: View {
     
     // MARK: - Helper Functions
     
+    private func loadTikTokVideos() async {
+        guard let placeId = selectedPlaceVM.selectedPlace?.id.uuidString else {
+            return
+        }
+        
+        isLoadingTikToks = true
+        
+        // Get place TikTok videos
+        let placeTikTokVideos = selectedPlaceVM.tiktokVideos
+        
+        // Get user TikTok videos (from external places)
+        let userTikTokVideos = await profile.getTikTokVideos(for: placeId)
+        
+        // Combine and deduplicate based on videoID or URL
+        var allVideos = placeTikTokVideos
+        
+        for userVideo in userTikTokVideos {
+            // Check if this video already exists (by videoID or URL)
+            let alreadyExists = allVideos.contains { existingVideo in
+                existingVideo.videoID == userVideo.videoID || existingVideo.url == userVideo.url
+            }
+            
+            if !alreadyExists {
+                allVideos.append(userVideo)
+            }
+        }
+        
+        tikTokVideos = allVideos
+        isLoadingTikToks = false
+    }
+    
     private func deleteTikTok(video: TikTokVideo) async {
         guard let placeId = selectedPlaceVM.selectedPlace?.id.uuidString,
               let userId = userSession.currentUserId else {
             return
         }
         
+        let videoUrl = video.url
+        
+        // Get the external_place_id for this video URL
+        let externalPlaceId = await profile.getExternalPlaceId(for: placeId, videoUrl: videoUrl)
+        
         do {
             try await TikTokPlaceService.shared.deleteTikTokFromPlace(
                 placeId: placeId,
-                videoId: video.videoID,
-                userId: userId
+                videoUrl: videoUrl,
+                userId: userId,
+                externalPlaceId: externalPlaceId
             )
             
+            // Refresh TikTok videos for this place
+            await loadTikTokVideos()
+            
             // Refresh the profile to update the UI
-            await MainActor.run {
-                profile.fetchUserExternalPlaces()
-            }
+            await profile.fetchUserExternalPlaces()
         } catch {
             print("❌ Error deleting TikTok: \(error)")
         }

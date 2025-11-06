@@ -35,9 +35,8 @@ struct MyProfileHorizontalListPlaces: View {
             return firstVideo.thumbnailURL
         }
         
-        // Check user's TikTok videos for this place
-        let userTikTokVideos = viewModel.getTikTokVideos(for: place.id.uuidString)
-        return userTikTokVideos.first?.thumbnailURL
+        // Check user's TikTok videos for this place (uses cached data)
+        return viewModel.getFirstTikTokThumbnailURL(for: place.id.uuidString)
     }
     
     // Check if a place should load its image (only if actually visible on screen and not already loaded)

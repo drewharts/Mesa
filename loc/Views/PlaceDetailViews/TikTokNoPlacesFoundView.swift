@@ -245,8 +245,7 @@ struct TikTokNoPlacesFoundView: View {
         // Create a DetailPlace from the suggestion
         let detailPlace = createDetailPlaceFromSuggestion(suggestion)
         
-        // Create external place entry with TikTok video
-        let externalTikTokVideo = createExternalTikTokVideoFromUrl()
+        // Create external place entry with TikTok video URL
         let externalPlace = ExternalPlace(
             id: detailPlace.id.uuidString,
             addedAt: Date(),
@@ -258,7 +257,7 @@ struct TikTokNoPlacesFoundView: View {
             name: detailPlace.name,
             placeId: detailPlace.id.uuidString,
             source: "user_assigned",
-            tiktokVideos: [externalTikTokVideo]
+            url: tikTokUrl
         )
         
         // Save to user's external places
@@ -288,25 +287,6 @@ struct TikTokNoPlacesFoundView: View {
         )
         detailPlace.createdAt = ISO8601DateFormatter().string(from: Date())
         return detailPlace
-    }
-    
-    private func createExternalTikTokVideoFromUrl() -> ExternalTikTokVideo {
-        // Extract basic info from the TikTok URL
-        let videoID = UUID().uuidString // Generate a temporary ID
-        let author = ExternalTikTokAuthor(
-            displayName: "Unknown",
-            username: ""
-        )
-        
-        return ExternalTikTokVideo(
-            author: author,
-            createdAt: ISO8601DateFormatter().string(from: Date()),
-            embedHtml: "",
-            hashtags: [],
-            thumbnailUrl: "",
-            url: tikTokUrl,
-            videoId: videoID
-        )
     }
     
     private func submitFlag() {

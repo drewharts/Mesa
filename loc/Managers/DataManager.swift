@@ -309,6 +309,15 @@ class DataManager: ObservableObject {
             // Load 8 places at a time
             let lightweightPlaces = try await userService.fetchUserExternalPlaces(userId: userId, limit: 8, offset: offset)
             
+            // Prefetch TikTok metadata for all TikTok URLs to populate cache
+            let tiktokUrls = lightweightPlaces.compactMap { $0.tiktok_url }.filter { !$0.isEmpty }
+            if !tiktokUrls.isEmpty {
+                Task {
+                    await TikTokMetadataCache.shared.prefetchMetadata(for: tiktokUrls)
+                    print("✅ [DataManager] Prefetched TikTok metadata for \(tiktokUrls.count) URLs")
+                }
+            }
+            
             // Store lightweight places in ProfileViewModel
             await MainActor.run {
                 if offset == 0 {
@@ -922,44 +931,6 @@ class DataManager: ObservableObject {
         } catch {
             print("❌ [DataManager] Error checking if place \(placeId) is in list \(listId): \(error.localizedDescription)")
             return false
-        }
-    }
-    
-    /// Check if the current place is in any of the newly loaded lists and update lightweightPlaceListPlaces
-    private func checkCurrentPlaceInNewLists(_ lists: [LightweightPlaceList], placeId: String) async {
-        print("🔍 [DataManager] Checking if place \(placeId) is in \(lists.count) new lists...")
-        
-        await withTaskGroup(of: (String, Bool).self) { group in
-            for list in lists {
-                group.addTask {
-                    let exists = await self.checkPlaceInList(listId: list.list_id, placeId: placeId)
-                    return (list.list_id, exists)
-                }
-            }
-            
-            for await (listId, exists) in group {
-                if exists {
-                    print("✅ [DataManager] Place \(placeId) found in list \(listId)")
-                    
-                    // Add the place to lightweightPlaceListPlaces if it's not already there
-                    await MainActor.run {
-                        let lightweightPlace = LightweightPlace(
-                            place_id: placeId,
-                            name: "Current Place", // We don't have the name here, but it's not critical
-                            latest_review_photo: nil
-                        )
-                        
-                        if profileViewModel.lightweightPlaceListPlaces[listId] != nil {
-                            // Check if it's already in the list
-                            if !profileViewModel.lightweightPlaceListPlaces[listId]!.contains(where: { $0.place_id == placeId }) {
-                                profileViewModel.lightweightPlaceListPlaces[listId]!.append(lightweightPlace)
-                            }
-                        } else {
-                            profileViewModel.lightweightPlaceListPlaces[listId] = [lightweightPlace]
-                        }
-                    }
-                }
-            }
         }
     }
     

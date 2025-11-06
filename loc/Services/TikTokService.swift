@@ -140,7 +140,48 @@ class TikTokService: ObservableObject {
         }
     }
     
-    func refreshTikTokThumbnail(for url: String, userId: String?) async -> Result<String, Error> {
+    func getTikTokOEmbed(url: String) async -> Result<TikTokOEmbedResponse, Error> {
+        print("🎬 [TikTokService] getTikTokOEmbed called for: \(url)")
+        
+        guard let encodedURL = url.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+              let requestURL = URL(string: "\(baseURL)/tiktok/oembed?url=\(encodedURL)") else {
+            print("❌ [TikTokService] Invalid URL for oEmbed request")
+            return .failure(TikTokError.invalidURL)
+        }
+        
+        var request = URLRequest(url: requestURL)
+        request.httpMethod = "GET"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        print("📤 [TikTokService] Fetching oEmbed data from: \(requestURL.absoluteString)")
+        
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            
+            guard let httpResponse = response as? HTTPURLResponse else {
+                return .failure(TikTokError.invalidResponse)
+            }
+            
+            guard httpResponse.statusCode == 200 else {
+                if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let errorMsg = json["error"] as? String {
+                    print("❌ [TikTokService] oEmbed error: \(errorMsg)")
+                    return .failure(NSError(domain: "TikTokService", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: errorMsg]))
+                }
+                return .failure(TikTokError.serverError(httpResponse.statusCode))
+            }
+            
+            let oembedResponse = try JSONDecoder().decode(TikTokOEmbedResponse.self, from: data)
+            print("✅ [TikTokService] Successfully fetched oEmbed data: \(oembedResponse.title)")
+            return .success(oembedResponse)
+            
+        } catch {
+            print("❌ [TikTokService] oEmbed request failed: \(error.localizedDescription)")
+            return .failure(error)
+        }
+    }
+    
+    func refreshTikTokThumbnail(for url: String, userId: String?, externalPlaceId: String? = nil) async -> Result<String, Error> {
         guard let requestURL = URL(string: "\(baseURL)/refresh-thumbnail") else {
             return .failure(TikTokError.invalidURL)
         }
@@ -152,6 +193,19 @@ class TikTokService: ObservableObject {
         var body: [String: String] = ["url": url]
         if let userId = userId {
             body["user_id"] = userId
+        }
+        if let externalPlaceId = externalPlaceId {
+            body["external_place_id"] = externalPlaceId
+        }
+        
+        // 🔍 Log the request body for debugging
+        print("🔄 [TikTokService] Refreshing thumbnail with request body:")
+        print("   URL: \(url)")
+        print("   User ID: \(userId ?? "nil")")
+        print("   External Place ID: \(externalPlaceId ?? "nil")")
+        if let bodyJSON = try? JSONSerialization.data(withJSONObject: body),
+           let bodyString = String(data: bodyJSON, encoding: .utf8) {
+            print("   Full body JSON: \(bodyString)")
         }
         
         guard let httpBody = try? JSONSerialization.data(withJSONObject: body) else {

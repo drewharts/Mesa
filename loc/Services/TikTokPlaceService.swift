@@ -27,54 +27,45 @@ class TikTokPlaceService {
     }
     
     /// Delete a TikTok video from a specific place in external_places
-    func deleteTikTokFromPlace(placeId: String, videoId: String, userId: String) async throws {
-        // First, fetch the current row
-        struct ExternalPlaceRecord: Codable {
-            let id: String
-            let tiktok_videos: [AnyCodable]
-        }
-        
-        let currentRecords: [ExternalPlaceRecord] = try await supabase.client
-            .from("external_places")
-            .select()
-            .eq("place_id", value: placeId)
-            .eq("user_id", value: userId)
-            .execute()
-            .value
-        
-        guard let currentRecord = currentRecords.first else {
-            throw NSError(domain: "TikTokPlaceService", code: 404, userInfo: [
-                NSLocalizedDescriptionKey: "External place record not found"
-            ])
-        }
-        
-        // Filter out the TikTok with the matching video_id
-        let updatedVideos = currentRecord.tiktok_videos.compactMap { video -> [String: Any]? in
-            guard let videoDict = video.value as? [String: Any],
-                  let thisVideoId = videoDict["video_id"] as? String else {
-                return nil
-            }
-            
-            // Keep all videos except the one we're deleting
-            return thisVideoId == videoId ? nil : videoDict
-        }
-        
-        if updatedVideos.isEmpty {
-            // If no TikToks left, delete the entire row
+    /// Since each external_places row now contains only one URL, we delete the entire row
+    func deleteTikTokFromPlace(placeId: String, videoUrl: String, userId: String, externalPlaceId: String? = nil) async throws {
+        // If external_place_id is provided, use it directly for deletion
+        if let externalPlaceId = externalPlaceId {
             try await supabase.client
                 .from("external_places")
                 .delete()
-                .eq("id", value: currentRecord.id)
+                .eq("id", value: externalPlaceId)
                 .execute()
-        } else {
-            // Update with remaining TikToks (convert to AnyCodable for encoding)
-            let encodableVideos = updatedVideos.map { AnyCodable($0) }
-            try await supabase.client
-                .from("external_places")
-                .update(["tiktok_videos": encodableVideos])
-                .eq("id", value: currentRecord.id)
-                .execute()
+            return
         }
+        
+        // Otherwise, find the row by URL
+        struct ExternalPlaceRecord: Codable {
+            let id: String
+            let url: String?
+        }
+        
+        let records: [ExternalPlaceRecord] = try await supabase.client
+            .from("external_places")
+            .select("id, url")
+            .eq("place_id", value: placeId)
+            .eq("user_id", value: userId)
+            .eq("url", value: videoUrl)
+            .execute()
+            .value
+        
+        guard let record = records.first else {
+            throw NSError(domain: "TikTokPlaceService", code: 404, userInfo: [
+                NSLocalizedDescriptionKey: "External place record not found for URL"
+            ])
+        }
+        
+        // Delete the entire row (since each row = one TikTok video)
+        try await supabase.client
+            .from("external_places")
+            .delete()
+            .eq("id", value: record.id)
+            .execute()
     }
 }
 

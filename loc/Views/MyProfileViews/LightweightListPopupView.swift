@@ -356,12 +356,16 @@ struct LightweightListPopupView_Previews: PreviewProvider {
                 LightweightPlace(
                     place_id: "place-1",
                     name: "Test Place 1",
-                    latest_review_photo: nil
+                    latest_review_photo: nil,
+                    external_place_id: nil,
+                    tiktok_url: nil
                 ),
                 LightweightPlace(
                     place_id: "place-2",
                     name: "Test Place 2",
-                    latest_review_photo: nil
+                    latest_review_photo: nil,
+                    external_place_id: nil,
+                    tiktok_url: nil
                 )
             ],
             placeColors: .constant([:])

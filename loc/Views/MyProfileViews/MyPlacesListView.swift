@@ -395,8 +395,34 @@ struct LightweightPlaceGridCell: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             ZStack(alignment: .bottom) {
-                // Load image directly from Supabase URL (no Firebase!)
-                if let photoUrl = place.latest_review_photo, let url = URL(string: photoUrl) {
+                // Check for TikTok thumbnail first, then review photo, then colored rectangle
+                if let tiktokUrl = place.tiktok_url,
+                   let thumbnailURL = TikTokMetadataCache.shared.getCachedThumbnailUrl(for: tiktokUrl) {
+                    // Show TikTok thumbnail
+                    AsyncImage(url: URL(string: thumbnailURL)) { image in
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(width: cardWidth, height: cardHeight)
+                            .clipped()
+                    } placeholder: {
+                        Rectangle()
+                            .foregroundColor(placeColor)
+                            .frame(width: cardWidth, height: cardHeight)
+                            .overlay(
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                    .scaleEffect(0.8)
+                            )
+                            .onAppear {
+                                // Prefetch TikTok metadata if not cached
+                                Task {
+                                    _ = await TikTokMetadataCache.shared.getMetadata(for: tiktokUrl)
+                                }
+                            }
+                    }
+                } else if let photoUrl = place.latest_review_photo, let url = URL(string: photoUrl) {
+                    // Show review photo
                     AsyncImage(url: url) { image in
                         image
                             .resizable()
@@ -418,6 +444,14 @@ struct LightweightPlaceGridCell: View {
                     Rectangle()
                         .foregroundColor(placeColor)
                         .frame(width: cardWidth, height: cardHeight)
+                        .onAppear {
+                            // If we have a TikTok URL but no cached thumbnail, prefetch it
+                            if let tiktokUrl = place.tiktok_url {
+                                Task {
+                                    _ = await TikTokMetadataCache.shared.getMetadata(for: tiktokUrl)
+                                }
+                            }
+                        }
                 }
                 
                 // Gradient overlay
@@ -738,7 +772,8 @@ struct TikTokPlaceGridCell: View {
     
     // Get first TikTok thumbnail URL for this place
     private func getFirstTikTokThumbnail() -> String? {
-        return externalPlace?.tiktokVideos.first?.thumbnailUrl
+        guard let url = externalPlace?.url else { return nil }
+        return TikTokMetadataCache.shared.getCachedThumbnailUrl(for: url)
     }
     
     var body: some View {

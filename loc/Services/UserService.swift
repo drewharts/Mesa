@@ -2,48 +2,6 @@ import Foundation
 import Supabase
 
 // MARK: - Response Models for External Places
-struct ExternalPlaceResponse: Codable {
-    let id: String
-    let userId: String
-    let placeId: String
-    let source: String
-    let tiktokVideos: AnyCodable?
-    let addedAt: Date
-    let places: ExternalPlaceData?
-    
-    enum CodingKeys: String, CodingKey {
-        case id
-        case userId = "user_id"
-        case placeId = "place_id"
-        case source
-        case tiktokVideos = "tiktok_videos"
-        case addedAt = "added_at"
-        case places
-    }
-    
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        
-        self.id = try container.decode(String.self, forKey: .id)
-        self.userId = try container.decode(String.self, forKey: .userId)
-        self.placeId = try container.decode(String.self, forKey: .placeId)
-        self.source = try container.decode(String.self, forKey: .source)
-        self.addedAt = try container.decode(Date.self, forKey: .addedAt)
-        self.places = try container.decodeIfPresent(ExternalPlaceData.self, forKey: .places)
-        self.tiktokVideos = try container.decodeIfPresent(AnyCodable.self, forKey: .tiktokVideos)
-    }
-    
-    // Manual initializer for creating instances programmatically
-    init(id: String, userId: String, placeId: String, source: String, tiktokVideos: AnyCodable?, addedAt: Date, places: ExternalPlaceData?) {
-        self.id = id
-        self.userId = userId
-        self.placeId = placeId
-        self.source = source
-        self.tiktokVideos = tiktokVideos
-        self.addedAt = addedAt
-        self.places = places
-    }
-}
 
 // Helper struct to handle Any type in Codable
 struct AnyCodable: Codable {
@@ -94,35 +52,8 @@ struct AnyCodable: Codable {
     }
 }
 
-struct ExternalPlaceData: Codable {
-    let id: String
-    let name: String
-    let address: String?
-    let latitude: Double?
-    let longitude: Double?
-}
-
-struct ExternalPlaceBasicResponse: Codable {
-    let id: String
-    let userId: String
-    let placeId: String
-    let source: String
-    let tiktokVideos: AnyCodable?
-    let addedAt: Date
-    
-    enum CodingKeys: String, CodingKey {
-        case id
-        case userId = "user_id"
-        case placeId = "place_id"
-        case source
-        case tiktokVideos = "tiktok_videos"
-        case addedAt = "added_at"
-    }
-}
-
-struct PlaceBasicResponse: Codable {
-    let id: String
-    let name: String
+struct PlaceData: Codable {
+    let name: String?
     let address: String?
     let latitude: Double?
     let longitude: Double?
@@ -132,23 +63,19 @@ struct ExternalPlaceDirectResponse: Codable {
     let id: String
     let userId: String
     let placeId: String?
-    let name: String?
-    let address: String?
-    let coordinates: AnyCodable? // PostGIS geometry
     let source: String?
-    let tiktokVideos: AnyCodable? // JSONB array
+    let url: String? // TikTok video URL
     let addedAt: Date?
+    let places: PlaceData? // Joined from places table
     
     enum CodingKeys: String, CodingKey {
         case id
         case userId = "user_id"
         case placeId = "place_id"
-        case name
-        case address
-        case coordinates
         case source
-        case tiktokVideos = "tiktok_videos"
+        case url
         case addedAt = "added_at"
+        case places
     }
 }
 
@@ -321,37 +248,59 @@ class UserService: ObservableObject {
         }
     }
     
-    func fetchUserExternalPlaces(userId: String, completion: @escaping (Result<[ExternalPlace], Error>) -> Void) {
-        print("🔄 [UserService] Fetching external places for user: \(userId)")
-        Task {
-            do {
-                let externalPlaces = try await fetchUserExternalPlaces(userId: userId)
-                await MainActor.run {
-                    completion(.success(externalPlaces))
+    /// Fetch external places for a specific place ID and user
+    /// Returns tuples of (external_place_id, url) for TikTok videos
+    func fetchExternalPlaceURLs(placeId: String, userId: String) async throws -> [(id: String, url: String)] {
+        do {
+            let response: [ExternalPlaceDirectResponse] = try await SupabaseManager.shared.client
+                .from("external_places")
+                .select("""
+                    id,
+                    user_id,
+                    place_id,
+                    source,
+                    url,
+                    added_at
+                """)
+                .eq("place_id", value: placeId)
+                .eq("user_id", value: userId)
+                .execute()
+                .value
+            
+            // Extract (id, url) pairs and filter out empty URLs
+            let urlPairs = response.compactMap { response -> (id: String, url: String)? in
+                guard let url = response.url, !url.isEmpty else {
+                    return nil
                 }
-            } catch {
-                await MainActor.run {
-                    completion(.failure(error))
-                }
+                return (id: response.id, url: url)
             }
+            return urlPairs
+        } catch {
+            print("❌ [UserService] Error fetching external place URLs: \(error.localizedDescription)")
+            throw error
         }
     }
     
-    func fetchUserExternalPlaces(userId: String) async throws -> [ExternalPlace] {
+    /// Fetch all external places for a user (full objects with place data joined)
+    /// Use fetchUserExternalPlaces(userId:limit:offset:) for paginated lightweight results
+    func fetchAllUserExternalPlaces(userId: String) async throws -> [ExternalPlace] {
         do {
-            // Fetch external places for the specific user
+            // Fetch external places for the specific user, joining with places table for name/address/coordinates
             let externalPlacesResponse: [ExternalPlaceDirectResponse] = try await SupabaseManager.shared.client
                 .from("external_places")
                 .select("""
                     id,
                     user_id,
                     place_id,
-                    name,
-                    address,
-                    coordinates,
                     source,
-                    tiktok_videos,
-                    added_at
+                    url,
+                    added_at,
+                    places:place_id (
+                        name,
+                        address,
+                        latitude,
+                        longitude
+                    )
                 """)
                 .eq("user_id", value: userId)
                 .execute()
@@ -375,12 +324,15 @@ class UserService: ObservableObject {
                             id,
                             user_id,
                             place_id,
-                            name,
-                            address,
-                            coordinates,
                             source,
-                            tiktok_videos,
-                            added_at
+                            url,
+                            added_at,
+                            places:place_id (
+                                name,
+                                address,
+                                latitude,
+                                longitude
+                            )
                         """)
                         .eq("user_id", value: altUserId)
                         .execute()
@@ -404,142 +356,29 @@ class UserService: ObservableObject {
         }
     }
     
-    // Helper method to process external places response
-    private func processExternalPlacesResponse(_ externalPlacesResponse: [ExternalPlaceBasicResponse]) async throws -> [ExternalPlace] {
-        // Get all place IDs from external places
-        let placeIds = externalPlacesResponse.map { $0.placeId }
-        print("📍 [UserService] Fetching details for \(placeIds.count) places: \(placeIds)")
-        
-        // Fetch place details separately
-        let placesResponse: [PlaceBasicResponse] = try await SupabaseManager.shared.client
-            .from("places")
-            .select("""
-                id,
-                name,
-                address,
-                latitude,
-                longitude
-            """)
-            .in("id", values: placeIds)
-            .execute()
-            .value
-        
-        print("🏢 [UserService] Found \(placesResponse.count) place details")
-        
-        // Create a dictionary for quick lookup
-        let placesDict = Dictionary(uniqueKeysWithValues: placesResponse.map { ($0.id, $0) })
-        
-        // Combine external places with place details
-        let response = externalPlacesResponse.compactMap { externalPlace -> ExternalPlaceResponse? in
-            guard let place = placesDict[externalPlace.placeId] else {
-                print("⚠️ [UserService] No place details found for place ID: \(externalPlace.placeId)")
-                return nil
-            }
-            
-            return ExternalPlaceResponse(
-                id: externalPlace.id,
-                userId: externalPlace.userId,
-                placeId: externalPlace.placeId,
-                source: externalPlace.source,
-                tiktokVideos: externalPlace.tiktokVideos,
-                addedAt: externalPlace.addedAt,
-                places: ExternalPlaceData(
-                    id: place.id,
-                    name: place.name,
-                    address: place.address,
-                    latitude: place.latitude,
-                    longitude: place.longitude
-                )
-            )
-        }
-        
-        print("📊 [UserService] Raw response count: \(response.count)")
-        print("📋 [UserService] Raw response data: \(response)")
-        
-        // Convert to ExternalPlace format
-        let externalPlaces = response.compactMap { response -> ExternalPlace? in
-            print("🔄 [UserService] Processing response item: \(response.id)")
-            print("📍 [UserService] Place data: \(response.places?.name ?? "nil")")
-            print("🎥 [UserService] TikTok videos data: \(response.tiktokVideos?.value ?? "nil")")
-            
-            guard let place = response.places else { 
-                print("❌ [UserService] No place data for response: \(response.id)")
-                return nil 
-            }
-            
-            let coordinates = ExternalPlaceCoordinates(
-                latitude: place.latitude ?? 0.0,
-                longitude: place.longitude ?? 0.0
-            )
-            
-            // Parse TikTok videos from JSONB
-            var tiktokVideos: [ExternalTikTokVideo] = []
-            if let videosData = response.tiktokVideos?.value {
-                print("🎬 [UserService] Parsing TikTok videos data...")
-                do {
-                    let jsonData = try JSONSerialization.data(withJSONObject: videosData)
-                    tiktokVideos = try JSONDecoder().decode([ExternalTikTokVideo].self, from: jsonData)
-                    print("✅ [UserService] Successfully parsed \(tiktokVideos.count) TikTok videos")
-                } catch {
-                    print("⚠️ [UserService] Error parsing TikTok videos: \(error)")
-                    print("🔍 [UserService] Videos data was: \(videosData)")
-                }
-            } else {
-                print("ℹ️ [UserService] No TikTok videos data for place: \(place.name)")
-            }
-            
-            let externalPlace = ExternalPlace(
-                id: response.id,
-                addedAt: response.addedAt,
-                address: place.address ?? "",
-                coordinates: coordinates,
-                name: place.name,
-                placeId: place.id,
-                source: response.source,
-                tiktokVideos: tiktokVideos
-            )
-            
-            print("✅ [UserService] Created ExternalPlace: \(externalPlace.name) with \(externalPlace.tiktokVideos.count) videos")
-            return externalPlace
-        }
-        
-        print("✅ [UserService] Successfully fetched \(externalPlaces.count) external places")
-        for place in externalPlaces {
-            print("📍 [UserService] - \(place.name) (\(place.placeId)) with \(place.tiktokVideos.count) videos")
-        }
-        return externalPlaces
-    }
-    
     // Helper method to process direct external places response (from your table structure)
     private func processDirectExternalPlacesResponse(_ externalPlacesResponse: [ExternalPlaceDirectResponse]) async throws -> [ExternalPlace] {
         let externalPlaces = externalPlacesResponse.compactMap { response -> ExternalPlace? in
-            // Extract coordinates from PostGIS geometry
-            var coordinates = ExternalPlaceCoordinates(latitude: 0.0, longitude: 0.0)
-            if let coordsData = response.coordinates?.value {
-                // PostGIS geometry format - might need special parsing
-                // For now, we'll use default coordinates
+            // Use joined place data from places table
+            guard let placeData = response.places else {
+                print("⚠️ [UserService] No place data found for external place \(response.id)")
+                return nil
             }
             
-            // Parse TikTok videos from JSONB array
-            var tiktokVideos: [ExternalTikTokVideo] = []
-            if let videosData = response.tiktokVideos?.value {
-                do {
-                    let jsonData = try JSONSerialization.data(withJSONObject: videosData)
-                    tiktokVideos = try JSONDecoder().decode([ExternalTikTokVideo].self, from: jsonData)
-                } catch {
-                    print("⚠️ [UserService] Error parsing TikTok videos: \(error)")
-                }
-            }
+            let coordinates = ExternalPlaceCoordinates(
+                latitude: placeData.latitude ?? 0.0,
+                longitude: placeData.longitude ?? 0.0
+            )
             
             let externalPlace = ExternalPlace(
                 id: response.id,
                 addedAt: response.addedAt ?? Date(),
-                address: response.address ?? "",
+                address: placeData.address ?? "",
                 coordinates: coordinates,
-                name: response.name ?? "Unknown Place",
-                placeId: response.placeId ?? response.id, // Use place_id if available, otherwise use id
+                name: placeData.name ?? "Unknown Place",
+                placeId: response.placeId ?? response.id,
                 source: response.source ?? "unknown",
-                tiktokVideos: tiktokVideos
+                url: response.url // Store URL only - TikTok metadata fetched on-demand via oEmbed
             )
             
             return externalPlace

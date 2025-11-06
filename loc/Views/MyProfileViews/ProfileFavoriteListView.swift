@@ -23,9 +23,8 @@ struct ProfileFavoriteListView: View {
             return firstVideo.thumbnailURL
         }
         
-        // Check user's TikTok videos for this place
-        let userTikTokVideos = profile.getTikTokVideos(for: place.id.uuidString)
-        return userTikTokVideos.first?.thumbnailURL
+        // Check user's TikTok videos for this place (uses cached data)
+        return profile.getFirstTikTokThumbnailURL(for: place.id.uuidString)
     }
 
     var body: some View {
@@ -335,9 +334,8 @@ struct FavoritePlaceCard: View {
             return firstVideo.thumbnailURL
         }
         
-        // Check user's TikTok videos for this place
-        let userTikTokVideos = profile.getTikTokVideos(for: place.id.uuidString)
-        return userTikTokVideos.first?.thumbnailURL
+        // Check user's TikTok videos for this place (uses cached data)
+        return profile.getFirstTikTokThumbnailURL(for: place.id.uuidString)
     }
 }
 

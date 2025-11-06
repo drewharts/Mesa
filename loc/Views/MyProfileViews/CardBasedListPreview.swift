@@ -264,9 +264,8 @@ struct PlacePreviewCard: View {
             return firstVideo.thumbnailURL
         }
         
-        // Check user's TikTok videos for this place (matching popup view implementation)
-        let userTikTokVideos = profile.getTikTokVideos(for: place.id.uuidString)
-        return userTikTokVideos.first?.thumbnailURL
+        // Check user's TikTok videos for this place (uses cached data)
+        return profile.getFirstTikTokThumbnailURL(for: place.id.uuidString)
     }
     
     private func getFirstPhotoUrl(for place: DetailPlace) -> String? {

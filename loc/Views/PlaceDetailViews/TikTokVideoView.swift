@@ -20,8 +20,8 @@ struct TikTokVideoView: View {
     let onDelete: (() -> Void)?
     let showDeleteOption: Bool
 
-    init(tikTokVideo: TikTokVideo, associatedPlace: DetailPlace? = nil, onNavigateToPlace: ((DetailPlace) -> Void)? = nil, onDelete: (() -> Void)? = nil, showDeleteOption: Bool = false) {
-        _viewModel = StateObject(wrappedValue: TikTokVideoViewModel(tikTokVideo: tikTokVideo))
+    init(tikTokVideo: TikTokVideo, externalPlaceId: String? = nil, associatedPlace: DetailPlace? = nil, onNavigateToPlace: ((DetailPlace) -> Void)? = nil, onDelete: (() -> Void)? = nil, showDeleteOption: Bool = false) {
+        _viewModel = StateObject(wrappedValue: TikTokVideoViewModel(tikTokVideo: tikTokVideo, externalPlaceId: externalPlaceId))
         self.associatedPlace = associatedPlace
         self.onNavigateToPlace = onNavigateToPlace
         self.onDelete = onDelete

@@ -17,29 +17,15 @@ struct ListPlaceGridCell: View {
     @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
     @Environment(\.presentationMode) var presentationMode
 
-    private var tikTokVideos: [TikTokVideo] {
-        let placeTikTokVideos = place.tikTokVideos ?? []
-        let userTikTokVideos = profile.getTikTokVideos(for: place.id.uuidString)
-        
-        // Combine and deduplicate based on videoID or URL
-        var allVideos = placeTikTokVideos
-        
-        for userVideo in userTikTokVideos {
-            // Check if this video already exists (by videoID or URL)
-            let alreadyExists = allVideos.contains { existingVideo in
-                existingVideo.videoID == userVideo.videoID || existingVideo.url == userVideo.url
-            }
-            
-            if !alreadyExists {
-                allVideos.append(userVideo)
-            }
+    private var firstTikTokThumbnail: String? {
+        // Check place's own TikTok videos first
+        if let placeTikTokVideos = place.tikTokVideos,
+           let firstVideo = placeTikTokVideos.first {
+            return firstVideo.thumbnailURL
         }
         
-        return allVideos
-    }
-    
-    private var firstTikTokThumbnail: String? {
-        return tikTokVideos.first?.thumbnailURL
+        // Check user's TikTok videos for this place (uses cached data)
+        return profile.getFirstTikTokThumbnailURL(for: place.id.uuidString)
     }
 
     var body: some View {

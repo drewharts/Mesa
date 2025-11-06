@@ -24,8 +24,8 @@ struct UserReviewedPlaceGridCell: View {
             return firstVideo.thumbnailURL
         }
         
-        // Check external places (user's TikTok videos for this place)
-        return userProfileViewModel.getFirstTikTokThumbnailURL(for: place.id.uuidString)
+        // Check external places (user's TikTok videos for this place) - uses cached data
+        return userProfileViewModel.getFirstTikTokThumbnailURLSync(for: place.id.uuidString)
     }
 
     var body: some View {
