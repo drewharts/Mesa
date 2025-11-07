@@ -695,7 +695,11 @@ extension SupabaseUserService {
         
         // First verify the user exists in the users table
         do {
-            let userCheck: [UserRecord] = try await supabase.client
+            struct UserIdRecord: Decodable {
+                let id: String
+            }
+            
+            let userCheck: [UserIdRecord] = try await supabase.client
                 .from("users")
                 .select("id")
                 .eq("id", value: userId)
