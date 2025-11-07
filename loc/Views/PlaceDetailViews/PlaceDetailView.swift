@@ -109,7 +109,8 @@ struct PlaceDetailView: View {
             }
             .onChange(of: selectedPlaceVM.selectedPlace) { _, newPlace in
                 if let place = newPlace {
-                    viewModel.updatePlaceData(place)
+                    let currentLocation = locationManager.currentLocation?.coordinate
+                    viewModel.updatePlaceData(place, currentLocation: currentLocation)
                 }
             }
 

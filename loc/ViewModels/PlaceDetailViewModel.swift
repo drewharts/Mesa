@@ -57,12 +57,21 @@ class PlaceDetailViewModel: ObservableObject {
         self.updateTravelTime(for: place, from: currentLocation)
     }
     
-    func updatePlaceData(_ place: DetailPlace) {
+    func updatePlaceData(_ place: DetailPlace, currentLocation: CLLocationCoordinate2D? = nil) {
         // Update the place data when SelectedPlaceViewModel gets complete details
         // Update currentPlaceID if it's different (indicates a new place was selected)
-        if currentPlaceID != place.id.uuidString {
+        let isNewPlace = currentPlaceID != place.id.uuidString
+        if isNewPlace {
             print("🔄 [PlaceDetailViewModel] updatePlaceData: New place detected, updating currentPlaceID")
             currentPlaceID = place.id.uuidString
+            // Recalculate travel times for new place if location is available
+            if let location = currentLocation {
+                updateTravelTime(for: place, from: location)
+            } else {
+                // Reset travel time if no location available
+                travelTime = "Calculating..."
+                travelTimes = [:]
+            }
         }
         
         print("🔄 [PlaceDetailViewModel] updatePlaceData: Setting placeName to '\(place.name)'")
