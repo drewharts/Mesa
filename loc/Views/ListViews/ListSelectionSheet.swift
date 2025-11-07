@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import CoreLocation
 
 // ListDescription - OLD (for PlaceList)
 struct ListDescription: View {
@@ -31,9 +32,9 @@ struct LightweightListDescription: View {
     @EnvironmentObject var profile: ProfileViewModel
     let list: LightweightPlaceList
 
-    // Computed property that reacts to changes in lightweightPlaceListPlaces
-    private var currentPlaceCount: Int {
-        profile.lightweightPlaceListPlaces[list.list_id]?.count ?? 0
+    // Get total place count from the list (from SQL function)
+    private var totalPlaceCount: Int {
+        return list.place_count
     }
 
     var body: some View {
@@ -42,7 +43,7 @@ struct LightweightListDescription: View {
                 .font(.body)
                 .foregroundStyle(Color.primary.opacity(1.0))
 
-            Text("\(currentPlaceCount) Places")
+            Text("\(totalPlaceCount) Places")
                 .font(.caption)
                 .foregroundStyle(Color.secondary.opacity(1.0))
         }
@@ -194,21 +195,12 @@ struct ListsInSelectionSheet: View {
     @EnvironmentObject var dataManager: DataManager
     @EnvironmentObject var userSession: UserSession
     let place: DetailPlace
-    @Binding var searchText: String
-
-    // Filtered lightweight lists based on search text (already sorted by proximity from SQL)
-    var filteredLists: [LightweightPlaceList] {
-        if searchText.isEmpty {
-            return profile.lightweightPlaceLists
-        } else {
-            return profile.lightweightPlaceLists.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
-        }
-    }
+    
+    @State private var placeCoordinates: CLLocationCoordinate2D?
 
     var isLoading: Bool {
         profile.lightweightPlaceLists.isEmpty && profile.isLoading
     }
-
 
     var body: some View {
         ScrollView {
@@ -221,12 +213,12 @@ struct ListsInSelectionSheet: View {
                         .foregroundColor(.secondary)
                 }
                 .padding()
-            } else if !filteredLists.isEmpty {
-                ForEach(Array(filteredLists.enumerated()), id: \.element.id) { index, list in
+            } else if !profile.lightweightPlaceLists.isEmpty {
+                ForEach(Array(profile.lightweightPlaceLists.enumerated()), id: \.element.id) { index, list in
                     LightweightListSelectionRowView(list: list, place: place)
                         .onAppear {
-                            // Load more when we reach the 3rd-to-last item (same as ProfileView)
-                            if index == filteredLists.count - 3 && searchText.isEmpty {
+                            // Load more when we reach the 3rd-to-last item
+                            if index == profile.lightweightPlaceLists.count - 3 {
                                 loadMoreListsIfNeeded()
                             }
                         }
@@ -243,19 +235,9 @@ struct ListsInSelectionSheet: View {
                 }
             } else {
                 VStack(spacing: 8) {
-                    if searchText.isEmpty {
-                        Text("No lists available")
-                            .foregroundColor(.gray)
-                            .padding(.horizontal)
-                    } else {
-                        Text("No lists found")
-                            .foregroundColor(.gray)
-                            .padding(.horizontal)
-                        Text("No lists match '\(searchText)'")
-                            .font(.caption)
-                            .foregroundColor(.gray)
-                            .padding(.horizontal)
-                    }
+                    Text("No lists available")
+                        .foregroundColor(.gray)
+                        .padding(.horizontal)
                 }
             }
         }
@@ -263,6 +245,7 @@ struct ListsInSelectionSheet: View {
             // Load lists by proximity to the place's coordinates
             if let userId = userSession.currentUserId,
                let coord = place.coordinate {
+                placeCoordinates = coord
                 Task {
                     await dataManager.loadPlaceListsByPlaceCoordinates(
                         userId: userId,
@@ -276,9 +259,14 @@ struct ListsInSelectionSheet: View {
     
     private func loadMoreListsIfNeeded() {
         guard !profile.isLoadingMorePlaceLists && profile.hasMorePlaceLists else { return }
+        guard let coord = placeCoordinates, let userId = userSession.currentUserId else { return }
         
         Task {
-            await dataManager.loadMorePlaceLists(userId: userSession.currentUserId ?? "")
+            await dataManager.loadMorePlaceLists(
+                userId: userId,
+                userLatitude: coord.latitude,
+                userLongitude: coord.longitude
+            )
         }
     }
 }
@@ -290,8 +278,6 @@ struct ListSelectionSheet: View {
     let place: DetailPlace
     @Binding var isPresented: Bool
     @State private var showNewListSheet = false
-    @State private var newListName = ""
-    @State public var searchText = ""
 
     var body: some View {
         VStack(spacing: 10) {
@@ -322,9 +308,7 @@ struct ListSelectionSheet: View {
             .padding(.horizontal, 20)
             .padding(.top, 10)
 
-            SkinnySearchBar(searchText: $searchText)
-
-            ListsInSelectionSheet(place: place, searchText: $searchText)
+            ListsInSelectionSheet(place: place)
 
             Spacer()
         }

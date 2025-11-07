@@ -13,7 +13,6 @@ struct MapView: View {
     @EnvironmentObject var locationManager: LocationManager
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var detailPlaceVM: DetailPlaceViewModel
-    @EnvironmentObject var placeTypeFilterVM: PlaceTypeFilterViewModel
     @EnvironmentObject var mapViewModel: MapViewModel
 
     @Binding var recenterMap: Bool
@@ -274,16 +273,10 @@ struct MapView: View {
             // ✅ REMOVED: Duplicate operations already handled in DataManager
             // profile.refreshUserPlaces() - Already done in DataManager.initializeProfileData()
             // detailPlaceVM.calculateAnnotationPlaces() - Already done in DataManager.calculateMapAnnotations()
-            
-            // Only refresh place types (not done elsewhere)
-            Task.detached(priority: .background) {
-                await placeTypeFilterVM.refreshMostFrequentTypes()
-            }
         }
         .sheet(isPresented: $showVisiblePlacesPopup) {
             VisiblePlacesPopupView(mapRegion: currentMapRegion)
                 .environmentObject(selectedPlaceVM)
-                .environmentObject(placeTypeFilterVM)
                 .presentationDragIndicator(.visible)
         }
     }
@@ -297,14 +290,7 @@ struct MapView: View {
             object: nil,
             queue: .main
         ) { _ in
-            // ✅ OPTIMIZED: Only refresh what's needed when notified
-            Task {
-                // Only refresh place types and filtered places (other data already loaded)
-                await placeTypeFilterVM.refreshMostFrequentTypes()
-                await MainActor.run {
-                    placeTypeFilterVM.updateFilteredPlaces()
-                }
-            }
+            // Map annotations are refreshed automatically via viewport loading
         }
     }
     

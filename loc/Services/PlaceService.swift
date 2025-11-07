@@ -306,9 +306,21 @@ class PlaceService: ObservableObject {
     }
     
     func createNewList(userId: String, listName: String, city: String, emoji: String, image: String, completion: @escaping (PlaceList?, Error?) -> Void) {
-        print("⚠️ [PlaceService] createNewList not fully implemented")
-        let newList = PlaceList(name: listName, city: city, emoji: emoji, image: image)
-        completion(newList, nil)
+        Task { @MainActor in
+            do {
+                let createdList = try await SupabasePlaceService.shared.createNewList(
+                    userId: userId,
+                    name: listName,
+                    city: city,
+                    emoji: emoji,
+                    image: image
+                )
+                completion(createdList, nil)
+            } catch {
+                print("❌ [PlaceService] Error creating new list: \(error)")
+                completion(nil, error)
+            }
+        }
     }
     
     func deleteList(userId: String, listId: String, completion: @escaping (Error?) -> Void) {

@@ -181,7 +181,6 @@ class SupabasePlaceService: ObservableObject {
         let description: String?
         let cover_image_url: String?
         let is_public: Bool
-        let sort_order: Int
         let average_location: String? // PostGIS geometry as WKT string
         let distance_meters: Double? // Distance from user location (when sorted by proximity)
 
@@ -192,7 +191,6 @@ class SupabasePlaceService: ObservableObject {
             case description
             case cover_image_url
             case is_public
-            case sort_order
             case average_location
             case distance_meters
         }
@@ -1101,7 +1099,7 @@ class SupabasePlaceService: ObservableObject {
             city: "", // Not available in PlaceListRecord, will be populated later
             emoji: "📋", // Default emoji
             image: record.cover_image_url,
-            sortOrder: record.sort_order,
+            sortOrder: 0, // Not used anymore - kept for backward compatibility
             averageCoordinate: averageCoordinate,
             lastCoordinateUpdate: nil // Not available in PlaceListRecord
         )
@@ -1254,7 +1252,7 @@ class SupabasePlaceService: ObservableObject {
                     .from("place_lists")
                     .select()
                     .eq("user_id", value: userId)
-                    .order("sort_order", ascending: true)
+                    .order("created_at", ascending: false)
                     .execute()
                     .value
 
@@ -1270,7 +1268,7 @@ class SupabasePlaceService: ObservableObject {
                         city: "",
                         emoji: "📍", // Default emoji
                         image: record.cover_image_url,
-                        sortOrder: record.sort_order,
+                        sortOrder: 0, // Not used anymore - kept for backward compatibility
                         averageCoordinate: parseGeometryToCoordinate(record.average_location),
                         lastCoordinateUpdate: nil
                     )
@@ -1316,13 +1314,13 @@ class SupabasePlaceService: ObservableObject {
                         .execute()
                         .value
                 } else {
-                    // Fallback to regular sorting if no location available
-                    print("📍 [Supabase] No user location available, using regular sort_order")
+                    // Fallback to regular sorting if no location available - use created_at (newest first)
+                    print("📍 [Supabase] No user location available, using created_at DESC")
                     records = try await supabase.client
                         .from("place_lists")
                         .select()
                         .eq("user_id", value: userId)
-                        .order("sort_order", ascending: true)
+                        .order("created_at", ascending: false)
                         .execute()
                         .value
                 }
@@ -1339,7 +1337,7 @@ class SupabasePlaceService: ObservableObject {
                         city: "",
                         emoji: "📍", // Default emoji
                         image: record.cover_image_url,
-                        sortOrder: record.sort_order,
+                        sortOrder: 0, // Not used anymore - kept for backward compatibility
                         averageCoordinate: parseGeometryToCoordinate(record.average_location),
                         lastCoordinateUpdate: nil
                     )
@@ -1365,7 +1363,7 @@ class SupabasePlaceService: ObservableObject {
                 .from("place_lists")
                 .select()
                 .eq("user_id", value: userId)
-                .order("sort_order", ascending: true)
+                .order("created_at", ascending: false)
                 .execute()
                 .value
             
@@ -1378,7 +1376,7 @@ class SupabasePlaceService: ObservableObject {
                         .from("place_lists")
                         .select()
                         .eq("user_id", value: authUserId)
-                        .order("sort_order", ascending: true)
+                        .order("created_at", ascending: false)
                         .execute()
                         .value
                 } catch {
@@ -1396,7 +1394,7 @@ class SupabasePlaceService: ObservableObject {
                     city: "",
                     emoji: "📍", // Default emoji
                     image: record.cover_image_url,
-                    sortOrder: record.sort_order,
+                    sortOrder: 0, // Not used anymore - kept for backward compatibility
                     averageCoordinate: parseGeometryToCoordinate(record.average_location),
                     lastCoordinateUpdate: nil
                 )
@@ -1410,6 +1408,52 @@ class SupabasePlaceService: ObservableObject {
             print("❌ [Supabase] Error fetching place lists: \(error)")
             throw error
         }
+    }
+    
+    /// Create a new place list
+    func createNewList(userId: String, name: String, city: String, emoji: String, image: String) async throws -> PlaceList {
+        print("📝 [Supabase] Creating new place list: \(name) for user: \(userId)")
+        
+        // Generate a new UUID for the list
+        let listId = UUID().uuidString
+        
+        // Create the insert struct
+        struct NewPlaceListRecord: Encodable {
+            let id: String
+            let user_id: String
+            let name: String
+            let description: String?
+            let cover_image_url: String?
+            let is_public: Bool
+        }
+        
+        let newList = NewPlaceListRecord(
+            id: listId,
+            user_id: userId,
+            name: name,
+            description: nil,
+            cover_image_url: image.isEmpty ? nil : image,
+            is_public: false
+        )
+        
+        // Insert the new list
+        let response: [PlaceListRecord] = try await supabase.client
+            .from("place_lists")
+            .insert(newList)
+            .select()
+            .execute()
+            .value
+        
+        guard let createdRecord = response.first else {
+            throw NSError(domain: "SupabasePlaceService", code: -1, userInfo: [
+                NSLocalizedDescriptionKey: "Failed to create list - no record returned"
+            ])
+        }
+        
+        let placeList = convertToPlaceList(createdRecord)
+        print("✅ [Supabase] Successfully created new place list: \(placeList.name) with ID: \(placeList.id)")
+        
+        return placeList
     }
     
     /// Async version: Fetches place lists sorted by proximity to user's current location
@@ -1440,13 +1484,13 @@ class SupabasePlaceService: ObservableObject {
                     .execute()
                     .value
             } else {
-                // Fallback to regular sorting if no location available
-                print("📍 [Supabase] No user location available, using regular sort_order")
+                // Fallback to regular sorting if no location available - use created_at (newest first)
+                print("📍 [Supabase] No user location available, using created_at DESC")
                 records = try await supabase.client
                     .from("place_lists")
                     .select()
                     .eq("user_id", value: userId)
-                    .order("sort_order", ascending: true)
+                    .order("created_at", ascending: false)
                     .execute()
                     .value
             }
@@ -1463,7 +1507,7 @@ class SupabasePlaceService: ObservableObject {
                     city: "",
                     emoji: "📍", // Default emoji
                     image: record.cover_image_url,
-                    sortOrder: record.sort_order,
+                    sortOrder: 0, // Not used anymore - kept for backward compatibility
                     averageCoordinate: parseGeometryToCoordinate(record.average_location),
                     lastCoordinateUpdate: nil
                 )

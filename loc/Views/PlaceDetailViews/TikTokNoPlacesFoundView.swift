@@ -233,8 +233,7 @@ struct TikTokNoPlacesFoundView: View {
     }
     
     private func assignTikTokToPlace() {
-        guard let suggestion = selectedSuggestion,
-              let userId = userSession.currentUserId else {
+        guard let suggestion = selectedSuggestion else {
             errorMessage = "Unable to assign TikTok to place"
             showingErrorAlert = true
             return
@@ -245,31 +244,26 @@ struct TikTokNoPlacesFoundView: View {
         // Create a DetailPlace from the suggestion
         let detailPlace = createDetailPlaceFromSuggestion(suggestion)
         
-        // Create external place entry with TikTok video URL
-        let externalPlace = ExternalPlace(
-            id: detailPlace.id.uuidString,
-            addedAt: Date(),
-            address: detailPlace.address ?? "",
-            coordinates: ExternalPlaceCoordinates(
-                latitude: detailPlace.coordinate?.latitude ?? 0,
-                longitude: detailPlace.coordinate?.longitude ?? 0
-            ),
-            name: detailPlace.name,
-            placeId: detailPlace.id.uuidString,
-            source: "user_assigned",
-            url: tikTokUrl
-        )
+        // Add place to places dictionary so it's available for the map/UI
+        detailPlaceViewModel.places[detailPlace.id.uuidString] = detailPlace
         
-        // Save to user's external places
-        profile.saveExternalPlace(externalPlace: externalPlace) { success, error in
-            DispatchQueue.main.async {
+        // Use the unified createExternalPlaceEntry method
+        Task {
+            let success = await profile.createExternalPlaceEntry(
+                placeId: detailPlace.id.uuidString,
+                tikTokUrl: tikTokUrl,
+                source: "user_assigned",
+                place: detailPlace
+            )
+            
+            await MainActor.run {
                 isSubmitting = false
                 if success {
                     // Refresh TikTok places list
                     profile.refreshTikTokPlacesAfterImport()
                     showingSuccessAlert = true
                 } else {
-                    errorMessage = "Failed to assign TikTok: \(error?.localizedDescription ?? "Unknown error")"
+                    errorMessage = "Failed to assign TikTok to place"
                     showingErrorAlert = true
                 }
             }

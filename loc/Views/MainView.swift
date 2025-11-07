@@ -18,7 +18,6 @@ struct MainView: View {
     @EnvironmentObject var locationManager: LocationManager
     @EnvironmentObject var notificationManager: NotificationManager
     @EnvironmentObject var viewModel: SearchViewModel
-    @EnvironmentObject var placeTypeFilterVM: PlaceTypeFilterViewModel
     @EnvironmentObject var deepLinkViewModel: DeepLinkViewModel
     @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
     @EnvironmentObject var mapViewModel: MapViewModel
@@ -81,11 +80,7 @@ struct MainView: View {
         .onAppear {
             locationManager.requestLocationPermission()
             viewModel.selectedPlaceVM = selectedPlaceVM
-            viewModel.placeTypeFilterVM = placeTypeFilterVM
             viewModel.searchText = ""
-
-            // Trigger immediate calculation of most frequent types
-            placeTypeFilterVM.refreshMostFrequentTypes()
 
             // SearchViewModel is properly initialized
         }
@@ -96,14 +91,6 @@ struct MainView: View {
             }
             // Note: We don't clear selectedPlace on dismissal to avoid unwanted map movements
             // The annotation highlight will be controlled by both selectedPlace AND isDetailSheetPresented
-        }
-        .onChange(of: profileViewModel.userFavorites) {
-            // Recalculate filters when user favorites change
-            placeTypeFilterVM.refreshMostFrequentTypes()
-        }
-        .onChange(of: profileViewModel.userListsPlaces) {
-            // Recalculate filters when user lists change
-            placeTypeFilterVM.refreshMostFrequentTypes()
         }
         .onChange(of: selectedPlaceVM.shouldAnimateMapToPlace) { oldValue, newValue in
             if newValue, let place = selectedPlaceVM.selectedPlace, let coordinate = place.coordinate {
@@ -220,7 +207,6 @@ struct MainView: View {
     private var expandedSearchControls: some View {
         VStack(spacing: 16) {
             searchBar
-            placeTypeFilterButtons
             searchResultsContainer
         }
     }
@@ -277,12 +263,6 @@ struct MainView: View {
                 searchIsFocused = true
             }
             // REMOVED: Duplicate onChange handler - SearchViewModel already handles this with debouncing
-    }
-    
-    // MARK: - Place Type Filter Buttons
-    private var placeTypeFilterButtons: some View {
-        PlaceTypeFilterButtonsView(filterVM: placeTypeFilterVM)
-            .padding(.horizontal, 20)
     }
     
     // MARK: - Bottom Sheet

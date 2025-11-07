@@ -19,7 +19,6 @@ class SearchViewModel: ObservableObject {
     @Published var isSearching: Bool = false  // Track when search is in progress
 
     weak var selectedPlaceVM: SelectedPlaceViewModel?
-    weak var placeTypeFilterVM: PlaceTypeFilterViewModel?
 
     private let placeService: PlaceService
     private let userService: UserService
@@ -78,10 +77,6 @@ class SearchViewModel: ObservableObject {
                 self?.searchError = nil
                 self?.showNoPlaceFound = false
                 self?.isSearching = false
-                // Clear filters
-                Task { @MainActor in
-                    self?.placeTypeFilterVM?.filterBySearchText("")
-                }
             }
             .store(in: &cancellables)
     }
@@ -116,9 +111,6 @@ class SearchViewModel: ObservableObject {
             }
             group.addTask { [weak self] in
                 await self?.searchUsersAsync(query: query)
-            }
-            group.addTask { [weak self] in
-                await self?.updatePlaceTypeFilters(query: query)
             }
         }
     }
@@ -190,12 +182,6 @@ class SearchViewModel: ObservableObject {
         }
     }
     
-    private func updatePlaceTypeFilters(query: String) async {
-        await MainActor.run {
-            placeTypeFilterVM?.filterBySearchText(query)
-        }
-    }
-
     // Legacy searchPlaces function - kept for compatibility but not used
     func searchPlaces(query: String) {
         // This function is deprecated - use performSearch instead

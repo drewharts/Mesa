@@ -584,8 +584,36 @@ class UserService: ObservableObject {
     }
     
     func saveExternalPlace(externalPlace: ExternalPlace, completion: @escaping (Bool, Error?) -> Void) {
-        print("⚠️ [UserService] saveExternalPlace not fully implemented")
-        completion(true, nil)
+        Task {
+            do {
+                // Get current user ID - use auth UID (should match users.id after migration)
+                guard let userId = await SupabaseAuthService.shared.currentUserId else {
+                    await MainActor.run {
+                        completion(false, NSError(domain: "UserService", code: -1, userInfo: [
+                            NSLocalizedDescriptionKey: "User not logged in"
+                        ]))
+                    }
+                    return
+                }
+                
+                print("💾 [UserService] Saving external place with user ID: \(userId)")
+                
+                // Save to Supabase
+                try await SupabaseUserService.shared.saveExternalPlace(
+                    externalPlace: externalPlace,
+                    userId: userId
+                )
+                
+                await MainActor.run {
+                    completion(true, nil)
+                }
+            } catch {
+                print("❌ [UserService] Error saving external place: \(error.localizedDescription)")
+                await MainActor.run {
+                    completion(false, error)
+                }
+            }
+        }
     }
     
     func deleteTikTokPlace(userId: String, placeId: String, completion: @escaping (Error?) -> Void) {

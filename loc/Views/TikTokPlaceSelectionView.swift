@@ -71,6 +71,10 @@ struct TikTokPlaceSelectionView: View {
                                 },
                                 onPlaceTapped: {
                                     print("📍 [TikTokPlaceSelectionView] Place tapped: \(place.name)")
+                                    
+                                    // Create external_place entry for this TikTok
+                                    profile.createExternalPlaceEntryForSelectedPlace(placeId: place.id.uuidString)
+                                    
                                     // First dismiss this sheet, then navigate to place detail
                                     profile.clearPlaceSelection()
 

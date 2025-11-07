@@ -23,17 +23,27 @@ class DeepLinkManager: ObservableObject {
     private let selectedPlaceViewModel: SelectedPlaceViewModel
     private let tikTokService: TikTokService
     private let detailPlaceViewModel: DetailPlaceViewModel
+    private weak var profileViewModel: ProfileViewModel?
     
     // Deduplication mechanism for TikTok URLs
     private static var recentlyProcessedURLs: Set<String> = []
     private static var urlProcessingQueue = DispatchQueue(label: "url-processing", qos: .userInitiated)
     
-    init(placeService: PlaceService, userService: UserService, selectedPlaceViewModel: SelectedPlaceViewModel, tikTokService: TikTokService = TikTokService(), detailPlaceViewModel: DetailPlaceViewModel) {
+    // Store TikTok URL during processing to create external_place entry
+    private var currentProcessingTikTokUrl: String?
+    
+    init(placeService: PlaceService, userService: UserService, selectedPlaceViewModel: SelectedPlaceViewModel, tikTokService: TikTokService = TikTokService(), detailPlaceViewModel: DetailPlaceViewModel, profileViewModel: ProfileViewModel? = nil) {
         self.placeService = placeService
         self.userService = userService
         self.selectedPlaceViewModel = selectedPlaceViewModel
         self.tikTokService = tikTokService
         self.detailPlaceViewModel = detailPlaceViewModel
+        self.profileViewModel = profileViewModel
+    }
+    
+    /// Set the ProfileViewModel reference (called after ProfileViewModel is created)
+    func setProfileViewModel(_ profileViewModel: ProfileViewModel) {
+        self.profileViewModel = profileViewModel
     }
     
     // MARK: - Deep Link Processing
@@ -169,6 +179,9 @@ class DeepLinkManager: ObservableObject {
     private func processTikTokURL(_ urlString: String) async {
         print("🎬 [DeepLinkManager] Starting processTikTokURL for: \(urlString)")
         
+        // Store URL for later use when creating external_place entry
+        currentProcessingTikTokUrl = urlString
+        
         // Check for duplicate processing
         let shouldProcess = await withCheckedContinuation { continuation in
             Self.urlProcessingQueue.async {
@@ -192,6 +205,7 @@ class DeepLinkManager: ObservableObject {
         
         guard shouldProcess else { 
             print("⏭️ [DeepLinkManager] Skipping duplicate URL")
+            currentProcessingTikTokUrl = nil
             return 
         }
         
@@ -209,6 +223,7 @@ class DeepLinkManager: ObservableObject {
                     let message = "We couldn't figure out what place is associated with this video."
                     self.onNoLocationFound?(message)
                 }
+                currentProcessingTikTokUrl = nil
                 return
             }
             
@@ -217,7 +232,7 @@ class DeepLinkManager: ObservableObject {
                 print("🧭 [DeepLinkManager] Navigating to place: \(place.name)")
                 
                 // Navigate directly - backend returns full place details
-                await navigateToPlace(place)
+                await navigateToPlace(place, tikTokUrl: urlString)
             } else {
                 // Multiple places - let ProfileViewModel handle the selection
                 await MainActor.run {
@@ -225,13 +240,15 @@ class DeepLinkManager: ObservableObject {
                     NotificationCenter.default.post(
                         name: NSNotification.Name("TikTokMultiplePlacesFound"),
                         object: nil,
-                        userInfo: ["places": detailPlaces]
+                        userInfo: ["places": detailPlaces, "tikTokUrl": urlString]
                     )
                 }
+                // Keep URL stored for when user selects a place
             }
             
         case .failure(let error):
             print("❌ [DeepLinkManager] Result is .failure: \(error.localizedDescription)")
+            currentProcessingTikTokUrl = nil
             break
         }
     }
@@ -316,7 +333,7 @@ class DeepLinkManager: ObservableObject {
     
     // MARK: - Navigation
     
-    private func navigateToPlace(_ place: DetailPlace) async {
+    private func navigateToPlace(_ place: DetailPlace, tikTokUrl: String? = nil) async {
         print("📍 [DeepLinkManager] navigateToPlace called for: \(place.name)")
         await MainActor.run {
             print("📱 [DeepLinkManager] On main thread, setting up place detail view")
@@ -331,6 +348,26 @@ class DeepLinkManager: ObservableObject {
             selectedPlaceViewModel.isDetailSheetPresented = true
             print("✅ [DeepLinkManager] Place detail sheet presented")
             pendingPlace = nil
+        }
+        
+        // Create external_place entry if we have a TikTok URL
+        if let tikTokUrl = tikTokUrl ?? currentProcessingTikTokUrl {
+            print("💾 [DeepLinkManager] Creating external_place entry for TikTok: \(tikTokUrl)")
+            if let profileViewModel = profileViewModel {
+                let success = await profileViewModel.createExternalPlaceEntry(
+                    placeId: place.id.uuidString,
+                    tikTokUrl: tikTokUrl,
+                    place: place
+                )
+                if success {
+                    print("✅ [DeepLinkManager] Successfully created external_place entry")
+                } else {
+                    print("❌ [DeepLinkManager] Failed to create external_place entry")
+                }
+            } else {
+                print("⚠️ [DeepLinkManager] ProfileViewModel not available, cannot create external_place entry")
+            }
+            currentProcessingTikTokUrl = nil
         }
     }
     

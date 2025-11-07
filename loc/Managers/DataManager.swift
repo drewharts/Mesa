@@ -21,7 +21,6 @@ class DataManager: ObservableObject {
     private let locationManager: LocationManager
     private let profileViewModel: ProfileViewModel
     private let detailPlaceViewModel: DetailPlaceViewModel
-    weak var placeTypeFilterViewModel: PlaceTypeFilterViewModel?
     
     init(
         userService: UserService,
@@ -202,14 +201,6 @@ class DataManager: ObservableObject {
             
             // Trigger map annotation calculation
             calculateMapAnnotations()
-            
-            // Force update of filtered places for map display
-            await MainActor.run {
-                if let placeTypeFilterVM = self.placeTypeFilterViewModel {
-                    placeTypeFilterVM.updateFilteredPlaces()
-                    print("🗺️ [DataManager] Forced filteredPlaces update, now showing: \(placeTypeFilterVM.filteredPlaces.count) places")
-                }
-            }
             
         } catch {
             print("❌ [DataManager] Error loading all user places: \(error.localizedDescription)")
@@ -826,7 +817,7 @@ class DataManager: ObservableObject {
     
     /// Load more place lists (pagination)
     @MainActor
-    func loadMorePlaceLists(userId: String) async {
+    func loadMorePlaceLists(userId: String, userLatitude: Double? = nil, userLongitude: Double? = nil) async {
         // Guard: Already loading
         guard !profileViewModel.isLoadingMorePlaceLists else {
             print("⚠️ [DataManager] Already loading more place lists, skipping duplicate request")
@@ -839,8 +830,17 @@ class DataManager: ObservableObject {
             return
         }
         
-        // Guard: Location required for proximity sorting
-        guard let location = locationManager.currentLocation?.coordinate else {
+        // Use provided coordinates or fall back to user's current location
+        let latitude: Double
+        let longitude: Double
+        
+        if let lat = userLatitude, let lng = userLongitude {
+            latitude = lat
+            longitude = lng
+        } else if let location = locationManager.currentLocation?.coordinate {
+            latitude = location.latitude
+            longitude = location.longitude
+        } else {
             print("⚠️ [DataManager] No location available for loading more place lists")
             return
         }
@@ -860,8 +860,8 @@ class DataManager: ObservableObject {
         do {
             let moreLists = try await userService.fetchPlaceListsByProximity(
                 userId: userId,
-                userLatitude: location.latitude,
-                userLongitude: location.longitude,
+                userLatitude: latitude,
+                userLongitude: longitude,
                 page: nextPage,
                 pageSize: pageSize
             )

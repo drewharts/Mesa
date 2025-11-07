@@ -17,7 +17,6 @@ struct locApp: App {
     @StateObject private var notificationManager = NotificationManager.shared
     @StateObject private var deepLinkManager: DeepLinkManager
     @StateObject private var deepLinkViewModel: DeepLinkViewModel
-    @StateObject private var placeTypeFilterViewModel: PlaceTypeFilterViewModel
     @StateObject private var mapViewModel: MapViewModel
     
     private let dataManager: DataManager
@@ -59,7 +58,8 @@ struct locApp: App {
             userService: services.userService,
             selectedPlaceViewModel: selectedPlaceVM,
             tikTokService: services.tikTokService,
-            detailPlaceViewModel: detailVM
+            detailPlaceViewModel: detailVM,
+            profileViewModel: nil // Will be set after ProfileViewModel is created
         )
         
         let deepLinkVM = DeepLinkViewModel(
@@ -78,6 +78,9 @@ struct locApp: App {
             deepLinkManager: deepLinkMgr,
             deepLinkViewModel: deepLinkVM
         )
+        
+        // Set ProfileViewModel reference in DeepLinkManager so it can create external_place entries
+        deepLinkMgr.setProfileViewModel(profileVM)
         
         let dataMgr = DataManager(
             userService: services.userService,
@@ -113,23 +116,9 @@ struct locApp: App {
             detailPlaceVM: detailVM
         )
         
-        let placeTypeFilterVM = PlaceTypeFilterViewModel(
-            detailPlaceVM: detailVM,
-            profileVM: profileVM
-        )
-        
-        // Wire up MapViewModel to PlaceTypeFilterViewModel
-        placeTypeFilterVM.mapViewModel = mapVM
-        
         // Wire up ProfileViewModel to MapViewModel (for friends' places viewport filtering and profile photos)
         profileVM.mapViewModel = mapVM
         mapVM.profileViewModel = profileVM
-        
-        // Setup observer for viewport changes (must be after mapViewModel is set)
-        placeTypeFilterVM.observeMapViewModel()
-        
-        // Wire up DataManager to PlaceTypeFilterViewModel for map updates
-        dataMgr.placeTypeFilterViewModel = placeTypeFilterVM
         
         self._locationManager = StateObject(wrappedValue: location)
         self._userSession = StateObject(wrappedValue: userSess)
@@ -141,7 +130,6 @@ struct locApp: App {
         self._searchViewModel = StateObject(wrappedValue: searchVM)
         self._deepLinkManager = StateObject(wrappedValue: deepLinkMgr)
         self._deepLinkViewModel = StateObject(wrappedValue: deepLinkVM)
-        self._placeTypeFilterViewModel = StateObject(wrappedValue: placeTypeFilterVM)
         self._mapViewModel = StateObject(wrappedValue: mapVM)
         
         // Pass user service to AppDelegate
@@ -164,7 +152,6 @@ struct locApp: App {
                 .environmentObject(serviceContainer)
                 .environmentObject(deepLinkManager)
                 .environmentObject(deepLinkViewModel)
-                .environmentObject(placeTypeFilterViewModel)
                 .environmentObject(mapViewModel)
                 .preferredColorScheme(.light)
                 .onOpenURL { url in
