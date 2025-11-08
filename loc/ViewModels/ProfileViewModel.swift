@@ -44,6 +44,7 @@ class ProfileViewModel: ObservableObject {
     @Published var lightweightFavorites: [FavoritePlace] = [] // New - lightweight data for display
     @Published var lightweightPlaceLists: [LightweightPlaceList] = [] // New - lightweight place lists by proximity
     @Published var lightweightPlaceListPlaces: [String: [LightweightPlace]] = [:] // [listId: places]
+    @Published var lightweightPlaceListCounts: [String: Int] = [:] // [listId: placeCount]
     @Published var lightweightMyPlaces: [LightweightPlace] = [] // Lightweight my places for tiles
     @Published var isLoadingMoreMyPlaces: Bool = false
     @Published var hasMoreMyPlaces: Bool = true
@@ -408,13 +409,25 @@ class ProfileViewModel: ObservableObject {
             tiktok_url: nil
         )
         
+        var didInsert = false
+        
         // Update local lightweightPlaceListPlaces
-        if lightweightPlaceListPlaces[listId] != nil {
-            if !lightweightPlaceListPlaces[listId]!.contains(where: { $0.place_id == placeId }) {
-                lightweightPlaceListPlaces[listId]!.append(lightweightPlace)
+        if var existingPlaces = lightweightPlaceListPlaces[listId] {
+            if !existingPlaces.contains(where: { $0.place_id == placeId }) {
+                existingPlaces.append(lightweightPlace)
+                lightweightPlaceListPlaces[listId] = existingPlaces
+                didInsert = true
             }
         } else {
             lightweightPlaceListPlaces[listId] = [lightweightPlace]
+            didInsert = true
+        }
+        
+        if didInsert {
+            let startingCount = lightweightPlaceListCounts[listId]
+                ?? lightweightPlaceLists.first(where: { $0.list_id == listId })?.place_count
+                ?? 0
+            lightweightPlaceListCounts[listId] = startingCount + 1
         }
         
         // Update DetailPlaceViewModel's places dictionary for immediate UI update
@@ -473,10 +486,23 @@ class ProfileViewModel: ObservableObject {
             return
         }
         
+        var didRemove = false
+        
         // Update local lightweightPlaceListPlaces
         if var places = lightweightPlaceListPlaces[listId] {
+            let originalCount = places.count
             places.removeAll { $0.place_id == place.id.uuidString }
+            if places.count != originalCount {
+                didRemove = true
+            }
             lightweightPlaceListPlaces[listId] = places
+        }
+        
+        if didRemove {
+            let startingCount = lightweightPlaceListCounts[listId]
+                ?? lightweightPlaceLists.first(where: { $0.list_id == listId })?.place_count
+                ?? 0
+            lightweightPlaceListCounts[listId] = max(startingCount - 1, 0)
         }
         
         // Remove current user as saver

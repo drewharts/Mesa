@@ -868,24 +868,34 @@ class DataManager: ObservableObject {
             
             print("✅ [DataManager] Fetched \(moreLists.count) lists for page \(nextPage)")
             
-            // Update pagination state
-            // If we got fewer than pageSize items, we've reached the end
-            profileViewModel.hasMorePlaceLists = moreLists.count >= pageSize
+            await MainActor.run {
+                // Update pagination state
+                // If we got fewer than pageSize items, we've reached the end
+                profileViewModel.hasMorePlaceLists = moreLists.count >= pageSize
+                
+                // Append new lists if any
+                if !moreLists.isEmpty {
+                    profileViewModel.lightweightPlaceLists.append(contentsOf: moreLists)
+                    profileViewModel.placeListsCurrentPage = nextPage
+                    
+                    for list in moreLists {
+                        if profileViewModel.lightweightPlaceListCounts[list.list_id] == nil {
+                            profileViewModel.lightweightPlaceListCounts[list.list_id] = list.place_count
+                        }
+                    }
+                    
+                    print("✅ [DataManager] Added \(moreLists.count) more lists. Total: \(profileViewModel.lightweightPlaceLists.count)")
+                } else {
+                    print("ℹ️ [DataManager] No more lists returned, reached end of pagination")
+                    profileViewModel.hasMorePlaceLists = false
+                }
+            }
             
-            // Append new lists if any
             if !moreLists.isEmpty {
-                profileViewModel.lightweightPlaceLists.append(contentsOf: moreLists)
-                profileViewModel.placeListsCurrentPage = nextPage
-                
-                print("✅ [DataManager] Added \(moreLists.count) more lists. Total: \(profileViewModel.lightweightPlaceLists.count)")
-                
                 // Load places for new lists in background
                 Task.detached(priority: .userInitiated) { [weak self] in
                     await self?.loadPlacesForLists(moreLists)
                 }
-            } else {
-                print("ℹ️ [DataManager] No more lists returned, reached end of pagination")
-                profileViewModel.hasMorePlaceLists = false
             }
         } catch {
             print("❌ [DataManager] Error loading more place lists: \(error.localizedDescription)")
@@ -908,6 +918,12 @@ class DataManager: ObservableObject {
                 profileViewModel.lightweightPlaceLists = lists
                 profileViewModel.placeListsCurrentPage = 1
                 profileViewModel.hasMorePlaceLists = lists.count >= 6  // Keep loading if we got 6 or more lists
+                
+                var updatedCounts: [String: Int] = [:]
+                for list in lists {
+                    updatedCounts[list.list_id] = profileViewModel.lightweightPlaceListCounts[list.list_id] ?? list.place_count
+                }
+                profileViewModel.lightweightPlaceListCounts = updatedCounts
             }
             
             print("✅ [DataManager] Loaded \(lists.count) place lists closest to place at (\(placeLatitude), \(placeLongitude))")

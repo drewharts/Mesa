@@ -33,8 +33,8 @@ struct LightweightListDescription: View {
     let list: LightweightPlaceList
 
     // Get total place count from the list (from SQL function)
-    private var totalPlaceCount: Int {
-        return list.place_count
+    private var displayedPlaceCount: Int {
+        return profile.lightweightPlaceListCounts[list.list_id] ?? list.place_count
     }
 
     var body: some View {
@@ -43,7 +43,7 @@ struct LightweightListDescription: View {
                 .font(.body)
                 .foregroundStyle(Color.primary.opacity(1.0))
 
-            Text("\(totalPlaceCount) Places")
+            Text("\(displayedPlaceCount) Places")
                 .font(.caption)
                 .foregroundStyle(Color.secondary.opacity(1.0))
         }
