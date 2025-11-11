@@ -15,6 +15,7 @@ struct VisiblePlacesPopupView: View {
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
     @EnvironmentObject var mapViewModel: MapViewModel
+    @EnvironmentObject var profile: ProfileViewModel
     
     @State private var placeColors: [String: Color] = [:]
     @State private var loadedImageCount = 0
@@ -159,13 +160,21 @@ struct VisiblePlacesPopupView: View {
         Task {
             do {
                 let imageMap = try await SupabasePlaceService.shared.fetchPlaceImages(for: placeIds)
-                
-                // Load the images from URLs
-                await MainActor.run {
-                    for (placeId, imageUrl) in imageMap {
-                        loadImage(from: imageUrl, for: placeId)
+                for placeId in placeIds {
+                    if let imageUrl = imageMap[placeId] {
+                        await loadImage(from: imageUrl, for: placeId)
                     }
-                    
+                }
+                
+                let placesNeedingTikTok = await MainActor.run { () -> [String] in
+                    placeIds.filter { detailPlaceViewModel.placeImages[$0] == nil }
+                }
+                
+                if !placesNeedingTikTok.isEmpty {
+                    await profile.fetchTikTokThumbnails(for: placesNeedingTikTok)
+                }
+                
+                await MainActor.run {
                     loadedImageCount = endIndex
                     isLoadingImages = false
                 }
@@ -179,23 +188,21 @@ struct VisiblePlacesPopupView: View {
         }
     }
     
-    private func loadImage(from urlString: String, for placeId: String) {
+    private func loadImage(from urlString: String, for placeId: String) async {
         guard let url = URL(string: urlString) else { return }
         
         // Check if already loaded
         guard detailPlaceViewModel.placeImages[placeId] == nil else { return }
         
-        Task {
-            do {
-                let (data, _) = try await URLSession.shared.data(from: url)
-                if let image = UIImage(data: data) {
-                    await MainActor.run {
-                        detailPlaceViewModel.placeImages[placeId] = image
-                    }
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            if let image = UIImage(data: data) {
+                await MainActor.run {
+                    detailPlaceViewModel.placeImages[placeId] = image
                 }
-            } catch {
-                print("❌ Error loading image for place \(placeId): \(error)")
             }
+        } catch {
+            print("❌ Error loading image for place \(placeId): \(error)")
         }
     }
 }
@@ -209,6 +216,17 @@ struct VisiblePlaceGridCell: View {
     
     @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
+    @EnvironmentObject var profile: ProfileViewModel
+    
+    private var firstTikTokThumbnail: String? {
+        if let place = detailPlaceViewModel.places[annotation.id],
+           let videos = place.tikTokVideos,
+           let firstVideo = videos.first {
+            return firstVideo.thumbnailURL
+        }
+        
+        return profile.getFirstTikTokThumbnailURL(for: annotation.id)
+    }
     
     // Generate a consistent color for this place based on its ID
     private var placeColor: Color {
@@ -229,8 +247,20 @@ struct VisiblePlaceGridCell: View {
         }) {
             VStack(alignment: .leading, spacing: 0) {
                 ZStack(alignment: .bottom) {
-                    // Try to show cached image, otherwise show color
-                    if let image = detailPlaceViewModel.placeImages[annotation.id] {
+                    if let thumbnailURL = firstTikTokThumbnail,
+                       let url = URL(string: thumbnailURL) {
+                        AsyncImage(url: url) { image in
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .frame(width: cardWidth, height: cardHeight)
+                                .clipped()
+                        } placeholder: {
+                            Rectangle()
+                                .foregroundColor(placeColor)
+                                .frame(width: cardWidth, height: cardHeight)
+                        }
+                    } else if let image = detailPlaceViewModel.placeImages[annotation.id] {
                         Image(uiImage: image)
                             .resizable()
                             .aspectRatio(contentMode: .fill)
@@ -241,7 +271,9 @@ struct VisiblePlaceGridCell: View {
                         Rectangle()
                             .foregroundColor(placeColor)
                             .frame(width: cardWidth, height: cardHeight)
-                            // Images are batch loaded by parent view, no individual loading needed
+                            .onAppear {
+                                profile.ensureTikTokThumbnailCached(for: annotation.id)
+                            }
                     }
                     
                     // Gradient overlay

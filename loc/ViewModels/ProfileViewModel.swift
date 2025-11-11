@@ -1966,10 +1966,11 @@ class ProfileViewModel: ObservableObject {
         pagination.allPlaceIds = allPlaceIds
         pagination.hasMorePlaces = allPlaceIds.count > pagination.placesPerPage
         
+        // Store initial pagination before loading the first page
+        listPlacePagination[listIdString] = pagination
+        
         // Load first page
         loadNextPageForList(listId: listId)
-        
-        listPlacePagination[listIdString] = pagination
         print("🔍 [ProfileViewModel] initializeListPagination: Initialized pagination for list \(listId) with \(allPlaceIds.count) total places")
         
         // Trigger image preloading for initial places
@@ -2380,6 +2381,38 @@ class ProfileViewModel: ObservableObject {
             print("✅ [ProfileViewModel] TikTok metadata prefetch complete")
         } catch {
             print("❌ [ProfileViewModel] Error fetching external places: \(error.localizedDescription)")
+        }
+    }
+    
+    func ensureTikTokThumbnailCached(for placeId: String) {
+        if detailPlaceViewModel.placeImages[placeId] != nil {
+            return
+        }
+        
+        Task { [weak self] in
+            await self?.fetchTikTokThumbnails(for: [placeId])
+        }
+    }
+    
+    func fetchTikTokThumbnails(for placeIds: [String]) async {
+        let idsToFetch = placeIds.filter { detailPlaceViewModel.placeImages[$0] == nil }
+        guard !idsToFetch.isEmpty else { return }
+        guard let userId = user?.id else { return }
+        
+        do {
+            let urlMap = try await SupabaseUserService.shared.fetchExternalPlaceURLs(placeIds: idsToFetch, userId: userId)
+            
+            for placeId in idsToFetch {
+                guard let url = urlMap[placeId], !url.isEmpty else { continue }
+                
+                guard let video = await TikTokMetadataCache.shared.getMetadata(for: url) else { continue }
+                let thumbnailURL = video.thumbnailURL
+                guard !thumbnailURL.isEmpty else { continue }
+                
+                loadTikTokThumbnailAsPlaceImage(placeId: placeId, thumbnailURL: thumbnailURL)
+            }
+        } catch {
+            print("❌ [ProfileViewModel] Error fetching TikTok thumbnails: \(error.localizedDescription)")
         }
     }
     

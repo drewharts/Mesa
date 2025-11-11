@@ -549,8 +549,9 @@ class UserService: ObservableObject {
     }
     
     func searchUsers(query: String, completion: @escaping ([User]?, Error?) -> Void) {
-        print("⚠️ [UserService] searchUsers not fully implemented")
-        completion([], nil)
+        Task { @MainActor in
+            await supabase.searchUsers(query: query, completion: completion)
+        }
     }
     
     func savePlaceNote(note: PlaceNote, completion: @escaping (Bool, Error?) -> Void) {

@@ -174,6 +174,127 @@ class SupabaseUserService: ObservableObject {
         }
     }
     
+    func searchUsers(query: String, completion: @escaping ([User]?, Error?) -> Void) {
+        Task {
+            do {
+                let users = try await searchUsers(query: query, limit: 20)
+                await MainActor.run {
+                    completion(users, nil)
+                }
+            } catch {
+                print("❌ [Supabase] Error searching users for query '\(query)': \(error)")
+                await MainActor.run {
+                    completion(nil, error)
+                }
+            }
+        }
+    }
+    
+    func searchUsers(query: String, limit: Int = 20) async throws -> [User] {
+        let trimmedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmedQuery.count >= 2 else {
+            return []
+        }
+        
+        let normalizedQuery = trimmedQuery
+            .components(separatedBy: .whitespacesAndNewlines)
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+            .lowercased()
+        
+        guard !normalizedQuery.isEmpty else {
+            return []
+        }
+        
+        let likePattern = "%\(normalizedQuery)%"
+        
+        var uniqueRecords: [String: UserRecord] = [:]
+        
+        let fullNameMatches: [UserRecord] = try await supabase.client
+            .from("users")
+            .select("""
+                id,
+                first_name,
+                last_name,
+                email,
+                profile_photo_url,
+                full_name
+            """)
+            .ilike("full_name_lower", value: likePattern)
+            .limit(limit)
+            .execute()
+            .value
+        
+        fullNameMatches.forEach { uniqueRecords[$0.id] = $0 }
+        
+        if trimmedQuery.contains("@") {
+            let emailPattern = "%\(trimmedQuery.lowercased())%"
+            let emailMatches: [UserRecord] = try await supabase.client
+                .from("users")
+                .select("""
+                    id,
+                    first_name,
+                    last_name,
+                    email,
+                    profile_photo_url,
+                    full_name
+                """)
+                .ilike("email", value: emailPattern)
+                .limit(limit)
+                .execute()
+                .value
+            
+            emailMatches.forEach { uniqueRecords[$0.id] = $0 }
+        }
+        
+        if uniqueRecords.isEmpty && normalizedQuery.contains(" ") {
+            let tokens = normalizedQuery
+                .split(separator: " ")
+                .map(String.init)
+                .filter { !$0.isEmpty }
+            
+            for token in tokens {
+                let tokenPattern = "%\(token)%"
+                let tokenMatches: [UserRecord] = try await supabase.client
+                    .from("users")
+                    .select("""
+                        id,
+                        first_name,
+                        last_name,
+                        email,
+                        profile_photo_url,
+                        full_name
+                    """)
+                    .ilike("full_name_lower", value: tokenPattern)
+                    .limit(limit)
+                    .execute()
+                    .value
+                
+                tokenMatches.forEach { uniqueRecords[$0.id] = $0 }
+                
+                if uniqueRecords.count >= limit {
+                    break
+                }
+            }
+        }
+        
+        let sortedRecords = uniqueRecords
+            .values
+            .sorted { $0.full_name.localizedCaseInsensitiveCompare($1.full_name) == .orderedAscending }
+            .prefix(limit)
+        
+        return sortedRecords.map { record in
+            User(
+                id: record.id,
+                firstName: record.first_name,
+                lastName: record.last_name,
+                email: record.email,
+                profilePhotoURL: record.profile_photo_url.flatMap { URL(string: $0) },
+                fullName: record.full_name
+            )
+        }
+    }
+    
     func fetchFollowingProfiles(for userId: String, completion: @escaping ([User]?, Error?) -> Void) {
         fetchFriends(userId: userId) { followingIds, error in
             if let error = error {
@@ -560,6 +681,34 @@ class SupabaseUserService: ObservableObject {
             .value
         
         return places
+    }
+    
+    func fetchExternalPlaceURLs(placeIds: [String], userId: String) async throws -> [String: String] {
+        guard !placeIds.isEmpty else {
+            return [:]
+        }
+        
+        struct ExternalPlaceUrlRecord: Codable {
+            let place_id: String
+            let url: String?
+        }
+        
+        let records: [ExternalPlaceUrlRecord] = try await supabase.client
+            .from("external_places")
+            .select("place_id,url")
+            .eq("user_id", value: userId)
+            .in("place_id", values: placeIds)
+            .execute()
+            .value
+        
+        var result: [String: String] = [:]
+        for record in records {
+            if let url = record.url, !url.isEmpty {
+                result[record.place_id] = url
+            }
+        }
+        
+        return result
     }
 }
 

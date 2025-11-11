@@ -801,6 +801,7 @@ class DataManager: ObservableObject {
                 // Update place lists on main thread
                 await MainActor.run {
                     self.profileViewModel.lightweightPlaceLists = placeLists
+                    self.profileViewModel.placeListsCurrentPage = 1
                     // Set hasMore based on whether we got a full page
                     self.profileViewModel.hasMorePlaceLists = placeLists.count >= pageSize
                 }
@@ -818,6 +819,12 @@ class DataManager: ObservableObject {
     /// Load more place lists (pagination)
     @MainActor
     func loadMorePlaceLists(userId: String, userLatitude: Double? = nil, userLongitude: Double? = nil) async {
+        // Guard: Require a valid user ID before attempting pagination
+        guard !userId.isEmpty else {
+            print("⚠️ [DataManager] Missing user id, deferring loadMorePlaceLists")
+            return
+        }
+
         // Guard: Already loading
         guard !profileViewModel.isLoadingMorePlaceLists else {
             print("⚠️ [DataManager] Already loading more place lists, skipping duplicate request")
