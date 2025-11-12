@@ -166,12 +166,12 @@ struct VisiblePlacesPopupView: View {
                     }
                 }
                 
-                let placesNeedingTikTok = await MainActor.run { () -> [String] in
+                let placesNeedingImage = await MainActor.run { () -> [String] in
                     placeIds.filter { detailPlaceViewModel.placeImages[$0] == nil }
                 }
                 
-                if !placesNeedingTikTok.isEmpty {
-                    await profile.fetchTikTokThumbnails(for: placesNeedingTikTok)
+                if !placesNeedingImage.isEmpty {
+                    await profile.fetchFallbackImages(for: placesNeedingImage)
                 }
                 
                 await MainActor.run {

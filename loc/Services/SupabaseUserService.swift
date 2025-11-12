@@ -710,6 +710,47 @@ class SupabaseUserService: ObservableObject {
         
         return result
     }
+    
+    func fetchExternalReviewImages(for placeIds: [String]) async throws -> [String: String] {
+        guard !placeIds.isEmpty else {
+            return [:]
+        }
+        
+        struct ExternalReviewMedia: Codable {
+            let type: String?
+            let imageUrl: String?
+            
+            enum CodingKeys: String, CodingKey {
+                case type
+                case imageUrl
+            }
+        }
+        
+        struct ExternalReviewRecord: Codable {
+            let place_id: String
+            let media: [ExternalReviewMedia]?
+        }
+        
+        let records: [ExternalReviewRecord] = try await supabase.client
+            .from("external_reviews")
+            .select("place_id, media")
+            .in("place_id", values: placeIds)
+            .order("review_iso_date", ascending: false)
+            .execute()
+            .value
+        
+        var result: [String: String] = [:]
+        
+        for record in records {
+            guard result[record.place_id] == nil else { continue }
+            guard let mediaItems = record.media else { continue }
+            if let imageUrl = mediaItems.first(where: { ($0.type ?? "").lowercased() == "image" && ($0.imageUrl?.isEmpty == false) })?.imageUrl {
+                result[record.place_id] = imageUrl
+            }
+        }
+        
+        return result
+    }
 }
 
 // MARK: - Supabase Data Models

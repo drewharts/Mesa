@@ -2390,58 +2390,73 @@ class ProfileViewModel: ObservableObject {
         }
         
         Task { [weak self] in
-            await self?.fetchTikTokThumbnails(for: [placeId])
+            await self?.fetchFallbackImages(for: [placeId])
         }
     }
     
-    func fetchTikTokThumbnails(for placeIds: [String]) async {
-        let idsToFetch = placeIds.filter { detailPlaceViewModel.placeImages[$0] == nil }
-        guard !idsToFetch.isEmpty else { return }
-        guard let userId = user?.id else { return }
+    func fetchFallbackImages(for placeIds: [String]) async {
+        var remaining = placeIds.filter { detailPlaceViewModel.placeImages[$0] == nil }
+        guard !remaining.isEmpty else { return }
+        
+        if let userId = user?.id {
+            do {
+                let urlMap = try await SupabaseUserService.shared.fetchExternalPlaceURLs(placeIds: Array(remaining), userId: userId)
+                
+                for placeId in remaining {
+                    guard let url = urlMap[placeId], !url.isEmpty else { continue }
+                    guard detailPlaceViewModel.placeImages[placeId] == nil else { continue }
+                    
+                    guard let video = await TikTokMetadataCache.shared.getMetadata(for: url) else { continue }
+                    let thumbnailURL = video.thumbnailURL
+                    guard !thumbnailURL.isEmpty else { continue }
+                    
+                    loadRemoteImageAsPlaceImage(placeId: placeId, imageURL: thumbnailURL)
+                }
+            } catch {
+                print("❌ [ProfileViewModel] Error fetching TikTok thumbnails: \(error.localizedDescription)")
+            }
+            
+            remaining = remaining.filter { detailPlaceViewModel.placeImages[$0] == nil }
+        }
+        
+        guard !remaining.isEmpty else { return }
         
         do {
-            let urlMap = try await SupabaseUserService.shared.fetchExternalPlaceURLs(placeIds: idsToFetch, userId: userId)
-            
-            for placeId in idsToFetch {
-                guard let url = urlMap[placeId], !url.isEmpty else { continue }
-                
-                guard let video = await TikTokMetadataCache.shared.getMetadata(for: url) else { continue }
-                let thumbnailURL = video.thumbnailURL
-                guard !thumbnailURL.isEmpty else { continue }
-                
-                loadTikTokThumbnailAsPlaceImage(placeId: placeId, thumbnailURL: thumbnailURL)
+            let reviewImages = try await SupabaseUserService.shared.fetchExternalReviewImages(for: Array(remaining))
+            for (placeId, imageUrl) in reviewImages {
+                guard detailPlaceViewModel.placeImages[placeId] == nil else { continue }
+                loadRemoteImageAsPlaceImage(placeId: placeId, imageURL: imageUrl)
             }
         } catch {
-            print("❌ [ProfileViewModel] Error fetching TikTok thumbnails: \(error.localizedDescription)")
+            print("❌ [ProfileViewModel] Error fetching external review images: \(error.localizedDescription)")
         }
     }
     
     /// Load TikTok thumbnail as place image for external places
     private func loadTikTokThumbnailAsPlaceImage(placeId: String, thumbnailURL: String) {
-        // Skip if image already exists
+        loadRemoteImageAsPlaceImage(placeId: placeId, imageURL: thumbnailURL)
+    }
+    
+    private func loadRemoteImageAsPlaceImage(placeId: String, imageURL: String) {
         if detailPlaceViewModel.placeImages[placeId] != nil {
             return
         }
         
-        guard let url = URL(string: thumbnailURL) else {
-            print("❌ [ProfileViewModel] Invalid thumbnail URL for place \(placeId): \(thumbnailURL)")
+        guard let url = URL(string: imageURL) else {
+            print("❌ [ProfileViewModel] Invalid image URL for place \(placeId): \(imageURL)")
             return
         }
-        
-        // Loading TikTok thumbnail for place
         
         URLSession.shared.dataTask(with: url) { [weak self] data, response, error in
             guard let self = self else { return }
             
             DispatchQueue.main.async {
                 if let error = error {
-                    print("❌ [ProfileViewModel] Error loading TikTok thumbnail for \(placeId): \(error.localizedDescription)")
+                    print("❌ [ProfileViewModel] Error loading image for \(placeId): \(error.localizedDescription)")
                 } else if let data = data, let image = UIImage(data: data) {
-                    // Successfully loaded TikTok thumbnail
-                    // Store in DetailPlaceViewModel for popup views to access
                     self.detailPlaceViewModel.placeImages[placeId] = image
                 } else {
-                    print("⚠️ [ProfileViewModel] No image data returned for TikTok thumbnail \(placeId)")
+                    print("⚠️ [ProfileViewModel] No image data returned for place \(placeId)")
                 }
             }
         }.resume()
