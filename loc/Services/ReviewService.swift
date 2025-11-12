@@ -121,6 +121,10 @@ class ReviewService: ObservableObject {
         return try await supabase.fetchPlaceReviews(placeId: placeId, latestOnly: latestOnly)
     }
     
+    func fetchExternalReviewMedia(placeId: String, reviewOffset: Int, reviewLimit: Int) async throws -> (urls: [String], nextReviewOffset: Int, hasMore: Bool) {
+        return try await supabase.fetchExternalReviewMedia(placeId: placeId, reviewOffset: reviewOffset, reviewLimit: reviewLimit)
+    }
+    
     func deleteReview(reviewId: String, completion: @escaping (Result<Void, Error>) -> Void) {
         completion(.success(()))
     }

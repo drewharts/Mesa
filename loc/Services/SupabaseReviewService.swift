@@ -281,6 +281,44 @@ class SupabaseReviewService: ObservableObject {
         
         return (reviews, tiktokVideos)
     }
+
+    func fetchExternalReviewMedia(placeId: String, reviewOffset: Int, reviewLimit: Int) async throws -> (urls: [String], nextReviewOffset: Int, hasMore: Bool) {
+        struct ExternalReviewMediaRecord: Codable {
+            let type: String?
+            let imageUrl: String?
+        }
+        
+        struct ExternalReviewRecord: Codable {
+            let id: String
+            let media: [ExternalReviewMediaRecord]?
+        }
+        
+        let records: [ExternalReviewRecord] = try await supabase.client
+            .from("external_reviews")
+            .select("id, media")
+            .eq("place_id", value: placeId)
+            .order("review_iso_date", ascending: false)
+            .range(from: reviewOffset, to: reviewOffset + reviewLimit - 1)
+            .execute()
+            .value
+        
+        var imageUrls: [String] = []
+        
+        for record in records {
+            guard let mediaItems = record.media else { continue }
+            let urls = mediaItems.compactMap { item -> String? in
+                guard let type = item.type, type.lowercased() == "image" else { return nil }
+                guard let url = item.imageUrl, !url.isEmpty else { return nil }
+                return url
+            }
+            imageUrls.append(contentsOf: urls)
+        }
+        
+        let nextOffset = reviewOffset + records.count
+        let hasMore = records.count == reviewLimit
+        
+        return (imageUrls, nextOffset, hasMore)
+    }
     
     // MARK: - Comments
     

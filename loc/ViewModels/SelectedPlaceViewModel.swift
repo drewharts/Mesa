@@ -38,58 +38,73 @@ class SelectedPlaceViewModel: ObservableObject {
     }
 
     private var isUpdatingPlaceDetails = false
+    private var isFetchingFreshDetails = false
 
     @Published var selectedPlace: DetailPlace? {
         didSet {
-            // Prevent infinite loop when updating place details
-            guard !isUpdatingPlaceDetails else {
-                return
-            }
+            guard !isUpdatingPlaceDetails else { return }
+            handleSelectedPlaceChange()
+        }
+    }
 
-            if let place = selectedPlace,
-               let currentLocation = locationManager.currentLocation {
-                
-                print("📍 [SelectedPlaceViewModel] Place and location available")
-                print("   - Rating: \(place.rating ?? 0)")
-                print("   - Categories: \(place.categories?.count ?? 0)")
-                print("   - UserRatingsTotal: \(place.userRatingsTotal ?? 0)")
+    private func handleSelectedPlaceChange() {
+        guard let place = selectedPlace else {
+            print("⚠️ [SelectedPlaceViewModel] selectedPlace is nil, skipping setup")
+            return
+        }
 
-                // Check if place has complete details (rating, reviews count, categories)
-                // If not, fetch complete details from backend
-                if place.rating == nil || place.userRatingsTotal == nil || place.categories == nil || place.categories?.isEmpty == true {
-                    print("⚠️ [SelectedPlaceViewModel] Place missing details, fetching complete details...")
-                    fetchCompletePlaceDetails(for: place) { [weak self] updatedPlace in
-                        guard let self = self else { return }
-                        DispatchQueue.main.async {
-                            if let updatedPlace = updatedPlace {
-                                print("✅ [SelectedPlaceViewModel] Got complete details, updating place")
-                                // Update the selected place with complete data (without triggering didSet)
-                                self.isUpdatingPlaceDetails = true
-                                self.selectedPlace = updatedPlace
-                                self.isUpdatingPlaceDetails = false
-                                
-                                // Since we bypassed didSet, manually trigger the setup
-                                print("🎬 [SelectedPlaceViewModel] Manually calling continueWithPlaceSetup after bypass")
-                                self.continueWithPlaceSetup(place: updatedPlace, currentLocation: currentLocation.coordinate)
-                            } else {
-                                print("❌ [SelectedPlaceViewModel] Failed to get complete details, continuing with current data")
-                                // If fetch failed, continue with current data
-                                self.continueWithPlaceSetup(place: place, currentLocation: currentLocation.coordinate)
-                            }
-                        }
-                    }
+        guard let currentLocation = locationManager.currentLocation else {
+            print("⚠️ [SelectedPlaceViewModel] currentLocation is nil, skipping setup")
+            return
+        }
+
+        print("📍 [SelectedPlaceViewModel] Place and location available")
+        print("   - Rating: \(place.rating ?? 0)")
+        print("   - Categories: \(place.categories?.count ?? 0)")
+        print("   - UserRatingsTotal: \(place.userRatingsTotal ?? 0)")
+
+        if placeNeedsCompleteDetails(place) {
+            handlePlaceWithIncompleteDetails(place, currentLocation: currentLocation.coordinate)
+        } else {
+            print("✅ [SelectedPlaceViewModel] Place has complete details, continuing with setup")
+            continueWithPlaceSetup(place: place, currentLocation: currentLocation.coordinate)
+        }
+    }
+
+    private func handlePlaceWithIncompleteDetails(_ place: DetailPlace, currentLocation: CLLocationCoordinate2D) {
+        print("⚠️ [SelectedPlaceViewModel] Place missing details, fetching complete details...")
+
+        if isFetchingFreshDetails {
+            print("ℹ️ [SelectedPlaceViewModel] Fresh details fetch in progress, using current data for now")
+            continueWithPlaceSetup(place: place, currentLocation: currentLocation)
+            return
+        }
+
+        fetchCompletePlaceDetails(for: place) { [weak self] updatedPlace in
+            guard let self = self else { return }
+
+            DispatchQueue.main.async {
+                if let updatedPlace = updatedPlace {
+                    print("✅ [SelectedPlaceViewModel] Got complete details, updating place")
+                    self.isUpdatingPlaceDetails = true
+                    self.selectedPlace = updatedPlace
+                    self.isUpdatingPlaceDetails = false
+
+                    print("🎬 [SelectedPlaceViewModel] Manually calling continueWithPlaceSetup after bypass")
+                    self.continueWithPlaceSetup(place: updatedPlace, currentLocation: currentLocation)
                 } else {
-                    print("✅ [SelectedPlaceViewModel] Place has complete details, continuing with setup")
-                    continueWithPlaceSetup(place: place, currentLocation: currentLocation.coordinate)
-                }
-            } else {
-                if selectedPlace == nil {
-                    print("⚠️ [SelectedPlaceViewModel] selectedPlace is nil, skipping setup")
-                } else {
-                    print("⚠️ [SelectedPlaceViewModel] currentLocation is nil, skipping setup")
+                    print("❌ [SelectedPlaceViewModel] Failed to get complete details, continuing with current data")
+                    self.continueWithPlaceSetup(place: place, currentLocation: currentLocation)
                 }
             }
         }
+    }
+
+    private func placeNeedsCompleteDetails(_ place: DetailPlace) -> Bool {
+        let missingRating = place.rating == nil
+        let missingReviewCount = place.userRatingsTotal == nil
+        let missingCategories = place.categories == nil || place.categories?.isEmpty == true
+        return missingRating || missingReviewCount || missingCategories
     }
 
     private func continueWithPlaceSetup(place: DetailPlace, currentLocation: CLLocationCoordinate2D) {
@@ -100,6 +115,7 @@ class SelectedPlaceViewModel: ObservableObject {
         
         // Load reviews first, then photos will be loaded after reviews complete
         loadReviews(for: place)
+        loadExternalReviewPhotos(for: place, reset: true)
 
         // Set Google rating from the place data
         placeRating = place.rating ?? 0
@@ -132,6 +148,9 @@ class SelectedPlaceViewModel: ObservableObject {
     @Published private var userProfilePhotos: [String: UIImage] = [:] // Cache for profile photos by userId
     @Published private var restaurantTypes: [String: String] = [:] // Dictionary to store restaurant types by placeId
     @Published private var reviewPhotosForAbout: [String: [UIImage]] = [:] // Cache for review photos in about section by placeId
+    @Published private var externalReviewPhotosByPlace: [String: [UIImage]] = [:] // Cache for external review photos by placeId
+    @Published private var externalReviewPhotoLoadingStates: [String: LoadingState] = [:] // Loading states for external review photos
+    @Published private var externalReviewPhotosAllLoadedByPlace: [String: Bool] = [:] // Track completion of external photo loading per place
     
     @Published var placeRating: Double = 0
     
@@ -146,6 +165,13 @@ class SelectedPlaceViewModel: ObservableObject {
     @Published private var photoPageLimit = 9
     @Published private var lastPhotoDocument: Any? // Replaced DocumentSnapshot for Supabase migration
     @Published private var allPhotosLoaded = false
+    
+    private var externalReviewImageURLCache: [String: [String]] = [:] // placeId -> photo URLs
+    private var externalReviewReviewOffsets: [String: Int] = [:] // placeId -> offset into external reviews
+    private var externalReviewPhotoCursor: [String: Int] = [:] // placeId -> number of image URLs consumed
+    private var externalReviewReviewHasMore: [String: Bool] = [:] // placeId -> more review pages available
+    private let externalReviewReviewBatchSize = 10
+    private let externalReviewPhotoBatchSize = 5
     
     // Add new property to track liked reviews
     @Published private var likedReviews: Set<String> = []
@@ -310,38 +336,43 @@ class SelectedPlaceViewModel: ObservableObject {
         // Backend now accepts UUID and handles everything automatically
         // Just send the UUID as place_id and "google" as provider
         let placeId = place.id.uuidString
-        
-        // Fetch fresh details from backend first
+
+        DispatchQueue.main.async {
+            self.isFetchingFreshDetails = true
+            self.selectedPlace = place
+            self.shouldAnimateMapToPlace = shouldAnimateMap
+        }
+
         mesaBackendService.fetchPlaceDetails(placeId: placeId, source: "google") { [weak self] result in
             guard let self = self else { return }
             
             switch result {
             case .success(let freshPlace):
                 DispatchQueue.main.async {
+                    guard self.selectedPlace?.id == place.id else {
+                        print("ℹ️ [SelectedPlaceViewModel] Selected place changed before fresh details returned, skipping update")
+                        return
+                    }
+
+                    self.isFetchingFreshDetails = false
+
                     // Preserve the original ID and merge fresh data
                     var updatedPlace = freshPlace
                     updatedPlace.id = place.id
                     
-                    // Update selected place with fresh data
-                    // This will trigger didSet which handles loading reviews/photos
                     self.selectedPlace = updatedPlace
                     
                     // Update Firestore in background
                     self.updatePlaceInFirestore(updatedPlace)
-                    
-                    // Set the animation flag AFTER selectedPlace is set
-                    // This ensures MainView's onChange sees both the place and the flag together
-                    self.shouldAnimateMapToPlace = shouldAnimateMap
                 }
                 
             case .failure(let error):
                 print("❌ [SelectedPlaceViewModel] Failed to fetch fresh details for '\(place.name)': \(error.localizedDescription)")
-                // Set cached data - didSet will handle loading reviews/photos
                 DispatchQueue.main.async {
-                    self.selectedPlace = place
-                    
-                    // Set the animation flag AFTER selectedPlace is set
-                    self.shouldAnimateMapToPlace = shouldAnimateMap
+                    guard self.selectedPlace?.id == place.id else { return }
+
+                    self.isFetchingFreshDetails = false
+                    self.handleSelectedPlaceChange()
                 }
             }
         }
@@ -468,6 +499,13 @@ class SelectedPlaceViewModel: ObservableObject {
             reviewPhotosForAboutLoadingStates[placeId] = .idle
             lastPhotoDocument = nil
             allPhotosLoaded = false
+            externalReviewPhotosByPlace[placeId]?.removeAll()
+            externalReviewPhotoLoadingStates[placeId] = .idle
+            externalReviewPhotosAllLoadedByPlace[placeId] = false
+            externalReviewImageURLCache[placeId]?.removeAll()
+            externalReviewReviewOffsets[placeId] = 0
+            externalReviewPhotoCursor[placeId] = 0
+            externalReviewReviewHasMore[placeId] = true
         }
     }
     
@@ -696,11 +734,160 @@ class SelectedPlaceViewModel: ObservableObject {
         }
     }
     
+    private struct ExternalReviewPaginationState {
+        let placeId: String
+        var cachedURLs: [String]
+        var reviewOffset: Int
+        var hasMoreReviews: Bool
+        var photoCursor: Int
+    }
+    
+    private func extendExternalReviewURLs(placeId: String, state: inout ExternalReviewPaginationState) async throws {
+        while state.cachedURLs.count < state.photoCursor + externalReviewPhotoBatchSize && state.hasMoreReviews {
+            let page = try await reviewService.fetchExternalReviewMedia(
+                placeId: placeId,
+                reviewOffset: state.reviewOffset,
+                reviewLimit: externalReviewReviewBatchSize
+            )
+            
+            state.cachedURLs.append(contentsOf: page.urls)
+            state.reviewOffset = page.nextReviewOffset
+            state.hasMoreReviews = page.hasMore
+        }
+    }
+    
+    private func loadExternalReviewImages(from urls: [String]) async -> [UIImage] {
+        guard !urls.isEmpty else { return [] }
+        
+        var loadedImages: [UIImage] = []
+        
+        await withTaskGroup(of: UIImage?.self) { group in
+            for url in urls {
+                group.addTask {
+                    await self.loadImageFromURL(imageUrl: url)
+                }
+            }
+            
+            for await image in group {
+                if let image {
+                    loadedImages.append(image)
+                }
+            }
+        }
+        
+        return loadedImages
+    }
+    
+    private func loadExternalReviewPhotos(for place: DetailPlace, reset: Bool) {
+        let placeId = place.id.uuidString
+        
+        if externalReviewPhotoLoadingStates[placeId] == .loading {
+            return
+        }
+        
+        Task {
+            await MainActor.run {
+                self.externalReviewPhotoLoadingStates[placeId] = .loading
+            }
+            
+            var state = await externalReviewPaginationState(for: placeId, reset: reset)
+            
+            do {
+                try await extendExternalReviewURLs(placeId: placeId, state: &state)
+            } catch {
+                await MainActor.run {
+                    self.externalReviewPhotoLoadingStates[placeId] = .error(error)
+                }
+                return
+            }
+            
+            let urlsToLoad = Array(state.cachedURLs.dropFirst(state.photoCursor).prefix(externalReviewPhotoBatchSize))
+            
+            if urlsToLoad.isEmpty {
+                await updateExternalReviewPaginationState(state, newImages: [], loadingState: .loaded)
+                return
+            }
+            
+            let loadedImages = await loadExternalReviewImages(from: urlsToLoad)
+            state.photoCursor += urlsToLoad.count
+            
+            await updateExternalReviewPaginationState(state, newImages: loadedImages, loadingState: .loaded)
+        }
+    }
+    
+    @MainActor
+    private func externalReviewPaginationState(for placeId: String, reset: Bool) -> ExternalReviewPaginationState {
+        if reset {
+            externalReviewPhotosByPlace[placeId] = []
+            externalReviewImageURLCache[placeId] = []
+            externalReviewReviewOffsets[placeId] = 0
+            externalReviewPhotoCursor[placeId] = 0
+            externalReviewReviewHasMore[placeId] = true
+            externalReviewPhotosAllLoadedByPlace[placeId] = false
+        }
+        
+        let cachedURLs = externalReviewImageURLCache[placeId] ?? []
+        let reviewOffset = externalReviewReviewOffsets[placeId] ?? 0
+        let hasMore = externalReviewReviewHasMore[placeId] ?? true
+        let cursor = externalReviewPhotoCursor[placeId] ?? 0
+        
+        return ExternalReviewPaginationState(
+            placeId: placeId,
+            cachedURLs: cachedURLs,
+            reviewOffset: reviewOffset,
+            hasMoreReviews: hasMore,
+            photoCursor: cursor
+        )
+    }
+    
+    @MainActor
+    private func updateExternalReviewPaginationState(_ state: ExternalReviewPaginationState, newImages: [UIImage], loadingState: LoadingState) {
+        if !newImages.isEmpty {
+            var currentPhotos = externalReviewPhotosByPlace[state.placeId] ?? []
+            currentPhotos.append(contentsOf: newImages)
+            externalReviewPhotosByPlace[state.placeId] = currentPhotos
+        } else if externalReviewPhotosByPlace[state.placeId] == nil {
+            externalReviewPhotosByPlace[state.placeId] = []
+        }
+        
+        externalReviewImageURLCache[state.placeId] = state.cachedURLs
+        externalReviewReviewOffsets[state.placeId] = state.reviewOffset
+        externalReviewReviewHasMore[state.placeId] = state.hasMoreReviews
+        externalReviewPhotoCursor[state.placeId] = state.photoCursor
+        
+        let noMorePhotos = !state.hasMoreReviews && state.photoCursor >= state.cachedURLs.count
+        externalReviewPhotosAllLoadedByPlace[state.placeId] = noMorePhotos
+        externalReviewPhotoLoadingStates[state.placeId] = loadingState
+    }
+    
     /// Load more photos for the about section when user scrolls
     func loadMorePhotosForAbout(placeId: String) {
         // This method should load more photos from all reviews for the about section
         // For now, we'll use the existing loadMorePhotos method which handles place-level photo pagination
         loadMorePhotos()
+    }
+
+    func loadInitialExternalReviewPhotos() {
+        guard let place = selectedPlace else { return }
+        let placeId = place.id.uuidString
+        
+        if externalReviewPhotosByPlace[placeId] != nil || externalReviewPhotoLoadingStates[placeId] == .loading {
+            return
+        }
+        
+        loadExternalReviewPhotos(for: place, reset: false)
+    }
+
+    func loadMoreExternalReviewPhotosIfNeeded(currentIndex: Int) {
+        guard let place = selectedPlace else { return }
+        let placeId = place.id.uuidString
+        
+        guard !externalReviewPhotosFullyLoaded else { return }
+        
+        let photos = externalReviewPhotosByPlace[placeId] ?? []
+        if currentIndex >= max(0, photos.count - 2) {
+            loadExternalReviewPhotos(for: place, reset: false)
+        }
     }
     
     /// Get a review by its ID to access original data
@@ -1075,6 +1262,21 @@ class SelectedPlaceViewModel: ObservableObject {
 
     func reviewPhotosForAboutLoadingState(forPlaceId placeId: String) -> LoadingState {
         return reviewPhotosForAboutLoadingStates[placeId] ?? .idle
+    }
+
+    var externalReviewPhotos: [UIImage] {
+        guard let placeId = selectedPlace?.id.uuidString else { return [] }
+        return externalReviewPhotosByPlace[placeId] ?? []
+    }
+
+    var externalReviewPhotoLoadingState: LoadingState {
+        guard let placeId = selectedPlace?.id.uuidString else { return .idle }
+        return externalReviewPhotoLoadingStates[placeId] ?? .idle
+    }
+
+    var externalReviewPhotosFullyLoaded: Bool {
+        guard let placeId = selectedPlace?.id.uuidString else { return true }
+        return externalReviewPhotosAllLoadedByPlace[placeId] ?? false
     }
 
     var allPhotosLoadedForCurrentPlace: Bool {

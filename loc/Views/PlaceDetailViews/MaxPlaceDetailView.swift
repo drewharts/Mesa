@@ -38,6 +38,9 @@ struct MaxPlaceDetailView: View {
                                     .padding()
                             }
                             
+                            ExternalReviewPhotoGallery(onPhotoTapped: onPhotoTapped)
+                                .environmentObject(selectedPlaceVM)
+                            
                         case .error(let error):
                             Text("Failed to load photos: \(error.localizedDescription)")
                                 .frame(maxWidth: .infinity)
