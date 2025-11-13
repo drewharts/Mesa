@@ -17,7 +17,7 @@ AS $function$
 DECLARE
   result text;
 BEGIN
-  -- Try to get the most recent review photo
+  -- Try to get the most recent review photo from reviews table first
   SELECT unnest(images)
   INTO result
   FROM reviews
@@ -27,8 +27,24 @@ BEGIN
   ORDER BY timestamp DESC
   LIMIT 1;
 
+  -- If no review photo found, try external_reviews
+  IF result IS NULL THEN
+    SELECT (media_item->>'imageUrl')::text
+    INTO result
+    FROM external_reviews er
+    CROSS JOIN LATERAL jsonb_array_elements(er.media) AS media_item
+    WHERE er.place_id = p_place_id
+      AND er.media IS NOT NULL
+      AND jsonb_array_length(er.media) > 0
+      AND (media_item->>'type')::text ILIKE 'image'
+      AND (media_item->>'imageUrl')::text IS NOT NULL
+      AND (media_item->>'imageUrl')::text != ''
+    ORDER BY er.review_iso_date DESC
+    LIMIT 1;
+  END IF;
+
   -- ✅ Removed tiktok_videos fallback - TikTok thumbnails fetched on-demand in Swift
-  -- If no review photo found, return NULL (Swift will fetch TikTok thumbnail via oEmbed if needed)
+  -- If no photo found, return NULL (Swift will fetch TikTok thumbnail via oEmbed if needed)
 
   RETURN result;
 END;
@@ -42,23 +58,49 @@ AS $function$
 BEGIN
   RETURN QUERY
   WITH review_photos AS (
-    -- Get the latest review photo for each place_id
-    SELECT r.place_id, unnest(r.images) AS image_url
+    -- Get the latest review photo for each place_id from reviews table
+    SELECT 
+      r.place_id, 
+      image_elem AS image_url, 
+      r.timestamp AS photo_timestamp
     FROM reviews r
+    CROSS JOIN LATERAL unnest(r.images) AS image_elem
     WHERE r.place_id = ANY(p_place_ids)
       AND r.images IS NOT NULL
       AND array_length(r.images, 1) > 0
     ORDER BY r.timestamp DESC
   ),
-  latest_review_photo AS (
-    -- Select the most recent image per place_id
-    SELECT DISTINCT ON (review_photos.place_id) review_photos.place_id, review_photos.image_url
-    FROM review_photos
+  external_review_photos AS (
+    -- Get images from external_reviews.media JSONB array
+    SELECT 
+      er.place_id,
+      (media_item->>'imageUrl')::text AS image_url,
+      er.review_iso_date AS photo_timestamp
+    FROM external_reviews er
+    CROSS JOIN LATERAL jsonb_array_elements(er.media) AS media_item
+    WHERE er.place_id = ANY(p_place_ids)
+      AND er.media IS NOT NULL
+      AND jsonb_array_length(er.media) > 0
+      AND (media_item->>'type')::text ILIKE 'image'
+      AND (media_item->>'imageUrl')::text IS NOT NULL
+      AND (media_item->>'imageUrl')::text != ''
+    ORDER BY er.review_iso_date DESC
+  ),
+  all_photos AS (
+    -- Combine both sources, preferring review photos (they come first in UNION)
+    SELECT rp.place_id, rp.image_url, rp.photo_timestamp FROM review_photos rp
+    UNION ALL
+    SELECT erp.place_id, erp.image_url, erp.photo_timestamp FROM external_review_photos erp
+  ),
+  latest_photo AS (
+    -- Select the most recent image per place_id (preferring review photos when timestamps are equal)
+    SELECT DISTINCT ON (ap.place_id) ap.place_id, ap.image_url
+    FROM all_photos ap
+    ORDER BY ap.place_id, ap.photo_timestamp DESC
   )
-  -- ✅ Removed tiktok_thumbnails CTE - TikTok thumbnails fetched on-demand in Swift
-  -- Return results for all input place_ids, including NULL for those with no review images
-  SELECT p.place_id, lrp.image_url
+  -- Return results for all input place_ids, including NULL for those with no images
+  SELECT p.place_id, lp.image_url
   FROM unnest(p_place_ids) AS p(place_id)
-  LEFT JOIN latest_review_photo lrp ON p.place_id = lrp.place_id;
+  LEFT JOIN latest_photo lp ON p.place_id = lp.place_id;
 END;
 $function$;
