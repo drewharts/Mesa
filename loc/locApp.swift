@@ -7,20 +7,21 @@ import Supabase
 struct locApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     
+    // Only 3 global environment objects!
     @StateObject private var locationManager: LocationManager
     @StateObject private var userSession: UserSession
-    @StateObject private var profileViewModel: ProfileViewModel
-    @StateObject private var detailPlaceViewModel: DetailPlaceViewModel
-    @StateObject private var selectedPlaceViewModel: SelectedPlaceViewModel
-    @StateObject private var userProfileViewModel: UserProfileViewModel
-    @StateObject private var searchViewModel: SearchViewModel
-    @StateObject private var notificationManager = NotificationManager.shared
-    @StateObject private var deepLinkManager: DeepLinkManager
-    @StateObject private var deepLinkViewModel: DeepLinkViewModel
-    @StateObject private var mapViewModel: MapViewModel
+    @StateObject private var appCoordinator = AppCoordinator()
     
-    private let dataManager: DataManager
+    // Other dependencies (not environment objects)
     private let serviceContainer = ServiceContainer.shared
+    private let selectedPlaceViewModel: SelectedPlaceViewModel
+    private let profileViewModel: ProfileViewModel
+    private let userProfileViewModel: UserProfileViewModel
+    private let detailPlaceViewModel: DetailPlaceViewModel
+    private let deepLinkViewModel: DeepLinkViewModel
+    private let deepLinkManager: DeepLinkManager
+    private let notificationManager = NotificationManager.shared
+    private let dataManager: DataManager
     
     init() {
         // Supabase is initialized via SupabaseManager.shared
@@ -104,33 +105,17 @@ struct locApp: App {
         )
         
         profileVM.userProfileViewModel = userProfileVM
-
-        let searchVM = SearchViewModel(
-            placeService: services.placeService,
-            userService: services.userService,
-            locationManager: location
-        )
         
-        let mapVM = MapViewModel(
-            placeService: services.placeService,
-            detailPlaceVM: detailVM
-        )
-        
-        // Wire up ProfileViewModel to MapViewModel (for friends' places viewport filtering and profile photos)
-        profileVM.mapViewModel = mapVM
-        mapVM.profileViewModel = profileVM
-        
+        // Assign to properties
         self._locationManager = StateObject(wrappedValue: location)
         self._userSession = StateObject(wrappedValue: userSess)
-        self._profileViewModel = StateObject(wrappedValue: profileVM)
-        self._detailPlaceViewModel = StateObject(wrappedValue: detailVM)
+        self.selectedPlaceViewModel = selectedPlaceVM
+        self.profileViewModel = profileVM
+        self.userProfileViewModel = userProfileVM
+        self.detailPlaceViewModel = detailVM
+        self.deepLinkViewModel = deepLinkVM
+        self.deepLinkManager = deepLinkMgr
         self.dataManager = dataMgr
-        self._selectedPlaceViewModel = StateObject(wrappedValue: selectedPlaceVM)
-        self._userProfileViewModel = StateObject(wrappedValue: userProfileVM)
-        self._searchViewModel = StateObject(wrappedValue: searchVM)
-        self._deepLinkManager = StateObject(wrappedValue: deepLinkMgr)
-        self._deepLinkViewModel = StateObject(wrappedValue: deepLinkVM)
-        self._mapViewModel = StateObject(wrappedValue: mapVM)
         
         // Pass user service to AppDelegate
         appDelegate.userService = services.userService
@@ -139,20 +124,21 @@ struct locApp: App {
 
     var body: some Scene {
         WindowGroup {
-            SplashScreenView()
+            SplashScreenView(
+                selectedPlaceViewModel: selectedPlaceViewModel,
+                profileViewModel: profileViewModel,
+                userProfileViewModel: userProfileViewModel,
+                detailPlaceViewModel: detailPlaceViewModel,
+                deepLinkViewModel: deepLinkViewModel,
+                deepLinkManager: deepLinkManager,
+                notificationManager: notificationManager,
+                dataManager: dataManager,
+                serviceContainer: serviceContainer
+            )
+                // Only 3 environment objects at the root!
                 .environmentObject(userSession)
                 .environmentObject(locationManager)
-                .environmentObject(profileViewModel)
-                .environmentObject(detailPlaceViewModel)
-                .environmentObject(selectedPlaceViewModel)
-                .environmentObject(dataManager)
-                .environmentObject(userProfileViewModel)
-                .environmentObject(searchViewModel)
-                .environmentObject(notificationManager)
-                .environmentObject(serviceContainer)
-                .environmentObject(deepLinkManager)
-                .environmentObject(deepLinkViewModel)
-                .environmentObject(mapViewModel)
+                .environmentObject(appCoordinator)
                 .preferredColorScheme(.light)
                 .onOpenURL { url in
                     // Handle deep links for places

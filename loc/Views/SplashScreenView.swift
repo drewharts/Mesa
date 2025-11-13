@@ -3,6 +3,7 @@
 //  loc
 //
 //  Created by Andrew Hartsfield II on 11/9/24.
+//  Refactored to enterprise architecture on 11/13/25
 //
 
 import SwiftUI
@@ -11,13 +12,33 @@ struct SplashScreenView: View {
     @State private var isActive = false
     @State private var isCheckingSession = true
     @EnvironmentObject var userSession: UserSession
-    @EnvironmentObject var dataManager: DataManager
+    
+    // ViewModels passed as props, not environment objects
+    let selectedPlaceViewModel: SelectedPlaceViewModel
+    let profileViewModel: ProfileViewModel
+    let userProfileViewModel: UserProfileViewModel
+    let detailPlaceViewModel: DetailPlaceViewModel
+    let deepLinkViewModel: DeepLinkViewModel
+    let deepLinkManager: DeepLinkManager
+    let notificationManager: NotificationManager
+    let dataManager: DataManager
+    let serviceContainer: ServiceContainer
 
     var body: some View {
         Group {
             if isActive {
-                ContentView()
-                    .transition(.opacity)
+                ContentView(
+                    selectedPlaceViewModel: selectedPlaceViewModel,
+                    profileViewModel: profileViewModel,
+                    userProfileViewModel: userProfileViewModel,
+                    detailPlaceViewModel: detailPlaceViewModel,
+                    deepLinkViewModel: deepLinkViewModel,
+                    deepLinkManager: deepLinkManager,
+                    notificationManager: notificationManager,
+                    dataManager: dataManager,
+                    serviceContainer: serviceContainer
+                )
+                .transition(.opacity)
             } else {
                 splashImage
             }

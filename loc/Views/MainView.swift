@@ -3,43 +3,57 @@
 //  loc
 //
 //  Created by Andrew Hartsfield II on 12/12/24.
+//  Refactored to enterprise architecture on 11/13/25
 //
-
 
 import SwiftUI
 import MapKit
 
-
 struct MainView: View {
+    // MARK: - Global Dependencies (Only 3!)
     @EnvironmentObject var userSession: UserSession
-    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
-    @EnvironmentObject var profileViewModel: ProfileViewModel
-    @EnvironmentObject var userProfileViewModel: UserProfileViewModel
     @EnvironmentObject var locationManager: LocationManager
-    @EnvironmentObject var notificationManager: NotificationManager
-    @EnvironmentObject var viewModel: SearchViewModel
-    @EnvironmentObject var deepLinkViewModel: DeepLinkViewModel
-    @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
-    @EnvironmentObject var mapViewModel: MapViewModel
-
-    @FocusState private var searchIsFocused: Bool
-    @State private var isSearchBarMinimized = true
+    @EnvironmentObject var appCoordinator: AppCoordinator
+    
+    // MARK: - Required ViewModels (passed from parent as @ObservedObject)
+    @ObservedObject var selectedPlaceVM: SelectedPlaceViewModel
+    @ObservedObject var profileViewModel: ProfileViewModel
+    @ObservedObject var userProfileViewModel: UserProfileViewModel
+    @ObservedObject var detailPlaceViewModel: DetailPlaceViewModel
+    @ObservedObject var deepLinkViewModel: DeepLinkViewModel
+    @ObservedObject var notificationManager: NotificationManager
+    
+    let deepLinkManager: DeepLinkManager
+    let dataManager: DataManager
+    let serviceContainer: ServiceContainer
+    
+    // MARK: - Local UI State
     @State private var sheetHeight: CGFloat = 250
     @State private var minSheetHeight: CGFloat = 250
     @State private var maxSheetHeight: CGFloat = UIScreen.main.bounds.height * 0.85
     @State private var shouldNavigateToProfile = false
-    @State private var triggerFocus = false
     @State private var recenterMap = false
     @State private var isCreatePlacePopupActive = false
     @State private var mapPosition = MapCameraPosition.automatic
-
+    
     var body: some View {
         NavigationStack {
             ZStack {
-                mapLayer
+                // Map Container - owns MapViewModel
+                MapContainerView(
+                    mapPosition: $mapPosition,
+                    recenterMap: $recenterMap,
+                    isSearchExpanded: $appCoordinator.isSearchExpanded,
+                    isCreatePlacePopupActive: $isCreatePlacePopupActive,
+                    selectedPlaceViewModel: selectedPlaceVM,
+                    detailPlaceViewModel: detailPlaceViewModel,
+                    placeService: serviceContainer.placeService,
+                    profileViewModel: profileViewModel,
+                    onMapTap: handleMapTap
+                )
+                
                 uiOverlayLayer
                 loadingOverlay
-                noLocationAlert
             }
             .navigationBarHidden(true)
             .sheet(isPresented: $profileViewModel.isShowingPlaceSelection) {
@@ -60,14 +74,21 @@ struct MainView: View {
                 ProfileView()
                     .environmentObject(userProfileViewModel)
                     .environmentObject(deepLinkViewModel)
+                    .environmentObject(selectedPlaceVM)
+                    .environmentObject(detailPlaceViewModel)
+                    .environmentObject(profileViewModel)
+                    .environmentObject(deepLinkManager)
+                    .environmentObject(dataManager)
+                    .environmentObject(serviceContainer)
             }
-            // Present external user profiles
             .sheet(isPresented: $userProfileViewModel.isUserDetailPresented) {
                 UserProfileView(
                     userId: userSession.currentUserId ?? "",
                     UserProfileVM: userProfileViewModel
                 )
                 .environmentObject(profileViewModel)
+                .environmentObject(selectedPlaceVM)
+                .environmentObject(detailPlaceViewModel)
             }
             .alert("No Location Found", isPresented: $deepLinkViewModel.showNoLocationAlert) {
                 Button("OK") {
@@ -79,63 +100,25 @@ struct MainView: View {
         }
         .onAppear {
             locationManager.requestLocationPermission()
-            viewModel.selectedPlaceVM = selectedPlaceVM
-            viewModel.searchText = ""
-
-            // SearchViewModel is properly initialized
         }
         .onChange(of: selectedPlaceVM.isDetailSheetPresented) { _, newValue in
             if newValue {
-                isSearchBarMinimized = true
-                searchIsFocused = false
+                appCoordinator.isSearchExpanded = false
             }
-            // Note: We don't clear selectedPlace on dismissal to avoid unwanted map movements
-            // The annotation highlight will be controlled by both selectedPlace AND isDetailSheetPresented
         }
-        .onChange(of: selectedPlaceVM.shouldAnimateMapToPlace) { oldValue, newValue in
+        .onChange(of: selectedPlaceVM.shouldAnimateMapToPlace) { _, newValue in
             if newValue, let place = selectedPlaceVM.selectedPlace, let coordinate = place.coordinate {
-                // Animate map to place location with smooth animation
                 withAnimation(.easeInOut(duration: 0.6)) {
                     mapPosition = .region(MKCoordinateRegion(
                         center: coordinate,
                         span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
                     ))
                 }
-                // Reset the flag after animation
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                     selectedPlaceVM.shouldAnimateMapToPlace = false
                 }
             }
         }
-        .onChange(of: isSearchBarMinimized) { oldValue, newValue in
-            // Pause loading when search is expanded, resume when minimized
-            if !newValue {
-                // Search is expanded - pause loading
-                mapViewModel.pauseLoading()
-            } else {
-                // Search is minimized - resume loading
-                mapViewModel.resumeLoading()
-            }
-        }
-        .onChange(of: searchIsFocused) { oldValue, newValue in
-            // Also pause when search gains focus (even if already expanded)
-            if newValue {
-                mapViewModel.pauseLoading()
-            }
-            // Don't resume here - let isSearchBarMinimized handle that
-        }
-    }
-    
-    // MARK: - Map Layer
-    private var mapLayer: some View {
-        MapView(recenterMap: $recenterMap, mapPosition: $mapPosition, isSearchBarMinimized: isSearchBarMinimized, isCreatePlacePopupActive: $isCreatePlacePopupActive, onMapTap: {
-            withAnimation {
-                isSearchBarMinimized = true
-                searchIsFocused = false
-            }
-        })
-            .ignoresSafeArea()
-            .edgesIgnoringSafeArea(.all)
     }
     
     // MARK: - UI Overlay Layer
@@ -143,20 +126,42 @@ struct MainView: View {
         VStack(spacing: 0) {
             topControls
             Spacer(minLength: 0)
-            bottomSheet
+            PlaceDetailContainerView(
+                profileViewModel: profileViewModel,
+                detailPlaceViewModel: detailPlaceViewModel,
+                serviceContainer: serviceContainer,
+                sheetHeight: $sheetHeight,
+                minSheetHeight: minSheetHeight,
+                maxSheetHeight: maxSheetHeight
+            )
+            .environmentObject(selectedPlaceVM)
+            .environmentObject(userProfileViewModel)
+            .environmentObject(notificationManager)
+            .environmentObject(appCoordinator)
         }
-        .overlay(
-            floatingActionButtons
-        )
+        .overlay(floatingActionButtons)
     }
     
     // MARK: - Top Controls
     private var topControls: some View {
         Group {
-            if isSearchBarMinimized {
-                minimizedControls
+            if appCoordinator.isSearchExpanded {
+                SearchContainerView(
+                    isSearchExpanded: $appCoordinator.isSearchExpanded,
+                    placeService: serviceContainer.placeService,
+                    userService: serviceContainer.userService,
+                    locationManager: locationManager,
+                    selectedPlaceViewModel: selectedPlaceVM,
+                    onPlaceSelected: {
+                        // Place selection is handled by SearchViewModel
+                    },
+                    onUserSelected: { profileData in
+                        guard let currentUserId = userSession.currentUserId else { return }
+                        userProfileViewModel.selectUser(profileData, currentUserId: currentUserId)
+                    }
+                )
             } else {
-                expandedSearchControls
+                minimizedControls
             }
         }
     }
@@ -166,9 +171,7 @@ struct MainView: View {
         HStack {
             Spacer()
             VStack(spacing: 10) {
-                Button(action: {
-                    recenterMap = true
-                }) {
+                Button(action: { recenterMap = true }) {
                     Image(systemName: "location.fill")
                         .foregroundColor(.secondary)
                         .frame(width: 36, height: 36)
@@ -186,13 +189,15 @@ struct MainView: View {
     // MARK: - Floating Action Buttons
     private var floatingActionButtons: some View {
         Group {
-            if isSearchBarMinimized && !searchIsFocused && !selectedPlaceVM.isDetailSheetPresented && !isCreatePlacePopupActive {
+            if !appCoordinator.isSearchExpanded && 
+               !selectedPlaceVM.isDetailSheetPresented && 
+               !isCreatePlacePopupActive {
                 FloatingActionButtons(
-                    isSearchBarMinimized: $isSearchBarMinimized,
-                    searchIsFocused: Binding(
-                        get: { searchIsFocused },
-                        set: { searchIsFocused = $0 }
+                    isSearchBarMinimized: Binding(
+                        get: { !appCoordinator.isSearchExpanded },
+                        set: { appCoordinator.isSearchExpanded = !$0 }
                     ),
+                    searchIsFocused: .constant(false),
                     sheetHeight: $sheetHeight,
                     shouldNavigateToProfile: $shouldNavigateToProfile,
                     maxSheetHeight: maxSheetHeight,
@@ -203,94 +208,12 @@ struct MainView: View {
         }
     }
     
-    // MARK: - Expanded Search Controls  
-    private var expandedSearchControls: some View {
-        VStack(spacing: 16) {
-            searchBar
-            searchResultsContainer
-        }
-    }
-    
-    // MARK: - Search Results Container
-    private var searchResultsContainer: some View {
-        Group {
-            if !viewModel.searchResults.isEmpty || !viewModel.userResults.isEmpty || viewModel.showNoPlaceFound || viewModel.isSearching {
-                SearchResultsView(
-                    placeResults: viewModel.searchResults,
-                    userResults: viewModel.userResults,
-                    showNoPlaceFound: viewModel.showNoPlaceFound,
-                    searchText: viewModel.searchText,
-                    isSearching: viewModel.isSearching,
-                    onSelectPlace: { prediction in
-                        viewModel.selectSuggestion(prediction)
-                        withAnimation {
-                            isSearchBarMinimized = true
-                            searchIsFocused = false
-                        }
-                    },
-                    onSelectUser: { user in
-                        guard let currentUserId = userSession.currentUserId else { return }
-                        userProfileViewModel.selectUser(user, currentUserId: currentUserId)
-                        withAnimation {
-                            isSearchBarMinimized = true
-                            searchIsFocused = false
-                        }
-                    }
-                )
-                .frame(maxWidth: .infinity)
-                .padding(.horizontal, 20)
-                .padding(.top, 10)
-                .padding(.bottom, 50)
-            }
-        }
-    }
-    
-    // MARK: - Search Bar
-    private var searchBar: some View {
-        TextField("Search here...", text: $viewModel.searchText)
-            .padding()
-            .background(Color.white)
-            .cornerRadius(20)
-            .shadow(color: .black.opacity(0.2), radius: 5, x: 0, y: 3)
-            .padding(.horizontal, 20)
-            .padding(.top, 20)
-            .foregroundStyle(Color.gray)
-            .focused($searchIsFocused)
-            .padding(.horizontal, 20)
-            .padding(.top, 10)
-            .padding(.bottom, -10)
-            .onTapGesture {
-                searchIsFocused = true
-            }
-            // REMOVED: Duplicate onChange handler - SearchViewModel already handles this with debouncing
-    }
-    
-    // MARK: - Bottom Sheet
-    private var bottomSheet: some View {
-        Group {
-            if selectedPlaceVM.isDetailSheetPresented {
-                BottomSheetView(
-                    isPresented: $selectedPlaceVM.isDetailSheetPresented,
-                    sheetHeight: $sheetHeight,
-                    minSheetHeight: minSheetHeight,
-                    maxSheetHeight: maxSheetHeight
-                ) {
-                    PlaceDetailView(
-                        sheetHeight: $sheetHeight,
-                        minSheetHeight: minSheetHeight
-                    )
-                    .environmentObject(userProfileViewModel)
-                    .environmentObject(notificationManager)
-                    .frame(maxWidth: .infinity)
-                }
-            }
-        }
-    }
-    
     // MARK: - Loading Overlay
     private var loadingOverlay: some View {
         Group {
-            if deepLinkViewModel.isProcessingDeepLink || profileViewModel.isProcessingTikTok || profileViewModel.isWaitingForPlaceDetail {
+            if deepLinkViewModel.isProcessingDeepLink || 
+               profileViewModel.isProcessingTikTok || 
+               profileViewModel.isWaitingForPlaceDetail {
                 Color.black.opacity(0.4)
                     .ignoresSafeArea()
                 
@@ -305,12 +228,7 @@ struct MainView: View {
         }
     }
     
-    // MARK: - No Location Alert
-    private var noLocationAlert: some View {
-        EmptyView()
-    }
-    
-    // MARK: - Error View
+    // MARK: - Helper Views
     private var errorView: some View {
         VStack(spacing: 12) {
             Image(systemName: "exclamationmark.triangle.fill")
@@ -339,7 +257,6 @@ struct MainView: View {
         }
     }
     
-    // MARK: - Loading View
     private var loadingView: some View {
         VStack(spacing: 12) {
             ProgressView()
@@ -353,6 +270,13 @@ struct MainView: View {
             Text("Extracting place information")
                 .font(.subheadline)
                 .foregroundColor(.white.opacity(0.8))
+        }
+    }
+    
+    // MARK: - Actions
+    private func handleMapTap() {
+        withAnimation {
+            appCoordinator.isSearchExpanded = false
         }
     }
 }

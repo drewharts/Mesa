@@ -3,42 +3,51 @@
 //  loc
 //
 //  Created by Andrew Hartsfield II on 11/9/24.
+//  Refactored to enterprise architecture on 11/13/25
 //
-//  Updated to align with Profile and UserSession changes
 
 import SwiftUI
 
 struct ContentView: View {
     @EnvironmentObject var userSession: UserSession
     @EnvironmentObject var locationManager: LocationManager
-    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
+    @EnvironmentObject var appCoordinator: AppCoordinator
     
-    @EnvironmentObject var serviceContainer: ServiceContainer
+    // ViewModels passed as props, not environment objects
+    let selectedPlaceViewModel: SelectedPlaceViewModel
+    let profileViewModel: ProfileViewModel
+    let userProfileViewModel: UserProfileViewModel
+    let detailPlaceViewModel: DetailPlaceViewModel
+    let deepLinkViewModel: DeepLinkViewModel
+    let deepLinkManager: DeepLinkManager
+    let notificationManager: NotificationManager
+    let dataManager: DataManager
+    let serviceContainer: ServiceContainer
     
-    @EnvironmentObject var detailPlaceVM: DetailPlaceViewModel
-    @EnvironmentObject var profileViewModel: ProfileViewModel
-    @EnvironmentObject var dataManager: DataManager
-    @EnvironmentObject var userProfileViewModel: UserProfileViewModel
-    @EnvironmentObject var notificationManager: NotificationManager
     @State private var showNavigationError = false
     @State private var navigationErrorMessage = ""
 
     var body: some View {
         if userSession.isUserLoggedIn {
-            MainView()
-                .environmentObject(profileViewModel)
-                .environmentObject(locationManager)
-                .environmentObject(selectedPlaceVM)
-                .environmentObject(detailPlaceVM)
-                .environmentObject(userProfileViewModel)
-                .onReceive(notificationManager.$pendingNavigation) { pendingNavigation in
-                    handleNotificationNavigation(pendingNavigation)
-                }
-                .alert("Navigation Error", isPresented: $showNavigationError) {
-                    Button("OK") { }
-                } message: {
-                    Text(navigationErrorMessage)
-                }
+            MainView(
+                selectedPlaceVM: selectedPlaceViewModel,
+                profileViewModel: profileViewModel,
+                userProfileViewModel: userProfileViewModel,
+                detailPlaceViewModel: detailPlaceViewModel,
+                deepLinkViewModel: deepLinkViewModel,
+                notificationManager: notificationManager,
+                deepLinkManager: deepLinkManager,
+                dataManager: dataManager,
+                serviceContainer: serviceContainer
+            )
+            .onReceive(notificationManager.$pendingNavigation) { pendingNavigation in
+                handleNotificationNavigation(pendingNavigation)
+            }
+            .alert("Navigation Error", isPresented: $showNavigationError) {
+                Button("OK") { }
+            } message: {
+                Text(navigationErrorMessage)
+            }
         } else {
             LoginView(viewModel: LoginViewModel(userService: serviceContainer.userService, dataManager: dataManager))
         }
@@ -63,8 +72,8 @@ struct ContentView: View {
                 print("✅ Found place: \(place.name)")
                 
                 // Animate map to place location when navigating from notification
-                selectedPlaceVM.selectPlaceAndFetchDetails(place, shouldAnimateMap: true)
-                selectedPlaceVM.isDetailSheetPresented = true
+                selectedPlaceViewModel.selectPlaceAndFetchDetails(place, shouldAnimateMap: true)
+                selectedPlaceViewModel.isDetailSheetPresented = true
                 
                 // Clear the pending navigation but keep the highlighted review ID
                 notificationManager.clearPendingNavigation()
