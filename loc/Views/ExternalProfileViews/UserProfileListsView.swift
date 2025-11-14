@@ -108,6 +108,7 @@ struct UserProfileLightweightListSection: View {
                                     place: place,
                                     placeColors: $placeColors
                                 )
+                                .environmentObject(viewModel)
                             }
                             
                             // Fill remaining slots if less than 6 places
@@ -173,12 +174,10 @@ struct UserProfileLightweightListSection: View {
 }
 
 /// Lightweight place preview card for external user profiles
+/// Note: These small preview tiles are NOT clickable - only tiles in the full popup are clickable
 struct UserProfileLightweightPlacePreviewCard: View {
     let place: LightweightPlace
     @Binding var placeColors: [UUID: Color]
-    
-    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
-    @Environment(\.presentationMode) var presentationMode
     
     // Generate a consistent color for this place based on its ID
     private var placeColor: Color {
@@ -275,7 +274,7 @@ struct UserProfileLightweightPlacePreviewCard: View {
             RoundedRectangle(cornerRadius: 8)
                 .stroke(Color.gray.opacity(0.2), lineWidth: 1)
         )
-        // Individual places are NOT tappable - only the whole list button is tappable
+        // Small preview tiles are NOT clickable - only tiles in the full popup are clickable
     }
 }
 
@@ -565,11 +564,14 @@ struct ExternalUserListPlaceCard: View {
         do {
             let detailPlace = try await PlaceService.shared.fetchPlace(withId: place.place_id)
             await MainActor.run {
-                selectedPlaceVM.selectPlaceAndFetchDetails(detailPlace)
-                selectedPlaceVM.isDetailSheetPresented = true
-                
-                // Dismiss the list popup sheet
+                // Dismiss the list popup sheet first
                 presentationMode.wrappedValue.dismiss()
+                
+                // Then navigate to map and select place
+                selectedPlaceVM.navigateToMapAndSelectPlace(detailPlace) {
+                    // Dismiss user profile navigation
+                    userProfileViewModel.isUserDetailPresented = false
+                }
             }
         } catch {
             print("❌ Error loading place details: \(error)")

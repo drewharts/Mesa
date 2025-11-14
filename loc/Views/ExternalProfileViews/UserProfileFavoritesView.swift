@@ -182,12 +182,15 @@ struct ExternalFavoritePlaceCard: View {
                 .stroke(Color.gray.opacity(0.1), lineWidth: 0.5)
         )
         .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
-        .onTapGesture {
-            // Load full place details and navigate
-            Task {
-                await loadPlaceAndNavigate()
+        .contentShape(Rectangle())
+        .highPriorityGesture(
+            TapGesture().onEnded {
+                // Load full place details and navigate
+                Task {
+                    await loadPlaceAndNavigate()
+                }
             }
-        }
+        )
     }
     
     private func loadPlaceAndNavigate() async {
@@ -195,10 +198,12 @@ struct ExternalFavoritePlaceCard: View {
             // Fetch the full place details
             let place = try await PlaceService.shared.fetchPlace(withId: favoritePlace.place_id)
             
-            // Navigate to the place detail view
+            // Navigate to map and select place
             await MainActor.run {
-                selectedPlaceVM.selectPlaceAndFetchDetails(place)
-                selectedPlaceVM.isDetailSheetPresented = true
+                selectedPlaceVM.navigateToMapAndSelectPlace(place) {
+                    // Dismiss user profile navigation
+                    userProfileViewModel.isUserDetailPresented = false
+                }
             }
         } catch {
             print("❌ Error loading place details: \(error)")
