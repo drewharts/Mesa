@@ -15,6 +15,7 @@ struct ProfileView: View {
     @EnvironmentObject var placeVM: DetailPlaceViewModel
     @EnvironmentObject var userProfileViewModel: UserProfileViewModel
     @EnvironmentObject var deepLinkViewModel: DeepLinkViewModel
+    @EnvironmentObject var dataManager: DataManager
     @StateObject private var photoImportVM = PhotoImportViewModel()
     @StateObject private var tikTokService = TikTokService()
     
@@ -220,6 +221,7 @@ struct SheetsModifier: ViewModifier {
     @Binding var showCreateReview: Bool
     let selectedReviewType: CreatePlaceReviewView.ReviewType
     @EnvironmentObject var userSession: UserSession
+    @EnvironmentObject var dataManager: DataManager
     @Binding var reviewWasSubmitted: Bool
     let onGenericReview: () -> Void
     let onRestaurantReview: () -> Void
@@ -241,6 +243,8 @@ struct SheetsModifier: ViewModifier {
                     .environmentObject(profile)
                     .environmentObject(selectedPlaceVM)
                     .environmentObject(placeVM)
+                    .environmentObject(dataManager)
+                    .environmentObject(userSession)
                     .presentationDragIndicator(.visible)
             }
             .sheet(isPresented: $profile.isShowingNoPlacesFound) {

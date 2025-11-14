@@ -17,6 +17,7 @@ struct PlaceDetailContainerView: View {
     let profileViewModel: ProfileViewModel
     let detailPlaceViewModel: DetailPlaceViewModel
     let serviceContainer: ServiceContainer
+    let dataManager: DataManager
     
     @Binding var sheetHeight: CGFloat
     let minSheetHeight: CGFloat
@@ -40,6 +41,7 @@ struct PlaceDetailContainerView: View {
                     .environmentObject(profileViewModel)
                     .environmentObject(detailPlaceViewModel)
                     .environmentObject(serviceContainer)
+                    .environmentObject(dataManager)
                     .frame(maxWidth: .infinity)
                 }
             }

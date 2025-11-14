@@ -70,6 +70,8 @@ struct MainView: View {
                     .environmentObject(profileViewModel)
                     .environmentObject(selectedPlaceVM)
                     .environmentObject(detailPlaceViewModel)
+                    .environmentObject(dataManager)
+                    .environmentObject(userSession)
                     .presentationDragIndicator(.visible)
             }
             .sheet(isPresented: $profileViewModel.isShowingNoPlacesFound) {
@@ -130,6 +132,7 @@ struct MainView: View {
                 profileViewModel: profileViewModel,
                 detailPlaceViewModel: detailPlaceViewModel,
                 serviceContainer: serviceContainer,
+                dataManager: dataManager,
                 sheetHeight: $sheetHeight,
                 minSheetHeight: minSheetHeight,
                 maxSheetHeight: maxSheetHeight

@@ -4,6 +4,8 @@ struct TikTokPlaceSelectionView: View {
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
+    @EnvironmentObject var dataManager: DataManager
+    @EnvironmentObject var userSession: UserSession
     @State private var selectedPlaceForList: DetailPlace?
     @State private var showingListSelection = false
     
@@ -127,6 +129,8 @@ struct TikTokPlaceSelectionView: View {
                 )
                 .environmentObject(profile)
                 .environmentObject(detailPlaceViewModel)
+                .environmentObject(dataManager)
+                .environmentObject(userSession)
             }
         }
     }

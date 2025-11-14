@@ -25,6 +25,8 @@ struct PlaceDetailView: View {
     @EnvironmentObject var userProfileViewModel: UserProfileViewModel
     @EnvironmentObject var userSession: UserSession
     @EnvironmentObject var serviceContainer: ServiceContainer
+    @EnvironmentObject var dataManager: DataManager
+    @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
     @Environment(\.isScrollingEnabled) var isScrollingEnabled // Access scroll state
 
     @StateObject private var viewModel = PlaceDetailViewModel()
@@ -81,7 +83,9 @@ struct PlaceDetailView: View {
                         isPresented: $showListSelection
                     )
                     .environmentObject(profile)
-                    .environmentObject(viewModel)
+                    .environmentObject(detailPlaceViewModel)
+                    .environmentObject(dataManager)
+                    .environmentObject(userSession)
                 } else {
                     Text("No place selected")
                 }

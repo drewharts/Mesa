@@ -502,7 +502,8 @@ class SelectedPlaceViewModel: ObservableObject {
             reviewPhotosForAboutLoadingStates[placeId] = .idle
             lastPhotoDocument = nil
             allPhotosLoaded = false
-            externalReviewPhotosByPlace[placeId]?.removeAll()
+            // Remove the entry entirely instead of just clearing it, so loadInitialExternalReviewPhotos can work
+            externalReviewPhotosByPlace.removeValue(forKey: placeId)
             externalReviewPhotoLoadingStates[placeId] = .idle
             externalReviewPhotosAllLoadedByPlace[placeId] = false
             externalReviewImageURLCache[placeId]?.removeAll()
@@ -907,7 +908,11 @@ class SelectedPlaceViewModel: ObservableObject {
         guard let place = selectedPlace else { return }
         let placeId = place.id.uuidString
         
-        if externalReviewPhotosByPlace[placeId] != nil || externalReviewPhotoLoadingStates[placeId] == .loading {
+        // Only skip if we already have photos loaded or are currently loading
+        let existingPhotos = externalReviewPhotosByPlace[placeId] ?? []
+        let loadingState = externalReviewPhotoLoadingStates[placeId] ?? .idle
+        
+        if !existingPhotos.isEmpty || loadingState == .loading {
             return
         }
         
