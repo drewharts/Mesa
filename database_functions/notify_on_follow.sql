@@ -5,9 +5,9 @@
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION public.notify_on_follow()
- RETURNS trigger
- LANGUAGE plpgsql
-AS $function$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
 BEGIN
     INSERT INTO user_notifications (
         id, user_id, type, actor_id, "timestamp", is_read
@@ -23,4 +23,4 @@ BEGIN
     
     RETURN NEW;
 END;
-$function$
+$$;

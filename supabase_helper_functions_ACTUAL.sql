@@ -528,7 +528,9 @@ CREATE TRIGGER trigger_decrement_review_likes
 
 -- Trigger: Notify when someone follows you
 CREATE OR REPLACE FUNCTION notify_on_follow()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
 BEGIN
     INSERT INTO user_notifications (
         id, user_id, type, actor_id, "timestamp", is_read
@@ -544,7 +546,7 @@ BEGIN
     
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 DROP TRIGGER IF EXISTS trigger_notify_on_follow ON following;
 CREATE TRIGGER trigger_notify_on_follow
