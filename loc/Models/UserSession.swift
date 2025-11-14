@@ -84,33 +84,6 @@ class UserSession: ObservableObject {
         print("⚠️ Push notifications need to be implemented")
     }
     
-//    func fetchProfile(for uid: String) {
-//        let docRef = Firestore.firestore().collection("users").document(uid)
-//        docRef.getDocument { [weak self] (document, error) in
-//            guard let self = self else { return }
-//            if let error = error {
-//                print("Error fetching profile: \(error.localizedDescription)")
-//                return
-//            }
-//            guard let document = document, document.exists else {
-//                print("No profile found for user \(uid)")
-//                return
-//            }
-//            do {
-//                let profileData = try document.data(as: ProfileData.self)
-//                let profileViewModel = ProfileViewModel(
-//                    data: profileData,
-//                    firestoreService: self.firestoreService,
-//                    detailPlaceViewModel: self.detailPlaceVM,
-//                    userId: uid
-//                )
-//                self.profileViewModel = profileViewModel
-//            } catch {
-//                print("Error decoding profile data: \(error)")
-//            }
-//        }
-//    }
-    
     func signInWithGoogle(user: GIDGoogleUser) {
         Task { @MainActor in
             do {

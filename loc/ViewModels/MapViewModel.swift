@@ -16,13 +16,13 @@ class MapViewModel: ObservableObject {
     @Published var followedUsersPhotos: [FollowedUserPhoto] = [] // Profile photos for custom annotations
     @Published var annotationImages: [String: UIImage] = [:] // Combined profile images for annotations
     @Published var userProfilePictures: [String: UIImage] = [:] // Cache of user profile pictures
-    @Published var isLoadingPaused: Bool = false // Pause loading when user is interacting with search
     
     private var debounceTimer: Timer?
     private let placeService: PlaceService
     private let detailPlaceVM: DetailPlaceViewModel
     private var lastLoadedRegion: MKCoordinateRegion?
     private var placeDetailsCache: [String: DetailPlace] = [:] // Cache for full place details
+    private var currentLoadTask: Task<Void, Never>? // Track current loading task for cancellation
     weak var profileViewModel: ProfileViewModel? // To access current user's profile
     
     // Minimum movement threshold to trigger reload (in degrees)
@@ -170,13 +170,20 @@ class MapViewModel: ObservableObject {
         }
     }
     
-    /// Call this when the map region changes (pan or zoom)
-    func onMapRegionChange(_ newRegion: MKCoordinateRegion) {
-        // 🚫 Skip loading if paused (e.g., when search is active)
-        if isLoadingPaused {
+    /// Call this when the map camera has settled (using native iOS 17+ callback)
+    /// Apple handles debouncing automatically, so we don't need manual timers
+    func onMapCameraSettled(_ newRegion: MKCoordinateRegion) async {
+        // Check if the region change is significant enough to warrant a reload
+        if let lastRegion = lastLoadedRegion, !shouldReloadForRegion(newRegion, lastRegion: lastRegion) {
             return
         }
         
+        // Load places for the new viewport with low priority
+        await loadPlacesForViewport(newRegion)
+    }
+    
+    /// Legacy method for compatibility (deprecated - use onMapCameraSettled instead)
+    func onMapRegionChange(_ newRegion: MKCoordinateRegion) {
         // Check if the region change is significant enough to warrant a reload
         if let lastRegion = lastLoadedRegion, !shouldReloadForRegion(newRegion, lastRegion: lastRegion) {
             return
@@ -186,60 +193,90 @@ class MapViewModel: ObservableObject {
         debounceTimer?.invalidate()
         
         debounceTimer = Timer.scheduledTimer(
-            withTimeInterval: 0.8,  // 800ms for smoother experience
+            withTimeInterval: 1.2,  // 1.2s for better debouncing
             repeats: false
         ) { [weak self] _ in
-            Task { @MainActor in
+            Task(priority: .background) { @MainActor in
                 await self?.loadPlacesForViewport(newRegion)
             }
         }
     }
     
-    /// Pause viewport loading (call when user starts interacting with search)
+    /// Cancel current loading tasks (called when user starts interacting with search)
     func pauseLoading() {
-        isLoadingPaused = true
+        currentLoadTask?.cancel() // Cancel any ongoing loads
         debounceTimer?.invalidate() // Cancel any pending loads
-        print("⏸️ [MapViewModel] Annotation loading paused")
+        print("⏸️ [MapViewModel] Annotation loading cancelled")
     }
     
-    /// Resume viewport loading (call when user dismisses search)
+    /// Resume is a no-op now - we use task prioritization instead of pausing
     func resumeLoading() {
-        isLoadingPaused = false
-        print("▶️ [MapViewModel] Annotation loading resumed")
+        print("▶️ [MapViewModel] Annotation loading ready (no action needed)")
     }
     
     /// Main method to load place annotations for a given viewport
     /// Uses the optimized PostgreSQL function for ultra-fast loading
+    /// Implements task cancellation to avoid redundant loads
     private func loadPlacesForViewport(_ region: MKCoordinateRegion) async {
-        let startTime = Date()
-        isLoadingViewportPlaces = true
+        // Cancel any previous loading task
+        currentLoadTask?.cancel()
         
-        let bounds = getViewportBounds(from: region)
-        
-        do {
-            // Use the optimized PostgreSQL function
-            let annotations = try await placeService.fetchPlacesInViewport(
-                northLat: bounds.northLat,
-                southLat: bounds.southLat,
-                eastLng: bounds.eastLng,
-                westLng: bounds.westLng
-            )
+        let task = Task { @MainActor in
+            // Check if cancelled before starting
+            guard !Task.isCancelled else {
+                print("⏭️ [MapViewModel] Load cancelled before starting")
+                return
+            }
             
-            self.viewportAnnotations = annotations
-            self.lastLoadedRegion = region
+            let startTime = Date()
+            isLoadingViewportPlaces = true
             
-            // Generate annotation images for new annotations
-            generateAnnotationImages()
+            let bounds = getViewportBounds(from: region)
             
-            let loadTime = Date().timeIntervalSince(startTime)
-            print("⏱️ [MapViewModel] Loaded \(annotations.count) place annotations in \(String(format: "%.2f", loadTime))s")
+            do {
+                // Check if cancelled before network call
+                guard !Task.isCancelled else {
+                    print("⏭️ [MapViewModel] Load cancelled before fetch")
+                    isLoadingViewportPlaces = false
+                    return
+                }
+                
+                // Use the optimized PostgreSQL function
+                let annotations = try await placeService.fetchPlacesInViewport(
+                    northLat: bounds.northLat,
+                    southLat: bounds.southLat,
+                    eastLng: bounds.eastLng,
+                    westLng: bounds.westLng
+                )
+                
+                // Check if cancelled after network call
+                guard !Task.isCancelled else {
+                    print("⏭️ [MapViewModel] Load cancelled after fetch")
+                    isLoadingViewportPlaces = false
+                    return
+                }
+                
+                self.viewportAnnotations = annotations
+                self.lastLoadedRegion = region
+                
+                // Generate annotation images for new annotations
+                generateAnnotationImages()
+                
+                let loadTime = Date().timeIntervalSince(startTime)
+                print("⏱️ [MapViewModel] Loaded \(annotations.count) place annotations in \(String(format: "%.2f", loadTime))s")
+                
+                
+            } catch {
+                if !Task.isCancelled {
+                    print("❌ [MapViewModel] Error loading viewport annotations: \(error.localizedDescription)")
+                }
+            }
             
-            
-        } catch {
-            print("❌ [MapViewModel] Error loading viewport annotations: \(error.localizedDescription)")
+            isLoadingViewportPlaces = false
         }
         
-        isLoadingViewportPlaces = false
+        currentLoadTask = task
+        await task.value
     }
     
     // loadAllPlaceAnnotations method removed - we now use viewport-based loading exclusively

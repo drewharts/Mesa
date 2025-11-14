@@ -111,12 +111,13 @@ struct MapView: View {
                 mapContentView
                 .mapControlVisibility(.hidden)
                 .ignoresSafeArea()
-                .onMapCameraChange { context in
+                .onMapCameraChange(frequency: .onEnd) { context in
+                    // This fires only when camera stops moving - Apple handles debouncing!
                     currentMapRegion = context.region
                     
-                    // 🔄 CRITICAL: Dynamic loading on every viewport change
-                    // This fires when user pans or zooms the map
-                    mapViewModel.onMapRegionChange(context.region)
+                    Task.detached(priority: .background) {
+                        await mapViewModel.onMapCameraSettled(context.region)
+                    }
                 }
                 .gesture(
                     LongPressGesture(minimumDuration: 0.7)
@@ -235,7 +236,9 @@ struct MapView: View {
             
             // 🚀 Load initial viewport places
             if !hasLoadedInitialViewport, let region = currentMapRegion {
-                mapViewModel.onMapRegionChange(region)
+                Task.detached(priority: .background) {
+                    await mapViewModel.onMapCameraSettled(region)
+                }
                 hasLoadedInitialViewport = true
             }
         }
@@ -256,7 +259,7 @@ struct MapView: View {
                 try? await Task.sleep(nanoseconds: 300_000_000) // 0.3 seconds
                 
                 if let region = currentMapRegion {
-                    mapViewModel.onMapRegionChange(region)
+                    await mapViewModel.onMapCameraSettled(region)
                     hasLoadedInitialViewport = true
                 } else {
                     // Create a region from the current map position
@@ -265,7 +268,7 @@ struct MapView: View {
                         center: coords,
                         span: MKCoordinateSpan(latitudeDelta: 0.1, longitudeDelta: 0.1)
                     )
-                    mapViewModel.onMapRegionChange(region)
+                    await mapViewModel.onMapCameraSettled(region)
                     hasLoadedInitialViewport = true
                 }
             }
