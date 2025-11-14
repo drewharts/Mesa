@@ -170,8 +170,11 @@ class SelectedPlaceViewModel: ObservableObject {
     private var externalReviewReviewOffsets: [String: Int] = [:] // placeId -> offset into external reviews
     private var externalReviewPhotoCursor: [String: Int] = [:] // placeId -> number of image URLs consumed
     private var externalReviewReviewHasMore: [String: Bool] = [:] // placeId -> more review pages available
+    private var externalReviewRetryAttempts: [String: Int] = [:] // placeId -> retry attempt count
     private let externalReviewReviewBatchSize = 10
     private let externalReviewPhotoBatchSize = 5
+    private let maxExternalReviewRetries = 3 // Maximum retry attempts for external reviews
+    private let externalReviewRetryDelay: TimeInterval = 2.0 // Delay between retries in seconds
     
     // Add new property to track liked reviews
     @Published private var likedReviews: Set<String> = []
@@ -786,30 +789,63 @@ class SelectedPlaceViewModel: ObservableObject {
         }
         
         Task {
+            await loadExternalReviewPhotosInternal(for: place, placeId: placeId, reset: reset)
+        }
+    }
+    
+    /// Internal method that handles loading external reviews with retry logic
+    private func loadExternalReviewPhotosInternal(for place: DetailPlace, placeId: String, reset: Bool) async {
+        await MainActor.run {
+            self.externalReviewPhotoLoadingStates[placeId] = .loading
+            if reset {
+                self.externalReviewRetryAttempts[placeId] = 0
+            }
+        }
+        
+        var state = await externalReviewPaginationState(for: placeId, reset: reset)
+        
+        do {
+            try await extendExternalReviewURLs(placeId: placeId, state: &state)
+        } catch {
             await MainActor.run {
-                self.externalReviewPhotoLoadingStates[placeId] = .loading
+                self.externalReviewPhotoLoadingStates[placeId] = .error(error)
+            }
+            return
+        }
+        
+        let urlsToLoad = Array(state.cachedURLs.dropFirst(state.photoCursor).prefix(externalReviewPhotoBatchSize))
+        
+        // If no reviews found and we're still within retry limit, retry
+        if urlsToLoad.isEmpty && state.cachedURLs.isEmpty && !state.hasMoreReviews {
+            let retryCount = await MainActor.run {
+                return self.externalReviewRetryAttempts[placeId] ?? 0
             }
             
-            var state = await externalReviewPaginationState(for: placeId, reset: reset)
-            
-            do {
-                try await extendExternalReviewURLs(placeId: placeId, state: &state)
-            } catch {
+            if retryCount < maxExternalReviewRetries {
                 await MainActor.run {
-                    self.externalReviewPhotoLoadingStates[placeId] = .error(error)
+                    self.externalReviewRetryAttempts[placeId] = retryCount + 1
+                    print("🔄 [SelectedPlaceViewModel] No external reviews for \(placeId), retrying (\(retryCount + 1)/\(maxExternalReviewRetries))...")
                 }
+                
+                try? await Task.sleep(nanoseconds: UInt64(externalReviewRetryDelay * 1_000_000_000))
+                await loadExternalReviewPhotosInternal(for: place, placeId: placeId, reset: false)
                 return
+            } else {
+                print("⚠️ [SelectedPlaceViewModel] No external reviews after \(maxExternalReviewRetries) retries for \(placeId)")
             }
-            
-            let urlsToLoad = Array(state.cachedURLs.dropFirst(state.photoCursor).prefix(externalReviewPhotoBatchSize))
-            
-            if urlsToLoad.isEmpty {
-                await updateExternalReviewPaginationState(state, newImages: [], loadingState: .loaded)
-                return
-            }
-            
+        }
+        
+        // Load images if we have URLs, otherwise mark as loaded (empty state)
+        if urlsToLoad.isEmpty {
+            await updateExternalReviewPaginationState(state, newImages: [], loadingState: .loaded)
+        } else {
             let loadedImages = await loadExternalReviewImages(from: urlsToLoad)
             state.photoCursor += urlsToLoad.count
+            
+            await MainActor.run {
+                // Reset retry count on success
+                self.externalReviewRetryAttempts[placeId] = 0
+            }
             
             await updateExternalReviewPaginationState(state, newImages: loadedImages, loadingState: .loaded)
         }
