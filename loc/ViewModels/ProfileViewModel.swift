@@ -2371,10 +2371,12 @@ class ProfileViewModel: ObservableObject {
                 for externalPlace in externalPlaces {
                     if let url = externalPlace.url,
                        let thumbnailURL = TikTokMetadataCache.shared.getCachedThumbnailUrl(for: url) {
-                        self.loadTikTokThumbnailAsPlaceImage(
-                            placeId: externalPlace.placeId,
-                            thumbnailURL: thumbnailURL
-                        )
+                        Task {
+                            await self.loadTikTokThumbnailAsPlaceImage(
+                                placeId: externalPlace.placeId,
+                                thumbnailURL: thumbnailURL
+                            )
+                        }
                     }
                 }
             }
@@ -2430,11 +2432,6 @@ class ProfileViewModel: ObservableObject {
         } catch {
             print("❌ [ProfileViewModel] Error fetching external review images: \(error.localizedDescription)")
         }
-    }
-    
-    /// Load TikTok thumbnail as place image for external places
-    private func loadTikTokThumbnailAsPlaceImage(placeId: String, thumbnailURL: String) {
-        loadRemoteImageAsPlaceImage(placeId: placeId, imageURL: thumbnailURL)
     }
     
     private func loadRemoteImageAsPlaceImage(placeId: String, imageURL: String) {
@@ -2539,12 +2536,30 @@ class ProfileViewModel: ObservableObject {
                let url = externalPlace.url,
                let thumbnailURL = await TikTokMetadataCache.shared.getThumbnailUrl(for: url) {
                 
-                userProfileViewModel?.loadTikTokThumbnailAsPlaceImage(placeId: placeId, thumbnailURL: thumbnailURL) { [weak self] placeId, image in
-                    if let image = image {
-                        self?.detailPlaceViewModel.placeImages[placeId] = image
-                    }
-                }
+                // Load TikTok thumbnail directly
+                await loadTikTokThumbnailAsPlaceImage(placeId: placeId, thumbnailURL: thumbnailURL)
             }
+        }
+    }
+    
+    /// Load TikTok thumbnail as place image for external places
+    private func loadTikTokThumbnailAsPlaceImage(placeId: String, thumbnailURL: String) async {
+        guard let url = URL(string: thumbnailURL) else {
+            print("❌ [ProfileViewModel] Invalid thumbnail URL for place \(placeId): \(thumbnailURL)")
+            return
+        }
+        
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            if let image = UIImage(data: data) {
+                await MainActor.run {
+                    self.detailPlaceViewModel.placeImages[placeId] = image
+                }
+            } else {
+                print("⚠️ [ProfileViewModel] No image data returned for TikTok thumbnail \(placeId)")
+            }
+        } catch {
+            print("❌ [ProfileViewModel] Error loading TikTok thumbnail for \(placeId): \(error.localizedDescription)")
         }
     }
     

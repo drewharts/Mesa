@@ -41,6 +41,15 @@ struct ProfileView: View {
                     presentationMode: presentationMode,
                     photoImportVM: photoImportVM
                 ))
+                .navigationDestination(isPresented: $userProfileViewModel.isUserDetailPresented) {
+                    UserProfileView(
+                        userId: userSession.currentUserId ?? "",
+                        UserProfileVM: userProfileViewModel
+                    )
+                    .environmentObject(profile)
+                    .environmentObject(selectedPlaceVM)
+                    .environmentObject(placeVM)
+                }
         }
             .modifier(SheetsModifier(
                 photoImportVM: photoImportVM,

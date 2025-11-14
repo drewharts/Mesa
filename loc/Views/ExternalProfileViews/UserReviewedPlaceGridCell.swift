@@ -18,14 +18,15 @@ struct UserReviewedPlaceGridCell: View {
     @Environment(\.presentationMode) var presentationMode
 
     private func getFirstTikTokThumbnail(for place: DetailPlace) -> String? {
-        // Check place's own TikTok videos first
+        // Check place's own TikTok videos
         if let placeTikTokVideos = place.tikTokVideos,
            let firstVideo = placeTikTokVideos.first {
             return firstVideo.thumbnailURL
         }
         
-        // Check external places (user's TikTok videos for this place) - uses cached data
-        return userProfileViewModel.getFirstTikTokThumbnailURLSync(for: place.id.uuidString)
+        // For external user profiles, we don't have access to their TikTok videos
+        // Just show the review image or colored rectangle
+        return nil
     }
 
     var body: some View {
@@ -102,14 +103,6 @@ struct UserReviewedPlaceGridCell: View {
         .onTapGesture {
             selectedPlaceVM.selectPlaceAndFetchDetails(place)
             selectedPlaceVM.isDetailSheetPresented = true
-            
-            // Dismiss the user profile sheet properly
-            userProfileViewModel.isUserDetailPresented = false
-            
-            // Also call presentationMode dismiss as backup
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                presentationMode.wrappedValue.dismiss()
-            }
         }
     }
 } 

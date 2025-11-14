@@ -154,25 +154,9 @@ struct UserProfileView: View {
             showPageIndicators = true
             startFadeOutTimer()
         }
-        .navigationBarBackButtonHidden(true)
         .toolbarBackground(Color(.systemGray6), for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
-                Button(action: {
-                    self.presentationMode.wrappedValue.dismiss()
-                }) {
-                    HStack {
-                        Image(systemName: "chevron.left")
-                            .aspectRatio(contentMode: .fit)
-                            .foregroundColor(.black)
-                        Text("Back")
-                            .foregroundColor(.black)
-                    }
-                }
-            }
-        }
         .alert("Follow Error", isPresented: $UserProfileVM.showFollowError) {
             Button("OK") {
                 UserProfileVM.showFollowError = false

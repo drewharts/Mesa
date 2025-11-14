@@ -19,14 +19,12 @@ struct ProfileFollowCountsView: View {
         case followers
         case following
         case myPlaces
-        case userProfile
         
         var id: Int {
             switch self {
             case .followers: return 0
             case .following: return 1
             case .myPlaces: return 2
-            case .userProfile: return 3
             }
         }
     }
@@ -104,8 +102,8 @@ struct ProfileFollowCountsView: View {
             switch sheetType {
             case .followers:
                 FollowersListView(onSelectUser: {
-                    // Replace sheet with user profile
-                    activeSheet = .userProfile
+                    // Dismiss sheet and trigger navigation
+                    activeSheet = nil
                 })
                     .environmentObject(profile)
                     .environmentObject(userProfileViewModel)
@@ -114,8 +112,8 @@ struct ProfileFollowCountsView: View {
                     .environmentObject(detailPlaceVM)
             case .following:
                 FollowingListView(onSelectUser: {
-                    // Replace sheet with user profile
-                    activeSheet = .userProfile
+                    // Dismiss sheet and trigger navigation
+                    activeSheet = nil
                 })
                     .environmentObject(profile)
                     .environmentObject(userProfileViewModel)
@@ -129,12 +127,6 @@ struct ProfileFollowCountsView: View {
                     .environmentObject(dataManager)
                     .environmentObject(userSession)
                     .environmentObject(selectedPlaceVM)
-            case .userProfile:
-                UserProfileView(
-                    userId: userSession.currentUserId ?? "",
-                    UserProfileVM: userProfileViewModel
-                )
-                .environmentObject(profile)
             }
         }
         .onAppear {

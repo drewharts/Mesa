@@ -56,6 +56,15 @@ struct MainView: View {
                 loadingOverlay
             }
             .navigationBarHidden(true)
+            .navigationDestination(isPresented: $userProfileViewModel.isUserDetailPresented) {
+                UserProfileView(
+                    userId: userSession.currentUserId ?? "",
+                    UserProfileVM: userProfileViewModel
+                )
+                .environmentObject(profileViewModel)
+                .environmentObject(selectedPlaceVM)
+                .environmentObject(detailPlaceViewModel)
+            }
             .sheet(isPresented: $profileViewModel.isShowingPlaceSelection) {
                 TikTokPlaceSelectionView()
                     .environmentObject(profileViewModel)
@@ -80,15 +89,6 @@ struct MainView: View {
                     .environmentObject(deepLinkManager)
                     .environmentObject(dataManager)
                     .environmentObject(serviceContainer)
-            }
-            .sheet(isPresented: $userProfileViewModel.isUserDetailPresented) {
-                UserProfileView(
-                    userId: userSession.currentUserId ?? "",
-                    UserProfileVM: userProfileViewModel
-                )
-                .environmentObject(profileViewModel)
-                .environmentObject(selectedPlaceVM)
-                .environmentObject(detailPlaceViewModel)
             }
             .alert("No Location Found", isPresented: $deepLinkViewModel.showNoLocationAlert) {
                 Button("OK") {
