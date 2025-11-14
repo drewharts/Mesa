@@ -256,6 +256,7 @@ struct MinPlaceDetailView: View {
                         viewModel: viewModel,
                         onPhotoTapped: onPhotoTapped
                     )
+                    .padding(.top, 20)
                 case .reviews:
                     PlaceReviewsView(onPhotoTapped: onPhotoTapped)
                         .environmentObject(userProfileViewModel)

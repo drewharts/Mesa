@@ -795,26 +795,26 @@ class SelectedPlaceViewModel: ObservableObject {
     
     /// Internal method that handles loading external reviews with retry logic
     private func loadExternalReviewPhotosInternal(for place: DetailPlace, placeId: String, reset: Bool) async {
-        await MainActor.run {
-            self.externalReviewPhotoLoadingStates[placeId] = .loading
+            await MainActor.run {
+                self.externalReviewPhotoLoadingStates[placeId] = .loading
             if reset {
                 self.externalReviewRetryAttempts[placeId] = 0
             }
-        }
-        
-        var state = await externalReviewPaginationState(for: placeId, reset: reset)
-        
-        do {
-            try await extendExternalReviewURLs(placeId: placeId, state: &state)
-        } catch {
-            await MainActor.run {
-                self.externalReviewPhotoLoadingStates[placeId] = .error(error)
             }
-            return
-        }
-        
-        let urlsToLoad = Array(state.cachedURLs.dropFirst(state.photoCursor).prefix(externalReviewPhotoBatchSize))
-        
+            
+            var state = await externalReviewPaginationState(for: placeId, reset: reset)
+            
+            do {
+                try await extendExternalReviewURLs(placeId: placeId, state: &state)
+            } catch {
+                await MainActor.run {
+                    self.externalReviewPhotoLoadingStates[placeId] = .error(error)
+                }
+                return
+            }
+            
+            let urlsToLoad = Array(state.cachedURLs.dropFirst(state.photoCursor).prefix(externalReviewPhotoBatchSize))
+            
         // If no reviews found and we're still within retry limit, retry
         if urlsToLoad.isEmpty && state.cachedURLs.isEmpty && !state.hasMoreReviews {
             let retryCount = await MainActor.run {
@@ -833,8 +833,8 @@ class SelectedPlaceViewModel: ObservableObject {
             } else {
                 print("⚠️ [SelectedPlaceViewModel] No external reviews after \(maxExternalReviewRetries) retries for \(placeId)")
             }
-        }
-        
+            }
+            
         // Load images if we have URLs, otherwise mark as loaded (empty state)
         if urlsToLoad.isEmpty {
             await updateExternalReviewPaginationState(state, newImages: [], loadingState: .loaded)

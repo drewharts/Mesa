@@ -32,10 +32,6 @@ struct MaxPlaceDetailView: View {
                                     onPhotoTapped(photos, index)
                                 })
                                 .environmentObject(selectedPlaceVM)
-                            } else {
-                                Text("No Photos")
-                                    .frame(maxWidth: .infinity)
-                                    .padding()
                             }
                             
                             ExternalReviewPhotoGallery(onPhotoTapped: onPhotoTapped)

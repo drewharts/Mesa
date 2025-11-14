@@ -2373,9 +2373,9 @@ class ProfileViewModel: ObservableObject {
                        let thumbnailURL = TikTokMetadataCache.shared.getCachedThumbnailUrl(for: url) {
                         Task {
                             await self.loadTikTokThumbnailAsPlaceImage(
-                                placeId: externalPlace.placeId,
-                                thumbnailURL: thumbnailURL
-                            )
+                            placeId: externalPlace.placeId,
+                            thumbnailURL: thumbnailURL
+                        )
                         }
                     }
                 }
@@ -2554,7 +2554,7 @@ class ProfileViewModel: ObservableObject {
             if let image = UIImage(data: data) {
                 await MainActor.run {
                     self.detailPlaceViewModel.placeImages[placeId] = image
-                }
+                    }
             } else {
                 print("⚠️ [ProfileViewModel] No image data returned for TikTok thumbnail \(placeId)")
             }

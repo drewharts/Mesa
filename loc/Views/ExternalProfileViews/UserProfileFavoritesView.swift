@@ -188,8 +188,8 @@ struct ExternalFavoritePlaceCard: View {
                 // Load full place details and navigate
                 Task {
                     await loadPlaceAndNavigate()
-                }
             }
+        }
         )
     }
     

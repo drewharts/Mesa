@@ -184,7 +184,7 @@ struct UserProfileLightweightPlacePreviewCard: View {
         let hash = place.place_id.hashValue
         let hue = Double(abs(hash) % 360) / 360.0
         return Color(hue: hue, saturation: 0.6, brightness: 0.8)
-    }
+            }
     
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -210,8 +210,8 @@ struct UserProfileLightweightPlacePreviewCard: View {
                                     .onAppear {
                                         Task {
                                             _ = await TikTokMetadataCache.shared.getMetadata(for: tiktokUrl)
-                                        }
-                                    }
+    }
+}
                             }
                         } else if let photoUrl = place.latest_review_photo, let url = URL(string: photoUrl) {
                             AsyncImage(url: url) { image in
