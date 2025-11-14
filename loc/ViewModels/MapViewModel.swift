@@ -202,18 +202,6 @@ class MapViewModel: ObservableObject {
         }
     }
     
-    /// Cancel current loading tasks (called when user starts interacting with search)
-    func pauseLoading() {
-        currentLoadTask?.cancel() // Cancel any ongoing loads
-        debounceTimer?.invalidate() // Cancel any pending loads
-        print("⏸️ [MapViewModel] Annotation loading cancelled")
-    }
-    
-    /// Resume is a no-op now - we use task prioritization instead of pausing
-    func resumeLoading() {
-        print("▶️ [MapViewModel] Annotation loading ready (no action needed)")
-    }
-    
     /// Main method to load place annotations for a given viewport
     /// Uses the optimized PostgreSQL function for ultra-fast loading
     /// Implements task cancellation to avoid redundant loads

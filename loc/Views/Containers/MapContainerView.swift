@@ -71,16 +71,6 @@ struct MapContainerView: View {
         .environmentObject(profileViewModel)
         .ignoresSafeArea()
         .edgesIgnoringSafeArea(.all)
-        .onChange(of: isSearchExpanded) { oldValue, newValue in
-            // Pause loading when search is expanded, resume when minimized
-            if newValue {
-                // Search is expanded - pause loading
-                mapViewModel.pauseLoading()
-            } else {
-                // Search is minimized - resume loading
-                mapViewModel.resumeLoading()
-            }
-        }
     }
 }
 
