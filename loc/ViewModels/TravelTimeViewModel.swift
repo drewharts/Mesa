@@ -1,0 +1,146 @@
+//
+//  TravelTimeViewModel.swift
+//  loc
+//
+//  Created by Cursor on 1/22/25.
+//  Smart ViewModel for travel time calculation and transport mode management
+//
+
+import Foundation
+import MapKit
+import Combine
+
+@MainActor
+class TravelTimeViewModel: ObservableObject {
+    // MARK: - Published Properties
+    @Published var travelTime: String = "Calculating..."
+    @Published var currentTransportType: MapKitService.TransportType = .automobile
+    @Published var travelTimes: [MapKitService.TransportType: String] = [:]
+    @Published var place: DetailPlace?
+    
+    // MARK: - Dependencies
+    private let selectedPlaceVM: SelectedPlaceViewModel  // Temporary until fully refactored
+    private var cancellables = Set<AnyCancellable>()
+    
+    // MARK: - Initialization
+    init(selectedPlaceVM: SelectedPlaceViewModel) {
+        self.selectedPlaceVM = selectedPlaceVM
+        loadDefaultTransportType()
+        setupObservers()
+    }
+    
+    // MARK: - Setup
+    private func setupObservers() {
+        // Observe place changes
+        selectedPlaceVM.$selectedPlace
+            .sink { [weak self] place in
+                self?.place = place
+            }
+            .store(in: &cancellables)
+    }
+    
+    // MARK: - Travel Time Management
+    func updateTravelTime(for place: DetailPlace, from userCoordinate: CLLocationCoordinate2D) {
+        // Unwrap the coordinate; if it's nil, set travelTime to "N/A" and return.
+        guard let placeCoordinate = place.coordinate else {
+            travelTime = "N/A"
+            travelTimes = [:]
+            return
+        }
+
+        // Calculate travel times for all transport types
+        MapKitService.shared.calculateTravelTimes(from: userCoordinate, to: placeCoordinate) { [weak self] results, error in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                if let error = error {
+                    self.travelTime = "N/A"
+                    self.travelTimes = [:]
+                } else if let results = results {
+                    var times: [MapKitService.TransportType: String] = [:]
+
+                    for (transportType, timeInterval) in results {
+                        let minutes = timeInterval / 60.0
+                        let timeString = minutes > 60 ? "60+ min" : String(format: "%.0f min", minutes)
+                        times[transportType] = timeString
+                    }
+
+                    self.travelTimes = times
+
+                    // Set the current travel time based on current transport type
+                    if let currentTime = times[self.currentTransportType] {
+                        self.travelTime = currentTime
+                    } else {
+                        self.travelTime = "N/A"
+                    }
+                } else {
+                    self.travelTime = "N/A"
+                    self.travelTimes = [:]
+                }
+            }
+        }
+    }
+    
+    func switchTransportType(to transportType: MapKitService.TransportType) {
+        self.currentTransportType = transportType
+        if let timeString = travelTimes[transportType] {
+            self.travelTime = timeString
+        } else {
+            self.travelTime = "Calculating..."
+        }
+    }
+    
+    private func loadDefaultTransportType() {
+        let savedTypeRaw = UserDefaults.standard.integer(forKey: "defaultTransportType")
+        if let transportType = MapKitService.TransportType(rawValue: savedTypeRaw) {
+            currentTransportType = transportType
+        } else {
+            currentTransportType = .automobile // Default to automobile
+        }
+    }
+
+    func saveDefaultTransportType(_ transportType: MapKitService.TransportType) {
+        UserDefaults.standard.set(transportType.rawValue, forKey: "defaultTransportType")
+        currentTransportType = transportType
+    }
+    
+    func openNavigation(for place: DetailPlace, currentLocation: CLLocationCoordinate2D) {
+        // Unwrap the coordinate
+        guard let destinationCoordinate = place.coordinate else {
+            print("No coordinate available for this place.")
+            return
+        }
+
+        let destinationPlacemark = MKPlacemark(coordinate: destinationCoordinate)
+        let destinationMapItem = MKMapItem(placemark: destinationPlacemark)
+        destinationMapItem.name = place.name
+
+        // Create a map item for the current location.
+        let currentLocationMapItem = MKMapItem.forCurrentLocation()
+
+        // Define launch options based on current transport type.
+        var launchOptions: [String: Any] = [:]
+
+        print("🗺️ [TravelTimeViewModel] Opening navigation with transport type: \(currentTransportType.displayName)")
+
+        switch currentTransportType {
+        case .automobile:
+            launchOptions = [MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeDriving]
+            print("🚗 [TravelTimeViewModel] Using driving directions")
+        case .walking:
+            launchOptions = [MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeWalking]
+            print("🚶 [TravelTimeViewModel] Using walking directions")
+        case .transit:
+            launchOptions = [MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeTransit]
+            print("🚇 [TravelTimeViewModel] Using transit directions")
+        case .bicycle:
+            // MapKit doesn't have bicycle directions, so we'll use walking directions
+            // which is better than driving directions for cyclists
+            launchOptions = [MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeWalking]
+            print("🚴 [TravelTimeViewModel] Using walking directions for bicycle (best available)")
+        }
+
+        // Launch Apple Maps with the specified options.
+        MKMapItem.openMaps(with: [currentLocationMapItem, destinationMapItem], launchOptions: launchOptions)
+    }
+}
+

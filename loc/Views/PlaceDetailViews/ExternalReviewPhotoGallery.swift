@@ -2,15 +2,15 @@ import SwiftUI
 import UIKit
 
 struct ExternalReviewPhotoGallery: View {
-    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     let onPhotoTapped: ([UIImage], Int) -> Void
+    @ObservedObject var photosViewModel: PlacePhotosViewModel
     
     private let heroImageHeight: CGFloat = 200
     private let gridSpacing: CGFloat = 8
     private let cornerRadius: CGFloat = 12
     
     private var photos: [UIImage] {
-        selectedPlaceVM.externalReviewPhotos
+        photosViewModel.externalReviewPhotos
     }
     
     private var staggeredLayoutItems: [StaggeredItem] {
@@ -71,7 +71,7 @@ struct ExternalReviewPhotoGallery: View {
                 Spacer()
             }
             
-            let loadingState = selectedPlaceVM.externalReviewPhotoLoadingState
+            let loadingState = photosViewModel.externalReviewPhotoLoadingState
             
             if photos.isEmpty {
                 switch loadingState {
@@ -108,7 +108,7 @@ struct ExternalReviewPhotoGallery: View {
                             onPhotoTapped(photos, 0)
                         }
                         .onAppear {
-                            selectedPlaceVM.loadMoreExternalReviewPhotosIfNeeded(currentIndex: 0)
+                            photosViewModel.loadMoreExternalReviewPhotosIfNeeded(currentIndex: 0)
                         }
                     }
                     
@@ -133,7 +133,7 @@ struct ExternalReviewPhotoGallery: View {
                                 onPhotoTapped(photos, actualIndex)
                             }
                             .onAppear {
-                                selectedPlaceVM.loadMoreExternalReviewPhotosIfNeeded(currentIndex: actualIndex)
+                                photosViewModel.loadMoreExternalReviewPhotosIfNeeded(currentIndex: actualIndex)
                             }
                             
                         case .double(let indices):
@@ -157,7 +157,7 @@ struct ExternalReviewPhotoGallery: View {
                                         onPhotoTapped(photos, actualIndex)
                                     }
                                     .onAppear {
-                                        selectedPlaceVM.loadMoreExternalReviewPhotosIfNeeded(currentIndex: actualIndex)
+                                        photosViewModel.loadMoreExternalReviewPhotosIfNeeded(currentIndex: actualIndex)
                                     }
                                 }
                             }
@@ -165,7 +165,7 @@ struct ExternalReviewPhotoGallery: View {
                     }
                 }
                 
-                if loadingState == .loading && !selectedPlaceVM.externalReviewPhotosFullyLoaded {
+                if loadingState == .loading && !photosViewModel.externalReviewPhotosFullyLoaded {
                     HStack {
                         Spacer()
                         ProgressView()
@@ -177,7 +177,7 @@ struct ExternalReviewPhotoGallery: View {
         }
         .padding(.top, 8)
         .onAppear {
-            selectedPlaceVM.loadInitialExternalReviewPhotos()
+            photosViewModel.loadInitialExternalReviewPhotos()
         }
     }
 }

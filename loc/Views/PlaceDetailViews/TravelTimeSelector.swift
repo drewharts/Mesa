@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct TravelTimeSelector: View {
-    @ObservedObject var viewModel: PlaceDetailViewModel
+    @ObservedObject var viewModel: TravelTimeViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var locationManager: LocationManager
 

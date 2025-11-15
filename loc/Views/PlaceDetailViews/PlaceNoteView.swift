@@ -3,25 +3,13 @@
 //  loc
 //
 //  Created by Andrew Hartsfield II on 1/29/25.
+//  Refactored to use NotesTabViewModel for proper MVVM
 //
 
 import SwiftUI
 
 struct PlaceNoteView: View {
-    let place: DetailPlace
-    @EnvironmentObject var profile: ProfileViewModel
-    @State private var noteText: String = ""
-    @State private var linkText: String = ""
-    @State private var isEditing: Bool = false
-    @State private var showingDeleteAlert: Bool = false
-    
-    private var currentPlaceNote: PlaceNote? {
-        profile.getPlaceNote(for: place.id.uuidString)
-    }
-    
-    private var hasExistingNote: Bool {
-        return currentPlaceNote?.hasContent ?? false
-    }
+    @ObservedObject var viewModel: NotesTabViewModel
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -37,9 +25,9 @@ struct PlaceNoteView: View {
                 
                 Spacer()
                 
-                if hasExistingNote {
+                if viewModel.hasExistingNote {
                     Button(action: {
-                        showingDeleteAlert = true
+                        viewModel.showDeleteAlert()
                     }) {
                         Image(systemName: "trash")
                             .foregroundColor(.red)
@@ -48,14 +36,9 @@ struct PlaceNoteView: View {
                 }
                 
                 Button(action: {
-                    if isEditing {
-                        saveNote()
-                    } else {
-                        loadExistingNote()
-                        isEditing = true
-                    }
+                    viewModel.toggleEditing()
                 }) {
-                    Text(isEditing ? "Save" : hasExistingNote ? "Edit" : "Add Note")
+                    Text(viewModel.saveButtonTitle)
                         .font(.system(size: 14, weight: .medium))
                         .foregroundColor(.blue)
                 }
@@ -63,7 +46,7 @@ struct PlaceNoteView: View {
             .padding(.horizontal, 20)
             .padding(.top, 16)
             
-            if isEditing {
+            if viewModel.isEditing {
                 // Editing mode
                 VStack(spacing: 12) {
                     // Note text field
@@ -73,7 +56,7 @@ struct PlaceNoteView: View {
                             .fontWeight(.medium)
                             .foregroundColor(.secondary)
                         
-                        TextEditor(text: $noteText)
+                        TextEditor(text: $viewModel.noteText)
                             .frame(minHeight: 80)
                             .padding(12)
                             .background(Color(.systemGray6))
@@ -91,7 +74,7 @@ struct PlaceNoteView: View {
                             .fontWeight(.medium)
                             .foregroundColor(.secondary)
                         
-                        TextField("https://example.com", text: $linkText)
+                        TextField("https://example.com", text: $viewModel.linkText)
                             .textFieldStyle(RoundedBorderTextFieldStyle())
                             .keyboardType(.URL)
                             .autocapitalization(.none)
@@ -100,17 +83,17 @@ struct PlaceNoteView: View {
                 }
                 .padding(.horizontal, 20)
                 .padding(.bottom, 16)
-            } else if hasExistingNote {
+            } else if viewModel.hasExistingNote {
                 // Display mode
                 VStack(alignment: .leading, spacing: 8) {
-                    if let note = currentPlaceNote?.note, !note.isEmpty {
+                    if let note = viewModel.placeNote?.note, !note.isEmpty {
                         Text(note)
                             .font(.body)
                             .foregroundColor(.primary)
                             .padding(.horizontal, 20)
                     }
                     
-                    if let link = currentPlaceNote?.link, !link.isEmpty {
+                    if let link = viewModel.placeNote?.link, !link.isEmpty {
                         Button(action: {
                             if let url = URL(string: link) {
                                 UIApplication.shared.open(url)
@@ -147,42 +130,65 @@ struct PlaceNoteView: View {
                 .padding(.bottom, 16)
             }
         }
-        .onAppear {
-            loadExistingNote()
-        }
-        .alert("Delete Note", isPresented: $showingDeleteAlert) {
+        .alert("Delete Note", isPresented: $viewModel.showingDeleteAlert) {
             Button("Cancel", role: .cancel) { }
             Button("Delete", role: .destructive) {
-                deleteNote()
+                viewModel.deleteNote()
             }
         } message: {
             Text("Are you sure you want to delete your note for this place?")
         }
     }
+}
+
+// MARK: - Preview
+#Preview {
+    let services = ServiceContainer.shared
+    let locationManager = LocationManager()
     
-    private func loadExistingNote() {
-        if let placeNote = currentPlaceNote {
-            noteText = placeNote.note ?? ""
-            linkText = placeNote.link ?? ""
-        } else {
-            noteText = ""
-            linkText = ""
-        }
-    }
+    let detailPlaceVM = DetailPlaceViewModel(
+        placeService: services.placeService,
+        userService: services.userService
+    )
     
-    private func saveNote() {
-        let trimmedNote = noteText.trimmingCharacters(in: .whitespacesAndNewlines)
-        let trimmedLink = linkText.trimmingCharacters(in: .whitespacesAndNewlines)
-        
-        profile.savePlaceNote(for: place.id.uuidString, note: trimmedNote.isEmpty ? nil : trimmedNote, link: trimmedLink.isEmpty ? nil : trimmedLink)
-        
-        isEditing = false
-    }
+    let selectedPlaceVM = SelectedPlaceViewModel(
+        locationManager: locationManager,
+        reviewService: services.reviewService,
+        placeService: services.placeService,
+        userService: services.userService,
+        imageService: services.imageService,
+        detailPlaceViewModel: detailPlaceVM
+    )
     
-    private func deleteNote() {
-        profile.deletePlaceNote(for: place.id.uuidString)
-        noteText = ""
-        linkText = ""
-        isEditing = false
-    }
+    let userSession = UserSession(
+        userService: services.userService,
+        locationManager: locationManager,
+        detailPlaceVM: detailPlaceVM
+    )
+    
+    let profileVM = ProfileViewModel(
+        userSession: userSession,
+        userService: services.userService,
+        detailPlaceViewModel: detailPlaceVM,
+        imageService: services.imageService,
+        placeService: services.placeService,
+        reviewService: services.reviewService,
+        locationManager: locationManager,
+        deepLinkManager: services.deepLinkManager,
+        deepLinkViewModel: nil
+    )
+    
+    let notesVM = NotesTabViewModel(
+        userService: services.userService,
+        selectedPlaceVM: selectedPlaceVM,
+        profileVM: profileVM,
+        userSession: userSession
+    )
+    
+    var mockPlace = DetailPlace()
+    mockPlace.name = "Sample Restaurant"
+    selectedPlaceVM.selectedPlace = mockPlace
+    
+    return PlaceNoteView(viewModel: notesVM)
+        .padding()
 }

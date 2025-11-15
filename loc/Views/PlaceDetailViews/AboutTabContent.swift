@@ -1,0 +1,120 @@
+//
+//  AboutTabContent.swift
+//  loc
+//
+//  Created by Cursor on 1/22/25.
+//  Refactored to use proper MVVM with child components
+//
+
+import SwiftUI
+import UIKit
+
+struct AboutTabContent: View {
+    // MARK: - Primary ViewModel (Coordinator)
+    @ObservedObject var viewModel: AboutTabViewModel
+    
+    // MARK: - Still needed for child components (temporary)
+    @EnvironmentObject var profile: ProfileViewModel
+    @EnvironmentObject var userSession: UserSession
+    
+    let onPhotoTapped: ([UIImage], Int) -> Void
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // 1. DUMB COMPONENT: Pure display of place info
+            if let place = viewModel.place {
+                PlaceInfoSection(place: place)
+            }
+            
+            // 2. SMART COMPONENT: TikTok videos with their own ViewModel
+            TikTokVideosSection(
+                viewModel: viewModel.tikTokVideosViewModel,
+                placeId: viewModel.placeId,
+                selectedPlace: viewModel.place
+            )
+            .environmentObject(profile)
+            .environmentObject(userSession)
+            
+            // 3. SMART COMPONENT: Photos with its own ViewModel
+            PlacePhotosView(
+                viewModel: viewModel.placePhotosViewModel,
+                onPhotoTapped: onPhotoTapped
+            )
+            .padding(.top, 20)
+        }
+    }
+}
+
+// MARK: - Preview (Much Simpler!)
+#Preview {
+    let services = ServiceContainer.shared
+    let locationManager = LocationManager()
+    
+    let detailPlaceVM = DetailPlaceViewModel(
+        placeService: services.placeService,
+        userService: services.userService
+    )
+    
+    let selectedPlaceVM = SelectedPlaceViewModel(
+        locationManager: locationManager,
+        reviewService: services.reviewService,
+        placeService: services.placeService,
+        userService: services.userService,
+        imageService: services.imageService,
+        detailPlaceViewModel: detailPlaceVM
+    )
+    
+    let userSession = UserSession(
+        userService: services.userService,
+        locationManager: locationManager,
+        detailPlaceVM: detailPlaceVM
+    )
+    
+    let profileVM = ProfileViewModel(
+        userSession: userSession,
+        userService: services.userService,
+        detailPlaceViewModel: detailPlaceVM,
+        imageService: services.imageService,
+        placeService: services.placeService,
+        reviewService: services.reviewService,
+        locationManager: locationManager,
+        deepLinkManager: services.deepLinkManager,
+        deepLinkViewModel: nil
+    )
+    
+    // Create child ViewModels
+    let tikTokVM = TikTokVideosViewModel(
+        tikTokService: TikTokPlaceService.shared,
+        selectedPlaceVM: selectedPlaceVM,
+        profileVM: profileVM
+    )
+    
+    let photosVM = PlacePhotosViewModel(
+        reviewService: services.reviewService,
+        selectedPlaceVM: selectedPlaceVM
+    )
+    
+    // Create coordinator ViewModel
+    let aboutVM = AboutTabViewModel(
+        tikTokVideosViewModel: tikTokVM,
+        placePhotosViewModel: photosVM,
+        selectedPlaceVM: selectedPlaceVM
+    )
+    
+    var mockPlace = DetailPlace()
+    mockPlace.name = "Sample Restaurant"
+    mockPlace.description = "A cozy Italian restaurant."
+    mockPlace.rating = 4.5
+    mockPlace.userRatingsTotal = 234
+    selectedPlaceVM.selectedPlace = mockPlace
+    
+    return AboutTabContent(
+        viewModel: aboutVM,
+        onPhotoTapped: { photos, index in
+            print("Tapped photo at index: \(index)")
+        }
+    )
+    .environmentObject(profileVM)
+    .environmentObject(userSession)
+    .padding()
+}

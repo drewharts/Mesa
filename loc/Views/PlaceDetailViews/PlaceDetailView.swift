@@ -29,7 +29,8 @@ struct PlaceDetailView: View {
     @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
     @Environment(\.isScrollingEnabled) var isScrollingEnabled // Access scroll state
 
-    @StateObject private var viewModel = PlaceDetailViewModel()
+    // Removed PlaceDetailViewModel - travel time logic now in PlaceDetailTabsViewModel
+    @State private var tabsViewModel: PlaceDetailTabsViewModel?
 
     init(sheetHeight: Binding<CGFloat>, minSheetHeight: CGFloat) {
         self._sheetHeight = sheetHeight
@@ -39,14 +40,14 @@ struct PlaceDetailView: View {
     var body: some View {
         ZStack {
             VStack(spacing: 16) {
-                if viewModel.placeName == "Unknown" {
+                if selectedPlaceVM.selectedPlace == nil {
                     ProgressView("Loading Place Details...")
                         .onAppear {
-                            print("📱 [PlaceDetailView] Showing loading state - placeName: '\(viewModel.placeName)'")
+                            print("📱 [PlaceDetailView] Showing loading state")
                         }
-                } else {
-                    MinPlaceDetailView(
-                        viewModel: viewModel,
+                } else if let tabsViewModel = tabsViewModel {
+                    PlaceDetailTabsView(
+                        viewModel: tabsViewModel,
                         showNoPhoneNumberAlert: $showNoPhoneNumberAlert,
                         onPhotoTapped: { photos, index in
                             galleryPhotos = photos
@@ -55,20 +56,30 @@ struct PlaceDetailView: View {
                         }
                     )
                     .environmentObject(userProfileViewModel)
-                    .scrollDisabled(!isScrollingEnabled) // Disable scrolling based on sheet height
+                    .scrollDisabled(!isScrollingEnabled)
                     .onAppear {
-                        print("📱 [PlaceDetailView] Showing content - placeName: '\(viewModel.placeName)'")
+                        print("📱 [PlaceDetailView] Showing content")
                     }
                 }
             }
             .padding(.vertical)
             .frame(maxWidth: .infinity)
             .blur(radius: showPhotoGallery ? 10 : 0)
-            .alert(isPresented: $viewModel.showAlert) {
-                Alert(title: Text("Success"),
-                      message: Text(viewModel.alertMessage),
-                      dismissButton: .default(Text("OK")))
+            .onAppear {
+                // Initialize the ViewModel when the view appears
+                if tabsViewModel == nil {
+                    tabsViewModel = PlaceDetailTabsViewModel(
+                        placeService: serviceContainer.placeService,
+                        reviewService: serviceContainer.reviewService,
+                        userService: serviceContainer.userService,
+                        notificationManager: serviceContainer.notificationManager,
+                        selectedPlaceVM: selectedPlaceVM,
+                        profileVM: profile,
+                        userSession: userSession
+                    )
+                }
             }
+            // Alert for travel time removed - no longer needed
             .alert(isPresented: $showNoPhoneNumberAlert) {
                 Alert(
                     title: Text("Phone Number Not Available"),
@@ -107,14 +118,16 @@ struct PlaceDetailView: View {
             .onAppear {
                 print("📱 [PlaceDetailView] View appeared, starting to load place data...")
                 if let place = selectedPlaceVM.selectedPlace,
-                   let currentLocation = locationManager.currentLocation {
-                    viewModel.loadData(for: place, currentLocation: currentLocation.coordinate)
+                   let currentLocation = locationManager.currentLocation,
+                   let tabsVM = tabsViewModel {
+                    tabsVM.travelTimeViewModel.updateTravelTime(for: place, from: currentLocation.coordinate)
                 }
             }
             .onChange(of: selectedPlaceVM.selectedPlace) { _, newPlace in
-                if let place = newPlace {
-                    let currentLocation = locationManager.currentLocation?.coordinate
-                    viewModel.updatePlaceData(place, currentLocation: currentLocation)
+                if let place = newPlace,
+                   let currentLocation = locationManager.currentLocation?.coordinate,
+                   let tabsVM = tabsViewModel {
+                    tabsVM.travelTimeViewModel.updateTravelTime(for: place, from: currentLocation)
                 }
             }
 
