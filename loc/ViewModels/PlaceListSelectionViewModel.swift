@@ -26,6 +26,7 @@ class PlaceListSelectionViewModel: ObservableObject {
     private var placeCoordinates: CLLocationCoordinate2D?
     private var currentPage: Int = 1
     private let pageSize: Int = 6
+    private var hasLoadedOnce: Bool = false
     
     // MARK: - Init
     init(profile: ProfileViewModel,
@@ -41,6 +42,13 @@ class PlaceListSelectionViewModel: ObservableObject {
     func loadInitialLists(for place: DetailPlace) async {
         guard let userId = userSession.currentUserId,
               let coord = place.coordinate else { return }
+        
+        // Guard: Don't reload if we already have lists loaded
+        // This prevents .task from wiping out paginated lists when view re-renders
+        if hasLoadedOnce && !lists.isEmpty {
+            print("ℹ️ [PlaceListSelectionVM] Lists already loaded (\(lists.count) lists), skipping reload")
+            return
+        }
         
         // Reset state for new place
         placeCoordinates = coord
@@ -59,6 +67,7 @@ class PlaceListSelectionViewModel: ObservableObject {
             
             lists = fetchedLists
             hasMore = fetchedLists.count >= pageSize
+            hasLoadedOnce = true
             
             print("✅ [PlaceListSelectionVM] Loaded \(fetchedLists.count) lists for place at (\(coord.latitude), \(coord.longitude))")
         } catch {
