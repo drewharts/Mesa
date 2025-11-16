@@ -75,6 +75,9 @@ class PlaceDetailTabsViewModel: ObservableObject {
             selectedPlaceVM: selectedPlaceVM
         )
         
+        // IMPORTANT: Connect PlacePhotosViewModel to SelectedPlaceViewModel for delegation
+        selectedPlaceVM.setPhotosViewModel(photosVM)
+        
         self.aboutTabViewModel = AboutTabViewModel(
             tikTokVideosViewModel: tikTokVM,
             placePhotosViewModel: photosVM,
