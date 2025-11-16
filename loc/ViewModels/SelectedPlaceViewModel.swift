@@ -397,7 +397,7 @@ class SelectedPlaceViewModel: ObservableObject {
         }
     }
     
-
+    
     // MARK: - Public Methods
     func addReview<T: ReviewProtocol>(_ review: T) {
         guard let placeId = selectedPlace?.id.uuidString else { return }
@@ -412,7 +412,7 @@ class SelectedPlaceViewModel: ObservableObject {
         }
     }
     
-    /// Get a review by its ID to access original data  
+    /// Get a review by its ID to access original data
     func getReview(by reviewId: String) -> (any ReviewProtocol)? {
         // Search through all place reviews to find the review with matching ID
         for reviews in placeReviews.values {
@@ -510,12 +510,12 @@ class SelectedPlaceViewModel: ObservableObject {
         guard let placeId = selectedPlace?.id.uuidString else { return [] }
         return placeReviews[placeId] ?? []
     }
-    
+
     var tiktokVideos: [TikTokVideo] {
         guard let placeId = selectedPlace?.id.uuidString else { return [] }
         return placeTikToks[placeId] ?? []
     }
-    
+
     func reviewLoadingState(forPlaceId placeId: String) -> LoadingState {
         return reviewLoadingStates[placeId] ?? .idle
     }

@@ -172,7 +172,7 @@ struct LightweightListSelectionRowView: View {
 struct ListsInSelectionSheet: View {
     @ObservedObject var viewModel: PlaceListSelectionViewModel
     let place: DetailPlace
-    
+
     var isLoading: Bool {
         viewModel.isLoadingInitial
     }

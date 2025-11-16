@@ -29,12 +29,12 @@ struct PlaceReviewsListView : View {
                         viewModel: viewModel,
                         onPhotoTapped: onPhotoTapped
                     )
-                    .id(review.id)
-                    .padding(.horizontal)
-                    .padding(.vertical, 8)
+                        .id(review.id)
+                        .padding(.horizontal)
+                        .padding(.vertical, 8)
                     .background(viewModel.highlightedReviewId == review.id ? 
-                               Color.blue.opacity(0.1) : Color.white)
-                    .cornerRadius(10)
+                                   Color.blue.opacity(0.1) : Color.white)
+                        .cornerRadius(10)
                     .animation(.easeInOut(duration: 0.3), value: viewModel.highlightedReviewId)
                 } else if let genericReview = review as? GenericReview {
                     GenericReviewView(
@@ -42,13 +42,13 @@ struct PlaceReviewsListView : View {
                         viewModel: viewModel,
                         onPhotoTapped: onPhotoTapped
                     )
-                    .environmentObject(userProfileViewModel)
-                    .id(review.id)
-                    .padding(.horizontal)
-                    .padding(.vertical, 8)
+                        .environmentObject(userProfileViewModel)
+                        .id(review.id)
+                        .padding(.horizontal)
+                        .padding(.vertical, 8)
                     .background(viewModel.highlightedReviewId == review.id ? 
-                               Color.blue.opacity(0.1) : Color.white)
-                    .cornerRadius(10)
+                                   Color.blue.opacity(0.1) : Color.white)
+                        .cornerRadius(10)
                     .animation(.easeInOut(duration: 0.3), value: viewModel.highlightedReviewId)
                 }
             }

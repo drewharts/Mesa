@@ -50,7 +50,7 @@ struct GenericReviewView: View {
     
     @ViewBuilder
     private var photoSection: some View {
-        switch loadingState {
+            switch loadingState {
             case .loading:
                 ZStack {
                     VStack {
@@ -136,6 +136,6 @@ struct GenericReviewView: View {
                 ProgressView()
                     .padding()
                     .frame(maxWidth: .infinity)
-            }
+        }
     }
 }

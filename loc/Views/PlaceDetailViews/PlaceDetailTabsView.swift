@@ -19,7 +19,7 @@ struct PlaceDetailTabsView: View {
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var userProfileViewModel: UserProfileViewModel
     @EnvironmentObject var userSession: UserSession
-    
+
     @Environment(\.isScrollingEnabled) var isScrollingEnabled
     @Binding var showNoPhoneNumberAlert: Bool
     let onPhotoTapped: ([UIImage], Int) -> Void
@@ -158,7 +158,7 @@ struct PlaceDetailTabsView: View {
                         onPhotoTapped: onPhotoTapped
                     )
                     .environmentObject(selectedPlaceVM)
-                    .environmentObject(userProfileViewModel)
+                        .environmentObject(userProfileViewModel)
                 case .notes:
                     NotesTabContent(viewModel: viewModel.notesTabViewModel)
                 }

@@ -15,18 +15,18 @@ struct PlaceReviewsView: View {
     // Still needed for child views (temporary)
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var userProfileViewModel: UserProfileViewModel
-    
+
     var body: some View {
         ScrollViewReader { scrollProxy in
             ScrollView {
                 VStack(spacing: 24) {
                     switch viewModel.loadingState {
-                    case .loading:
-                        ProgressView()
-                            .padding()
-                            .frame(maxWidth: .infinity)
-                        
-                    case .loaded:
+                        case .loading:
+                            ProgressView()
+                                .padding()
+                                .frame(maxWidth: .infinity)
+                            
+                        case .loaded:
                         if viewModel.hasReviews {
                             PlaceReviewsListView(
                                 viewModel: viewModel,
@@ -35,19 +35,19 @@ struct PlaceReviewsView: View {
                             )
                         } else {
                             Text(viewModel.emptyStateMessage)
+                                    .font(.subheadline)
+                                    .foregroundColor(.gray)
+                                    .padding(20)
+                            }
+                            
+                        case .error(let error):
+                            Text("Failed to load reviews: \(error.localizedDescription)")
                                 .font(.subheadline)
-                                .foregroundColor(.gray)
-                                .padding(20)
-                        }
-                        
-                    case .error(let error):
-                        Text("Failed to load reviews: \(error.localizedDescription)")
-                            .font(.subheadline)
-                            .foregroundColor(.red)
-                            .padding()
-                        
-                    case .idle:
-                        Text("Reviews not yet loaded")
+                                .foregroundColor(.red)
+                                .padding()
+                            
+                        case .idle:
+                            Text("Reviews not yet loaded")
                             .font(.subheadline)
                             .foregroundColor(.gray)
                             .padding()

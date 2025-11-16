@@ -214,7 +214,7 @@ struct ModernPhotoGallery: View {
     return ModernPhotoGallery(
         images: sampleImages,
         onImageTapped: { index in
-            print("Tapped image at index: \(index)")
+        print("Tapped image at index: \(index)")
         },
         photosViewModel: photosViewModel
     )

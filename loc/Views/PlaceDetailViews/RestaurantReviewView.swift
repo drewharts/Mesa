@@ -64,7 +64,7 @@ struct RestaurantReviewView: View {
     
     @ViewBuilder
     private var photoSection: some View {
-        switch loadingState {
+            switch loadingState {
             case .loading:
                 ZStack {
                     VStack {
@@ -150,7 +150,7 @@ struct RestaurantReviewView: View {
                 ProgressView()
                     .padding()
                     .frame(maxWidth: .infinity)
-            }
+        }
     }
 }
 
