@@ -8,6 +8,7 @@ struct TikTokPlaceSelectionView: View {
     @EnvironmentObject var userSession: UserSession
     @State private var selectedPlaceForList: DetailPlace?
     @State private var showingListSelection = false
+    @State private var listSelectionViewModel: PlaceListSelectionViewModel?
     
     var body: some View {
         NavigationView {
@@ -122,22 +123,27 @@ struct TikTokPlaceSelectionView: View {
             }
         }
         .sheet(isPresented: $showingListSelection) {
-            if let place = selectedPlaceForList {
-                // Get userService from the service singleton
-                let userService = UserService.shared
-                
-                let listVM = PlaceListSelectionViewModel(
-                    profile: profile,
-                    userService: userService,
-                    userSession: userSession
-                )
-                
+            if let place = selectedPlaceForList,
+               let viewModel = listSelectionViewModel {
                 ListSelectionSheet(
-                    viewModel: listVM,
+                    viewModel: viewModel,
                     place: place,
                     isPresented: $showingListSelection
                 )
-                .environmentObject(profile)
+                .onDisappear {
+                    // Clean up ViewModel when sheet is dismissed
+                    listSelectionViewModel = nil
+                }
+            }
+        }
+        .onChange(of: showingListSelection) { newValue in
+            // Create ViewModel when sheet is about to be shown
+            if newValue && listSelectionViewModel == nil {
+                listSelectionViewModel = PlaceListSelectionViewModel(
+                    profile: profile,
+                    userService: UserService.shared,
+                    userSession: userSession
+                )
             }
         }
     }

@@ -21,6 +21,7 @@ class PlaceListSelectionViewModel: ObservableObject {
     private let profile: ProfileViewModel
     private let userService: UserService
     private let userSession: UserSession
+    private let placeService: SupabasePlaceService
     
     // MARK: - Internal State
     private var placeCoordinates: CLLocationCoordinate2D?
@@ -31,10 +32,17 @@ class PlaceListSelectionViewModel: ObservableObject {
     // MARK: - Init
     init(profile: ProfileViewModel,
          userService: UserService,
-         userSession: UserSession) {
+         userSession: UserSession,
+         placeService: SupabasePlaceService = SupabasePlaceService.shared) {
         self.profile = profile
         self.userService = userService
         self.userSession = userSession
+        self.placeService = placeService
+        print("🆕 [PlaceListSelectionVM] ViewModel initialized")
+    }
+    
+    deinit {
+        print("🗑️ [PlaceListSelectionVM] ViewModel deallocated")
     }
     
     // MARK: - Public API
@@ -130,6 +138,44 @@ class PlaceListSelectionViewModel: ObservableObject {
             profile.removePlaceFromLightweightList(listId: list.list_id, place: place)
         } else {
             profile.addPlaceToLightweightList(listId: list.list_id, place: place)
+        }
+    }
+    
+    func createNewList(named name: String, city: String, emoji: String, image: String) async {
+        guard let userId = userSession.currentUserId else { return }
+        
+        do {
+            let createdList = try await placeService.createNewList(
+                userId: userId,
+                name: name,
+                city: city,
+                emoji: emoji,
+                image: image
+            )
+            
+            // Add new list to top of our own lists array
+            let lightweightList = LightweightPlaceList(
+                list_id: createdList.id.uuidString,
+                name: createdList.name,
+                is_public: false,
+                image: createdList.image,
+                created_at: ISO8601DateFormatter().string(from: Date()),
+                updated_at: ISO8601DateFormatter().string(from: Date()),
+                distance_meters: nil,
+                place_count: 0,
+                city: nil
+            )
+            
+            lists.insert(lightweightList, at: 0)
+            
+            // Also update ProfileViewModel for other parts of the app
+            profile.lightweightPlaceLists.insert(lightweightList, at: 0)
+            profile.userLists.append(createdList)
+            profile.recentlyCreatedListId = createdList.id
+            
+            print("✅ [PlaceListSelectionVM] Created new list: \(name)")
+        } catch {
+            print("❌ [PlaceListSelectionVM] Error creating list: \(error)")
         }
     }
 }

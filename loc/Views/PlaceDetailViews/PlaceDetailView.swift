@@ -17,6 +17,7 @@ struct PlaceDetailView: View {
     @State private var showNoPhoneNumberAlert = false
     @State private var showListSelection = false
     @State private var showCreateReview = false
+    @State private var listSelectionViewModel: PlaceListSelectionViewModel?
 
     @EnvironmentObject var profile: ProfileViewModel
 
@@ -88,21 +89,29 @@ struct PlaceDetailView: View {
                 )
             }
             .sheet(isPresented: $showListSelection) {
-                if let selectedPlace = selectedPlaceVM.selectedPlace {
-                    let listVM = PlaceListSelectionViewModel(
+                if let selectedPlace = selectedPlaceVM.selectedPlace,
+                   let viewModel = listSelectionViewModel {
+                    ListSelectionSheet(
+                        viewModel: viewModel,
+                        place: selectedPlace,
+                        isPresented: $showListSelection
+                    )
+                    .onDisappear {
+                        // Clean up ViewModel when sheet is dismissed
+                        listSelectionViewModel = nil
+                    }
+                } else {
+                    Text("No place selected")
+                }
+            }
+            .onChange(of: showListSelection) { newValue in
+                // Create ViewModel when sheet is about to be shown
+                if newValue && listSelectionViewModel == nil {
+                    listSelectionViewModel = PlaceListSelectionViewModel(
                         profile: profile,
                         userService: serviceContainer.userService,
                         userSession: userSession
                     )
-                    
-                    ListSelectionSheet(
-                        viewModel: listVM,
-                        place: selectedPlace,
-                        isPresented: $showListSelection
-                    )
-                    .environmentObject(profile)
-                } else {
-                    Text("No place selected")
                 }
             }
             .sheet(isPresented: $showCreateReview) {

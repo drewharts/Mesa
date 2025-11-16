@@ -230,7 +230,6 @@ struct ListsInSelectionSheet: View {
 
 // MARK: - ListSelectionSheet
 struct ListSelectionSheet: View {
-    @EnvironmentObject var profile: ProfileViewModel
     @ObservedObject var viewModel: PlaceListSelectionViewModel
     let place: DetailPlace
     @Binding var isPresented: Bool
@@ -258,7 +257,9 @@ struct ListSelectionSheet: View {
                 }
                 .sheet(isPresented: $showNewListSheet) {
                     NewListView(isPresented: $showNewListSheet, onSave: { listName in
-                        profile.addNewPlaceList(named: listName, city: "", emoji: "", image: "")
+                        Task {
+                            await viewModel.createNewList(named: listName, city: "", emoji: "", image: "")
+                        }
                     })
                 }
             }
