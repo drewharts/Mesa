@@ -16,6 +16,15 @@ struct GenericReviewView: View {
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var userProfileViewModel: UserProfileViewModel
     @EnvironmentObject var userSession: UserSession
+    
+    // Computed properties to help the compiler
+    private var reviewPhotos: [UIImage] {
+        viewModel.getPhotos(for: review)
+    }
+    
+    private var loadingState: PlacePhotosViewModel.LoadingState {
+        viewModel.getPhotoLoadingState(for: review)
+    }
 
     var body: some View {
         VStack(spacing: 16) {
@@ -34,10 +43,14 @@ struct GenericReviewView: View {
                 .padding(.bottom, 15)
             
             // Images (Horizontal Scrolling) with Loading State
-            let reviewPhotos = viewModel.getPhotos(for: review)
-            let loadingState = viewModel.getPhotoLoadingState(for: review)
-            
-            switch loadingState {
+            photoSection
+        }
+        .padding(.vertical)
+    }
+    
+    @ViewBuilder
+    private var photoSection: some View {
+        switch loadingState {
             case .loading:
                 ZStack {
                     VStack {
@@ -124,9 +137,5 @@ struct GenericReviewView: View {
                     .padding()
                     .frame(maxWidth: .infinity)
             }
-            
-            // Comments section removed for simplification
-        }
-        .padding(.vertical)
     }
 }
