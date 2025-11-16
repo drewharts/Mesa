@@ -123,9 +123,12 @@ struct TikTokPlaceSelectionView: View {
         }
         .sheet(isPresented: $showingListSelection) {
             if let place = selectedPlaceForList {
+                // Get userService from the service singleton
+                let userService = UserService.shared
+                
                 let listVM = PlaceListSelectionViewModel(
                     profile: profile,
-                    dataManager: dataManager,
+                    userService: userService,
                     userSession: userSession
                 )
                 

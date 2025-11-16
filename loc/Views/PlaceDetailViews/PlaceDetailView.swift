@@ -91,7 +91,7 @@ struct PlaceDetailView: View {
                 if let selectedPlace = selectedPlaceVM.selectedPlace {
                     let listVM = PlaceListSelectionViewModel(
                         profile: profile,
-                        dataManager: dataManager,
+                        userService: serviceContainer.userService,
                         userSession: userSession
                     )
                     

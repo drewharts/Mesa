@@ -209,7 +209,7 @@ struct ListsInSelectionSheet: View {
                 }
                 
                 // Loading indicator at the bottom
-                if viewModel.isLoadingMorePlaceLists {
+                if viewModel.isLoadingMore {
                     HStack {
                         Spacer()
                         ProgressView()

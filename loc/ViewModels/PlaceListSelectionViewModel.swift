@@ -11,36 +11,28 @@ import CoreLocation
 
 @MainActor
 class PlaceListSelectionViewModel: ObservableObject {
-    // MARK: - Published State
+    // MARK: - Published State (Own Pagination)
+    @Published var lists: [LightweightPlaceList] = []
     @Published var isLoadingInitial: Bool = false
+    @Published var isLoadingMore: Bool = false
+    @Published var hasMore: Bool = true
     
     // MARK: - Dependencies
     private let profile: ProfileViewModel
-    private let dataManager: DataManager
+    private let userService: UserService
     private let userSession: UserSession
     
     // MARK: - Internal State
     private var placeCoordinates: CLLocationCoordinate2D?
-    
-    // MARK: - Derived State (from ProfileViewModel)
-    var lists: [LightweightPlaceList] {
-        profile.lightweightPlaceLists
-    }
-    
-    var isLoadingMorePlaceLists: Bool {
-        profile.isLoadingMorePlaceLists
-    }
-    
-    var hasMorePlaceLists: Bool {
-        profile.hasMorePlaceLists
-    }
+    private var currentPage: Int = 1
+    private let pageSize: Int = 6
     
     // MARK: - Init
     init(profile: ProfileViewModel,
-         dataManager: DataManager,
+         userService: UserService,
          userSession: UserSession) {
         self.profile = profile
-        self.dataManager = dataManager
+        self.userService = userService
         self.userSession = userSession
     }
     
@@ -50,30 +42,73 @@ class PlaceListSelectionViewModel: ObservableObject {
         guard let userId = userSession.currentUserId,
               let coord = place.coordinate else { return }
         
+        // Reset state for new place
         placeCoordinates = coord
+        currentPage = 1
+        hasMore = true
         isLoadingInitial = true
         
-        await dataManager.loadPlaceListsByPlaceCoordinates(
-            userId: userId,
-            placeLatitude: coord.latitude,
-            placeLongitude: coord.longitude
-        )
+        do {
+            let fetchedLists = try await userService.fetchPlaceListsByProximity(
+                userId: userId,
+                userLatitude: coord.latitude,
+                userLongitude: coord.longitude,
+                page: 1,
+                pageSize: pageSize
+            )
+            
+            lists = fetchedLists
+            hasMore = fetchedLists.count >= pageSize
+            
+            print("✅ [PlaceListSelectionVM] Loaded \(fetchedLists.count) lists for place at (\(coord.latitude), \(coord.longitude))")
+        } catch {
+            print("❌ [PlaceListSelectionVM] Error loading lists: \(error)")
+            lists = []
+            hasMore = false
+        }
         
         isLoadingInitial = false
     }
     
     func loadMoreListsIfNeeded(currentIndex: Int) async {
-        guard !profile.isLoadingMorePlaceLists,
-              profile.hasMorePlaceLists,
+        // Guard: Already loading or no more to load
+        guard !isLoadingMore,
+              hasMore,
               let coord = placeCoordinates,
               let userId = userSession.currentUserId else { return }
         
-        // Only trigger when we get near the end (handled by caller via index)
-        await dataManager.loadMorePlaceLists(
-            userId: userId,
-            userLatitude: coord.latitude,
-            userLongitude: coord.longitude
-        )
+        // Don't load if we're not near the end
+        guard currentIndex >= lists.count - 3 else { return }
+        
+        isLoadingMore = true
+        let nextPage = currentPage + 1
+        
+        print("📄 [PlaceListSelectionVM] Loading page \(nextPage) of lists...")
+        
+        do {
+            let moreLists = try await userService.fetchPlaceListsByProximity(
+                userId: userId,
+                userLatitude: coord.latitude,
+                userLongitude: coord.longitude,
+                page: nextPage,
+                pageSize: pageSize
+            )
+            
+            if !moreLists.isEmpty {
+                lists.append(contentsOf: moreLists)
+                currentPage = nextPage
+                hasMore = moreLists.count >= pageSize
+                print("✅ [PlaceListSelectionVM] Added \(moreLists.count) more lists. Total: \(lists.count)")
+            } else {
+                hasMore = false
+                print("ℹ️ [PlaceListSelectionVM] No more lists available")
+            }
+        } catch {
+            print("❌ [PlaceListSelectionVM] Error loading more lists: \(error)")
+            // Don't set hasMore to false on error - allow retry
+        }
+        
+        isLoadingMore = false
     }
     
     func isPlace(_ place: DetailPlace, in list: LightweightPlaceList) -> Bool {
@@ -89,5 +124,4 @@ class PlaceListSelectionViewModel: ObservableObject {
         }
     }
 }
-
 
