@@ -54,6 +54,24 @@ class PlacePhotosViewModel: ObservableObject {
     private let selectedPlaceVM: SelectedPlaceViewModel  // Temporary until fully refactored
     private var cancellables = Set<AnyCancellable>()
     
+    // MARK: - Shared Network Resources
+    /// Shared URLSession for all image loading - prevents connection spam
+    private static let imageLoadSession: URLSession = {
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 10.0
+        config.timeoutIntervalForResource = 30.0
+        config.httpMaximumConnectionsPerHost = 4  // Limit concurrent connections per host
+        config.requestCachePolicy = .returnCacheDataElseLoad
+        config.urlCache = URLCache(
+            memoryCapacity: 50 * 1024 * 1024,  // 50 MB memory cache
+            diskCapacity: 200 * 1024 * 1024     // 200 MB disk cache
+        )
+        return URLSession(configuration: config)
+    }()
+    
+    /// Semaphore to limit concurrent image loads and prevent network exhaustion
+    private let imageLoadSemaphore = AsyncSemaphore(value: 6)
+    
     // MARK: - Loading State Enum
     enum LoadingState: Equatable {
         case idle
@@ -428,9 +446,9 @@ class PlacePhotosViewModel: ObservableObject {
         externalReviewPhotoLoadingStates[state.placeId] = loadingState
     }
     
-    /// Load image directly from URL
+    /// Load image directly from URL with concurrency control and error handling
     private func loadImageFromURL(imageUrl: String) async -> UIImage? {
-        // ✅ COMPLETE Firebase elimination - block ALL Firebase URLs, only use Supabase
+        // Block Firebase URLs - only use Supabase
         if imageUrl.contains("firebasestorage.googleapis.com") {
             return nil
         }
@@ -439,17 +457,36 @@ class PlacePhotosViewModel: ObservableObject {
             return nil
         }
         
+        // Limit concurrent image loads to prevent network exhaustion
+        await imageLoadSemaphore.wait()
+        defer { imageLoadSemaphore.signal() }
+        
         do {
-            // ✅ Use background queue and shorter timeout
-            let config = URLSessionConfiguration.default
-            config.timeoutIntervalForRequest = 5.0
-            config.timeoutIntervalForResource = 10.0
-            let session = URLSession(configuration: config)
+            // Use shared URLSession with connection pooling and caching
+            let (data, response) = try await Self.imageLoadSession.data(from: url)
             
-            let (data, _) = try await session.data(from: url)
-            return UIImage(data: data)
+            // Validate HTTP status code
+            if let httpResponse = response as? HTTPURLResponse,
+               !(200...299).contains(httpResponse.statusCode) {
+                // Silently fail for non-200 responses (avoid log spam)
+                return nil
+            }
+            
+            // Validate Content-Type to catch non-image responses
+            if let mimeType = response.mimeType,
+               !mimeType.hasPrefix("image/") {
+                return nil
+            }
+            
+            // Try to decode image - this catches CMPhotoJFIFUtilities errors (-17102)
+            guard let image = UIImage(data: data) else {
+                // Corrupted or invalid image data - silently fail
+                return nil
+            }
+            
+            return image
         } catch {
-            print("Error loading image from URL: \(error.localizedDescription)")
+            // Network errors - silently fail to avoid log spam
             return nil
         }
     }
@@ -592,8 +629,12 @@ class PlacePhotosViewModel: ObservableObject {
         Task {
             guard let url = URL(string: photoUrl) else { return }
             
+            // Use shared session with concurrency control
+            await imageLoadSemaphore.wait()
+            defer { imageLoadSemaphore.signal() }
+            
             do {
-                let (data, _) = try await URLSession.shared.data(from: url)
+                let (data, _) = try await Self.imageLoadSession.data(from: url)
                 if let image = UIImage(data: data) {
                     self.userProfilePhotos[userId] = image
                     self.profilePhotoLoadingStates[userId] = .loaded
@@ -629,6 +670,34 @@ class PlacePhotosViewModel: ObservableObject {
     
     func reviewPhotosForAboutLoadingState(forPlaceId placeId: String) -> LoadingState {
         return reviewPhotosForAboutLoadingStates[placeId] ?? .idle
+    }
+}
+
+// MARK: - AsyncSemaphore for Concurrency Control
+
+/// Actor-based semaphore for limiting concurrent async operations
+actor AsyncSemaphore {
+    private var value: Int
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+    
+    init(value: Int) {
+        self.value = value
+    }
+    
+    func wait() async {
+        value -= 1
+        if value >= 0 { return }
+        
+        await withCheckedContinuation { continuation in
+            waiters.append(continuation)
+        }
+    }
+    
+    func signal() {
+        value += 1
+        if value > 0, !waiters.isEmpty {
+            waiters.removeFirst().resume()
+        }
     }
 }
 
