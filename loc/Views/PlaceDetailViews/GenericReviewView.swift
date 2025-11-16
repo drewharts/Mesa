@@ -88,8 +88,8 @@ struct GenericReviewView: View {
                                         // Load more photos when user scrolls to the last visible photo
                                         if index == reviewPhotos.count - 1 {
                                             // Get the original review to access all image URLs
-                                            if let originalReview = selectedPlaceVM.getReview(by: review.id) {
-                                                selectedPlaceVM.loadMoreReviewPhotos(for: review.id, allImageUrls: originalReview.images)
+                                            if let originalReview = viewModel.getReview(by: review.id) {
+                                                viewModel.loadMorePhotos(for: review.id, allImageUrls: originalReview.images)
                                             }
                                         }
                                     }
@@ -118,7 +118,7 @@ struct GenericReviewView: View {
                     
                     Button(action: {
                         // Trigger reload of photos
-                        selectedPlaceVM.reloadReviewPhotos(for: review)
+                        viewModel.reloadPhotos(for: review)
                     }) {
                         Text("Retry")
                             .font(.footnote)
