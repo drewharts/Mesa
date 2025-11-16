@@ -3,6 +3,7 @@ import SwiftUI
 struct RestaruantReviewViewProfileInformation: View {
     let review: ReviewProtocol
     @ObservedObject var photosViewModel: PlacePhotosViewModel
+    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var detailPlaceVM: DetailPlaceViewModel
     @EnvironmentObject var userSession: UserSession
@@ -54,10 +55,10 @@ struct RestaruantReviewViewProfileInformation: View {
                 HStack(spacing: 4) {
                     Button(action: {
                         guard let currentUserId = userSession.currentUserId else { return }
-                        detailPlaceVM.likeReview(review, userId: currentUserId)
+                        selectedPlaceVM.likeReview(review, userId: currentUserId)
                     }) {
                                             Image(systemName: "heart.fill")
-                        .foregroundColor((userSession.currentUserId != nil && review.userId == userSession.currentUserId) ? .gray : (detailPlaceVM.isReviewLiked(review.id) ? .red : .gray))
+                        .foregroundColor((userSession.currentUserId != nil && review.userId == userSession.currentUserId) ? .gray : (selectedPlaceVM.isReviewLiked(review.id) ? .red : .gray))
                         .opacity((userSession.currentUserId != nil && review.userId == userSession.currentUserId) ? 0.3 : 0.7)
                 }
                 .disabled(userSession.currentUserId != nil && review.userId == userSession.currentUserId)
