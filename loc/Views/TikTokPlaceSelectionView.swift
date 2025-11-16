@@ -123,14 +123,18 @@ struct TikTokPlaceSelectionView: View {
         }
         .sheet(isPresented: $showingListSelection) {
             if let place = selectedPlaceForList {
+                let listVM = PlaceListSelectionViewModel(
+                    profile: profile,
+                    dataManager: dataManager,
+                    userSession: userSession
+                )
+                
                 ListSelectionSheet(
+                    viewModel: listVM,
                     place: place,
                     isPresented: $showingListSelection
                 )
                 .environmentObject(profile)
-                .environmentObject(detailPlaceViewModel)
-                .environmentObject(dataManager)
-                .environmentObject(userSession)
             }
         }
     }

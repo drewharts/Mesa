@@ -112,17 +112,13 @@ struct ListSelectionRowView: View {
 }
 
 // LightweightListSelectionRowView - NEW (for LightweightPlaceList)
+// Refactored to be a dumb view that delegates behavior via closures.
 struct LightweightListSelectionRowView: View {
-    @EnvironmentObject var profile: ProfileViewModel
-    @EnvironmentObject var dataManager: DataManager
     let list: LightweightPlaceList
     let place: DetailPlace
+    let isInList: Bool
+    let onToggle: () -> Void
     @State private var backgroundColor: Color = Color(.systemGray5)
-
-    // Computed property that reacts to profile.lightweightPlaceListPlaces changes
-    private var isInList: Bool {
-        profile.lightweightPlaceListPlaces[list.list_id]?.contains(where: { $0.place_id == place.id.uuidString }) ?? false
-    }
 
     var body: some View {
         Button(action: {
@@ -168,38 +164,17 @@ struct LightweightListSelectionRowView: View {
     }
     
     private func togglePlaceInList() {
-        Task {
-            do {
-                if isInList {
-                    // Remove from list using ProfileViewModel's method
-                    await MainActor.run {
-                        profile.removePlaceFromLightweightList(listId: list.list_id, place: place)
-                    }
-                } else {
-                    // Add to list using ProfileViewModel's method
-                    await MainActor.run {
-                        profile.addPlaceToLightweightList(listId: list.list_id, place: place)
-                    }
-                }
-            } catch {
-                print("❌ Error toggling place in list: \(error.localizedDescription)")
-            }
-        }
+        onToggle()
     }
 }
 
 // MARK: - ListsInSelectionSheet (Lightweight - uses place coordinates!)
 struct ListsInSelectionSheet: View {
-    @EnvironmentObject var profile: ProfileViewModel
-    @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
-    @EnvironmentObject var dataManager: DataManager
-    @EnvironmentObject var userSession: UserSession
+    @ObservedObject var viewModel: PlaceListSelectionViewModel
     let place: DetailPlace
     
-    @State private var placeCoordinates: CLLocationCoordinate2D?
-
     var isLoading: Bool {
-        profile.lightweightPlaceLists.isEmpty && profile.isLoading
+        viewModel.isLoadingInitial
     }
 
     var body: some View {
@@ -213,19 +188,28 @@ struct ListsInSelectionSheet: View {
                         .foregroundColor(.secondary)
                 }
                 .padding()
-            } else if !profile.lightweightPlaceLists.isEmpty {
-                ForEach(Array(profile.lightweightPlaceLists.enumerated()), id: \.element.id) { index, list in
-                    LightweightListSelectionRowView(list: list, place: place)
+            } else if !viewModel.lists.isEmpty {
+                ForEach(Array(viewModel.lists.enumerated()), id: \.element.id) { index, list in
+                    LightweightListSelectionRowView(
+                        list: list,
+                        place: place,
+                        isInList: viewModel.isPlace(place, in: list),
+                        onToggle: {
+                            viewModel.toggle(place: place, in: list)
+                        }
+                    )
                         .onAppear {
                             // Load more when we reach the 3rd-to-last item
-                            if index == profile.lightweightPlaceLists.count - 3 {
-                                loadMoreListsIfNeeded()
+                            if index == viewModel.lists.count - 3 {
+                                Task {
+                                    await viewModel.loadMoreListsIfNeeded(currentIndex: index)
+                                }
                             }
                         }
                 }
                 
                 // Loading indicator at the bottom
-                if profile.isLoadingMorePlaceLists {
+                if viewModel.isLoadingMorePlaceLists {
                     HStack {
                         Spacer()
                         ProgressView()
@@ -241,40 +225,13 @@ struct ListsInSelectionSheet: View {
                 }
             }
         }
-        .onAppear {
-            // Load lists by proximity to the place's coordinates
-            if let userId = userSession.currentUserId,
-               let coord = place.coordinate {
-                placeCoordinates = coord
-                Task {
-                    await dataManager.loadPlaceListsByPlaceCoordinates(
-                        userId: userId,
-                        placeLatitude: coord.latitude,
-                        placeLongitude: coord.longitude
-                    )
-                }
-            }
-        }
-    }
-    
-    private func loadMoreListsIfNeeded() {
-        guard !profile.isLoadingMorePlaceLists && profile.hasMorePlaceLists else { return }
-        guard let coord = placeCoordinates, let userId = userSession.currentUserId else { return }
-        
-        Task {
-            await dataManager.loadMorePlaceLists(
-                userId: userId,
-                userLatitude: coord.latitude,
-                userLongitude: coord.longitude
-            )
-        }
     }
 }
 
 // MARK: - ListSelectionSheet
 struct ListSelectionSheet: View {
     @EnvironmentObject var profile: ProfileViewModel
-    @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
+    @ObservedObject var viewModel: PlaceListSelectionViewModel
     let place: DetailPlace
     @Binding var isPresented: Bool
     @State private var showNewListSheet = false
@@ -308,11 +265,14 @@ struct ListSelectionSheet: View {
             .padding(.horizontal, 20)
             .padding(.top, 10)
 
-            ListsInSelectionSheet(place: place)
+            ListsInSelectionSheet(viewModel: viewModel, place: place)
 
             Spacer()
         }
         .cornerRadius(20)
         .padding()
+        .task {
+            await viewModel.loadInitialLists(for: place)
+        }
     }
 }

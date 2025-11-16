@@ -89,14 +89,18 @@ struct PlaceDetailView: View {
             }
             .sheet(isPresented: $showListSelection) {
                 if let selectedPlace = selectedPlaceVM.selectedPlace {
+                    let listVM = PlaceListSelectionViewModel(
+                        profile: profile,
+                        dataManager: dataManager,
+                        userSession: userSession
+                    )
+                    
                     ListSelectionSheet(
+                        viewModel: listVM,
                         place: selectedPlace,
                         isPresented: $showListSelection
                     )
                     .environmentObject(profile)
-                    .environmentObject(detailPlaceViewModel)
-                    .environmentObject(dataManager)
-                    .environmentObject(userSession)
                 } else {
                     Text("No place selected")
                 }
