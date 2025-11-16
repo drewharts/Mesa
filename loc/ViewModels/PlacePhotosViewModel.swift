@@ -13,14 +13,27 @@ import Combine
 @MainActor
 class PlacePhotosViewModel: ObservableObject {
     // MARK: - Published Properties
+    // Place-level photos
     @Published private var placePhotos: [String: [UIImage]] = [:] // Cache for place-level photos by placeId
     @Published private var photoLoadingStates: [String: LoadingState] = [:] // Loading states for place photos
-    @Published private var externalReviewPhotosByPlace: [String: [UIImage]] = [:] // Cache for external review photos by placeId
-    @Published private var externalReviewPhotoLoadingStates: [String: LoadingState] = [:] // Loading states for external review photos
-    @Published private var externalReviewPhotosAllLoadedByPlace: [String: Bool] = [:] // Track completion of external photo loading per place
     @Published private var photoPageLimit = 9
     @Published private var lastPhotoDocument: Any? // Replaced DocumentSnapshot for Supabase migration
     @Published private var allPhotosLoaded = false
+    
+    // Review photos
+    @Published private var reviewPhotos: [String: [UIImage]] = [:] // Cache for review photos by reviewId
+    @Published private var reviewPhotoLoadingStates: [String: LoadingState] = [:] // Loading states for review photos
+    @Published private var reviewPhotosForAbout: [String: [UIImage]] = [:] // Cache for review photos in about section by placeId
+    @Published private var reviewPhotosForAboutLoadingStates: [String: LoadingState] = [:] // Loading states for review photos in about section
+    
+    // External review photos
+    @Published private var externalReviewPhotosByPlace: [String: [UIImage]] = [:] // Cache for external review photos by placeId
+    @Published private var externalReviewPhotoLoadingStates: [String: LoadingState] = [:] // Loading states for external review photos
+    @Published private var externalReviewPhotosAllLoadedByPlace: [String: Bool] = [:] // Track completion of external photo loading per place
+    
+    // Profile photos
+    @Published private var userProfilePhotos: [String: UIImage] = [:] // Cache for profile photos by userId
+    @Published private var profilePhotoLoadingStates: [String: LoadingState] = [:] // Loading states for profile photos
     
     @Published var place: DetailPlace?
     @Published var placeId: String = ""
@@ -80,8 +93,30 @@ class PlacePhotosViewModel: ObservableObject {
                 // Reset and load photos for new place
                 if let place = place {
                     self.resetPhotoLoading()
-                    self.getPlacePhotos(for: place, loadMore: false)
+                    // Place photos will be loaded after reviews are ready
                     self.loadExternalReviewPhotos(for: place, reset: true)
+                }
+            }
+            .store(in: &cancellables)
+        
+        // Observe when reviews are loaded and load photos for them
+        // We check selectedPlace changes as proxy for review updates since reviews are loaded after place selection
+        selectedPlaceVM.$selectedPlace
+            .debounce(for: .milliseconds(500), scheduler: DispatchQueue.main)
+            .sink { [weak self] place in
+                guard let self = self, let place = place else { return }
+                
+                // Load place-level photos from reviews
+                self.getPlacePhotos(for: place, loadMore: false)
+                
+                // Load photos for About section
+                self.loadReviewPhotosForAbout(for: place)
+                
+                // Load review photos and profile photos for each review
+                let reviews = self.selectedPlaceVM.reviews
+                reviews.forEach { review in
+                    self.loadReviewPhotos(for: review)
+                    self.loadProfilePhotoFromURL(userId: review.userId, photoUrl: review.profilePhotoUrl)
                 }
             }
             .store(in: &cancellables)
@@ -158,6 +193,8 @@ class PlacePhotosViewModel: ObservableObject {
         if let placeId = place?.id.uuidString {
             placePhotos[placeId]?.removeAll()
             photoLoadingStates[placeId] = .idle
+            reviewPhotosForAbout[placeId]?.removeAll()
+            reviewPhotosForAboutLoadingStates[placeId] = .idle
             lastPhotoDocument = nil
             allPhotosLoaded = false
             // Remove the entry entirely instead of just clearing it, so loadInitialExternalReviewPhotos can work
@@ -415,6 +452,183 @@ class PlacePhotosViewModel: ObservableObject {
             print("Error loading image from URL: \(error.localizedDescription)")
             return nil
         }
+    }
+    
+    // MARK: - Review Photos
+    
+    /// Load photos for a specific review (loads first 4 initially for performance)
+    func loadReviewPhotos<T: ReviewProtocol>(for review: T) {
+        let reviewId = review.id
+        guard !review.images.isEmpty else {
+            reviewPhotos[reviewId] = []
+            reviewPhotoLoadingStates[reviewId] = .loaded
+            return
+        }
+        
+        reviewPhotoLoadingStates[reviewId] = .loading
+        
+        // Load only the first 4 images initially for better performance
+        let initialImageCount = min(4, review.images.count)
+        let initialImageUrls = Array(review.images.prefix(initialImageCount))
+        
+        // Load initial images in parallel using TaskGroup
+        Task {
+            var loadedImages: [UIImage] = []
+            
+            await withTaskGroup(of: UIImage?.self) { group in
+                for imageUrl in initialImageUrls {
+                    group.addTask {
+                        await self.loadImageFromURL(imageUrl: imageUrl)
+                    }
+                }
+                
+                for await image in group {
+                    if let image {
+                        loadedImages.append(image)
+                    }
+                }
+            }
+            
+            self.reviewPhotos[reviewId] = loadedImages
+            self.reviewPhotoLoadingStates[reviewId] = .loaded
+        }
+    }
+    
+    /// Load more photos for a specific review when user scrolls
+    func loadMoreReviewPhotos(for reviewId: String, allImageUrls: [String]) {
+        guard let currentPhotos = reviewPhotos[reviewId],
+              currentPhotos.count < allImageUrls.count else {
+            return // Already loaded all photos or no photos to load
+        }
+        
+        let startIndex = currentPhotos.count
+        let endIndex = min(startIndex + 4, allImageUrls.count) // Load 4 more at a time
+        let urlsToLoad = Array(allImageUrls[startIndex..<endIndex])
+        
+        Task {
+            var newImages: [UIImage] = []
+            
+            await withTaskGroup(of: UIImage?.self) { group in
+                for imageUrl in urlsToLoad {
+                    group.addTask {
+                        await self.loadImageFromURL(imageUrl: imageUrl)
+                    }
+                }
+                
+                for await image in group {
+                    if let image {
+                        newImages.append(image)
+                    }
+                }
+            }
+            
+            self.reviewPhotos[reviewId]?.append(contentsOf: newImages)
+        }
+    }
+    
+    /// Public method to reload review photos
+    func reloadReviewPhotos<T: ReviewProtocol>(for review: T) {
+        self.loadReviewPhotos(for: review)
+    }
+    
+    /// Load photos for the About section (limited to first 6 for performance)
+    func loadReviewPhotosForAbout(for place: DetailPlace) {
+        let placeId = place.id.uuidString
+        
+        // Don't fetch if already loading
+        if reviewPhotosForAboutLoadingStates[placeId] == .loading {
+            return
+        }
+        
+        reviewPhotosForAboutLoadingStates[placeId] = .loading
+        
+        // Use cached reviews to get photo URLs (reviews are already loaded at this point)
+        Task {
+            let reviews = selectedPlaceVM.reviews
+            
+            // Extract photo URLs from reviews
+            var photoURLs: [String] = []
+            for review in reviews {
+                photoURLs.append(contentsOf: review.images)
+            }
+            
+            // If no photos found, mark as loaded with empty array
+            if photoURLs.isEmpty {
+                self.reviewPhotosForAbout[placeId] = []
+                self.reviewPhotosForAboutLoadingStates[placeId] = .loaded
+                return
+            }
+            
+            // Load the first few images for the about section (limit to avoid loading too many)
+            let urlsToLoad = Array(photoURLs.prefix(6))
+            var loadedImages: [UIImage] = []
+            
+            await withTaskGroup(of: UIImage?.self) { group in
+                for imageUrl in urlsToLoad {
+                    group.addTask {
+                        await self.loadImageFromURL(imageUrl: imageUrl)
+                    }
+                }
+                
+                for await image in group {
+                    if let image {
+                        loadedImages.append(image)
+                    }
+                }
+            }
+            
+            self.reviewPhotosForAbout[placeId] = loadedImages
+            self.reviewPhotosForAboutLoadingStates[placeId] = .loaded
+        }
+    }
+    
+    // MARK: - Profile Photos
+    
+    /// Load profile photo from URL (URL comes from SQL JOIN with users table)
+    func loadProfilePhotoFromURL(userId: String, photoUrl: String) {
+        // Skip if already loaded or empty URL
+        guard !photoUrl.isEmpty, userProfilePhotos[userId] == nil else { return }
+        
+        Task {
+            guard let url = URL(string: photoUrl) else { return }
+            
+            do {
+                let (data, _) = try await URLSession.shared.data(from: url)
+                if let image = UIImage(data: data) {
+                    self.userProfilePhotos[userId] = image
+                    self.profilePhotoLoadingStates[userId] = .loaded
+                }
+            } catch {
+                // Silently fail - profile photo is optional
+                self.profilePhotoLoadingStates[userId] = .loaded
+            }
+        }
+    }
+    
+    // MARK: - Public Accessors for Review & Profile Photos
+    
+    func photos(for review: any ReviewProtocol) -> [UIImage] {
+        return reviewPhotos[review.id] ?? []
+    }
+    
+    func photoLoadingState(for review: any ReviewProtocol) -> LoadingState {
+        return reviewPhotoLoadingStates[review.id] ?? .idle
+    }
+    
+    func profilePhoto(forUserId userId: String) -> UIImage? {
+        return userProfilePhotos[userId]
+    }
+    
+    func profilePhotoLoadingState(forUserId userId: String) -> LoadingState {
+        return profilePhotoLoadingStates[userId] ?? .idle
+    }
+    
+    func reviewPhotosForAbout(forPlaceId placeId: String) -> [UIImage] {
+        return reviewPhotosForAbout[placeId] ?? []
+    }
+    
+    func reviewPhotosForAboutLoadingState(forPlaceId placeId: String) -> LoadingState {
+        return reviewPhotosForAboutLoadingStates[placeId] ?? .idle
     }
 }
 

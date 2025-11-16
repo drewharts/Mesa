@@ -176,10 +176,8 @@ class PlaceDetailTabsViewModel: ObservableObject {
     }
     
     func onAppear() {
-        // Load review photos for about section
-        if let place = currentPlace {
-            selectedPlaceVM.loadReviewPhotosForAbout(for: place)
-        }
+        // Load review photos for about section (handled by PlacePhotosViewModel)
+        // PlacePhotosViewModel automatically loads review photos when place changes
     }
     
     // MARK: - Private Helpers
