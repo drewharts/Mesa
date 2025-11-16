@@ -22,14 +22,6 @@ class SelectedPlaceViewModel: ObservableObject {
 
     private let locationManager: LocationManager
     private weak var detailPlaceViewModel: DetailPlaceViewModel?
-    
-    // MARK: - Photo Management Delegation
-    // PlacePhotosViewModel handles ALL photo loading logic
-    private var photosVM: PlacePhotosViewModel?
-    
-    func setPhotosViewModel(_ viewModel: PlacePhotosViewModel) {
-        self.photosVM = viewModel
-    }
 
     init(locationManager: LocationManager, reviewService: ReviewService, placeService: PlaceService, userService: UserService, imageService: ImageService, mesaBackendService: MesaBackendService = MesaBackendService(), detailPlaceViewModel: DetailPlaceViewModel? = nil) {
         self.locationManager = locationManager
@@ -166,20 +158,10 @@ class SelectedPlaceViewModel: ObservableObject {
         }
         
         let reviewState = reviewLoadingStates[placeId] ?? .idle
-        
-        // Get photo state from PlacePhotosViewModel (if available)
-        let photoState = photosVM?.photoLoadingState ?? .idle
 
-        // Consider loaded if both photos and reviews are either loaded or in error state
+        // Consider loaded if reviews are either loaded or in error state
         // (we don't want to wait forever if there's an error)
-        let photosReady: Bool
-        switch photoState {
-        case .loaded, .error:
-            photosReady = true
-        case .idle, .loading:
-            photosReady = false
-        }
-
+        // Photos are managed independently by PlacePhotosViewModel
         let reviewsReady: Bool
         switch reviewState {
         case .loaded, .error:
@@ -188,11 +170,11 @@ class SelectedPlaceViewModel: ObservableObject {
             reviewsReady = false
         }
 
-        // Note: reviewPhotosForAbout is loaded separately and asynchronously, but we don't want to block
-        // the main place detail view from loading. The about section can show a loading state independently.
+        // Note: Photos are loaded separately by PlacePhotosViewModel and don't block
+        // the main place detail view from loading. Each section shows its own loading state.
 
         let wasLoaded = isCurrentPlaceFullyLoaded
-        isCurrentPlaceFullyLoaded = photosReady && reviewsReady
+        isCurrentPlaceFullyLoaded = reviewsReady
         
         // Debug logging when the state changes
         // Place is now fully loaded
@@ -415,29 +397,6 @@ class SelectedPlaceViewModel: ObservableObject {
         }
     }
     
-    // MARK: - Photo Loading Delegation
-    // All photo loading is now handled by PlacePhotosViewModel
-    // These methods delegate to PlacePhotosViewModel for backward compatibility
-    
-    func loadMorePhotos() {
-        photosVM?.loadMorePhotos()
-    }
-    
-    func loadInitialExternalReviewPhotos() {
-        photosVM?.loadInitialExternalReviewPhotos()
-    }
-    
-    func loadMoreExternalReviewPhotosIfNeeded(currentIndex: Int) {
-        photosVM?.loadMoreExternalReviewPhotosIfNeeded(currentIndex: currentIndex)
-    }
-    
-    func loadMoreReviewPhotos(for reviewId: String, allImageUrls: [String]) {
-        photosVM?.loadMoreReviewPhotos(for: reviewId, allImageUrls: allImageUrls)
-    }
-    
-    func reloadReviewPhotos<T: ReviewProtocol>(for review: T) {
-        photosVM?.reloadReviewPhotos(for: review)
-    }
 
     // MARK: - Public Methods
     func addReview<T: ReviewProtocol>(_ review: T) {
@@ -557,72 +516,8 @@ class SelectedPlaceViewModel: ObservableObject {
         return placeTikToks[placeId] ?? []
     }
     
-    // Helper to convert PlacePhotosViewModel.LoadingState to SelectedPlaceViewModel.LoadingState
-    private func convertLoadingState(_ state: PlacePhotosViewModel.LoadingState) -> LoadingState {
-        switch state {
-        case .idle: return .idle
-        case .loading: return .loading
-        case .loaded: return .loaded
-        case .error(let error): return .error(error)
-        }
-    }
-    
-    // Photo accessors - delegate to PlacePhotosViewModel
-    var photoLoadingState: LoadingState {
-        guard let state = photosVM?.photoLoadingState else { return .idle }
-        return convertLoadingState(state)
-    }
-    
-    var photos: [UIImage] {
-        return photosVM?.photos ?? []
-    }
-    
-    func photos(for review: any ReviewProtocol) -> [UIImage] {
-        return photosVM?.photos(for: review) ?? []
-    }
-    
-    func photoLoadingState(for review: any ReviewProtocol) -> LoadingState {
-        guard let state = photosVM?.photoLoadingState(for: review) else { return .idle }
-        return convertLoadingState(state)
-    }
-    
-    func profilePhoto(forUserId userId: String) -> UIImage? {
-        return photosVM?.profilePhoto(forUserId: userId)
-    }
-    
-    func profilePhotoLoadingState(forUserId userId: String) -> LoadingState {
-        guard let state = photosVM?.profilePhotoLoadingState(forUserId: userId) else { return .idle }
-        return convertLoadingState(state)
-    }
-    
     func reviewLoadingState(forPlaceId placeId: String) -> LoadingState {
         return reviewLoadingStates[placeId] ?? .idle
-    }
-
-    func reviewPhotosForAbout(forPlaceId placeId: String) -> [UIImage] {
-        return photosVM?.reviewPhotosForAbout(forPlaceId: placeId) ?? []
-    }
-
-    func reviewPhotosForAboutLoadingState(forPlaceId placeId: String) -> LoadingState {
-        guard let state = photosVM?.reviewPhotosForAboutLoadingState(forPlaceId: placeId) else { return .idle }
-        return convertLoadingState(state)
-    }
-
-    var externalReviewPhotos: [UIImage] {
-        return photosVM?.externalReviewPhotos ?? []
-    }
-
-    var externalReviewPhotoLoadingState: LoadingState {
-        guard let state = photosVM?.externalReviewPhotoLoadingState else { return .idle }
-        return convertLoadingState(state)
-    }
-
-    var externalReviewPhotosFullyLoaded: Bool {
-        return photosVM?.externalReviewPhotosFullyLoaded ?? true
-    }
-
-    var allPhotosLoadedForCurrentPlace: Bool {
-        return photosVM?.allPhotosLoadedForCurrentPlace ?? true
     }
     
     func likeReview<T: ReviewProtocol>(_ review: T, userId: String) {

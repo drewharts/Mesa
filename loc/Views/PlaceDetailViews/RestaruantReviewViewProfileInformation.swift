@@ -2,7 +2,7 @@ import SwiftUI
 
 struct RestaruantReviewViewProfileInformation: View {
     let review: ReviewProtocol
-    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
+    @ObservedObject var photosViewModel: PlacePhotosViewModel
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var detailPlaceVM: DetailPlaceViewModel
     @EnvironmentObject var userSession: UserSession
@@ -30,7 +30,7 @@ struct RestaruantReviewViewProfileInformation: View {
                             userProfileViewModel.fetchAndSelectUser(userId: review.userId, currentUserId: currentUserId)
                         }
                     }
-            } else if selectedPlaceVM.profilePhotoLoadingState(forUserId: review.userId) == .loading {
+            } else if photosViewModel.profilePhotoLoadingState(forUserId: review.userId) == .loading {
                 ProgressView()
                     .frame(width: 50, height: 50)
             } else {
@@ -54,10 +54,10 @@ struct RestaruantReviewViewProfileInformation: View {
                 HStack(spacing: 4) {
                     Button(action: {
                         guard let currentUserId = userSession.currentUserId else { return }
-                        selectedPlaceVM.likeReview(review, userId: currentUserId)
+                        detailPlaceVM.likeReview(review, userId: currentUserId)
                     }) {
                                             Image(systemName: "heart.fill")
-                        .foregroundColor((userSession.currentUserId != nil && review.userId == userSession.currentUserId) ? .gray : (selectedPlaceVM.isReviewLiked(review.id) ? .red : .gray))
+                        .foregroundColor((userSession.currentUserId != nil && review.userId == userSession.currentUserId) ? .gray : (detailPlaceVM.isReviewLiked(review.id) ? .red : .gray))
                         .opacity((userSession.currentUserId != nil && review.userId == userSession.currentUserId) ? 0.3 : 0.7)
                 }
                 .disabled(userSession.currentUserId != nil && review.userId == userSession.currentUserId)

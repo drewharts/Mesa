@@ -20,7 +20,10 @@ struct GenericReviewView: View {
     var body: some View {
         VStack(spacing: 16) {
             // Header: Profile Picture, Name, and Timestamp
-            RestaruantReviewViewProfileInformation(review: review)
+            RestaruantReviewViewProfileInformation(
+                review: review,
+                photosViewModel: viewModel.photosViewModel
+            )
             
             // Review Text
             Text(review.reviewText)

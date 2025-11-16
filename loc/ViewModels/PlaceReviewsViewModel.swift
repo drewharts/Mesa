@@ -20,6 +20,7 @@ class PlaceReviewsViewModel: ObservableObject {
     
     // MARK: - Dependencies
     private let reviewService: ReviewService
+    private let photosVM: PlacePhotosViewModel  // Direct dependency for photos
     private let selectedPlaceVM: SelectedPlaceViewModel  // Temporary until fully refactored
     private let notificationManager: NotificationManager
     private let userSession: UserSession
@@ -36,10 +37,12 @@ class PlaceReviewsViewModel: ObservableObject {
     
     // MARK: - Initialization
     init(reviewService: ReviewService,
+         photosViewModel: PlacePhotosViewModel,
          selectedPlaceVM: SelectedPlaceViewModel,
          notificationManager: NotificationManager,
          userSession: UserSession) {
         self.reviewService = reviewService
+        self.photosVM = photosViewModel
         self.selectedPlaceVM = selectedPlaceVM
         self.notificationManager = notificationManager
         self.userSession = userSession
@@ -80,6 +83,10 @@ class PlaceReviewsViewModel: ObservableObject {
         "Be the first to write a review!"
     }
     
+    var photosViewModel: PlacePhotosViewModel {
+        photosVM
+    }
+    
     // MARK: - Actions
     func loadReviews(for placeId: String) {
         // Reviews are already loaded via selectedPlaceVM observers
@@ -104,20 +111,25 @@ class PlaceReviewsViewModel: ObservableObject {
         selectedPlaceVM.checkLikeStatuses(userId: userId)
     }
     
-    func getPhotoLoadingState<T: ReviewProtocol>(for review: T) -> SelectedPlaceViewModel.LoadingState {
-        selectedPlaceVM.photoLoadingState(for: review)
+    // MARK: - Photo Management (Direct Access)
+    func getPhotoLoadingState<T: ReviewProtocol>(for review: T) -> PlacePhotosViewModel.LoadingState {
+        photosVM.photoLoadingState(for: review)
     }
     
     func getPhotos<T: ReviewProtocol>(for review: T) -> [UIImage] {
-        selectedPlaceVM.photos(for: review)
+        photosVM.photos(for: review)
     }
     
     func loadMorePhotos(for reviewId: String, allImageUrls: [String]) {
-        selectedPlaceVM.loadMoreReviewPhotos(for: reviewId, allImageUrls: allImageUrls)
+        photosVM.loadMoreReviewPhotos(for: reviewId, allImageUrls: allImageUrls)
     }
     
     func reloadPhotos<T: ReviewProtocol>(for review: T) {
-        selectedPlaceVM.reloadReviewPhotos(for: review)
+        photosVM.reloadReviewPhotos(for: review)
+    }
+    
+    func getProfilePhotoLoadingState(forUserId userId: String) -> PlacePhotosViewModel.LoadingState {
+        photosVM.profilePhotoLoadingState(forUserId: userId)
     }
     
     func getReview(by id: String) -> (any ReviewProtocol)? {
