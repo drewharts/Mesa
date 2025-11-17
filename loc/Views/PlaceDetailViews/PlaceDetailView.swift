@@ -110,7 +110,8 @@ struct PlaceDetailView: View {
                     listSelectionViewModel = PlaceListSelectionViewModel(
                         profile: profile,
                         userService: serviceContainer.userService,
-                        userSession: userSession
+                        userSession: userSession,
+                        dataManager: dataManager
                     )
                 }
             }

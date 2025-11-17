@@ -142,7 +142,8 @@ struct TikTokPlaceSelectionView: View {
                 listSelectionViewModel = PlaceListSelectionViewModel(
                     profile: profile,
                     userService: UserService.shared,
-                    userSession: userSession
+                    userSession: userSession,
+                    dataManager: dataManager
                 )
             }
         }

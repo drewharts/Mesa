@@ -22,6 +22,7 @@ class PlaceListSelectionViewModel: ObservableObject {
     private let userService: UserService
     private let userSession: UserSession
     private let placeService: SupabasePlaceService
+    private let dataManager: DataManager
     
     // MARK: - Internal State
     private var placeCoordinates: CLLocationCoordinate2D?
@@ -33,10 +34,12 @@ class PlaceListSelectionViewModel: ObservableObject {
     init(profile: ProfileViewModel,
          userService: UserService,
          userSession: UserSession,
+         dataManager: DataManager,
          placeService: SupabasePlaceService = SupabasePlaceService.shared) {
         self.profile = profile
         self.userService = userService
         self.userSession = userSession
+        self.dataManager = dataManager
         self.placeService = placeService
         print("🆕 [PlaceListSelectionVM] ViewModel initialized")
     }
@@ -78,6 +81,11 @@ class PlaceListSelectionViewModel: ObservableObject {
             hasLoadedOnce = true
             
             print("✅ [PlaceListSelectionVM] Loaded \(fetchedLists.count) lists for place at (\(coord.latitude), \(coord.longitude))")
+            
+            // Load place membership data for each list (so we can show checkmarks)
+            if !fetchedLists.isEmpty {
+                await loadPlaceMembershipForLists(fetchedLists)
+            }
         } catch {
             print("❌ [PlaceListSelectionVM] Error loading lists: \(error)")
             lists = []
@@ -116,6 +124,9 @@ class PlaceListSelectionViewModel: ObservableObject {
                 currentPage = nextPage
                 hasMore = moreLists.count >= pageSize
                 print("✅ [PlaceListSelectionVM] Added \(moreLists.count) more lists. Total: \(lists.count)")
+                
+                // Load place membership data for new lists
+                await loadPlaceMembershipForLists(moreLists)
             } else {
                 hasMore = false
                 print("ℹ️ [PlaceListSelectionVM] No more lists available")
@@ -126,6 +137,49 @@ class PlaceListSelectionViewModel: ObservableObject {
         }
         
         isLoadingMore = false
+    }
+    
+    // MARK: - Private Helpers
+    
+    /// Load place membership data for lists (so we can show checkmarks)
+    private func loadPlaceMembershipForLists(_ listsToLoad: [LightweightPlaceList]) async {
+        print("📋 [PlaceListSelectionVM] Loading place membership for \(listsToLoad.count) lists...")
+        
+        // Load places for each list in parallel
+        await withTaskGroup(of: (String, [LightweightPlace]?).self) { group in
+            for list in listsToLoad {
+                group.addTask {
+                    do {
+                        let places = try await self.userService.fetchPlacesForPlaceList(
+                            listId: list.list_id,
+                            page: 1,
+                            pageSize: 6
+                        )
+                        return (list.list_id, places)
+                    } catch {
+                        print("❌ [PlaceListSelectionVM] Error loading places for list \(list.list_id): \(error)")
+                        return (list.list_id, nil)
+                    }
+                }
+            }
+            
+            // Collect all results
+            var allPlaces: [String: [LightweightPlace]] = [:]
+            for await (listId, places) in group {
+                if let places = places {
+                    allPlaces[listId] = places
+                }
+            }
+            
+            // Single main thread update to prevent multiple re-renders
+            await MainActor.run {
+                for (listId, places) in allPlaces {
+                    profile.lightweightPlaceListPlaces[listId] = places
+                }
+            }
+        }
+        
+        print("✅ [PlaceListSelectionVM] Finished loading place membership for all lists")
     }
     
     func isPlace(_ place: DetailPlace, in list: LightweightPlaceList) -> Bool {
