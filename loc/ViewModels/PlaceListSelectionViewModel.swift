@@ -90,14 +90,23 @@ class PlaceListSelectionViewModel: ObservableObject {
     }
     
     func loadMoreListsIfNeeded(currentIndex: Int) async {
+        // Debug: Log every call to see if pagination is being triggered
+        print("🔍 [PlaceListSelectionVM] Pagination check: index=\(currentIndex), count=\(lists.count), isLoadingMore=\(isLoadingMore), hasMore=\(hasMore)")
+        
         // Guard: Already loading or no more to load
         guard !isLoadingMore,
               hasMore,
               let coord = placeCoordinates,
-              let userId = userSession.currentUserId else { return }
+              let userId = userSession.currentUserId else {
+            print("⛔️ [PlaceListSelectionVM] Pagination blocked by guard")
+            return
+        }
         
-        // Load when we're within 5 items of the end (earlier loading for better UX)
-        guard currentIndex >= lists.count - 5 else { return }
+        // Load when we're within 3 items of the end (earlier trigger for smoother UX)
+        guard currentIndex >= lists.count - 3 else {
+            print("⏭️ [PlaceListSelectionVM] Not near end yet: \(currentIndex) < \(lists.count - 3)")
+            return
+        }
         
         isLoadingMore = true
         let nextPage = currentPage + 1
@@ -117,10 +126,14 @@ class PlaceListSelectionViewModel: ObservableObject {
                 lists.append(contentsOf: moreLists)
                 currentPage = nextPage
                 hasMore = moreLists.count >= pageSize
-                print("✅ [PlaceListSelectionVM] Added \(moreLists.count) more lists. Total: \(lists.count)")
+                print("✅ [PlaceListSelectionVM] Added \(moreLists.count) more lists. Total: \(lists.count), hasMore=\(hasMore)")
                 
-                // Load place membership data for new lists
-                await loadPlaceMembershipForLists(moreLists)
+                // ✅ CRITICAL FIX: Load place membership data in BACKGROUND (non-blocking)
+                // This allows pagination to continue immediately without waiting for checkmarks
+                // Follows Single Responsibility: Pagination ≠ Data Enrichment
+                Task {
+                    await loadPlaceMembershipForLists(moreLists)
+                }
             } else {
                 hasMore = false
                 print("ℹ️ [PlaceListSelectionVM] No more lists available")
@@ -130,7 +143,9 @@ class PlaceListSelectionViewModel: ObservableObject {
             // Don't set hasMore to false on error - allow retry
         }
         
+        // ✅ CRITICAL: Release lock immediately so next page can load
         isLoadingMore = false
+        print("✅ [PlaceListSelectionVM] Pagination complete, ready for next page")
     }
     
     // MARK: - Private Helpers
