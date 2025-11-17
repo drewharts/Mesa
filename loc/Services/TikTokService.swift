@@ -34,8 +34,6 @@ class TikTokService: ObservableObject {
     @Published var errorMessage: String?
     
     func processTikTokURL(_ url: String) async -> Result<[DetailPlace], Error> {
-        print("🎬 [TikTokService] processTikTokURL called for: \(url)")
-        
         guard let requestURL = URL(string: "\(baseURL)/process-url") else {
             print("❌ [TikTokService] Invalid base URL")
             return .failure(TikTokError.invalidURL)
@@ -45,7 +43,6 @@ class TikTokService: ObservableObject {
         defer { isProcessing = false }
         
         let request = await createRequest(url: requestURL, tikTokURL: url)
-        print("📤 [TikTokService] Sending request to backend...")
         
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
@@ -55,22 +52,17 @@ class TikTokService: ObservableObject {
                 return .failure(error)
             }
             
-            print("✅ [TikTokService] Got response, parsing...")
-            
             // Parse the response - could be single place or array of places
             do {
                 // First try to parse as an array of DetailPlace objects
                 let detailPlaces = try JSONDecoder().decode([DetailPlace].self, from: data)
-                print("✅ [TikTokService] Parsed as DetailPlace array: \(detailPlaces.count) places")
                 return .success(detailPlaces)
             } catch {
                 // Try to parse as a single DetailPlace
                 do {
                     let detailPlace = try JSONDecoder().decode(DetailPlace.self, from: data)
-                    print("✅ [TikTokService] Parsed as single DetailPlace")
                     return .success([detailPlace]) // Wrap in array
                 } catch {
-                    print("⚠️ [TikTokService] Trying wrapped format parsing...")
                     // If that fails, try to parse as wrapped format like other backend responses
                     do {
                         let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
@@ -141,8 +133,6 @@ class TikTokService: ObservableObject {
     }
     
     func getTikTokOEmbed(url: String) async -> Result<TikTokOEmbedResponse, Error> {
-        print("🎬 [TikTokService] getTikTokOEmbed called for: \(url)")
-        
         guard let encodedURL = url.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
               let requestURL = URL(string: "\(baseURL)/tiktok/oembed?url=\(encodedURL)") else {
             print("❌ [TikTokService] Invalid URL for oEmbed request")
@@ -152,8 +142,6 @@ class TikTokService: ObservableObject {
         var request = URLRequest(url: requestURL)
         request.httpMethod = "GET"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        
-        print("📤 [TikTokService] Fetching oEmbed data from: \(requestURL.absoluteString)")
         
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
@@ -172,7 +160,6 @@ class TikTokService: ObservableObject {
             }
             
             let oembedResponse = try JSONDecoder().decode(TikTokOEmbedResponse.self, from: data)
-            print("✅ [TikTokService] Successfully fetched oEmbed data: \(oembedResponse.title)")
             return .success(oembedResponse)
             
         } catch {
@@ -196,16 +183,6 @@ class TikTokService: ObservableObject {
         }
         if let externalPlaceId = externalPlaceId {
             body["external_place_id"] = externalPlaceId
-        }
-        
-        // 🔍 Log the request body for debugging
-        print("🔄 [TikTokService] Refreshing thumbnail with request body:")
-        print("   URL: \(url)")
-        print("   User ID: \(userId ?? "nil")")
-        print("   External Place ID: \(externalPlaceId ?? "nil")")
-        if let bodyJSON = try? JSONSerialization.data(withJSONObject: body),
-           let bodyString = String(data: bodyJSON, encoding: .utf8) {
-            print("   Full body JSON: \(bodyString)")
         }
         
         guard let httpBody = try? JSONSerialization.data(withJSONObject: body) else {
