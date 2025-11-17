@@ -107,9 +107,6 @@ struct ExternalReviewPhotoGallery: View {
                         .onTapGesture {
                             onPhotoTapped(photos, 0)
                         }
-                        .onAppear {
-                            photosViewModel.loadMoreExternalReviewPhotosIfNeeded(currentIndex: 0)
-                        }
                     }
                     
                     ForEach(staggeredLayoutItems) { item in

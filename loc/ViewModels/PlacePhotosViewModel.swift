@@ -180,10 +180,18 @@ class PlacePhotosViewModel: ObservableObject {
         guard let place = place else { return }
         let placeId = place.id.uuidString
         
+        // Early exit if already fully loaded
         guard !externalReviewPhotosFullyLoaded else { return }
         
         let photos = externalReviewPhotosByPlace[placeId] ?? []
-        if currentIndex >= max(0, photos.count - 2) {
+        let loadingState = externalReviewPhotoLoadingStates[placeId] ?? .idle
+        let triggerThreshold = max(0, photos.count - 2)
+        
+        // Only trigger if:
+        // 1. We're near the end (within last 2 photos)
+        // 2. We have at least 3 photos (prevents premature triggers)
+        // 3. Not currently loading (prevents duplicate requests)
+        if currentIndex >= triggerThreshold && photos.count >= 3 && loadingState != .loading {
             loadExternalReviewPhotos(for: place, reset: false)
         }
     }
@@ -328,9 +336,13 @@ class PlacePhotosViewModel: ObservableObject {
     private func loadExternalReviewPhotos(for place: DetailPlace, reset: Bool) {
         let placeId = place.id.uuidString
         
+        // Check AND set loading state BEFORE creating Task to prevent race conditions
         if externalReviewPhotoLoadingStates[placeId] == .loading {
             return
         }
+        
+        // Set loading state immediately to prevent duplicate requests
+        externalReviewPhotoLoadingStates[placeId] = .loading
         
         Task {
             await loadExternalReviewPhotosInternal(for: place, placeId: placeId, reset: reset)
@@ -339,7 +351,6 @@ class PlacePhotosViewModel: ObservableObject {
     
     /// Internal method that handles loading external reviews with retry logic
     private func loadExternalReviewPhotosInternal(for place: DetailPlace, placeId: String, reset: Bool) async {
-        self.externalReviewPhotoLoadingStates[placeId] = .loading
         if reset {
             self.externalReviewRetryAttempts[placeId] = 0
         }
