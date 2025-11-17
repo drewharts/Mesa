@@ -198,12 +198,9 @@ struct ExternalFavoritePlaceCard: View {
             // Fetch the full place details
             let place = try await PlaceService.shared.fetchPlace(withId: favoritePlace.place_id)
             
-            // Navigate to map and select place
+            // Use centralized navigation method from UserProfileViewModel
             await MainActor.run {
-                selectedPlaceVM.navigateToMapAndSelectPlace(place) {
-                    // Dismiss user profile navigation
-                    userProfileViewModel.isUserDetailPresented = false
-                }
+                userProfileViewModel.navigateToPlaceFromProfile(place, selectedPlaceVM: selectedPlaceVM)
             }
         } catch {
             print("❌ Error loading place details: \(error)")

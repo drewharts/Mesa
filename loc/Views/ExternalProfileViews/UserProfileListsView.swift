@@ -567,11 +567,8 @@ struct ExternalUserListPlaceCard: View {
                 // Dismiss the list popup sheet first
                 presentationMode.wrappedValue.dismiss()
                 
-                // Then navigate to map and select place
-                selectedPlaceVM.navigateToMapAndSelectPlace(detailPlace) {
-                    // Dismiss user profile navigation
-                    userProfileViewModel.isUserDetailPresented = false
-                }
+                // Use centralized navigation method from UserProfileViewModel
+                userProfileViewModel.navigateToPlaceFromProfile(detailPlace, selectedPlaceVM: selectedPlaceVM)
             }
         } catch {
             print("❌ Error loading place details: \(error)")

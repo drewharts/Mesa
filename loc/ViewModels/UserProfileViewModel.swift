@@ -533,5 +533,15 @@ class UserProfileViewModel: ObservableObject {
     func hasAttemptedLoadReviews(for userId: String) -> Bool {
         return hasAttemptedLoadReviewedPlaces[userId] ?? false
     }
+    
+    // MARK: - Navigation
+    
+    /// Centralized navigation method for all external profile places (favorites, lists, reviews)
+    /// Navigates back to the map, selects the place, and dismisses the user profile sheet
+    func navigateToPlaceFromProfile(_ place: DetailPlace, selectedPlaceVM: SelectedPlaceViewModel) {
+        selectedPlaceVM.navigateToMapAndSelectPlace(place) { [weak self] in
+            self?.isUserDetailPresented = false
+        }
+    }
 }
 
