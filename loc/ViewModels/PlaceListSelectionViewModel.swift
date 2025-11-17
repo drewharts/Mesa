@@ -19,28 +19,22 @@ class PlaceListSelectionViewModel: ObservableObject {
     
     // MARK: - Dependencies
     private let profile: ProfileViewModel
-    private let userService: UserService
+    private let placeListService: PlaceListService
     private let userSession: UserSession
-    private let placeService: SupabasePlaceService
-    private let dataManager: DataManager
     
     // MARK: - Internal State
     private var placeCoordinates: CLLocationCoordinate2D?
     private var currentPage: Int = 1
-    private let pageSize: Int = 6
+    private let pageSize: Int = 10  // Load 10 lists at a time
     private var hasLoadedOnce: Bool = false
     
     // MARK: - Init
     init(profile: ProfileViewModel,
-         userService: UserService,
-         userSession: UserSession,
-         dataManager: DataManager,
-         placeService: SupabasePlaceService = SupabasePlaceService.shared) {
+         placeListService: PlaceListService = PlaceListService.shared,
+         userSession: UserSession) {
         self.profile = profile
-        self.userService = userService
+        self.placeListService = placeListService
         self.userSession = userSession
-        self.dataManager = dataManager
-        self.placeService = placeService
         print("🆕 [PlaceListSelectionVM] ViewModel initialized")
     }
     
@@ -68,10 +62,10 @@ class PlaceListSelectionViewModel: ObservableObject {
         isLoadingInitial = true
         
         do {
-            let fetchedLists = try await userService.fetchPlaceListsByProximity(
+            let fetchedLists = try await placeListService.fetchListsByProximity(
                 userId: userId,
-                userLatitude: coord.latitude,
-                userLongitude: coord.longitude,
+                latitude: coord.latitude,
+                longitude: coord.longitude,
                 page: 1,
                 pageSize: pageSize
             )
@@ -102,19 +96,19 @@ class PlaceListSelectionViewModel: ObservableObject {
               let coord = placeCoordinates,
               let userId = userSession.currentUserId else { return }
         
-        // Don't load if we're not near the end
-        guard currentIndex >= lists.count - 3 else { return }
+        // Load when we're within 5 items of the end (earlier loading for better UX)
+        guard currentIndex >= lists.count - 5 else { return }
         
         isLoadingMore = true
         let nextPage = currentPage + 1
         
-        print("📄 [PlaceListSelectionVM] Loading page \(nextPage) of lists...")
+        print("📄 [PlaceListSelectionVM] Loading page \(nextPage) of lists (triggered at index \(currentIndex) of \(lists.count))...")
         
         do {
-            let moreLists = try await userService.fetchPlaceListsByProximity(
+            let moreLists = try await placeListService.fetchListsByProximity(
                 userId: userId,
-                userLatitude: coord.latitude,
-                userLongitude: coord.longitude,
+                latitude: coord.latitude,
+                longitude: coord.longitude,
                 page: nextPage,
                 pageSize: pageSize
             )
@@ -150,7 +144,7 @@ class PlaceListSelectionViewModel: ObservableObject {
             for list in listsToLoad {
                 group.addTask {
                     do {
-                        let places = try await self.userService.fetchPlacesForPlaceList(
+                        let places = try await self.placeListService.fetchPlacesInList(
                             listId: list.list_id,
                             page: 1,
                             pageSize: 6
@@ -199,7 +193,7 @@ class PlaceListSelectionViewModel: ObservableObject {
         guard let userId = userSession.currentUserId else { return }
         
         do {
-            let createdList = try await placeService.createNewList(
+            let createdList = try await placeListService.createList(
                 userId: userId,
                 name: name,
                 city: city,

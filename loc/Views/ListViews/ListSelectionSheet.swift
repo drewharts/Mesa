@@ -199,11 +199,9 @@ struct ListsInSelectionSheet: View {
                         }
                     )
                         .onAppear {
-                            // Load more when we reach the 3rd-to-last item
-                            if index == viewModel.lists.count - 3 {
-                                Task {
-                                    await viewModel.loadMoreListsIfNeeded(currentIndex: index)
-                                }
+                            // ViewModel handles the logic of when to load more
+                            Task {
+                                await viewModel.loadMoreListsIfNeeded(currentIndex: index)
                             }
                         }
                 }

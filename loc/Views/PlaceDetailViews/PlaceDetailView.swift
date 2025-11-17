@@ -109,9 +109,7 @@ struct PlaceDetailView: View {
                 if newValue && listSelectionViewModel == nil {
                     listSelectionViewModel = PlaceListSelectionViewModel(
                         profile: profile,
-                        userService: serviceContainer.userService,
-                        userSession: userSession,
-                        dataManager: dataManager
+                        userSession: userSession
                     )
                 }
             }

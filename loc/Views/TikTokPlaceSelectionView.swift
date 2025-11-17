@@ -141,9 +141,7 @@ struct TikTokPlaceSelectionView: View {
             if newValue && listSelectionViewModel == nil {
                 listSelectionViewModel = PlaceListSelectionViewModel(
                     profile: profile,
-                    userService: UserService.shared,
-                    userSession: userSession,
-                    dataManager: dataManager
+                    userSession: userSession
                 )
             }
         }
