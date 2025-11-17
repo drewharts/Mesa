@@ -53,8 +53,6 @@ class MapKitService {
 
     /// Test transit routing specifically (for debugging)
     func testTransitRouting(from origin: CLLocationCoordinate2D, to destination: CLLocationCoordinate2D, completion: @escaping (Bool, String) -> Void) {
-        print("🧪 [MapKitService] Testing transit routing availability...")
-
         // Try a simple transit request - MapKit will handle support detection
         calculateTravelTime(from: origin, to: destination, transportType: .transit) { timeInterval, error in
             if let error = error {
@@ -75,8 +73,6 @@ class MapKitService {
         transportType: TransportType = .automobile,
         completion: @escaping (TimeInterval?, Error?) -> Void
     ) {
-        print("🗺️ [MapKitService] Calculating \(transportType.displayName) time from \(String(format: "%.6f", origin.latitude)),\(String(format: "%.6f", origin.longitude)) to \(String(format: "%.6f", destination.latitude)),\(String(format: "%.6f", destination.longitude))")
-
         let sourcePlacemark = MKPlacemark(coordinate: origin)
         let destinationPlacemark = MKPlacemark(coordinate: destination)
 
@@ -87,9 +83,6 @@ class MapKitService {
 
         // For transit and cycling, use calculateETA which provides accurate ETAs
         if transportType == .transit || transportType == .bicycle {
-            let transportEmoji = transportType == .transit ? "🚇" : "🚴"
-            print("\(transportEmoji) [MapKitService] Using calculateETA for \(transportType.displayName) (\(transportType == .bicycle ? "native cycling routing" : "transit routing"))")
-
             let directions = MKDirections(request: request)
             directions.calculateETA { response, error in
                 if let error = error {
@@ -100,8 +93,6 @@ class MapKitService {
 
                 if let etaResponse = response {
                     let travelTime = etaResponse.expectedTravelTime
-
-                    print("✅ [MapKitService] \(transportType.displayName) ETA: \(travelTime) seconds (\(String(format: "%.1f", travelTime/60)) min)")
                     completion(travelTime, nil)
                     return
                 }
@@ -152,30 +143,8 @@ class MapKitService {
 
             if let route = response?.routes.first {
                 let travelTime = route.expectedTravelTime
-                print("✅ [MapKitService] \(transportType.displayName) time: \(travelTime) seconds (\(String(format: "%.1f", travelTime/60)) min)")
-
-                // Additional debugging for transit routes
-                if transportType == .transit {
-                    print("🚇 [MapKitService] Transit route details:")
-                    print("   - Distance: \(route.distance) meters")
-                    print("   - Expected travel time: \(route.expectedTravelTime)")
-                    print("   - Transport type: \(route.transportType.rawValue)")
-                    print("   - Has steps: \(route.steps.count)")
-                    if let firstStep = route.steps.first {
-                        print("   - First step: \(firstStep.instructions)")
-                    }
-                }
-
                 completion(travelTime, nil)
             } else {
-                print("⚠️ [MapKitService] No route found for \(transportType.displayName)")
-                print("   Available routes count: \(response?.routes.count ?? 0)")
-                if let response = response {
-                    print("   Response has \(response.routes.count) routes")
-                    for (index, route) in response.routes.enumerated() {
-                        print("   Route \(index): \(route.expectedTravelTime) seconds, distance: \(route.distance)m")
-                    }
-                }
                 completion(nil, nil)
             }
         }
@@ -188,15 +157,11 @@ class MapKitService {
         transportTypes: [TransportType] = [.automobile, .walking, .transit, .bicycle],
         completion: @escaping ([TransportType: TimeInterval]?, Error?) -> Void
     ) {
-        print("🚀 [MapKitService] Starting batch calculation for \(transportTypes.count) transport types")
-
         // Calculate distance to determine if transit makes sense
         let originLocation = CLLocation(latitude: origin.latitude, longitude: origin.longitude)
         let destinationLocation = CLLocation(latitude: destination.latitude, longitude: destination.longitude)
         let distanceInMeters = originLocation.distance(from: destinationLocation)
         let distanceInMiles = distanceInMeters * 0.000621371 // Convert to miles
-
-        print("📏 [MapKitService] Distance: \(String(format: "%.2f", distanceInMiles)) miles (\(Int(distanceInMeters)) meters)")
 
         var results: [TransportType: TimeInterval] = [:]
         var errors: [Error] = []
@@ -207,7 +172,6 @@ class MapKitService {
             // Skip transit for very short distances (less than 0.5 miles)
             // Transit doesn't make sense for walking distances
             if transportType == .transit && distanceInMiles < 0.5 {
-                print("⚠️ [MapKitService] Skipping transit for short distance (\(String(format: "%.2f", distanceInMiles)) miles)")
                 completedCount += 1
                 if completedCount == totalCount {
                     completion(results, nil)
