@@ -37,11 +37,9 @@ class PlaceListSelectionViewModel: ObservableObject {
         self.profile = profile
         self.placeListService = placeListService
         self.userSession = userSession
-        print("🆕 [PlaceListSelectionVM] ViewModel initialized")
     }
     
     deinit {
-        print("🗑️ [PlaceListSelectionVM] ViewModel deallocated")
     }
     
     // MARK: - Public API
@@ -53,7 +51,6 @@ class PlaceListSelectionViewModel: ObservableObject {
         // Guard: Don't reload if we already have lists loaded
         // This prevents .task from wiping out paginated lists when view re-renders
         if hasLoadedOnce && !lists.isEmpty {
-            print("ℹ️ [PlaceListSelectionVM] Lists already loaded (\(lists.count) lists), skipping reload")
             return
         }
         
@@ -78,8 +75,6 @@ class PlaceListSelectionViewModel: ObservableObject {
             hasMore = fetchedLists.count >= pageSize
             hasLoadedOnce = true
             
-            print("✅ [PlaceListSelectionVM] Loaded \(fetchedLists.count) lists for place at (\(coord.latitude), \(coord.longitude))")
-            
             // Load place membership data for each list (so we can show checkmarks)
             if !fetchedLists.isEmpty {
                 await loadPlaceMembershipForLists(fetchedLists, placeId: place.id.uuidString)
@@ -94,28 +89,21 @@ class PlaceListSelectionViewModel: ObservableObject {
     }
     
     func loadMoreListsIfNeeded(currentIndex: Int) async {
-        // Debug: Log every call to see if pagination is being triggered
-        print("🔍 [PlaceListSelectionVM] Pagination check: index=\(currentIndex), count=\(lists.count), isLoadingMore=\(isLoadingMore), hasMore=\(hasMore)")
-        
         // Guard: Already loading or no more to load
         guard !isLoadingMore,
               hasMore,
               let coord = placeCoordinates,
               let userId = userSession.currentUserId else {
-            print("⛔️ [PlaceListSelectionVM] Pagination blocked by guard")
             return
         }
         
         // Load when we're within 3 items of the end (earlier trigger for smoother UX)
         guard currentIndex >= lists.count - 3 else {
-            print("⏭️ [PlaceListSelectionVM] Not near end yet: \(currentIndex) < \(lists.count - 3)")
             return
         }
         
         isLoadingMore = true
         let nextPage = currentPage + 1
-        
-        print("📄 [PlaceListSelectionVM] Loading page \(nextPage) of lists (triggered at index \(currentIndex) of \(lists.count))...")
         
         do {
             let moreLists = try await placeListService.fetchListsByProximity(
@@ -130,7 +118,6 @@ class PlaceListSelectionViewModel: ObservableObject {
                 lists.append(contentsOf: moreLists)
                 currentPage = nextPage
                 hasMore = moreLists.count >= pageSize
-                print("✅ [PlaceListSelectionVM] Added \(moreLists.count) more lists. Total: \(lists.count), hasMore=\(hasMore)")
                 
                 // ✅ CRITICAL FIX: Load place membership data in BACKGROUND (non-blocking)
                 // This allows pagination to continue immediately without waiting for checkmarks
@@ -142,7 +129,6 @@ class PlaceListSelectionViewModel: ObservableObject {
                 }
             } else {
                 hasMore = false
-                print("ℹ️ [PlaceListSelectionVM] No more lists available")
             }
         } catch {
             print("❌ [PlaceListSelectionVM] Error loading more lists: \(error)")
@@ -151,7 +137,6 @@ class PlaceListSelectionViewModel: ObservableObject {
         
         // ✅ CRITICAL: Release lock immediately so next page can load
         isLoadingMore = false
-        print("✅ [PlaceListSelectionVM] Pagination complete, ready for next page")
     }
     
     // MARK: - Private Helpers
@@ -159,8 +144,6 @@ class PlaceListSelectionViewModel: ObservableObject {
     /// Load place membership data for lists using direct database checks
     /// This checks if the specific place is in each list without loading all places
     private func loadPlaceMembershipForLists(_ listsToLoad: [LightweightPlaceList], placeId: String) async {
-        print("📋 [PlaceListSelectionVM] Checking membership for place \(placeId) in \(listsToLoad.count) lists...")
-        
         // Check membership for each list in parallel
         await withTaskGroup(of: (String, Bool).self) { group in
             for list in listsToLoad {
@@ -189,8 +172,6 @@ class PlaceListSelectionViewModel: ObservableObject {
                 self.placeMembership.merge(membership) { _, new in new }
             }
         }
-        
-        print("✅ [PlaceListSelectionVM] Finished checking place membership for all lists")
     }
     
     func isPlace(_ place: DetailPlace, in list: LightweightPlaceList) -> Bool {
