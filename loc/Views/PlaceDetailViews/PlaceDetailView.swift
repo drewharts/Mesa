@@ -43,9 +43,6 @@ struct PlaceDetailView: View {
             VStack(spacing: 16) {
                 if selectedPlaceVM.selectedPlace == nil {
                     ProgressView("Loading Place Details...")
-                        .onAppear {
-                            print("📱 [PlaceDetailView] Showing loading state")
-                        }
                 } else if let tabsViewModel = tabsViewModel {
                     PlaceDetailTabsView(
                         viewModel: tabsViewModel,
@@ -58,9 +55,6 @@ struct PlaceDetailView: View {
                     )
                     .environmentObject(userProfileViewModel)
                     .scrollDisabled(!isScrollingEnabled)
-                    .onAppear {
-                        print("📱 [PlaceDetailView] Showing content")
-                    }
                 }
             }
             .padding(.vertical)
@@ -78,6 +72,12 @@ struct PlaceDetailView: View {
                         profileVM: profile,
                         userSession: userSession
                     )
+                    
+                    // Calculate travel time now that ViewModel is created
+                    if let place = selectedPlaceVM.selectedPlace,
+                       let currentLocation = locationManager.currentLocation {
+                        tabsViewModel?.travelTimeViewModel.updateTravelTime(for: place, from: currentLocation.coordinate)
+                    }
                 }
             }
             // Alert for travel time removed - no longer needed
@@ -128,7 +128,6 @@ struct PlaceDetailView: View {
                 }
             }
             .onAppear {
-                print("📱 [PlaceDetailView] View appeared, starting to load place data...")
                 if let place = selectedPlaceVM.selectedPlace,
                    let currentLocation = locationManager.currentLocation,
                    let tabsVM = tabsViewModel {

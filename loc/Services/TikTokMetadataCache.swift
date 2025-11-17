@@ -25,19 +25,16 @@ class TikTokMetadataCache: ObservableObject {
     func getMetadata(for url: String) async -> TikTokVideo? {
         // Return cached metadata if available
         if let cached = cache[url] {
-            print("✅ [TikTokMetadataCache] Cache hit for URL: \(url)")
             return cached
         }
         
         // Avoid duplicate requests for the same URL
         if pendingRequests.contains(url) {
-            print("⏳ [TikTokMetadataCache] Request already pending for URL: \(url)")
             // Wait a bit and check again
             try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
             return cache[url]
         }
         
-        print("🔄 [TikTokMetadataCache] Cache miss - fetching metadata for URL: \(url)")
         pendingRequests.insert(url)
         
         defer {
@@ -51,7 +48,6 @@ class TikTokMetadataCache: ObservableObject {
         case .success(let oembedResponse):
             let tikTokVideo = oembedResponse.toTikTokVideo(videoUrl: url)
             cache[url] = tikTokVideo
-            print("✅ [TikTokMetadataCache] Cached metadata for URL: \(url)")
             return tikTokVideo
             
         case .failure(let error):
@@ -80,7 +76,6 @@ class TikTokMetadataCache: ObservableObject {
     
     /// Prefetch metadata for multiple URLs (useful for preloading)
     func prefetchMetadata(for urls: [String]) async {
-        print("🔄 [TikTokMetadataCache] Prefetching metadata for \(urls.count) URLs")
         await withTaskGroup(of: Void.self) { group in
             for url in urls {
                 group.addTask {
@@ -88,20 +83,17 @@ class TikTokMetadataCache: ObservableObject {
                 }
             }
         }
-        print("✅ [TikTokMetadataCache] Prefetch complete")
     }
     
     /// Clear the cache
     func clearCache() {
         cache.removeAll()
         pendingRequests.removeAll()
-        print("🗑️ [TikTokMetadataCache] Cache cleared")
     }
     
     /// Remove specific URL from cache
     func removeFromCache(url: String) {
         cache.removeValue(forKey: url)
-        print("🗑️ [TikTokMetadataCache] Removed URL from cache: \(url)")
     }
 }
 
