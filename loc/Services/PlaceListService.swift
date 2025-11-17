@@ -97,6 +97,30 @@ class PlaceListService {
         }
     }
     
+    /// Check if a specific place is in a specific list
+    /// This is more efficient than fetching all places when we just need to check membership
+    func isPlaceInList(listId: String, placeId: String) async throws -> Bool {
+        struct PlaceListItemCheck: Decodable {
+            let place_id: String
+        }
+        
+        do {
+            let response = try await supabase.client
+                .from("place_list_items")
+                .select("place_id")
+                .eq("list_id", value: listId)
+                .eq("place_id", value: placeId)
+                .limit(1)
+                .execute()
+            
+            let items = try JSONDecoder().decode([PlaceListItemCheck].self, from: response.data)
+            return !items.isEmpty
+        } catch {
+            print("❌ [PlaceListService] Error checking if place is in list: \(error)")
+            throw error
+        }
+    }
+    
     // MARK: - Create Place List
     
     /// Create a new place list for a user

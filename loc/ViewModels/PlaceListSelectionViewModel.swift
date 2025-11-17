@@ -16,6 +16,7 @@ class PlaceListSelectionViewModel: ObservableObject {
     @Published var isLoadingInitial: Bool = false
     @Published var isLoadingMore: Bool = false
     @Published var hasMore: Bool = true
+    @Published var placeMembership: [String: Bool] = [:] // listId -> isPlaceInList
     
     // MARK: - Dependencies
     private let profile: ProfileViewModel
@@ -27,6 +28,7 @@ class PlaceListSelectionViewModel: ObservableObject {
     private var currentPage: Int = 1
     private let pageSize: Int = 10  // Load 10 lists at a time
     private var hasLoadedOnce: Bool = false
+    private var currentPlace: DetailPlace?
     
     // MARK: - Init
     init(profile: ProfileViewModel,
@@ -56,10 +58,12 @@ class PlaceListSelectionViewModel: ObservableObject {
         }
         
         // Reset state for new place
+        currentPlace = place
         placeCoordinates = coord
         currentPage = 1
         hasMore = true
         isLoadingInitial = true
+        placeMembership.removeAll()
         
         do {
             let fetchedLists = try await placeListService.fetchListsByProximity(
@@ -78,7 +82,7 @@ class PlaceListSelectionViewModel: ObservableObject {
             
             // Load place membership data for each list (so we can show checkmarks)
             if !fetchedLists.isEmpty {
-                await loadPlaceMembershipForLists(fetchedLists)
+                await loadPlaceMembershipForLists(fetchedLists, placeId: place.id.uuidString)
             }
         } catch {
             print("❌ [PlaceListSelectionVM] Error loading lists: \(error)")
@@ -131,8 +135,10 @@ class PlaceListSelectionViewModel: ObservableObject {
                 // ✅ CRITICAL FIX: Load place membership data in BACKGROUND (non-blocking)
                 // This allows pagination to continue immediately without waiting for checkmarks
                 // Follows Single Responsibility: Pagination ≠ Data Enrichment
-                Task {
-                    await loadPlaceMembershipForLists(moreLists)
+                if let placeId = currentPlace?.id.uuidString {
+                    Task {
+                        await loadPlaceMembershipForLists(moreLists, placeId: placeId)
+                    }
                 }
             } else {
                 hasMore = false
@@ -150,57 +156,58 @@ class PlaceListSelectionViewModel: ObservableObject {
     
     // MARK: - Private Helpers
     
-    /// Load place membership data for lists (so we can show checkmarks)
-    private func loadPlaceMembershipForLists(_ listsToLoad: [LightweightPlaceList]) async {
-        print("📋 [PlaceListSelectionVM] Loading place membership for \(listsToLoad.count) lists...")
+    /// Load place membership data for lists using direct database checks
+    /// This checks if the specific place is in each list without loading all places
+    private func loadPlaceMembershipForLists(_ listsToLoad: [LightweightPlaceList], placeId: String) async {
+        print("📋 [PlaceListSelectionVM] Checking membership for place \(placeId) in \(listsToLoad.count) lists...")
         
-        // Load places for each list in parallel
-        await withTaskGroup(of: (String, [LightweightPlace]?).self) { group in
+        // Check membership for each list in parallel
+        await withTaskGroup(of: (String, Bool).self) { group in
             for list in listsToLoad {
                 group.addTask {
                     do {
-                        let places = try await self.placeListService.fetchPlacesInList(
+                        let isInList = try await self.placeListService.isPlaceInList(
                             listId: list.list_id,
-                            page: 1,
-                            pageSize: 6
+                            placeId: placeId
                         )
-                        return (list.list_id, places)
+                        return (list.list_id, isInList)
                     } catch {
-                        print("❌ [PlaceListSelectionVM] Error loading places for list \(list.list_id): \(error)")
-                        return (list.list_id, nil)
+                        print("❌ [PlaceListSelectionVM] Error checking membership for list \(list.list_id): \(error)")
+                        return (list.list_id, false)
                     }
                 }
             }
             
             // Collect all results
-            var allPlaces: [String: [LightweightPlace]] = [:]
-            for await (listId, places) in group {
-                if let places = places {
-                    allPlaces[listId] = places
-                }
+            var membership: [String: Bool] = [:]
+            for await (listId, isInList) in group {
+                membership[listId] = isInList
             }
             
             // Single main thread update to prevent multiple re-renders
             await MainActor.run {
-                for (listId, places) in allPlaces {
-                    profile.lightweightPlaceListPlaces[listId] = places
-                }
+                self.placeMembership.merge(membership) { _, new in new }
             }
         }
         
-        print("✅ [PlaceListSelectionVM] Finished loading place membership for all lists")
+        print("✅ [PlaceListSelectionVM] Finished checking place membership for all lists")
     }
     
     func isPlace(_ place: DetailPlace, in list: LightweightPlaceList) -> Bool {
-        profile.lightweightPlaceListPlaces[list.list_id]?
-            .contains(where: { $0.place_id == place.id.uuidString }) ?? false
+        return placeMembership[list.list_id] ?? false
     }
     
     func toggle(place: DetailPlace, in list: LightweightPlaceList) {
-        if isPlace(place, in: list) {
+        let wasInList = isPlace(place, in: list)
+        
+        if wasInList {
             profile.removePlaceFromLightweightList(listId: list.list_id, place: place)
+            // Update local state immediately for UI responsiveness
+            placeMembership[list.list_id] = false
         } else {
             profile.addPlaceToLightweightList(listId: list.list_id, place: place)
+            // Update local state immediately for UI responsiveness
+            placeMembership[list.list_id] = true
         }
     }
     
@@ -235,9 +242,7 @@ class PlaceListSelectionViewModel: ObservableObject {
             profile.lightweightPlaceLists.insert(lightweightList, at: 0)
             profile.userLists.append(createdList)
             profile.recentlyCreatedListId = createdList.id
-            
-            print("✅ [PlaceListSelectionVM] Created new list: \(name)")
-        } catch {
+                    } catch {
             print("❌ [PlaceListSelectionVM] Error creating list: \(error)")
         }
     }
