@@ -8,6 +8,7 @@ struct SearchResultsView: View {
     let isSearching: Bool
     let onSelectPlace: (MesaPlaceSuggestion) -> Void
     let onSelectUser: (ProfileData) -> Void
+    @ObservedObject var searchViewModel: SearchViewModel
 
     var body: some View {
         GeometryReader { geometry in
@@ -25,7 +26,11 @@ struct SearchResultsView: View {
                         .padding()
                         .frame(maxWidth: .infinity)
                     } else {
-                        UserResultsView(userResults: userResults, onSelectUser: onSelectUser)
+                        UserResultsView(
+                            userResults: userResults,
+                            onSelectUser: onSelectUser,
+                            searchViewModel: searchViewModel
+                        )
                         PlaceResultsView(
                             placeResults: placeResults,
                             showNoPlaceFound: showNoPlaceFound,
@@ -116,6 +121,7 @@ struct PlaceResultsView: View {
 struct UserResultsView: View {
     let userResults: [ProfileData]
     let onSelectUser: (ProfileData) -> Void
+    @ObservedObject var searchViewModel: SearchViewModel
 
     var body: some View {
         if !userResults.isEmpty {
@@ -129,24 +135,22 @@ struct UserResultsView: View {
                 ForEach(userResults) { user in
                     Button(action: { onSelectUser(user) }) {
                         HStack {
-                            // Profile Image Placeholder (Replace with actual image loading)
-                            AsyncImage(url: user.profilePhotoURL) { phase in
-                                if let image = phase.image {
-                                    image.resizable()
-                                        .frame(width: 40, height: 40)
-                                        .clipShape(Circle())
-                                } else if phase.error != nil {
-                                    Image(systemName: "person.crop.circle.fill")
-                                        .resizable()
-                                        .frame(width: 40, height: 40)
-                                        .clipShape(Circle())
-                                        .foregroundColor(.gray)
-                                } else {
-                                    ProgressView()
-                                        .frame(width: 40, height: 40)
-                                }
+                            // Use cached profile photo from ViewModel
+                            if let profilePhoto = searchViewModel.profilePhoto(for: user.id) {
+                                Image(uiImage: profilePhoto)
+                                    .resizable()
+                                    .scaledToFill()
+                                    .frame(width: 40, height: 40)
+                                    .clipShape(Circle())
+                            } else if searchViewModel.profilePhotoLoadingState(for: user.id) == .loading {
+                                ProgressView()
+                                    .frame(width: 40, height: 40)
+                            } else {
+                                Image(systemName: "person.crop.circle.fill")
+                                    .resizable()
+                                    .frame(width: 40, height: 40)
+                                    .foregroundColor(.gray)
                             }
-
                             
                             VStack(alignment: .leading) {
                                 Text(user.fullName)

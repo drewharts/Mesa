@@ -17,6 +17,12 @@ class SearchViewModel: ObservableObject {
     @Published var selectedUser: ProfileData?
     @Published var showNoPlaceFound: Bool = false  // Track when search returns no results
     @Published var isSearching: Bool = false  // Track when search is in progress
+    
+    // MARK: - Profile Photo Caching
+    /// Cache for user profile photos in search results
+    @Published private(set) var userProfilePhotos: [String: UIImage] = [:]
+    /// Loading states for profile photos
+    @Published private(set) var profilePhotoLoadingStates: [String: LoadingState] = [:]
 
     weak var selectedPlaceVM: SelectedPlaceViewModel?
 
@@ -38,6 +44,23 @@ class SearchViewModel: ObservableObject {
     }
 
     private var cancellables = Set<AnyCancellable>()
+    
+    // MARK: - LoadingState Enum
+    enum LoadingState: Equatable {
+        case idle
+        case loading
+        case loaded
+        case error
+        
+        static func == (lhs: LoadingState, rhs: LoadingState) -> Bool {
+            switch (lhs, rhs) {
+            case (.idle, .idle), (.loading, .loading), (.loaded, .loaded), (.error, .error):
+                return true
+            default:
+                return false
+            }
+        }
+    }
 
     init(placeService: PlaceService, userService: UserService, locationManager: LocationManager) {
         // Initialize dependencies through dependency injection
@@ -175,6 +198,9 @@ class SearchViewModel: ObservableObject {
                             )
                         } ?? []
                         self?.userResults = profileData
+                        
+                        // ✅ Prefetch profile photos immediately
+                        self?.prefetchProfilePhotos(for: profileData)
                     }
                 }
                 continuation.resume()
@@ -211,5 +237,56 @@ class SearchViewModel: ObservableObject {
         Task {
             await searchUsersAsync(query: query)
         }
+    }
+    
+    // MARK: - Profile Photo Management
+    
+    /// Prefetch profile photos for search results
+    private func prefetchProfilePhotos(for users: [ProfileData]) {
+        for user in users {
+            guard let photoURL = user.profilePhotoURL else { continue }
+            loadProfilePhoto(userId: user.id, photoURL: photoURL)
+        }
+    }
+    
+    /// Load a single profile photo
+    private func loadProfilePhoto(userId: String, photoURL: URL) {
+        // Skip if already loaded or loading
+        guard userProfilePhotos[userId] == nil,
+              profilePhotoLoadingStates[userId] != .loading else {
+            return
+        }
+        
+        profilePhotoLoadingStates[userId] = .loading
+        
+        Task {
+            do {
+                let (data, _) = try await URLSession.shared.data(from: photoURL)
+                if let image = UIImage(data: data) {
+                    await MainActor.run {
+                        self.userProfilePhotos[userId] = image
+                        self.profilePhotoLoadingStates[userId] = .loaded
+                    }
+                } else {
+                    await MainActor.run {
+                        self.profilePhotoLoadingStates[userId] = .error
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    self.profilePhotoLoadingStates[userId] = .error
+                }
+            }
+        }
+    }
+    
+    /// Public accessor for profile photos
+    func profilePhoto(for userId: String) -> UIImage? {
+        return userProfilePhotos[userId]
+    }
+    
+    /// Public accessor for loading states
+    func profilePhotoLoadingState(for userId: String) -> LoadingState {
+        return profilePhotoLoadingStates[userId] ?? .idle
     }
 }

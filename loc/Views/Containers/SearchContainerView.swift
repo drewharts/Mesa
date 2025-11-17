@@ -98,7 +98,8 @@ struct SearchContainerView: View {
                             isSearchExpanded = false
                             searchIsFocused = false
                         }
-                    }
+                    },
+                    searchViewModel: searchViewModel
                 )
                 .frame(maxWidth: .infinity)
                 .padding(.horizontal, 20)
