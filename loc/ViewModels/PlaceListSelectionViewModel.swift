@@ -179,17 +179,50 @@ class PlaceListSelectionViewModel: ObservableObject {
     }
     
     func toggle(place: DetailPlace, in list: LightweightPlaceList) {
-        let wasInList = isPlace(place, in: list)
+        // CRITICAL FIX: Look up current state from our array (not the stale captured parameter)
+        // Since LightweightPlaceList is a struct (value type), the parameter may be a stale snapshot
+        // from when the closure was created. Always read from the source of truth: lists array.
+        guard let currentList = lists.first(where: { $0.list_id == list.list_id }) else { return }
+        
+        let wasInList = isPlace(place, in: currentList)
         
         if wasInList {
-            profile.removePlaceFromLightweightList(listId: list.list_id, place: place)
-            // Update local state immediately for UI responsiveness
-            placeMembership[list.list_id] = false
+            // Calculate new count from CURRENT state (not stale parameter)
+            let newCount = max(0, currentList.place_count - 1)
+            updateLocalListCount(listId: currentList.list_id, delta: -1)
+            profile.removePlaceFromLightweightList(listId: currentList.list_id, place: place, updatedCount: newCount)
+            placeMembership[currentList.list_id] = false
         } else {
-            profile.addPlaceToLightweightList(listId: list.list_id, place: place)
-            // Update local state immediately for UI responsiveness
-            placeMembership[list.list_id] = true
+            // Calculate new count from CURRENT state (not stale parameter)
+            let newCount = currentList.place_count + 1
+            updateLocalListCount(listId: currentList.list_id, delta: +1)
+            profile.addPlaceToLightweightList(listId: currentList.list_id, place: place, updatedCount: newCount)
+            placeMembership[currentList.list_id] = true
         }
+    }
+    
+    /// Update the place count for a list in our local state
+    /// Follows SRP: PlaceListSelectionViewModel owns its list state
+    private func updateLocalListCount(listId: String, delta: Int) {
+        guard let index = lists.firstIndex(where: { $0.list_id == listId }) else { return }
+        
+        let oldList = lists[index]
+        let newCount = max(0, oldList.place_count + delta)
+        
+        // Create updated list with new count (struct is immutable)
+        let updatedList = LightweightPlaceList(
+            list_id: oldList.list_id,
+            name: oldList.name,
+            is_public: oldList.is_public,
+            image: oldList.image,
+            created_at: oldList.created_at,
+            updated_at: oldList.updated_at,
+            distance_meters: oldList.distance_meters,
+            place_count: newCount,
+            city: oldList.city
+        )
+        
+        lists[index] = updatedList
     }
     
     func createNewList(named name: String, city: String, emoji: String, image: String) async {

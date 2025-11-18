@@ -395,7 +395,11 @@ class ProfileViewModel: ObservableObject {
     // MARK: - Add to List Functions
     
     /// Add a place to a lightweight list (current format)
-    func addPlaceToLightweightList(listId: String, place: DetailPlace) {
+    /// - Parameters:
+    ///   - listId: The list ID to add the place to
+    ///   - place: The place to add
+    ///   - updatedCount: The new count after adding (caller owns state and does the math)
+    func addPlaceToLightweightList(listId: String, place: DetailPlace, updatedCount: Int? = nil) {
         guard let userId = userSession.currentUserId else { return }
         
         let placeId = place.id.uuidString
@@ -424,10 +428,16 @@ class ProfileViewModel: ObservableObject {
         }
         
         if didInsert {
-            let startingCount = lightweightPlaceListCounts[listId]
-                ?? lightweightPlaceLists.first(where: { $0.list_id == listId })?.place_count
-                ?? 0
-            lightweightPlaceListCounts[listId] = startingCount + 1
+            if let finalCount = updatedCount {
+                // Caller owns state and has already done the math - just store it
+                lightweightPlaceListCounts[listId] = finalCount
+            } else {
+                // Legacy path: we own the state, so we do the math
+                let startingCount = lightweightPlaceListCounts[listId]
+                    ?? lightweightPlaceLists.first(where: { $0.list_id == listId })?.place_count
+                    ?? 0
+                lightweightPlaceListCounts[listId] = startingCount + 1
+            }
         }
         
         // Update DetailPlaceViewModel's places dictionary for immediate UI update
@@ -481,7 +491,12 @@ class ProfileViewModel: ObservableObject {
     }
     
     /// Remove a place from a lightweight list (new format)
-    func removePlaceFromLightweightList(listId: String, place: DetailPlace) {
+    /// Remove a place from a lightweight list
+    /// - Parameters:
+    ///   - listId: The list ID to remove the place from
+    ///   - place: The place to remove
+    ///   - updatedCount: The new count after removing (caller owns state and does the math)
+    func removePlaceFromLightweightList(listId: String, place: DetailPlace, updatedCount: Int? = nil) {
         guard let userId = userSession.currentUserId else {
             return
         }
@@ -499,10 +514,16 @@ class ProfileViewModel: ObservableObject {
         }
         
         if didRemove {
-            let startingCount = lightweightPlaceListCounts[listId]
-                ?? lightweightPlaceLists.first(where: { $0.list_id == listId })?.place_count
-                ?? 0
-            lightweightPlaceListCounts[listId] = max(startingCount - 1, 0)
+            if let finalCount = updatedCount {
+                // Caller owns state and has already done the math - just store it
+                lightweightPlaceListCounts[listId] = finalCount
+            } else {
+                // Legacy path: we own the state, so we do the math
+                let startingCount = lightweightPlaceListCounts[listId]
+                    ?? lightweightPlaceLists.first(where: { $0.list_id == listId })?.place_count
+                    ?? 0
+                lightweightPlaceListCounts[listId] = max(startingCount - 1, 0)
+            }
         }
         
         // Remove current user as saver
