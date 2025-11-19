@@ -12,7 +12,6 @@ struct UserProfileView: View {
     @ObservedObject var UserProfileVM: UserProfileViewModel
     @EnvironmentObject var profileVM: ProfileViewModel
     @Environment(\.presentationMode) var presentationMode
-    @State private var refreshToggle = false
     @State private var selectedTab = 0
     @State private var showPageIndicators = true
     @State private var fadeOutTimer: Timer?
@@ -28,11 +27,16 @@ struct UserProfileView: View {
                             profilePhotoURL: UserProfileVM.selectedUser?.profilePhotoURL,
                             isFollowing: UserProfileVM.isFollowing,
                             onToggleFollow: {
-                                //TODO: Need to populate user's annotations on the map after following/unfollowing
-                                UserProfileVM.toggleFollowUser(currentUserId: userId)
-                                profileVM.toggleFollowUser(userId: UserProfileVM.selectedUser!.id)
-                                // Force UI refresh
-                                refreshToggle.toggle()
+                                // Single responsibility: Only UserProfileViewModel makes the API call
+                                UserProfileVM.toggleFollowUser(currentUserId: userId) { success, newFollowingState in
+                                    if success {
+                                        // Update ProfileViewModel's local state WITHOUT making another API call
+                                        profileVM.updateFollowingState(
+                                            userId: UserProfileVM.selectedUser!.id, 
+                                            isFollowing: newFollowingState
+                                        )
+                                    }
+                                }
                             }
                         )
 
@@ -141,7 +145,6 @@ struct UserProfileView: View {
                 .padding(.bottom, 10)
             }
         }
-        .id(refreshToggle) // Force view refresh when toggle changes
         .onAppear {
             UserProfileVM.checkIfFollowing(currentUserId: userId)
             startFadeOutTimer() // Start timer when view appears

@@ -105,16 +105,19 @@ class UserProfileViewModel: ObservableObject {
         }
     }
     
-    func toggleFollowUser(currentUserId: String) {
-        guard let targetUserId = selectedUser?.id else { return }
+    func toggleFollowUser(currentUserId: String, completion: @escaping (Bool, Bool) -> Void) {
+        guard let targetUserId = selectedUser?.id else { 
+            completion(false, isFollowing)
+            return 
+        }
         
         // Store original state for potential rollback
         let originalFollowingState = isFollowing
         let originalFollowersCount = followers
         
         if isFollowing {
-            // Optimistic update: immediately change UI
-            DispatchQueue.main.async {
+            // Optimistic update with smooth animation
+            withAnimation(.easeInOut(duration: 0.2)) {
                 self.isFollowing = false
                 self.followers = max(0, self.followers - 1)
             }
@@ -125,22 +128,25 @@ class UserProfileViewModel: ObservableObject {
             // Make the actual API call
             userService.unfollowUser(followerId: currentUserId, followingId: targetUserId) { success, error in
                 if !success {
-                    // Revert on failure
-                    DispatchQueue.main.async {
+                    // Revert on failure with animation
+                    withAnimation(.easeInOut(duration: 0.2)) {
                         self.isFollowing = originalFollowingState
                         self.followers = originalFollowersCount
-                        // Re-add user to placeSavers and recalculate annotations
-                        self.addUserToPlaceSavers(userId: targetUserId)
-                        self.detailPlaceViewModel.calculateAnnotationPlaces()
                         // Show error alert
                         self.showFollowError = true
                         self.followErrorMessage = "Failed to unfollow user. Please try again."
                     }
+                    // Re-add user to placeSavers and recalculate annotations
+                    self.addUserToPlaceSavers(userId: targetUserId)
+                    self.detailPlaceViewModel.calculateAnnotationPlaces()
+                    completion(false, originalFollowingState)
+                } else {
+                    completion(true, false)
                 }
             }
         } else {
-            // Optimistic update: immediately change UI
-            DispatchQueue.main.async {
+            // Optimistic update with smooth animation
+            withAnimation(.easeInOut(duration: 0.2)) {
                 self.isFollowing = true
                 self.followers += 1
             }
@@ -154,15 +160,17 @@ class UserProfileViewModel: ObservableObject {
                         await self.dataManager.loadUserPlaceLists(userId: targetUserId, forUser: self.selectedUser)
                         self.detailPlaceViewModel.calculateAnnotationPlaces()
                     }
+                    completion(true, true)
                 } else {
-                    // Revert on failure
-                    DispatchQueue.main.async {
+                    // Revert on failure with animation
+                    withAnimation(.easeInOut(duration: 0.2)) {
                         self.isFollowing = originalFollowingState
                         self.followers = originalFollowersCount
                         // Show error alert
                         self.showFollowError = true
                         self.followErrorMessage = "Failed to follow user. Please try again."
                     }
+                    completion(false, originalFollowingState)
                 }
             }
         }

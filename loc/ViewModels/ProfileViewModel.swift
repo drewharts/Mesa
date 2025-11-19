@@ -357,6 +357,31 @@ class ProfileViewModel: ObservableObject {
         }
     }
     
+    /// Update local following state after external follow/unfollow action
+    /// This does NOT make an API call - it only updates local state
+    func updateFollowingState(userId: String, isFollowing: Bool) {
+        if isFollowing {
+            // Add to following list if not already there
+            if !userFollowing.contains(where: { $0.id == userId }) {
+                followingCount += 1
+                // Fetch the user profile and add to following list
+                userService.fetchUserById(userId: userId) { [weak self] result in
+                    if case .success(let profileData) = result {
+                        DispatchQueue.main.async {
+                            self?.userFollowing.append(profileData)
+                        }
+                    }
+                }
+            }
+        } else {
+            // Remove from following list
+            if userFollowing.contains(where: { $0.id == userId }) {
+                userFollowing.removeAll { $0.id == userId }
+                followingCount = max(0, followingCount - 1)
+            }
+        }
+    }
+    
     /// Update friend IDs in MapViewModel for viewport filtering
     // updateMapViewModelFriendIds removed - friend tracking is now handled by the PostgreSQL function
     

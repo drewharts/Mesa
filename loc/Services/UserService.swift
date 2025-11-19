@@ -144,7 +144,7 @@ class UserService: ObservableObject {
     func fetchUserById(userId: String, completion: @escaping (Result<ProfileData, Error>) -> Void) {
         Task { @MainActor in
             do {
-            let response: [ProfileData] = try await SupabaseManager.shared.client
+            let profileData: ProfileData = try await SupabaseManager.shared.client
                 .from("users")
                     .select()
                     .eq("id", value: userId)
@@ -152,9 +152,6 @@ class UserService: ObservableObject {
                     .execute()
                     .value
 
-                guard let profileData = response.first else {
-                    throw NSError(domain: "UserService", code: 404, userInfo: [NSLocalizedDescriptionKey: "User profile not found"])
-                }
                 print("✅ [UserService] Found existing user profile: \(profileData.firstName) \(profileData.lastName)")
                 completion(.success(profileData))
             } catch let error as DecodingError {
