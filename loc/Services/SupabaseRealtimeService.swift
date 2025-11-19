@@ -46,7 +46,6 @@ class SupabaseRealtimeService: ObservableObject {
     
     /// Subscribe to following changes - placeholder implementation
     func subscribeFollowing(userId: String, onInsert: @escaping (SupabaseFollow) -> Void) async throws {
-        print("⚠️ [Realtime] subscribeFollowing not yet implemented with V2 API")
         // TODO: Implement with RealtimeClientV2 API
     }
     

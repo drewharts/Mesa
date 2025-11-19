@@ -138,13 +138,10 @@ class UserService: ObservableObject {
     
     // Placeholder methods for compatibility
     func fetchFollowerProfiles(for userId: String, completion: @escaping ([User]?, Error?) -> Void) {
-        print("⚠️ [UserService] fetchFollowerProfiles not fully implemented")
         completion([], nil)
     }
     
     func fetchUserById(userId: String, completion: @escaping (Result<ProfileData, Error>) -> Void) {
-        // Fetch user profile from Supabase users table
-        print("🔄 [UserService] Fetching user profile from Supabase: \(userId)")
         Task { @MainActor in
             do {
             let response: [ProfileData] = try await SupabaseManager.shared.client
@@ -505,13 +502,11 @@ class UserService: ObservableObject {
     }
     
     func addOrUpdateMapPlace(userId: String, place: DetailPlace, completion: @escaping (Error?) -> Void) {
-        print("⚠️ [UserService] addOrUpdateMapPlace not fully implemented")
         completion(nil)
     }
 
     func fetchUserLists(userId: String, completion: @escaping ([PlaceList]?, Error?) -> Void) {
-        print("⚠️ [UserService] fetchUserLists not fully implemented")
-                    completion([], nil)
+        completion([], nil)
     }
     
     func fetchFriendsReviews(userId: String, completion: @escaping ([ReviewProtocol]?, Error?) -> Void) {

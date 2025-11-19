@@ -49,7 +49,9 @@ struct FollowingListView: View {
                                 .onAppear {
                                     // Load more when user scrolls to the last few items
                                     if let index = profile.userFollowing.firstIndex(where: { $0.id == profileData.id }),
-                                       index >= profile.userFollowing.count - 3 && !profile.isFollowingListLoading {
+                                       index >= profile.userFollowing.count - 3,
+                                       !profile.isFollowingListLoading,
+                                       profile.hasMoreFollowing {
                                         Task {
                                             await dataManager.loadFollowing(userId: userSession.currentUserId ?? "", offset: profile.userFollowing.count)
                                         }

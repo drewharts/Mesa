@@ -644,27 +644,29 @@ class DataManager: ObservableObject {
     /// Pass offset = 0 for initial load, or current count for loading more
     func loadFollowing(userId: String, offset: Int = 0) async {
         let isInitialLoad = offset == 0
-        let startTime = Date()
+        let pageSize = 10
         
         if isInitialLoad {
-            print("👥 [DataManager] Loading first 10 following profiles...")
-        } else {
-            print("👥 [DataManager] Loading next 10 following profiles (offset: \(offset))...")
+            await MainActor.run {
+                self.profileViewModel.hasMoreFollowing = true
+            }
         }
         
         profileViewModel.isFollowingListLoading = true
         
         do {
-            let profiles = try await userService.fetchFollowingProfilesData(for: userId, limit: 10, offset: offset)
-            
-            let duration = Date().timeIntervalSince(startTime)
-            print("⚡ [DataManager] Loaded \(profiles.count) following profiles in \(String(format: "%.2f", duration))s")
+            let profiles = try await userService.fetchFollowingProfilesData(for: userId, limit: pageSize, offset: offset)
             
             await MainActor.run {
                 if isInitialLoad {
                     self.profileViewModel.userFollowing = profiles
                 } else {
                     self.profileViewModel.userFollowing.append(contentsOf: profiles)
+                }
+                
+                // If we received fewer profiles than requested, we've reached the end
+                if profiles.count < pageSize {
+                    self.profileViewModel.hasMoreFollowing = false
                 }
             }
             
@@ -705,27 +707,29 @@ class DataManager: ObservableObject {
     /// Pass offset = 0 for initial load, or current count for loading more
     func loadFollowers(userId: String, offset: Int = 0) async {
         let isInitialLoad = offset == 0
-        let startTime = Date()
+        let pageSize = 10
         
         if isInitialLoad {
-            print("👥 [DataManager] Loading first 10 follower profiles...")
-        } else {
-            print("👥 [DataManager] Loading next 10 follower profiles (offset: \(offset))...")
+            await MainActor.run {
+                self.profileViewModel.hasMoreFollowers = true
+            }
         }
         
         profileViewModel.isFollowersListLoading = true
         
         do {
-            let profiles = try await userService.fetchFollowerProfilesData(for: userId, limit: 10, offset: offset)
-            
-            let duration = Date().timeIntervalSince(startTime)
-            print("⚡ [DataManager] Loaded \(profiles.count) follower profiles in \(String(format: "%.2f", duration))s")
+            let profiles = try await userService.fetchFollowerProfilesData(for: userId, limit: pageSize, offset: offset)
             
             await MainActor.run {
                 if isInitialLoad {
                     self.profileViewModel.userFollowers = profiles
                 } else {
                     self.profileViewModel.userFollowers.append(contentsOf: profiles)
+                }
+                
+                // If we received fewer profiles than requested, we've reached the end
+                if profiles.count < pageSize {
+                    self.profileViewModel.hasMoreFollowers = false
                 }
             }
             
@@ -746,9 +750,6 @@ class DataManager: ObservableObject {
     /// FAST: Load all profile counts, favorites, and place lists in parallel (~20-50ms total!)
     /// Called when profile view appears
     func loadProfileCounts(userId: String) async {
-        let startTime = Date()
-        print("🔢 [DataManager] Loading profile COUNTS, favorites, and place lists (fast)...")
-        
         profileViewModel.isFollowersLoading = true
         profileViewModel.isFollowingLoading = true
         profileViewModel.isMyPlacesLoading = true
@@ -778,16 +779,12 @@ class DataManager: ObservableObject {
             profileViewModel.isMyPlacesLoading = false
         }
         
-        let duration = Date().timeIntervalSince(startTime)
-        print("⚡ [DataManager] Loaded counts in \(String(format: "%.2f", duration))s (Followers: \(followersCount), Following: \(followingCount), My Places: \(myPlacesCount), Total Lists: \(totalListCount), Favorites: \(favoritePlaces.count))")
-        
         // Load place lists in background - don't block UI
         if let location = userLocation {
             Task.detached(priority: .userInitiated) { [weak self] in
                 guard let self = self else { return }
                 
                 let pageSize = 6 // Consistent page size for initial load and pagination
-                print("📍 [DataManager] User location available: \(location.latitude), \(location.longitude)")
                 let placeLists = (try? await self.userService.fetchPlaceListsByProximity(
                     userId: userId,
                     userLatitude: location.latitude,
@@ -795,8 +792,6 @@ class DataManager: ObservableObject {
                     page: 1,
                     pageSize: pageSize
                 )) ?? []
-                
-                print("✅ [DataManager] Loaded \(placeLists.count) place lists in background (page 1)")
                 
                 // Update place lists on main thread
                 await MainActor.run {

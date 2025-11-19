@@ -268,119 +268,89 @@ class LoginViewModel: ObservableObject {
     }
 
     private func updateRelatedTables(oldUserId: String, newUserId: String) async {
-        print("🔄 Updating related tables for user migration...")
-        print("📋 Old User ID: \(oldUserId)")
-        print("📋 New User ID: \(newUserId)")
-
         do {
             // Update favorites
-            print("🔄 Updating favorites...")
             try await SupabaseManager.shared.client
                 .from("favorites")
                 .update(["user_id": newUserId])
                 .eq("user_id", value: oldUserId)
                 .execute()
-            print("✅ favorites updated")
 
             // Update following (both follower and following)
-            print("🔄 Updating following (follower_id)...")
             try await SupabaseManager.shared.client
                 .from("following")
                 .update(["follower_id": newUserId])
                 .eq("follower_id", value: oldUserId)
                 .execute()
-            print("✅ following (follower_id) updated")
 
-            print("🔄 Updating following (following_id)...")
             try await SupabaseManager.shared.client
                 .from("following")
                 .update(["following_id": newUserId])
                 .eq("following_id", value: oldUserId)
                 .execute()
-            print("✅ following (following_id) updated")
 
             // Update place lists
-            print("🔄 Updating place_lists...")
             try await SupabaseManager.shared.client
                 .from("place_lists")
                 .update(["user_id": newUserId])
                 .eq("user_id", value: oldUserId)
                 .execute()
-            print("✅ place_lists updated")
 
             // Update reviews
-            print("🔄 Updating reviews...")
             try await SupabaseManager.shared.client
                 .from("reviews")
                 .update(["user_id": newUserId])
                 .eq("user_id", value: oldUserId)
                 .execute()
-            print("✅ reviews updated")
 
             // Update comments
-            print("🔄 Updating comments...")
             try await SupabaseManager.shared.client
                 .from("comments")
                 .update(["user_id": newUserId])
                 .eq("user_id", value: oldUserId)
                 .execute()
-            print("✅ comments updated")
 
             // Update my_places
-            print("🔄 Updating my_places...")
             try await SupabaseManager.shared.client
                 .from("my_places")
                 .update(["user_id": newUserId])
                 .eq("user_id", value: oldUserId)
                 .execute()
-            print("✅ my_places updated")
 
             // Update external_places
-            print("🔄 Updating external_places...")
             try await SupabaseManager.shared.client
                 .from("external_places")
                 .update(["user_id": newUserId])
                 .eq("user_id", value: oldUserId)
                 .execute()
-            print("✅ external_places updated")
 
             // Update place_notes
-            print("🔄 Updating place_notes...")
             try await SupabaseManager.shared.client
                 .from("place_notes")
                 .update(["user_id": newUserId])
                 .eq("user_id", value: oldUserId)
                 .execute()
-            print("✅ place_notes updated")
 
             // Update tik_tok_place_flags
-            print("🔄 Updating tik_tok_place_flags...")
             try await SupabaseManager.shared.client
                 .from("tik_tok_place_flags")
                 .update(["user_id": newUserId])
                 .eq("user_id", value: oldUserId)
                 .execute()
-            print("✅ tik_tok_place_flags updated")
 
             // Update user_notifications
-            print("🔄 Updating user_notifications...")
             try await SupabaseManager.shared.client
                 .from("user_notifications")
                 .update(["user_id": newUserId])
                 .eq("user_id", value: oldUserId)
                 .execute()
-            print("✅ user_notifications updated")
 
             // Update review_likes
-            print("🔄 Updating review_likes...")
             try await SupabaseManager.shared.client
                 .from("review_likes")
                 .update(["user_id": newUserId])
                 .eq("user_id", value: oldUserId)
                 .execute()
-            print("✅ review_likes updated")
-
-            print("✅ All related tables updated successfully")
 
         } catch {
             print("❌ Error updating related tables: \(error.localizedDescription)")

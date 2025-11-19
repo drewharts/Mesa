@@ -92,6 +92,8 @@ class ProfileViewModel: ObservableObject {
     // Popup list loading states
     @Published var isFollowersListLoading: Bool = false
     @Published var isFollowingListLoading: Bool = false
+    @Published var hasMoreFollowers: Bool = true
+    @Published var hasMoreFollowing: Bool = true
     
     // TikTok processing state
     @Published var isProcessingTikTok: Bool = false
