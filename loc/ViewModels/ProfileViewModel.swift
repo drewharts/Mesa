@@ -61,6 +61,7 @@ class ProfileViewModel: ObservableObject {
     @Published var myPlaces: [String] = [] // Legacy - keep for compatibility
     @Published var userExternalPlaces: [String: ExternalPlace] = [:] // PlaceId -> ExternalPlace
     @Published var recentlyCreatedListId: UUID?
+    private var listCreationTime: Date?
     
     private let userService: UserService
     private let imageService: ImageService
@@ -888,75 +889,67 @@ class ProfileViewModel: ObservableObject {
         }
     }
 
-     func addNewPlaceList(named name: String, city: String, emoji: String, image: String) {
-         guard let userId = userSession.currentUserId else { return }
-         
-         Task { @MainActor in
-             do {
-                 let createdList = try await SupabasePlaceService.shared.createNewList(
-                     userId: userId,
-                     name: name,
-                     city: city,
-                     emoji: emoji,
-                     image: image
-                 )
-                 
-                 // Update old format (for backward compatibility)
-                 userLists.append(createdList)
-                 sortListsByDistance()
-                 recentlyCreatedListId = createdList.id
-                 
-                 // Add new list to top of lightweightPlaceLists for immediate UI update
-                 let lightweightList = LightweightPlaceList(
-                     list_id: createdList.id.uuidString,
-                     name: createdList.name,
-                     is_public: false,
-                     image: createdList.image,
-                     created_at: ISO8601DateFormatter().string(from: Date()),
-                     updated_at: ISO8601DateFormatter().string(from: Date()),
-                     distance_meters: nil,
-                     place_count: 0,
-                     city: nil
-                 )
-                 lightweightPlaceLists.insert(lightweightList, at: 0)
-                 
-                 // Refresh lightweight place lists to include the new list
-                 // Use current location if available, otherwise use default page 1
-                 if let location = locationManager.currentLocation?.coordinate {
-                     do {
-                         let lists = try await SupabaseUserService.shared.fetchPlaceListsByProximity(
-                             userId: userId,
-                             userLatitude: location.latitude,
-                             userLongitude: location.longitude,
-                             page: 1,
-                             pageSize: 6
-                         )
-                         // Merge: keep new list at top, then add others (avoiding duplicates)
-                         var merged = [lightweightList]
-                         merged.append(contentsOf: lists.filter { $0.list_id != lightweightList.list_id })
-                         lightweightPlaceLists = merged
-                         placeListsCurrentPage = 1
-                         hasMorePlaceLists = lists.count >= 6
-                     } catch {
-                         print("❌ [ProfileViewModel] Error refreshing lists: \(error)")
-                     }
-                 } else {
-                     print("ℹ️ [ProfileViewModel] No location available, new list added to top")
-                 }
-                 
-                 // Clear the recently created list ID after a short delay
-                 DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
-                     if self.recentlyCreatedListId == createdList.id {
-                         self.recentlyCreatedListId = nil
-                     }
-                 }
-                 
-                 print("✅ Successfully created new list: \(createdList.name)")
-             } catch {
-                 print("❌ Error creating new list: \(error)")
-             }
-         }
-     }
+    func addNewPlaceList(named name: String, city: String, emoji: String, image: String) async -> Result<PlaceList, Error> {
+        guard let userId = userSession.currentUserId else { 
+            return .failure(NSError(domain: "ProfileViewModel", code: -1, 
+                userInfo: [NSLocalizedDescriptionKey: "No user session"]))
+        }
+        
+        do {
+            let createdList = try await SupabasePlaceService.shared.createNewList(
+                userId: userId,
+                name: name,
+                city: city,
+                emoji: emoji,
+                image: image
+            )
+            
+            // Update old format (for backward compatibility)
+            userLists.append(createdList)
+            sortListsByDistance()
+            setRecentlyCreatedList(createdList.id)
+            
+            // Add new list to top of lightweightPlaceLists for immediate UI update
+            let lightweightList = LightweightPlaceList(
+                list_id: createdList.id.uuidString,
+                name: createdList.name,
+                is_public: false,
+                image: createdList.image,
+                created_at: ISO8601DateFormatter().string(from: Date()),
+                updated_at: ISO8601DateFormatter().string(from: Date()),
+                distance_meters: nil,
+                place_count: 0,
+                city: nil
+            )
+            lightweightPlaceLists.insert(lightweightList, at: 0)
+            
+            // Refresh lightweight place lists to include the new list
+            // Use current location if available, otherwise use default page 1
+            if let location = locationManager.currentLocation?.coordinate {
+                do {
+                    let lists = try await SupabaseUserService.shared.fetchPlaceListsByProximity(
+                        userId: userId,
+                        userLatitude: location.latitude,
+                        userLongitude: location.longitude,
+                        page: 1,
+                        pageSize: 6
+                    )
+                    // Merge: keep new list at top, then add others (avoiding duplicates)
+                    var merged = [lightweightList]
+                    merged.append(contentsOf: lists.filter { $0.list_id != lightweightList.list_id })
+                    lightweightPlaceLists = merged
+                    placeListsCurrentPage = 1
+                    hasMorePlaceLists = lists.count >= 6
+                } catch {
+                    // Non-critical error - list was already added locally
+                }
+            }
+            
+            return .success(createdList)
+        } catch {
+            return .failure(error)
+        }
+    }
     
      func removePlaceList(placeList: PlaceList) {
          if let index = userLists.firstIndex(where: { $0.id == placeList.id }) {
@@ -2364,14 +2357,38 @@ class ProfileViewModel: ObservableObject {
         }
     }
     
+    /// Helper to check if a list is "recently" created (within last 60 seconds)
+    func isListRecentlyCreated(_ listId: UUID) -> Bool {
+        guard let createdId = recentlyCreatedListId,
+              let creationTime = listCreationTime,
+              createdId == listId else {
+            return false
+        }
+        
+        // Only consider "recent" if created within last 60 seconds
+        return Date().timeIntervalSince(creationTime) < 60
+    }
+    
+    /// Set the recently created list ID with timestamp
+    func setRecentlyCreatedList(_ listId: UUID) {
+        recentlyCreatedListId = listId
+        listCreationTime = Date()
+    }
+    
+    /// Clear the recently created list flag (called on user interaction)
+    func clearRecentlyCreatedList() {
+        recentlyCreatedListId = nil
+        listCreationTime = nil
+    }
+    
     /// Sorts lists with recently created list at the top, then by proximity to a specific place
     func sortListsWithRecentFirstFromPlace(_ place: DetailPlace) -> [PlaceList] {
         return userLists.sorted { list1, list2 in
-            // If one of the lists is recently created, prioritize it
-            if list1.id == recentlyCreatedListId {
+            // If one of the lists is recently created (and still within time window), prioritize it
+            if isListRecentlyCreated(list1.id) {
                 return true
             }
-            if list2.id == recentlyCreatedListId {
+            if isListRecentlyCreated(list2.id) {
                 return false
             }
             

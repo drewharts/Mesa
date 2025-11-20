@@ -80,7 +80,6 @@ class PlaceListSelectionViewModel: ObservableObject {
                 await loadPlaceMembershipForLists(fetchedLists, placeId: place.id.uuidString)
             }
         } catch {
-            print("❌ [PlaceListSelectionVM] Error loading lists: \(error)")
             lists = []
             hasMore = false
         }
@@ -131,7 +130,6 @@ class PlaceListSelectionViewModel: ObservableObject {
                 hasMore = false
             }
         } catch {
-            print("❌ [PlaceListSelectionVM] Error loading more lists: \(error)")
             // Don't set hasMore to false on error - allow retry
         }
         
@@ -155,7 +153,6 @@ class PlaceListSelectionViewModel: ObservableObject {
                         )
                         return (list.list_id, isInList)
                     } catch {
-                        print("❌ [PlaceListSelectionVM] Error checking membership for list \(list.list_id): \(error)")
                         return (list.list_id, false)
                     }
                 }
@@ -199,6 +196,11 @@ class PlaceListSelectionViewModel: ObservableObject {
             profile.addPlaceToLightweightList(listId: currentList.list_id, place: place, updatedCount: newCount)
             placeMembership[currentList.list_id] = true
         }
+        
+        // ✅ STAFF ENGINEER: Clear recently created flag on user interaction
+        // This is event-driven, not time-driven. Once user interacts with any list,
+        // they've acknowledged the new list and we can clear the highlight state.
+        profile.clearRecentlyCreatedList()
     }
     
     /// Update the place count for a list in our local state
@@ -225,19 +227,15 @@ class PlaceListSelectionViewModel: ObservableObject {
         lists[index] = updatedList
     }
     
-    func createNewList(named name: String, city: String, emoji: String, image: String) async {
-        guard let userId = userSession.currentUserId else { return }
+    /// Adds a new list by delegating to ProfileViewModel (Single Source of Truth)
+    /// and updates local selection state
+    func addNewListToSelection(named name: String, city: String, emoji: String, image: String) async -> Result<Void, Error> {
+        // Delegate to ProfileViewModel - it owns list creation logic
+        let result = await profile.addNewPlaceList(named: name, city: city, emoji: emoji, image: image)
         
-        do {
-            let createdList = try await placeListService.createList(
-                userId: userId,
-                name: name,
-                city: city,
-                emoji: emoji,
-                image: image
-            )
-            
-            // Add new list to top of our own lists array
+        switch result {
+        case .success(let createdList):
+            // Add to our local selection state for this UI context
             let lightweightList = LightweightPlaceList(
                 list_id: createdList.id.uuidString,
                 name: createdList.name,
@@ -250,14 +248,13 @@ class PlaceListSelectionViewModel: ObservableObject {
                 city: nil
             )
             
+            // Update our own paginated view (independent from ProfileViewModel's state)
             lists.insert(lightweightList, at: 0)
             
-            // Also update ProfileViewModel for other parts of the app
-            profile.lightweightPlaceLists.insert(lightweightList, at: 0)
-            profile.userLists.append(createdList)
-            profile.recentlyCreatedListId = createdList.id
-                    } catch {
-            print("❌ [PlaceListSelectionVM] Error creating list: \(error)")
+            return .success(())
+            
+        case .failure(let error):
+            return .failure(error)
         }
     }
 }

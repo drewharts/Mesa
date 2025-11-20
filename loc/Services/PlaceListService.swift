@@ -132,6 +132,7 @@ class PlaceListService {
         image: String = ""
     ) async throws -> PlaceList {
         struct NewPlaceListRecord: Encodable {
+            let id: String
             let user_id: String
             let name: String
             let city: String?
@@ -139,7 +140,11 @@ class PlaceListService {
             let image: String?
         }
         
+        // Generate UUID client-side for reliability (doesn't depend on DB defaults)
+        let listId = UUID()
+        
         let newList = NewPlaceListRecord(
+            id: listId.uuidString,
             user_id: userId,
             name: name,
             city: city.isEmpty ? nil : city,
@@ -157,10 +162,8 @@ class PlaceListService {
                 .value
             
             let placeList = convertToPlaceList(record)
-            print("✅ [PlaceListService] Created list: \(name)")
             return placeList
         } catch {
-            print("❌ [PlaceListService] Error creating list: \(error)")
             throw error
         }
     }

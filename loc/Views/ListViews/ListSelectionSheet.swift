@@ -232,6 +232,8 @@ struct ListSelectionSheet: View {
     let place: DetailPlace
     @Binding var isPresented: Bool
     @State private var showNewListSheet = false
+    @State private var errorMessage: String?
+    @State private var showError = false
 
     var body: some View {
         VStack(spacing: 10) {
@@ -255,8 +257,20 @@ struct ListSelectionSheet: View {
                 }
                 .sheet(isPresented: $showNewListSheet) {
                     NewListView(isPresented: $showNewListSheet, onSave: { listName in
-                        Task {
-                            await viewModel.createNewList(named: listName, city: "", emoji: "", image: "")
+                        let result = await viewModel.addNewListToSelection(
+                            named: listName, 
+                            city: "", 
+                            emoji: "", 
+                            image: ""
+                        )
+                        
+                        // Handle result explicitly
+                        switch result {
+                        case .success:
+                            break  // Sheet will dismiss via NewListView
+                        case .failure(let error):
+                            errorMessage = error.localizedDescription
+                            showError = true
                         }
                     })
                 }
@@ -272,6 +286,11 @@ struct ListSelectionSheet: View {
         .padding()
         .task {
             await viewModel.loadInitialLists(for: place)
+        }
+        .alert("Error Creating List", isPresented: $showError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(errorMessage ?? "Unknown error occurred")
         }
     }
 }

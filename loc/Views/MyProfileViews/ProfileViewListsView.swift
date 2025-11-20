@@ -100,7 +100,8 @@ struct ProfileViewListsView: View {
         }
         .sheet(isPresented: $showingNewListSheet) {
             NewListView(isPresented: $showingNewListSheet, onSave: { listName in
-                profile.addNewPlaceList(named: listName, city: "", emoji: "", image: "")
+                let _ = await profile.addNewPlaceList(named: listName, city: "", emoji: "", image: "")
+                // Result is ignored here - user will see the list appear in their profile
             })
         }
         .sheet(isPresented: .constant(deepLinkManager.hasPendingList()), onDismiss: {
