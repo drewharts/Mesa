@@ -501,15 +501,15 @@ class SupabaseUserService: ObservableObject {
             let id: String
             let name: String
             let is_public: Bool?
-            let cover_image_url: String?
-            let created_at: String
-            let updated_at: String
+            let image: String?
+            let created_at: String?
+            let updated_at: String?
         }
         
         // Fetch matching lists from database
         let response: [SearchListRecord] = try await supabase.client
             .from("place_lists")
-            .select("id, name, is_public, cover_image_url, created_at, updated_at")
+            .select("id, name, is_public, image, created_at, updated_at")
             .eq("user_id", value: userId)
             .ilike("name", pattern: "%\(query)%")
             .order("name", ascending: true)
@@ -518,17 +518,16 @@ class SupabaseUserService: ObservableObject {
             .value
         
         // Convert to LightweightPlaceList format
-        // Note: place_count is set to 0 here - will be loaded when list is displayed
         return response.map { record in
             LightweightPlaceList(
                 list_id: record.id,
                 name: record.name,
                 is_public: record.is_public ?? false,
-                image: record.cover_image_url,
-                created_at: record.created_at,
-                updated_at: record.updated_at,
+                image: record.image,
+                created_at: record.created_at ?? ISO8601DateFormatter().string(from: Date()),
+                updated_at: record.updated_at ?? ISO8601DateFormatter().string(from: Date()),
                 distance_meters: nil,
-                place_count: 0, // Will be fetched on-demand
+                place_count: 0,
                 city: nil
             )
         }
