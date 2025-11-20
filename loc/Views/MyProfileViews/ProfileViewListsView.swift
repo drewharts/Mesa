@@ -17,21 +17,28 @@ struct ProfileViewListsView: View {
     @EnvironmentObject var userSession: UserSession
     @Environment(\.presentationMode) private var presentationMode
 
+    @StateObject private var searchVM: ListSearchViewModel
     @State private var showingImagePicker = false
     @State private var inputImage: [UIImage] = []
     @State private var selectedList: PlaceListViewModel?
     @State private var showingNewListSheet = false
-    @State private var searchText = ""
     @State private var placeColors: [UUID: Color] = [:]
     
-    // Filtered lightweight lists based on search
-    var filteredLists: [LightweightPlaceList] {
-        let sorted = profile.lightweightPlaceLists
-        if searchText.isEmpty {
-            return sorted
-        } else {
-            return sorted.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
-        }
+    // Initialize with dependency injection
+    init() {
+        // Create searchVM with proper dependencies
+        // Note: EnvironmentObject values aren't available in init, so we use a wrapper
+        let session = UserSession.shared
+        _searchVM = StateObject(wrappedValue: ListSearchViewModel(userSession: session))
+    }
+    
+    // ✅ STAFF ENGINEER: Separate contexts for browse vs search
+    private var isSearching: Bool {
+        !searchVM.searchText.isEmpty
+    }
+    
+    private var displayedLists: [LightweightPlaceList] {
+        isSearching ? searchVM.searchResults : profile.lightweightPlaceLists
     }
     
     var body: some View {
@@ -40,35 +47,26 @@ struct ProfileViewListsView: View {
                 onAddList: {
                     showingNewListSheet = true
                 },
-                searchText: $searchText
+                searchText: $searchVM.searchText
             )
 
-            if !filteredLists.isEmpty {
+            if !displayedLists.isEmpty {
                 LazyVStack(spacing: 16) {
-                    ForEach(filteredLists, id: \.id) { list in
+                    ForEach(Array(displayedLists.enumerated()), id: \.element.id) { index, list in
                         LightweightProfileListSection(
                             list: list,
                             places: profile.lightweightPlaceListPlaces[list.list_id] ?? [],
-                            allLists: filteredLists,
-                            currentIndex: filteredLists.firstIndex(where: { $0.id == list.id }) ?? 0,
+                            allLists: displayedLists,
+                            currentIndex: index,
                             placeColors: $placeColors
                         )
                         .onAppear {
-                            // Trigger pagination when approaching the end
-                            if profile.shouldLoadMorePlaceLists(
-                                currentItem: list,
-                                filteredLists: filteredLists,
-                                isSearching: !searchText.isEmpty
-                            ) {
-                                Task {
-                                    await dataManager.loadMorePlaceLists(userId: userSession.currentUserId ?? "")
-                                }
-                            }
+                            handlePagination(index: index, list: list)
                         }
                     }
                     
                     // Loading indicator at the bottom
-                    if profile.isLoadingMorePlaceLists {
+                    if isSearching ? searchVM.isLoadingMore : profile.isLoadingMorePlaceLists {
                         HStack {
                             Spacer()
                             ProgressView()
@@ -78,21 +76,7 @@ struct ProfileViewListsView: View {
                     }
                 }
             } else {
-                VStack(spacing: 8) {
-                    if searchText.isEmpty {
-                        Text("No lists available")
-                            .foregroundColor(.gray)
-                            .padding(.horizontal)
-                    } else {
-                        Text("No lists found")
-                            .foregroundColor(.gray)
-                            .padding(.horizontal)
-                        Text("No lists match '\(searchText)'")
-                            .font(.caption)
-                            .foregroundColor(.gray)
-                            .padding(.horizontal)
-                    }
-                }
+                emptyStateView
             }
         }
         .sheet(isPresented: $showingImagePicker) {
@@ -122,4 +106,52 @@ struct ProfileViewListsView: View {
         }
     }
     
+    // MARK: - Helper Methods
+    
+    /// ✅ STAFF ENGINEER: Separate pagination logic by context (browse vs search)
+    private func handlePagination(index: Int, list: LightweightPlaceList) {
+        if isSearching {
+            // Search pagination
+            if searchVM.shouldLoadMore(currentIndex: index) {
+                Task {
+                    await searchVM.loadMoreResults()
+                }
+            }
+        } else {
+            // Browse pagination (proximity-based)
+            if profile.shouldLoadMorePlaceLists(
+                currentItem: list,
+                filteredLists: displayedLists,
+                isSearching: false
+            ) {
+                Task {
+                    await dataManager.loadMorePlaceLists(userId: userSession.currentUserId ?? "")
+                }
+            }
+        }
+    }
+    
+    /// Empty state view for different contexts
+    private var emptyStateView: some View {
+        VStack(spacing: 8) {
+            if searchVM.isSearching {
+                ProgressView()
+                    .padding()
+                Text("Searching...")
+                    .foregroundColor(.gray)
+            } else if isSearching {
+                Text("No lists found")
+                    .foregroundColor(.gray)
+                    .padding(.horizontal)
+                Text("No lists match '\(searchVM.searchText)'")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+                    .padding(.horizontal)
+            } else {
+                Text("No lists available")
+                    .foregroundColor(.gray)
+                    .padding(.horizontal)
+            }
+        }
+    }
 }
