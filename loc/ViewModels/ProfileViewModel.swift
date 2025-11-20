@@ -2526,20 +2526,20 @@ class ProfileViewModel: ObservableObject {
     
     /// Get TikTok videos for a specific place ID (async)
     /// Fetches all external_places for the place and returns TikTok videos with metadata
-    /// Returns a dictionary mapping URL to external_place_id for deletion purposes
+    /// Fetch TikTok videos from ALL users for a place
+    /// Populates ownership data for proper deletion and UI display
     func getTikTokVideos(for placeId: String) async -> [TikTokVideo] {
-        guard let userId = user?.id else {
-            return []
-        }
-        
-        // Fetch all TikTok URLs and their external_place_ids for this place
         do {
-            let urlPairs = try await userService.fetchExternalPlaceURLs(placeId: placeId, userId: userId)
+            // Fetch TikTok URLs from ALL users (not just current user)
+            let urlTuples = try await userService.fetchAllExternalPlaceURLs(placeId: placeId)
             
-            // Fetch metadata for each URL (using cache when available)
+            // Fetch metadata for each URL and populate ownership
             var tikTokVideos: [TikTokVideo] = []
-            for pair in urlPairs {
-                if let tikTokVideo = await TikTokMetadataCache.shared.getMetadata(for: pair.url) {
+            for tuple in urlTuples {
+                if var tikTokVideo = await TikTokMetadataCache.shared.getMetadata(for: tuple.url) {
+                    // Populate ownership tracking for deletion/display
+                    tikTokVideo.savedByUserId = tuple.userId
+                    tikTokVideo.externalPlaceId = tuple.id
                     tikTokVideos.append(tikTokVideo)
                 }
             }

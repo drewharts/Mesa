@@ -13,6 +13,10 @@ struct TikTokVideo: Codable, Identifiable, Equatable {
     let hashtags: [String]
     let createdAt: String  // Changed from Date to String to match backend
     
+    // Ownership tracking (not stored in backend, populated at runtime)
+    var savedByUserId: String?
+    var externalPlaceId: String?
+    
     enum CodingKeys: String, CodingKey {
         case id
         case videoID = "video_id"
@@ -27,7 +31,7 @@ struct TikTokVideo: Codable, Identifiable, Equatable {
     }
     
     // Manual initializer
-    init(id: UUID = UUID(), videoID: String, url: String, title: String?, caption: String?, embedHTML: String, thumbnailURL: String, author: TikTokAuthor, hashtags: [String], createdAt: String) {
+    init(id: UUID = UUID(), videoID: String, url: String, title: String?, caption: String?, embedHTML: String, thumbnailURL: String, author: TikTokAuthor, hashtags: [String], createdAt: String, savedByUserId: String? = nil, externalPlaceId: String? = nil) {
         self.id = id
         self.videoID = videoID
         self.url = url
@@ -38,6 +42,8 @@ struct TikTokVideo: Codable, Identifiable, Equatable {
         self.author = author
         self.hashtags = hashtags
         self.createdAt = createdAt
+        self.savedByUserId = savedByUserId
+        self.externalPlaceId = externalPlaceId
     }
     
     // Custom decoder to handle the backend format
@@ -64,5 +70,9 @@ struct TikTokVideo: Codable, Identifiable, Equatable {
             let formatter = ISO8601DateFormatter()
             self.createdAt = formatter.string(from: Date())
         }
+        
+        // Ownership tracking not decoded from JSON (populated at runtime)
+        self.savedByUserId = nil
+        self.externalPlaceId = nil
     }
 } 

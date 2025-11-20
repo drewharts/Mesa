@@ -44,6 +44,8 @@ struct TikTokVideosSection: View {
                         HStack(spacing: 12) {
                             ForEach(viewModel.videos, id: \.videoID) { video in
                                 let externalPlaceId = profile.getExternalPlace(for: placeId)?.id
+                                // Only show delete option if current user saved this video
+                                let canDelete = video.savedByUserId == userSession.currentUserId
                                 TikTokVideoView(
                                     tikTokVideo: video,
                                     externalPlaceId: externalPlaceId,
@@ -52,7 +54,7 @@ struct TikTokVideosSection: View {
                                             await deleteVideo(video)
                                         }
                                     },
-                                    showDeleteOption: true
+                                    showDeleteOption: canDelete
                                 )
                                 .id("tiktok_\(video.videoID)")
                             }

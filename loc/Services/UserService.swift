@@ -275,6 +275,38 @@ class UserService: ObservableObject {
         }
     }
     
+    /// Fetch ALL external place URLs for a place (from all users)
+    /// Returns tuples of (external_place_id, url, user_id) for ownership tracking
+    func fetchAllExternalPlaceURLs(placeId: String) async throws -> [(id: String, url: String, userId: String)] {
+        do {
+            let response: [ExternalPlaceDirectResponse] = try await SupabaseManager.shared.client
+                .from("external_places")
+                .select("""
+                    id,
+                    user_id,
+                    place_id,
+                    source,
+                    url,
+                    added_at
+                """)
+                .eq("place_id", value: placeId)
+                .execute()
+                .value
+            
+            // Extract (id, url, userId) tuples and filter out empty URLs
+            let urlTuples = response.compactMap { response -> (id: String, url: String, userId: String)? in
+                guard let url = response.url, !url.isEmpty else {
+                    return nil
+                }
+                return (id: response.id, url: url, userId: response.userId)
+            }
+            return urlTuples
+        } catch {
+            print("❌ [UserService] Error fetching all external place URLs: \(error.localizedDescription)")
+            throw error
+        }
+    }
+    
     /// Fetch all external places for a user (full objects with place data joined)
     /// Use fetchUserExternalPlaces(userId:limit:offset:) for paginated lightweight results
     func fetchAllUserExternalPlaces(userId: String) async throws -> [ExternalPlace] {

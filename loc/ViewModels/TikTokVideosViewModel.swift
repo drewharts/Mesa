@@ -69,10 +69,19 @@ class TikTokVideosViewModel: ObservableObject {
     
     func deleteVideo(_ video: TikTokVideo, placeId: String, userId: String) async {
         do {
-            let videoUrl = video.url
+            // Security: Verify user owns this video before deletion
+            guard video.savedByUserId == userId else {
+                print("❌ [TikTokVideosViewModel] Cannot delete video - user doesn't own it")
+                error = NSError(
+                    domain: "TikTokVideosViewModel",
+                    code: 403,
+                    userInfo: [NSLocalizedDescriptionKey: "You can only delete your own TikToks"]
+                )
+                return
+            }
             
-            // Get the external_place_id for this video URL
-            let externalPlaceId = await profileVM.getExternalPlaceId(for: placeId, videoUrl: videoUrl)
+            let videoUrl = video.url
+            let externalPlaceId = video.externalPlaceId
             
             try await tikTokService.deleteTikTokFromPlace(
                 placeId: placeId,
