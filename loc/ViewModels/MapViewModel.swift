@@ -25,6 +25,10 @@ class MapViewModel: ObservableObject {
     private var currentLoadTask: Task<Void, Never>? // Track current loading task for cancellation
     weak var profileViewModel: ProfileViewModel? // To access current user's profile
     
+    // Photo loading state (for de-duplication)
+    private var isLoadingPhotos = false
+    private var hasLoadedPhotos = false
+    
     // Minimum movement threshold to trigger reload (in degrees)
     private let minMovementThreshold: Double = 0.01 // ~1km at equator
     
@@ -35,11 +39,20 @@ class MapViewModel: ObservableObject {
     
     /// Load profile photos for followed users (for custom annotation views)
     func loadFollowedUsersPhotos() async {
+        // Prevent duplicate loads
+        guard !isLoadingPhotos else {
+            print("⚠️ [MapViewModel] Already loading photos, skipping duplicate call")
+            return
+        }
+        
         // Use cached profile data instead of fetching again
         guard let currentUser = profileViewModel?.user else {
             print("⚠️ [MapViewModel] No user profile available for loading photos")
             return
         }
+        
+        isLoadingPhotos = true
+        defer { isLoadingPhotos = false }
         
         let profileUserId = currentUser.id
         let currentUserPhotoUrl = currentUser.profilePhotoURL
@@ -55,6 +68,7 @@ class MapViewModel: ObservableObject {
             }
             
             self.followedUsersPhotos = photos
+            self.hasLoadedPhotos = true
             print("📸 [MapViewModel] Loaded \(photos.count) total photos for annotations (including current user)")
             
             // Load profile pictures from URLs

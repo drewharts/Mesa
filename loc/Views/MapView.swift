@@ -273,6 +273,10 @@ struct MapView: View {
                 }
             }
             
+            // ✅ Load profile photos on first appearance (critical for login flow)
+            // This ensures photos load whether user logs in OR app starts already logged in
+            await mapViewModel.loadFollowedUsersPhotos()
+            
             // ✅ REMOVED: Duplicate operations already handled in DataManager
             // profile.refreshUserPlaces() - Already done in DataManager.initializeProfileData()
             // detailPlaceVM.calculateAnnotationPlaces() - Already done in DataManager.calculateMapAnnotations()
