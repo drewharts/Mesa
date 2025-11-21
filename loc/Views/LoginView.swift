@@ -11,6 +11,13 @@ import AuthenticationServices
 struct LoginView: View {
     @ObservedObject var viewModel: LoginViewModel
     @EnvironmentObject var userSession: UserSession
+    let dataManager: DataManager?
+    @State private var showAdminDebug = false
+    
+    init(viewModel: LoginViewModel, dataManager: DataManager? = nil) {
+        self.viewModel = viewModel
+        self.dataManager = dataManager
+    }
 
     var body: some View {
         ZStack {
@@ -51,13 +58,46 @@ struct LoginView: View {
                 }
                 
                 Spacer()
+                
+                #if DEBUG
+                // Admin Debug Button (only in DEBUG builds)
+                if AdminConfig.adminModeEnabled {
+                    Button {
+                        showAdminDebug = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "person.badge.key.fill")
+                            Text("Admin Login")
+                        }
+                        .font(.caption)
+                        .foregroundColor(.orange)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(Color.orange.opacity(0.1))
+                        .cornerRadius(8)
+                    }
+                    .padding(.bottom, 20)
+                }
+                #endif
             }
+        }
+        .sheet(isPresented: $showAdminDebug) {
+            AdminDebugView(dataManager: dataManager)
+                .environmentObject(userSession)
         }
     }
 }
 
 #Preview {
     LoginViewPreview()
+}
+
+// Fix for missing init in preview - add default init
+extension LoginView {
+    init(viewModel: LoginViewModel) {
+        self.viewModel = viewModel
+        self.dataManager = nil
+    }
 }
 
 

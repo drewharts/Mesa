@@ -46,6 +46,10 @@ class DataManager: ObservableObject {
     }
 
     func initializeProfileData(userId: String) async {
+        print("🚀 [DataManager] ========================================")
+        print("🚀 [DataManager] initializeProfileData called for user: \(userId)")
+        print("🚀 [DataManager] ========================================")
+        
         startDataLoadingFlags()
         
         // ✅ PHASE 1: Load ONLY essential data for immediate UI display
@@ -59,6 +63,8 @@ class DataManager: ObservableObject {
                 await self?.loadViewportPlacesOnly(userId: userId)
             }
         }
+        
+        print("✅ [DataManager] initializeProfileData completed for user: \(userId)")
     }
     
     /// Helper to measure loading time for performance monitoring
@@ -364,14 +370,27 @@ class DataManager: ObservableObject {
     
     // Load's current user's profile data and profile picture
     func loadProfileData(userId: String) async {
+        print("🔄 [DataManager] Loading profile data for user ID: \(userId)")
         do {
             let profileData = try await userService.fetchUserById(userId: userId)
+            print("✅ [DataManager] Fetched profile data:")
+            print("   - ID: \(profileData.id)")
+            print("   - Name: \(profileData.fullName)")
+            print("   - First: \(profileData.firstName), Last: \(profileData.lastName)")
+            print("   - Email: \(profileData.email)")
+            print("   - Photo URL: \(profileData.profilePhotoURL?.absoluteString ?? "nil")")
+            
             self.profileViewModel.user = profileData
+            print("✅ [DataManager] Set profileViewModel.user")
+            
             if let profilePhotoUrl = profileData.profilePhotoURL {
+                print("🖼️ [DataManager] Loading profile picture from: \(profilePhotoUrl)")
                 self.AddProfilePicture(userId: userId, profilePhotoUrl: profilePhotoUrl, isCurrentUser: true)
+            } else {
+                print("⚠️ [DataManager] No profile photo URL available")
             }
         } catch {
-            print("Error loading profile data: \(error.localizedDescription)")
+            print("❌ [DataManager] Error loading profile data: \(error.localizedDescription)")
         }
     }
     

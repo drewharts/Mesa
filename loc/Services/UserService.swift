@@ -168,29 +168,53 @@ class UserService: ObservableObject {
     
     func fetchUserById(userId: String) async throws -> ProfileData {
         print("🔄 [UserService] Fetching user profile async from Supabase: \(userId)")
+        
+        // Normalize UUID to lowercase for consistent comparison
+        let normalizedUserId = userId.lowercased()
+        print("🔍 [UserService] Normalized user ID: \(normalizedUserId)")
 
         do {
             // First try to fetch by id (works for UIDs and new Supabase users)
             let profile: ProfileData = try await SupabaseManager.shared.client
                 .from("users")
                 .select()
-                .eq("id", value: userId)
+                .eq("id", value: normalizedUserId)
                 .single()
                 .execute()
                 .value
 
             print("✅ [UserService] Found user profile: \(profile.firstName) \(profile.lastName)")
+            print("🔍 [UserService] Profile data: firstName=\(profile.firstName), lastName=\(profile.lastName), email=\(profile.email)")
+            print("🔍 [UserService] Photo URL: \(profile.profilePhotoURL?.absoluteString ?? "nil")")
             return profile
 
+        } catch let decodingError as DecodingError {
+            print("❌ [UserService] DECODING ERROR: \(decodingError)")
+            switch decodingError {
+            case .keyNotFound(let key, let context):
+                print("   Missing key: \(key.stringValue)")
+                print("   Context: \(context.debugDescription)")
+            case .typeMismatch(let type, let context):
+                print("   Type mismatch: expected \(type)")
+                print("   Context: \(context.debugDescription)")
+            case .valueNotFound(let type, let context):
+                print("   Value not found: \(type)")
+                print("   Context: \(context.debugDescription)")
+            case .dataCorrupted(let context):
+                print("   Data corrupted: \(context.debugDescription)")
+            @unknown default:
+                print("   Unknown decoding error")
+            }
+            throw decodingError
         } catch {
-            print("🔄 [UserService] User not found by id, trying supabase_uid: \(userId)")
+            print("🔄 [UserService] User not found by id, trying supabase_uid: \(normalizedUserId)")
 
             // If not found by id, try by supabase_uid (for Supabase auth UIDs)
             do {
                 let profile: ProfileData = try await SupabaseManager.shared.client
                     .from("users")
                     .select()
-                    .eq("supabase_uid", value: userId)
+                    .eq("supabase_uid", value: normalizedUserId)
                     .single()
                     .execute()
                     .value
@@ -199,7 +223,7 @@ class UserService: ObservableObject {
                 return profile
 
                 } catch {
-                print("❌ [UserService] User profile not found by id or supabase_uid: \(userId)")
+                print("❌ [UserService] User profile not found by id or supabase_uid: \(normalizedUserId)")
                 throw NSError(domain: "UserService", code: 404, userInfo: [NSLocalizedDescriptionKey: "User profile not found"])
             }
         }

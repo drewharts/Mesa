@@ -14,8 +14,8 @@ struct ProfileData: Codable, Identifiable {
     var lastName: String
     var email: String
     var profilePhotoURL: URL?
-    var phoneNumber: String
-    var fullNameLower: String
+    var phoneNumber: String?  // Optional - may be NULL in database
+    var fullNameLower: String?  // Optional - generated column may be NULL
     var fullName: String
     var fcmToken: String?
     var firebaseUid: String?

@@ -48,3 +48,6 @@ firebase-functions/node_modules/
 
 # Logs
 *.log
+
+# Admin Config (contains service_role key - NEVER COMMIT)
+loc/Services/AdminConfig.swift

@@ -49,7 +49,10 @@ struct ContentView: View {
                 Text(navigationErrorMessage)
             }
         } else {
-            LoginView(viewModel: LoginViewModel(userService: serviceContainer.userService, dataManager: dataManager))
+            LoginView(
+                viewModel: LoginViewModel(userService: serviceContainer.userService, dataManager: dataManager),
+                dataManager: dataManager
+            )
         }
     }
     
