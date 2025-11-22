@@ -24,6 +24,7 @@ struct SplashScreenView: View {
     let dataManager: DataManager
     let serviceContainer: ServiceContainer
     let searchViewModel: SearchViewModel  // ✅ Accept from parent
+    let searchCoordinator: SearchCoordinatorViewModel  // ✅ Coordinator for search
 
     var body: some View {
         Group {
@@ -38,7 +39,8 @@ struct SplashScreenView: View {
                     notificationManager: notificationManager,
                     dataManager: dataManager,
                     serviceContainer: serviceContainer,
-                    searchViewModel: searchViewModel  // ✅ Pass to ContentView
+                    searchViewModel: searchViewModel,  // ✅ Pass to ContentView
+                    searchCoordinator: searchCoordinator  // ✅ Pass coordinator
                 )
                 .transition(.opacity)
             } else {

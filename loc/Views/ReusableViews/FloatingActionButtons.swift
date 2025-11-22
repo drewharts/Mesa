@@ -2,13 +2,9 @@ import SwiftUI
 
 struct FloatingActionButtons: View {
     @EnvironmentObject var profileViewModel: ProfileViewModel
+    @ObservedObject var searchCoordinator: SearchCoordinatorViewModel
     @Binding var isSearchBarMinimized: Bool
-    @Binding var searchIsFocused: Bool
-    @Binding var sheetHeight: CGFloat
     @Binding var shouldNavigateToProfile: Bool
-    
-    let maxSheetHeight: CGFloat
-    let minSheetHeight: CGFloat
     
     var body: some View {
         VStack {
@@ -27,14 +23,13 @@ struct FloatingActionButtons: View {
     
     private var searchButton: some View {
         Button(action: {
-            // ✅ Remove animation block here - let MainView's .opacity transition handle it
-            // This prevents fighting animations and layout thrashing
-            if sheetHeight == maxSheetHeight {
-                sheetHeight = minSheetHeight
+            // ✅ Wrap in faster animation for snappy feel
+            withAnimation(.easeInOut(duration: 0.2)) {
+                searchCoordinator.collapseSheetIfExpanded()
+                isSearchBarMinimized = false
             }
-            isSearchBarMinimized = false
             
-            // ✅ Focus now handled by SearchContainerView.onChange (staff engineer: single source of truth)
+            // ✅ Focus handled by SearchContainerView.onChange
         }) {
             Image(systemName: "magnifyingglass")
                 .foregroundColor(.secondary)

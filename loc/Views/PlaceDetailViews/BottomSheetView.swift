@@ -35,7 +35,7 @@ struct BottomSheetView<Content: View>: View {
     private var isScrollingEnabled: Bool {
         sheetHeight == maxSheetHeight
     }
-    
+
     // MARK: - Drag Handling Methods
     
     /// Handle ongoing drag gesture changes

@@ -63,23 +63,26 @@ struct SearchContainerView: View {
         if isExpanded {
             // Ensure pipeline is setup before use
             searchViewModel.setupIfNeeded()
-            // Delay focus to ensure animation is fully complete (prevents keyboard crashes)
-            // 0.35s > 0.2s animation duration
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                searchIsFocused = true
+            
+            // Delay focus to align with animation duration (0.25s)
+            // This ensures the view is fully visible and stable before requesting focus
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak searchViewModel] in
+                // CRITICAL: Check if still expanded before forcing focus
+                if self.isSearchExpanded {
+                    self.searchIsFocused = true
+                }
             }
         } else {
-            // Clear focus and dismiss keyboard when collapsing
+            // Clear focus when collapsing
             dismissKeyboard()
         }
     }
     
-    /// Dismiss keyboard immediately (no animation delay)
-    /// Single Responsibility: Handle keyboard dismissal cleanly
+    /// Dismiss keyboard immediately
+    /// Single Responsibility: Handle keyboard dismissal cleanly using SwiftUI state
     private func dismissKeyboard() {
         searchIsFocused = false
-        // Force keyboard dismissal at UIKit level
-        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+        // Removed manual UIKit resignation to prevent conflicts with SwiftUI FocusState
     }
     
     private var searchBar: some View {

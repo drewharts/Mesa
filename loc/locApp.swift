@@ -23,6 +23,7 @@ struct locApp: App {
     private let notificationManager = NotificationManager.shared
     private let dataManager: DataManager
     private let searchViewModel: SearchViewModel  // ✅ Staff Engineer: Create VM at app level
+    private let searchCoordinator: SearchCoordinatorViewModel  // ✅ Coordinator for search interactions
     
     init() {
         // Supabase is initialized via SupabaseManager.shared
@@ -114,6 +115,13 @@ struct locApp: App {
             locationManager: location
         )
         
+        // ✅ Create SearchCoordinator to handle search interactions (MVVM Coordinator Pattern)
+        let searchCoord = SearchCoordinatorViewModel(
+            selectedPlaceVM: selectedPlaceVM,
+            userProfileViewModel: userProfileVM,
+            userSession: userSess
+        )
+        
         // Assign to properties
         self._locationManager = StateObject(wrappedValue: location)
         self._userSession = StateObject(wrappedValue: userSess)
@@ -125,6 +133,7 @@ struct locApp: App {
         self.deepLinkManager = deepLinkMgr
         self.dataManager = dataMgr
         self.searchViewModel = searchVM
+        self.searchCoordinator = searchCoord
         
         // Pass user service to AppDelegate
         appDelegate.userService = services.userService
@@ -143,7 +152,8 @@ struct locApp: App {
                 notificationManager: notificationManager,
                 dataManager: dataManager,
                 serviceContainer: serviceContainer,
-                searchViewModel: searchViewModel  // ✅ Pass to children
+                searchViewModel: searchViewModel,  // ✅ Pass to children
+                searchCoordinator: searchCoordinator  // ✅ Pass coordinator
             )
                 // Only 3 environment objects at the root!
                 .environmentObject(userSession)

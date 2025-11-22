@@ -23,21 +23,18 @@ struct MainView: View {
     @ObservedObject var deepLinkViewModel: DeepLinkViewModel
     @ObservedObject var notificationManager: NotificationManager
     @ObservedObject var searchViewModel: SearchViewModel  // ✅ Accept from parent (staff engineer: dependency injection)
+    @ObservedObject var searchCoordinator: SearchCoordinatorViewModel  // ✅ Coordinator for search interactions
     
     let deepLinkManager: DeepLinkManager
     let dataManager: DataManager
     let serviceContainer: ServiceContainer
     
     // MARK: - Local UI State
-    private let minSheetHeight: CGFloat = 250
-    private var maxSheetHeight: CGFloat { UIScreen.main.bounds.height * 0.85 }
-    @State private var sheetHeight: CGFloat = UIScreen.main.bounds.height * 0.85
     @State private var shouldNavigateToProfile = false
     @State private var recenterMap = false
     @State private var isCreatePlacePopupActive = false
     @State private var mapPosition = MapCameraPosition.automatic
-    
-    // ✅ NO INIT - Pure view with dependency injection (staff engineer: MVVM separation)
+    @State private var searchCoordinator: SearchCoordinatorViewModel?
     
     var body: some View {
         NavigationStack {
@@ -115,10 +112,10 @@ struct MainView: View {
         .onChange(of: selectedPlaceVM.isDetailSheetPresented) { _, newValue in
             if newValue {
                 appCoordinator.isSearchExpanded = false
-                // Sheet height is set in onPlaceSelected before presenting
+                // Sheet height is set in SearchCoordinator before presenting
             } else {
                 // Reset sheet height when dismissing so next open starts fresh
-                sheetHeight = maxSheetHeight
+                searchCoordinator.resetSheetToMaxHeight()
             }
         }
         .onChange(of: selectedPlaceVM.shouldAnimateMapToPlace) { _, newValue in
@@ -155,9 +152,9 @@ struct MainView: View {
                 detailPlaceViewModel: detailPlaceViewModel,
                 serviceContainer: serviceContainer,
                 dataManager: dataManager,
-                sheetHeight: $sheetHeight,
-                minSheetHeight: minSheetHeight,
-                maxSheetHeight: maxSheetHeight
+                sheetHeight: $searchCoordinator.sheetHeight,
+                minSheetHeight: searchCoordinator.minHeight,
+                maxSheetHeight: searchCoordinator.maxHeight
             )
             .environmentObject(selectedPlaceVM)
             .environmentObject(userProfileViewModel)
@@ -171,20 +168,10 @@ struct MainView: View {
         ZStack(alignment: .topTrailing) {
             // ✅ Always render SearchContainerView (staff engineer: use visibility, not recreation)
             SearchContainerView(
-                searchViewModel: searchViewModel,  // Pass existing VM
+                searchViewModel: searchViewModel,
                 isSearchExpanded: $appCoordinator.isSearchExpanded,
-                onPlaceSelected: { detailPlace in
-                    // Handle place selection via SelectedPlaceViewModel callback
-                    selectedPlaceVM.selectPlaceAndFetchDetails(detailPlace, shouldAnimateMap: true)
-                    // Set sheet height BEFORE presenting to avoid race condition
-                    sheetHeight = maxSheetHeight
-                    selectedPlaceVM.isDetailSheetPresented = true
-                },
-                onUserSelected: { profileData in
-                    // Handle user selection via UserProfileViewModel
-                    guard let currentUserId = userSession.currentUserId else { return }
-                    userProfileViewModel.selectUser(profileData, currentUserId: currentUserId)
-                }
+                onPlaceSelected: searchCoordinator.handlePlaceSelection,  // ✅ Stable method reference
+                onUserSelected: searchCoordinator.handleUserSelection     // ✅ Stable method reference
             )
             .opacity(appCoordinator.isSearchExpanded ? 1 : 0)
             .allowsHitTesting(appCoordinator.isSearchExpanded)
@@ -223,15 +210,12 @@ struct MainView: View {
                !selectedPlaceVM.isDetailSheetPresented && 
                !isCreatePlacePopupActive {
                 FloatingActionButtons(
+                    searchCoordinator: searchCoordinator,
                     isSearchBarMinimized: Binding(
                         get: { !appCoordinator.isSearchExpanded },
                         set: { appCoordinator.isSearchExpanded = !$0 }
                     ),
-                    searchIsFocused: .constant(false),
-                    sheetHeight: $sheetHeight,
-                    shouldNavigateToProfile: $shouldNavigateToProfile,
-                    maxSheetHeight: maxSheetHeight,
-                    minSheetHeight: minSheetHeight
+                    shouldNavigateToProfile: $shouldNavigateToProfile
                 )
                 .environmentObject(profileViewModel)
             }

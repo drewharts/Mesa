@@ -24,6 +24,7 @@ struct ContentView: View {
     let dataManager: DataManager
     let serviceContainer: ServiceContainer
     let searchViewModel: SearchViewModel  // ✅ Accept from parent
+    let searchCoordinator: SearchCoordinatorViewModel  // ✅ Search coordinator
     
     @State private var showNavigationError = false
     @State private var navigationErrorMessage = ""
@@ -39,7 +40,8 @@ struct ContentView: View {
                 detailPlaceViewModel: detailPlaceViewModel,
                 deepLinkViewModel: deepLinkViewModel,
                 notificationManager: notificationManager,
-                searchViewModel: searchViewModel,  // ✅ Pass from parent (correct order)
+                searchViewModel: searchViewModel,
+                searchCoordinator: searchCoordinator,
                 deepLinkManager: deepLinkManager,
                 dataManager: dataManager,
                 serviceContainer: serviceContainer
