@@ -87,6 +87,16 @@ struct MainView: View {
                 // UI Overlay (Top Controls, FABs)
                 uiOverlayLayer
                 
+                // Search Overlay (Isolated to prevent recreation)
+                // Staff Engineer: Separate layer prevents TextField destruction on MainView re-renders
+                SearchOverlayView(
+                    searchViewModel: searchViewModel,
+                    searchCoordinator: searchCoordinator,
+                    onSheetHeightChange: { newHeight in
+                        sheetHeight = newHeight
+                    }
+                )
+                
                 // Place Detail Sheet (Independent Z-Layer)
                 // Moved out of VStack to prevent keyboard/layout constraints from affecting sheet height
                 placeDetailLayer
@@ -167,9 +177,27 @@ struct MainView: View {
     
     // MARK: - UI Overlay Layer
     private var uiOverlayLayer: some View {
-        VStack(spacing: 0) {
-            topControls
-            Spacer(minLength: 0)
+        VStack {
+            HStack {
+                Spacer()
+                VStack(spacing: 10) {
+                    Button(action: { recenterMap = true }) {
+                        Image(systemName: "location.fill")
+                            .foregroundColor(.secondary)
+                            .frame(width: 36, height: 36)
+                            .background(.ultraThinMaterial)
+                            .clipShape(Circle())
+                            .overlay(Circle().stroke(Color.gray.opacity(0.3), lineWidth: 1))
+                            .shadow(radius: 4)
+                    }
+                    .padding(.top, 10)
+                    .padding(.trailing, 20)
+                }
+            }
+            .opacity(!appCoordinator.isSearchExpanded ? 1 : 0)
+            .allowsHitTesting(!appCoordinator.isSearchExpanded)
+            
+            Spacer()
         }
         .overlay(floatingActionButtons)
     }
@@ -192,50 +220,6 @@ struct MainView: View {
             .environmentObject(userProfileViewModel)
             .environmentObject(notificationManager)
             .environmentObject(appCoordinator)
-        }
-    }
-    
-    // MARK: - Top Controls
-    private var topControls: some View {
-        ZStack(alignment: .topTrailing) {
-            // ✅ Always render SearchContainerView (staff engineer: use visibility, not recreation)
-            SearchContainerView(
-                searchViewModel: searchViewModel,
-                isSearchExpanded: $appCoordinator.isSearchExpanded,
-                onPlaceSelected: { detailPlace in
-                    // Coordinator returns new height, we set it locally
-                    sheetHeight = searchCoordinator.handlePlaceSelection(detailPlace)
-                },
-                onUserSelected: searchCoordinator.handleUserSelection
-            )
-            .id("SearchContainer")  // ✅ Stable identity prevents TextField recreation
-            .opacity(appCoordinator.isSearchExpanded ? 1 : 0)
-            .allowsHitTesting(appCoordinator.isSearchExpanded)
-            
-            // Show minimized controls when search is collapsed
-            minimizedControls
-                .opacity(!appCoordinator.isSearchExpanded ? 1 : 0)
-                .allowsHitTesting(!appCoordinator.isSearchExpanded)
-        }
-    }
-    
-    // MARK: - Minimized Controls
-    private var minimizedControls: some View {
-        HStack {
-            Spacer()
-            VStack(spacing: 10) {
-                Button(action: { recenterMap = true }) {
-                    Image(systemName: "location.fill")
-                        .foregroundColor(.secondary)
-                        .frame(width: 36, height: 36)
-                        .background(.ultraThinMaterial)
-                        .clipShape(Circle())
-                        .overlay(Circle().stroke(Color.gray.opacity(0.3), lineWidth: 1))
-                        .shadow(radius: 4)
-                }
-                .padding(.top, 10)
-                .padding(.trailing, 20)
-            }
         }
     }
     
