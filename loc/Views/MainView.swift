@@ -22,9 +22,10 @@ struct MainView: View {
     @ObservedObject var detailPlaceViewModel: DetailPlaceViewModel
     @ObservedObject var deepLinkViewModel: DeepLinkViewModel
     @ObservedObject var notificationManager: NotificationManager
-    @ObservedObject var searchViewModel: SearchViewModel  // ✅ Accept from parent (staff engineer: dependency injection)
     
-    let searchCoordinator: SearchCoordinatorViewModel  // ✅ Coordinator (no observation to prevent render loops)
+    // MARK: - Pass-through ViewModels (no observation to prevent render loops)
+    let searchViewModel: SearchViewModel  // ✅ Pass-through only, no observation
+    let searchCoordinator: SearchCoordinatorViewModel  // ✅ Coordinator (no observation)
     
     let deepLinkManager: DeepLinkManager
     let dataManager: DataManager
