@@ -29,9 +29,9 @@ struct MainView: View {
     let serviceContainer: ServiceContainer
     
     // MARK: - Local UI State
-    @State private var sheetHeight: CGFloat = 250
-    @State private var minSheetHeight: CGFloat = 250
-    @State private var maxSheetHeight: CGFloat = UIScreen.main.bounds.height * 0.92
+    private let minSheetHeight: CGFloat = 250
+    private var maxSheetHeight: CGFloat { UIScreen.main.bounds.height * 0.75 }
+    @State private var sheetHeight: CGFloat = UIScreen.main.bounds.height * 0.75
     @State private var shouldNavigateToProfile = false
     @State private var recenterMap = false
     @State private var isCreatePlacePopupActive = false
@@ -55,7 +55,13 @@ struct MainView: View {
                     onMapTap: handleMapTap
                 )
                 
+                // UI Overlay (Top Controls, FABs)
                 uiOverlayLayer
+                
+                // Place Detail Sheet (Independent Z-Layer)
+                // Moved out of VStack to prevent keyboard/layout constraints from affecting sheet height
+                placeDetailLayer
+                
                 loadingOverlay
             }
             .navigationBarHidden(true)
@@ -109,6 +115,10 @@ struct MainView: View {
         .onChange(of: selectedPlaceVM.isDetailSheetPresented) { _, newValue in
             if newValue {
                 appCoordinator.isSearchExpanded = false
+                // Sheet height is set in onPlaceSelected before presenting
+            } else {
+                // Reset sheet height when dismissing so next open starts fresh
+                sheetHeight = maxSheetHeight
             }
         }
         .onChange(of: selectedPlaceVM.shouldAnimateMapToPlace) { _, newValue in
@@ -131,6 +141,15 @@ struct MainView: View {
         VStack(spacing: 0) {
             topControls
             Spacer(minLength: 0)
+        }
+        .overlay(floatingActionButtons)
+    }
+    
+    // MARK: - Place Detail Layer
+    // Isolated layer for the bottom sheet to ensure full-screen height availability
+    private var placeDetailLayer: some View {
+        VStack(spacing: 0) {
+            Spacer(minLength: 0)
             PlaceDetailContainerView(
                 profileViewModel: profileViewModel,
                 detailPlaceViewModel: detailPlaceViewModel,
@@ -145,7 +164,6 @@ struct MainView: View {
             .environmentObject(notificationManager)
             .environmentObject(appCoordinator)
         }
-        .overlay(floatingActionButtons)
     }
     
     // MARK: - Top Controls
@@ -158,6 +176,8 @@ struct MainView: View {
                 onPlaceSelected: { detailPlace in
                     // Handle place selection via SelectedPlaceViewModel callback
                     selectedPlaceVM.selectPlaceAndFetchDetails(detailPlace, shouldAnimateMap: true)
+                    // Set sheet height BEFORE presenting to avoid race condition
+                    sheetHeight = maxSheetHeight
                     selectedPlaceVM.isDetailSheetPresented = true
                 },
                 onUserSelected: { profileData in

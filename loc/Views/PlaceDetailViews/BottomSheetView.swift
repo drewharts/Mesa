@@ -35,6 +35,40 @@ struct BottomSheetView<Content: View>: View {
     private var isScrollingEnabled: Bool {
         sheetHeight == maxSheetHeight
     }
+    
+    // MARK: - Drag Handling Methods
+    
+    /// Handle ongoing drag gesture changes
+    private func handleDragChange(_ translation: CGFloat) {
+        let newHeight = sheetHeight - translation
+        
+        if newHeight <= maxSheetHeight && newHeight >= minSheetHeight {
+            sheetHeight = newHeight
+        } else if newHeight > maxSheetHeight {
+            sheetHeight = maxSheetHeight
+        } else if newHeight < minSheetHeight {
+            sheetHeight = minSheetHeight
+        }
+    }
+    
+    /// Handle drag gesture end - snap to position or dismiss
+    private func handleDragEnd(translation: CGFloat) {
+        let newHeight = sheetHeight - translation
+        let dismissalThreshold: CGFloat = 100
+        let midpoint = (maxSheetHeight + minSheetHeight) / 2
+        
+        withAnimation {
+            if translation > dismissalThreshold {
+                // Reset height to max before dismissing so next open starts at max
+                sheetHeight = maxSheetHeight
+                isPresented = false
+            } else if newHeight > midpoint {
+                sheetHeight = maxSheetHeight
+            } else {
+                sheetHeight = minSheetHeight
+            }
+        }
+    }
 
     var body: some View {
         GeometryReader { geometry in
@@ -65,28 +99,11 @@ struct BottomSheetView<Content: View>: View {
                             state = value.translation.height
                         }
                         .onEnded { value in
-                            let newHeight = sheetHeight - value.translation.height
-                            let dismissalThreshold: CGFloat = 100
-                            withAnimation {
-                                if value.translation.height > dismissalThreshold {
-                                    isPresented = false
-                                } else if newHeight > (maxSheetHeight + minSheetHeight) / 2 {
-                                    sheetHeight = maxSheetHeight
-                                } else {
-                                    sheetHeight = minSheetHeight
-                                }
-                            }
+                            handleDragEnd(translation: value.translation.height)
                         }
                 )
                 .onChange(of: dragTranslation) {
-                    let newHeight = sheetHeight - dragTranslation
-                    if newHeight <= maxSheetHeight && newHeight >= minSheetHeight {
-                        sheetHeight = newHeight
-                    } else if newHeight > maxSheetHeight {
-                        sheetHeight = maxSheetHeight
-                    } else if newHeight < minSheetHeight {
-                        sheetHeight = minSheetHeight
-                    }
+                    handleDragChange(dragTranslation)
                 }
             }
             .frame(width: geometry.size.width, height: geometry.size.height)

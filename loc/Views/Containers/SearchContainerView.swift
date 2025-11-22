@@ -41,26 +41,45 @@ struct SearchContainerView: View {
             searchResults
         }
         .onAppear {
-            // ✅ Setup search pipeline lazily (staff engineer: defer expensive work)
-            searchViewModel.setupIfNeeded()
-            // Clear search text when appearing
-            searchViewModel.searchText = ""
+            setupSearchView()
         }
-        // ✅ Single source of truth for focus (staff engineer: no conflicts)
         .onChange(of: isSearchExpanded) { oldValue, newValue in
-            if newValue {
-                // Ensure pipeline is setup before use
-                searchViewModel.setupIfNeeded()
-                // Delay focus to ensure animation is fully complete (prevents keyboard crashes)
-                // 0.35s > 0.2s animation duration
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                    searchIsFocused = true
-                }
-            } else {
-                // Clear focus when collapsing
-                searchIsFocused = false
-            }
+            handleSearchExpansionChange(isExpanded: newValue)
         }
+    }
+    
+    // MARK: - Private Methods (Single Responsibility)
+    
+    /// Setup search view on appearance
+    private func setupSearchView() {
+        // Setup search pipeline lazily (defer expensive work)
+        searchViewModel.setupIfNeeded()
+        // Clear search text when appearing
+        searchViewModel.searchText = ""
+    }
+    
+    /// Handle search expansion state changes
+    private func handleSearchExpansionChange(isExpanded: Bool) {
+        if isExpanded {
+            // Ensure pipeline is setup before use
+            searchViewModel.setupIfNeeded()
+            // Delay focus to ensure animation is fully complete (prevents keyboard crashes)
+            // 0.35s > 0.2s animation duration
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                searchIsFocused = true
+            }
+        } else {
+            // Clear focus and dismiss keyboard when collapsing
+            dismissKeyboard()
+        }
+    }
+    
+    /// Dismiss keyboard immediately (no animation delay)
+    /// Single Responsibility: Handle keyboard dismissal cleanly
+    private func dismissKeyboard() {
+        searchIsFocused = false
+        // Force keyboard dismissal at UIKit level
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     }
     
     private var searchBar: some View {
@@ -91,17 +110,24 @@ struct SearchContainerView: View {
                     searchText: searchViewModel.searchText,
                     isSearching: searchViewModel.isSearching,
                     onSelectPlace: { suggestion in
+                        // CRITICAL: Dismiss keyboard BEFORE network call to prevent keyboard from affecting sheet height
+                        dismissKeyboard()
+                        
                         searchViewModel.selectSuggestion(suggestion)
+                        
+                        // Collapse search UI after keyboard is dismissed
                         withAnimation {
                             isSearchExpanded = false
-                            searchIsFocused = false
                         }
                     },
                     onSelectUser: { user in
+                        // Dismiss keyboard immediately to prevent UI conflicts
+                        dismissKeyboard()
+                        
                         onUserSelected(user)
+                        
                         withAnimation {
                             isSearchExpanded = false
-                            searchIsFocused = false
                         }
                     }
                 )
