@@ -3,143 +3,134 @@
 //  loc
 //
 //  Created by Andrew Hartsfield II on 11/5/24.
+//  Refactored for clean MVVM with single responsibility
 //
 
 import SwiftUI
 import Combine
 import CoreLocation
 
+/// ViewModel for search functionality
+/// Single Responsibility: Coordinate search operations and manage search state
+@MainActor
 class SearchViewModel: ObservableObject {
+    // MARK: - Published State
     @Published var searchText = ""
     @Published var searchResults: [MesaPlaceSuggestion] = []
     @Published var userResults: [ProfileData] = []
     @Published var searchError: String?
-    @Published var selectedUser: ProfileData?
-    @Published var showNoPlaceFound: Bool = false  // Track when search returns no results
-    @Published var isSearching: Bool = false  // Track when search is in progress
+    @Published var showNoPlaceFound: Bool = false
+    @Published var isSearching: Bool = false
     
-    // MARK: - Profile Photo Caching
-    /// Cache for user profile photos in search results
-    @Published private(set) var userProfilePhotos: [String: UIImage] = [:]
-    /// Loading states for profile photos
-    @Published private(set) var profilePhotoLoadingStates: [String: LoadingState] = [:]
-
-    weak var selectedPlaceVM: SelectedPlaceViewModel?
-
+    /// Snapshot of user profile photos - updates only when search completes
+    /// This prevents main thread blocking from reactive observation of ProfilePhotoCache
+    @Published private(set) var userPhotosSnapshot: [String: UIImage] = [:]
+    
+    // MARK: - Dependencies (Services only, NOT other ViewModels)
     private let placeService: PlaceService
     private let userService: UserService
     private let locationManager: LocationManager
-//    private let mapboxSearchService = MapboxSearchService()
     private let searchService = PlaceSearchService()
-    private let objectId = UUID()  // For debugging instance tracking
+    private let photoCache = ProfilePhotoCache.shared
     
-    // Simple cache for instant repeat searches
+    // MARK: - Private State
     private var searchCache: [String: [MesaPlaceSuggestion]] = [:]
-    
-    // Track current search task to allow cancellation
     private var currentSearchTask: Task<Void, Never>?
-
-    var debugObjectId: String {
-        objectId.uuidString.prefix(8).description
-    }
-
     private var cancellables = Set<AnyCancellable>()
+    private var hasSetupPipeline = false  // ✅ Track if pipeline is setup
     
-    // MARK: - LoadingState Enum
-    enum LoadingState: Equatable {
-        case idle
-        case loading
-        case loaded
-        case error
-        
-        static func == (lhs: LoadingState, rhs: LoadingState) -> Bool {
-            switch (lhs, rhs) {
-            case (.idle, .idle), (.loading, .loading), (.loaded, .loaded), (.error, .error):
-                return true
-            default:
-                return false
-            }
-        }
-    }
-
+    // MARK: - Callbacks (instead of direct ViewModel references)
+    var onPlaceSelected: ((DetailPlace) -> Void)?
+    
+    // MARK: - Initialization
     init(placeService: PlaceService, userService: UserService, locationManager: LocationManager) {
-        // Initialize dependencies through dependency injection
         self.placeService = placeService
         self.userService = userService
         self.locationManager = locationManager
         
-        // ✅ Optimized pipeline for responsive text input
+        // ✅ Staff Engineer: Defer Combine setup until needed (prevents main thread blocking)
+    }
+    
+    // MARK: - Setup
+    
+    /// Setup search pipeline lazily (only when actually needed)
+    /// Staff Engineer: Defer expensive work to prevent blocking during view creation
+    func setupIfNeeded() {
+        guard !hasSetupPipeline else { return }
+        hasSetupPipeline = true
+        setupSearchPipeline()
+    }
+    
+    private func setupSearchPipeline() {
+        // Debounced search pipeline
         $searchText
             .debounce(for: .milliseconds(150), scheduler: DispatchQueue.main)
             .removeDuplicates()
             .filter { !$0.isEmpty && $0.count >= 2 }
             .sink { [weak self] text in
-                // Cancel any ongoing search
                 self?.currentSearchTask?.cancel()
-                
-                // Show loading state immediately on main thread
                 self?.isSearching = true
                 
-                // Move heavy operations to background thread
                 self?.currentSearchTask = Task {
                     await self?.performSearch(query: text)
                 }
             }
-            .store(in: &cancellables) // 🔧 FIX: This was missing!
-
-        // Handle empty search text separately to clear results immediately
+            .store(in: &cancellables)
+        
+        // Clear results immediately when search text is empty
         $searchText
             .filter { $0.isEmpty }
             .sink { [weak self] _ in
-                // Cancel any ongoing search
-                self?.currentSearchTask?.cancel()
-                self?.currentSearchTask = nil
-                
-                self?.searchResults = []
-                self?.userResults = []
-                self?.searchError = nil
-                self?.showNoPlaceFound = false
-                self?.isSearching = false
+                self?.clearResults()
             }
             .store(in: &cancellables)
     }
     
-    // MARK: - Optimized Search Methods
+    // MARK: - Search Methods
     
-    @MainActor
+    /// Clear all search results
+    private func clearResults() {
+        currentSearchTask?.cancel()
+        currentSearchTask = nil
+        searchResults = []
+        userResults = []
+        userPhotosSnapshot = [:]  // Clear photo snapshot
+        searchError = nil
+        showNoPlaceFound = false
+        isSearching = false
+    }
+    
+    /// Perform search for places and users
     private func performSearch(query: String) async {
         // Check if task was cancelled
-        if Task.isCancelled { return }
+        guard !Task.isCancelled else { return }
         
         // Check cache first for instant results
         if let cachedResults = searchCache[query] {
             searchResults = cachedResults
-            showNoPlaceFound = cachedResults.isEmpty && !query.isEmpty
+            showNoPlaceFound = cachedResults.isEmpty
             isSearching = false
             return
         }
-        
-        // Check again before clearing results
-        if Task.isCancelled { return }
         
         // Clear previous results
         searchResults = []
         searchError = nil
         showNoPlaceFound = false
         
-        // Perform search operations
+        // Perform parallel search operations
         await withTaskGroup(of: Void.self) { group in
-            group.addTask { [weak self] in
-                await self?.searchPlacesAsync(query: query)
+            group.addTask {
+                await self.searchPlaces(query: query)
             }
-            group.addTask { [weak self] in
-                await self?.searchUsersAsync(query: query)
+            group.addTask {
+                await self.searchUsers(query: query)
             }
         }
     }
     
-    private func searchPlacesAsync(query: String) async {
-        // Get current location for location-aware search
+    /// Search for places
+    private func searchPlaces(query: String) async {
         let latitude = locationManager.currentLocation?.coordinate.latitude
         let longitude = locationManager.currentLocation?.coordinate.longitude
         
@@ -149,144 +140,109 @@ class SearchViewModel: ObservableObject {
                 latitude: latitude,
                 longitude: longitude,
                 onResultsUpdated: { [weak self] results in
-                    Task { @MainActor in
-                        self?.searchResults = results
-                        self?.showNoPlaceFound = results.isEmpty && !query.isEmpty
-                        self?.isSearching = false
-                        
-                        // Cache the results
-                        self?.searchCache[query] = results
-                        if let cache = self?.searchCache, cache.count > 50 {
-                            let keysToRemove = Array(cache.keys.prefix(cache.count - 50))
-                            keysToRemove.forEach { self?.searchCache.removeValue(forKey: $0) }
-                        }
+                    guard let self = self else {
+                        continuation.resume()
+                        return
                     }
+                    
+                    self.searchResults = results
+                    self.showNoPlaceFound = results.isEmpty
+                    self.isSearching = false
+                    
+                    // Cache the results
+                    self.searchCache[query] = results
+                    self.limitCacheSize()
+                    
                     continuation.resume()
                 },
                 onError: { [weak self] error in
-                    Task { @MainActor in
-                        self?.searchError = error
-                        self?.showNoPlaceFound = false
-                        self?.isSearching = false
-                    }
+                    self?.searchError = error
+                    self?.showNoPlaceFound = false
+                    self?.isSearching = false
                     continuation.resume()
                 }
             )
         }
     }
     
-    private func searchUsersAsync(query: String) async {
+    /// Search for users
+    private func searchUsers(query: String) async {
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
             userService.searchUsers(query: query) { [weak self] users, error in
-                Task { @MainActor in
-                    if let error = error {
-                        // User search error - silently handle
-                    } else {
-                        let profileData = users?.compactMap { user in
-                            ProfileData(
-                                id: user.id,
-                                firstName: user.firstName,
-                                lastName: user.lastName,
-                                email: user.email,
-                                profilePhotoURL: user.profilePhotoURL,
-                                phoneNumber: "",
-                                fullNameLower: user.fullName.lowercased(),
-                                fullName: user.fullName,
-                                fcmToken: nil,
-                                firebaseUid: nil,
-                                supabaseUid: nil
-                            )
-                        } ?? []
-                        self?.userResults = profileData
-                        
-                        // ✅ Prefetch profile photos immediately
-                        self?.prefetchProfilePhotos(for: profileData)
-                    }
+                guard let self = self else {
+                    continuation.resume()
+                    return
                 }
+                
+                if let users = users {
+                    let profiles = users.compactMap { user in
+                        ProfileData(
+                            id: user.id,
+                            firstName: user.firstName,
+                            lastName: user.lastName,
+                            email: user.email,
+                            profilePhotoURL: user.profilePhotoURL,
+                            phoneNumber: "",
+                            fullNameLower: user.fullName.lowercased(),
+                            fullName: user.fullName,
+                            fcmToken: nil,
+                            firebaseUid: nil,
+                            supabaseUid: nil
+                        )
+                    }
+                    
+                    Task { @MainActor in
+                        self.userResults = profiles
+                        // Prefetch photos using shared cache
+                        await self.prefetchProfilePhotos(for: profiles)
+                        // Create snapshot AFTER photos load to prevent reactive updates
+                        self.createPhotoSnapshot()
+                    }
+                } else if let error = error {
+                    print("⚠️ [SearchViewModel] User search error: \(error.localizedDescription)")
+                }
+                
                 continuation.resume()
             }
         }
     }
     
-    // Legacy searchPlaces function - kept for compatibility but not used
-    func searchPlaces(query: String) {
-        // This function is deprecated - use performSearch instead
-        Task {
-            await performSearch(query: query)
-        }
-    }
-    
-    // Removed MapboxSearch searchResultToDetailPlace method - now using Google Places API
-    
-    func selectSuggestion(_ suggestion: MesaPlaceSuggestion) {
-        searchService.selectSuggestion(
-            suggestion,
-            onResultResolved: { [weak self] result in
-                DispatchQueue.main.async {
-                    // Animate map to searched place location and fetch fresh details
-                    self?.selectedPlaceVM?.selectPlaceAndFetchDetails(result, shouldAnimateMap: true)
-                    self?.selectedPlaceVM?.isDetailSheetPresented = true
-                }
-            }
-        )
-    }
-    
-    // Legacy searchUsers function - kept for compatibility but not used
-    private func searchUsers(query: String) {
-        // This function is deprecated - use searchUsersAsync instead
-        Task {
-            await searchUsersAsync(query: query)
-        }
-    }
-    
-    // MARK: - Profile Photo Management
-    
     /// Prefetch profile photos for search results
-    private func prefetchProfilePhotos(for users: [ProfileData]) {
-        for user in users {
-            guard let photoURL = user.profilePhotoURL else { continue }
-            loadProfilePhoto(userId: user.id, photoURL: photoURL)
-        }
-    }
-    
-    /// Load a single profile photo
-    private func loadProfilePhoto(userId: String, photoURL: URL) {
-        // Skip if already loaded or loading
-        guard userProfilePhotos[userId] == nil,
-              profilePhotoLoadingStates[userId] != .loading else {
-            return
-        }
-        
-        profilePhotoLoadingStates[userId] = .loading
-        
-        Task {
-            do {
-                let (data, _) = try await URLSession.shared.data(from: photoURL)
-                if let image = UIImage(data: data) {
-                    await MainActor.run {
-                        self.userProfilePhotos[userId] = image
-                        self.profilePhotoLoadingStates[userId] = .loaded
-                    }
-                } else {
-                    await MainActor.run {
-                        self.profilePhotoLoadingStates[userId] = .error
-                    }
-                }
-            } catch {
-                await MainActor.run {
-                    self.profilePhotoLoadingStates[userId] = .error
+    private func prefetchProfilePhotos(for users: [ProfileData]) async {
+        await withTaskGroup(of: Void.self) { group in
+            for user in users {
+                guard let photoURL = user.profilePhotoURL else { continue }
+                group.addTask {
+                    await self.photoCache.loadPhoto(userId: user.id, photoURL: photoURL)
                 }
             }
         }
     }
     
-    /// Public accessor for profile photos
-    func profilePhoto(for userId: String) -> UIImage? {
-        return userProfilePhotos[userId]
+    /// Create a snapshot of current profile photos
+    /// Single Responsibility: Provide view-ready photo data without reactive observation
+    private func createPhotoSnapshot() {
+        // Create a copy to avoid reactive binding to the cache's @Published property
+        userPhotosSnapshot = photoCache.photos
     }
     
-    /// Public accessor for loading states
-    func profilePhotoLoadingState(for userId: String) -> LoadingState {
-        return profilePhotoLoadingStates[userId] ?? .idle
+    // MARK: - Public Methods
+    
+    /// Handle selection of a place suggestion
+    func selectSuggestion(_ suggestion: MesaPlaceSuggestion) {
+        searchService.selectSuggestion(suggestion) { [weak self] result in
+            // Use callback instead of direct ViewModel access
+            self?.onPlaceSelected?(result)
+        }
+    }
+    
+    // MARK: - Cache Management
+    
+    /// Limit cache size to prevent memory issues
+    private func limitCacheSize() {
+        if searchCache.count > 50 {
+            let keysToRemove = Array(searchCache.keys.prefix(searchCache.count - 50))
+            keysToRemove.forEach { searchCache.removeValue(forKey: $0) }
+        }
     }
 }

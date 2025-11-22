@@ -228,7 +228,7 @@ struct MapView: View {
             } else {
                 // Default to current location or center of US
                 let coords = locationManager.currentLocation?.coordinate ?? defaultCenter
-                mapPosition = .camera(MapCamera(centerCoordinate: coords, distance: 10000))
+                mapPosition = .camera(MapCamera(centerCoordinate: coords, distance: 1500))
             }
 
             // Setup notification observers
@@ -266,7 +266,7 @@ struct MapView: View {
                     let coords = locationManager.currentLocation?.coordinate ?? defaultCenter
                     let region = MKCoordinateRegion(
                         center: coords,
-                        span: MKCoordinateSpan(latitudeDelta: 0.1, longitudeDelta: 0.1)
+                        span: MKCoordinateSpan(latitudeDelta: 0.015, longitudeDelta: 0.015)
                     )
                     await mapViewModel.onMapCameraSettled(region)
                     hasLoadedInitialViewport = true

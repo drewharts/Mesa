@@ -22,6 +22,7 @@ struct locApp: App {
     private let deepLinkManager: DeepLinkManager
     private let notificationManager = NotificationManager.shared
     private let dataManager: DataManager
+    private let searchViewModel: SearchViewModel  // ✅ Staff Engineer: Create VM at app level
     
     init() {
         // Supabase is initialized via SupabaseManager.shared
@@ -106,6 +107,13 @@ struct locApp: App {
         
         profileVM.userProfileViewModel = userProfileVM
         
+        // ✅ Create SearchViewModel ONCE at app level (staff engineer: no recreation overhead)
+        let searchVM = SearchViewModel(
+            placeService: services.placeService,
+            userService: services.userService,
+            locationManager: location
+        )
+        
         // Assign to properties
         self._locationManager = StateObject(wrappedValue: location)
         self._userSession = StateObject(wrappedValue: userSess)
@@ -116,6 +124,7 @@ struct locApp: App {
         self.deepLinkViewModel = deepLinkVM
         self.deepLinkManager = deepLinkMgr
         self.dataManager = dataMgr
+        self.searchViewModel = searchVM
         
         // Pass user service to AppDelegate
         appDelegate.userService = services.userService
@@ -133,7 +142,8 @@ struct locApp: App {
                 deepLinkManager: deepLinkManager,
                 notificationManager: notificationManager,
                 dataManager: dataManager,
-                serviceContainer: serviceContainer
+                serviceContainer: serviceContainer,
+                searchViewModel: searchViewModel  // ✅ Pass to children
             )
                 // Only 3 environment objects at the root!
                 .environmentObject(userSession)

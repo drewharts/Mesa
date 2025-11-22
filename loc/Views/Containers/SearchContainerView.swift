@@ -3,44 +3,36 @@
 //  loc
 //
 //  Created by Cursor on 11/13/25.
+//  Refactored for clean MVVM with proper callbacks
 //
 
 import SwiftUI
 
-/// Container that owns SearchViewModel and handles search functionality
+/// Container that displays search UI and handles search functionality
+/// Single Responsibility: Manage search UI and coordinate search actions via callbacks
+/// Staff Engineer: Accepts ViewModel as parameter (no recreation overhead)
 struct SearchContainerView: View {
-    @StateObject private var searchViewModel: SearchViewModel
+    @ObservedObject var searchViewModel: SearchViewModel  // ✅ Accept from parent
     @EnvironmentObject var appCoordinator: AppCoordinator
-    @EnvironmentObject var userSession: UserSession
-    @EnvironmentObject var locationManager: LocationManager
-    
     @FocusState private var searchIsFocused: Bool
     @Binding var isSearchExpanded: Bool
     
-    let onPlaceSelected: () -> Void
+    let onPlaceSelected: (DetailPlace) -> Void
     let onUserSelected: (ProfileData) -> Void
     
     init(
+        searchViewModel: SearchViewModel,
         isSearchExpanded: Binding<Bool>,
-        placeService: PlaceService,
-        userService: UserService,
-        locationManager: LocationManager,
-        selectedPlaceViewModel: SelectedPlaceViewModel,
-        onPlaceSelected: @escaping () -> Void,
+        onPlaceSelected: @escaping (DetailPlace) -> Void,
         onUserSelected: @escaping (ProfileData) -> Void
     ) {
+        self.searchViewModel = searchViewModel
         self._isSearchExpanded = isSearchExpanded
         self.onPlaceSelected = onPlaceSelected
         self.onUserSelected = onUserSelected
         
-        // Create SearchViewModel scoped to this container
-        let searchVM = SearchViewModel(
-            placeService: placeService,
-            userService: userService,
-            locationManager: locationManager
-        )
-        searchVM.selectedPlaceVM = selectedPlaceViewModel
-        self._searchViewModel = StateObject(wrappedValue: searchVM)
+        // Set callback (NOT ViewModel reference)
+        searchViewModel.onPlaceSelected = onPlaceSelected
     }
     
     var body: some View {
@@ -49,8 +41,25 @@ struct SearchContainerView: View {
             searchResults
         }
         .onAppear {
+            // ✅ Setup search pipeline lazily (staff engineer: defer expensive work)
+            searchViewModel.setupIfNeeded()
             // Clear search text when appearing
             searchViewModel.searchText = ""
+        }
+        // ✅ Single source of truth for focus (staff engineer: no conflicts)
+        .onChange(of: isSearchExpanded) { oldValue, newValue in
+            if newValue {
+                // Ensure pipeline is setup before use
+                searchViewModel.setupIfNeeded()
+                // Delay focus to ensure animation is fully complete (prevents keyboard crashes)
+                // 0.35s > 0.2s animation duration
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                    searchIsFocused = true
+                }
+            } else {
+                // Clear focus when collapsing
+                searchIsFocused = false
+            }
         }
     }
     
@@ -60,16 +69,12 @@ struct SearchContainerView: View {
             .background(Color.white)
             .cornerRadius(20)
             .shadow(color: .black.opacity(0.2), radius: 5, x: 0, y: 3)
-            .padding(.horizontal, 20)
-            .padding(.top, 20)
             .foregroundStyle(Color.gray)
             .focused($searchIsFocused)
             .padding(.horizontal, 20)
-            .padding(.top, 10)
-            .padding(.bottom, -10)
-            .onTapGesture {
-                searchIsFocused = true
-            }
+            .padding(.top, 20)
+            // ✅ Removed .onTapGesture - TextField handles taps natively
+            // This prevents gesture conflicts that cause "System gesture gate timed out"
     }
     
     private var searchResults: some View {
@@ -81,16 +86,16 @@ struct SearchContainerView: View {
                 SearchResultsView(
                     placeResults: searchViewModel.searchResults,
                     userResults: searchViewModel.userResults,
+                    userPhotos: searchViewModel.userPhotosSnapshot,  // ✅ Use snapshot (not reactive)
                     showNoPlaceFound: searchViewModel.showNoPlaceFound,
                     searchText: searchViewModel.searchText,
                     isSearching: searchViewModel.isSearching,
-                    onSelectPlace: { prediction in
-                        searchViewModel.selectSuggestion(prediction)
+                    onSelectPlace: { suggestion in
+                        searchViewModel.selectSuggestion(suggestion)
                         withAnimation {
                             isSearchExpanded = false
                             searchIsFocused = false
                         }
-                        onPlaceSelected()
                     },
                     onSelectUser: { user in
                         onUserSelected(user)
@@ -98,8 +103,7 @@ struct SearchContainerView: View {
                             isSearchExpanded = false
                             searchIsFocused = false
                         }
-                    },
-                    searchViewModel: searchViewModel
+                    }
                 )
                 .frame(maxWidth: .infinity)
                 .padding(.horizontal, 20)
@@ -109,4 +113,3 @@ struct SearchContainerView: View {
         }
     }
 }
-

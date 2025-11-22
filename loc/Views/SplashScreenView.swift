@@ -23,6 +23,7 @@ struct SplashScreenView: View {
     let notificationManager: NotificationManager
     let dataManager: DataManager
     let serviceContainer: ServiceContainer
+    let searchViewModel: SearchViewModel  // ✅ Accept from parent
 
     var body: some View {
         Group {
@@ -36,7 +37,8 @@ struct SplashScreenView: View {
                     deepLinkManager: deepLinkManager,
                     notificationManager: notificationManager,
                     dataManager: dataManager,
-                    serviceContainer: serviceContainer
+                    serviceContainer: serviceContainer,
+                    searchViewModel: searchViewModel  // ✅ Pass to ContentView
                 )
                 .transition(.opacity)
             } else {

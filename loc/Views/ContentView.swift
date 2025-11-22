@@ -23,12 +23,15 @@ struct ContentView: View {
     let notificationManager: NotificationManager
     let dataManager: DataManager
     let serviceContainer: ServiceContainer
+    let searchViewModel: SearchViewModel  // ✅ Accept from parent
     
     @State private var showNavigationError = false
     @State private var navigationErrorMessage = ""
 
     var body: some View {
-        if userSession.isUserLoggedIn {
+        // ✅ Staff Engineer: Use visibility, not conditional rendering (prevents destruction)
+        ZStack {
+            // MainView always exists (never destroyed/recreated)
             MainView(
                 selectedPlaceVM: selectedPlaceViewModel,
                 profileViewModel: profileViewModel,
@@ -36,20 +39,32 @@ struct ContentView: View {
                 detailPlaceViewModel: detailPlaceViewModel,
                 deepLinkViewModel: deepLinkViewModel,
                 notificationManager: notificationManager,
+                searchViewModel: searchViewModel,  // ✅ Pass from parent (correct order)
                 deepLinkManager: deepLinkManager,
                 dataManager: dataManager,
                 serviceContainer: serviceContainer
             )
+            .opacity(userSession.isUserLoggedIn ? 1 : 0)
+            .allowsHitTesting(userSession.isUserLoggedIn)
             .onReceive(notificationManager.$pendingNavigation) { pendingNavigation in
                 handleNotificationNavigation(pendingNavigation)
             }
-            .alert("Navigation Error", isPresented: $showNavigationError) {
-                Button("OK") { }
-            } message: {
-                Text(navigationErrorMessage)
+            
+            // LoginView overlays when not logged in
+            if !userSession.isUserLoggedIn {
+                LoginView(
+                    viewModel: LoginViewModel(
+                        userService: serviceContainer.userService,
+                        dataManager: dataManager
+                    )
+                )
+                .transition(.opacity)
             }
-        } else {
-            LoginView(viewModel: LoginViewModel(userService: serviceContainer.userService, dataManager: dataManager))
+        }
+        .alert("Navigation Error", isPresented: $showNavigationError) {
+            Button("OK") { }
+        } message: {
+            Text(navigationErrorMessage)
         }
     }
     

@@ -22,6 +22,7 @@ struct MainView: View {
     @ObservedObject var detailPlaceViewModel: DetailPlaceViewModel
     @ObservedObject var deepLinkViewModel: DeepLinkViewModel
     @ObservedObject var notificationManager: NotificationManager
+    @ObservedObject var searchViewModel: SearchViewModel  // ✅ Accept from parent (staff engineer: dependency injection)
     
     let deepLinkManager: DeepLinkManager
     let dataManager: DataManager
@@ -30,11 +31,13 @@ struct MainView: View {
     // MARK: - Local UI State
     @State private var sheetHeight: CGFloat = 250
     @State private var minSheetHeight: CGFloat = 250
-    @State private var maxSheetHeight: CGFloat = UIScreen.main.bounds.height * 0.85
+    @State private var maxSheetHeight: CGFloat = UIScreen.main.bounds.height * 0.92
     @State private var shouldNavigateToProfile = false
     @State private var recenterMap = false
     @State private var isCreatePlacePopupActive = false
     @State private var mapPosition = MapCameraPosition.automatic
+    
+    // ✅ NO INIT - Pure view with dependency injection (staff engineer: MVVM separation)
     
     var body: some View {
         NavigationStack {
@@ -147,25 +150,29 @@ struct MainView: View {
     
     // MARK: - Top Controls
     private var topControls: some View {
-        Group {
-            if appCoordinator.isSearchExpanded {
-                SearchContainerView(
-                    isSearchExpanded: $appCoordinator.isSearchExpanded,
-                    placeService: serviceContainer.placeService,
-                    userService: serviceContainer.userService,
-                    locationManager: locationManager,
-                    selectedPlaceViewModel: selectedPlaceVM,
-                    onPlaceSelected: {
-                        // Place selection is handled by SearchViewModel
-                    },
-                    onUserSelected: { profileData in
-                        guard let currentUserId = userSession.currentUserId else { return }
-                        userProfileViewModel.selectUser(profileData, currentUserId: currentUserId)
-                    }
-                )
-            } else {
-                minimizedControls
-            }
+        ZStack(alignment: .topTrailing) {
+            // ✅ Always render SearchContainerView (staff engineer: use visibility, not recreation)
+            SearchContainerView(
+                searchViewModel: searchViewModel,  // Pass existing VM
+                isSearchExpanded: $appCoordinator.isSearchExpanded,
+                onPlaceSelected: { detailPlace in
+                    // Handle place selection via SelectedPlaceViewModel callback
+                    selectedPlaceVM.selectPlaceAndFetchDetails(detailPlace, shouldAnimateMap: true)
+                    selectedPlaceVM.isDetailSheetPresented = true
+                },
+                onUserSelected: { profileData in
+                    // Handle user selection via UserProfileViewModel
+                    guard let currentUserId = userSession.currentUserId else { return }
+                    userProfileViewModel.selectUser(profileData, currentUserId: currentUserId)
+                }
+            )
+            .opacity(appCoordinator.isSearchExpanded ? 1 : 0)
+            .allowsHitTesting(appCoordinator.isSearchExpanded)
+            
+            // Show minimized controls when search is collapsed
+            minimizedControls
+                .opacity(!appCoordinator.isSearchExpanded ? 1 : 0)
+                .allowsHitTesting(!appCoordinator.isSearchExpanded)
         }
     }
     

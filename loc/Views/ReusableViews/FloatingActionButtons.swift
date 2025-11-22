@@ -27,16 +27,14 @@ struct FloatingActionButtons: View {
     
     private var searchButton: some View {
         Button(action: {
-            withAnimation(.easeInOut(duration: 0.2)) {
-                if sheetHeight == maxSheetHeight {
-                    sheetHeight = minSheetHeight
-                }
-                isSearchBarMinimized = false
+            // ✅ Remove animation block here - let MainView's .opacity transition handle it
+            // This prevents fighting animations and layout thrashing
+            if sheetHeight == maxSheetHeight {
+                sheetHeight = minSheetHeight
             }
-            // Delay focus longer to let UI settle and reduce lag
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                searchIsFocused = true
-            }
+            isSearchBarMinimized = false
+            
+            // ✅ Focus now handled by SearchContainerView.onChange (staff engineer: single source of truth)
         }) {
             Image(systemName: "magnifyingglass")
                 .foregroundColor(.secondary)
