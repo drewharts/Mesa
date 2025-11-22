@@ -2,8 +2,9 @@ import SwiftUI
 
 struct FloatingActionButtons: View {
     @EnvironmentObject var profileViewModel: ProfileViewModel
-    @ObservedObject var searchCoordinator: SearchCoordinatorViewModel
+    let searchCoordinator: SearchCoordinatorViewModel
     @Binding var isSearchBarMinimized: Bool
+    @Binding var sheetHeight: CGFloat
     @Binding var shouldNavigateToProfile: Bool
     
     var body: some View {
@@ -25,7 +26,7 @@ struct FloatingActionButtons: View {
         Button(action: {
             // ✅ Wrap in faster animation for snappy feel
             withAnimation(.easeInOut(duration: 0.2)) {
-                searchCoordinator.collapseSheetIfExpanded()
+                sheetHeight = searchCoordinator.calculateCollapsedHeight(currentHeight: sheetHeight)
                 isSearchBarMinimized = false
             }
             

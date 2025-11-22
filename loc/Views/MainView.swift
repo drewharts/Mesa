@@ -23,17 +23,49 @@ struct MainView: View {
     @ObservedObject var deepLinkViewModel: DeepLinkViewModel
     @ObservedObject var notificationManager: NotificationManager
     @ObservedObject var searchViewModel: SearchViewModel  // ✅ Accept from parent (staff engineer: dependency injection)
-    @ObservedObject var searchCoordinator: SearchCoordinatorViewModel  // ✅ Coordinator for search interactions
+    
+    let searchCoordinator: SearchCoordinatorViewModel  // ✅ Coordinator (no observation to prevent render loops)
     
     let deepLinkManager: DeepLinkManager
     let dataManager: DataManager
     let serviceContainer: ServiceContainer
     
     // MARK: - Local UI State
+    @State private var sheetHeight: CGFloat
     @State private var shouldNavigateToProfile = false
     @State private var recenterMap = false
     @State private var isCreatePlacePopupActive = false
     @State private var mapPosition = MapCameraPosition.automatic
+    
+    // MARK: - Initialization
+    init(
+        selectedPlaceVM: SelectedPlaceViewModel,
+        profileViewModel: ProfileViewModel,
+        userProfileViewModel: UserProfileViewModel,
+        detailPlaceViewModel: DetailPlaceViewModel,
+        deepLinkViewModel: DeepLinkViewModel,
+        notificationManager: NotificationManager,
+        searchViewModel: SearchViewModel,
+        searchCoordinator: SearchCoordinatorViewModel,
+        deepLinkManager: DeepLinkManager,
+        dataManager: DataManager,
+        serviceContainer: ServiceContainer
+    ) {
+        self.selectedPlaceVM = selectedPlaceVM
+        self.profileViewModel = profileViewModel
+        self.userProfileViewModel = userProfileViewModel
+        self.detailPlaceViewModel = detailPlaceViewModel
+        self.deepLinkViewModel = deepLinkViewModel
+        self.notificationManager = notificationManager
+        self.searchViewModel = searchViewModel
+        self.searchCoordinator = searchCoordinator
+        self.deepLinkManager = deepLinkManager
+        self.dataManager = dataManager
+        self.serviceContainer = serviceContainer
+        
+        // Initialize sheet height from coordinator
+        self._sheetHeight = State(initialValue: searchCoordinator.maxSheetHeight)
+    }
     
     var body: some View {
         NavigationStack {
@@ -111,10 +143,10 @@ struct MainView: View {
         .onChange(of: selectedPlaceVM.isDetailSheetPresented) { _, newValue in
             if newValue {
                 appCoordinator.isSearchExpanded = false
-                // Sheet height is set in SearchCoordinator before presenting
+                // Sheet height is set by SearchCoordinator when place selected
             } else {
                 // Reset sheet height when dismissing so next open starts fresh
-                searchCoordinator.resetSheetToMaxHeight()
+                sheetHeight = searchCoordinator.maxSheetHeight
             }
         }
         .onChange(of: selectedPlaceVM.shouldAnimateMapToPlace) { _, newValue in
@@ -151,9 +183,9 @@ struct MainView: View {
                 detailPlaceViewModel: detailPlaceViewModel,
                 serviceContainer: serviceContainer,
                 dataManager: dataManager,
-                sheetHeight: $searchCoordinator.sheetHeight,
-                minSheetHeight: searchCoordinator.minHeight,
-                maxSheetHeight: searchCoordinator.maxHeight
+                sheetHeight: $sheetHeight,
+                minSheetHeight: searchCoordinator.minSheetHeight,
+                maxSheetHeight: searchCoordinator.maxSheetHeight
             )
             .environmentObject(selectedPlaceVM)
             .environmentObject(userProfileViewModel)
@@ -169,8 +201,11 @@ struct MainView: View {
             SearchContainerView(
                 searchViewModel: searchViewModel,
                 isSearchExpanded: $appCoordinator.isSearchExpanded,
-                onPlaceSelected: searchCoordinator.handlePlaceSelection,  // ✅ Stable method reference
-                onUserSelected: searchCoordinator.handleUserSelection     // ✅ Stable method reference
+                onPlaceSelected: { detailPlace in
+                    // Coordinator returns new height, we set it locally
+                    sheetHeight = searchCoordinator.handlePlaceSelection(detailPlace)
+                },
+                onUserSelected: searchCoordinator.handleUserSelection
             )
             .id("SearchContainer")  // ✅ Stable identity prevents TextField recreation
             .opacity(appCoordinator.isSearchExpanded ? 1 : 0)
@@ -215,6 +250,7 @@ struct MainView: View {
                         get: { !appCoordinator.isSearchExpanded },
                         set: { appCoordinator.isSearchExpanded = !$0 }
                     ),
+                    sheetHeight: $sheetHeight,
                     shouldNavigateToProfile: $shouldNavigateToProfile
                 )
                 .environmentObject(profileViewModel)

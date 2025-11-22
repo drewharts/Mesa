@@ -11,23 +11,18 @@ import UIKit
 
 /// Coordinator ViewModel for search interactions
 /// Single Responsibility: Coordinate search actions with other ViewModels
+/// Staff Engineer: Does NOT own UI state (sheetHeight) - that belongs to the View
+/// This prevents observation cycles that cause view recreation
 @MainActor
-class SearchCoordinatorViewModel: ObservableObject {
+class SearchCoordinatorViewModel {
     // MARK: - Dependencies (Weak references to prevent retain cycles)
     private weak var selectedPlaceVM: SelectedPlaceViewModel?
     private weak var userProfileViewModel: UserProfileViewModel?
     private weak var userSession: UserSession?
     
-    // MARK: - Published State
-    @Published var sheetHeight: CGFloat
-    
-    // MARK: - Constants
-    private let minSheetHeight: CGFloat = 250
-    private var maxSheetHeight: CGFloat { UIScreen.main.bounds.height * 0.85 }
-    
-    // MARK: - Computed Properties
-    var minHeight: CGFloat { minSheetHeight }
-    var maxHeight: CGFloat { maxSheetHeight }
+    // MARK: - Constants (Computed, not stored)
+    var minSheetHeight: CGFloat { 250 }
+    var maxSheetHeight: CGFloat { UIScreen.main.bounds.height * 0.85 }
     
     // MARK: - Initialization
     init(
@@ -38,17 +33,17 @@ class SearchCoordinatorViewModel: ObservableObject {
         self.selectedPlaceVM = selectedPlaceVM
         self.userProfileViewModel = userProfileViewModel
         self.userSession = userSession
-        self.sheetHeight = UIScreen.main.bounds.height * 0.85
     }
     
     // MARK: - Coordination Methods (Single Responsibility)
     
     /// Handle place selection from search
     /// Single Responsibility: Coordinate place detail presentation
-    func handlePlaceSelection(_ detailPlace: DetailPlace) {
+    /// Returns the sheet height that should be set
+    func handlePlaceSelection(_ detailPlace: DetailPlace) -> CGFloat {
         selectedPlaceVM?.selectPlaceAndFetchDetails(detailPlace, shouldAnimateMap: true)
-        sheetHeight = maxSheetHeight
         selectedPlaceVM?.isDetailSheetPresented = true
+        return maxSheetHeight
     }
     
     /// Handle user selection from search
@@ -58,17 +53,11 @@ class SearchCoordinatorViewModel: ObservableObject {
         userProfileViewModel?.selectUser(profileData, currentUserId: currentUserId)
     }
     
-    /// Reset sheet height to maximum
-    /// Single Responsibility: Manage sheet height state
-    func resetSheetToMaxHeight() {
-        sheetHeight = maxSheetHeight
-    }
-    
-    /// Collapse sheet to minimum height if at maximum
-    /// Single Responsibility: Manage sheet collapse behavior
-    func collapseSheetIfExpanded() {
-        if sheetHeight == maxSheetHeight {
-            sheetHeight = minSheetHeight
-        }
+    /// Calculate sheet height for collapse if currently expanded
+    /// Single Responsibility: Determine appropriate sheet height
+    /// - Parameter currentHeight: The current sheet height
+    /// - Returns: New sheet height (min if was at max, unchanged otherwise)
+    func calculateCollapsedHeight(currentHeight: CGFloat) -> CGFloat {
+        return currentHeight == maxSheetHeight ? minSheetHeight : currentHeight
     }
 }
