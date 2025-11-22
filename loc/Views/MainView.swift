@@ -30,8 +30,8 @@ struct MainView: View {
     
     // MARK: - Local UI State
     private let minSheetHeight: CGFloat = 250
-    private var maxSheetHeight: CGFloat { UIScreen.main.bounds.height * 0.75 }
-    @State private var sheetHeight: CGFloat = UIScreen.main.bounds.height * 0.75
+    private var maxSheetHeight: CGFloat { UIScreen.main.bounds.height * 0.85 }
+    @State private var sheetHeight: CGFloat = UIScreen.main.bounds.height * 0.85
     @State private var shouldNavigateToProfile = false
     @State private var recenterMap = false
     @State private var isCreatePlacePopupActive = false
