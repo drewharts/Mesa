@@ -34,7 +34,6 @@ struct MainView: View {
     @State private var recenterMap = false
     @State private var isCreatePlacePopupActive = false
     @State private var mapPosition = MapCameraPosition.automatic
-    @State private var searchCoordinator: SearchCoordinatorViewModel?
     
     var body: some View {
         NavigationStack {
@@ -173,6 +172,7 @@ struct MainView: View {
                 onPlaceSelected: searchCoordinator.handlePlaceSelection,  // ✅ Stable method reference
                 onUserSelected: searchCoordinator.handleUserSelection     // ✅ Stable method reference
             )
+            .id("SearchContainer")  // ✅ Stable identity prevents TextField recreation
             .opacity(appCoordinator.isSearchExpanded ? 1 : 0)
             .allowsHitTesting(appCoordinator.isSearchExpanded)
             
