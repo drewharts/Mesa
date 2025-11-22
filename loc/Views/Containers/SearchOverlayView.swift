@@ -10,10 +10,10 @@ import SwiftUI
 
 /// Isolated search overlay view
 /// Single Responsibility: Display search UI without being affected by parent re-renders
-/// MVVM: Observes only what it needs, preventing cascade updates
+/// MVVM: Pass-through pattern - doesn't observe what it doesn't need
 struct SearchOverlayView: View {
-    // MARK: - Dependencies
-    @ObservedObject var searchViewModel: SearchViewModel
+    // MARK: - Dependencies (Pass-through only)
+    let searchViewModel: SearchViewModel  // ✅ Pass-through only, no observation
     @EnvironmentObject var appCoordinator: AppCoordinator
     
     // MARK: - Coordinator (not observed to prevent loops)
