@@ -64,8 +64,8 @@ struct MainView: View {
         self.dataManager = dataManager
         self.serviceContainer = serviceContainer
         
-        // Initialize sheet height from coordinator
-        self._sheetHeight = State(initialValue: searchCoordinator.maxSheetHeight)
+        // Initialize sheet height to min - partially expanded on first open
+        self._sheetHeight = State(initialValue: searchCoordinator.minSheetHeight)
     }
     
     var body: some View {
@@ -155,10 +155,10 @@ struct MainView: View {
         .onChange(of: selectedPlaceVM.isDetailSheetPresented) { _, newValue in
             if newValue {
                 appCoordinator.isSearchExpanded = false
-                // Sheet height is set by SearchCoordinator when place selected
+                // Sheet opens at partial height, user can swipe up to expand
             } else {
-                // Reset sheet height when dismissing so next open starts fresh
-                sheetHeight = searchCoordinator.maxSheetHeight
+                // Reset to partial height when dismissing so next open starts at bottom
+                sheetHeight = searchCoordinator.minSheetHeight
             }
         }
         .onChange(of: selectedPlaceVM.shouldAnimateMapToPlace) { _, newValue in

@@ -14,6 +14,7 @@ struct BottomSheetView<Content: View>: View {
     let minSheetHeight: CGFloat
     let maxSheetHeight: CGFloat
     @GestureState private var dragTranslation: CGFloat = 0
+    @State private var isDismissing = false
     @Environment(\.allowChildDrag) private var allowChildDrag
     let content: Content
 
@@ -40,6 +41,9 @@ struct BottomSheetView<Content: View>: View {
     
     /// Handle ongoing drag gesture changes
     private func handleDragChange(_ translation: CGFloat) {
+        // Don't update height if we're in the dismissal animation
+        guard !isDismissing else { return }
+        
         let newHeight = sheetHeight - translation
         
         if newHeight <= maxSheetHeight && newHeight >= minSheetHeight {
@@ -57,15 +61,28 @@ struct BottomSheetView<Content: View>: View {
         let dismissalThreshold: CGFloat = 100
         let midpoint = (maxSheetHeight + minSheetHeight) / 2
         
-        withAnimation {
-            if translation > dismissalThreshold {
-                // Reset height to max before dismissing so next open starts at max
-                sheetHeight = maxSheetHeight
+        if translation > dismissalThreshold {
+            // Lock height updates during dismissal
+            isDismissing = true
+            
+            // Animate sheet down smoothly, then dismiss
+            withAnimation(.interactiveSpring(response: 0.35, dampingFraction: 0.9, blendDuration: 0.2)) {
+                sheetHeight = 0
+            }
+            // Dismiss after animation completes
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
                 isPresented = false
-            } else if newHeight > midpoint {
-                sheetHeight = maxSheetHeight
-            } else {
-                sheetHeight = minSheetHeight
+                sheetHeight = minSheetHeight // Reset to partial height for next presentation
+                isDismissing = false
+            }
+        } else {
+            // Use interactiveSpring for smooth, enterprise-level gesture animations
+            withAnimation(.interactiveSpring(response: 0.4, dampingFraction: 0.8, blendDuration: 0.25)) {
+                if newHeight > midpoint {
+                    sheetHeight = maxSheetHeight
+                } else {
+                    sheetHeight = minSheetHeight
+                }
             }
         }
     }
@@ -104,6 +121,12 @@ struct BottomSheetView<Content: View>: View {
                 )
                 .onChange(of: dragTranslation) {
                     handleDragChange(dragTranslation)
+                }
+                .onChange(of: isPresented) { newValue in
+                    // Reset dismissing state when sheet is re-presented
+                    if newValue {
+                        isDismissing = false
+                    }
                 }
             }
             .frame(width: geometry.size.width, height: geometry.size.height)
