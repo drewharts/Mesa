@@ -9,7 +9,6 @@ import SwiftUI
 
 /// Container that manages place detail sheet presentation
 struct PlaceDetailContainerView: View {
-    @EnvironmentObject var appCoordinator: AppCoordinator
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var userProfileViewModel: UserProfileViewModel
     @EnvironmentObject var notificationManager: NotificationManager

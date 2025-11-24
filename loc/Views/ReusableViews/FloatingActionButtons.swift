@@ -24,11 +24,9 @@ struct FloatingActionButtons: View {
     
     private var searchButton: some View {
         Button(action: {
-            // ✅ Wrap in faster animation for snappy feel
-            withAnimation(.easeInOut(duration: 0.2)) {
-                sheetHeight = searchCoordinator.calculateCollapsedHeight(currentHeight: sheetHeight)
-                isSearchBarMinimized = false
-            }
+            // ✅ No animation for instant response
+            sheetHeight = searchCoordinator.calculateCollapsedHeight(currentHeight: sheetHeight)
+            isSearchBarMinimized = false
             
             // ✅ Focus handled by SearchContainerView.onChange
         }) {

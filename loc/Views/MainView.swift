@@ -91,6 +91,7 @@ struct MainView: View {
                 // Staff Engineer: Separate layer prevents TextField destruction on MainView re-renders
                 SearchOverlayView(
                     searchViewModel: searchViewModel,
+                    isSearchExpanded: $appCoordinator.isSearchExpanded,
                     searchCoordinator: searchCoordinator,
                     onSheetHeightChange: { newHeight in
                         sheetHeight = newHeight
@@ -219,7 +220,6 @@ struct MainView: View {
             .environmentObject(selectedPlaceVM)
             .environmentObject(userProfileViewModel)
             .environmentObject(notificationManager)
-            .environmentObject(appCoordinator)
         }
     }
     

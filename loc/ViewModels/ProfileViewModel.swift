@@ -123,14 +123,12 @@ class ProfileViewModel: ObservableObject {
     private let maxConcurrentListLoads = 2
     private var activeListLoadTasks: [UUID: Task<Void, Never>] = [:]
     
-    // Pagination for reviewed places
+    // Pagination for reviewed places (server-side pagination like TikToks)
     @Published var isLoadingReviewedPlaces: Bool = false
     @Published var isLoadingMoreReviews: Bool = false
-    private var _hasMoreReviews: Bool = true
-    private var currentReviewPage: Int = 0
+    @Published var hasMoreReviews: Bool = true
+    @Published var lightweightReviewedPlaces: [LightweightPlace] = [] // Lightweight reviewed places for tiles
     private let reviewsPerPage: Int = 8
-    var allReviewedPlaceIds: [String] = []
-    private var loadedReviewedPlaceIds: [String] = []
     
     // Pagination for TikTok places
     @Published var isLoadingTikTokPlaces: Bool = false
@@ -1010,120 +1008,147 @@ class ProfileViewModel: ObservableObject {
         await detailPlaceViewModel.refreshPlaces(detailPlaces: Array(allPlaceIds))
     }
 
+    /// Load initial reviewed places (server-side pagination like TikToks)
     func loadMyReviewedPlacesWithPagination() {
-        guard let userId = user?.id else { return }
-        if allReviewedPlaceIds.isEmpty {
-            isLoadingReviewedPlaces = true
-            Task {
-                do {
-                    let restaurantReviews: [RestaurantReview] = try await reviewService.fetchUserReviews(userId: userId)
-                    let genericReviews: [GenericReview] = try await reviewService.fetchUserGenericReviews(userId: userId)
-                    let allReviews: [ReviewProtocol] = restaurantReviews + genericReviews
-                    
-                    // Sort reviews by timestamp (most recent first) and get unique place IDs while preserving order
-                    let sortedReviews = allReviews.sorted { $0.timestamp > $1.timestamp }
-
-                    // Get unique place IDs while preserving the order of most recently reviewed places
-                    var seenPlaceIds = Set<String>()
-                    allReviewedPlaceIds = sortedReviews.compactMap { review in
-                        if seenPlaceIds.contains(review.placeId) {
-                            return nil
-                        }
-                        seenPlaceIds.insert(review.placeId)
-                        return review.placeId
-                    }
-                } catch {
-                    isLoadingReviewedPlaces = false
-                    return
-                }
-                if allReviewedPlaceIds.isEmpty {
-                    isLoadingReviewedPlaces = false
-                    return
-                }
-                await self.loadNextBatchOfMyReviews()
-            }
-        } else {
-            Task { await self.loadNextBatchOfMyReviews() }
-}
+        guard let userId = user?.id else {
+            print("⚠️ [ProfileViewModel] Cannot load reviewed places: no user ID")
+            return
+        }
+        
+        // Don't reload if already loading or if we have data
+        guard !isLoadingReviewedPlaces && lightweightReviewedPlaces.isEmpty else {
+            print("ℹ️ [ProfileViewModel] Skipping initial reviews load - already loading or data exists")
+            return
+        }
+        
+        Task {
+            await loadInitialReviewedPlaces()
+        }
+    }
+    
+    /// Load initial reviewed places from database (server-side pagination)
+    private func loadInitialReviewedPlaces() async {
+        guard let userId = user?.id else {
+            print("⚠️ [ProfileViewModel] Cannot load initial reviewed places: no user ID")
+            return
+        }
+        
+        print("🔄 [ProfileViewModel] Starting initial load of reviewed places")
+        isLoadingReviewedPlaces = true
+        
+        defer {
+            isLoadingReviewedPlaces = false
+            print("✅ [ProfileViewModel] Completed initial load of reviewed places")
+        }
+        
+        do {
+            // Fetch first page of lightweight reviewed places
+            let lightweightPlaces = try await userService.fetchUserReviewedPlaces(userId: userId, limit: reviewsPerPage, offset: 0)
+            
+            // Update state: replace existing places and update hasMore flag
+            lightweightReviewedPlaces = lightweightPlaces
+            hasMoreReviews = !lightweightPlaces.isEmpty && lightweightPlaces.count >= reviewsPerPage
+            
+            // Load full place details for display
+            await loadPlaceDetailsForReviews(lightweightPlaces, userId: userId)
+            
+            print("✅ [ProfileViewModel] Loaded \(lightweightPlaces.count) lightweight reviewed places (hasMore: \(hasMoreReviews))")
+        } catch {
+            print("❌ [ProfileViewModel] Error loading initial reviewed places: \(error.localizedDescription)")
+            // Set hasMore to false on error to prevent infinite retry loops
+            hasMoreReviews = false
+        }
     }
 
-    private func loadNextBatchOfMyReviews() async {
-        guard !isLoadingMoreReviews && _hasMoreReviews else {
-            isLoadingReviewedPlaces = false
-            return
-        }
-        isLoadingMoreReviews = true
-        let startIndex = currentReviewPage * reviewsPerPage
-        let endIndex = min(startIndex + reviewsPerPage, allReviewedPlaceIds.count)
-        guard startIndex < allReviewedPlaceIds.count else {
-            _hasMoreReviews = false
-            isLoadingMoreReviews = false
-            isLoadingReviewedPlaces = false
-            return
-        }
-        let placeIdsToLoad = Array(allReviewedPlaceIds[startIndex..<endIndex])
-        var successfullyLoadedPlaceIds: [String] = []
-        guard let currentUserId = user?.id else {
-            isLoadingMoreReviews = false
-            isLoadingReviewedPlaces = false
+    /// Load more reviewed places (pagination) - server-side like TikToks
+    func loadMoreMyReviews() async {
+        guard let userId = user?.id else {
+            print("⚠️ [ProfileViewModel] Cannot load more reviewed places: no user ID")
             return
         }
         
-        // Fetch review images for these places in parallel
-        await fetchReviewImagesForPlaces(placeIdsToLoad, userId: currentUserId)
-        
-        for placeId in placeIdsToLoad {
-            if detailPlaceViewModel.places[placeId] == nil {
-                // Retry logic for failed place loads
-                var retryCount = 0
-                let maxRetries = 2
-
-                while retryCount <= maxRetries {
-                    do {
-                        let detailPlace = try await placeService.fetchPlace(withId: placeId)
-                        await MainActor.run {
-                            detailPlaceViewModel.places[placeId] = detailPlace
-                            detailPlaceViewModel.fetchPlaceImage(for: placeId)
-                            successfullyLoadedPlaceIds.append(placeId)
-                        }
-                        break // Success, exit retry loop
-                    } catch {
-                        retryCount += 1
-                        if retryCount <= maxRetries {
-                            print("⚠️ [ProfileViewModel] Failed to load place \(placeId), retrying (\(retryCount)/\(maxRetries)): \(error.localizedDescription)")
-                            try? await Task.sleep(nanoseconds: 500_000_000 * UInt64(retryCount)) // Exponential backoff
-                        } else {
-                            print("❌ [ProfileViewModel] Failed to load place \(placeId) after \(maxRetries) retries: \(error.localizedDescription)")
-                            // Could add to a failed places list for later retry
-                        }
-                    }
-                }
+        // Guard: prevent multiple simultaneous loads and check if more data is available
+        guard !isLoadingMoreReviews && hasMoreReviews else {
+            if isLoadingMoreReviews {
+                print("ℹ️ [ProfileViewModel] Skipping loadMoreMyReviews - already loading")
             } else {
-                successfullyLoadedPlaceIds.append(placeId)
+                print("ℹ️ [ProfileViewModel] Skipping loadMoreMyReviews - no more data available")
+            }
+            return
+        }
+        
+        // Calculate offset based on current count
+        let offset = lightweightReviewedPlaces.count
+        print("🔄 [ProfileViewModel] Loading more reviewed places (offset: \(offset), current count: \(lightweightReviewedPlaces.count))")
+        
+        isLoadingMoreReviews = true
+        
+        defer {
+            isLoadingMoreReviews = false
+            print("✅ [ProfileViewModel] Completed loading more reviewed places")
+        }
+        
+        do {
+            // Fetch next page of lightweight reviewed places
+            let lightweightPlaces = try await userService.fetchUserReviewedPlaces(userId: userId, limit: reviewsPerPage, offset: offset)
+            
+            // Update state: append new places and update hasMore flag
+            // ⚠️ CRITICAL: Deduplicate to prevent SwiftUI rendering issues
+            let existingIds = Set(lightweightReviewedPlaces.map { $0.id })
+            let newUniquePlaces = lightweightPlaces.filter { !existingIds.contains($0.id) }
+            
+            if !newUniquePlaces.isEmpty {
+                lightweightReviewedPlaces.append(contentsOf: newUniquePlaces)
+                let duplicateCount = lightweightPlaces.count - newUniquePlaces.count
+                if duplicateCount > 0 {
+                    print("⚠️ [ProfileViewModel] Filtered \(duplicateCount) duplicate reviewed places")
+                }
+            } else if !lightweightPlaces.isEmpty {
+                print("⚠️ [ProfileViewModel] All \(lightweightPlaces.count) reviewed places were duplicates - potential pagination issue")
+            }
+            
+            // Update hasMore flag: false if empty or if we got less than a full page
+            hasMoreReviews = !lightweightPlaces.isEmpty && lightweightPlaces.count >= reviewsPerPage
+            
+            // Load full place details for display
+            await loadPlaceDetailsForReviews(newUniquePlaces, userId: userId)
+            
+            print("✅ [ProfileViewModel] Loaded \(newUniquePlaces.count) more reviewed places (total: \(lightweightReviewedPlaces.count), hasMore: \(hasMoreReviews))")
+        } catch {
+            print("❌ [ProfileViewModel] Error loading more reviewed places: \(error.localizedDescription)")
+            // Set hasMore to false on error to prevent infinite retry loops
+            hasMoreReviews = false
+        }
+    }
+    
+    /// Load full place details for reviewed places
+    private func loadPlaceDetailsForReviews(_ lightweightPlaces: [LightweightPlace], userId: String) async {
+        for place in lightweightPlaces {
+            let placeId = place.place_id
+            
+            // Load place details if not already loaded
+            if detailPlaceViewModel.places[placeId] == nil {
+                do {
+                    let detailPlace = try await placeService.fetchPlace(withId: placeId)
+                    await MainActor.run {
+                        detailPlaceViewModel.places[placeId] = detailPlace
+                        detailPlaceViewModel.fetchPlaceImage(for: placeId)
+                    }
+                } catch {
+                    print("❌ [ProfileViewModel] Failed to load place \(placeId): \(error.localizedDescription)")
+                }
             }
             
             // Add current user as saver so reviewed places appear on map with profile picture
             if detailPlaceViewModel.placeSavers[placeId] == nil {
-                detailPlaceViewModel.placeSavers[placeId] = [currentUserId]
-            } else if !detailPlaceViewModel.placeSavers[placeId]!.contains(currentUserId) {
-                detailPlaceViewModel.placeSavers[placeId]!.append(currentUserId)
+                detailPlaceViewModel.placeSavers[placeId] = [userId]
+            } else if !detailPlaceViewModel.placeSavers[placeId]!.contains(userId) {
+                detailPlaceViewModel.placeSavers[placeId]!.append(userId)
             }
         }
         
-        // Only add new place IDs
-        let newPlaceIds = successfullyLoadedPlaceIds.filter { !loadedReviewedPlaceIds.contains($0) }
-        loadedReviewedPlaceIds.append(contentsOf: newPlaceIds)
-        currentReviewPage += 1
-        _hasMoreReviews = endIndex < allReviewedPlaceIds.count
-        isLoadingMoreReviews = false
-        isLoadingReviewedPlaces = false
-        
         // Recalculate map annotations to include new reviewed places
         detailPlaceViewModel.calculateAnnotationPlaces()
-    }
-
-    func loadMoreMyReviews() {
-        Task { await self.loadNextBatchOfMyReviews() }
     }
     
     /// Fetch review images for a batch of places to enhance the place display
@@ -1161,8 +1186,9 @@ class ProfileViewModel: ObservableObject {
         }
     }
 
+    /// Get reviewed places for display (server-side pagination)
     func getMyReviewedPlaces() -> [DetailPlace] {
-        return loadedReviewedPlaceIds.compactMap { detailPlaceViewModel.places[$0] }
+        return lightweightReviewedPlaces.compactMap { detailPlaceViewModel.places[$0.place_id] }
     }
     
     /// Load image directly from URL and add to placeImages
@@ -1199,20 +1225,17 @@ class ProfileViewModel: ObservableObject {
         }
     }
 
+    /// Reset reviewed places pagination state (server-side pagination)
     func resetMyReviewedPlacesPagination() {
         isLoadingReviewedPlaces = false
         isLoadingMoreReviews = false
-        _hasMoreReviews = true
-        currentReviewPage = 0
-        allReviewedPlaceIds = []
-        loadedReviewedPlaceIds = []
+        hasMoreReviews = true
+        lightweightReviewedPlaces = []
     }
 
-    var hasMoreReviews: Bool { _hasMoreReviews }
-    
-    /// Get the total count of reviewed places
+    /// Get the total count of reviewed places (server-side pagination)
     var reviewedPlacesCount: Int {
-        return allReviewedPlaceIds.count
+        return lightweightReviewedPlaces.count
     }
     
     // User reviews for display in My Places
@@ -1285,7 +1308,7 @@ class ProfileViewModel: ObservableObject {
             
             await MainActor.run {
                 lightweightExternalPlaces = lightweightPlaces
-                hasMoreExternalPlaces = lightweightPlaces.count >= 8
+                hasMoreExternalPlaces = !lightweightPlaces.isEmpty && lightweightPlaces.count >= 8
                 isLoadingTikTokPlaces = false
             }
             
@@ -1294,7 +1317,125 @@ class ProfileViewModel: ObservableObject {
             print("❌ [ProfileViewModel] Error reloading lightweight external places: \(error.localizedDescription)")
             await MainActor.run {
                 isLoadingTikTokPlaces = false
+                hasMoreExternalPlaces = false
             }
+        }
+    }
+    
+    // MARK: - External Places Pagination (MVVM Architecture)
+    
+    /// Load initial external places (TikTok places) - lightweight with pagination
+    /// This method handles the first page load when the TikTok tab appears
+    func loadInitialExternalPlaces() async {
+        guard let userId = user?.id else {
+            print("⚠️ [ProfileViewModel] Cannot load initial external places: no user ID")
+            return
+        }
+        
+        // Don't reload if already loading or if we have data
+        guard !isLoadingTikTokPlaces && lightweightExternalPlaces.isEmpty else {
+            print("ℹ️ [ProfileViewModel] Skipping initial load - already loading or data exists")
+            return
+        }
+        
+        print("🔄 [ProfileViewModel] Starting initial load of external places")
+        isLoadingTikTokPlaces = true
+        
+        defer {
+            isLoadingTikTokPlaces = false
+            print("✅ [ProfileViewModel] Completed initial load of external places")
+        }
+        
+        do {
+            // Fetch first page of lightweight external places
+            let lightweightPlaces = try await userService.fetchUserExternalPlaces(userId: userId, limit: 8, offset: 0)
+            
+            // Prefetch TikTok metadata for all TikTok URLs (non-blocking)
+            let tiktokUrls = lightweightPlaces.compactMap { $0.tiktok_url }.filter { !$0.isEmpty }
+            if !tiktokUrls.isEmpty {
+                Task {
+                    await TikTokMetadataCache.shared.prefetchMetadata(for: tiktokUrls)
+                    print("✅ [ProfileViewModel] Prefetched TikTok metadata for \(tiktokUrls.count) URLs")
+                }
+            }
+            
+            // Update state: replace existing places and update hasMore flag
+            lightweightExternalPlaces = lightweightPlaces
+            hasMoreExternalPlaces = !lightweightPlaces.isEmpty && lightweightPlaces.count >= 8
+            
+            print("✅ [ProfileViewModel] Loaded \(lightweightPlaces.count) lightweight external places (hasMore: \(hasMoreExternalPlaces))")
+        } catch {
+            print("❌ [ProfileViewModel] Error loading initial external places: \(error.localizedDescription)")
+            // Set hasMore to false on error to prevent infinite retry loops
+            hasMoreExternalPlaces = false
+        }
+    }
+    
+    /// Load more external places (pagination) - MVVM architecture
+    /// This method handles loading additional pages when user scrolls to the end
+    func loadMoreExternalPlaces() async {
+        guard let userId = user?.id else {
+            print("⚠️ [ProfileViewModel] Cannot load more external places: no user ID")
+            return
+        }
+        
+        // Guard: prevent multiple simultaneous loads and check if more data is available
+        guard !isLoadingMoreExternalPlaces && hasMoreExternalPlaces else {
+            if isLoadingMoreExternalPlaces {
+                print("ℹ️ [ProfileViewModel] Skipping loadMoreExternalPlaces - already loading")
+            } else {
+                print("ℹ️ [ProfileViewModel] Skipping loadMoreExternalPlaces - no more data available")
+            }
+            return
+        }
+        
+        // Calculate offset based on current count
+        let offset = lightweightExternalPlaces.count
+        print("🔄 [ProfileViewModel] Loading more external places (offset: \(offset), current count: \(lightweightExternalPlaces.count))")
+        
+        isLoadingMoreExternalPlaces = true
+        
+        defer {
+            isLoadingMoreExternalPlaces = false
+            print("✅ [ProfileViewModel] Completed loading more external places")
+        }
+        
+        do {
+            // Fetch next page of lightweight external places
+            let lightweightPlaces = try await userService.fetchUserExternalPlaces(userId: userId, limit: 8, offset: offset)
+            
+            // Prefetch TikTok metadata for all TikTok URLs (non-blocking)
+            let tiktokUrls = lightweightPlaces.compactMap { $0.tiktok_url }.filter { !$0.isEmpty }
+            if !tiktokUrls.isEmpty {
+                Task {
+                    await TikTokMetadataCache.shared.prefetchMetadata(for: tiktokUrls)
+                    print("✅ [ProfileViewModel] Prefetched TikTok metadata for \(tiktokUrls.count) URLs")
+                }
+            }
+            
+            // Update state: append new places and update hasMore flag
+            // ⚠️ CRITICAL: Deduplicate to prevent SwiftUI rendering issues
+            let existingIds = Set(lightweightExternalPlaces.map { $0.id })
+            let newUniquePlaces = lightweightPlaces.filter { !existingIds.contains($0.id) }
+            
+            if !newUniquePlaces.isEmpty {
+                lightweightExternalPlaces.append(contentsOf: newUniquePlaces)
+                let duplicateCount = lightweightPlaces.count - newUniquePlaces.count
+                if duplicateCount > 0 {
+                    print("⚠️ [ProfileViewModel] Filtered \(duplicateCount) duplicate places")
+                }
+            } else if !lightweightPlaces.isEmpty {
+                print("⚠️ [ProfileViewModel] All \(lightweightPlaces.count) places were duplicates - potential pagination issue")
+            }
+            
+            // Update hasMore flag: false if empty or if we got less than a full page
+            hasMoreExternalPlaces = !lightweightPlaces.isEmpty && lightweightPlaces.count >= 8
+            
+            print("✅ [ProfileViewModel] Loaded \(newUniquePlaces.count) unique external places (total: \(lightweightExternalPlaces.count), hasMore: \(hasMoreExternalPlaces))")
+        } catch {
+            print("❌ [ProfileViewModel] Error loading more external places: \(error.localizedDescription)")
+            // Set hasMore to false on error to prevent infinite retry loops
+            hasMoreExternalPlaces = false
         }
     }
     
@@ -1386,8 +1527,9 @@ class ProfileViewModel: ObservableObject {
     // MARK: - Reviewed Places Access
     
     /// Check if the current user has reviewed a specific place
+    /// Check if user has reviewed a place (server-side pagination)
     func hasReviewedPlace(placeId: String) -> Bool {
-        return allReviewedPlaceIds.contains(placeId)
+        return lightweightReviewedPlaces.contains { $0.place_id == placeId }
     }
     
     // MARK: - List Sorting by Distance

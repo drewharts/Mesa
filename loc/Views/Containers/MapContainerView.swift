@@ -11,7 +11,6 @@ import MapKit
 /// Container that owns MapViewModel and handles all map-related logic
 struct MapContainerView: View {
     @StateObject private var mapViewModel: MapViewModel
-    @EnvironmentObject var appCoordinator: AppCoordinator
     @EnvironmentObject var locationManager: LocationManager
     @EnvironmentObject var userSession: UserSession
     

@@ -287,12 +287,25 @@ class DataManager: ObservableObject {
     }
     
     /// Load user external places (TikTok places) - lightweight with pagination
+    /// ⚠️ DEPRECATED: Use ProfileViewModel.loadInitialExternalPlaces() and loadMoreExternalPlaces() instead
+    /// This method is kept for backward compatibility but should not be used in new code.
+    /// MVVM architecture: ViewModel should own pagination state and logic.
     func loadUserExternalPlaces(userId: String, offset: Int = 0) async {
         if offset == 0 {
             profileViewModel.isLoadingTikTokPlaces = true
         } else {
             await MainActor.run {
                 profileViewModel.isLoadingMoreExternalPlaces = true
+            }
+        }
+        
+        defer {
+            if offset == 0 {
+                profileViewModel.isLoadingTikTokPlaces = false
+            } else {
+                Task { @MainActor in
+                    profileViewModel.isLoadingMoreExternalPlaces = false
+                }
             }
         }
         
@@ -319,25 +332,24 @@ class DataManager: ObservableObject {
                     self.profileViewModel.lightweightExternalPlaces.append(contentsOf: lightweightPlaces)
                 }
                 
-                // Update hasMore flag
-                self.profileViewModel.hasMoreExternalPlaces = lightweightPlaces.count >= 8
+                // Update hasMore flag: false if empty or if we got less than a full page
+                self.profileViewModel.hasMoreExternalPlaces = !lightweightPlaces.isEmpty && lightweightPlaces.count >= 8
             }
             
             print("✅ [DataManager] Loaded \(lightweightPlaces.count) lightweight external places (offset: \(offset), hasMore: \(profileViewModel.hasMoreExternalPlaces))")
         } catch {
             print("❌ [DataManager] Error loading external places: \(error.localizedDescription)")
-        }
-        
-        if offset == 0 {
-            profileViewModel.isLoadingTikTokPlaces = false
-        } else {
+            // Set hasMore to false on error to prevent infinite retry loops
             await MainActor.run {
-                profileViewModel.isLoadingMoreExternalPlaces = false
+                profileViewModel.hasMoreExternalPlaces = false
             }
         }
     }
     
     /// Load more external places (pagination)
+    /// ⚠️ DEPRECATED: Use ProfileViewModel.loadMoreExternalPlaces() instead
+    /// This method is kept for backward compatibility but should not be used in new code.
+    /// MVVM architecture: ViewModel should own pagination state and logic.
     @MainActor
     func loadMoreExternalPlaces(userId: String) async {
         guard !profileViewModel.isLoadingMoreExternalPlaces && profileViewModel.hasMoreExternalPlaces else { return }
@@ -357,9 +369,10 @@ class DataManager: ObservableObject {
     /// Refresh Reviewed Places data (for when user clicks on My Places)
     func refreshReviewedPlaces(userId: String) async {
         print("🔄 [DataManager] Refreshing Reviewed Places data...")
-        // Clear existing data and reload
-        profileViewModel.allReviewedPlaceIds.removeAll()
-        await loadUserReviewedPlaces(userId: userId)
+        // Clear existing data and reload (server-side pagination)
+        profileViewModel.lightweightReviewedPlaces.removeAll()
+        profileViewModel.hasMoreReviews = true
+        // Reload will happen automatically when view appears
     }
     
     // Load's current user's profile data and profile picture
@@ -1053,10 +1066,8 @@ class DataManager: ObservableObject {
                 return review.placeId
             }
             
-            // Update the ProfileViewModel with the reviewed place IDs for count display
-            await MainActor.run {
-                profileViewModel.allReviewedPlaceIds = placeIds
-            }
+            // Note: Reviewed places are now loaded via server-side pagination
+            // This legacy method is kept for compatibility but reviews are managed by ProfileViewModel
 
             // Process place details in batches
             let batchSize = 10

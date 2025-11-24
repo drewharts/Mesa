@@ -493,6 +493,11 @@ class UserService: ObservableObject {
     func fetchUserExternalPlaces(userId: String, limit: Int = 8, offset: Int = 0) async throws -> [LightweightPlace] {
         return try await supabase.fetchUserExternalPlaces(userId: userId, limit: limit, offset: offset)
     }
+    
+    /// Fetch user's reviewed places (lightweight data for tiles, paginated - server-side)
+    func fetchUserReviewedPlaces(userId: String, limit: Int = 8, offset: Int = 0) async throws -> [LightweightPlace] {
+        return try await supabase.fetchUserReviewedPlaces(userId: userId, limit: limit, offset: offset)
+    }
 
     /// ✅ NEW: Fetch following user IDs only (not full profiles) - SUPER FAST!
     func fetchFollowingUserIds(userId: String) async throws -> [String] {

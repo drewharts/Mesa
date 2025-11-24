@@ -13,7 +13,6 @@ import SwiftUI
 /// Staff Engineer: Accepts ViewModel as parameter (no recreation overhead)
 struct SearchContainerView: View {
     @ObservedObject var searchViewModel: SearchViewModel  // ✅ Accept from parent
-    @EnvironmentObject var appCoordinator: AppCoordinator
     @FocusState private var searchIsFocused: Bool
     @Binding var isSearchExpanded: Bool
     
@@ -41,37 +40,21 @@ struct SearchContainerView: View {
             searchResults
         }
         .onAppear {
-            setupSearchView()
+            // Setup pipeline only once on first appearance
+            searchViewModel.setupIfNeeded()
         }
         .onChange(of: isSearchExpanded) { oldValue, newValue in
             handleSearchExpansionChange(isExpanded: newValue)
         }
     }
     
-    // MARK: - Private Methods (Single Responsibility)
-    
-    /// Setup search view on appearance
-    private func setupSearchView() {
-        // Setup search pipeline lazily (defer expensive work)
-        searchViewModel.setupIfNeeded()
-        // Clear search text when appearing
-        searchViewModel.searchText = ""
-    }
-    
     /// Handle search expansion state changes
     private func handleSearchExpansionChange(isExpanded: Bool) {
         if isExpanded {
-            // Ensure pipeline is setup before use
-            searchViewModel.setupIfNeeded()
-            
-            // Delay focus to align with animation duration (0.25s)
-            // This ensures the view is fully visible and stable before requesting focus
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak searchViewModel] in
-                // CRITICAL: Check if still expanded before forcing focus
-                if self.isSearchExpanded {
-                    self.searchIsFocused = true
-                }
-            }
+            // Clear search text when opening
+            searchViewModel.searchText = ""
+            // Focus immediately - no delay needed with proper isolation
+            searchIsFocused = true
         } else {
             // Clear focus when collapsing
             dismissKeyboard()

@@ -14,7 +14,7 @@ import SwiftUI
 struct SearchOverlayView: View {
     // MARK: - Dependencies (Pass-through only)
     let searchViewModel: SearchViewModel  // ✅ Pass-through only, no observation
-    @EnvironmentObject var appCoordinator: AppCoordinator
+    @Binding var isSearchExpanded: Bool
     
     // MARK: - Coordinator (not observed to prevent loops)
     let searchCoordinator: SearchCoordinatorViewModel
@@ -26,13 +26,13 @@ struct SearchOverlayView: View {
         VStack {
             SearchContainerView(
                 searchViewModel: searchViewModel,
-                isSearchExpanded: $appCoordinator.isSearchExpanded,
+                isSearchExpanded: $isSearchExpanded,
                 onPlaceSelected: handlePlaceSelection,
                 onUserSelected: searchCoordinator.handleUserSelection
             )
             .id("SearchContainer")  // Stable identity
-            .opacity(appCoordinator.isSearchExpanded ? 1 : 0)
-            .allowsHitTesting(appCoordinator.isSearchExpanded)
+            .opacity(isSearchExpanded ? 1 : 0)
+            .allowsHitTesting(isSearchExpanded)
             
             Spacer()
         }

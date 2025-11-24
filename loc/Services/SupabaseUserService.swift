@@ -715,6 +715,28 @@ class SupabaseUserService: ObservableObject {
         return places
     }
     
+    /// Fetch user's reviewed places (lightweight data for tiles, paginated - server-side)
+    func fetchUserReviewedPlaces(userId: String, limit: Int = 8, offset: Int = 0) async throws -> [LightweightPlace] {
+        struct Params: Encodable {
+            let p_user_id: String
+            let p_limit: Int
+            let p_offset: Int
+        }
+        
+        let params = Params(
+            p_user_id: userId,
+            p_limit: limit,
+            p_offset: offset
+        )
+        
+        let places: [LightweightPlace] = try await supabase.client
+            .rpc("get_user_reviewed_places", params: params)
+            .execute()
+            .value
+        
+        return places
+    }
+    
     func fetchExternalPlaceURLs(placeIds: [String], userId: String) async throws -> [String: String] {
         guard !placeIds.isEmpty else {
             return [:]

@@ -33,7 +33,7 @@ BEGIN
     FROM external_places ep
     JOIN places p ON ep.place_id = p.id
     WHERE ep.user_id = p_user_id
-    ORDER BY ep.added_at DESC
+    ORDER BY ep.added_at DESC, ep.id DESC
     LIMIT p_limit
     OFFSET p_offset;
 END;
