@@ -252,22 +252,35 @@ struct FavoritePlaceCard: View {
                                     .foregroundColor(.gray.opacity(0.3))
                                     .frame(maxWidth: .infinity, maxHeight: 80)
                             }
+                        } else if let detailPlace = detailPlace,
+                                  let photoUrls = detailPlace.photoUrls,
+                                  !photoUrls.isEmpty,
+                                  let photoUrl = photoUrls.first,
+                                  let url = URL(string: photoUrl) {
+                            // Show place's own photo (for created places) using AsyncImage
+                            AsyncImage(url: url) { image in
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .frame(maxWidth: .infinity, maxHeight: 80)
+                                    .clipped()
+                            } placeholder: {
+                                Rectangle()
+                                    .foregroundColor(.gray.opacity(0.3))
+                                    .frame(maxWidth: .infinity, maxHeight: 80)
+                            }
                         } else if let image = places.placeImages[place] {
+                            // Show place review image (already loaded)
                             Image(uiImage: image)
                                 .resizable()
                                 .aspectRatio(contentMode: .fill)
                                 .frame(maxWidth: .infinity, maxHeight: 80)
                                 .clipped()
                         } else {
+                            // Show colored rectangle fallback
                             Rectangle()
                                 .foregroundColor(places.colorForPlace(placeId: place))
                                 .frame(maxWidth: .infinity, maxHeight: 80)
-                                .onAppear {
-                                    // Load images for priority tiles immediately, or lazy load for others
-                                    if let detailPlace = detailPlace {
-                                        profile.detailPlaceViewModel.fetchPlaceImage(for: detailPlace.id.uuidString)
-                                    }
-                                }
                         }
                     }
                     .clipped()

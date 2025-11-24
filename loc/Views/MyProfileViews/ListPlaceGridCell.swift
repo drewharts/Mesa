@@ -49,8 +49,24 @@ struct ListPlaceGridCell: View {
                                 .foregroundColor(.gray.opacity(0.3))
                                 .frame(width: cardWidth, height: cardHeight)
                         }
+                    } else if let photoUrls = place.photoUrls, 
+                              !photoUrls.isEmpty,
+                              let photoUrl = photoUrls.first,
+                              let url = URL(string: photoUrl) {
+                        // Show place's own photo (for created places) using AsyncImage
+                        AsyncImage(url: url) { image in
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .frame(width: cardWidth, height: cardHeight)
+                                .clipped()
+                        } placeholder: {
+                            Rectangle()
+                                .foregroundColor(.gray.opacity(0.3))
+                                .frame(width: cardWidth, height: cardHeight)
+                        }
                     } else if let image = detailPlaceViewModel.placeImages[place.id.uuidString] {
-                        // Show place review image
+                        // Show place review image (already loaded)
                         Image(uiImage: image)
                             .resizable()
                             .aspectRatio(contentMode: .fill)
@@ -61,9 +77,6 @@ struct ListPlaceGridCell: View {
                         Rectangle()
                             .foregroundColor(detailPlaceViewModel.colorForPlace(placeId: place.id.uuidString))
                             .frame(width: cardWidth, height: cardHeight)
-                            .onAppear {
-                                profile.detailPlaceViewModel.fetchPlaceImage(for: place.id.uuidString)
-                            }
                     }
                     LinearGradient(
                         gradient: Gradient(colors: [

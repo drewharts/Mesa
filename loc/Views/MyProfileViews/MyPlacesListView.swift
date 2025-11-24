@@ -147,12 +147,10 @@ struct MyPlacesListView: View {
                             removal: .move(edge: .leading).combined(with: .opacity)
                         ))
                         .onAppear {
-                            // Load external places when TikTok tab appears
-                            if let userId = profile.user?.id, profile.lightweightExternalPlaces.isEmpty {
-                                if let dataManager = profile.detailPlaceViewModel.dataManager {
-                                    Task {
-                                        await dataManager.loadUserExternalPlaces(userId: userId)
-                                    }
+                            // Load external places when TikTok tab appears (MVVM: call ViewModel)
+                            if profile.lightweightExternalPlaces.isEmpty {
+                                Task {
+                                    await profile.loadInitialExternalPlaces()
                                 }
                             }
                         }
@@ -514,14 +512,14 @@ struct PaginatedReviewedPlacesView: View {
     let columns: [GridItem]
     let cardWidth: CGFloat
     let cardHeight: CGFloat
-    let colorForPlace: (DetailPlace) -> Color
+    let colorForPlace: (DetailPlace) -> Color  // Keep for backward compatibility, but unused
     
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @Environment(\.presentationMode) var presentationMode
     
     var body: some View {
-        if profile.isLoadingReviewedPlaces || (profile.getMyReviewedPlaces().isEmpty && !profile.isLoadingReviewedPlaces) {
+        if profile.isLoadingReviewedPlaces || (profile.lightweightReviewedPlaces.isEmpty && !profile.isLoadingReviewedPlaces) {
             VStack {
                 Spacer()
                 ProgressView()
@@ -530,7 +528,7 @@ struct PaginatedReviewedPlacesView: View {
             .onAppear {
                 profile.loadMyReviewedPlacesWithPagination()
             }
-        } else if profile.getMyReviewedPlaces().isEmpty {
+        } else if profile.lightweightReviewedPlaces.isEmpty {
             VStack(spacing: 16) {
                 Spacer()
                 Text("No Places Reviewed Yet")
@@ -550,31 +548,36 @@ struct PaginatedReviewedPlacesView: View {
         } else {
             ScrollView {
                 LazyVGrid(columns: columns, spacing: 15) {
-                    ForEach(Array(profile.getMyReviewedPlaces().enumerated()), id: \.element.id) { index, place in
-                        PlaceGridCell(
+                    ForEach(Array(profile.lightweightReviewedPlaces.enumerated()), id: \.element.id) { index, place in
+                        LightweightPlaceGridCell(
                             place: place,
                             cardWidth: cardWidth,
-                            cardHeight: cardHeight,
-                            colorForPlace: colorForPlace,
-                            isPriorityTile: index < 8 // First 8 tiles are priority
+                            cardHeight: cardHeight
                         )
                         .onAppear {
-                            let lastIndex = profile.getMyReviewedPlaces().count - 1
-                            if index == lastIndex && profile.hasMoreReviews {
-                                profile.loadMoreMyReviews()
+                            let lastIndex = profile.lightweightReviewedPlaces.count - 1
+                            if index == lastIndex && profile.hasMoreReviews && !profile.isLoadingMoreReviews {
+                                Task {
+                                    await profile.loadMoreMyReviews()
+                                }
                             }
                         }
                     }
+                    
+                    // Loading indicator at bottom of content (enterprise-quality)
                     if profile.isLoadingMoreReviews {
                         HStack {
-                            ProgressView()
-                                .scaleEffect(0.8)
-                            Text("Loading more...")
-                                .font(.caption)
-                                .foregroundColor(.gray)
+                            Spacer()
+                            VStack(spacing: 12) {
+                                ProgressView()
+                                    .scaleEffect(1.0)
+                                Text("Loading...")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                            }
+                            .padding(.vertical, 30)
+                            Spacer()
                         }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 20)
                         .gridCellColumns(2)
                     }
                 }
@@ -723,28 +726,32 @@ struct PaginatedTikTokPlacesView: View {
                             cardHeight: cardHeight
                         )
                         .onAppear {
-                            // Trigger pagination when reaching the last item
-                            if index == profile.lightweightExternalPlaces.count - 1 && profile.hasMoreExternalPlaces {
-                                if let userId = profile.user?.id {
-                                    Task {
-                                        await dataManager.loadMoreExternalPlaces(userId: userId)
-                                    }
+                            // Trigger pagination when reaching the last item (MVVM: call ViewModel)
+                            // Defensive check: prevent race conditions from rapid scrolling
+                            if index == profile.lightweightExternalPlaces.count - 1 
+                                && profile.hasMoreExternalPlaces 
+                                && !profile.isLoadingMoreExternalPlaces {
+                                Task {
+                                    await profile.loadMoreExternalPlaces()
                                 }
                             }
                         }
                     }
                     
-                    // Loading indicator for pagination
+                    // Loading indicator at bottom of content (enterprise-quality)
                     if profile.isLoadingMoreExternalPlaces {
                         HStack {
-                            ProgressView()
-                                .scaleEffect(0.8)
-                            Text("Loading more...")
-                                .font(.caption)
-                                .foregroundColor(.gray)
+                            Spacer()
+                            VStack(spacing: 12) {
+                                ProgressView()
+                                    .scaleEffect(1.0)
+                                Text("Loading...")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                            }
+                            .padding(.vertical, 30)
+                            Spacer()
                         }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 20)
                         .gridCellColumns(2)
                     }
                 }
