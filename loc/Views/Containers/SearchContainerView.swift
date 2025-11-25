@@ -42,6 +42,10 @@ struct SearchContainerView: View {
         .onAppear {
             // Setup pipeline only once on first appearance
             searchViewModel.setupIfNeeded()
+            // Set initial focus state when view appears (onChange won't fire on initial render)
+            if isSearchExpanded {
+                handleSearchExpansionChange(isExpanded: true)
+            }
         }
         .onChange(of: isSearchExpanded) { oldValue, newValue in
             handleSearchExpansionChange(isExpanded: newValue)

@@ -24,15 +24,19 @@ struct SearchOverlayView: View {
     
     var body: some View {
         VStack {
-            SearchContainerView(
-                searchViewModel: searchViewModel,
-                isSearchExpanded: $isSearchExpanded,
-                onPlaceSelected: handlePlaceSelection,
-                onUserSelected: searchCoordinator.handleUserSelection
-            )
-            .id("SearchContainer")  // Stable identity
-            .opacity(isSearchExpanded ? 1 : 0)
-            .allowsHitTesting(isSearchExpanded)
+            // Staff Engineer: Conditionally render SearchContainerView instead of hiding with opacity
+            // This prevents SwiftUI's NavigationStack from restoring focus to a hidden TextField
+            // when navigating back, which would cause the keyboard to reappear
+            if isSearchExpanded {
+                SearchContainerView(
+                    searchViewModel: searchViewModel,
+                    isSearchExpanded: $isSearchExpanded,
+                    onPlaceSelected: handlePlaceSelection,
+                    onUserSelected: searchCoordinator.handleUserSelection
+                )
+                .id("SearchContainer")  // Stable identity
+                .transition(.opacity)
+            }
             
             Spacer()
         }

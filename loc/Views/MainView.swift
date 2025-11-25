@@ -174,6 +174,12 @@ struct MainView: View {
                 }
             }
         }
+        .onChange(of: userProfileViewModel.isUserDetailPresented) { oldValue, newValue in
+            // When navigating BACK from user profile (true -> false), ensure search is collapsed and keyboard dismissed
+            if oldValue == true && newValue == false {
+                appCoordinator.isSearchExpanded = false
+            }
+        }
     }
     
     // MARK: - UI Overlay Layer

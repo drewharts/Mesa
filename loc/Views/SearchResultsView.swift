@@ -41,6 +41,7 @@ struct SearchResultsView: View {
                     }
                 }
             }
+            .scrollDismissesKeyboard(.interactively)
             .frame(height: isSearching ? 100 : CGFloat((userResults.count + placeResults.count) * 120 + (showNoPlaceFound ? 120 : 0)))
         }
     }
