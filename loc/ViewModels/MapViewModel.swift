@@ -64,12 +64,10 @@ class MapViewModel: ObservableObject {
             if let photoUrl = currentUserPhotoUrl {
                 let currentUserPhoto = FollowedUserPhoto(userId: profileUserId, profilePhotoUrl: photoUrl.absoluteString)
                 photos.append(currentUserPhoto)
-                print("📸 [MapViewModel] Added current user's photo to annotation list (from cache)")
             }
             
             self.followedUsersPhotos = photos
             self.hasLoadedPhotos = true
-            print("📸 [MapViewModel] Loaded \(photos.count) total photos for annotations (including current user)")
             
             // Load profile pictures from URLs
             await loadProfilePictures(from: photos)
@@ -130,7 +128,6 @@ class MapViewModel: ObservableObject {
             
             annotationImages[annotation.id] = combinedImage
         }
-        print("✅ [MapViewModel] Generated \(annotationImages.count) annotation images")
     }
     
     /// Create combined circular image from profile pictures (matching existing implementation)
@@ -226,11 +223,9 @@ class MapViewModel: ObservableObject {
         let task = Task { @MainActor in
             // Check if cancelled before starting
             guard !Task.isCancelled else {
-                print("⏭️ [MapViewModel] Load cancelled before starting")
                 return
             }
             
-            let startTime = Date()
             isLoadingViewportPlaces = true
             
             let bounds = getViewportBounds(from: region)
@@ -238,7 +233,6 @@ class MapViewModel: ObservableObject {
             do {
                 // Check if cancelled before network call
                 guard !Task.isCancelled else {
-                    print("⏭️ [MapViewModel] Load cancelled before fetch")
                     isLoadingViewportPlaces = false
                     return
                 }
@@ -253,7 +247,6 @@ class MapViewModel: ObservableObject {
                 
                 // Check if cancelled after network call
                 guard !Task.isCancelled else {
-                    print("⏭️ [MapViewModel] Load cancelled after fetch")
                     isLoadingViewportPlaces = false
                     return
                 }
@@ -263,10 +256,6 @@ class MapViewModel: ObservableObject {
                 
                 // Generate annotation images for new annotations
                 generateAnnotationImages()
-                
-                let loadTime = Date().timeIntervalSince(startTime)
-                print("⏱️ [MapViewModel] Loaded \(annotations.count) place annotations in \(String(format: "%.2f", loadTime))s")
-                
                 
             } catch {
                 if !Task.isCancelled {

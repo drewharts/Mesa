@@ -372,7 +372,6 @@ class PlacePhotosViewModel: ObservableObject {
             
             if retryCount < maxExternalReviewRetries {
                 self.externalReviewRetryAttempts[placeId] = retryCount + 1
-                print("🔄 [PlacePhotosViewModel] No external reviews for \(placeId), retrying (\(retryCount + 1)/\(maxExternalReviewRetries))...")
                 
                 try? await Task.sleep(nanoseconds: UInt64(externalReviewRetryDelay * 1_000_000_000))
                 await loadExternalReviewPhotosInternal(for: place, placeId: placeId, reset: false)

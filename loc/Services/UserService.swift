@@ -91,7 +91,6 @@ class UserService: ObservableObject {
 
     func fetchUser(userId: String, completion: @escaping (User?, Error?) -> Void) {
         // ⚠️ NOW FETCHING FROM SUPABASE, NOT FIRESTORE
-        print("🔄 [UserService] Delegating to Supabase...")
         Task { @MainActor in
             await supabase.fetchUser(userId: userId, completion: completion)
         }
@@ -99,7 +98,6 @@ class UserService: ObservableObject {
 
     func fetchFriends(userId: String, completion: @escaping ([String]?, Error?) -> Void) {
         // ⚠️ NOW FETCHING FROM SUPABASE, NOT FIRESTORE
-        print("🔄 [UserService] Delegating to Supabase...")
         Task { @MainActor in
             await supabase.fetchFriends(userId: userId, completion: completion)
             }
@@ -107,7 +105,6 @@ class UserService: ObservableObject {
 
     func fetchProfiles(for userIds: [String], completion: @escaping ([User]?, Error?) -> Void) {
         // ⚠️ NOW FETCHING FROM SUPABASE, NOT FIRESTORE
-        print("🔄 [UserService] Delegating to Supabase...")
         Task { @MainActor in
             await supabase.fetchProfiles(for: userIds, completion: completion)
         }
@@ -115,7 +112,6 @@ class UserService: ObservableObject {
 
     func fetchFollowingProfiles(for userId: String, completion: @escaping ([User]?, Error?) -> Void) {
         // ⚠️ NOW FETCHING FROM SUPABASE, NOT FIRESTORE
-        print("🔄 [UserService] Delegating to Supabase...")
         Task { @MainActor in
             await supabase.fetchFollowingProfiles(for: userId, completion: completion)
         }
@@ -123,14 +119,12 @@ class UserService: ObservableObject {
     
     func updateFCMToken(userId: String, token: String, completion: @escaping (Error?) -> Void) {
         // ⚠️ NOW UPDATING IN SUPABASE, NOT FIRESTORE
-        print("🔄 [UserService] Delegating to Supabase...")
         Task { @MainActor in
             await supabase.updateFCMToken(userId: userId, token: token, completion: completion)
         }
     }
     
     func deleteAccount(userId: String, completion: @escaping (Error?) -> Void) {
-        print("🔄 [UserService] Delegating to Supabase...")
         Task { @MainActor in
             await supabase.deleteAccount(userId: userId, completion: completion)
         }
@@ -152,7 +146,6 @@ class UserService: ObservableObject {
                     .execute()
                     .value
 
-                print("✅ [UserService] Found existing user profile: \(profileData.firstName) \(profileData.lastName)")
                 completion(.success(profileData))
             } catch let error as DecodingError {
                 print("❌ [UserService] Decoding error: \(error.localizedDescription)")
@@ -167,8 +160,6 @@ class UserService: ObservableObject {
     }
     
     func fetchUserById(userId: String) async throws -> ProfileData {
-        print("🔄 [UserService] Fetching user profile async from Supabase: \(userId)")
-
         do {
             // First try to fetch by id (works for UIDs and new Supabase users)
             let profile: ProfileData = try await SupabaseManager.shared.client
@@ -179,12 +170,9 @@ class UserService: ObservableObject {
                 .execute()
                 .value
 
-            print("✅ [UserService] Found user profile: \(profile.firstName) \(profile.lastName)")
             return profile
 
         } catch {
-            print("🔄 [UserService] User not found by id, trying supabase_uid: \(userId)")
-
             // If not found by id, try by supabase_uid (for Supabase auth UIDs)
             do {
                 let profile: ProfileData = try await SupabaseManager.shared.client
@@ -195,7 +183,6 @@ class UserService: ObservableObject {
                     .execute()
                     .value
 
-                print("✅ [UserService] Found user profile by supabase_uid: \(profile.firstName) \(profile.lastName)")
                 return profile
 
                 } catch {
@@ -206,7 +193,6 @@ class UserService: ObservableObject {
     }
 
     func fetchUserBySupabaseUid(supabaseUid: String, completion: @escaping (Result<ProfileData, Error>) -> Void) {
-        print("🔄 [UserService] Fetching user profile by Supabase auth UID: \(supabaseUid)")
         Task {
             do {
                 let profile = try await fetchUserBySupabaseUid(supabaseUid: supabaseUid)
@@ -222,8 +208,6 @@ class UserService: ObservableObject {
     }
 
     func fetchUserBySupabaseUid(supabaseUid: String) async throws -> ProfileData {
-        print("🔄 [UserService] Fetching user profile by Supabase auth UID: \(supabaseUid)")
-
         do {
             let profile: ProfileData = try await SupabaseManager.shared.client
                 .from("users")
@@ -233,7 +217,6 @@ class UserService: ObservableObject {
                 .execute()
                 .value
 
-            print("✅ [UserService] Found user profile: \(profile.firstName) \(profile.lastName)")
             return profile
 
         } catch {
@@ -332,8 +315,6 @@ class UserService: ObservableObject {
                 .execute()
                 .value
             
-            print("✅ [UserService] Found \(externalPlacesResponse.count) external places for user")
-            
             // If no external places found, try alternative user ID formats
             if externalPlacesResponse.isEmpty {
                 let alternativeUserIds = [
@@ -365,7 +346,6 @@ class UserService: ObservableObject {
                         .value
                     
                     if !altResponse.isEmpty {
-                        print("✅ [UserService] Found \(altResponse.count) external places with alternative user_id")
                         return try await processDirectExternalPlacesResponse(altResponse)
                     }
                 }
@@ -410,7 +390,6 @@ class UserService: ObservableObject {
             return externalPlace
         }
         
-        print("✅ [UserService] Successfully processed \(externalPlaces.count) external places")
         return externalPlaces
     }
     
@@ -563,7 +542,6 @@ class UserService: ObservableObject {
                     .insert(profileData)
                     .execute()
 
-                print("✅ [UserService] Successfully saved user profile to Supabase")
                 completion(nil)
             } catch {
                 print("❌ [UserService] Error saving user profile: \(error.localizedDescription)")

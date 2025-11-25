@@ -14,14 +14,12 @@ class PlaceService: ObservableObject {
     // Async version of fetchAllPlaces
     func fetchAllPlaces() async throws -> [DetailPlace] {
         // ⚠️ NOW FETCHING FROM SUPABASE, NOT FIRESTORE
-        print("🔄 [PlaceService] Delegating to Supabase...")
         return try await supabase.fetchAllPlaces()
     }
 
     // Fetch all places from Supabase (was Firestore)
     func fetchAllPlaces(completion: @escaping ([DetailPlace]?, Error?) -> Void) {
         // ⚠️ NOW FETCHING FROM SUPABASE, NOT FIRESTORE
-        print("🔄 [PlaceService] Delegating to Supabase...")
         Task { @MainActor in
             await supabase.fetchAllPlaces(completion: completion)
         }
@@ -29,7 +27,6 @@ class PlaceService: ObservableObject {
 
     func findPlace(mapboxId: String, completion: @escaping (DetailPlace?, Error?) -> Void) {
         // ⚠️ NOW FETCHING FROM SUPABASE, NOT FIRESTORE
-        print("🔄 [PlaceService] Delegating to Supabase...")
         Task { @MainActor in
             await supabase.findPlace(mapboxId: mapboxId, completion: completion)
         }
@@ -37,7 +34,6 @@ class PlaceService: ObservableObject {
     
     func fetchPlace(withId placeId: String, completion: @escaping (Result<DetailPlace, Error>) -> Void) {
         // ⚠️ NOW FETCHING FROM SUPABASE, NOT FIRESTORE
-        print("🔄 [PlaceService] Delegating to Supabase...")
         Task { @MainActor in
             await supabase.fetchPlace(withId: placeId, completion: completion)
         }
@@ -59,28 +55,24 @@ class PlaceService: ObservableObject {
     }
     
     func addFavorite(userId: String, placeId: String, completion: @escaping (Error?) -> Void) {
-        print("🔄 [PlaceService] Delegating to Supabase...")
         Task { @MainActor in
             await supabase.addFavorite(userId: userId, placeId: placeId, completion: completion)
         }
     }
     
     func removeFavorite(userId: String, placeId: String, completion: @escaping (Error?) -> Void) {
-        print("🔄 [PlaceService] Delegating to Supabase...")
         Task { @MainActor in
             await supabase.removeFavorite(userId: userId, placeId: placeId, completion: completion)
         }
     }
     
     func fetchFavorites(userId: String, completion: @escaping ([DetailPlace]?, Error?) -> Void) {
-        print("🔄 [PlaceService] Delegating to Supabase...")
         Task { @MainActor in
             await supabase.fetchFavorites(userId: userId, completion: completion)
         }
     }
     
     func getDetailPlace(mapboxId: String, completion: @escaping (DetailPlace?) -> Void) {
-        print("🔄 [PlaceService] Delegating to Supabase...")
         findPlace(mapboxId: mapboxId) { place, error in
             if let error = error {
                 print("❌ Error fetching place: \(error)")
@@ -99,7 +91,6 @@ class PlaceService: ObservableObject {
     }
     
     func fetchMyPlaces(userId: String, completion: @escaping (Result<[DetailPlace], Error>) -> Void) {
-        print("🔄 [PlaceService] Delegating fetchMyPlaces to Supabase...")
         Task { @MainActor in
             await supabase.fetchMyPlaces(userId: userId) { places, error in
                 if let error = error {
@@ -112,12 +103,10 @@ class PlaceService: ObservableObject {
     }
     
     func fetchMyPlaces(userId: String) async throws -> [DetailPlace] {
-        print("🔄 [PlaceService] Delegating fetchMyPlaces async to Supabase...")
         return try await supabase.fetchMyPlaces(userId: userId)
     }
     
     func fetchProfileFavorites(userId: String, completion: @escaping ([DetailPlace], Error?) -> Void) {
-        print("🔄 [PlaceService] Delegating fetchProfileFavorites to Supabase...")
         Task { @MainActor in
             await supabase.fetchProfileFavorites(userId: userId) { places, error in
                 completion(places ?? [], error)
@@ -126,19 +115,16 @@ class PlaceService: ObservableObject {
     }
 
     func fetchProfileFavorites(userId: String) async throws -> [DetailPlace] {
-        print("🔄 [PlaceService] Delegating fetchProfileFavorites async to Supabase...")
         return try await supabase.fetchProfileFavorites(userId: userId)
     }
     
     func fetchLists(userId: String, completion: @escaping ([PlaceList]) -> Void) {
-        print("🔄 [PlaceService] Delegating fetchLists to Supabase...")
         Task { @MainActor in
             await supabase.fetchLists(userId: userId, completion: completion)
         }
     }
 
     func fetchLists(userId: String) async throws -> [PlaceList] {
-        print("🔄 [PlaceService] Delegating fetchLists async to Supabase...")
         return try await supabase.fetchLists(userId: userId)
     }
     
@@ -159,7 +145,6 @@ class PlaceService: ObservableObject {
     
     /// Fetches place lists sorted by proximity to user's current location
     func fetchListsByProximity(userId: String, userLocation: CLLocationCoordinate2D?, completion: @escaping ([PlaceList]) -> Void) {
-        print("🔄 [PlaceService] Delegating fetchListsByProximity to Supabase...")
         Task { @MainActor in
             await supabase.fetchListsByProximity(userId: userId, userLocation: userLocation, completion: completion)
         }
@@ -167,24 +152,20 @@ class PlaceService: ObservableObject {
     
     /// Async version: Fetches place lists sorted by proximity to user's current location
     func fetchListsByProximity(userId: String, userLocation: CLLocationCoordinate2D?) async throws -> [PlaceList] {
-        print("🔄 [PlaceService] Delegating fetchListsByProximity async to Supabase...")
         return try await supabase.fetchListsByProximity(userId: userId, userLocation: userLocation)
     }
     
     /// Fetch places for multiple lists efficiently (for first 6 visible lists)
     func fetchPlacesForLists(listIds: [String], maxPlacesPerList: Int = 6) async throws -> [String: [DetailPlace]] {
-        print("🔄 [PlaceService] Delegating fetchPlacesForLists to Supabase...")
         return try await supabase.fetchPlacesForLists(listIds: listIds, maxPlacesPerList: maxPlacesPerList)
     }
     
     /// Get place count for multiple lists efficiently
     func getPlaceCountsForLists(listIds: [String]) async throws -> [String: Int] {
-        print("🔄 [PlaceService] Delegating getPlaceCountsForLists to Supabase...")
         return try await supabase.getPlaceCountsForLists(listIds: listIds)
     }
     
     func fetchPlacesInViewport(viewport: (minLat: Double, maxLat: Double, minLng: Double, maxLng: Double), completion: @escaping ([PlaceAnnotation]?, Error?) -> Void) {
-        print("🔄 [PlaceService] Delegating fetchPlacesInViewport to Supabase...")
         Task { @MainActor in
             guard let authUserId = await SupabaseAuthService.shared.currentUserId else {
                 print("⚠️ [PlaceService] No auth userId available for viewport query")
@@ -197,7 +178,6 @@ class PlaceService: ObservableObject {
             do {
                 let profile = try await UserService.shared.fetchUserById(userId: authUserId)
                 profileUserId = profile.id
-                print("✅ [PlaceService] Using profile user ID: \(profileUserId)")
             } catch {
                 print("⚠️ [PlaceService] Could not fetch profile, using auth UID as fallback: \(authUserId)")
                 profileUserId = authUserId
@@ -224,7 +204,6 @@ class PlaceService: ObservableObject {
         do {
             let profile = try await UserService.shared.fetchUserById(userId: authUserId)
             profileUserId = profile.id
-            print("✅ [PlaceService] Using profile user ID: \(profileUserId)")
         } catch {
             print("⚠️ [PlaceService] Could not fetch profile, using auth UID as fallback: \(authUserId)")
             profileUserId = authUserId
@@ -241,19 +220,16 @@ class PlaceService: ObservableObject {
     
     /// Fetch full place details on demand (when user taps a marker)
     func fetchPlaceDetails(placeId: String) async throws -> DetailPlace? {
-        print("🔄 [PlaceService] Delegating fetchPlaceDetails to Supabase...")
         return try await supabase.fetchPlaceDetails(placeId: placeId)
     }
     
     /// Batch fetch full place details for multiple places
     func fetchPlaceDetailsBatch(placeIds: [String]) async throws -> [DetailPlace] {
-        print("🔄 [PlaceService] Delegating fetchPlaceDetailsBatch to Supabase...")
         return try await supabase.fetchPlaceDetailsBatch(placeIds: placeIds)
     }
     
     /// Fetch profile photos for all followed users (for custom annotation views)
     func fetchFollowedUsersPhotos(userId: String) async throws -> [FollowedUserPhoto] {
-        print("🔄 [PlaceService] Delegating fetchFollowedUsersPhotos to Supabase...")
         return try await supabase.fetchFollowedUsersPhotos(userId: userId)
     }
     
@@ -272,14 +248,12 @@ class PlaceService: ObservableObject {
     // now handles both user and friends' places in a single optimized query
     
     func addToAllPlaces(place: DetailPlace, completion: @escaping (Error?) -> Void) {
-        print("🔄 [PlaceService] Delegating addToAllPlaces to Supabase...")
         Task { @MainActor in
             SupabasePlaceService.shared.addToAllPlaces(place: place, completion: completion)
         }
     }
     
     func addToMyPlaces(userId: String, place: DetailPlace, completion: @escaping (Error?) -> Void) {
-        print("🔄 [PlaceService] Delegating addToMyPlaces to Supabase...")
         Task { @MainActor in
             SupabasePlaceService.shared.addToMyPlaces(userId: userId, place: place, completion: completion)
         }
@@ -329,14 +303,12 @@ class PlaceService: ObservableObject {
     }
     
     func deletePlaceFromMyPlaces(userId: String, placeId: String, completion: @escaping (Error?) -> Void) {
-        print("🔄 [PlaceService] Delegating deletePlaceFromMyPlaces to Supabase...")
         Task { @MainActor in
             SupabasePlaceService.shared.deletePlaceFromMyPlaces(userId: userId, placeId: placeId, completion: completion)
         }
     }
     
     func deletePlaceFromAllPlaces(placeId: String, completion: @escaping (Error?) -> Void) {
-        print("🔄 [PlaceService] Delegating deletePlaceFromAllPlaces to Supabase...")
         Task { @MainActor in
             SupabasePlaceService.shared.deletePlaceFromAllPlaces(placeId: placeId, completion: completion)
         }

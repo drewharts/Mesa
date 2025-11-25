@@ -49,7 +49,6 @@ class TravelTimeViewModel: ObservableObject {
             return
         }
         
-        print("🚗 [TravelTimeViewModel] Calculating travel time for '\(place.name)' to coordinates: lat=\(placeCoordinate.latitude), lon=\(placeCoordinate.longitude)")
 
         // Calculate travel times for all transport types
         MapKitService.shared.calculateTravelTimes(from: userCoordinate, to: placeCoordinate) { [weak self] results, error in
@@ -172,24 +171,18 @@ class TravelTimeViewModel: ObservableObject {
 
         // Define launch options based on current transport type.
         var launchOptions: [String: Any] = [:]
-
-        print("🗺️ [TravelTimeViewModel] Opening navigation with transport type: \(currentTransportType.displayName)")
-
+        
         switch currentTransportType {
         case .automobile:
             launchOptions = [MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeDriving]
-            print("🚗 [TravelTimeViewModel] Using driving directions")
         case .walking:
             launchOptions = [MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeWalking]
-            print("🚶 [TravelTimeViewModel] Using walking directions")
         case .transit:
             launchOptions = [MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeTransit]
-            print("🚇 [TravelTimeViewModel] Using transit directions")
         case .bicycle:
             // MapKit doesn't have bicycle directions, so we'll use walking directions
             // which is better than driving directions for cyclists
             launchOptions = [MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeWalking]
-            print("🚴 [TravelTimeViewModel] Using walking directions for bicycle (best available)")
         }
 
         // Launch Apple Maps with the specified options.

@@ -293,7 +293,7 @@ class SelectedPlaceViewModel: ObservableObject {
                 }
                 
             case .failure(let error):
-                print("❌ [SelectedPlaceViewModel] Failed to fetch fresh details for '\(place.name)': \(error.localizedDescription)")
+                print("❌ [SelectedPlaceViewModel] fetchPlaceDetails failed for '\(place.name)': \(error.localizedDescription)")
                 DispatchQueue.main.async {
                     guard self.selectedPlace?.id == place.id else { return }
 

@@ -70,7 +70,8 @@ class PlaceSearchService {
                 DispatchQueue.main.async {
                     onResultResolved(details)
                 }
-            case .failure(_):
+            case .failure(let error):
+                print("❌ [PlaceSearchService] fetchPlaceDetails failed: \(error.localizedDescription)")
                 // Error fetching place details - silently handle
                 break
             }

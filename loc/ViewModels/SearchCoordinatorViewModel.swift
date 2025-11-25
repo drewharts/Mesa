@@ -43,6 +43,7 @@ class SearchCoordinatorViewModel {
     func handlePlaceSelection(_ detailPlace: DetailPlace) -> CGFloat {
         selectedPlaceVM?.selectPlaceAndFetchDetails(detailPlace, shouldAnimateMap: true)
         selectedPlaceVM?.isDetailSheetPresented = true
+        
         return minSheetHeight
     }
     

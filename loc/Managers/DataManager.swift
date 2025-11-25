@@ -63,11 +63,7 @@ class DataManager: ObservableObject {
     
     /// Helper to measure loading time for performance monitoring
     private func measureLoadingTime<T>(_ operation: String, block: () async throws -> T) async rethrows -> T {
-        let start = CFAbsoluteTimeGetCurrent()
-        let result = try await block()
-        let end = CFAbsoluteTimeGetCurrent()
-        print("⏱️ [DataManager] \(operation) took \(String(format: "%.2f", end - start))s")
-        return result
+        return try await block()
     }
     
     /// Load essential user profile data and all place annotations at startup
@@ -360,7 +356,6 @@ class DataManager: ObservableObject {
     
     /// Refresh My Places data (for when user clicks on My Places)
     func refreshMyPlaces(userId: String) async {
-        print("🔄 [DataManager] Refreshing My Places data...")
         // Clear existing data and reload
         profileViewModel.myPlaces.removeAll()
         await loadUserMyPlaces(userId: userId)
@@ -368,7 +363,6 @@ class DataManager: ObservableObject {
     
     /// Refresh Reviewed Places data (for when user clicks on My Places)
     func refreshReviewedPlaces(userId: String) async {
-        print("🔄 [DataManager] Refreshing Reviewed Places data...")
         // Clear existing data and reload (server-side pagination)
         profileViewModel.lightweightReviewedPlaces.removeAll()
         profileViewModel.hasMoreReviews = true
@@ -506,11 +500,8 @@ class DataManager: ObservableObject {
         await MainActor.run {
             for list in sortedLists {
                 self.profileViewModel.loadedListIds.insert(list.id)
-                print("✅ [DataManager] Marked list '\(list.name)' as preloaded")
             }
         }
-        
-        print("✅ [DataManager] Finished preloading places for first \(sortedLists.count) lists")
     }
     
     // Optimized to process multiple places concurrently but with limits
@@ -864,13 +855,10 @@ class DataManager: ObservableObject {
         profileViewModel.isLoadingMorePlaceLists = true
         defer { 
             profileViewModel.isLoadingMorePlaceLists = false
-            print("✅ [DataManager] Pagination loading state cleaned up")
         }
         
         let nextPage = profileViewModel.placeListsCurrentPage + 1
         let pageSize = 6
-        
-        print("📄 [DataManager] Loading page \(nextPage) of place lists...")
         
         do {
             let moreLists = try await userService.fetchPlaceListsByProximity(
@@ -880,8 +868,6 @@ class DataManager: ObservableObject {
                 page: nextPage,
                 pageSize: pageSize
             )
-            
-            print("✅ [DataManager] Fetched \(moreLists.count) lists for page \(nextPage)")
             
             await MainActor.run {
                 // Update pagination state
@@ -898,10 +884,7 @@ class DataManager: ObservableObject {
                             profileViewModel.lightweightPlaceListCounts[list.list_id] = list.place_count
                         }
                     }
-                    
-                    print("✅ [DataManager] Added \(moreLists.count) more lists. Total: \(profileViewModel.lightweightPlaceLists.count)")
                 } else {
-                    print("ℹ️ [DataManager] No more lists returned, reached end of pagination")
                     profileViewModel.hasMorePlaceLists = false
                 }
             }
@@ -940,8 +923,6 @@ class DataManager: ObservableObject {
                 }
                 profileViewModel.lightweightPlaceListCounts = updatedCounts
             }
-            
-            print("✅ [DataManager] Loaded \(lists.count) place lists closest to place at (\(placeLatitude), \(placeLongitude))")
             
             // Load places for each list in background
             Task.detached(priority: .userInitiated) { [weak self] in
@@ -984,24 +965,18 @@ class DataManager: ObservableObject {
     
     /// Load the first 6 places for each place list (background task)
     func loadPlacesForLightweightList(listId: String) async {
-        print("📋 [DataManager] Loading places for list \(listId)...")
-        
         do {
             let places = try await userService.fetchPlacesForPlaceList(listId: listId, page: 1, pageSize: 6)
             
             await MainActor.run {
                 profileViewModel.lightweightPlaceListPlaces[listId] = places
             }
-            
-            print("✅ [DataManager] Loaded \(places.count) places for list \(listId)")
         } catch {
             print("❌ [DataManager] Error loading places for list \(listId): \(error.localizedDescription)")
         }
     }
     
     private func loadPlacesForLists(_ lists: [LightweightPlaceList]) async {
-        print("📋 [DataManager] Loading places for \(lists.count) lists...")
-        
         // Load all places in parallel, then batch update on main thread
         var allPlaces: [String: [LightweightPlace]] = [:]
         
@@ -1030,7 +1005,6 @@ class DataManager: ObservableObject {
         if !allTiktokUrls.isEmpty {
             Task {
                 await TikTokMetadataCache.shared.prefetchMetadata(for: Array(allTiktokUrls))
-                print("✅ [DataManager] Prefetched TikTok metadata for \(allTiktokUrls.count) URLs from place lists")
             }
         }
         
@@ -1040,8 +1014,6 @@ class DataManager: ObservableObject {
                 profileViewModel.lightweightPlaceListPlaces[listId] = places
             }
         }
-        
-        print("✅ [DataManager] Finished loading places for all lists")
     }
     
     // Loads all places the user has reviewed, even if not in favorites or lists

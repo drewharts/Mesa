@@ -27,7 +27,6 @@ struct locApp: App {
     
     init() {
         // Supabase is initialized via SupabaseManager.shared
-        print("🚀 Initializing app with Supabase")
         
         // Get services from container
         let services = ServiceContainer.shared
@@ -165,17 +164,13 @@ struct locApp: App {
                     if url.scheme == "loc" {
                         // Handle all deep links through DeepLinkViewModel
                         Task {
-                            print("🔗 Received deep link in onOpenURL: \(url)")
                             await deepLinkViewModel.processIncomingURL(url)
                         }
-                    } else {
-                        print("🔗 Received non-loc deep link: \(url)")
                     }
                 }
                 .onContinueUserActivity("com.mesa.share.tiktok") { userActivity in
                     // Handle TikTok share via NSUserActivity
                     if let tikTokURL = userActivity.userInfo?["tikTokURL"] as? String {
-                        print("🎵 Received TikTok URL via NSUserActivity: \(tikTokURL)")
                         let deepLinkURL = URL(string: "loc://share/tiktok?url=\(tikTokURL.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")")!
                         Task {
                             await deepLinkViewModel.processIncomingURL(deepLinkURL)
@@ -194,19 +189,14 @@ struct locApp: App {
     }
     
     private func checkForSharedTikTokURL() {
-        print("🔍 Checking for shared TikTok URLs...")
-        
         // Only use regular UserDefaults to avoid App Group errors
         if let regularURL = UserDefaults.standard.string(forKey: "sharedTikTokURL") {
-            print("🎵 Found TikTok URL in regular UserDefaults: \(regularURL)")
             UserDefaults.standard.removeObject(forKey: "sharedTikTokURL")
             
             let deepLinkURL = URL(string: "loc://share/tiktok?url=\(regularURL.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")")!
             Task {
                 await deepLinkViewModel.processIncomingURL(deepLinkURL)
             }
-        } else {
-            print("🔍 No TikTok URL found in UserDefaults")
         }
     }
 }
@@ -230,7 +220,6 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     private func requestNotificationPermissions(application: UIApplication) {
         let authOptions: UNAuthorizationOptions = [.alert, .badge, .sound]
         UNUserNotificationCenter.current().requestAuthorization(options: authOptions) { granted, error in
-            print("🔔 Notification permission granted: \(granted)")
             if let error = error {
                 print("❌ Error requesting notification permissions: \(error)")
                 return
@@ -240,7 +229,6 @@ class AppDelegate: NSObject, UIApplicationDelegate {
                 DispatchQueue.main.async {
                     // Register for remote notifications on main thread
                     application.registerForRemoteNotifications()
-                    print("📱 Registering for remote notifications...")
                 }
             } else {
                 print("⚠️ User denied notification permissions")
@@ -250,11 +238,8 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     
     // Called when APNs token is received
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
-        print("📱 APNS token received: \(deviceToken.map { String(format: "%02.2hhx", $0) }.joined())")
-        
         // TODO: Implement push notifications
         // You can use this token for APNs directly or another push service
-        print("⚠️ Push notifications need to be implemented")
     }
     
     // Called when registration for remote notifications fails
@@ -273,19 +258,15 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         
         // Handle Apple Sign-In URLs
         if url.scheme == "drewharts.locc" {
-            print("🍎 Received Apple Sign-In URL in AppDelegate: \(url)")
             return true
         }
         
         // Handle deep links for places
         if url.scheme == "loc" {
-            print("🔗 Received deep link in AppDelegate: \(url)")
             Task {
                 await deepLinkViewModel?.processIncomingURL(url)
             }
             return true
-        } else {
-            print("🔗 Received non-loc deep link in AppDelegate: \(url)")
         }
         
         return false
@@ -310,8 +291,6 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
         if let reviewId = userInfo["reviewId"] as? String,
            let placeId = userInfo["placeId"] as? String,
            let userId = userInfo["userId"] as? String {
-            print("👆 User tapped notification for review: \(reviewId) at place: \(placeId)")
-            
             // Use NotificationManager to coordinate navigation
             NotificationManager.shared.handleNotificationTap(
                 reviewId: reviewId,
@@ -325,8 +304,6 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
                 let placeId = userInfo["placeId"] as? String,
                 let type = userInfo["type"] as? String,
                 type == "comment" {
-            print("👆 User tapped notification for comment: \(commentId) on review: \(reviewId) at place: \(placeId)")
-            
             // For comments, we still navigate to the review (which will show the comments)
             // The reviewAuthorId is the person who should receive the notification
             let reviewAuthorId = userInfo["reviewAuthorId"] as? String ?? "unknown"
