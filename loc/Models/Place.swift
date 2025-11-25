@@ -6,7 +6,6 @@
 //
 
 import Foundation
-import FirebaseFirestore
 
 struct Place: Codable,Identifiable {
     var id: UUID = UUID()

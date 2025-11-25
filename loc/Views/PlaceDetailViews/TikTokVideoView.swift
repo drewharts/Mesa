@@ -9,17 +9,23 @@ import SwiftUI
 
 struct TikTokVideoView: View {
     @StateObject private var viewModel: TikTokVideoViewModel
+    @EnvironmentObject var userSession: UserSession
     @State private var refreshAttempted: Bool = false
     @State private var isPressed: Bool = false
+    @State private var showingDeleteConfirmation = false
 
     // Optional place for navigation instead of opening video
     let associatedPlace: DetailPlace?
     let onNavigateToPlace: ((DetailPlace) -> Void)?
+    let onDelete: (() -> Void)?
+    let showDeleteOption: Bool
 
-    init(tikTokVideo: TikTokVideo, associatedPlace: DetailPlace? = nil, onNavigateToPlace: ((DetailPlace) -> Void)? = nil) {
-        _viewModel = StateObject(wrappedValue: TikTokVideoViewModel(tikTokVideo: tikTokVideo))
+    init(tikTokVideo: TikTokVideo, externalPlaceId: String? = nil, associatedPlace: DetailPlace? = nil, onNavigateToPlace: ((DetailPlace) -> Void)? = nil, onDelete: (() -> Void)? = nil, showDeleteOption: Bool = false) {
+        _viewModel = StateObject(wrappedValue: TikTokVideoViewModel(tikTokVideo: tikTokVideo, externalPlaceId: externalPlaceId))
         self.associatedPlace = associatedPlace
         self.onNavigateToPlace = onNavigateToPlace
+        self.onDelete = onDelete
+        self.showDeleteOption = showDeleteOption
     }
     
     var body: some View {
@@ -33,6 +39,14 @@ struct TikTokVideoView: View {
                     .navigationBarHidden(true)
                     .ignoresSafeArea()
             }
+        }
+        .confirmationDialog("Delete TikTok", isPresented: $showingDeleteConfirmation, titleVisibility: .visible) {
+            Button("Delete", role: .destructive) {
+                onDelete?()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Are you sure you want to remove this TikTok from your saved places?")
         }
         .onChange(of: viewModel.tikTokVideo.thumbnailURL) { oldValue, newValue in
             if oldValue != newValue {
@@ -69,6 +83,25 @@ struct TikTokVideoView: View {
         .frame(width: 192, height: 192) // Match the visual size
         .contentShape(Rectangle()) // Make the entire frame tappable
         .gesture(
+            LongPressGesture(minimumDuration: 0.5)
+                .onEnded { _ in
+                    // Long press - show delete option
+                    if showDeleteOption {
+                        showingDeleteConfirmation = true
+                    }
+                }
+                .simultaneously(with: TapGesture()
+                    .onEnded { _ in
+                        // Regular tap - open video or navigate
+                        if let place = associatedPlace, let onNavigate = onNavigateToPlace {
+                            onNavigate(place)
+                        } else {
+                            viewModel.openVideo()
+                        }
+                    }
+                )
+        )
+        .simultaneousGesture(
             DragGesture(minimumDistance: 0)
                 .onChanged { _ in
                     if !isPressed {
@@ -81,13 +114,6 @@ struct TikTokVideoView: View {
                     withAnimation(.easeInOut(duration: 0.1)) {
                         isPressed = false
                     }
-
-                    // If we have an associated place, navigate to it instead of opening video
-                    if let place = associatedPlace, let onNavigate = onNavigateToPlace {
-                        onNavigate(place)
-                    } else {
-                        viewModel.openVideo()
-                    }
                 }
         )
     }
@@ -98,6 +124,23 @@ struct TikTokVideoView: View {
             .foregroundColor(.gray)
             .frame(maxWidth: 192, alignment: .leading)
             .lineLimit(1)
+    }
+}
+
+// MARK: - Associated Place Model
+struct TikTokAssociatedPlace: Identifiable, Codable {
+    let id: String
+    let name: String
+    let address: String?
+    let latitude: Double
+    let longitude: Double
+    
+    enum CodingKeys: String, CodingKey {
+        case id = "place_id"
+        case name = "place_name"
+        case address = "place_address"
+        case latitude
+        case longitude
     }
 }
 

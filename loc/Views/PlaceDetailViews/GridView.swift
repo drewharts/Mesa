@@ -10,8 +10,7 @@ import SwiftUI
 struct GridView: View {
     let images: [UIImage]
     let onImageTapped: (Int) -> Void
-
-    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
+    @ObservedObject var photosViewModel: PlacePhotosViewModel
     
     // For a 3-column grid
     let columns = [
@@ -37,15 +36,15 @@ struct GridView: View {
                 }
                 .onAppear {
                     // If this is the last image, load more
-                    if index == images.count - 1 && !selectedPlaceVM.allPhotosLoadedForCurrentPlace {
-                        selectedPlaceVM.loadMorePhotos()
+                    if index == images.count - 1 && !photosViewModel.allPhotosLoadedForCurrentPlace {
+                        photosViewModel.loadMorePhotos()
                     }
                 }
             }
         }
         
         // Show a progress indicator if more photos are being loaded
-        if selectedPlaceVM.photoLoadingState == .loading && !images.isEmpty {
+        if photosViewModel.photoLoadingState == .loading && !images.isEmpty {
             ProgressView()
                 .padding()
         }

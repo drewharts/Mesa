@@ -7,7 +7,6 @@
 
 import Foundation
 import UIKit
-import FirebaseStorage
 import Combine
 
 class PlaceListViewModel: ObservableObject, Identifiable {
@@ -40,7 +39,7 @@ class PlaceListViewModel: ObservableObject, Identifiable {
     // Load the place lists from Firestore.
     func loadPlaceLists() {
         print("📋 Loading place list: \(placeList.name) for user: \(userId)")
-        placeService.fetchList(userId: userId, listName: placeList.name) { [weak self] result in
+        placeService.fetchList(userId: userId, listId: placeList.id.uuidString) { [weak self] result in
             switch result {
             case .success(let fetchedPlaceList):
                 print("✅ Successfully loaded list: \(fetchedPlaceList.name) with \(fetchedPlaceList.places.count) places")

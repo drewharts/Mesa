@@ -61,17 +61,20 @@ struct UserProfileActivityView: View {
                                     }
                                 }
                                 
-                                // Loading indicator for pagination
+                                // Loading indicator at bottom of content (enterprise-quality)
                                 if UserProfileVM.isLoadingMoreReviews {
                                     HStack {
-                                        ProgressView()
-                                            .scaleEffect(0.8)
-                                        Text("Loading more...")
-                                            .font(.caption)
-                                            .foregroundColor(.gray)
+                                        Spacer()
+                                        VStack(spacing: 12) {
+                                            ProgressView()
+                                                .scaleEffect(1.0)
+                                            Text("Loading...")
+                                                .font(.subheadline)
+                                                .foregroundColor(.secondary)
+                                        }
+                                        .padding(.vertical, 30)
+                                        Spacer()
                                     }
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 20)
                                     .gridCellColumns(2)
                                 }
                             }

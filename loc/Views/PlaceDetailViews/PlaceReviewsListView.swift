@@ -1,65 +1,55 @@
+//
+//  PlaceReviewsListView.swift
+//  loc
+//
+//  Refactored to use ViewModel, comments removed for simplification
+//
+
 import SwiftUI
 import UIKit
 
 struct PlaceReviewsListView : View {
+    @ObservedObject var viewModel: PlaceReviewsViewModel
+    let onPhotoTapped: ([UIImage], Int) -> Void
+    let scrollProxy: ScrollViewProxy
+    
     @EnvironmentObject var userProfileViewModel: UserProfileViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var userSession: UserSession
-    @EnvironmentObject var notificationManager: NotificationManager
-    var reviews: [any ReviewProtocol]
-    @State private var activeKeyboardReviewId: String? = nil
-    let onPhotoTapped: ([UIImage], Int) -> Void
-    let scrollProxy: ScrollViewProxy
+    
     @State private var reviewToDelete: (any ReviewProtocol)? = nil
     @State private var showDeleteConfirmation = false
 
     var body: some View {
-        ForEach(reviews, id: \.id) { review in
+        ForEach(viewModel.reviews, id: \.id) { review in
             Group {
                 if let restaurantReview = review as? RestaurantReview {
-                    RestaurantReviewView(review: restaurantReview,
-                                       onPhotoTapped: onPhotoTapped,
-                                       isActiveKeyboard: Binding(
-                                          get: { activeKeyboardReviewId == review.id },
-                                          set: { isActive in
-                                              if isActive {
-                                                  activeKeyboardReviewId = review.id
-                                                  scrollToReview(review.id, proxy: scrollProxy)
-                                              } else if activeKeyboardReviewId == review.id {
-                                                  activeKeyboardReviewId = nil
-                                              }
-                                          }
-                                       ))
-                        
+                    RestaurantReviewView(
+                        review: restaurantReview,
+                        viewModel: viewModel,
+                        onPhotoTapped: onPhotoTapped
+                    )
                         .id(review.id)
                         .padding(.horizontal)
                         .padding(.vertical, 8)
-                        .background(notificationManager.highlightedReviewId == review.id ? 
+                    .background(viewModel.highlightedReviewId == review.id ? 
                                    Color.blue.opacity(0.1) : Color.white)
                         .cornerRadius(10)
-                        .animation(.easeInOut(duration: 0.3), value: notificationManager.highlightedReviewId)
+                    .animation(.easeInOut(duration: 0.3), value: viewModel.highlightedReviewId)
                 } else if let genericReview = review as? GenericReview {
-                    GenericReviewView(review: genericReview,
-                                    onPhotoTapped: onPhotoTapped,
-                                    isActiveKeyboard: Binding(
-                                       get: { activeKeyboardReviewId == review.id },
-                                       set: { isActive in
-                                           if isActive {
-                                               activeKeyboardReviewId = review.id
-                                               scrollToReview(review.id, proxy: scrollProxy)
-                                           } else if activeKeyboardReviewId == review.id {
-                                               activeKeyboardReviewId = nil
-                                           }
-                                       }
-                                    ))
+                    GenericReviewView(
+                        review: genericReview,
+                        viewModel: viewModel,
+                        onPhotoTapped: onPhotoTapped
+                    )
                         .environmentObject(userProfileViewModel)
                         .id(review.id)
                         .padding(.horizontal)
                         .padding(.vertical, 8)
-                        .background(notificationManager.highlightedReviewId == review.id ? 
+                    .background(viewModel.highlightedReviewId == review.id ? 
                                    Color.blue.opacity(0.1) : Color.white)
                         .cornerRadius(10)
-                        .animation(.easeInOut(duration: 0.3), value: notificationManager.highlightedReviewId)
+                    .animation(.easeInOut(duration: 0.3), value: viewModel.highlightedReviewId)
                 }
             }
             .onLongPressGesture(minimumDuration: 0.5) {

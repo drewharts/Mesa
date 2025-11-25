@@ -6,7 +6,6 @@
 
 import SwiftUI
 import PhotosUI
-import FirebaseFirestore
 
 struct ProfileView: View {
     @Environment(\.presentationMode) var presentationMode: Binding<PresentationMode>
@@ -16,12 +15,16 @@ struct ProfileView: View {
     @EnvironmentObject var placeVM: DetailPlaceViewModel
     @EnvironmentObject var userProfileViewModel: UserProfileViewModel
     @EnvironmentObject var deepLinkViewModel: DeepLinkViewModel
+    @EnvironmentObject var dataManager: DataManager
     @StateObject private var photoImportVM = PhotoImportViewModel()
+    @StateObject private var tikTokService = TikTokService()
     
     @State private var showCreateReview = false
     @State private var selectedReviewType: CreatePlaceReviewView.ReviewType = .restaurant
     @State private var reviewWasSubmitted = false
-    @StateObject private var tikTokService = TikTokService()
+    
+    // Track if we've already done initial data refresh
+    @State private var hasRefreshedPlaces = false
 
     init() {
         // Configure navigation bar appearance to remove the bottom border
@@ -30,14 +33,25 @@ struct ProfileView: View {
     }
 
     var body: some View {
-        mainContent
-            .navigationBarBackButtonHidden(true)
-            .preferredColorScheme(.light)
-            .navigationBarTitleDisplayMode(.inline)
-            .modifier(ToolbarModifier(
-                presentationMode: presentationMode,
-                photoImportVM: photoImportVM
-            ))
+        NavigationStack {
+            mainContent
+                .navigationBarBackButtonHidden(true)
+                .preferredColorScheme(.light)
+                .navigationBarTitleDisplayMode(.inline)
+                .modifier(ToolbarModifier(
+                    presentationMode: presentationMode,
+                    photoImportVM: photoImportVM
+                ))
+                .navigationDestination(isPresented: $userProfileViewModel.isUserDetailPresented) {
+                    UserProfileView(
+                        userId: userSession.currentUserId ?? "",
+                        UserProfileVM: userProfileViewModel
+                    )
+                    .environmentObject(profile)
+                    .environmentObject(selectedPlaceVM)
+                    .environmentObject(placeVM)
+                }
+        }
             .modifier(SheetsModifier(
                 photoImportVM: photoImportVM,
                 profile: profile,
@@ -54,7 +68,8 @@ struct ProfileView: View {
                 placeVM: placeVM,
                 showCreateReview: $showCreateReview,
                 reviewWasSubmitted: $reviewWasSubmitted,
-                tikTokService: tikTokService
+                tikTokService: tikTokService,
+                hasRefreshedPlaces: $hasRefreshedPlaces
             ))
             .alert("No Location Found", isPresented: $deepLinkViewModel.showNoLocationAlert) {
                 Button("OK") {
@@ -206,6 +221,7 @@ struct SheetsModifier: ViewModifier {
     @Binding var showCreateReview: Bool
     let selectedReviewType: CreatePlaceReviewView.ReviewType
     @EnvironmentObject var userSession: UserSession
+    @EnvironmentObject var dataManager: DataManager
     @Binding var reviewWasSubmitted: Bool
     let onGenericReview: () -> Void
     let onRestaurantReview: () -> Void
@@ -227,6 +243,8 @@ struct SheetsModifier: ViewModifier {
                     .environmentObject(profile)
                     .environmentObject(selectedPlaceVM)
                     .environmentObject(placeVM)
+                    .environmentObject(dataManager)
+                    .environmentObject(userSession)
                     .presentationDragIndicator(.visible)
             }
             .sheet(isPresented: $profile.isShowingNoPlacesFound) {
@@ -299,11 +317,14 @@ struct StateChangesModifier: ViewModifier {
     @Binding var showCreateReview: Bool
     @Binding var reviewWasSubmitted: Bool
     @ObservedObject var tikTokService: TikTokService
+    @Binding var hasRefreshedPlaces: Bool  // Track if refresh already happened
     
     func body(content: Content) -> some View {
         content
-            .task {
-                await profile.refreshUserPlaces()
+            .onAppear {
+                // Places are already loaded in startup phase - no need to refresh again
+                // This was causing 1.7s delay on profile view appearance
+                // External places (TikTok) are loaded on-demand when user swipes to that tab
             }
             .onChange(of: photoImportVM.selectedItems) {
                 Task {
@@ -331,7 +352,7 @@ struct StateChangesModifier: ViewModifier {
     
     private func setupCallbacks() {
         photoImportVM.onPlaceSaved = {
-            Task {
+            Task.detached(priority: .utility) {
                 await profile.refreshUserPlaces()
             }
         }
@@ -361,7 +382,8 @@ struct StateChangesModifier: ViewModifier {
            let place = photoImportVM.createdPlaceForDetail,
            !photoImportVM.isInPhotoImportFlow {
             
-            selectedPlaceVM.selectedPlace = place
+            // Animate map to newly created place location and fetch fresh details
+            selectedPlaceVM.selectPlaceAndFetchDetails(place, shouldAnimateMap: true)
             selectedPlaceVM.isDetailSheetPresented = true
             
             photoImportVM.shouldNavigateToPlaceDetail = false

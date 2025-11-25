@@ -6,75 +6,125 @@
 //
 
 import Foundation
-import MapboxSearch
 import CoreLocation
 import UIKit
-import FirebaseAuth
-import FirebaseFirestore
 
+// MARK: - Services
+// Note: MesaBackendService import should be available via project imports
 
+@MainActor
 class SelectedPlaceViewModel: ObservableObject {
     private let reviewService: ReviewService
     private let userService: UserService
     private let placeService: PlaceService
     private let imageService: ImageService
-    
+    private let mesaBackendService: MesaBackendService
+
     private let locationManager: LocationManager
-    
+    private weak var detailPlaceViewModel: DetailPlaceViewModel?
+
+    init(locationManager: LocationManager, reviewService: ReviewService, placeService: PlaceService, userService: UserService, imageService: ImageService, mesaBackendService: MesaBackendService = MesaBackendService(), detailPlaceViewModel: DetailPlaceViewModel? = nil) {
+        self.locationManager = locationManager
+        self.reviewService = reviewService
+        self.placeService = placeService
+        self.userService = userService
+        self.imageService = imageService
+        self.mesaBackendService = mesaBackendService
+        self.detailPlaceViewModel = detailPlaceViewModel
+    }
+
+    private var isUpdatingPlaceDetails = false
+    private var isFetchingFreshDetails = false
+
     @Published var selectedPlace: DetailPlace? {
         didSet {
-            if let place = selectedPlace,
-               let currentLocation = locationManager.currentLocation {
-                loadData(for: place, currentLocation: currentLocation.coordinate)
-                loadReviews(for: place)
-                
-                // Reset photo loading state for new place
-                resetPhotoLoading()
-                getPlacePhotos(for: place)
-                
-                // Clear previous likes when loading a new place
-                likedReviews.removeAll()
+            guard !isUpdatingPlaceDetails else { return }
+            handleSelectedPlaceChange()
+        }
+    }
+
+    private func handleSelectedPlaceChange() {
+        guard let place = selectedPlace else { return }
+        guard let currentLocation = locationManager.currentLocation else { return }
+
+        if placeNeedsCompleteDetails(place) {
+            handlePlaceWithIncompleteDetails(place, currentLocation: currentLocation.coordinate)
+        } else {
+            continueWithPlaceSetup(place: place, currentLocation: currentLocation.coordinate)
+        }
+    }
+
+    private func handlePlaceWithIncompleteDetails(_ place: DetailPlace, currentLocation: CLLocationCoordinate2D) {
+        if isFetchingFreshDetails {
+            continueWithPlaceSetup(place: place, currentLocation: currentLocation)
+            return
+        }
+
+        fetchCompletePlaceDetails(for: place) { [weak self] updatedPlace in
+            guard let self = self else { return }
+
+            DispatchQueue.main.async {
+                if let updatedPlace = updatedPlace {
+                    self.isUpdatingPlaceDetails = true
+                    self.selectedPlace = updatedPlace
+                    self.isUpdatingPlaceDetails = false
+                    self.continueWithPlaceSetup(place: updatedPlace, currentLocation: currentLocation)
+                } else {
+                    print("❌ [SelectedPlaceViewModel] Failed to get complete details, continuing with current data")
+                    self.continueWithPlaceSetup(place: place, currentLocation: currentLocation)
+                }
+            }
+        }
+    }
+
+    private func placeNeedsCompleteDetails(_ place: DetailPlace) -> Bool {
+        let missingRating = place.rating == nil
+        let missingReviewCount = place.userRatingsTotal == nil
+        let missingCategories = place.categories == nil || place.categories?.isEmpty == true
+        return missingRating || missingReviewCount || missingCategories
+    }
+
+    private func continueWithPlaceSetup(place: DetailPlace, currentLocation: CLLocationCoordinate2D) {
+        loadData(for: place, currentLocation: currentLocation)
+        
+        // Load reviews (photos will be loaded automatically by PlacePhotosViewModel)
+        loadReviews(for: place)
+
+        // Set Google rating from the place data
+        placeRating = place.rating ?? 0
+
+        // Clear previous likes when loading a new place
+        likedReviews.removeAll()
+    }
+
+    private func fetchCompletePlaceDetails(for place: DetailPlace, completion: @escaping (DetailPlace?) -> Void) {
+        // Backend now accepts UUID and handles everything automatically
+        let placeId = place.id.uuidString
+
+        mesaBackendService.fetchPlaceDetails(placeId: placeId, source: "google") { result in
+            switch result {
+            case .success(let completePlace):
+                completion(completePlace)
+            case .failure(let error):
+                completion(nil)
             }
         }
     }
     @Published var isDetailSheetPresented: Bool = false
     @Published var isRestaurantOpen: Bool = false // New property to track open status
     @Published var allowAutoPresent: Bool = true
-    @Published private var placePhotos: [String: [UIImage]] = [:] // Cache for place-level photos by placeId
+    @Published var shouldAnimateMapToPlace: Bool = false // Track if map should animate to place location
     @Published private var placeReviews: [String: [any ReviewProtocol]] = [:] // Cache for reviews by placeId
-    @Published private var reviewPhotos: [String: [UIImage]] = [:] // Cache for review photos by reviewId
-    @Published private var userProfilePhotos: [String: UIImage] = [:] // Cache for profile photos by userId
+    @Published private var placeTikToks: [String: [TikTokVideo]] = [:] // Cache for TikToks by placeId
     @Published private var restaurantTypes: [String: String] = [:] // Dictionary to store restaurant types by placeId
     
     @Published var placeRating: Double = 0
     
-    @Published private var photoLoadingStates: [String: LoadingState] = [:] // Loading states for place photos
-    @Published private var reviewPhotoLoadingStates: [String: LoadingState] = [:] // Loading states for review photos
-    @Published private var profilePhotoLoadingStates: [String: LoadingState] = [:] // Loading states for profile photos
     @Published private var reviewLoadingStates: [String: LoadingState] = [:] // Loading states for reviews
     @Published var isCurrentPlaceFullyLoaded: Bool = false
-
-    // Add pagination properties for photos
-    @Published private var photoPageLimit = 9
-    @Published private var lastPhotoDocument: DocumentSnapshot?
-    @Published private var allPhotosLoaded = false
     
     // Add new property to track liked reviews
     @Published private var likedReviews: Set<String> = []
-
-    // MARK: - Comment Management Properties
-    private var placeReviewComments: [String: [Comment]] = [:] // reviewId -> comments
-    private var commentLoadingStates: [String: LoadingState] = [:] // reviewId -> loading state
-    private var commentPhotos: [String: [UIImage]] = [:] // commentId -> photos
-    private var reviewCommentCounts: [String: Int] = [:] // reviewId -> comment count
-    
-    init(locationManager: LocationManager, reviewService: ReviewService, placeService: PlaceService, userService: UserService, imageService: ImageService) {
-        self.locationManager = locationManager
-        self.reviewService = reviewService
-        self.placeService = placeService
-        self.userService = userService
-        self.imageService = imageService
-    }
 
     // MARK: - Loading State Enum
     enum LoadingState: Equatable {
@@ -107,19 +157,11 @@ class SelectedPlaceViewModel: ObservableObject {
             return
         }
         
-        let photoState = photoLoadingStates[placeId] ?? .idle
         let reviewState = reviewLoadingStates[placeId] ?? .idle
-        
-        // Consider loaded if both photos and reviews are either loaded or in error state
+
+        // Consider loaded if reviews are either loaded or in error state
         // (we don't want to wait forever if there's an error)
-        let photosReady: Bool
-        switch photoState {
-        case .loaded, .error:
-            photosReady = true
-        case .idle, .loading:
-            photosReady = false
-        }
-        
+        // Photos are managed independently by PlacePhotosViewModel
         let reviewsReady: Bool
         switch reviewState {
         case .loaded, .error:
@@ -127,13 +169,15 @@ class SelectedPlaceViewModel: ObservableObject {
         case .idle, .loading:
             reviewsReady = false
         }
-        
+
+        // Note: Photos are loaded separately by PlacePhotosViewModel and don't block
+        // the main place detail view from loading. Each section shows its own loading state.
+
         let wasLoaded = isCurrentPlaceFullyLoaded
-        isCurrentPlaceFullyLoaded = photosReady && reviewsReady
+        isCurrentPlaceFullyLoaded = reviewsReady
         
         // Debug logging when the state changes
-        if !wasLoaded && isCurrentPlaceFullyLoaded {
-        }
+        // Place is now fully loaded
     }
     
     // Calculate restaurant type and store in dictionary
@@ -156,12 +200,110 @@ class SelectedPlaceViewModel: ObservableObject {
         
         DispatchQueue.main.async {
             self.isRestaurantOpen = openNow
-            if self.allowAutoPresent {
+            // Only auto-present if allowed and not already presented
+            if self.allowAutoPresent && !self.isDetailSheetPresented {
                 self.isDetailSheetPresented = true
             }
             self.updateCurrentPlaceFullyLoaded()
         }
     }
+    
+    /// Lazy load external ratings (Google/Mapbox) if they're missing
+    private func refreshExternalRatingsIfNeeded(for place: DetailPlace) {
+        // Skip if we already have valid ratings (rating > 0 and count exists)
+        if let rating = place.rating, rating > 0, place.userRatingsTotal != nil {
+            return
+        }
+        
+        // Backend now accepts UUID and handles everything automatically
+        let placeId = place.id.uuidString
+        
+        mesaBackendService.fetchPlaceDetails(placeId: placeId, source: "google") { [weak self] result in
+            guard let self = self else { return }
+            
+            switch result {
+            case .success(let updatedPlace):
+                DispatchQueue.main.async {
+                    // Only update if this is still the selected place
+                    guard self.selectedPlace?.id == place.id else {
+                        return
+                    }
+                    
+                    // Update the selected place with fresh ratings
+                    var updatedSelectedPlace = self.selectedPlace
+                    updatedSelectedPlace?.rating = updatedPlace.rating
+                    updatedSelectedPlace?.userRatingsTotal = updatedPlace.userRatingsTotal
+                    
+                    self.selectedPlace = updatedSelectedPlace
+                    
+                    // Update Firestore in background (non-blocking)
+                    if let placeToUpdate = updatedSelectedPlace {
+                        self.updatePlaceInFirestore(placeToUpdate)
+                    }
+                }
+                
+            case .failure(let error):
+                print("❌ [SelectedPlaceViewModel] Failed to fetch ratings for '\(place.name)': \(error.localizedDescription)")
+            }
+        }
+    }
+    
+    /// Update place in Firestore with fresh data
+    private func updatePlaceInFirestore(_ place: DetailPlace) {
+        placeService.updatePlace(place: place) { error in
+            if let error = error {
+                print("❌ [SelectedPlaceViewModel] Failed to update place in Firestore: \(error.localizedDescription)")
+            }
+        }
+    }
+    
+    /// Select a place and fetch fresh details from backend
+    /// Use this when a user clicks on a place from lists, maps, etc.
+    func selectPlaceAndFetchDetails(_ place: DetailPlace, shouldAnimateMap: Bool = true) {
+        // Backend now accepts UUID and handles everything automatically
+        // Just send the UUID as place_id and "google" as provider
+        let placeId = place.id.uuidString
+
+        DispatchQueue.main.async {
+            self.isFetchingFreshDetails = true
+            self.selectedPlace = place
+            self.shouldAnimateMapToPlace = shouldAnimateMap
+        }
+
+        mesaBackendService.fetchPlaceDetails(placeId: placeId, source: "google") { [weak self] result in
+            guard let self = self else { return }
+            
+            switch result {
+            case .success(let freshPlace):
+                DispatchQueue.main.async {
+                    guard self.selectedPlace?.id == place.id else {
+                        return
+                    }
+
+                    self.isFetchingFreshDetails = false
+
+                    // Preserve the original ID and merge fresh data
+                    var updatedPlace = freshPlace
+                    updatedPlace.id = place.id
+                    
+                    self.selectedPlace = updatedPlace
+                    
+                    // Update Firestore in background
+                    self.updatePlaceInFirestore(updatedPlace)
+                }
+                
+            case .failure(let error):
+                print("❌ [SelectedPlaceViewModel] fetchPlaceDetails failed for '\(place.name)': \(error.localizedDescription)")
+                DispatchQueue.main.async {
+                    guard self.selectedPlace?.id == place.id else { return }
+
+                    self.isFetchingFreshDetails = false
+                    self.handleSelectedPlaceChange()
+                }
+            }
+        }
+    }
+    
     
     func isRestaurantOpenNow(_ place: DetailPlace) -> Bool {
         guard let openHours = place.openHours, !openHours.isEmpty else { return false }
@@ -212,411 +354,50 @@ class SelectedPlaceViewModel: ObservableObject {
             self.reviewLoadingStates[placeId] = .loading
         }
         
-        // Use the user's ID to get only reviews from followed users
-        guard let currentUserId = Auth.auth().currentUser?.uid else {
-            print("Error: Current user ID is not available")
-            DispatchQueue.main.async {
+        // Use Task to handle async call to get current user ID
+        Task { @MainActor in
+            guard let currentUserId = await SupabaseAuthService.shared.currentUserId else {
+                print("Error: Current user ID is not available")
                 self.reviewLoadingStates[placeId] = .error(NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "User not logged in"]))
                 self.placeReviews[placeId] = []
                 self.updateCurrentPlaceFullyLoaded()
+                return
             }
-            return
-        }
-        
-        // Use the new method to fetch reviews from friends and the current user (both restaurant and generic)
-        userService.fetchFriendsReviews(placeId: placeId, currentUserId: currentUserId) { [weak self] reviews, error in
-            guard let self = self else { return }
             
-            DispatchQueue.main.async {
-                if let error = error {
-                    print("Error fetching reviews for place \(place.name): \(error.localizedDescription)")
+            self.loadReviewsWithUserId(placeId: placeId, currentUserId: currentUserId)
+        }
+    }
+    
+    private func loadReviewsWithUserId(placeId: String, currentUserId: String) {
+        
+        // Fetch reviews AND TikToks for the specific place in a single query
+        Task {
+            do {
+                let (reviews, tiktoks) = try await reviewService.fetchPlaceReviews(placeId: placeId, latestOnly: false)
+                
+                await MainActor.run {
+                    self.placeReviews[placeId] = reviews
+                    self.placeTikToks[placeId] = tiktoks // Store TikToks
+                    self.reviewLoadingStates[placeId] = .loaded
+                    
+                    // Photos are loaded automatically by PlacePhotosViewModel via observers
+                    
+                    self.updateCurrentPlaceFullyLoaded()
+                }
+            } catch {
+                await MainActor.run {
+                    print("❌ [SelectedPlaceViewModel] Error fetching reviews/TikToks for place \(placeId): \(error.localizedDescription)")
                     self.reviewLoadingStates[placeId] = .error(error)
                     self.placeReviews[placeId] = []
-                    self.updateCurrentPlaceFullyLoaded()
-                } else {
-                    let fetchedReviews = reviews ?? []
-                    self.placeReviews[placeId] = fetchedReviews
-                    if self.selectedPlace?.id.uuidString == placeId {
-                        self.placeRating = self.calculateAvgRating(for: placeId)
-                    }
+                    self.placeTikToks[placeId] = []
                     
-                    fetchedReviews.forEach { review in
-                        self.loadReviewPhotos(for: review)
-                        self.loadProfilePhoto(for: review)
-                        self.loadCommentCountForReview(placeId: placeId, reviewId: review.id)
-                    }
-                    self.reviewLoadingStates[placeId] = .loaded
                     self.updateCurrentPlaceFullyLoaded()
                 }
             }
         }
     }
     
-    private func calculateAvgRating(for placeId: String) -> Double {
-        guard let reviews = placeReviews[placeId], !reviews.isEmpty else { return 0 }
-        
-        // Filter restaurant reviews
-        let restaurantReviews = reviews.compactMap { $0 as? RestaurantReview }
-        
-        // If we have restaurant reviews, calculate based on food rating
-        if !restaurantReviews.isEmpty {
-            let total = restaurantReviews.reduce(into: 0.0) { result, review in
-                result += review.foodRating
-            }
-            return total / Double(restaurantReviews.count)
-        }
-        
-        // If no restaurant reviews, check for generic reviews
-        let genericReviews = reviews.compactMap { $0 as? GenericReview }
-        if !genericReviews.isEmpty {
-            // For generic reviews, we could use a default rating or a different calculation
-            // For now, we'll return a default value
-            return 0.0
-        }
-        
-        return 0.0
-    }
     
-    // MARK: - Photo Loading
-    
-    private func resetPhotoLoading() {
-        if let placeId = selectedPlace?.id.uuidString {
-            placePhotos[placeId]?.removeAll()
-            photoLoadingStates[placeId] = .idle
-            lastPhotoDocument = nil
-            allPhotosLoaded = false
-        }
-    }
-    
-    func loadMorePhotos() {
-        guard let place = selectedPlace, !allPhotosLoaded else {
-            return
-        }
-        
-        getPlacePhotos(for: place, loadMore: true)
-    }
-
-    private func getPlacePhotos(for place: DetailPlace, loadMore: Bool = false) {
-        let placeId = place.id.uuidString
-        
-        // Don't fetch if already loading
-        if photoLoadingStates[placeId] == .loading && !loadMore {
-            return
-        }
-        
-        DispatchQueue.main.async {
-            self.photoLoadingStates[placeId] = .loading
-        }
-        
-        // Use the same review fetching logic to get photo URLs
-        userService.fetchFriendsReviews(placeId: placeId, currentUserId: Auth.auth().currentUser?.uid ?? "") { [weak self] reviews, error in
-            guard let self = self else { return }
-            
-            if let error = error {
-                print("Error fetching reviews for place \(placeId): \(error.localizedDescription)")
-                DispatchQueue.main.async {
-                    self.photoLoadingStates[placeId] = .error(error)
-                    self.updateCurrentPlaceFullyLoaded()
-                }
-                return
-            }
-            
-            var photoURLs: [String] = []
-            for review in reviews ?? [] {
-                photoURLs.append(contentsOf: review.images)
-            }
-            
-            // If no photos found in any reviews, mark as loaded
-            if photoURLs.isEmpty {
-                DispatchQueue.main.async {
-                    self.photoLoadingStates[placeId] = .loaded
-                    self.placePhotos[placeId] = []
-                    self.allPhotosLoaded = true
-                    self.updateCurrentPlaceFullyLoaded()
-                }
-                return
-            }
-            
-            // Paginate the photo URLs
-            let startIndex = self.placePhotos[placeId]?.count ?? 0
-            let endIndex = min(startIndex + self.photoPageLimit, photoURLs.count)
-            
-            guard startIndex < endIndex else {
-                // No more photos to load
-                self.allPhotosLoaded = true
-                self.photoLoadingStates[placeId] = .loaded
-                self.updateCurrentPlaceFullyLoaded()
-                return
-            }
-            
-            let urlsToFetch = Array(photoURLs[startIndex..<endIndex])
-            
-            imageService.fetchPhotosFromStorage(urls: urlsToFetch) { [weak self] images, error in
-                guard let self = self else { return }
-                
-                DispatchQueue.main.async {
-                    if let error = error {
-                        print("Error fetching photos for place \(placeId): \(error.localizedDescription)")
-                        self.photoLoadingStates[placeId] = .error(error)
-                        self.updateCurrentPlaceFullyLoaded()
-                    } else {
-                        var currentPhotos = self.placePhotos[placeId] ?? []
-                        currentPhotos.append(contentsOf: images ?? [])
-                        self.placePhotos[placeId] = currentPhotos
-                        self.photoLoadingStates[placeId] = .loaded
-                        
-                        // Check if all photos have been loaded
-                        if currentPhotos.count >= photoURLs.count {
-                            self.allPhotosLoaded = true
-                        }
-                        self.updateCurrentPlaceFullyLoaded()
-                    }
-                }
-            }
-        }
-    }
-    
-    private func loadReviewPhotos<T: ReviewProtocol>(for review: T) {
-        let reviewId = review.id
-        guard !review.images.isEmpty else {
-            DispatchQueue.main.async {
-                self.reviewPhotos[reviewId] = []
-                self.reviewPhotoLoadingStates[reviewId] = .loaded
-            }
-            return
-        }
-        
-        DispatchQueue.main.async {
-            self.reviewPhotoLoadingStates[reviewId] = .loading
-        }
-        
-        imageService.fetchPhotosFromStorage(urls: review.images) { [weak self] images, error in
-            guard let self = self else { return }
-            
-            DispatchQueue.main.async {
-                if let error = error {
-                    print("Error fetching photos for review \(reviewId): \(error.localizedDescription)")
-                    self.reviewPhotoLoadingStates[reviewId] = .error(error)
-                    self.reviewPhotos[reviewId] = []
-                } else {
-                    self.reviewPhotos[reviewId] = images ?? []
-                    self.reviewPhotoLoadingStates[reviewId] = .loaded
-                }
-            }
-        }
-    }
-    
-    // Public method to reload review photos
-    func reloadReviewPhotos<T: ReviewProtocol>(for review: T) {
-        self.loadReviewPhotos(for: review)
-    }
-    
-    private func loadProfilePhoto<T: ReviewProtocol>(for review: T) {
-        let userId = review.userId
-        let photoUrlString = review.profilePhotoUrl
-        
-        guard !photoUrlString.isEmpty else {
-            DispatchQueue.main.async {
-                self.profilePhotoLoadingStates[userId] = .loaded
-                self.userProfilePhotos[userId] = nil
-            }
-            return
-        }
-        
-        if userProfilePhotos[userId] != nil {
-            return
-        }
-        
-        DispatchQueue.main.async {
-            self.profilePhotoLoadingStates[userId] = .loading
-        }
-        
-        guard let url = URL(string: photoUrlString) else {
-            DispatchQueue.main.async {
-                self.profilePhotoLoadingStates[userId] = .error(NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid profile photo URL"]))
-                self.userProfilePhotos[userId] = nil
-            }
-            return
-        }
-        
-        URLSession.shared.dataTask(with: url) { [weak self] data, response, error in
-            guard let self = self else { return }
-            
-            DispatchQueue.main.async {
-                if let error = error {
-                    print("Error fetching profile photo for user \(userId): \(error.localizedDescription)")
-                    self.profilePhotoLoadingStates[userId] = .error(error)
-                    self.userProfilePhotos[userId] = nil
-                } else if let data = data, let image = UIImage(data: data) {
-                    self.userProfilePhotos[userId] = image
-                    self.profilePhotoLoadingStates[userId] = .loaded
-                } else {
-                    self.profilePhotoLoadingStates[userId] = .error(NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to decode profile photo"]))
-                    self.userProfilePhotos[userId] = nil
-                }
-            }
-        }.resume()
-    }
-    
-    // Update the method to take userId as parameter
-    func checkLikeStatuses(userId: String) {
-        guard let placeId = selectedPlace?.id.uuidString,
-              let reviews = placeReviews[placeId] else { return }
-        
-        // Clear previous likes before checking
-        likedReviews.removeAll()
-        
-        reviews.forEach { review in
-            reviewService.hasUserLikedReview(userId: userId, reviewId: review.id) { [weak self] isLiked in
-                DispatchQueue.main.async {
-                    if isLiked {
-                        self?.likedReviews.insert(review.id)
-                    }
-                }
-            }
-        }
-    }
-    
-    // MARK: - Comment Methods
-    
-    func loadCommentsForReview(reviewId: String) {
-        guard let placeId = selectedPlace?.id.uuidString else { return }
-        
-        DispatchQueue.main.async {
-            self.commentLoadingStates[reviewId] = .loading
-        }
-        
-        // Add limit and order by timestamp to get only the most recent 5 comments
-        reviewService.fetchComments(placeId: placeId, reviewId: reviewId, limit: 5) { [weak self] comments, error in
-            guard let self = self else { return }
-            
-            DispatchQueue.main.async {
-                if let error = error {
-                    print("Error loading comments: \(error.localizedDescription)")
-                    self.commentLoadingStates[reviewId] = .error(error)
-                } else {
-                    let fetchedComments = comments ?? []
-                    self.placeReviewComments[reviewId] = fetchedComments
-                    
-                    // Update our count - but don't reset if we already have a larger count
-                    // This ensures we display the correct total even when loading limited comments
-                    if self.reviewCommentCounts[reviewId] == nil || self.reviewCommentCounts[reviewId]! < fetchedComments.count {
-                        self.reviewCommentCounts[reviewId] = fetchedComments.count
-                    }
-                    
-                    self.commentLoadingStates[reviewId] = .loaded
-                    
-                    // Efficiently load photos only for comments that have them
-                    for comment in fetchedComments where !comment.images.isEmpty {
-                        self.loadCommentPhotos(for: comment)
-                    }
-                }
-            }
-        }
-    }
-    
-    func addComment(reviewId: String, text: String, images: [UIImage], userId: String, userFirstName: String, userLastName: String, profilePhotoUrl: String) {
-        guard let placeId = selectedPlace?.id.uuidString else { return }
-        
-        let commentId = UUID().uuidString
-        
-        var comment = Comment(
-            id: commentId,
-            reviewId: reviewId,
-            userId: userId,
-            profilePhotoUrl: profilePhotoUrl,
-            userFirstName: userFirstName,
-            userLastName: userLastName,
-            commentText: text,
-            timestamp: Date(),
-            images: [],
-            likes: 0
-        )
-        
-        ImageService.shared.uploadImagesForComment(comment: comment, images: images) { [weak self] result in
-            guard let self = self else { return }
-            
-            switch result {
-            case .success(let downloadURLs):
-                comment.images = downloadURLs
-                
-                ReviewService.shared.addComment(placeId: placeId, reviewId: reviewId, comment: comment) { [weak self] result in
-                    guard let self = self else { return }
-                    
-                    DispatchQueue.main.async {
-                        switch result {
-                        case .success(let savedComment):
-                            // Add the comment to our local collection
-                            var currentComments = self.placeReviewComments[reviewId] ?? []
-                            currentComments.insert(savedComment, at: 0) // Add at the top
-                            self.placeReviewComments[reviewId] = currentComments
-                            
-                            // Update the comment count
-                            let currentCount = self.reviewCommentCounts[reviewId] ?? 0
-                            self.reviewCommentCounts[reviewId] = currentCount + 1
-                            
-                            // Ensure loading state is set to loaded
-                            self.commentLoadingStates[reviewId] = .loaded
-                            
-                            // Load comment photos if any
-                            if !savedComment.images.isEmpty {
-                                self.loadCommentPhotos(for: savedComment)
-                            }
-                            
-                        case .failure(let error):
-                            print("Error adding comment: \(error.localizedDescription)")
-                        }
-                    }
-                }
-            case .failure(let error):
-                print("Error uploading comment images: \(error.localizedDescription)")
-            }
-        }
-    }
-    
-    private func loadCommentPhotos(for comment: Comment) {
-        // Skip if already loaded or no images
-        if commentPhotos[comment.id] != nil || comment.images.isEmpty {
-            return
-        }
-        
-        imageService.fetchPhotosFromStorage(urls: comment.images) { [weak self] images, error in
-            guard let self = self else { return }
-            
-            DispatchQueue.main.async {
-                if let error = error {
-                    print("Error loading comment photos: \(error.localizedDescription)")
-                } else if let images = images {
-                    self.commentPhotos[comment.id] = images
-                }
-            }
-        }
-    }
-    
-    // MARK: - Comment Public Accessors
-    
-    func comments(for reviewId: String) -> [Comment] {
-        return placeReviewComments[reviewId] ?? []
-    }
-    
-    func commentLoadingState(for reviewId: String) -> LoadingState {
-        return commentLoadingStates[reviewId] ?? .idle
-    }
-    
-    func commentPhotos(for comment: Comment) -> [UIImage] {
-        return commentPhotos[comment.id] ?? []
-    }
-    
-    // Returns the number of comments for a specific review
-    func commentCount(for reviewId: String) -> Int {
-        // First check our stored counts
-        if let count = reviewCommentCounts[reviewId] {
-            return count
-        }
-        // Fall back to the comment array count if needed
-        return placeReviewComments[reviewId]?.count ?? 0
-    }
-
     // MARK: - Public Methods
     func addReview<T: ReviewProtocol>(_ review: T) {
         guard let placeId = selectedPlace?.id.uuidString else { return }
@@ -624,12 +405,22 @@ class SelectedPlaceViewModel: ObservableObject {
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
             var currentReviews = self.placeReviews[placeId] ?? []
-            currentReviews.insert(review, at: 0) // Insert at the beginning instead of appending
+            currentReviews.insert(review, at: 0) // Insert at the beginning
             self.placeReviews[placeId] = currentReviews
-            self.placeRating = self.calculateAvgRating(for: placeId)
-            self.loadReviewPhotos(for: review)
-            self.loadProfilePhoto(for: review)
+            
+            // Photos will be loaded automatically by PlacePhotosViewModel
         }
+    }
+    
+    /// Get a review by its ID to access original data
+    func getReview(by reviewId: String) -> (any ReviewProtocol)? {
+        // Search through all place reviews to find the review with matching ID
+        for reviews in placeReviews.values {
+            if let review = reviews.first(where: { $0.id == reviewId }) {
+                return review
+            }
+        }
+        return nil
     }
     
     func deleteReview(reviewId: String, completion: @escaping (Result<Void, Error>) -> Void) {
@@ -644,8 +435,7 @@ class SelectedPlaceViewModel: ObservableObject {
             return
         }
         
-        
-        reviewService.deleteReview(reviewId: reviewId, placeId: placeId, userId: review.userId) { [weak self] result in
+        reviewService.deleteReview(reviewId: reviewId) { [weak self] result in
             guard let self = self else { return }
             
             switch result {
@@ -658,21 +448,8 @@ class SelectedPlaceViewModel: ObservableObject {
                             currentReviews.remove(at: index)
                             self.placeReviews[placeId] = currentReviews
                             
-                            // Recalculate rating after deletion
-                            self.placeRating = self.calculateAvgRating(for: placeId)
-                            
-                            // Clean up cached photos for this review
-                            self.reviewPhotos.removeValue(forKey: reviewId)
-                            self.reviewPhotoLoadingStates.removeValue(forKey: reviewId)
-                            
-                            // Clean up cached comments for this review
-                            self.placeReviewComments.removeValue(forKey: reviewId)
-                            self.commentLoadingStates.removeValue(forKey: reviewId)
-                            self.reviewCommentCounts.removeValue(forKey: reviewId)
-                            
                             // Remove from liked reviews set if it was there
                             self.likedReviews.remove(reviewId)
-                            
                         }
                     }
                     completion(.success(()))
@@ -704,174 +481,52 @@ class SelectedPlaceViewModel: ObservableObject {
         }
     }
     
+    // Update the method to take userId as parameter
+    func checkLikeStatuses(userId: String) {
+        guard let placeId = selectedPlace?.id.uuidString,
+              let reviews = placeReviews[placeId] else { return }
+        
+        // Clear previous likes before checking
+        likedReviews.removeAll()
+        
+        reviews.forEach { review in
+            reviewService.hasUserLikedReview(userId: userId, placeId: placeId, reviewId: review.id) { [weak self] result in
+                DispatchQueue.main.async {
+                    switch result {
+                    case .success(let isLiked):
+                        if isLiked {
+                            self?.likedReviews.insert(review.id)
+                        }
+                    case .failure(let error):
+                        print("❌ Error checking if review is liked: \(error)")
+                    }
+                }
+            }
+        }
+    }
+    
     // MARK: - Public Accessors
     var reviews: [any ReviewProtocol] {
         guard let placeId = selectedPlace?.id.uuidString else { return [] }
         return placeReviews[placeId] ?? []
     }
-    
-    var photoLoadingState: LoadingState {
-        guard let placeId = selectedPlace?.id.uuidString else { return .idle }
-        return photoLoadingStates[placeId] ?? .idle
-    }
-    
-    var photos: [UIImage] {
+
+    var tiktokVideos: [TikTokVideo] {
         guard let placeId = selectedPlace?.id.uuidString else { return [] }
-        return placePhotos[placeId] ?? []
+        return placeTikToks[placeId] ?? []
     }
-    
-    func photos(for review: any ReviewProtocol) -> [UIImage] {
-        return reviewPhotos[review.id] ?? []
-    }
-    
-    func photoLoadingState(for review: any ReviewProtocol) -> LoadingState {
-        return reviewPhotoLoadingStates[review.id] ?? .idle
-    }
-    
-    func profilePhoto(forUserId userId: String) -> UIImage? {
-        return userProfilePhotos[userId]
-    }
-    
-    func profilePhotoLoadingState(forUserId userId: String) -> LoadingState {
-        return profilePhotoLoadingStates[userId] ?? .idle
-    }
-    
+
     func reviewLoadingState(forPlaceId placeId: String) -> LoadingState {
         return reviewLoadingStates[placeId] ?? .idle
     }
     
-    var allPhotosLoadedForCurrentPlace: Bool {
-        return allPhotosLoaded
-    }
-    
     func likeReview<T: ReviewProtocol>(_ review: T, userId: String) {
-        guard let placeId = selectedPlace?.id.uuidString else { return }
-        
-        // Prevent liking your own review
-        if review.userId == userId {
-            return
-        }
-        
-        reviewService.hasUserLikedReview(userId: userId, reviewId: review.id) { [weak self] isLiked in
-            guard let self = self else { return }
-            
-            if isLiked {
-                // Unlike the review
-                reviewService.unlikeReview(userId: userId, placeId: placeId, reviewId: review.id) { [weak self] result in
-                    guard let self = self else { return }
-                    
-                    switch result {
-                    case .success:
-                        DispatchQueue.main.async {
-                            if var currentReviews = self.placeReviews[placeId] {
-                                if let index = currentReviews.firstIndex(where: { $0.id == review.id }) {
-                                    // Create a new Review instance with updated likes count
-                                    var updatedReview = currentReviews[index]
-                                    updatedReview.likes = max(0, updatedReview.likes - 1)
-                                    currentReviews[index] = updatedReview
-                                    self.placeReviews[placeId] = currentReviews
-                                    self.likedReviews.remove(review.id)
-                                }
-                            }
-                        }
-                    case .failure(let error):
-                        print("Error unliking review: \(error.localizedDescription)")
-                    }
-                }
-            } else {
-                // Like the review
-                reviewService.likeReview(userId: userId, placeId: placeId, reviewId: review.id) { [weak self] result in
-                    guard let self = self else { return }
-                    
-                    switch result {
-                    case .success:
-                        DispatchQueue.main.async {
-                            if var currentReviews = self.placeReviews[placeId] {
-                                if let index = currentReviews.firstIndex(where: { $0.id == review.id }) {
-                                    // Create a new Review instance with updated likes count
-                                    var updatedReview = currentReviews[index]
-                                    updatedReview.likes += 1
-                                    currentReviews[index] = updatedReview
-                                    self.placeReviews[placeId] = currentReviews
-                                    self.likedReviews.insert(review.id)
-                                }
-                            }
-                        }
-                    case .failure(let error):
-                        print("Error liking review: \(error.localizedDescription)")
-                    }
-                }
-            }
-        }
+        // TODO: Implement proper like/unlike logic with Supabase
     }
 
     // Add helper method to check if a review is liked
     func isReviewLiked(_ reviewId: String) -> Bool {
         return likedReviews.contains(reviewId)
-    }
-
-    // Load comment count for a review (without loading all comments)
-    private func loadCommentCountForReview(placeId: String, reviewId: String) {
-        reviewService.fetchCommentCount(placeId: placeId, reviewId: reviewId) { [weak self] count, error in
-            guard let self = self else { return }
-            
-            DispatchQueue.main.async {
-                if let error = error {
-                    print("Error fetching comment count: \(error.localizedDescription)")
-                } else if let count = count {
-                    // Store the count in our dictionary
-                    self.reviewCommentCounts[reviewId] = count
-                    
-                    // Create a placeholder array with the right number of empty comments
-                    // This ensures commentCount returns the correct count even before comments are loaded
-                    if count > 0 {
-                        if self.placeReviewComments[reviewId] == nil {
-                            // Store empty array with the right capacity
-                            self.placeReviewComments[reviewId] = []
-                            
-                            // Mark as idle so actual comments can be loaded when needed
-                            self.commentLoadingStates[reviewId] = .idle
-                        }
-                    } else {
-                        // If no comments, initialize with empty array
-                        self.placeReviewComments[reviewId] = []
-                        self.commentLoadingStates[reviewId] = .loaded
-                    }
-                }
-            }
-        }
-    }
-
-    // Load additional comments beyond the initial 5
-    func loadMoreComments(placeId: String, reviewId: String, limit: Int) {
-        DispatchQueue.main.async {
-            // Don't change loading state to .loading to avoid flickering the UI
-            // Just keep the existing comments visible while loading more
-        }
-        
-        reviewService.fetchComments(placeId: placeId, reviewId: reviewId, limit: limit) { [weak self] comments, error in
-            guard let self = self else { return }
-            
-            DispatchQueue.main.async {
-                if let error = error {
-                    print("Error loading more comments: \(error.localizedDescription)")
-                    // Don't update loading state to error to preserve existing comments
-                } else {
-                    let fetchedComments = comments ?? []
-                    self.placeReviewComments[reviewId] = fetchedComments
-                    
-                    // Only update comment count if we get more than we knew about
-                    if self.reviewCommentCounts[reviewId] == nil || self.reviewCommentCounts[reviewId]! < fetchedComments.count {
-                        self.reviewCommentCounts[reviewId] = fetchedComments.count
-                    }
-                    
-                    // Load photos for new comments
-                    for comment in fetchedComments where !comment.images.isEmpty && self.commentPhotos[comment.id] == nil {
-                        self.loadCommentPhotos(for: comment)
-                    }
-                }
-            }
-        }
     }
 
     func createNewPlace(idString: String?, name: String, description: String?, coordinate: CLLocationCoordinate2D, userId: String, profileVM: ProfileViewModel? = nil, detailPlaceVM: DetailPlaceViewModel? = nil) {
@@ -882,10 +537,11 @@ class SelectedPlaceViewModel: ObservableObject {
         }
         newPlace.name = name
         newPlace.description = description
-        newPlace.coordinate = GeoPoint(
+        newPlace.coordinate = CLLocationCoordinate2D(
             latitude: coordinate.latitude,
             longitude: coordinate.longitude
         )
+        newPlace.isCustom = true // Mark as custom place
         
         // Immediately update local state for instant UI feedback
         DispatchQueue.main.async {
@@ -898,6 +554,9 @@ class SelectedPlaceViewModel: ObservableObject {
                 
                 // Trigger annotation calculation for immediate display
                 detailPlaceVM.calculateAnnotationPlaces()
+                
+                // Generate color for the new place
+                detailPlaceVM.generateColorForPlace(newPlace.id.uuidString)
             }
             
             // Update ProfileViewModel's myPlaces list
@@ -906,21 +565,30 @@ class SelectedPlaceViewModel: ObservableObject {
                     profileVM.myPlaces.append(newPlace.id.uuidString)
                 }
             }
+            
+            // Send notification to refresh map annotations
+            NotificationCenter.default.post(name: NSNotification.Name("RefreshMapAnnotations"), object: nil)
         }
         
-        // Save to main places collection
-        placeService.addToAllPlaces(detailPlace: newPlace) { error in
-            if let error = error {
-                print("Error saving place to main collection: \(error.localizedDescription)")
-            } else {
-                print("Successfully saved place to main collection")
+        // Save to database
+        Task { @MainActor in
+            SupabasePlaceService.shared.testSupabaseConnection { isConnected, error in
+                if !isConnected {
+                    print("❌ [SelectedPlaceViewModel] Supabase connection failed: \(error?.localizedDescription ?? "Unknown error")")
+                    return
+                }
                 
-                // Save to user's myPlaces collection
-                self.placeService.addToMyPlaces(userId: userId, detailPlace: newPlace) { error in
+                // Save to main places collection
+                self.placeService.addToAllPlaces(place: newPlace) { error in
                     if let error = error {
-                        print("Error saving place to user's collection: \(error.localizedDescription)")
+                        print("❌ [SelectedPlaceViewModel] Error saving place to main collection: \(error.localizedDescription)")
                     } else {
-                        print("Successfully saved place to user's myPlaces collection")
+                        // Save to user's myPlaces collection
+                        self.placeService.addToMyPlaces(userId: userId, place: newPlace) { error in
+                            if let error = error {
+                                print("❌ [SelectedPlaceViewModel] Error saving place to user's collection: \(error.localizedDescription)")
+                            }
+                        }
                     }
                 }
             }
@@ -932,5 +600,19 @@ class SelectedPlaceViewModel: ObservableObject {
             isDetailSheetPresented = true
         }
     }
+    
+    /// Navigate to map and select a place (for use when navigating from profile views)
+    /// This method handles dismissing navigation and then selecting the place with map animation
+    func navigateToMapAndSelectPlace(_ place: DetailPlace, dismissNavigation: @escaping () -> Void) {
+        // First dismiss any navigation
+        dismissNavigation()
+        
+        // Small delay to ensure navigation is dismissed before selecting place
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            guard let self = self else { return }
+            // Select place with map animation
+            self.selectPlaceAndFetchDetails(place, shouldAnimateMap: true)
+            self.isDetailSheetPresented = true
+        }
+    }
 }
-

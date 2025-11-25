@@ -2,9 +2,9 @@ import SwiftUI
 
 struct RestaruantReviewViewProfileInformation: View {
     let review: ReviewProtocol
+    @ObservedObject var photosViewModel: PlacePhotosViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var profile: ProfileViewModel
-    @EnvironmentObject var detailPlaceVM: DetailPlaceViewModel
     @EnvironmentObject var userSession: UserSession
     @EnvironmentObject var userProfileViewModel: UserProfileViewModel
     @State private var shouldNavigateToProfile = false
@@ -12,7 +12,7 @@ struct RestaruantReviewViewProfileInformation: View {
     var body: some View {
         HStack(alignment: .center, spacing: 16) { // Increased spacing between photo and text
             // Profile Photo from Cache
-            if let profilePhoto = detailPlaceVM.userProfilePicture[review.userId] {
+            if let profilePhoto = photosViewModel.profilePhoto(forUserId: review.userId) {
                 Image(uiImage: profilePhoto)
                     .resizable()
                     .scaledToFill()
@@ -30,7 +30,7 @@ struct RestaruantReviewViewProfileInformation: View {
                             userProfileViewModel.fetchAndSelectUser(userId: review.userId, currentUserId: currentUserId)
                         }
                     }
-            } else if selectedPlaceVM.profilePhotoLoadingState(forUserId: review.userId) == .loading {
+            } else if photosViewModel.profilePhotoLoadingState(forUserId: review.userId) == .loading {
                 ProgressView()
                     .frame(width: 50, height: 50)
             } else {

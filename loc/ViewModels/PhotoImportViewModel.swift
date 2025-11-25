@@ -9,9 +9,6 @@ import PhotosUI
 import CoreLocation
 import ImageIO
 import UIKit
-import FirebaseAuth
-import FirebaseStorage
-import FirebaseFirestore
 
 @MainActor
 class PhotoImportViewModel: ObservableObject {
@@ -213,7 +210,7 @@ class PhotoImportViewModel: ObservableObject {
     }
     
     private func saveSelectedPlaceToFirestore(_ nearbyPlace: NearbyPlaceFeature) async {
-        guard let currentUserId = Auth.auth().currentUser?.uid else {
+        guard let currentUserId = await SupabaseAuthService.shared.currentUserId else {
             print("❌ No authenticated user found")
             return
         }
@@ -226,7 +223,7 @@ class PhotoImportViewModel: ObservableObject {
             
             // Save to main places collection
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-                placeService.addToAllPlaces(detailPlace: detailPlace) { error in
+                placeService.addToAllPlaces(place: detailPlace) { error in
                     if let error = error {
                         print("❌ Error saving place to main collection: \(error.localizedDescription)")
                         continuation.resume(throwing: error)
@@ -240,7 +237,7 @@ class PhotoImportViewModel: ObservableObject {
             // Only save to user's myPlaces collection if this is a user-created place
             if nearbyPlace.properties.source == "user_created" {
                 try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-                    placeService.addToMyPlaces(userId: currentUserId, detailPlace: detailPlace) { error in
+                    placeService.addToMyPlaces(userId: currentUserId, place: detailPlace) { error in
                         if let error = error {
                             print("❌ Error saving place to user's collection: \(error.localizedDescription)")
                             continuation.resume(throwing: error)
@@ -253,7 +250,13 @@ class PhotoImportViewModel: ObservableObject {
             }
             
             // Add to user's map places for tracking
-            userService.addOrUpdateMapPlace(for: currentUserId, place: detailPlace, type: "selected")
+            userService.addOrUpdateMapPlace(userId: currentUserId, place: detailPlace) { error in
+                if let error = error {
+                    print("❌ Error updating map place: \(error)")
+                } else {
+                    print("✅ Successfully updated map place")
+                }
+            }
             
             // Notify other components to refresh map annotations
             NotificationCenter.default.post(name: NSNotification.Name("RefreshMapAnnotations"), object: nil)
@@ -274,11 +277,13 @@ class PhotoImportViewModel: ObservableObject {
     private func convertToDetailPlace(_ nearbyPlace: NearbyPlaceFeature) -> DetailPlace {
         var detailPlace = DetailPlace()
         
+        // TODO: This should use the backend to get/assign place IDs instead of creating them locally
+        // RISK: Hash-based UUIDs might not match backend-assigned UUIDs, causing duplicate places
         // Create a consistent UUID from the actualId by hashing it
         detailPlace.id = createConsistentUUID(from: nearbyPlace.properties.actualId)
         detailPlace.name = nearbyPlace.properties.name
         detailPlace.address = nearbyPlace.properties.address
-        detailPlace.coordinate = GeoPoint(
+        detailPlace.coordinate = CLLocationCoordinate2D(
             latitude: nearbyPlace.geometry.latitude,
             longitude: nearbyPlace.geometry.longitude
         )
@@ -304,6 +309,10 @@ class PhotoImportViewModel: ObservableObject {
         if let uuid = UUID(uuidString: string) {
             return uuid
         }
+        
+        // TODO: This hash-based approach is problematic
+        // The backend might assign different UUIDs for the same place, causing duplicates
+        // BETTER APPROACH: Send the Google Place ID to backend, let it assign/find the UUID
         
         // For non-UUID strings (like Google Place IDs), create a consistent UUID by hashing
         // This ensures the same string always produces the same UUID

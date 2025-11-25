@@ -8,12 +8,11 @@
 import SwiftUI
 
 struct UserProfileFavoritesView: View {
-    var userFavorites: [DetailPlace]
+    var userFavorites: [FavoritePlace]
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
     @EnvironmentObject var userProfileViewModel: UserProfileViewModel
     @Environment(\.presentationMode) var presentationMode
-    @State private var placeColors: [UUID: Color] = [:]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -68,8 +67,8 @@ struct UserProfileFavoritesView: View {
                 } else {
                     // Favorites grid (2x3 layout like list previews)
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
-                        ForEach(Array(userFavorites.prefix(6)), id: \.id) { place in
-                            ExternalFavoritePlaceCard(place: place)
+                        ForEach(Array(userFavorites.prefix(6)), id: \.id) { favoritePlace in
+                            ExternalFavoritePlaceCard(favoritePlace: favoritePlace)
                         }
                         
                         // Fill remaining slots if less than 6 favorites
@@ -105,11 +104,18 @@ struct UserProfileFavoritesView: View {
 }
 
 struct ExternalFavoritePlaceCard: View {
-    let place: DetailPlace
+    let favoritePlace: FavoritePlace
     @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var userProfileViewModel: UserProfileViewModel
     @Environment(\.presentationMode) var presentationMode
+    
+    // Generate a consistent color for this place based on its ID
+    private var placeColor: Color {
+        let hash = favoritePlace.place_id.hashValue
+        let hue = Double(abs(hash) % 360) / 360.0
+        return Color(hue: hue, saturation: 0.6, brightness: 0.8)
+    }
     
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -119,32 +125,23 @@ struct ExternalFavoritePlaceCard: View {
                 .frame(height: 80)
                 .overlay(
                     Group {
-                        // Image loading matching new card styling
-                        if let firstTikTokThumbnail = getFirstTikTokThumbnail(for: place) {
-                            AsyncImage(url: URL(string: firstTikTokThumbnail)) { image in
+                        // Image loading matching lightweight card styling
+                        if let photoUrl = favoritePlace.latest_review_photo, let url = URL(string: photoUrl) {
+                            AsyncImage(url: url) { image in
                                 image
                                     .resizable()
                                     .aspectRatio(contentMode: .fill)
-                                    .frame(width: .infinity, height: 80)
+                                    .frame(maxWidth: .infinity, maxHeight: 80)
                                     .clipped()
                             } placeholder: {
                                 Rectangle()
                                     .foregroundColor(.gray.opacity(0.3))
-                                    .frame(width: .infinity, height: 80)
+                                    .frame(maxWidth: .infinity, maxHeight: 80)
                             }
-                        } else if let image = detailPlaceViewModel.placeImages[place.id.uuidString] {
-                            Image(uiImage: image)
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
-                                .frame(width: .infinity, height: 80)
-                                .clipped()
                         } else {
                             Rectangle()
-                                .foregroundColor(detailPlaceViewModel.colorForPlace(placeId: place.id.uuidString))
-                                .frame(width: .infinity, height: 80)
-                                .onAppear {
-                                    detailPlaceViewModel.fetchPlaceImage(for: place.id.uuidString)
-                                }
+                                .foregroundColor(placeColor)
+                                .frame(maxWidth: .infinity, maxHeight: 80)
                         }
                     }
                     .clipped()
@@ -165,20 +162,12 @@ struct ExternalFavoritePlaceCard: View {
             
             // Text overlay
             VStack(alignment: .leading, spacing: 2) {
-                Text(place.name)
+                Text(favoritePlace.name)
                     .font(.caption)
                     .fontWeight(.semibold)
                     .foregroundColor(.white)
                     .lineLimit(1)
                     .multilineTextAlignment(.leading)
-                
-                if let city = place.city {
-                    Text(city)
-                        .font(.caption2)
-                        .foregroundColor(.white.opacity(0.7))
-                        .lineLimit(1)
-                        .multilineTextAlignment(.leading)
-                }
             }
             .padding(.horizontal, 8)
             .padding(.bottom, 8)
@@ -193,31 +182,28 @@ struct ExternalFavoritePlaceCard: View {
                 .stroke(Color.gray.opacity(0.1), lineWidth: 0.5)
         )
         .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
-        .onTapGesture {
-            selectedPlaceVM.selectedPlace = place
-            selectedPlaceVM.isDetailSheetPresented = true
-            
-            // Dismiss the user profile sheet properly
-            userProfileViewModel.isUserDetailPresented = false
-            
-            // Also call presentationMode dismiss as backup
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                presentationMode.wrappedValue.dismiss()
+        .contentShape(Rectangle())
+        .highPriorityGesture(
+            TapGesture().onEnded {
+                // Load full place details and navigate
+                Task {
+                    await loadPlaceAndNavigate()
             }
         }
+        )
     }
     
-    private func getFirstTikTokThumbnail(for place: DetailPlace?) -> String? {
-        guard let place = place else { return nil }
-        
-        // Check place's own TikTok videos first
-        if let placeTikTokVideos = place.tikTokVideos,
-           let firstVideo = placeTikTokVideos.first {
-            return firstVideo.thumbnailURL
+    private func loadPlaceAndNavigate() async {
+        do {
+            // Fetch the full place details
+            let place = try await PlaceService.shared.fetchPlace(withId: favoritePlace.place_id)
+            
+            // Use centralized navigation method from UserProfileViewModel
+            await MainActor.run {
+                userProfileViewModel.navigateToPlaceFromProfile(place, selectedPlaceVM: selectedPlaceVM)
+            }
+        } catch {
+            print("❌ Error loading place details: \(error)")
         }
-        
-        // For external users, we don't have access to their TikTok videos
-        // This would need to be implemented if we want to show external user's TikTok videos
-        return nil
     }
 }

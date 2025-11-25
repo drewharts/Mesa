@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Mesa (Loc) is a social iOS app for sharing and discovering places. Built with SwiftUI and Firebase, it allows users to create lists of restaurants, cafes, and other locations, share them with friends, and discover new places through their social network.
+Mesa (Loc) is a social iOS app for sharing and discovering places. Built with SwiftUI and Supabase, it allows users to create lists of restaurants, cafes, and other locations, share them with friends, and discover new places through their social network.
+
+**📚 For detailed architecture guidance, see `ARCHITECTURE.md`**
 
 ## Development Commands
 
@@ -37,23 +39,43 @@ xcrun simctl openurl booted "loc://list/listId"
 
 ## Architecture
 
-### MVVM Pattern
-- **Models**: Data structures in `Loc/Models/`
-- **Views**: SwiftUI views in `Loc/Views/`
-- **ViewModels**: Business logic in `Loc/ViewModels/`
-- **Services**: External integrations in `Loc/Services/`
+**🎯 Core Pattern: Smart vs Dumb Components with MVVM**
+
+See `ARCHITECTURE.md` for complete details. Quick reference:
+
+### Golden Rules
+1. **One View, One ViewModel** - Each view has exactly one primary ViewModel
+2. **Smart vs Dumb** - Behavior needs ViewModel, display doesn't
+3. **ViewModels depend on Services**, not other ViewModels
+4. **Views are DUMB** (purely declarative), ViewModels are SMART (business logic)
+
+### File Organization
+- **Models**: Data structures in `loc/Models/`
+- **Views**: SwiftUI views in `loc/Views/` (purely declarative)
+- **ViewModels**: Business logic in `loc/ViewModels/` (one per view)
+- **Services**: Data layer in `loc/Services/` (Supabase, APIs)
 
 ### Key Services
-- **ServiceContainer**: Dependency injection container at `Loc/Services/ServiceContainer.swift`
-- **FirebaseService**: Firestore operations at `Loc/Services/FirebaseService.swift`
-- **AuthenticationService**: User authentication at `Loc/Services/AuthenticationService.swift`
-- **NotificationService**: Push notifications at `Loc/Services/NotificationService.swift`
+- **ServiceContainer**: Dependency injection at `loc/Services/ServiceContainer.swift`
+- **SupabaseAuthService**: User authentication
+- **SupabasePlaceService**: Place data operations
+- **SupabaseReviewService**: Review management
+- **ImageService**: Photo handling
 
-### Data Flow
-1. Views observe ViewModels via `@StateObject` or `@ObservedObject`
-2. ViewModels interact with Services through ServiceContainer
-3. Services handle Firebase/external API calls
-4. Models define data structures with Codable for Firebase serialization
+### Example: Smart vs Dumb
+```swift
+// DUMB: Just display data
+struct PlaceInfoSection: View {
+    let place: DetailPlace
+    var body: some View { /* UI only */ }
+}
+
+// SMART: Has ViewModel for behavior
+struct TikTokVideosSection: View {
+    @ObservedObject var viewModel: TikTokVideosViewModel
+    var body: some View { /* Observes ViewModel */ }
+}
+```
 
 ## Key Features Implementation
 

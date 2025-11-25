@@ -6,20 +6,21 @@
 
 import Foundation
 import UIKit
-import SwiftUICore
-import MapboxSearch
+import SwiftUI
 
 @MainActor
 class UserProfileViewModel: ObservableObject {
     @Published var selectedUser: ProfileData?
     @Published var isUserDetailPresented = false
     
-    @Published var userFavorites: [DetailPlace] = []
-    @Published var favoritePlaceImages: [String: UIImage] = [:]
-
-    @Published var userLists: [PlaceList] = []
-    @Published var placeListMapboxPlaces: [UUID: [DetailPlace]] = [:]
-    @Published var placeImages: [String: UIImage] = [:]
+    // Lightweight objects for external user profile
+    @Published var userFavorites: [FavoritePlace] = []
+    @Published var userLists: [LightweightPlaceList] = []
+    @Published var placeListPlaces: [String: [LightweightPlace]] = [:] // [listId: places]
+    
+    // Lazy loading properties
+    private var loadedListIds: Set<String> = []
+    private var loadingListIds: Set<String> = []
     @Published var isFollowing: Bool = false
     @Published var followers: Int = 0
     
@@ -67,7 +68,6 @@ class UserProfileViewModel: ObservableObject {
         self.fetchProfileFavorites(userId: user.id)
         self.fetchLists(userId: user.id)
         self.fetchFollowers(userId: user.id)
-        self.fetchFavoritePlaceImages()
     }
     
     func fetchAndSelectUser(userId: String, currentUserId: String) {
@@ -77,7 +77,6 @@ class UserProfileViewModel: ObservableObject {
                 self?.selectUser(profileData, currentUserId: currentUserId)
             case .failure(let error):
                 print("Error fetching user profile: \(error.localizedDescription)")
-                // Optionally handle error - could show an alert or set an error state
             }
         }
     }
@@ -94,25 +93,34 @@ class UserProfileViewModel: ObservableObject {
     
     func checkIfFollowing(currentUserId: String) {
         guard let targetUserId = selectedUser?.id, !targetUserId.isEmpty else {
-            self.isFollowing = false
+            DispatchQueue.main.async {
+                self.isFollowing = false
+            }
             return
         }
         userService.isFollowingUser(followerId: currentUserId, followingId: targetUserId) { [weak self] isFollowing in
-            self?.isFollowing = isFollowing
+            DispatchQueue.main.async {
+                self?.isFollowing = isFollowing
+            }
         }
     }
     
-    func toggleFollowUser(currentUserId: String) {
-        guard let targetUserId = selectedUser?.id else { return }
+    func toggleFollowUser(currentUserId: String, completion: @escaping (Bool, Bool) -> Void) {
+        guard let targetUserId = selectedUser?.id else { 
+            completion(false, isFollowing)
+            return 
+        }
         
         // Store original state for potential rollback
         let originalFollowingState = isFollowing
         let originalFollowersCount = followers
         
         if isFollowing {
-            // Optimistic update: immediately change UI
-            self.isFollowing = false
-            self.followers = max(0, self.followers - 1)
+            // Optimistic update with smooth animation
+            withAnimation(.easeInOut(duration: 0.2)) {
+                self.isFollowing = false
+                self.followers = max(0, self.followers - 1)
+            }
             // Remove user from placeSavers and recalculate annotations
             self.removeUserFromPlaceSavers(userId: targetUserId)
             self.detailPlaceViewModel.calculateAnnotationPlaces()
@@ -120,23 +128,28 @@ class UserProfileViewModel: ObservableObject {
             // Make the actual API call
             userService.unfollowUser(followerId: currentUserId, followingId: targetUserId) { success, error in
                 if !success {
-                    // Revert on failure
-                    DispatchQueue.main.async {
+                    // Revert on failure with animation
+                    withAnimation(.easeInOut(duration: 0.2)) {
                         self.isFollowing = originalFollowingState
                         self.followers = originalFollowersCount
-                        // Re-add user to placeSavers and recalculate annotations
-                        self.addUserToPlaceSavers(userId: targetUserId)
-                        self.detailPlaceViewModel.calculateAnnotationPlaces()
                         // Show error alert
                         self.showFollowError = true
                         self.followErrorMessage = "Failed to unfollow user. Please try again."
                     }
+                    // Re-add user to placeSavers and recalculate annotations
+                    self.addUserToPlaceSavers(userId: targetUserId)
+                    self.detailPlaceViewModel.calculateAnnotationPlaces()
+                    completion(false, originalFollowingState)
+                } else {
+                    completion(true, false)
                 }
             }
         } else {
-            // Optimistic update: immediately change UI
-            self.isFollowing = true
-            self.followers += 1
+            // Optimistic update with smooth animation
+            withAnimation(.easeInOut(duration: 0.2)) {
+                self.isFollowing = true
+                self.followers += 1
+            }
             
             // Make the actual API call
             userService.followUser(followerId: currentUserId, followingId: targetUserId) { success, error in
@@ -147,15 +160,17 @@ class UserProfileViewModel: ObservableObject {
                         await self.dataManager.loadUserPlaceLists(userId: targetUserId, forUser: self.selectedUser)
                         self.detailPlaceViewModel.calculateAnnotationPlaces()
                     }
+                    completion(true, true)
                 } else {
-                    // Revert on failure
-                    DispatchQueue.main.async {
+                    // Revert on failure with animation
+                    withAnimation(.easeInOut(duration: 0.2)) {
                         self.isFollowing = originalFollowingState
                         self.followers = originalFollowersCount
                         // Show error alert
                         self.showFollowError = true
                         self.followErrorMessage = "Failed to follow user. Please try again."
                     }
+                    completion(false, originalFollowingState)
                 }
             }
         }
@@ -165,229 +180,126 @@ class UserProfileViewModel: ObservableObject {
         userService.followUser(followerId: currentUserId, followingId: targetUserId) { success, error in
             if let error = error {
                 print("Error following user: \(error.localizedDescription)")
-            } else if success {
-                print("Successfully followed user \(targetUserId).")
             }
         }
     }
     
     private func fetchProfileFavorites(userId: String) {
-        print("Fetching favorites for userId: \(userId)")
-        placeService.fetchProfileFavorites(userId: userId) { [weak self] favorites in
-            guard let self = self else { return }
-            if favorites == nil {
-                print("Favorites fetch returned nil - possible error or no data")
-                self.userFavorites = []
-            } else if favorites!.isEmpty {
-                print("No favorites found for userId: \(userId)")
-                self.userFavorites = []
-            } else {
-                print("Fetched \(favorites!.count) favorites for userId: \(userId)")
-                self.userFavorites = favorites!
-            }
-        }
-    }
-    
-    func fetchFavoritePlaceImages() {
-        print("Starting fetchFavoritePlaceImages for \(userFavorites.count) favorites")
-        for place in userFavorites {
-            fetchImage(for: place) { [weak self] placeId, image in
-                guard let self = self else { return }
-                if let image = image {
-                    self.favoritePlaceImages[placeId] = image
-                    // Explicitly trigger UI update
-                    self.objectWillChange.send()
-                    print("Updated image for place \(placeId) in favoritePlaceImages")
+        Task {
+            do {
+                let favorites = try await userService.fetchUserFavorites(userId: userId)
+                await MainActor.run {
+                    self.userFavorites = favorites
+                }
+            } catch {
+                print("❌ [UserProfileViewModel] Error fetching favorites: \(error)")
+                await MainActor.run {
+                    self.userFavorites = []
                 }
             }
         }
     }
     
     private func fetchLists(userId: String) {
-        placeService.fetchLists(userId: userId) { lists in
-            self.userLists = lists
-            // Fetch places and images for each PlaceList
-            for list in lists {
-                self.fetchFirestorePlaces(for: list.places) { places in
-                    self.placeListMapboxPlaces[list.id] = places
-                    // Fetch images for places in this list
-                    for place in places {
-                        self.fetchImage(for: place) { [weak self] placeId, image in
-                            self?.placeImages[placeId] = image
-                        }
-                    }
-                }
-            }
-        }
-    }
-    
-    func fetchFirestorePlaces(for places: [Place], completion: @escaping ([DetailPlace]) -> Void) {
-        var fetchedPlaces: [DetailPlace] = []
-        let dispatchGroup = DispatchGroup()
+        // Use proximity-based sorting if location is available
+        let userLocation = dataManager.currentUserLocation
         
-        for place in places {
-            dispatchGroup.enter()
-            
-            let documentId = place.id.uuidString
-            
-            placeService.fetchPlace(withId: documentId) { result in
-                switch result {
-                case .success(let detailPlace):
-                    fetchedPlaces.append(detailPlace)
-                case .failure(let error):
-                    print("Error fetching place from Firestore: \(error.localizedDescription)")
-                }
-                dispatchGroup.leave()
-            }
-        }
-        
-        dispatchGroup.notify(queue: .main) {
-            DispatchQueue.main.async {
-                completion(fetchedPlaces)
-            }
-        }
-    }
-    
-    // Helper method to fetch images with completion handler
-    private func fetchImage(for place: DetailPlace, completion: @escaping (String, UIImage?) -> Void) {
-        let placeId = place.id.uuidString
-        print("Starting image fetch for place: \(place.name) (\(placeId))")
-        
-        // Skip if image already exists in either dictionary
-        if favoritePlaceImages[placeId] != nil || placeImages[placeId] != nil {
-            print("Image already cached for place \(placeId)")
-            completion(placeId, favoritePlaceImages[placeId] ?? placeImages[placeId])
-            return
-        }
-        
-        // First check if this place has TikTok videos from external places
-        if let externalPlace = dataManager.getExternalPlace(for: placeId),
-           let firstTikTokVideo = externalPlace.tiktokVideos.first,
-           !firstTikTokVideo.thumbnailUrl.isEmpty {
-            
-            print("Found TikTok thumbnail for place \(placeId), loading...")
-            self.loadTikTokThumbnailAsPlaceImage(placeId: placeId, thumbnailURL: firstTikTokVideo.thumbnailUrl, completion: completion)
-            return
-        }
-        
-        // Fetch reviews for this place
-        reviewService.fetchReviews(placeId: placeId, latestOnly: false) { [weak self] (reviews: [ReviewProtocol]?, error) in
-            guard let self = self else { return }
-            
-            if let error = error {
-                print("Error fetching reviews for place \(placeId): \(error.localizedDescription)")
-                DispatchQueue.main.async {
-                    completion(placeId, nil)
-                }
-                return
-            }
-            
-            print("Found \(reviews?.count ?? 0) reviews for place \(placeId)")
-            
-            // Collect all image URLs from all reviews as strings (same as review images)
-            var imageURLStrings: [String] = []
-            for review in reviews ?? [] {
-                imageURLStrings.append(contentsOf: review.images)
-            }
-            
-            print("Found \(imageURLStrings.count) image URLs for place \(placeId)")
-            
-            if !imageURLStrings.isEmpty {
-                // Use the same ImageService method that review images use for consistent processing
-                ImageService.shared.fetchPhotosFromStorage(urls: imageURLStrings) { [weak self] images, error in
-                    guard let self = self else { return }
-                    
-                    DispatchQueue.main.async {
-                        if let error = error {
-                            print("Error fetching place image for \(placeId): \(error.localizedDescription)")
-                            completion(placeId, nil)
-                        } else if let images = images, !images.isEmpty {
-                            // Use the first successfully loaded image as the place cover image
-                            let image = images[0]
-                            print("Successfully cached image for place \(placeId)")
-                            self.placeImages[placeId] = image
-                            completion(placeId, image)
-                        } else {
-                            print("No images returned for place \(placeId)")
-                            completion(placeId, nil)
-                        }
-                    }
-                }
-            } else {
-                print("No image URLs found for place \(placeId)")
-                DispatchQueue.main.async {
-                    completion(placeId, nil)
-                }
-            }
-        }
-    }
-    
-    /// Get TikTok videos for a specific place
-    func getTikTokVideos(for placeId: String) -> [TikTokVideo] {
-        if let externalPlace = dataManager.getExternalPlace(for: placeId) {
-            return externalPlace.tiktokVideos.map { $0.toTikTokVideo() }
-        }
-        return []
-    }
-    
-    /// Get first TikTok thumbnail URL for a place
-    func getFirstTikTokThumbnailURL(for placeId: String) -> String? {
-        if let externalPlace = dataManager.getExternalPlace(for: placeId),
-           let firstTikTokVideo = externalPlace.tiktokVideos.first,
-           !firstTikTokVideo.thumbnailUrl.isEmpty {
-            return firstTikTokVideo.thumbnailUrl
-        }
-        return nil
-    }
-    
-    /// Load TikTok thumbnail as place image for external places
-    public func loadTikTokThumbnailAsPlaceImage(placeId: String, thumbnailURL: String, completion: @escaping (String, UIImage?) -> Void) {
-        guard let url = URL(string: thumbnailURL) else {
-            print("❌ [UserProfileViewModel] Invalid thumbnail URL for place \(placeId): \(thumbnailURL)")
-            DispatchQueue.main.async {
-                completion(placeId, nil)
-            }
-            return
-        }
-        
-        print("🖼️ [UserProfileViewModel] Loading TikTok thumbnail for place \(placeId)")
-        
-        URLSession.shared.dataTask(with: url) { [weak self] data, response, error in
-            guard let self = self else { return }
-            
-            DispatchQueue.main.async {
-                if let error = error {
-                    print("❌ [UserProfileViewModel] Error loading TikTok thumbnail for \(placeId): \(error.localizedDescription)")
-                    completion(placeId, nil)
-                } else if let data = data, let image = UIImage(data: data) {
-                    print("✅ [UserProfileViewModel] Successfully loaded TikTok thumbnail for place \(placeId)")
-                    // Store in both dictionaries to ensure consistency
-                    self.placeImages[placeId] = image
-                    completion(placeId, image)
+        Task {
+            do {
+                let lists: [LightweightPlaceList]
+                
+                if let userLocation = userLocation {
+                    lists = try await userService.fetchPlaceListsByProximity(
+                        userId: userId,
+                        userLatitude: userLocation.latitude,
+                        userLongitude: userLocation.longitude,
+                        page: 1,
+                        pageSize: 6
+                    )
                 } else {
-                    print("⚠️ [UserProfileViewModel] No image data returned for TikTok thumbnail \(placeId)")
-                    completion(placeId, nil)
+                    // Fallback: fetch lists without proximity sorting
+                    // For now, return empty - ideally we'd have a non-proximity version
+                    lists = []
+                }
+                
+                await MainActor.run {
+                    self.userLists = lists
+                }
+                
+                // Load places for each list (first 6 places per list)
+                for list in lists.prefix(3) {
+                    await loadPlacesForList(listId: list.list_id)
+                }
+                
+            } catch {
+                print("❌ [UserProfileViewModel] Error fetching lists: \(error)")
+                await MainActor.run {
+                    self.userLists = []
                 }
             }
-        }.resume()
+        }
     }
     
-    func downloadImage(from url: URL) async throws -> UIImage {
-        let (data, _) = try await URLSession.shared.data(from: url)
-        guard let image = UIImage(data: data) else {
-            throw NSError(domain: "ImageError", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to create image from data"])
+    /// Load places for a specific list
+    private func loadPlacesForList(listId: String) async {
+        guard placeListPlaces[listId] == nil else { return }
+        
+        do {
+            let places = try await userService.fetchPlacesForPlaceList(
+                listId: listId,
+                page: 1,
+                pageSize: 6
+            )
+            
+            await MainActor.run {
+                self.placeListPlaces[listId] = places
+                self.loadedListIds.insert(listId)
+            }
+        } catch {
+            print("❌ [UserProfileViewModel] Error loading places for list \(listId): \(error)")
         }
-        return image
+    }
+    
+    /// Load places for a specific list (public version that can be called from views)
+    func loadPlacesForList(_ list: LightweightPlaceList) {
+        Task {
+            await loadPlacesForList(listId: list.list_id)
+        }
+    }
+    
+    /// Load more lists when user scrolls (lazy loading)
+    func loadMoreListsIfNeeded() {
+        // Find the next 3 lists that haven't been loaded yet
+        let unloadedLists = userLists.filter { !loadedListIds.contains($0.list_id) && !loadingListIds.contains($0.list_id) }
+        let nextThreeLists = Array(unloadedLists.prefix(3))
+        
+        guard !nextThreeLists.isEmpty else { return }
+        
+        Task {
+            // Mark as loading
+            await MainActor.run {
+                for list in nextThreeLists {
+                    self.loadingListIds.insert(list.list_id)
+                }
+            }
+            
+            // Load places for these lists
+            for list in nextThreeLists {
+                await loadPlacesForList(listId: list.list_id)
+            }
+            
+            await MainActor.run {
+                for list in nextThreeLists {
+                    self.loadingListIds.remove(list.list_id)
+                }
+            }
+        }
     }
     
     // Helper to remove a user from all placeSavers
     private func removeUserFromPlaceSavers(userId: String) {
         for (placeId, savers) in detailPlaceViewModel.placeSavers {
             detailPlaceViewModel.placeSavers[placeId] = savers.filter { $0 != userId }
-            // Optionally, remove the place if no savers left:
-            // if detailPlaceViewModel.placeSavers[placeId]?.isEmpty == true {
-            //     detailPlaceViewModel.places.removeValue(forKey: placeId)
-            // }
         }
     }
     
@@ -464,7 +376,7 @@ class UserProfileViewModel: ObservableObject {
             
             do {
                 let restaurantReviews: [RestaurantReview] = try await reviewService.fetchUserReviews(userId: userId)
-                let genericReviews: [GenericReview] = try await reviewService.fetchUserReviews(userId: userId)
+                let genericReviews: [GenericReview] = try await reviewService.fetchUserGenericReviews(userId: userId)
                 let allReviews: [ReviewProtocol] = restaurantReviews + genericReviews
                 
                 // Sort reviews by timestamp (most recent first) and get unique place IDs while preserving order
@@ -546,14 +458,29 @@ class UserProfileViewModel: ObservableObject {
             
             // Fetch and store the place if not already present
             if detailPlaceViewModel.places[placeId] == nil {
-                do {
-                    let detailPlace = try await placeService.fetchPlace(withId: placeId)
-                    detailPlaceViewModel.places[placeId] = detailPlace
-                    detailPlaceViewModel.fetchPlaceImage(for: placeId)
-                    // Only add to successfully loaded places if we got the data
-                    successfullyLoadedPlaceIds.append(placeId)
-                } catch {
-                    print("Error fetching place for reviewed placeId \(placeId): \(error.localizedDescription)")
+                // Retry logic for failed place loads
+                var retryCount = 0
+                let maxRetries = 2
+
+                while retryCount <= maxRetries {
+                    do {
+                        let detailPlace = try await placeService.fetchPlace(withId: placeId)
+                        await MainActor.run {
+                            detailPlaceViewModel.places[placeId] = detailPlace
+                            detailPlaceViewModel.fetchPlaceImage(for: placeId)
+                            // Only add to successfully loaded places if we got the data
+                            successfullyLoadedPlaceIds.append(placeId)
+                        }
+                        break // Success, exit retry loop
+                    } catch {
+                        retryCount += 1
+                        if retryCount <= maxRetries {
+                            print("⚠️ [UserProfileViewModel] Failed to load place \(placeId), retrying (\(retryCount)/\(maxRetries)): \(error.localizedDescription)")
+                            try? await Task.sleep(nanoseconds: 500_000_000 * UInt64(retryCount)) // Exponential backoff
+                        } else {
+                            print("❌ [UserProfileViewModel] Failed to load place \(placeId) after \(maxRetries) retries: \(error.localizedDescription)")
+                        }
+                    }
                 }
             } else {
                 // Place already exists, add to successfully loaded
@@ -614,4 +541,15 @@ class UserProfileViewModel: ObservableObject {
     func hasAttemptedLoadReviews(for userId: String) -> Bool {
         return hasAttemptedLoadReviewedPlaces[userId] ?? false
     }
+    
+    // MARK: - Navigation
+    
+    /// Centralized navigation method for all external profile places (favorites, lists, reviews)
+    /// Navigates back to the map, selects the place, and dismisses the user profile sheet
+    func navigateToPlaceFromProfile(_ place: DetailPlace, selectedPlaceVM: SelectedPlaceViewModel) {
+        selectedPlaceVM.navigateToMapAndSelectPlace(place) { [weak self] in
+            self?.isUserDetailPresented = false
+        }
+    }
 }
+

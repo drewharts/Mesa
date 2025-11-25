@@ -1,8 +1,9 @@
 //
-//  PlaceReviewView.swift
+//  RestaurantReviewView.swift
 //  loc
 //
 //  Created by Andrew Hartsfield II on 3/1/25.
+//  Refactored - comments removed for simplification
 //
 
 import SwiftUI
@@ -10,27 +11,30 @@ import UIKit
 
 struct RestaurantReviewView: View {
     let review: RestaurantReview
+    @ObservedObject var viewModel: PlaceReviewsViewModel
     let onPhotoTapped: ([UIImage], Int) -> Void
-    @Binding var isActiveKeyboard: Bool
+    
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var userProfileViewModel: UserProfileViewModel
     @EnvironmentObject var userSession: UserSession
-    @State private var showComments = false
     
-    // Static dictionary to track which review comments should be hidden
-    private static var hiddenComments = [String: Bool]()
+    // Computed properties to help the compiler
+    private var reviewPhotos: [UIImage] {
+        viewModel.getPhotos(for: review)
+    }
     
-    // Static method to hide comments for a specific review
-    static func hideComments(reviewId: String) {
-        // This is called from InlineCommentsView to hide its parent review's comments
-        Foundation.NotificationCenter.default.post(name: Foundation.Notification.Name("HideCommentsFor-\(reviewId)"), object: nil)
+    private var loadingState: PlacePhotosViewModel.LoadingState {
+        viewModel.getPhotoLoadingState(for: review)
     }
 
     var body: some View {
         VStack(spacing: 16) {
             // Header: Profile Picture, Name, and Timestamp
-            RestaruantReviewViewProfileInformation(review: review)
+            RestaruantReviewViewProfileInformation(
+                review: review,
+                photosViewModel: viewModel.photosViewModel
+            )
 
             // Ratings (Food, Ambience, Service)
             HStack(spacing: 45) {
@@ -53,9 +57,13 @@ struct RestaurantReviewView: View {
                 .padding(.bottom, 15)
             
             // Images (Horizontal Scrolling) with Loading State
-            let reviewPhotos = selectedPlaceVM.photos(for: review)
-            let loadingState = selectedPlaceVM.photoLoadingState(for: review)
-            
+            photoSection
+        }
+        .padding(.vertical)
+    }
+    
+    @ViewBuilder
+    private var photoSection: some View {
             switch loadingState {
             case .loading:
                 ZStack {
@@ -90,6 +98,15 @@ struct RestaurantReviewView: View {
                                     .onTapGesture {
                                         onPhotoTapped(reviewPhotos, index)
                                     }
+                                    .onAppear {
+                                        // Load more photos when user scrolls to the last visible photo
+                                        if index == reviewPhotos.count - 1 {
+                                            // Get the original review to access all image URLs
+                                            if let originalReview = viewModel.getReview(by: review.id) {
+                                                viewModel.loadMorePhotos(for: review.id, allImageUrls: originalReview.images)
+                                            }
+                                        }
+                                    }
                             }
                         }
                         .padding(.horizontal)
@@ -115,7 +132,7 @@ struct RestaurantReviewView: View {
                     
                     Button(action: {
                         // Trigger reload of photos
-                        selectedPlaceVM.reloadReviewPhotos(for: review)
+                        viewModel.reloadPhotos(for: review)
                     }) {
                         Text("Retry")
                             .font(.footnote)
@@ -133,73 +150,6 @@ struct RestaurantReviewView: View {
                 ProgressView()
                     .padding()
                     .frame(maxWidth: .infinity)
-            }
-            
-            if showComments {
-                // Show comments section when expanded
-                VStack(alignment: .leading, spacing: 10) {
-                    // Embedded comments view
-                    InlineCommentsView(reviewId: review.id, onPhotoTapped: onPhotoTapped, onKeyboardActive: { isActive in
-                        isActiveKeyboard = isActive
-                    })
-                        .padding(.leading, 15) // Indentation for comments
-                }
-                .padding(8)
-                .padding(.horizontal)
-                .transition(.opacity.combined(with: .move(edge: .top)))
-            } else {
-                // Show reply button when comments are hidden
-                HStack(spacing: 8) {
-                    // Small horizontal line
-                    Rectangle()
-                        .frame(width: 16, height: 1)
-                        .foregroundColor(.gray.opacity(0.5))
-                    
-                    // Comment button positioned to the left
-                    Button(action: {
-                        // Load comments if needed before showing
-                        if !showComments {
-                            // Only fetch comments if we don't already have them
-                            if selectedPlaceVM.commentLoadingState(for: review.id) == .idle {
-                                selectedPlaceVM.loadCommentsForReview(reviewId: review.id)
-                            }
-                            withAnimation {
-                                showComments.toggle()
-                            }
-                        }
-                    }) {
-                        let commentCount = selectedPlaceVM.commentCount(for: review.id)
-                        Text(commentCount > 0 ? 
-                             "Show \(commentCount) \(commentCount == 1 ? "reply" : "replies")" : 
-                             "Reply")
-                            .font(.footnote)
-                            .foregroundColor(.gray)
-                            .fontWeight(.semibold)
-                    }
-                    
-                    Spacer()
-                }
-                .padding(.leading, 30) // Left padding to align with the indentation
-                .padding(.bottom, 10)
-            }
-        }
-        .padding(.vertical)
-        .onAppear {
-            // Check like statuses using the proper userId from profile
-            if let currentUserId = userSession.currentUserId {
-                selectedPlaceVM.checkLikeStatuses(userId: currentUserId)
-            }
-            
-            // Listen for the hide comments notification
-            NotificationCenter.default.addObserver(forName: Foundation.Notification.Name("HideCommentsFor-\(review.id)"), object: nil, queue: .main) { _ in
-                withAnimation {
-                    showComments = false
-                }
-            }
-        }
-        .onDisappear {
-            // Remove the observer when view disappears
-            NotificationCenter.default.removeObserver(self, name: Foundation.Notification.Name("HideCommentsFor-\(review.id)"), object: nil)
         }
     }
 }

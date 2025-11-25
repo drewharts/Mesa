@@ -7,72 +7,69 @@
 
 import SwiftUI
 import PhotosUI
-import MapboxSearch
 
 struct ProfileViewListsView: View {
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
     @EnvironmentObject var deepLinkManager: DeepLinkManager
+    @EnvironmentObject var dataManager: DataManager
+    @EnvironmentObject var userSession: UserSession
     @Environment(\.presentationMode) private var presentationMode
 
     @State private var showingImagePicker = false
     @State private var inputImage: [UIImage] = []
     @State private var selectedList: PlaceListViewModel?
     @State private var showingNewListSheet = false
-    @State private var searchText = ""
     @State private var placeColors: [UUID: Color] = [:]
-    
-    // Filtered and sorted lists based on search
-    var filteredLists: [PlaceList] {
-        let sorted = profile.userLists
-        if searchText.isEmpty {
-            return sorted
-        } else {
-            return sorted.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
-        }
-    }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             ListHeaderView(
                 onAddList: {
                     showingNewListSheet = true
-                },
-                searchText: $searchText
+                }
             )
 
-            if !filteredLists.isEmpty {
+            if !profile.lightweightPlaceLists.isEmpty {
                 LazyVStack(spacing: 16) {
-                    ForEach(filteredLists, id: \.id) { list in
-                        ProfileListSection(
+                    ForEach(Array(profile.lightweightPlaceLists.enumerated()), id: \.element.id) { index, list in
+                        LightweightProfileListSection(
                             list: list,
-                            placeIds: profile.userListsPlaces[list.id.uuidString],
-                            detailPlaceViewModel: detailPlaceViewModel,
-                            placeColors: $placeColors,
-                            isLoading: profile.loadingListIds.contains(list.id)
+                            places: profile.lightweightPlaceListPlaces[list.list_id] ?? [],
+                            allLists: profile.lightweightPlaceLists,
+                            currentIndex: index,
+                            placeColors: $placeColors
                         )
                         .onAppear {
-                            // Load list data only when it becomes visible
-                            profile.loadListDataIfNeeded(listId: list.id)
+                            // Trigger pagination when approaching the end
+                            if profile.shouldLoadMorePlaceLists(
+                                currentItem: list,
+                                filteredLists: profile.lightweightPlaceLists,
+                                isSearching: false
+                            ) {
+                                Task {
+                                    await dataManager.loadMorePlaceLists(userId: userSession.currentUserId ?? "")
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Loading indicator at the bottom
+                    if profile.isLoadingMorePlaceLists {
+                        HStack {
+                            Spacer()
+                            ProgressView()
+                                .padding()
+                            Spacer()
                         }
                     }
                 }
             } else {
                 VStack(spacing: 8) {
-                    if searchText.isEmpty {
-                        Text("No lists available")
-                            .foregroundColor(.gray)
-                            .padding(.horizontal)
-                    } else {
-                        Text("No lists found")
-                            .foregroundColor(.gray)
-                            .padding(.horizontal)
-                        Text("No lists match '\(searchText)'")
-                            .font(.caption)
-                            .foregroundColor(.gray)
-                            .padding(.horizontal)
-                    }
+                    Text("No lists available")
+                        .foregroundColor(.gray)
+                        .padding(.horizontal)
                 }
             }
         }
@@ -81,7 +78,8 @@ struct ProfileViewListsView: View {
         }
         .sheet(isPresented: $showingNewListSheet) {
             NewListView(isPresented: $showingNewListSheet, onSave: { listName in
-                profile.addNewPlaceList(named: listName, city: "", emoji: "", image: "")
+                let _ = await profile.addNewPlaceList(named: listName, city: "", emoji: "", image: "")
+                // Result is ignored here - user will see the list appear in their profile
             })
         }
         .sheet(isPresented: .constant(deepLinkManager.hasPendingList()), onDismiss: {
@@ -101,4 +99,5 @@ struct ProfileViewListsView: View {
             }
         }
     }
+    
 }

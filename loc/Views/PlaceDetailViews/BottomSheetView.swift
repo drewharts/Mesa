@@ -14,6 +14,8 @@ struct BottomSheetView<Content: View>: View {
     let minSheetHeight: CGFloat
     let maxSheetHeight: CGFloat
     @GestureState private var dragTranslation: CGFloat = 0
+    @State private var isDismissing = false
+    @Environment(\.allowChildDrag) private var allowChildDrag
     let content: Content
 
     init(
@@ -33,6 +35,56 @@ struct BottomSheetView<Content: View>: View {
     // Computed property to determine if scrolling should be enabled
     private var isScrollingEnabled: Bool {
         sheetHeight == maxSheetHeight
+    }
+
+    // MARK: - Drag Handling Methods
+    
+    /// Handle ongoing drag gesture changes
+    private func handleDragChange(_ translation: CGFloat) {
+        // Don't update height if we're in the dismissal animation
+        guard !isDismissing else { return }
+        
+        let newHeight = sheetHeight - translation
+        
+        if newHeight <= maxSheetHeight && newHeight >= minSheetHeight {
+            sheetHeight = newHeight
+        } else if newHeight > maxSheetHeight {
+            sheetHeight = maxSheetHeight
+        } else if newHeight < minSheetHeight {
+            sheetHeight = minSheetHeight
+        }
+    }
+    
+    /// Handle drag gesture end - snap to position or dismiss
+    private func handleDragEnd(translation: CGFloat) {
+        let newHeight = sheetHeight - translation
+        let dismissalThreshold: CGFloat = 100
+        let midpoint = (maxSheetHeight + minSheetHeight) / 2
+        
+        if translation > dismissalThreshold {
+            // Lock height updates during dismissal
+            isDismissing = true
+            
+            // Animate sheet down smoothly, then dismiss
+            withAnimation(.interactiveSpring(response: 0.35, dampingFraction: 0.9, blendDuration: 0.2)) {
+                sheetHeight = 0
+            }
+            // Dismiss after animation completes
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                isPresented = false
+                sheetHeight = minSheetHeight // Reset to partial height for next presentation
+                isDismissing = false
+            }
+        } else {
+            // Use interactiveSpring for smooth, enterprise-level gesture animations
+            withAnimation(.interactiveSpring(response: 0.4, dampingFraction: 0.8, blendDuration: 0.25)) {
+                if newHeight > midpoint {
+                    sheetHeight = maxSheetHeight
+                } else {
+                    sheetHeight = minSheetHeight
+                }
+            }
+        }
     }
 
     var body: some View {
@@ -58,32 +110,22 @@ struct BottomSheetView<Content: View>: View {
                 .cornerRadius(16, corners: [.topLeft, .topRight])
                 .clipped()
                 .gesture(
+                    allowChildDrag ? nil :
                     DragGesture()
                         .updating($dragTranslation) { value, state, _ in
                             state = value.translation.height
                         }
                         .onEnded { value in
-                            let newHeight = sheetHeight - value.translation.height
-                            let dismissalThreshold: CGFloat = 100
-                            withAnimation {
-                                if value.translation.height > dismissalThreshold {
-                                    isPresented = false
-                                } else if newHeight > (maxSheetHeight + minSheetHeight) / 2 {
-                                    sheetHeight = maxSheetHeight
-                                } else {
-                                    sheetHeight = minSheetHeight
-                                }
-                            }
+                            handleDragEnd(translation: value.translation.height)
                         }
                 )
                 .onChange(of: dragTranslation) {
-                    let newHeight = sheetHeight - dragTranslation
-                    if newHeight <= maxSheetHeight && newHeight >= minSheetHeight {
-                        sheetHeight = newHeight
-                    } else if newHeight > maxSheetHeight {
-                        sheetHeight = maxSheetHeight
-                    } else if newHeight < minSheetHeight {
-                        sheetHeight = minSheetHeight
+                    handleDragChange(dragTranslation)
+                }
+                .onChange(of: isPresented) { newValue in
+                    // Reset dismissing state when sheet is re-presented
+                    if newValue {
+                        isDismissing = false
                     }
                 }
             }
@@ -102,6 +144,18 @@ extension EnvironmentValues {
     var isScrollingEnabled: Bool {
         get { self[IsScrollingEnabledKey.self] }
         set { self[IsScrollingEnabledKey.self] = newValue }
+    }
+}
+
+// Custom Environment Key for allowing child drag gestures
+private struct AllowChildDragKey: EnvironmentKey {
+    static let defaultValue: Bool = false
+}
+
+extension EnvironmentValues {
+    var allowChildDrag: Bool {
+        get { self[AllowChildDragKey.self] }
+        set { self[AllowChildDragKey.self] = newValue }
     }
 }
 

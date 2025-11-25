@@ -136,7 +136,7 @@ struct TikTokPlaceFlaggingView: View {
         isSubmitting = true
         
         // Get TikTok URL if available
-        let tikTokUrl = profile.getExternalPlace(for: place.id.uuidString)?.tiktokVideos.first?.url
+        let tikTokUrl = profile.getExternalPlace(for: place.id.uuidString)?.url
         
         profile.flagTikTokPlace(
             for: place.id.uuidString,

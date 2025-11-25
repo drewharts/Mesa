@@ -8,13 +8,15 @@ import SwiftUI
 import MapKit
 
 struct MapView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var locationManager: LocationManager
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var detailPlaceVM: DetailPlaceViewModel
-    @EnvironmentObject var placeTypeFilterVM: PlaceTypeFilterViewModel
+    @EnvironmentObject var mapViewModel: MapViewModel
 
     @Binding var recenterMap: Bool
+    @Binding var mapPosition: MapCameraPosition
     var isSearchBarMinimized: Bool = true
     @Binding var isCreatePlacePopupActive: Bool
 
@@ -23,67 +25,99 @@ struct MapView: View {
     @State private var newPlaceName = ""
     @State private var newPlaceDescription = ""
     @State private var newPlaceCoordinate: CLLocationCoordinate2D?
-    @State private var mapPosition = MapCameraPosition.automatic
     @State private var mapRefreshToggle = false
     @State private var showVisiblePlacesPopup = false
     @State private var currentMapRegion: MKCoordinateRegion?
+    @State private var hasLoadedInitialViewport = false
     
     var onMapTap: (() -> Void)?
+    
+    // Helper computed property to simplify type checking
+    private var annotationsToDisplay: [PlaceAnnotation] {
+        return mapViewModel.viewportAnnotations
+    }
+    
+    // Map content extracted to help Swift type checker
+    private var mapContentView: some View {
+        Map(position: $mapPosition) {
+            ForEach(annotationsToDisplay) { annotation in
+                Annotation(
+                    annotation.name,
+                    coordinate: annotation.coordinate,
+                    anchor: .bottom
+                ) {
+                    annotationMarkerView(for: annotation)
+                }
+            }
+            // Current location dot
+            if let userLocation = locationManager.currentLocation?.coordinate {
+                Annotation(
+                    "",
+                    coordinate: userLocation,
+                    anchor: .center
+                ) {
+                    userLocationMarker
+                }
+            }
+        }
+    }
+    
+    // Annotation marker view with user photos
+    private func annotationMarkerView(for annotation: PlaceAnnotation) -> some View {
+        // Only highlight annotation if detail sheet is presented AND this is the selected place
+        let isSelected = selectedPlaceVM.isDetailSheetPresented && 
+                        selectedPlaceVM.selectedPlace?.id.uuidString == annotation.id
+        return CustomPlaceAnnotationView(
+            annotation: annotation,
+            annotationImage: mapViewModel.annotationImages[annotation.id],
+            isSelected: isSelected
+        )
+        .onTapGesture {
+            handleAnnotationTap(annotation)
+        }
+    }
+    
+    // User location marker
+    private var userLocationMarker: some View {
+        Circle()
+            .fill(Color.blue)
+            .frame(width: 18, height: 18)
+            .overlay(
+                Circle()
+                    .stroke(Color.white, lineWidth: 4)
+                    .frame(width: 18, height: 18)
+            )
+            .shadow(radius: 4)
+    }
+    
+    // Handle annotation tap
+    private func handleAnnotationTap(_ annotation: PlaceAnnotation) {
+        Task {
+            if let place = await mapViewModel.loadPlaceDetails(for: annotation) {
+                await MainActor.run {
+                    // Don't animate map when tapping annotation - user is already looking at it
+                    selectedPlaceVM.selectPlaceAndFetchDetails(place, shouldAnimateMap: false)
+                    selectedPlaceVM.isDetailSheetPresented = true
+                }
+            }
+        }
+    }
     
     var body: some View {
         let currentCoords = locationManager.currentLocation?.coordinate ?? defaultCenter
         
         ZStack {
             MapReader { mapProxy in
-                Map(position: $mapPosition) {
-                    ForEach(placeTypeFilterVM.getFilteredPlaces().compactMap { place -> PlaceAnnotationItem? in
-                        guard let coordinate = place.coordinate else {
-                            return nil
-                        }
-                        return PlaceAnnotationItem(
-                            id: place.id,
-                            coordinate: CLLocationCoordinate2D(latitude: coordinate.latitude, longitude: coordinate.longitude),
-                            place: place
-                        )
-                    }) { place in
-                        Annotation(
-                            "",
-                            coordinate: place.coordinate,
-                            anchor: .bottom
-                        ) {
-                            PlaceAnnotationView(
-                                place: place.place,
-                                image: detailPlaceVM.placeAnnotations[place.place.id.uuidString],
-                                annotationImage: detailPlaceVM.placeAnnotations[place.place.id.uuidString]
-                            )
-                            .onTapGesture {
-                                selectedPlaceVM.selectedPlace = place.place
-                            }
-                        }
-                    }
-                    // Current location dot
-                    if let userLocation = locationManager.currentLocation?.coordinate {
-                        Annotation(
-                            "",
-                            coordinate: userLocation,
-                            anchor: .center
-                        ) {
-                            Circle()
-                                .fill(Color.blue)
-                                .frame(width: 18, height: 18)
-                                .overlay(
-                                    Circle()
-                                        .stroke(Color.white, lineWidth: 4)
-                                        .frame(width: 18, height: 18)
-                                )
-                                .shadow(radius: 4)
-                        }
-                    }
-                }
+                mapContentView
                 .mapControlVisibility(.hidden)
                 .ignoresSafeArea()
-                .onMapCameraChange { context in
+                .onMapCameraChange(frequency: .onEnd) { context in
+                    // This fires only when camera stops moving - Apple handles debouncing!
                     currentMapRegion = context.region
+                    
+                    Task.detached(priority: .background) {
+                        await mapViewModel.onMapCameraSettled(context.region)
+                    }
                 }
                 .gesture(
                     LongPressGesture(minimumDuration: 0.7)
@@ -173,7 +207,7 @@ struct MapView: View {
                 ) { name, description in
                     if let userId = profile.user?.id {
                         let generatedId = UUID().uuidString
-                        selectedPlaceVM.allowAutoPresent = false
+                        selectedPlaceVM.allowAutoPresent = true // Allow auto-present for newly created places
                         selectedPlaceVM.createNewPlace(idString: generatedId, name: name, description: description, coordinate: coordinate, userId: userId, profileVM: profile, detailPlaceVM: detailPlaceVM)
                         // Reset fields
                         newPlaceName = ""
@@ -194,30 +228,62 @@ struct MapView: View {
             } else {
                 // Default to current location or center of US
                 let coords = locationManager.currentLocation?.coordinate ?? defaultCenter
-                mapPosition = .camera(MapCamera(centerCoordinate: coords, distance: 10000))
+                mapPosition = .camera(MapCamera(centerCoordinate: coords, distance: 1500))
             }
 
             // Setup notification observers
             setupNotificationObservers()
+            
+            // 🚀 Load initial viewport places
+            if !hasLoadedInitialViewport, let region = currentMapRegion {
+                Task.detached(priority: .background) {
+                    await mapViewModel.onMapCameraSettled(region)
+                }
+                hasLoadedInitialViewport = true
+            }
         }
          .onDisappear {
              // Remove notification observers
              removeNotificationObservers()
          }
+        .task(id: scenePhase) {
+            // Reload photos when app becomes active
+            if scenePhase == .active {
+                await mapViewModel.loadFollowedUsersPhotos()
+            }
+        }
         .task {
-            // Refresh places whenever the view appears
-            await profile.refreshUserPlaces()
-
-            // Calculate annotation images
-            detailPlaceVM.calculateAnnotationPlaces()
-
-            // Calculate most frequent types
-            placeTypeFilterVM.refreshMostFrequentTypes()
+            // 🚀 CRITICAL: Load viewport places FIRST (instant map rendering)
+            if !hasLoadedInitialViewport {
+                // Give the map a moment to settle and provide a region
+                try? await Task.sleep(nanoseconds: 300_000_000) // 0.3 seconds
+                
+                if let region = currentMapRegion {
+                    await mapViewModel.onMapCameraSettled(region)
+                    hasLoadedInitialViewport = true
+                } else {
+                    // Create a region from the current map position
+                    let coords = locationManager.currentLocation?.coordinate ?? defaultCenter
+                    let region = MKCoordinateRegion(
+                        center: coords,
+                        span: MKCoordinateSpan(latitudeDelta: 0.015, longitudeDelta: 0.015)
+                    )
+                    await mapViewModel.onMapCameraSettled(region)
+                    hasLoadedInitialViewport = true
+                }
+            }
+            
+            // ✅ Load profile photos on first appearance (critical for login flow)
+            // This ensures photos load whether user logs in OR app starts already logged in
+            await mapViewModel.loadFollowedUsersPhotos()
+            
+            // ✅ REMOVED: Duplicate operations already handled in DataManager
+            // profile.refreshUserPlaces() - Already done in DataManager.initializeProfileData()
+            // detailPlaceVM.calculateAnnotationPlaces() - Already done in DataManager.calculateMapAnnotations()
         }
         .sheet(isPresented: $showVisiblePlacesPopup) {
             VisiblePlacesPopupView(mapRegion: currentMapRegion)
                 .environmentObject(selectedPlaceVM)
-                .environmentObject(placeTypeFilterVM)
                 .presentationDragIndicator(.visible)
         }
     }
@@ -231,12 +297,7 @@ struct MapView: View {
             object: nil,
             queue: .main
         ) { _ in
-            // Refresh places when notified
-            Task {
-                await profile.refreshUserPlaces()
-                await detailPlaceVM.calculateAnnotationPlaces()
-                await placeTypeFilterVM.refreshMostFrequentTypes()
-            }
+            // Map annotations are refreshed automatically via viewport loading
         }
     }
     

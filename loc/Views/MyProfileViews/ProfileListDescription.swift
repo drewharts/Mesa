@@ -23,7 +23,7 @@ struct ProfileListDescription: View {
                     .foregroundColor(.black)
                     .padding(.leading, 20)
                 
-                Text("\(profile.userListsPlaces[list.id.uuidString]?.count ?? 0) \(profile.userListsPlaces[list.id.uuidString]?.count == 1 ? "place" : "places")")
+                Text("\(profile.placeListCounts[list.id] ?? 0) \(profile.placeListCounts[list.id] == 1 ? "place" : "places")")
                     .font(.caption)
                     .foregroundStyle(.black)
                 

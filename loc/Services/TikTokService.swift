@@ -7,8 +7,6 @@
 
 import Foundation
 import CoreLocation
-import FirebaseFirestore
-import FirebaseAuth
 
 // MARK: - TikTok Data Models
 // NOTE: Most TikTok-specific data models are no longer needed since the backend 
@@ -37,12 +35,9 @@ class TikTokService: ObservableObject {
     
     func processTikTokURL(_ url: String) async -> Result<[DetailPlace], Error> {
         guard let requestURL = URL(string: "\(baseURL)/process-url") else {
-            print("❌ [TikTokService] Invalid base URL: \(baseURL)/process-url")
+            print("❌ [TikTokService] Invalid base URL")
             return .failure(TikTokError.invalidURL)
         }
-        
-        print("🌐 [TikTokService] Making request to: \(requestURL)")
-        print("📝 [TikTokService] Request body: {\"url\": \"\(url)\"}")
         
         isProcessing = true
         defer { isProcessing = false }
@@ -52,19 +47,8 @@ class TikTokService: ObservableObject {
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
             
-            print("📡 [TikTokService] Received response")
-            if let httpResponse = response as? HTTPURLResponse {
-                print("📊 [TikTokService] Status code: \(httpResponse.statusCode)")
-            }
-            
-            if let responseString = String(data: data, encoding: .utf8) {
-                print("📄 [TikTokService] Response data: \(responseString)")
-            } else {
-                print("❌ [TikTokService] Could not decode response data as string")
-            }
-            
             if let error = validateResponse(response) {
-                print("❌ [TikTokService] Response validation failed: \(error)")
+                print("❌ [TikTokService] Response validation failed")
                 return .failure(error)
             }
             
@@ -72,19 +56,13 @@ class TikTokService: ObservableObject {
             do {
                 // First try to parse as an array of DetailPlace objects
                 let detailPlaces = try JSONDecoder().decode([DetailPlace].self, from: data)
-                print("✅ [TikTokService] Successfully decoded array of DetailPlaces: \(detailPlaces.count) places")
                 return .success(detailPlaces)
             } catch {
-                print("❌ [TikTokService] Failed to decode as array, trying single DetailPlace...")
-                
                 // Try to parse as a single DetailPlace
                 do {
                     let detailPlace = try JSONDecoder().decode(DetailPlace.self, from: data)
-                    print("✅ [TikTokService] Successfully decoded single DetailPlace: \(detailPlace.name)")
                     return .success([detailPlace]) // Wrap in array
                 } catch {
-                    print("❌ [TikTokService] Failed to decode as single DetailPlace, trying wrapped format...")
-                    
                     // If that fails, try to parse as wrapped format like other backend responses
                     do {
                         let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
@@ -93,27 +71,11 @@ class TikTokService: ObservableObject {
                         if let processingStatus = json?["processing_status"] as? [String: Any],
                            let locationFound = processingStatus["location_found"] as? Bool,
                            !locationFound {
-                            print("❌ [TikTokService] No location found in TikTok video")
                             return .success([]) // Return empty array to indicate no places found
-                        }
-                        
-                        // First check if it's the TikTok response format with location_info array (all detected places)
-                        if let locationInfoArray = json?["location_info"] as? [[String: Any]], locationInfoArray.count > 0 {
-                            print("🔍 [TikTokService] Found TikTok location_info array with \(locationInfoArray.count) places")
-                            var detailPlaces: [DetailPlace] = []
-                            
-                            for locationDict in locationInfoArray {
-                                let detailPlace = try parseLocationInfoToDetailPlace(locationDict, tikTokData: json?["data"] as? [String: Any])
-                                detailPlaces.append(detailPlace)
-                            }
-                            
-                            print("✅ [TikTokService] Successfully parsed \(detailPlaces.count) DetailPlaces from location_info array")
-                            return .success(detailPlaces)
                         }
                         
                         // Check if it's the TikTok response format with saved_places array (multiple places)
                         if let savedPlacesArray = json?["saved_places"] as? [[String: Any]] {
-                            print("🔍 [TikTokService] Found TikTok saved_places array with \(savedPlacesArray.count) places")
                             var detailPlaces: [DetailPlace] = []
                             
                             for placeDict in savedPlacesArray {
@@ -129,68 +91,87 @@ class TikTokService: ObservableObject {
                                 detailPlaces.append(detailPlace)
                             }
                             
-                            print("✅ [TikTokService] Successfully parsed \(detailPlaces.count) DetailPlaces from saved_places array")
                             return .success(detailPlaces)
                         }
                         
                         // Check if it's the TikTok response format with saved_place (single place)
                         if let savedPlaceDict = json?["saved_place"] as? [String: Any] {
-                            print("🔍 [TikTokService] Found TikTok saved_place object, parsing...")
                             var detailPlace = try parseDetailPlaceFromDictionary(savedPlaceDict)
                             
                             // Also extract TikTok video data from the response
                             if let tikTokData = json?["data"] as? [String: Any] {
-                                print("🔍 [TikTokService] Found TikTok video data, adding to place...")
                                 if let tikTokVideo = createTikTokVideoFromResponseData(tikTokData) {
                                     detailPlace.tikTokVideos = [tikTokVideo]
-                                    print("✅ [TikTokService] Added TikTok video to place")
                                 }
                             }
                             
-                            print("✅ [TikTokService] Successfully parsed TikTok DetailPlace: \(detailPlace.name)")
                             return .success([detailPlace]) // Wrap in array
                         }
                         
                         // Check if it's wrapped in a "place" object
                         if let placeDict = json?["place"] as? [String: Any] {
-                            print("🔍 [TikTokService] Found wrapped place object, parsing manually...")
                             let detailPlace = try parseDetailPlaceFromDictionary(placeDict)
-                            print("✅ [TikTokService] Successfully parsed wrapped DetailPlace: \(detailPlace.name)")
                             return .success([detailPlace]) // Wrap in array
                         }
                         
                         // If no wrapper, try direct parsing from the dictionary
                         if let json = json {
                             let detailPlace = try parseDetailPlaceFromDictionary(json)
-                            print("✅ [TikTokService] Successfully parsed DetailPlace from dictionary: \(detailPlace.name)")
                             return .success([detailPlace]) // Wrap in array
                         }
                         
-                        throw NSError(domain: "TikTokService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Unable to parse response as DetailPlace"])
+                        throw NSError(domain: "TikTokService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Unable to parse response"])
                     } catch {
-                        print("❌ [TikTokService] Failed to parse response: \(error)")
                         return .failure(error)
                     }
                 }
             }
             
         } catch {
-            print("❌ [TikTokService] Network error: \(error)")
             return .failure(error)
         }
     }
     
-    func refreshTikTokThumbnail(for url: String, userId: String?) async -> Result<String, Error> {
-        print("🌐 [TikTokService] refreshTikTokThumbnail called")
-        print("🌐 [TikTokService] Input URL: \(url)")
-        print("🌐 [TikTokService] User ID: \(userId ?? "nil")")
-        
-        guard let requestURL = URL(string: "\(baseURL)/refresh-thumbnail") else {
-            print("❌ [TikTokService] Failed to create request URL: \(baseURL)/refresh-thumbnail")
+    func getTikTokOEmbed(url: String) async -> Result<TikTokOEmbedResponse, Error> {
+        guard let encodedURL = url.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+              let requestURL = URL(string: "\(baseURL)/tiktok/oembed?url=\(encodedURL)") else {
+            print("❌ [TikTokService] Invalid URL for oEmbed request")
             return .failure(TikTokError.invalidURL)
         }
         
-        print("🌐 [TikTokService] Request URL: \(requestURL)")
+        var request = URLRequest(url: requestURL)
+        request.httpMethod = "GET"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            
+            guard let httpResponse = response as? HTTPURLResponse else {
+                return .failure(TikTokError.invalidResponse)
+            }
+            
+            guard httpResponse.statusCode == 200 else {
+                if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let errorMsg = json["error"] as? String {
+                    print("❌ [TikTokService] oEmbed error: \(errorMsg)")
+                    return .failure(NSError(domain: "TikTokService", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: errorMsg]))
+                }
+                return .failure(TikTokError.serverError(httpResponse.statusCode))
+            }
+            
+            let oembedResponse = try JSONDecoder().decode(TikTokOEmbedResponse.self, from: data)
+            return .success(oembedResponse)
+            
+        } catch {
+            print("❌ [TikTokService] oEmbed request failed: \(error.localizedDescription)")
+            return .failure(error)
+        }
+    }
+    
+    func refreshTikTokThumbnail(for url: String, userId: String?, externalPlaceId: String? = nil) async -> Result<String, Error> {
+        guard let requestURL = URL(string: "\(baseURL)/refresh-thumbnail") else {
+            return .failure(TikTokError.invalidURL)
+        }
         
         var request = URLRequest(url: requestURL)
         request.httpMethod = "POST"
@@ -200,65 +181,31 @@ class TikTokService: ObservableObject {
         if let userId = userId {
             body["user_id"] = userId
         }
-        
-        print("🌐 [TikTokService] Request body: \(body)")
+        if let externalPlaceId = externalPlaceId {
+            body["external_place_id"] = externalPlaceId
+        }
         
         guard let httpBody = try? JSONSerialization.data(withJSONObject: body) else {
-            print("❌ [TikTokService] Failed to serialize request body")
             return .failure(TikTokError.invalidURL)
         }
         
         request.httpBody = httpBody
         
-        print("🌐 [TikTokService] Request headers: \(request.allHTTPHeaderFields ?? [:])")
-        print("🌐 [TikTokService] Request body string: \(String(data: httpBody, encoding: .utf8) ?? "nil")")
-        
         do {
-            print("🌐 [TikTokService] Making HTTP request...")
             let (data, response) = try await URLSession.shared.data(for: request)
             
-            print("🌐 [TikTokService] Received response")
-            
-            if let httpResponse = response as? HTTPURLResponse {
-                print("🌐 [TikTokService] HTTP Status Code: \(httpResponse.statusCode)")
-                print("🌐 [TikTokService] Response headers: \(httpResponse.allHeaderFields)")
-            }
-            
-            let responseString = String(data: data, encoding: .utf8) ?? "Unable to decode response"
-            print("🌐 [TikTokService] Raw response data: \(responseString)")
-            
             guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-                print("❌ [TikTokService] Failed to parse JSON response")
                 return .failure(TikTokError.invalidResponse)
             }
             
-            print("🌐 [TikTokService] Parsed JSON: \(json)")
-            
             if let thumbnailURL = json["thumbnailURL"] as? String {
-                print("✅ [TikTokService] SUCCESS: Extracted thumbnail URL: \(thumbnailURL)")
-                
-                // Test if the URL is valid
-                if let testURL = URL(string: thumbnailURL) {
-                    print("✅ [TikTokService] URL is valid: \(testURL)")
-                } else {
-                    print("⚠️ [TikTokService] Warning: thumbnailURL is not a valid URL")
-                }
-                
                 return .success(thumbnailURL)
             } else if let errorMsg = json["error"] as? String {
-                print("❌ [TikTokService] Backend error: \(errorMsg)")
                 return .failure(NSError(domain: "TikTokService", code: 1, userInfo: [NSLocalizedDescriptionKey: errorMsg]))
             } else {
-                print("❌ [TikTokService] No thumbnailURL or error in response")
                 return .failure(TikTokError.invalidResponse)
             }
         } catch {
-            print("❌ [TikTokService] HTTP request failed: \(error)")
-            if let nsError = error as NSError? {
-                print("❌ [TikTokService] Error domain: \(nsError.domain)")
-                print("❌ [TikTokService] Error code: \(nsError.code)")
-                print("❌ [TikTokService] Error userInfo: \(nsError.userInfo)")
-            }
             return .failure(error)
         }
     }
@@ -268,7 +215,7 @@ class TikTokService: ObservableObject {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         
-        // Add Firebase authentication token
+        // Add authentication token
         await addAuthenticationToken(to: &request)
         
         // Set request body
@@ -281,13 +228,12 @@ class TikTokService: ObservableObject {
     }
     
     private func addAuthenticationToken(to request: inout URLRequest) async {
-        if let currentUser = Auth.auth().currentUser {
-            do {
-                let idToken = try await currentUser.getIDToken()
-                request.setValue("Bearer \(idToken)", forHTTPHeaderField: "Authorization")
-            } catch {
-                // Continue without auth token - backend supports unauthenticated requests
-            }
+        do {
+            let session = try await SupabaseAuthService.shared.getSession()
+            let accessToken = session.accessToken
+            request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        } catch {
+            // Continue without auth token - backend supports unauthenticated requests
         }
     }
     
@@ -308,42 +254,17 @@ class TikTokService: ObservableObject {
     
     // MARK: - Helper Methods
     
-    private func parseLocationInfoToDetailPlace(_ locationDict: [String: Any], tikTokData: [String: Any]?) throws -> DetailPlace {
-        // Extract basic info from location_info format
-        let name = locationDict["business_name"] as? String ?? locationDict["location_name"] as? String ?? ""
-        let placeIdString = locationDict["place_id"] as? String ?? UUID().uuidString
-        let placeId = UUID(uuidString: placeIdString) ?? UUID()
-        
-        // Extract address
-        let address = locationDict["formatted_address"] as? String
-        
-        // Create DetailPlace with basic initializer
-        var detailPlace = DetailPlace(
-            id: placeId,
-            name: name,
-            address: address,
-            city: nil
-        )
-        
-        // Set coordinate separately
-        if let coordinatesArray = locationDict["coordinates"] as? [Double], coordinatesArray.count >= 2 {
-            detailPlace.coordinate = GeoPoint(latitude: coordinatesArray[0], longitude: coordinatesArray[1])
-        }
-        
-        // Add TikTok video data if available
-        if let tikTokData = tikTokData, let tikTokVideo = createTikTokVideoFromResponseData(tikTokData) {
-            detailPlace.tikTokVideos = [tikTokVideo]
-        }
-        
-        return detailPlace
-    }
-    
     /// Parse DetailPlace from dictionary (for handling backend responses that might be wrapped)
     private func parseDetailPlaceFromDictionary(_ dict: [String: Any]) throws -> DetailPlace {
         var detailPlace = DetailPlace()
         
-        // Basic fields
-        detailPlace.id = UUID(uuidString: dict["id"] as? String ?? "") ?? UUID()
+        // CRITICAL: Never create a new UUID - always use the backend's ID
+        // Creating a new ID will orphan the place
+        guard let idString = dict["id"] as? String,
+              let placeId = UUID(uuidString: idString) else {
+            throw NSError(domain: "TikTokService", code: -2, userInfo: [NSLocalizedDescriptionKey: "Invalid place ID from backend"])
+        }
+        detailPlace.id = placeId
         detailPlace.name = dict["name"] as? String ?? ""
         detailPlace.address = dict["address"] as? String
         detailPlace.city = dict["city"] as? String
@@ -377,11 +298,11 @@ class TikTokService: ObservableObject {
         if let coordinateDict = dict["coordinate"] as? [String: Any],
            let latitude = coordinateDict["latitude"] as? Double,
            let longitude = coordinateDict["longitude"] as? Double {
-            detailPlace.coordinate = GeoPoint(latitude: latitude, longitude: longitude)
+            detailPlace.coordinate = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
         } else if let locationDict = dict["location"] as? [String: Any],
                   let latitude = locationDict["latitude"] as? Double,
                   let longitude = locationDict["longitude"] as? Double {
-            detailPlace.coordinate = GeoPoint(latitude: latitude, longitude: longitude)
+            detailPlace.coordinate = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
         }
         
         // Handle TikTok videos if present
@@ -427,7 +348,6 @@ class TikTokService: ObservableObject {
     /// Create TikTok video from response data
     private func createTikTokVideoFromResponseData(_ data: [String: Any]) -> TikTokVideo? {
         guard let url = data["url"] as? String else {
-            print("❌ [TikTokService] Missing URL in TikTok data")
             return nil
         }
         

@@ -8,7 +8,6 @@
 import Foundation
 import UIKit
 import Combine
-import FirebaseFirestore // Add import if needed
 
 class MapAnnotationService: ObservableObject {
     

@@ -13,9 +13,6 @@
 		B0384E892CE2D19A00FC72F7 /* FirebaseAppCheck in Frameworks */ = {isa = PBXBuildFile; productRef = B0384E882CE2D19A00FC72F7 /* FirebaseAppCheck */; };
 		B0384E8B2CE2D19A00FC72F7 /* FirebaseAppDistribution-Beta in Frameworks */ = {isa = PBXBuildFile; productRef = B0384E8A2CE2D19A00FC72F7 /* FirebaseAppDistribution-Beta */; };
 		B0384E8F2CE2D54200FC72F7 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = B0384E8E2CE2D54200FC72F7 /* FirebaseAuth */; };
-		B03AE5C02D54785B00B986B1 /* MapboxSearch in Frameworks */ = {isa = PBXBuildFile; productRef = B03AE5BF2D54785B00B986B1 /* MapboxSearch */; };
-		B03AE5C22D54785B00B986B1 /* MapboxSearchUI in Frameworks */ = {isa = PBXBuildFile; productRef = B03AE5C12D54785B00B986B1 /* MapboxSearchUI */; };
-		B03AE5C52D5478A000B986B1 /* MapboxMaps in Frameworks */ = {isa = PBXBuildFile; productRef = B03AE5C42D5478A000B986B1 /* MapboxMaps */; };
 		B054DC612C42F5DA00C98088 /* locApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B054DC602C42F5DA00C98088 /* locApp.swift */; };
 		B054DC652C42F5DB00C98088 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B054DC642C42F5DB00C98088 /* Assets.xcassets */; };
 		B054DC682C42F5DB00C98088 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B054DC672C42F5DB00C98088 /* Preview Assets.xcassets */; };
@@ -23,8 +20,14 @@
 		B054DC7C2C42F5DB00C98088 /* locUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B054DC7B2C42F5DB00C98088 /* locUITests.swift */; };
 		B054DC7E2C42F5DB00C98088 /* locUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B054DC7D2C42F5DB00C98088 /* locUITestsLaunchTests.swift */; };
 		B054DC902C4301FB00C98088 /* GoogleMaps in Frameworks */ = {isa = PBXBuildFile; productRef = B054DC8F2C4301FB00C98088 /* GoogleMaps */; };
-		B05FEF352E1F28FB002436B7 /* Mesa Share.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = B05FEF2B2E1F28FB002436B7 /* Mesa Share.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		B061F1DE2C5815FA00042CB0 /* GooglePlaces in Frameworks */ = {isa = PBXBuildFile; productRef = B061F1DD2C5815FA00042CB0 /* GooglePlaces */; };
+		B0667AA92EB309CA00879683 /* MesaShare.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = B0667A9F2EB309CA00879683 /* MesaShare.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		B067944A2E9C439600B9D273 /* Auth in Frameworks */ = {isa = PBXBuildFile; productRef = B06794492E9C439600B9D273 /* Auth */; };
+		B067944C2E9C439600B9D273 /* Functions in Frameworks */ = {isa = PBXBuildFile; productRef = B067944B2E9C439600B9D273 /* Functions */; };
+		B067944E2E9C439600B9D273 /* PostgREST in Frameworks */ = {isa = PBXBuildFile; productRef = B067944D2E9C439600B9D273 /* PostgREST */; };
+		B06794502E9C439600B9D273 /* Realtime in Frameworks */ = {isa = PBXBuildFile; productRef = B067944F2E9C439600B9D273 /* Realtime */; };
+		B06794522E9C439600B9D273 /* Storage in Frameworks */ = {isa = PBXBuildFile; productRef = B06794512E9C439600B9D273 /* Storage */; };
+		B06794542E9C439600B9D273 /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = B06794532E9C439600B9D273 /* Supabase */; };
 		B0821C682C641B9100BA126E /* CoreLocationUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B0821C672C641B9100BA126E /* CoreLocationUI.framework */; settings = {ATTRIBUTES = (Required, ); }; };
 		B0A819152CEA5F2A0041416F /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = B0A819142CEA5F2A0041416F /* GoogleService-Info.plist */; };
 		B0A819182CEA5F970041416F /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = B0A819172CEA5F970041416F /* GoogleSignIn */; };
@@ -50,12 +53,12 @@
 			remoteGlobalIDString = B054DC5C2C42F5DA00C98088;
 			remoteInfo = loc;
 		};
-		B05FEF332E1F28FB002436B7 /* PBXContainerItemProxy */ = {
+		B0667AA72EB309CA00879683 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = B054DC552C42F5DA00C98088 /* Project object */;
 			proxyType = 1;
-			remoteGlobalIDString = B05FEF2A2E1F28FB002436B7;
-			remoteInfo = "Mesa Share";
+			remoteGlobalIDString = B0667A9E2EB309CA00879683;
+			remoteInfo = MesaShare;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -66,7 +69,7 @@
 			dstPath = "";
 			dstSubfolderSpec = 13;
 			files = (
-				B05FEF352E1F28FB002436B7 /* Mesa Share.appex in Embed Foundation Extensions */,
+				B0667AA92EB309CA00879683 /* MesaShare.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -84,8 +87,8 @@
 		B054DC772C42F5DB00C98088 /* locUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = locUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		B054DC7B2C42F5DB00C98088 /* locUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = locUITests.swift; sourceTree = "<group>"; };
 		B054DC7D2C42F5DB00C98088 /* locUITestsLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = locUITestsLaunchTests.swift; sourceTree = "<group>"; };
-		B05FEF2B2E1F28FB002436B7 /* Mesa Share.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "Mesa Share.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
 		B061F1E22C581A3A00042CB0 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		B0667A9F2EB309CA00879683 /* MesaShare.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = MesaShare.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		B0821C672C641B9100BA126E /* CoreLocationUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreLocationUI.framework; path = System/Library/Frameworks/CoreLocationUI.framework; sourceTree = SDKROOT; };
 		B0A819142CEA5F2A0041416F /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		B0C31A862D94CB6400E481F4 /* .gitignore */ = {isa = PBXFileReference; lastKnownFileType = text; path = .gitignore; sourceTree = "<group>"; };
@@ -93,12 +96,12 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		B010DCB32E4D94A000E35032 /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
+		B0667AAA2EB309CA00879683 /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
 			);
-			target = B05FEF2A2E1F28FB002436B7 /* Mesa Share */;
+			target = B0667A9E2EB309CA00879683 /* MesaShare */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
@@ -108,7 +111,7 @@
 		B00311FD2CDACD81002AE03B /* Views */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Views; sourceTree = "<group>"; };
 		B00311FE2CDACD8B002AE03B /* Services */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Services; sourceTree = "<group>"; };
 		B00311FF2CDACE01002AE03B /* Managers */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Managers; sourceTree = "<group>"; };
-		B05FEF2C2E1F28FB002436B7 /* Mesa Share */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (B010DCB32E4D94A000E35032 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = "Mesa Share"; sourceTree = "<group>"; };
+		B0667AA02EB309CA00879683 /* MesaShare */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (B0667AAA2EB309CA00879683 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = MesaShare; sourceTree = "<group>"; };
 		B0E659872D39D54300F8527E /* Extensions */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Extensions; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
@@ -118,23 +121,26 @@
 			buildActionMask = 2147483647;
 			files = (
 				B0FE7F7C2DEFF32D006600D0 /* FirebaseMessaging in Frameworks */,
-				B03AE5C02D54785B00B986B1 /* MapboxSearch in Frameworks */,
 				B0821C682C641B9100BA126E /* CoreLocationUI.framework in Frameworks */,
 				B0EDE3F22CF7985900F33939 /* FirebaseFirestore in Frameworks */,
-				B03AE5C52D5478A000B986B1 /* MapboxMaps in Frameworks */,
+				B067944A2E9C439600B9D273 /* Auth in Frameworks */,
 				B0384E872CE2D19A00FC72F7 /* FirebaseAnalyticsWithoutAdIdSupport in Frameworks */,
 				B054DC902C4301FB00C98088 /* GoogleMaps in Frameworks */,
 				B0384E852CE2D19A00FC72F7 /* FirebaseAnalyticsOnDeviceConversion in Frameworks */,
+				B067944E2E9C439600B9D273 /* PostgREST in Frameworks */,
 				B0384E8F2CE2D54200FC72F7 /* FirebaseAuth in Frameworks */,
+				B067944C2E9C439600B9D273 /* Functions in Frameworks */,
 				B0EDE3F02CF7980100F33939 /* FirebaseFirestore in Frameworks */,
 				B0A819182CEA5F970041416F /* GoogleSignIn in Frameworks */,
-				B03AE5C22D54785B00B986B1 /* MapboxSearchUI in Frameworks */,
 				B0384E892CE2D19A00FC72F7 /* FirebaseAppCheck in Frameworks */,
 				B0384E832CE2D19A00FC72F7 /* FirebaseAnalytics in Frameworks */,
 				B061F1DE2C5815FA00042CB0 /* GooglePlaces in Frameworks */,
+				B06794522E9C439600B9D273 /* Storage in Frameworks */,
 				B0E659862D37436000F8527E /* FirebaseStorage in Frameworks */,
+				B06794542E9C439600B9D273 /* Supabase in Frameworks */,
 				B0384E8B2CE2D19A00FC72F7 /* FirebaseAppDistribution-Beta in Frameworks */,
 				B0A8191A2CEA5F970041416F /* GoogleSignInSwift in Frameworks */,
+				B06794502E9C439600B9D273 /* Realtime in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -152,7 +158,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		B05FEF282E1F28FB002436B7 /* Frameworks */ = {
+		B0667A9C2EB309CA00879683 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -169,7 +175,7 @@
 				B054DC5F2C42F5DA00C98088 /* loc */,
 				B054DC702C42F5DB00C98088 /* locTests */,
 				B054DC7A2C42F5DB00C98088 /* locUITests */,
-				B05FEF2C2E1F28FB002436B7 /* Mesa Share */,
+				B0667AA02EB309CA00879683 /* MesaShare */,
 				B054DC5E2C42F5DA00C98088 /* Products */,
 				B0821C662C641B9100BA126E /* Frameworks */,
 				B021AF4B2CED816500642586 /* loc copy-Info.plist */,
@@ -183,7 +189,7 @@
 				B054DC5D2C42F5DA00C98088 /* loc.app */,
 				B054DC6D2C42F5DB00C98088 /* locTests.xctest */,
 				B054DC772C42F5DB00C98088 /* locUITests.xctest */,
-				B05FEF2B2E1F28FB002436B7 /* Mesa Share.appex */,
+				B0667A9F2EB309CA00879683 /* MesaShare.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -255,7 +261,7 @@
 			buildRules = (
 			);
 			dependencies = (
-				B05FEF342E1F28FB002436B7 /* PBXTargetDependency */,
+				B0667AA82EB309CA00879683 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				B00311FA2CDACD4B002AE03B /* Models */,
@@ -280,10 +286,13 @@
 				B0EDE3EF2CF7980100F33939 /* FirebaseFirestore */,
 				B0EDE3F12CF7985900F33939 /* FirebaseFirestore */,
 				B0E659852D37436000F8527E /* FirebaseStorage */,
-				B03AE5BF2D54785B00B986B1 /* MapboxSearch */,
-				B03AE5C12D54785B00B986B1 /* MapboxSearchUI */,
-				B03AE5C42D5478A000B986B1 /* MapboxMaps */,
 				B0FE7F7B2DEFF32D006600D0 /* FirebaseMessaging */,
+				B06794492E9C439600B9D273 /* Auth */,
+				B067944B2E9C439600B9D273 /* Functions */,
+				B067944D2E9C439600B9D273 /* PostgREST */,
+				B067944F2E9C439600B9D273 /* Realtime */,
+				B06794512E9C439600B9D273 /* Storage */,
+				B06794532E9C439600B9D273 /* Supabase */,
 			);
 			productName = loc;
 			productReference = B054DC5D2C42F5DA00C98088 /* loc.app */;
@@ -325,26 +334,26 @@
 			productReference = B054DC772C42F5DB00C98088 /* locUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
-		B05FEF2A2E1F28FB002436B7 /* Mesa Share */ = {
+		B0667A9E2EB309CA00879683 /* MesaShare */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = B05FEF372E1F28FB002436B7 /* Build configuration list for PBXNativeTarget "Mesa Share" */;
+			buildConfigurationList = B0667AAB2EB309CA00879683 /* Build configuration list for PBXNativeTarget "MesaShare" */;
 			buildPhases = (
-				B05FEF272E1F28FB002436B7 /* Sources */,
-				B05FEF282E1F28FB002436B7 /* Frameworks */,
-				B05FEF292E1F28FB002436B7 /* Resources */,
+				B0667A9B2EB309CA00879683 /* Sources */,
+				B0667A9C2EB309CA00879683 /* Frameworks */,
+				B0667A9D2EB309CA00879683 /* Resources */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				B05FEF2C2E1F28FB002436B7 /* Mesa Share */,
+				B0667AA02EB309CA00879683 /* MesaShare */,
 			);
-			name = "Mesa Share";
+			name = MesaShare;
 			packageProductDependencies = (
 			);
-			productName = "Mesa Share";
-			productReference = B05FEF2B2E1F28FB002436B7 /* Mesa Share.appex */;
+			productName = MesaShare;
+			productReference = B0667A9F2EB309CA00879683 /* MesaShare.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
@@ -354,7 +363,7 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 1640;
+				LastSwiftUpdateCheck = 2600;
 				LastUpgradeCheck = 1640;
 				TargetAttributes = {
 					B054DC5C2C42F5DA00C98088 = {
@@ -368,8 +377,8 @@
 						CreatedOnToolsVersion = 15.4;
 						TestTargetID = B054DC5C2C42F5DA00C98088;
 					};
-					B05FEF2A2E1F28FB002436B7 = {
-						CreatedOnToolsVersion = 16.4;
+					B0667A9E2EB309CA00879683 = {
+						CreatedOnToolsVersion = 26.0.1;
 					};
 				};
 			};
@@ -387,8 +396,7 @@
 				B061F1DC2C5290EF00042CB0 /* XCRemoteSwiftPackageReference "ios-places-sdk" */,
 				B0384E812CE2D19A00FC72F7 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
 				B0A819162CEA5F970041416F /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
-				B03AE5BE2D54785B00B986B1 /* XCRemoteSwiftPackageReference "search-ios" */,
-				B03AE5C32D5478A000B986B1 /* XCRemoteSwiftPackageReference "mapbox-maps-ios" */,
+				B06794482E9C439600B9D273 /* XCRemoteSwiftPackageReference "supabase-swift" */,
 			);
 			productRefGroup = B054DC5E2C42F5DA00C98088 /* Products */;
 			projectDirPath = "";
@@ -397,7 +405,7 @@
 				B054DC5C2C42F5DA00C98088 /* loc */,
 				B054DC6C2C42F5DB00C98088 /* locTests */,
 				B054DC762C42F5DB00C98088 /* locUITests */,
-				B05FEF2A2E1F28FB002436B7 /* Mesa Share */,
+				B0667A9E2EB309CA00879683 /* MesaShare */,
 			);
 		};
 /* End PBXProject section */
@@ -427,7 +435,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		B05FEF292E1F28FB002436B7 /* Resources */ = {
+		B0667A9D2EB309CA00879683 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -462,7 +470,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		B05FEF272E1F28FB002436B7 /* Sources */ = {
+		B0667A9B2EB309CA00879683 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -482,10 +490,10 @@
 			target = B054DC5C2C42F5DA00C98088 /* loc */;
 			targetProxy = B054DC782C42F5DB00C98088 /* PBXContainerItemProxy */;
 		};
-		B05FEF342E1F28FB002436B7 /* PBXTargetDependency */ = {
+		B0667AA82EB309CA00879683 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = B05FEF2A2E1F28FB002436B7 /* Mesa Share */;
-			targetProxy = B05FEF332E1F28FB002436B7 /* PBXContainerItemProxy */;
+			target = B0667A9E2EB309CA00879683 /* MesaShare */;
+			targetProxy = B0667AA72EB309CA00879683 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -639,12 +647,13 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 3.7;
+				MARKETING_VERSION = 4.1;
 				PRODUCT_BUNDLE_IDENTIFIER = drewharts.locc;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 1;
@@ -677,12 +686,13 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 3.7;
+				MARKETING_VERSION = 4.1;
 				PRODUCT_BUNDLE_IDENTIFIER = drewharts.locc;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 1;
@@ -759,57 +769,63 @@
 			};
 			name = Release;
 		};
-		B05FEF382E1F28FB002436B7 /* Debug */ = {
+		B0667AAC2EB309CA00879683 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGN_ENTITLEMENTS = "Mesa Share/Mesa Share.entitlements";
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = "Mesa Share/Info.plist";
-				INFOPLIST_KEY_CFBundleDisplayName = "Mesa Share";
+				DEVELOPMENT_TEAM = 585YK2F2H6;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = MesaShare/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = MesaShare;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 3.3;
-				NEW_SETTING = "";
-				PRODUCT_BUNDLE_IDENTIFIER = "drewharts.locc.Mesa-Share";
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = drewharts.locc.MesaShare;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Debug;
 		};
-		B05FEF392E1F28FB002436B7 /* Release */ = {
+		B0667AAD2EB309CA00879683 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGN_ENTITLEMENTS = "Mesa Share/Mesa Share.entitlements";
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = "Mesa Share/Info.plist";
-				INFOPLIST_KEY_CFBundleDisplayName = "Mesa Share";
+				DEVELOPMENT_TEAM = 585YK2F2H6;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = MesaShare/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = MesaShare;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 3.3;
-				NEW_SETTING = "";
-				PRODUCT_BUNDLE_IDENTIFIER = "drewharts.locc.Mesa-Share";
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = drewharts.locc.MesaShare;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -854,11 +870,11 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		B05FEF372E1F28FB002436B7 /* Build configuration list for PBXNativeTarget "Mesa Share" */ = {
+		B0667AAB2EB309CA00879683 /* Build configuration list for PBXNativeTarget "MesaShare" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				B05FEF382E1F28FB002436B7 /* Debug */,
-				B05FEF392E1F28FB002436B7 /* Release */,
+				B0667AAC2EB309CA00879683 /* Debug */,
+				B0667AAD2EB309CA00879683 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -872,22 +888,6 @@
 			requirement = {
 				kind = upToNextMajorVersion;
 				minimumVersion = 11.4.0;
-			};
-		};
-		B03AE5BE2D54785B00B986B1 /* XCRemoteSwiftPackageReference "search-ios" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/mapbox/search-ios.git";
-			requirement = {
-				kind = exactVersion;
-				version = "2.8.0-rc.2";
-			};
-		};
-		B03AE5C32D5478A000B986B1 /* XCRemoteSwiftPackageReference "mapbox-maps-ios" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/mapbox/mapbox-maps-ios.git";
-			requirement = {
-				kind = exactVersion;
-				version = "11.10.0-rc.1";
 			};
 		};
 		B054DC8A2C42F95A00C98088 /* XCRemoteSwiftPackageReference "ios-maps-sdk" */ = {
@@ -904,6 +904,14 @@
 			requirement = {
 				kind = upToNextMajorVersion;
 				minimumVersion = 9.0.0;
+			};
+		};
+		B06794482E9C439600B9D273 /* XCRemoteSwiftPackageReference "supabase-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/supabase/supabase-swift.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.5.1;
 			};
 		};
 		B0A819162CEA5F970041416F /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */ = {
@@ -947,21 +955,6 @@
 			package = B0384E812CE2D19A00FC72F7 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseAuth;
 		};
-		B03AE5BF2D54785B00B986B1 /* MapboxSearch */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = B03AE5BE2D54785B00B986B1 /* XCRemoteSwiftPackageReference "search-ios" */;
-			productName = MapboxSearch;
-		};
-		B03AE5C12D54785B00B986B1 /* MapboxSearchUI */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = B03AE5BE2D54785B00B986B1 /* XCRemoteSwiftPackageReference "search-ios" */;
-			productName = MapboxSearchUI;
-		};
-		B03AE5C42D5478A000B986B1 /* MapboxMaps */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = B03AE5C32D5478A000B986B1 /* XCRemoteSwiftPackageReference "mapbox-maps-ios" */;
-			productName = MapboxMaps;
-		};
 		B054DC8F2C4301FB00C98088 /* GoogleMaps */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = B054DC8A2C42F95A00C98088 /* XCRemoteSwiftPackageReference "ios-maps-sdk" */;
@@ -971,6 +964,36 @@
 			isa = XCSwiftPackageProductDependency;
 			package = B061F1DC2C5290EF00042CB0 /* XCRemoteSwiftPackageReference "ios-places-sdk" */;
 			productName = GooglePlaces;
+		};
+		B06794492E9C439600B9D273 /* Auth */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B06794482E9C439600B9D273 /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Auth;
+		};
+		B067944B2E9C439600B9D273 /* Functions */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B06794482E9C439600B9D273 /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Functions;
+		};
+		B067944D2E9C439600B9D273 /* PostgREST */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B06794482E9C439600B9D273 /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = PostgREST;
+		};
+		B067944F2E9C439600B9D273 /* Realtime */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B06794482E9C439600B9D273 /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Realtime;
+		};
+		B06794512E9C439600B9D273 /* Storage */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B06794482E9C439600B9D273 /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Storage;
+		};
+		B06794532E9C439600B9D273 /* Supabase */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B06794482E9C439600B9D273 /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Supabase;
 		};
 		B0A819172CEA5F970041416F /* GoogleSignIn */ = {
 			isa = XCSwiftPackageProductDependency;

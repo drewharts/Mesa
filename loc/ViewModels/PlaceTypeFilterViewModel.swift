@@ -15,11 +15,15 @@ class PlaceTypeFilterViewModel: ObservableObject {
     @Published var mostFrequentTypes: [String] = []
     @Published var availableTypes: [String] = []
     @Published var isCalculatingTypes: Bool = false
+    @Published var filteredPlaces: [DetailPlace] = []  // CACHED for performance
     
     private let detailPlaceVM: DetailPlaceViewModel
     private let profileVM: ProfileViewModel
     private var cancellables = Set<AnyCancellable>()
     private var recalculationTimer: Timer?
+    
+    // Optional MapViewModel for viewport places
+    weak var mapViewModel: MapViewModel?
     
     init(detailPlaceVM: DetailPlaceViewModel, profileVM: ProfileViewModel) {
         self.detailPlaceVM = detailPlaceVM
@@ -31,17 +35,26 @@ class PlaceTypeFilterViewModel: ObservableObject {
         
         // Calculate immediately in case data is already available
         calculateMostFrequentTypes()
+        updateFilteredPlaces()
         
         // Set up periodic recalculation for the first 10 seconds to handle async loading
         startPeriodicRecalculation()
     }
     
     private func setupProfileDataObservers() {
+        // Watch for changes to selected place types - update filtered places
+        $selectedPlaceTypes
+            .sink { [weak self] _ in
+                self?.updateFilteredPlaces()
+            }
+            .store(in: &cancellables)
+        
         // Watch for changes to user favorites
         profileVM.$userFavorites
             .dropFirst() // Skip initial empty value
             .sink { [weak self] favorites in
                 self?.calculateMostFrequentTypes()
+                self?.updateFilteredPlaces()
             }
             .store(in: &cancellables)
         
@@ -50,6 +63,7 @@ class PlaceTypeFilterViewModel: ObservableObject {
             .dropFirst() // Skip initial empty value
             .sink { [weak self] listsPlaces in
                 self?.calculateMostFrequentTypes()
+                self?.updateFilteredPlaces()
             }
             .store(in: &cancellables)
         
@@ -58,6 +72,7 @@ class PlaceTypeFilterViewModel: ObservableObject {
             .dropFirst()
             .sink { [weak self] places in
                 self?.calculateMostFrequentTypes()
+                self?.updateFilteredPlaces()
             }
             .store(in: &cancellables)
         
@@ -66,6 +81,23 @@ class PlaceTypeFilterViewModel: ObservableObject {
             .dropFirst() // Skip initial empty value
             .sink { [weak self] placeTypes in
                 self?.calculateMostFrequentTypes()
+                self?.updateFilteredPlaces()
+            }
+            .store(in: &cancellables)
+    }
+    
+    /// Setup observer for MapViewModel viewport changes
+    func observeMapViewModel() {
+        guard let mapVM = mapViewModel else { 
+            print("⚠️ [PlaceTypeFilterVM] No MapViewModel available for observation")
+            return 
+        }
+        
+        print("✅ [PlaceTypeFilterVM] Setting up observer for MapViewModel viewport changes")
+        
+        mapVM.$viewportAnnotations
+            .sink { [weak self] _ in
+                self?.updateFilteredPlaces()
             }
             .store(in: &cancellables)
     }
@@ -184,13 +216,19 @@ class PlaceTypeFilterViewModel: ObservableObject {
     
     // MARK: - Filtering Logic
     
-    func getFilteredPlaces() -> [DetailPlace] {
+    /// Update the cached filtered places (called when data changes)
+    func updateFilteredPlaces() {
+        // Get all places to display (viewport + saved places)
+        let allPlaces = getAllDisplayPlaces()
+        
+        
         guard !selectedPlaceTypes.isEmpty else {
-            return detailPlaceVM.savedDetailPlaces
+            filteredPlaces = allPlaces
+            return
         }
         
         // First pass: Calculate missing place types on-demand for filtering
-        let placesToCalculate = detailPlaceVM.savedDetailPlaces.filter { place in
+        let placesToCalculate = allPlaces.filter { place in
             detailPlaceVM.placeTypes[place.id.uuidString] == nil
         }
         
@@ -202,7 +240,7 @@ class PlaceTypeFilterViewModel: ObservableObject {
         }
         
         // Second pass: Apply filtering with all types calculated
-        let filteredPlaces = detailPlaceVM.savedDetailPlaces.filter { place in
+        filteredPlaces = allPlaces.filter { place in
             let placeId = place.id.uuidString
             
             guard let placeType = detailPlaceVM.placeTypes[placeId] else { 
@@ -211,8 +249,28 @@ class PlaceTypeFilterViewModel: ObservableObject {
             
             return shouldIncludePlaceType(placeType)
         }
-        
+    }
+    
+    /// DEPRECATED: Use filteredPlaces @Published property instead
+    /// Kept for backward compatibility
+    func getFilteredPlaces() -> [DetailPlace] {
         return filteredPlaces
+    }
+    
+    /// Get all places to display (combines viewport annotations with cached place details)
+    private func getAllDisplayPlaces() -> [DetailPlace] {
+        // If we have a MapViewModel, get annotations and load details for them
+        if let mapVM = mapViewModel {
+            let annotations = mapVM.getAllDisplayAnnotations()
+            
+            // For now, return empty array since we're using on-demand loading
+            // The map will handle displaying annotations directly
+            return []
+        }
+        
+        // Fallback to saved places only (for non-map views)
+        let places = detailPlaceVM.savedDetailPlaces
+        return places
     }
     
     // Helper method to determine if a place type should be included based on selected filters
@@ -241,14 +299,25 @@ class PlaceTypeFilterViewModel: ObservableObject {
             return
         }
         
-        let matchingTypes = availableTypes.filter { type in
-            type.lowercased().contains(searchText.lowercased())
-        }
+        // Capture availableTypes on main thread before background processing
+        let availableTypes = self.availableTypes
         
-        if matchingTypes.count == 1 {
-            selectPlaceType(matchingTypes[0])
-        } else if matchingTypes.count <= 5 {
-            selectedPlaceTypes = Set(matchingTypes)
+        // Perform filtering on background queue to prevent blocking main thread
+        Task.detached(priority: .userInitiated) { [weak self] in
+            guard let self = self else { return }
+            
+            let matchingTypes = availableTypes.filter { type in
+                type.lowercased().contains(searchText.lowercased())
+            }
+            
+            // Update UI on main thread
+            await MainActor.run {
+                if matchingTypes.count == 1 {
+                    self.selectPlaceType(matchingTypes[0])
+                } else if matchingTypes.count <= 5 {
+                    self.selectedPlaceTypes = Set(matchingTypes)
+                }
+            }
         }
     }
     

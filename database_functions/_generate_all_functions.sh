@@ -1,0 +1,52 @@
+#!/bin/bash
+# Script to generate all function files from database
+# This script queries the database for each function and creates a file
+
+# List of all custom functions to extract
+FUNCTIONS=(
+    "calculate_place_list_average_location"
+    "decrement_review_likes"
+    "extract_video_url"
+    "get_all_user_places"
+    "get_bounding_box"
+    "get_external_places_annotations"
+    "get_favorites_annotations"
+    "get_followed_users"
+    "get_followed_users_photos"
+    "get_follower_profiles"
+    "get_follower_profiles_paginated"
+    "get_following_profiles_paginated"
+    "get_list_places_annotations"
+    "get_map_places_in_viewport"
+    "get_my_places_annotations"
+    "get_nearby_places"
+    "get_paginated_user_place_lists_by_proximity"
+    "get_place_average_rating"
+    "get_place_list_with_items"
+    "get_place_recommendations"
+    "get_place_reviews_with_tiktoks"
+    "get_place_tiktoks"
+    "get_place_with_tiktoks"
+    "get_places_for_tiktok_video"
+    "get_reviewed_places_annotations"
+    "get_trending_places"
+    "get_user_and_friends"
+    "get_user_created_places"
+    "get_user_favorite_places"
+    "get_user_feed"
+    "get_user_place_lists_by_proximity"
+    "get_user_stats"
+    "notify_on_comment"
+    "notify_on_follow"
+    "notify_on_review"
+    "notify_on_review_like"
+    "search_places"
+    "trigger_update_place_list_average_location"
+    "update_place_list_average_location"
+    "update_user_place_lists_average_locations"
+)
+
+echo "This script would query the database for each function."
+echo "To use this, you would need to configure Supabase connection."
+echo "For now, function files are being created manually from database queries."
+

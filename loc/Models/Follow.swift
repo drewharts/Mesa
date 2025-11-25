@@ -6,10 +6,9 @@
 //
 
 import Foundation
-import FirebaseFirestore
 
 struct Follow: Codable, Identifiable {
-    @DocumentID var id: String?  // Firestore document ID (optional)
+    var id: String?  // Document ID
     let followerId: String  // User who follows
     let followingId: String  // User being followed
     let followedAt: Date  // Timestamp when the follow happened

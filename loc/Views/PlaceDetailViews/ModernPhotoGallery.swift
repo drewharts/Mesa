@@ -11,7 +11,7 @@ struct ModernPhotoGallery: View {
     let images: [UIImage]
     let onImageTapped: (Int) -> Void
 
-    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
+    @ObservedObject var photosViewModel: PlacePhotosViewModel
 
     // Configuration
     private let heroImageHeight: CGFloat = 200
@@ -71,13 +71,6 @@ struct ModernPhotoGallery: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            // Header
-            Text("PHOTOS")
-                .font(.subheadline)
-                .foregroundColor(.black)
-                .fontWeight(.semibold)
-                .padding(.bottom, 5)
-
             if images.isEmpty {
                 // Empty state
                 VStack(spacing: 16) {
@@ -141,8 +134,8 @@ struct ModernPhotoGallery: View {
                                 }
                                 .onAppear {
                                     // Load more photos when nearing the end
-                                    if actualIndex == images.count - 3 && !selectedPlaceVM.allPhotosLoadedForCurrentPlace {
-                                        selectedPlaceVM.loadMorePhotos()
+                                    if actualIndex == images.count - 3 && !photosViewModel.allPhotosLoadedForCurrentPlace {
+                                        photosViewModel.loadMorePhotos()
                                     }
                                 }
                                 .transition(.opacity.combined(with: .scale(scale: 0.9)))
@@ -175,7 +168,7 @@ struct ModernPhotoGallery: View {
                         }
 
                         // Loading indicator
-                        if selectedPlaceVM.photoLoadingState == .loading && !images.isEmpty {
+                        if photosViewModel.photoLoadingState == .loading && !images.isEmpty {
                             HStack {
                                 Spacer()
                                 ProgressView()
@@ -196,6 +189,20 @@ struct ModernPhotoGallery: View {
 
 // MARK: - Preview
 #Preview {
+    let services = ServiceContainer.shared
+    let selectedPlaceVM = SelectedPlaceViewModel(
+        locationManager: LocationManager(),
+        reviewService: services.reviewService,
+        placeService: services.placeService,
+        userService: services.userService,
+        imageService: services.imageService
+    )
+    
+    let photosViewModel = PlacePhotosViewModel(
+        reviewService: services.reviewService,
+        selectedPlaceVM: selectedPlaceVM
+    )
+    
     let sampleImages = [
         UIImage(systemName: "photo")!,
         UIImage(systemName: "photo.fill")!,
@@ -204,8 +211,12 @@ struct ModernPhotoGallery: View {
         UIImage(systemName: "photo.stack")!
     ]
 
-    return ModernPhotoGallery(images: sampleImages) { index in
+    return ModernPhotoGallery(
+        images: sampleImages,
+        onImageTapped: { index in
         print("Tapped image at index: \(index)")
-    }
+        },
+        photosViewModel: photosViewModel
+    )
     .padding()
 }

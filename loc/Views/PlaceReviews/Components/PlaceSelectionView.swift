@@ -196,7 +196,7 @@ struct PlaceSelectionView: View {
                 longitude: coordinate.longitude
             )
             
-                        selectedPlaceVM.allowAutoPresent = false
+            selectedPlaceVM.allowAutoPresent = true // Allow auto-present for newly created places
             // Use the existing createNewPlace method from SelectedPlaceViewModel
             selectedPlaceVM.createNewPlace(
                 idString: generatedId,

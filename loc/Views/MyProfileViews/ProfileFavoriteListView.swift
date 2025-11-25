@@ -23,9 +23,8 @@ struct ProfileFavoriteListView: View {
             return firstVideo.thumbnailURL
         }
         
-        // Check user's TikTok videos for this place
-        let userTikTokVideos = profile.getTikTokVideos(for: place.id.uuidString)
-        return userTikTokVideos.first?.thumbnailURL
+        // Check user's TikTok videos for this place (uses cached data)
+        return profile.getFirstTikTokThumbnailURL(for: place.id.uuidString)
     }
 
     var body: some View {
@@ -35,21 +34,20 @@ struct ProfileFavoriteListView: View {
             Divider()
                 .padding(.horizontal, 20)
         }
+        .onAppear {
+            print("📱 [ProfileFavoriteListView] View appeared - lightweightFavorites count: \(profile.lightweightFavorites.count)")
+            // Preload images for the first 6 priority tiles immediately
+            preloadPriorityFavoriteImages()
+        }
         // TODO: Add search functionality for adding more favorites
     }
     
     private var favoritesHeader: some View {
         HStack {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("FAVORITES")
-                    .font(.headline)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.primary)
-                
-                Text("\(profile.userFavorites.count) place\(profile.userFavorites.count == 1 ? "" : "s")")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
+            Text("FAVORITES")
+                .font(.headline)
+                .fontWeight(.semibold)
+                .foregroundColor(.primary)
             
             Spacer()
         }
@@ -61,7 +59,7 @@ struct ProfileFavoriteListView: View {
             // Could open a favorites popup or navigate to favorites view
         }) {
             VStack(spacing: 0) {
-                if profile.userFavorites.isEmpty {
+                if profile.lightweightFavorites.isEmpty {
                     // Empty state
                     VStack(spacing: 12) {
                         Image(systemName: "heart")
@@ -82,13 +80,13 @@ struct ProfileFavoriteListView: View {
                 } else {
                     // Favorites grid (2x3 layout like list previews)
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
-                        ForEach(Array(profile.userFavorites.prefix(6)), id: \.self) { place in
-                            FavoritePlaceCard(place: place)
+                        ForEach(Array(profile.lightweightFavorites.prefix(6).enumerated()), id: \.element.id) { index, favoritePlace in
+                            LightweightFavoritePlaceCard(favoritePlace: favoritePlace, isPriorityTile: index < 6)
                         }
                         
                         // Fill remaining slots if less than 6 favorites
-                        if profile.userFavorites.count < 6 {
-                            ForEach(0..<(6 - profile.userFavorites.count), id: \.self) { _ in
+                        if profile.lightweightFavorites.count < 6 {
+                            ForEach(0..<(6 - profile.lightweightFavorites.count), id: \.self) { _ in
                                 Rectangle()
                                     .fill(Color.gray.opacity(0.1))
                                     .frame(height: 80)
@@ -116,10 +114,114 @@ struct ProfileFavoriteListView: View {
         .buttonStyle(PlainButtonStyle())
         .padding(.horizontal, 20)
     }
+    
+    // Preload images for the first 6 priority favorite tiles
+    // Note: With lightweight favorites, images are loaded on-demand via AsyncImage
+    private func preloadPriorityFavoriteImages() {
+        // No longer needed - images are loaded via AsyncImage in LightweightFavoritePlaceCard
+    }
+}
+
+// Lightweight card that displays FavoritePlace data without needing full Place object
+struct LightweightFavoritePlaceCard: View {
+    let favoritePlace: FavoritePlace
+    let isPriorityTile: Bool
+    @EnvironmentObject var places: DetailPlaceViewModel
+    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
+    @Environment(\.presentationMode) var presentationMode
+    
+    var body: some View {
+        ZStack(alignment: .bottom) {
+            // Container to strictly enforce bounds
+            Rectangle()
+                .fill(Color.clear)
+                .frame(height: 80)
+                .overlay(
+                    Group {
+                        if let photoUrl = favoritePlace.latest_review_photo, let url = URL(string: photoUrl) {
+                            AsyncImage(url: url) { image in
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .frame(maxWidth: .infinity, maxHeight: 80)
+                                    .clipped()
+                            } placeholder: {
+                                Rectangle()
+                                    .foregroundColor(.gray.opacity(0.3))
+                                    .frame(maxWidth: .infinity, maxHeight: 80)
+                            }
+                        } else {
+                            Rectangle()
+                                .foregroundColor(places.colorForPlace(placeId: favoritePlace.place_id))
+                                .frame(maxWidth: .infinity, maxHeight: 80)
+                        }
+                    }
+                    .clipped()
+                )
+            
+            // Gradient overlay for text readability
+            LinearGradient(
+                gradient: Gradient(colors: [
+                    Color.black.opacity(0.0),
+                    Color.black.opacity(0.1),
+                    Color.black.opacity(0.2),
+                    Color.black.opacity(1.0)
+                ]),
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: 80)
+            
+            // Text overlay
+            VStack(alignment: .leading, spacing: 2) {
+                Text(favoritePlace.name)
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.white)
+                    .lineLimit(1)
+                    .multilineTextAlignment(.leading)
+            }
+            .padding(.horizontal, 8)
+            .padding(.bottom, 8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .frame(height: 80)
+        .clipped()
+        .cornerRadius(8)
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+        )
+        .contentShape(Rectangle())
+        .onTapGesture {
+            // When tapped, load the full place details and navigate
+            Task {
+                await loadPlaceAndNavigate()
+            }
+        }
+    }
+    
+    private func loadPlaceAndNavigate() async {
+        do {
+            // Fetch the full place details using PlaceService
+            let place = try await PlaceService.shared.fetchPlace(withId: favoritePlace.place_id)
+            
+            // Navigate to the place detail view
+            await MainActor.run {
+                // Animate map to favorite place location when tapping from tile
+                selectedPlaceVM.selectPlaceAndFetchDetails(place, shouldAnimateMap: true)
+                selectedPlaceVM.isDetailSheetPresented = true
+                presentationMode.wrappedValue.dismiss()
+            }
+        } catch {
+            print("❌ Error loading place details: \(error)")
+        }
+    }
 }
 
 struct FavoritePlaceCard: View {
     let place: String
+    let isPriorityTile: Bool
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var places: DetailPlaceViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
@@ -143,28 +245,42 @@ struct FavoritePlaceCard: View {
                                 image
                                     .resizable()
                                     .aspectRatio(contentMode: .fill)
-                                    .frame(width: .infinity, height: 80)
+                                    .frame(maxWidth: .infinity, maxHeight: 80)
                                     .clipped()
                             } placeholder: {
                                 Rectangle()
                                     .foregroundColor(.gray.opacity(0.3))
-                                    .frame(width: .infinity, height: 80)
+                                    .frame(maxWidth: .infinity, maxHeight: 80)
+                            }
+                        } else if let detailPlace = detailPlace,
+                                  let photoUrls = detailPlace.photoUrls,
+                                  !photoUrls.isEmpty,
+                                  let photoUrl = photoUrls.first,
+                                  let url = URL(string: photoUrl) {
+                            // Show place's own photo (for created places) using AsyncImage
+                            AsyncImage(url: url) { image in
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .frame(maxWidth: .infinity, maxHeight: 80)
+                                    .clipped()
+                            } placeholder: {
+                                Rectangle()
+                                    .foregroundColor(.gray.opacity(0.3))
+                                    .frame(maxWidth: .infinity, maxHeight: 80)
                             }
                         } else if let image = places.placeImages[place] {
+                            // Show place review image (already loaded)
                             Image(uiImage: image)
                                 .resizable()
                                 .aspectRatio(contentMode: .fill)
-                                .frame(width: .infinity, height: 80)
+                                .frame(maxWidth: .infinity, maxHeight: 80)
                                 .clipped()
                         } else {
+                            // Show colored rectangle fallback
                             Rectangle()
                                 .foregroundColor(places.colorForPlace(placeId: place))
-                                .frame(width: .infinity, height: 80)
-                                .onAppear {
-                                    if let detailPlace = detailPlace {
-                                        profile.loadPlaceImageWithFallback(for: detailPlace)
-                                    }
-                                }
+                                .frame(maxWidth: .infinity, maxHeight: 80)
                         }
                     }
                     .clipped()
@@ -214,7 +330,9 @@ struct FavoritePlaceCard: View {
         )
         .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
         .onTapGesture {
-            selectedPlaceVM.selectedPlace = detailPlace
+            // Animate map to favorite place location when tapping from card
+            guard let place = detailPlace else { return }
+            selectedPlaceVM.selectPlaceAndFetchDetails(place, shouldAnimateMap: true)
             selectedPlaceVM.isDetailSheetPresented = true
             presentationMode.wrappedValue.dismiss()
         }
@@ -229,9 +347,8 @@ struct FavoritePlaceCard: View {
             return firstVideo.thumbnailURL
         }
         
-        // Check user's TikTok videos for this place
-        let userTikTokVideos = profile.getTikTokVideos(for: place.id.uuidString)
-        return userTikTokVideos.first?.thumbnailURL
+        // Check user's TikTok videos for this place (uses cached data)
+        return profile.getFirstTikTokThumbnailURL(for: place.id.uuidString)
     }
 }
 

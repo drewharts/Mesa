@@ -7,9 +7,6 @@
 
 
 import Foundation
-import FirebaseFirestore
-
-import FirebaseFirestore
 
 struct MapPlace: Codable {
     var placeId: String

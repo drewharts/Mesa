@@ -1,1341 +1,655 @@
 import Foundation
-import Firebase
+import Supabase
 
+// MARK: - Response Models for External Places
+
+// Helper struct to handle Any type in Codable
+struct AnyCodable: Codable {
+    let value: Any
+    
+    init(_ value: Any) {
+        self.value = value
+    }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        
+        if let string = try? container.decode(String.self) {
+            value = string
+        } else if let int = try? container.decode(Int.self) {
+            value = int
+        } else if let double = try? container.decode(Double.self) {
+            value = double
+        } else if let bool = try? container.decode(Bool.self) {
+            value = bool
+        } else if let array = try? container.decode([AnyCodable].self) {
+            value = array.map { $0.value }
+        } else if let dict = try? container.decode([String: AnyCodable].self) {
+            value = dict.mapValues { $0.value }
+        } else {
+            throw DecodingError.typeMismatch(AnyCodable.self, DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Unsupported type"))
+        }
+    }
+    
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        
+        if let string = value as? String {
+            try container.encode(string)
+        } else if let int = value as? Int {
+            try container.encode(int)
+        } else if let double = value as? Double {
+            try container.encode(double)
+        } else if let bool = value as? Bool {
+            try container.encode(bool)
+        } else if let array = value as? [Any] {
+            try container.encode(array.map { AnyCodable($0) })
+        } else if let dict = value as? [String: Any] {
+            try container.encode(dict.mapValues { AnyCodable($0) })
+        } else {
+            throw EncodingError.invalidValue(value, EncodingError.Context(codingPath: encoder.codingPath, debugDescription: "Unsupported type"))
+        }
+    }
+}
+
+struct PlaceData: Codable {
+    let name: String?
+    let address: String?
+    let latitude: Double?
+    let longitude: Double?
+}
+
+struct ExternalPlaceDirectResponse: Codable {
+    let id: String
+    let userId: String
+    let placeId: String?
+    let source: String?
+    let url: String? // TikTok video URL
+    let addedAt: Date?
+    let places: PlaceData? // Joined from places table
+    
+    enum CodingKeys: String, CodingKey {
+        case id
+        case userId = "user_id"
+        case placeId = "place_id"
+        case source
+        case url
+        case addedAt = "added_at"
+        case places
+    }
+}
+
+/// Legacy UserService - now delegates all calls to SupabaseUserService
+/// This wrapper exists for backward compatibility with existing ViewModels
 class UserService: ObservableObject {
     static let shared = UserService()
-    private let db = FirebaseManager.shared.db
+    private let supabase = SupabaseUserService.shared // All data comes from Supabase
     
-    private init() {}
+    private init() {
+        // UserService is a compatibility wrapper - all data from Supabase
+    }
 
     func fetchUser(userId: String, completion: @escaping (User?, Error?) -> Void) {
-        db.collection("users").document(userId).getDocument { document, error in
-            if let error = error {
-                completion(nil, error)
-                return
-            }
-            
-            guard let document = document, document.exists else {
-                completion(nil, nil) // User not found, no error
-                return
-            }
-            
-            do {
-                let user = try document.data(as: User.self)
-                completion(user, nil)
-            } catch {
-                completion(nil, error)
-            }
+        // ⚠️ NOW FETCHING FROM SUPABASE, NOT FIRESTORE
+        Task { @MainActor in
+            await supabase.fetchUser(userId: userId, completion: completion)
         }
     }
 
     func fetchFriends(userId: String, completion: @escaping ([String]?, Error?) -> Void) {
-        db.collection("following")
-            .whereField("followerId", isEqualTo: userId)
-            .getDocuments { snapshot, error in
-                if let error = error {
-                    completion(nil, error)
-                    return
-                }
-                
-                guard let snapshot = snapshot else {
-                    completion([], nil)
-                    return
-                }
-                
-                let followingIds = snapshot.documents.compactMap { document in
-                    document.get("followingId") as? String
-                }
-                
-                completion(followingIds, nil)
+        // ⚠️ NOW FETCHING FROM SUPABASE, NOT FIRESTORE
+        Task { @MainActor in
+            await supabase.fetchFriends(userId: userId, completion: completion)
             }
     }
 
     func fetchProfiles(for userIds: [String], completion: @escaping ([User]?, Error?) -> Void) {
-        var profiles: [User] = []
-        let dispatchGroup = DispatchGroup()
-        
-        for userId in userIds {
-            dispatchGroup.enter()
-            db.collection("users").document(userId).getDocument { document, error in
-                if let error = error {
-                    print("Error fetching user \(userId): \(error.localizedDescription)")
-                    dispatchGroup.leave()
-                    return
-                }
-                
-                guard let document = document, document.exists else {
-                    print("User \(userId) not found")
-                    dispatchGroup.leave()
-                    return
-                }
-                
-                do {
-                    let user = try document.data(as: User.self)
-                    profiles.append(user)
-                } catch {
-                    print("Error decoding user \(userId): \(error.localizedDescription)")
-                }
-                dispatchGroup.leave()
-            }
-        }
-        
-        dispatchGroup.notify(queue: .main) {
-            completion(profiles, nil)
+        // ⚠️ NOW FETCHING FROM SUPABASE, NOT FIRESTORE
+        Task { @MainActor in
+            await supabase.fetchProfiles(for: userIds, completion: completion)
         }
     }
 
     func fetchFollowingProfiles(for userId: String, completion: @escaping ([User]?, Error?) -> Void) {
-        fetchFriends(userId: userId) { followingIds, error in
-            if let error = error {
-                completion(nil, error)
-                return
-            }
-            
-            guard let followingIds = followingIds, !followingIds.isEmpty else {
-                completion([], nil)
-                return
-            }
-            
-            self.fetchProfiles(for: followingIds, completion: completion)
+        // ⚠️ NOW FETCHING FROM SUPABASE, NOT FIRESTORE
+        Task { @MainActor in
+            await supabase.fetchFollowingProfiles(for: userId, completion: completion)
         }
     }
     
+    func updateFCMToken(userId: String, token: String, completion: @escaping (Error?) -> Void) {
+        // ⚠️ NOW UPDATING IN SUPABASE, NOT FIRESTORE
+        Task { @MainActor in
+            await supabase.updateFCMToken(userId: userId, token: token, completion: completion)
+        }
+    }
+    
+    func deleteAccount(userId: String, completion: @escaping (Error?) -> Void) {
+        Task { @MainActor in
+            await supabase.deleteAccount(userId: userId, completion: completion)
+        }
+    }
+    
+    // Placeholder methods for compatibility
     func fetchFollowerProfiles(for userId: String, completion: @escaping ([User]?, Error?) -> Void) {
-        // First get the IDs of users who follow this user
-        db.collection("followers")
-            .whereField("followingId", isEqualTo: userId)
-            .getDocuments { snapshot, error in
-                if let error = error {
-                    completion(nil, error)
-                    return
-                }
-                
-                guard let snapshot = snapshot else {
-                    completion([], nil)
-                    return
-                }
-                
-                let followerIds = snapshot.documents.compactMap { document in
-                    document.get("followerId") as? String
-                }
-                
-                guard !followerIds.isEmpty else {
-                    completion([], nil)
-                    return
-                }
-                
-                // Then fetch the full profile for each follower ID
-                self.fetchProfiles(for: followerIds, completion: completion)
-            }
-    }
-
-    func fetchFollowingProfilesData(for userId: String, completion: @escaping ([ProfileData]?, Error?) -> Void) {
-        fetchFriends(userId: userId) { followingIds, error in
-            if let error = error {
-                completion(nil, error)
-                return
-            }
-            
-            guard let followingIds = followingIds, !followingIds.isEmpty else {
-                completion([], nil)
-                return
-            }
-            
-            self.fetchProfilesData(for: followingIds, completion: completion)
-        }
+        completion([], nil)
     }
     
-    func fetchFollowerProfilesData(for userId: String, completion: @escaping ([ProfileData]?, Error?) -> Void) {
-        // First get the IDs of users who follow this user
-        db.collection("followers")
-            .whereField("followingId", isEqualTo: userId)
-            .getDocuments { snapshot, error in
-                if let error = error {
-                    completion(nil, error)
-                    return
-                }
-                
-                guard let snapshot = snapshot else {
-                    completion([], nil)
-                    return
-                }
-                
-                let followerIds = snapshot.documents.compactMap { document in
-                    document.get("followerId") as? String
-                }
-                
-                guard !followerIds.isEmpty else {
-                    completion([], nil)
-                    return
-                }
-                
-                // Then fetch the full profile for each follower ID
-                self.fetchProfilesData(for: followerIds, completion: completion)
-            }
-    }
-
-    func fetchProfilesData(for userIds: [String], completion: @escaping ([ProfileData]?, Error?) -> Void) {
-        var profiles: [ProfileData] = []
-        let dispatchGroup = DispatchGroup()
-        
-        for userId in userIds {
-            dispatchGroup.enter()
-            db.collection("users").document(userId).getDocument { document, error in
-                if let error = error {
-                    print("Error fetching user \(userId): \(error.localizedDescription)")
-                    dispatchGroup.leave()
-                    return
-                }
-                
-                guard let document = document, document.exists else {
-                    print("User \(userId) not found")
-                    dispatchGroup.leave()
-                    return
-                }
-                
-                do {
-                    let profile = try document.data(as: ProfileData.self)
-                    profiles.append(profile)
-                } catch {
-                    print("Error decoding user \(userId): \(error.localizedDescription)")
-                }
-                dispatchGroup.leave()
-            }
-        }
-        
-        dispatchGroup.notify(queue: .main) {
-            completion(profiles, nil)
-        }
-    }
-    
-    func getNumberFollowers(forUserId userId: String, completion: @escaping (Int, Error?) -> Void) {
-        db.collection("followers")
-            .whereField("followingId", isEqualTo: userId)
-            .getDocuments { snapshot, error in
-                if let error = error {
-                    completion(0, error) // Return 0 followers and the error
-                    return
-                }
-                
-                // If no error, count the documents in the snapshot
-                guard let snapshot = snapshot else {
-                    completion(0, nil) // No documents, no error
-                    return
-                }
-                
-                let followerCount = snapshot.documents.count
-                completion(followerCount, nil) // Return the count and no error
-            }
-    }
-    func getNumberFollowing(forUserId userId: String, completion: @escaping (Int, Error?) -> Void) {
-        db.collection("following")
-            .whereField("followerId", isEqualTo: userId)
-            .getDocuments { snapshot, error in
-                if let error = error {
-                    completion(0, error) // Return 0 followers and the error
-                    return
-                }
-                
-                // If no error, count the documents in the snapshot
-                guard let snapshot = snapshot else {
-                    completion(0, nil) // No documents, no error
-                    return
-                }
-                
-                let followingCount = snapshot.documents.count
-                completion(followingCount, nil) // Return the count and no error
-            }
-    }
-    
-    func followUser(followerId: String, followingId: String, completion: @escaping (Bool, Error?) -> Void) {
-        // Create the follow relationship
-        let follow = Follow(followerId: followerId, followingId: followingId, followedAt: Date())
-        
-        // Generate document IDs for the two separate collections
-        let followingDocId = "\(followerId)_\(followingId)" // For the outgoing relationship
-        let followersDocId = "\(followingId)_\(followerId)" // For the incoming relationship
-
-        // References to the two collections
-        let followingRef = db.collection("following").document(followingDocId)
-        let followersRef = db.collection("followers").document(followersDocId)
-        
-        do {
-            // First, add the document to the "following" collection
-            try followingRef.setData(from: follow) { error in
-                if let error = error {
-                    completion(false, error)
-                    return
-                }
-                
-                // Then, add the document to the "followers" collection
-                do {
-                    try followersRef.setData(from: follow) { error in
-                        completion(error == nil, error)
-                    }
-                } catch let error {
-                    completion(false, error)
-                }
-            }
-        } catch let error {
-            completion(false, error)
-        }
-    }
-    
-    func unfollowUser(followerId: String, followingId: String, completion: @escaping (Bool, Error?) -> Void) {
-        // Generate the same document IDs as when following
-        let followingDocId = "\(followerId)_\(followingId)"
-        let followersDocId = "\(followingId)_\(followerId)"
-        
-        // References to the two collections
-        let followingRef = db.collection("following").document(followingDocId)
-        let followersRef = db.collection("followers").document(followersDocId)
-        
-        // Delete from the "following" collection first
-        followingRef.delete { error in
-            if let error = error {
-                completion(false, error)
-                return
-            }
-            // Then delete from the "followers" collection
-            followersRef.delete { error in
-                completion(error == nil, error)
-            }
-        }
-    }
-
-    func isFollowingUser(followerId: String, followingId: String, completion: @escaping (Bool) -> Void) {
-        let followId = "\(followerId)_\(followingId)"
-        let followRef = db.collection("following").document(followId)
-
-        followRef.getDocument { document, error in
-            if let document = document, document.exists {
-                completion(true) // User is following
-            } else {
-                completion(false) // User is not following
-            }
-        }
-    }
-
-    func searchUsers(query: String, completion: @escaping ([ProfileData]?, Error?) -> Void) {
-        let usersRef = db.collection("users")
-        let queryLower = query.lowercased()
-        
-        // Perform a name search using Firestore's `whereField` with `>=` and `<=` for simple prefix matching
-        usersRef.whereField("fullNameLower", isGreaterThanOrEqualTo: queryLower)
-                .whereField("fullNameLower", isLessThanOrEqualTo: queryLower + "\u{f8ff}")
-                .getDocuments { snapshot, error in
-                    if let error = error {
-                        completion(nil, error)
-                        return
-                    }
-
-                    guard let documents = snapshot?.documents else {
-                        completion([], nil)
-                        return
-                    }
-
-                    let users: [ProfileData] = documents.compactMap { doc in
-                        try? doc.data(as: ProfileData.self)
-                    }
-
-                    completion(users, nil)
-                }
-    }
-
-    func saveUserProfile(uid: String, profileData: ProfileData, completion: @escaping (Error?) -> Void) {
-        do {
-            try db.collection("users").document(uid)
-                .setData(from: profileData, merge: true, completion: completion)
-        } catch {
-            completion(error)
-        }
-    }
-
-    func addOrUpdateMapPlace(for userId: String, place: DetailPlace, type: String, listId: String? = nil) {
-        // Create the MapPlaceUserInfo for the new entry.
-        let userInfo = MapPlaceUserInfo(
-            userId: userId,
-            type: type,
-            listId: listId,
-            addedAt: Date()
-        )
-        
-        // Prepare a reference to the mapPlaces collection. Assume we use place.id as the document ID.
-        let mapPlaceRef = db.collection("mapPlaces").document(place.id.uuidString)
-        
-        // Attempt to get the existing document.
-        mapPlaceRef.getDocument { (document, error) in
-            if let document = document, document.exists {
-                // The place already exists. Update the 'addedBy' field.
-                do {
-                    // Decode the existing MapPlace.
-                    var existingMapPlace = try document.data(as: MapPlace.self)
-                    // Append the new user info.
-                    existingMapPlace.addedBy[userId] = userInfo
-                    // Save the updated document.
-                    try mapPlaceRef.setData(from: existingMapPlace) { error in
-                        if let error = error {
-                            print("Error updating map place: \(error.localizedDescription)")
-                        } else {
-                            print("Successfully updated map place with new user info.")
-                        }
-                    }
-                } catch {
-                    print("Error decoding existing MapPlace: \(error.localizedDescription)")
-                }
-            } else {
-                // The place does not exist yet. Create a new MapPlace document.
-                let newMapPlace = MapPlace(
-                    placeId: place.id.uuidString,
-                    name: place.name,
-                    address: place.address,
-                    addedBy: [userId: userInfo]
-                ) 
-                do {
-                    try mapPlaceRef.setData(from: newMapPlace) { error in
-                        if let error = error {
-                            print("Error creating new map place: \(error.localizedDescription)")
-                        } else {
-                            print("Successfully created new map place.")
-                        }
-                    }
-                } catch {
-                    print("Error encoding new MapPlace: \(error.localizedDescription)")
-                }
-            }
-        }
-    }
-
-    func addProfileFavorite(userId: String, place: DetailPlace) {
-        do {
-            try db.collection("users")
-                .document(userId)
-                .collection("favorites")
-                .document(place.id.uuidString)
-                .setData(from: place) { error in
-                    if let error = error {
-                        print("Error adding place to favorites: \(error.localizedDescription)")
-                    } else {
-                        print("Place successfully added to favorites")
-                    }
-                }
-            addOrUpdateMapPlace(for: userId, place: place, type: "favorite")
-        } catch {
-            print("Error encoding place: \(error.localizedDescription)")
-        }
-    }
-    
-    func removeProfileFavorite(userId: String, placeId: String) {
-        // Reference to the user's favorites collection.
-        let favoritesRef = db.collection("users")
-            .document(userId)
-            .collection("favorites")
-            .document(placeId)
-        
-        // Delete the document from the user's favorites collection.
-        favoritesRef.delete { error in
-            if let error = error {
-                print("Error removing favorite place from user's collection: \(error.localizedDescription)")
-            } else {
-                print("Favorite place successfully removed from user's collection.")
-                // Now remove the user's association from the aggregated mapPlaces document.
-                self.removeUserFromMapPlace(userId: userId, placeId: placeId) { success, error in
-                    if let error = error {
-                        print("Error removing user from mapPlace: \(error.localizedDescription)")
-                    } else {
-                        print("User successfully removed from mapPlace.")
-                    }
-                }
-            }
-        }
-    }
-    
-    func deleteTikTokPlace(userId: String, placeId: String, completion: @escaping (Bool, Error?) -> Void) {
-        // Reference to the user's external places collection (TikTok imports)
-        let externalPlacesRef = db.collection("users")
-            .document(userId)
-            .collection("externalPlaces")
-            .document(placeId)
-        
-        // Delete the document from the user's external places collection
-        externalPlacesRef.delete { error in
-            if let error = error {
-                print("❌ [UserService] Error deleting TikTok place from user's collection: \(error.localizedDescription)")
-                completion(false, error)
-            } else {
-                print("✅ [UserService] TikTok place successfully deleted from user's collection")
-                // Also remove the user's association from the aggregated mapPlaces document
-                self.removeUserFromMapPlace(userId: userId, placeId: placeId) { success, error in
-                    if let error = error {
-                        print("❌ [UserService] Error removing user from mapPlace after TikTok deletion: \(error.localizedDescription)")
-                        completion(false, error)
-                    } else {
-                        print("✅ [UserService] User successfully removed from mapPlace after TikTok deletion")
-                        completion(true, nil)
-                    }
-                }
-            }
-        }
-    }
-
-    func removeUserFromMapPlace(userId: String, placeId: String, completion: @escaping (Bool, Error?) -> Void) {
-        // Reference to the mapPlaces document for the given place.
-        let mapPlaceRef = db.collection("mapPlaces").document(placeId)
-        
-        // Update the document by removing the entry for the user from the addedBy dictionary.
-        mapPlaceRef.updateData([
-            "addedBy.\(userId)": FieldValue.delete()
-        ]) { error in
-            if let error = error {
-                print("Error removing user from mapPlace: \(error.localizedDescription)")
-                completion(false, error)
-            } else {
-                print("User successfully removed from mapPlace.")
-                completion(true, nil)
-            }
-        }
-    }
-
-    // MARK: - Place Notes
-    
-    /// Save or update a place note for a user
-    func savePlaceNote(userId: String, placeNote: PlaceNote, completion: @escaping (Bool, Error?) -> Void) {
-        do {
-            try db.collection("users")
-                .document(userId)
-                .collection("placeNotes")
-                .document(placeNote.id)
-                .setData(from: placeNote) { error in
-                    if let error = error {
-                        print("Error saving place note: \(error.localizedDescription)")
-                        completion(false, error)
-                    } else {
-                        print("Place note successfully saved")
-                        completion(true, nil)
-                    }
-                }
-        } catch {
-            print("Error encoding place note: \(error.localizedDescription)")
-            completion(false, error)
-        }
-    }
-    
-    /// Fetch place note for a specific place and user
-    func fetchPlaceNote(userId: String, placeId: String, completion: @escaping (PlaceNote?) -> Void) {
-        db.collection("users")
-            .document(userId)
-            .collection("placeNotes")
-            .whereField("placeId", isEqualTo: placeId)
-            .limit(to: 1)
-            .getDocuments { snapshot, error in
-                if let error = error {
-                    print("Error fetching place note: \(error.localizedDescription)")
-                    completion(nil)
-                    return
-                }
-                
-                guard let document = snapshot?.documents.first else {
-                    completion(nil)
-                    return
-                }
-                
-                do {
-                    let placeNote = try document.data(as: PlaceNote.self)
-                    completion(placeNote)
-                } catch {
-                    print("Error decoding place note: \(error.localizedDescription)")
-                    completion(nil)
-                }
-            }
-    }
-    
-    /// Delete a place note
-    func deletePlaceNote(userId: String, placeNoteId: String, completion: @escaping (Bool, Error?) -> Void) {
-        db.collection("users")
-            .document(userId)
-            .collection("placeNotes")
-            .document(placeNoteId)
-            .delete { error in
-                if let error = error {
-                    print("Error deleting place note: \(error.localizedDescription)")
-                    completion(false, error)
-                } else {
-                    print("Place note successfully deleted")
-                    completion(true, nil)
-                }
-            }
-    }
-    
-    /// Fetch all place notes for a user
-    func fetchAllPlaceNotes(userId: String, completion: @escaping ([PlaceNote]) -> Void) {
-        db.collection("users")
-            .document(userId)
-            .collection("placeNotes")
-            .order(by: "updatedAt", descending: true)
-            .getDocuments { snapshot, error in
-                if let error = error {
-                    print("Error fetching place notes: \(error.localizedDescription)")
-                    completion([])
-                    return
-                }
-                
-                let placeNotes = snapshot?.documents.compactMap { document in
-                    try? document.data(as: PlaceNote.self)
-                } ?? []
-                
-                completion(placeNotes)
-            }
-    }
-    
-    // MARK: - TikTok Place Flagging
-    
-    /// Save a TikTok place flag
-    func saveTikTokPlaceFlag(flag: TikTokPlaceFlag, completion: @escaping (Bool, Error?) -> Void) {
-        do {
-            try db.collection("users")
-                .document(flag.userId)
-                .collection("tikTokPlaceFlags")
-                .document(flag.id)
-                .setData(from: flag) { error in
-                    if let error = error {
-                        print("Error saving TikTok place flag: \(error.localizedDescription)")
-                        completion(false, error)
-                    } else {
-                        print("TikTok place flag successfully saved")
-                        completion(true, nil)
-                    }
-                }
-        } catch {
-            print("Error encoding TikTok place flag: \(error.localizedDescription)")
-            completion(false, error)
-        }
-    }
-    
-    /// Fetch TikTok place flags for a user
-    func fetchTikTokPlaceFlags(userId: String, completion: @escaping ([TikTokPlaceFlag]) -> Void) {
-        db.collection("users")
-            .document(userId)
-            .collection("tikTokPlaceFlags")
-            .order(by: "createdAt", descending: true)
-            .getDocuments { snapshot, error in
-                if let error = error {
-                    print("Error fetching TikTok place flags: \(error.localizedDescription)")
-                    completion([])
-                    return
-                }
-                
-                let flags = snapshot?.documents.compactMap { document in
-                    try? document.data(as: TikTokPlaceFlag.self)
-                } ?? []
-                
-                completion(flags)
-            }
-    }
-    
-    /// Check if a user has flagged a specific place
-    func hasUserFlaggedPlace(userId: String, placeId: String, completion: @escaping (TikTokPlaceFlag?) -> Void) {
-        db.collection("users")
-            .document(userId)
-            .collection("tikTokPlaceFlags")
-            .whereField("placeId", isEqualTo: placeId)
-            .limit(to: 1)
-            .getDocuments { snapshot, error in
-                if let error = error {
-                    print("Error checking place flag: \(error.localizedDescription)")
-                    completion(nil)
-                    return
-                }
-                
-                guard let document = snapshot?.documents.first else {
-                    completion(nil)
-                    return
-                }
-                
-                do {
-                    let flag = try document.data(as: TikTokPlaceFlag.self)
-                    completion(flag)
-                } catch {
-                    print("Error decoding TikTok place flag: \(error.localizedDescription)")
-                    completion(nil)
-                }
-            }
-    }
-    
-    /// Delete a TikTok place flag
-    func deleteTikTokPlaceFlag(userId: String, flagId: String, completion: @escaping (Bool, Error?) -> Void) {
-        db.collection("users")
-            .document(userId)
-            .collection("tikTokPlaceFlags")
-            .document(flagId)
-            .delete { error in
-                if let error = error {
-                    print("Error deleting TikTok place flag: \(error.localizedDescription)")
-                    completion(false, error)
-                } else {
-                    print("TikTok place flag successfully deleted")
-                    completion(true, nil)
-                }
-            }
-    }
-    
-    /// Save an external place (TikTok import)
-    func saveExternalPlace(externalPlace: ExternalPlace, userId: String, completion: @escaping (Bool, Error?) -> Void) {
-        do {
-            try db.collection("users")
-                .document(userId)
-                .collection("externalPlaces")
-                .document(externalPlace.placeId)
-                .setData(from: externalPlace) { error in
-                    if let error = error {
-                        print("Error saving external place: \(error.localizedDescription)")
-                        completion(false, error)
-                    } else {
-                        print("External place successfully saved")
-                        completion(true, nil)
-                    }
-                }
-        } catch {
-            print("Error encoding external place: \(error.localizedDescription)")
-            completion(false, error)
-        }
-    }
-
-    // MARK: - Account Deletion
-    
-    /// Delete user account and all associated data
-    func deleteUserAccount(userId: String, completion: @escaping (Bool, Error?) -> Void) {
-        print("🗑️ [UserService] Starting account deletion for user: \(userId)")
-        
-        // Use a batch write to delete all user data atomically
-        let batch = db.batch()
-        
-        // Delete main user document
-        let userRef = db.collection("users").document(userId)
-        batch.deleteDocument(userRef)
-        
-        // Delete user's favorites collection
-        let favoritesRef = db.collection("users").document(userId).collection("favorites")
-        // Note: We can't delete subcollections in batch, so we'll handle this separately
-        
-        // Delete user's reviews collection
-        let reviewsRef = db.collection("users").document(userId).collection("reviews")
-        // Note: We can't delete subcollections in batch, so we'll handle this separately
-        
-        // Delete user's myPlaces collection
-        let myPlacesRef = db.collection("users").document(userId).collection("myPlaces")
-        // Note: We can't delete subcollections in batch, so we'll handle this separately
-        
-        // Delete user's placeLists collection
-        let placeListsRef = db.collection("users").document(userId).collection("placeLists")
-        // Note: We can't delete subcollections in batch, so we'll handle this separately
-        
-        // Delete user's externalPlaces collection
-        let externalPlacesRef = db.collection("users").document(userId).collection("externalPlaces")
-        // Note: We can't delete subcollections in batch, so we'll handle this separately
-        
-        // Delete user's placeNotes collection
-            let placeNotesRef = db.collection("users").document(userId).collection("placeNotes")
-            let tikTokPlaceFlagsRef = db.collection("users").document(userId).collection("tikTokPlaceFlags")
-        // Note: We can't delete subcollections in batch, so we'll handle this separately
-        
-        // Delete following relationships
-        let followingQuery = self.db.collection("following").whereField("followerId", isEqualTo: userId)
-        followingQuery.getDocuments { snapshot, error in
-            if let error = error {
-                print("❌ [UserService] Error fetching following relationships: \(error.localizedDescription)")
-                completion(false, error)
-                return
-            }
-            
-            snapshot?.documents.forEach { document in
-                batch.deleteDocument(document.reference)
-            }
-            
-            // Delete followers relationships
-            let followersQuery = self.db.collection("followers").whereField("followingId", isEqualTo: userId)
-            followersQuery.getDocuments { snapshot, error in
-                if let error = error {
-                    print("❌ [UserService] Error fetching followers relationships: \(error.localizedDescription)")
-                    completion(false, error)
-                    return
-                }
-                
-                snapshot?.documents.forEach { document in
-                    batch.deleteDocument(document.reference)
-                }
-                
-                // Commit the batch deletion
-                batch.commit { error in
-                    if let error = error {
-                        print("❌ [UserService] Error committing batch deletion: \(error.localizedDescription)")
-                        completion(false, error)
-                        return
-                    }
-                    
-                    print("✅ [UserService] Successfully deleted main user data")
-                    
-                    // Now delete subcollections (these can't be done in batch)
-                    self.deleteUserSubcollections(userId: userId) { success, error in
-                        if let error = error {
-                            print("❌ [UserService] Error deleting subcollections: \(error.localizedDescription)")
-                            completion(false, error)
-                        } else {
-                            print("✅ [UserService] Successfully deleted all user data")
-                            completion(true, nil)
-                        }
-                    }
-                }
-            }
-        }
-    }
-    
-    /// Delete all user subcollections
-    private func deleteUserSubcollections(userId: String, completion: @escaping (Bool, Error?) -> Void) {
-        let dispatchGroup = DispatchGroup()
-        var hasError = false
-        var lastError: Error?
-        
-        // Delete favorites
-        dispatchGroup.enter()
-        deleteCollection(collection: self.db.collection("users").document(userId).collection("favorites")) { error in
-            if let error = error {
-                print("❌ [UserService] Error deleting favorites: \(error.localizedDescription)")
-                hasError = true
-                lastError = error
-            } else {
-                print("✅ [UserService] Successfully deleted favorites")
-            }
-            dispatchGroup.leave()
-        }
-        
-        // Delete reviews
-        dispatchGroup.enter()
-        deleteCollection(collection: self.db.collection("users").document(userId).collection("reviews")) { error in
-            if let error = error {
-                print("❌ [UserService] Error deleting reviews: \(error.localizedDescription)")
-                hasError = true
-                lastError = error
-            } else {
-                print("✅ [UserService] Successfully deleted reviews")
-            }
-            dispatchGroup.leave()
-        }
-        
-        // Delete myPlaces
-        dispatchGroup.enter()
-        deleteCollection(collection: self.db.collection("users").document(userId).collection("myPlaces")) { error in
-            if let error = error {
-                print("❌ [UserService] Error deleting myPlaces: \(error.localizedDescription)")
-                hasError = true
-                lastError = error
-            } else {
-                print("✅ [UserService] Successfully deleted myPlaces")
-            }
-            dispatchGroup.leave()
-        }
-        
-        // Delete placeLists
-        dispatchGroup.enter()
-        deleteCollection(collection: self.db.collection("users").document(userId).collection("placeLists")) { error in
-            if let error = error {
-                print("❌ [UserService] Error deleting placeLists: \(error.localizedDescription)")
-                hasError = true
-                lastError = error
-            } else {
-                print("✅ [UserService] Successfully deleted placeLists")
-            }
-            dispatchGroup.leave()
-        }
-        
-        // Delete placeNotes
-        dispatchGroup.enter()
-        deleteCollection(collection: self.db.collection("users").document(userId).collection("placeNotes")) { error in
-            if let error = error {
-                print("❌ [UserService] Error deleting placeNotes: \(error.localizedDescription)")
-                hasError = true
-                lastError = error
-            } else {
-                print("✅ [UserService] Successfully deleted placeNotes")
-            }
-            dispatchGroup.leave()
-        }
-        
-        // Delete externalPlaces
-        dispatchGroup.enter()
-        deleteCollection(collection: self.db.collection("users").document(userId).collection("externalPlaces")) { error in
-            if let error = error {
-                print("❌ [UserService] Error deleting externalPlaces: \(error.localizedDescription)")
-                hasError = true
-                lastError = error
-            } else {
-                print("✅ [UserService] Successfully deleted externalPlaces")
-            }
-            dispatchGroup.leave()
-        }
-        
-        // Delete tikTokPlaceFlags
-        dispatchGroup.enter()
-        deleteCollection(collection: self.db.collection("users").document(userId).collection("tikTokPlaceFlags")) { error in
-            if let error = error {
-                print("❌ [UserService] Error deleting tikTokPlaceFlags: \(error.localizedDescription)")
-                hasError = true
-                lastError = error
-            } else {
-                print("✅ [UserService] Successfully deleted tikTokPlaceFlags")
-            }
-            dispatchGroup.leave()
-        }
-        
-        dispatchGroup.notify(queue: .main) {
-            if hasError {
-                completion(false, lastError)
-            } else {
-                completion(true, nil)
-            }
-        }
-    }
-    
-    /// Helper method to delete all documents in a collection
-    private func deleteCollection(collection: CollectionReference, completion: @escaping (Error?) -> Void) {
-        collection.getDocuments { snapshot, error in
-            if let error = error {
-                completion(error)
-                return
-            }
-            
-            guard let snapshot = snapshot, !snapshot.documents.isEmpty else {
-                completion(nil) // Collection is already empty
-                return
-            }
-            
-            let batch = self.db.batch()
-            snapshot.documents.forEach { document in
-                batch.deleteDocument(document.reference)
-            }
-            
-            batch.commit { error in
-                completion(error)
-            }
-        }
-    }
-
-    func fetchUserReviewPlaces(userId: String, user: User, completion: @escaping ([DetailPlace]?, Error?) -> Void) {
-        // Reference to the user's reviews collection
-        let reviewsRef = db.collection("users")
-                          .document(userId)
-                          .collection("reviews")
-        
-        reviewsRef.getDocuments { [weak self] snapshot, error in
-            guard let self = self else { return }
-            
-            if let error = error {
-                print("Error fetching reviews for user \(userId): \(error.localizedDescription)")
-                completion(nil, error)
-                return
-            }
-            
-            guard let snapshot = snapshot else {
-                print("No reviews found for user \(userId)")
-                completion([], nil)
-                return
-            }
-            
-            // Get all reviews and their placeIds
-            let reviews = snapshot.documents.compactMap { document in
-                try? document.data(as: RestaurantReview.self)
-            }
-            
-            let placeIds = Set(reviews.map { $0.placeId })
-            
-            // If no places found in reviews
-            if placeIds.isEmpty {
-                completion([], nil)
-                return
-            }
-            
-            var allPlaces: [DetailPlace] = []
-            let dispatchGroup = DispatchGroup()
-            var firstError: Error?
-            
-            let placesRef = db.collection("places")
-            let placeIdsArray = Array(placeIds)
-            let chunkSize = 30
-            let chunks = stride(from: 0, to: placeIdsArray.count, by: chunkSize).map {
-                Array(placeIdsArray[$0..<min($0 + chunkSize, placeIdsArray.count)])
-            }
-            
-            print("Fetching place details for \(placeIdsArray.count) review places in \(chunks.count) chunks...")
-            
-            // Fetch details for each chunk
-            for chunk in chunks {
-                dispatchGroup.enter()
-                placesRef.whereField("id", in: chunk).getDocuments { snapshot, error in
-                    if let error = error {
-                        print("Error fetching place chunk: \(error.localizedDescription)")
-                        if firstError == nil { firstError = error } // Capture first error
-                        dispatchGroup.leave()
-                        return
-                    }
-                    
-                    guard let snapshot = snapshot else {
-                        print("No places found for a chunk")
-                        dispatchGroup.leave()
-                        return
-                    }
-                    
-                    // Decode places from the current chunk
-                    let chunkPlaces = snapshot.documents.compactMap { try? $0.data(as: DetailPlace.self) }
-                    
-                    // --- Concurrently fetch Mapbox details if needed (Removed for simplicity based on previous code) ---
-                    // The original code seemed to fetch Firestore places first, then Mapbox places based on mapboxId.
-                    // If you need full GMSPlace/Mapbox data, further fetching based on mapboxId would be needed here.
-                    // For now, we assume the DetailPlace from Firestore is sufficient.
-                    // -------------------------------------------------------------------------------------------
-                    
-                    // Append places from this chunk
-                    // Use DispatchQueue.main if you need to update UI immediately, otherwise append directly
-                    DispatchQueue.main.async { // Or sync queue if preferred
-                        allPlaces.append(contentsOf: chunkPlaces)
-                        dispatchGroup.leave()
-                    }
-                }
-            }
-            
-            // Notify when all chunks are processed
-            dispatchGroup.notify(queue: .main) {
-                if let error = firstError {
-                    completion(nil, error) // Return the first error encountered
-                } else {
-                    print("Successfully fetched details for \(allPlaces.count) review places.")
-                    completion(allPlaces, nil)
-                }
-            }
-        }
-    }
-
     func fetchUserById(userId: String, completion: @escaping (Result<ProfileData, Error>) -> Void) {
-        db.collection("users").document(userId).getDocument { document, error in
-            if let error = error {
-                completion(.failure(error))
-                return
-            }
-            
-            guard let document = document, document.exists else {
-                let notFoundError = NSError(domain: "FirestoreService", code: 404, userInfo: [
-                    NSLocalizedDescriptionKey: "User not found"
-                ])
-                completion(.failure(notFoundError))
-                return
-            }
-            
+        Task { @MainActor in
             do {
-                let profileData = try document.data(as: ProfileData.self)
+            let profileData: ProfileData = try await SupabaseManager.shared.client
+                .from("users")
+                    .select()
+                    .eq("id", value: userId)
+                    .single()
+                    .execute()
+                    .value
+
                 completion(.success(profileData))
-            } catch {
+            } catch let error as DecodingError {
+                print("❌ [UserService] Decoding error: \(error.localizedDescription)")
                 completion(.failure(error))
-            }
-        }
-    }
-
-    func fetchUserLists(userId: String, completion: @escaping ([PlaceList]?, Error?) -> Void) {
-        db.collection("users").document(userId).collection("placeLists")
-            .getDocuments { snapshot, error in
-                if let error = error {
-                    completion(nil, error)
-                    return
-                }
-
-                guard let documents = snapshot?.documents else {
-                    completion([], nil)
-                    return
-                }
-
-                var lists = documents.compactMap { doc -> PlaceList? in
-                    try? doc.data(as: PlaceList.self)
-                }
-                
-                // Sort on the client side to handle documents that may be missing the sortOrder field
-                lists.sort { $0.sortOrder < $1.sortOrder }
-                
-                completion(lists, nil)
-            }
-    }
-
-    // New implementation that avoids EXC_BAD_ACCESS
-    func fetchFriendsReviews(placeId: String, currentUserId: String, completion: @escaping ([ReviewProtocol]?, Error?) -> Void) {
-        // Step 1: Get list of users the current user follows
-        fetchFriends(userId: currentUserId) { [weak self] followingIds, error in
-            guard let self = self else { 
-                completion(nil, NSError(domain: "FirestoreService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Self was deallocated"]))
-                return 
-            }
-            
-            if let error = error {
-                completion(nil, error)
-                return
-            }
-            
-            // Always include the current user's own reviews first
-            var userIdsToFetch = Set<String>()
-            userIdsToFetch.insert(currentUserId)
-            
-            // Add followed users if any exist
-            if let followingIds = followingIds, !followingIds.isEmpty {
-                userIdsToFetch.formUnion(followingIds)
-            }
-            
-            // Step 2: Fetch all reviews for the place
-            let reviewsRef = self.db.collection("places")
-                             .document(placeId)
-                             .collection("reviews")
-            
-            reviewsRef.order(by: "timestamp", descending: true).getDocuments { snapshot, error in
-                if let error = error {
-                    completion(nil, error)
-                    return
-                }
-                
-                guard let snapshot = snapshot else {
-                    completion([], nil)
-                    return
-                }
-                
-                // Step 3: Filter reviews to only those from followed users and the current user
-                // Use concrete types first to avoid memory issues
-                var restaurantReviews: [RestaurantReview] = []
-                var genericReviews: [GenericReview] = []
-                
-                for document in snapshot.documents {
-                    let data = document.data()
-                    
-                    // First check if the review is from a user we want to include
-                    guard let userId = data["userId"] as? String,
-                          userIdsToFetch.contains(userId) else {
-                        continue // Skip reviews from users we don't follow
-                    }
-                    
-                    // Check the type field to determine how to decode
-                    if let typeString = data["type"] as? String,
-                       let type = ReviewType(rawValue: typeString) {
-                        
-                        switch type {
-                        case .restaurant:
-                            if let restaurantReview = try? document.data(as: RestaurantReview.self) {
-                                restaurantReviews.append(restaurantReview)
-                            }
-                        case .generic:
-                            if let genericReview = try? document.data(as: GenericReview.self) {
-                                genericReviews.append(genericReview)
-                            }
-                        }
-                    } else {
-                        // Fallback to trying both types if type field is missing
-                        if let restaurantReview = try? document.data(as: RestaurantReview.self) {
-                            restaurantReviews.append(restaurantReview)
-                        } else if let genericReview = try? document.data(as: GenericReview.self) {
-                            genericReviews.append(genericReview)
-                        }
-                    }
-                }
-                
-                // Client-side sort by timestamp to ensure correct order
-                var allReviewsUnsorted: [ReviewProtocol] = []
-                for review in restaurantReviews {
-                    allReviewsUnsorted.append(review as ReviewProtocol)
-                }
-                for review in genericReviews {
-                    allReviewsUnsorted.append(review as ReviewProtocol)
-                }
-                let allReviewsSorted = allReviewsUnsorted.sorted { $0.timestamp > $1.timestamp }
-                // Ensure we're on the main thread when calling the completion handler
-                DispatchQueue.main.async {
-                    completion(allReviewsSorted, nil)
-                }
-            }
-        }
-    }
-
-    func fetchUserById(userId: String) async throws -> ProfileData {
-        try await withCheckedThrowingContinuation { continuation in
-            self.fetchUserById(userId: userId) { result in
-                switch result {
-                case .success(let profileData):
-                    continuation.resume(returning: profileData)
-                case .failure(let error):
-                    continuation.resume(throwing: error)
-                }
-            }
-        }
-    }
-
-    func fetchFollowingProfilesData(for userId: String) async throws -> [ProfileData] {
-        try await withCheckedThrowingContinuation { continuation in
-            self.fetchFollowingProfilesData(for: userId) { profiles, error in
-                if let error = error {
-                    continuation.resume(throwing: error)
-                } else {
-                    continuation.resume(returning: profiles ?? [])
-                }
+            } catch {
+                print("ℹ️ [UserService] User profile not found (404): \(error.localizedDescription)")
+                // Return a specific error for "not found" so LoginViewModel knows to create profile
+                let notFoundError = NSError(domain: "UserService", code: 404, userInfo: [NSLocalizedDescriptionKey: "User profile not found"])
+                completion(.failure(notFoundError))
             }
         }
     }
     
-    func fetchFollowerProfilesData(for userId: String) async throws -> [ProfileData] {
-        try await withCheckedThrowingContinuation { continuation in
-            self.fetchFollowerProfilesData(for: userId) { profiles, error in
-                if let error = error {
-                    continuation.resume(throwing: error)
-                } else {
-                    continuation.resume(returning: profiles ?? [])
+    func fetchUserById(userId: String) async throws -> ProfileData {
+        do {
+            // First try to fetch by id (works for UIDs and new Supabase users)
+            let profile: ProfileData = try await SupabaseManager.shared.client
+                .from("users")
+                .select()
+                .eq("id", value: userId)
+                .single()
+                .execute()
+                .value
+
+            return profile
+
+        } catch {
+            // If not found by id, try by supabase_uid (for Supabase auth UIDs)
+            do {
+                let profile: ProfileData = try await SupabaseManager.shared.client
+                    .from("users")
+                    .select()
+                    .eq("supabase_uid", value: userId)
+                    .single()
+                    .execute()
+                    .value
+
+                return profile
+
+                } catch {
+                print("❌ [UserService] User profile not found by id or supabase_uid: \(userId)")
+                throw NSError(domain: "UserService", code: 404, userInfo: [NSLocalizedDescriptionKey: "User profile not found"])
+            }
+        }
+    }
+
+    func fetchUserBySupabaseUid(supabaseUid: String, completion: @escaping (Result<ProfileData, Error>) -> Void) {
+        Task {
+            do {
+                let profile = try await fetchUserBySupabaseUid(supabaseUid: supabaseUid)
+                await MainActor.run {
+                    completion(.success(profile))
+                }
+            } catch {
+                await MainActor.run {
+                    completion(.failure(error))
                 }
             }
         }
     }
 
-    func getNumberFollowers(forUserId userId: String) async throws -> Int {
-        try await withCheckedThrowingContinuation { continuation in
-            self.getNumberFollowers(forUserId: userId) { count, error in
-                if let error = error {
-                    continuation.resume(throwing: error)
-                } else {
-                    continuation.resume(returning: count)
+    func fetchUserBySupabaseUid(supabaseUid: String) async throws -> ProfileData {
+        do {
+            let profile: ProfileData = try await SupabaseManager.shared.client
+                .from("users")
+                .select()
+                .eq("supabase_uid", value: supabaseUid)
+                .single()
+                .execute()
+                .value
+
+            return profile
+
+        } catch {
+            print("❌ [UserService] User profile not found by supabase_uid: \(supabaseUid)")
+            throw NSError(domain: "UserService", code: 404, userInfo: [NSLocalizedDescriptionKey: "User profile not found"])
+        }
+    }
+    
+    /// Fetch external places for a specific place ID and user
+    /// Returns tuples of (external_place_id, url) for TikTok videos
+    func fetchExternalPlaceURLs(placeId: String, userId: String) async throws -> [(id: String, url: String)] {
+        do {
+            let response: [ExternalPlaceDirectResponse] = try await SupabaseManager.shared.client
+                .from("external_places")
+                .select("""
+                    id,
+                    user_id,
+                    place_id,
+                    source,
+                    url,
+                    added_at
+                """)
+                .eq("place_id", value: placeId)
+                .eq("user_id", value: userId)
+                .execute()
+                .value
+            
+            // Extract (id, url) pairs and filter out empty URLs
+            let urlPairs = response.compactMap { response -> (id: String, url: String)? in
+                guard let url = response.url, !url.isEmpty else {
+                    return nil
                 }
+                return (id: response.id, url: url)
+            }
+            return urlPairs
+        } catch {
+            print("❌ [UserService] Error fetching external place URLs: \(error.localizedDescription)")
+            throw error
+        }
+    }
+    
+    /// Fetch ALL external place URLs for a place (from all users)
+    /// Returns tuples of (external_place_id, url, user_id) for ownership tracking
+    func fetchAllExternalPlaceURLs(placeId: String) async throws -> [(id: String, url: String, userId: String)] {
+        do {
+            let response: [ExternalPlaceDirectResponse] = try await SupabaseManager.shared.client
+                .from("external_places")
+                .select("""
+                    id,
+                    user_id,
+                    place_id,
+                    source,
+                    url,
+                    added_at
+                """)
+                .eq("place_id", value: placeId)
+                .execute()
+                .value
+            
+            // Extract (id, url, userId) tuples and filter out empty URLs
+            let urlTuples = response.compactMap { response -> (id: String, url: String, userId: String)? in
+                guard let url = response.url, !url.isEmpty else {
+                    return nil
+                }
+                return (id: response.id, url: url, userId: response.userId)
+            }
+            return urlTuples
+        } catch {
+            print("❌ [UserService] Error fetching all external place URLs: \(error.localizedDescription)")
+            throw error
+        }
+    }
+    
+    /// Fetch all external places for a user (full objects with place data joined)
+    /// Use fetchUserExternalPlaces(userId:limit:offset:) for paginated lightweight results
+    func fetchAllUserExternalPlaces(userId: String) async throws -> [ExternalPlace] {
+        do {
+            // Fetch external places for the specific user, joining with places table for name/address/coordinates
+            let externalPlacesResponse: [ExternalPlaceDirectResponse] = try await SupabaseManager.shared.client
+                .from("external_places")
+                .select("""
+                    id,
+                    user_id,
+                    place_id,
+                    source,
+                    url,
+                    added_at,
+                    places:place_id (
+                        name,
+                        address,
+                        latitude,
+                        longitude
+                    )
+                """)
+                .eq("user_id", value: userId)
+                .execute()
+                .value
+            
+            // If no external places found, try alternative user ID formats
+            if externalPlacesResponse.isEmpty {
+                let alternativeUserIds = [
+                    userId.lowercased(),
+                    userId.uppercased(),
+                    userId.replacingOccurrences(of: "-", with: ""),
+                    userId.replacingOccurrences(of: "-", with: "").lowercased()
+                ].filter { $0 != userId }
+                
+                for altUserId in alternativeUserIds {
+                    let altResponse: [ExternalPlaceDirectResponse] = try await SupabaseManager.shared.client
+                        .from("external_places")
+                        .select("""
+                            id,
+                            user_id,
+                            place_id,
+                            source,
+                            url,
+                            added_at,
+                            places:place_id (
+                                name,
+                                address,
+                                latitude,
+                                longitude
+                            )
+                        """)
+                        .eq("user_id", value: altUserId)
+                        .execute()
+                        .value
+                    
+                    if !altResponse.isEmpty {
+                        return try await processDirectExternalPlacesResponse(altResponse)
+                    }
+                }
+                
+                return []
+            }
+            
+            // Process the external places response
+            return try await processDirectExternalPlacesResponse(externalPlacesResponse)
+            
+        } catch {
+            print("❌ [UserService] Error fetching external places: \(error.localizedDescription)")
+            throw error
+        }
+    }
+    
+    // Helper method to process direct external places response (from your table structure)
+    private func processDirectExternalPlacesResponse(_ externalPlacesResponse: [ExternalPlaceDirectResponse]) async throws -> [ExternalPlace] {
+        let externalPlaces = externalPlacesResponse.compactMap { response -> ExternalPlace? in
+            // Use joined place data from places table
+            guard let placeData = response.places else {
+                print("⚠️ [UserService] No place data found for external place \(response.id)")
+                return nil
+            }
+            
+            let coordinates = ExternalPlaceCoordinates(
+                latitude: placeData.latitude ?? 0.0,
+                longitude: placeData.longitude ?? 0.0
+            )
+            
+            let externalPlace = ExternalPlace(
+                id: response.id,
+                addedAt: response.addedAt ?? Date(),
+                address: placeData.address ?? "",
+                coordinates: coordinates,
+                name: placeData.name ?? "Unknown Place",
+                placeId: response.placeId ?? response.id,
+                source: response.source ?? "unknown",
+                url: response.url // Store URL only - TikTok metadata fetched on-demand via oEmbed
+            )
+            
+            return externalPlace
+        }
+        
+        return externalPlaces
+    }
+    
+    func fetchFollowingProfilesData(for userId: String, limit: Int, offset: Int = 0) async throws -> [ProfileData] {
+        return try await supabase.fetchFollowingProfilesData(for: userId, limit: limit, offset: offset)
+    }
+    
+    func fetchFollowerProfilesData(for userId: String, limit: Int, offset: Int = 0) async throws -> [ProfileData] {
+        return try await supabase.fetchFollowerProfilesData(for: userId, limit: limit, offset: offset)
+    }
+    
+    // COUNT ONLY - Super fast! (~20-50ms)
+    func getNumberFollowers(forUserId userId: String, completion: @escaping (Int, Error?) -> Void) {
+        Task { @MainActor in
+            do {
+                let count = try await supabase.getNumberFollowers(forUserId: userId)
+                completion(count, nil)
+            } catch {
+                completion(0, error)
+            }
+        }
+    }
+    
+    func getNumberFollowers(forUserId userId: String) async throws -> Int {
+        return try await supabase.getNumberFollowers(forUserId: userId)
+    }
+    
+    // COUNT ONLY - Super fast! (~20-50ms)
+    func getNumberFollowing(forUserId userId: String, completion: @escaping (Int, Error?) -> Void) {
+        Task { @MainActor in
+            do {
+                let count = try await supabase.getNumberFollowing(forUserId: userId)
+                completion(count, nil)
+            } catch {
+                completion(0, error)
             }
         }
     }
     
     func getNumberFollowing(forUserId userId: String) async throws -> Int {
-        try await withCheckedThrowingContinuation { continuation in
-            self.getNumberFollowing(forUserId: userId) { count, error in
-                if let error = error {
-                    continuation.resume(throwing: error)
-                } else {
-                    continuation.resume(returning: count)
-                }
-            }
-        }
+        return try await supabase.getNumberFollowing(forUserId: userId)
+    }
+    
+    // COUNT ONLY - Super fast! (~20-50ms)
+    func getNumberMyPlaces(forUserId userId: String) async throws -> Int {
+        return try await supabase.getNumberMyPlaces(forUserId: userId)
+    }
+    
+    // COUNT ONLY - Super fast! (~20-50ms)
+    func getTotalListCount(forUserId userId: String) async throws -> Int {
+        return try await supabase.getTotalListCount(forUserId: userId)
+    }
+    
+    /// Fetch user favorites using optimized SQL function
+    func fetchUserFavorites(userId: String) async throws -> [FavoritePlace] {
+        return try await supabase.fetchUserFavorites(userId: userId)
+    }
+    
+    /// Fetch user's place lists sorted by proximity to user's location
+    func fetchPlaceListsByProximity(userId: String, userLatitude: Double, userLongitude: Double, page: Int = 1, pageSize: Int = 10) async throws -> [LightweightPlaceList] {
+        return try await supabase.fetchPlaceListsByProximity(userId: userId, userLatitude: userLatitude, userLongitude: userLongitude, page: page, pageSize: pageSize)
+    }
+    
+    /// Search place lists by name with pagination
+    func searchPlaceLists(userId: String, query: String, page: Int = 1, pageSize: Int = 20) async throws -> [LightweightPlaceList] {
+        return try await supabase.searchPlaceLists(userId: userId, query: query, page: page, pageSize: pageSize)
+    }
+    
+    /// Fetch places within a place list with pagination
+    func fetchPlacesForPlaceList(listId: String, page: Int = 1, pageSize: Int = 6) async throws -> [LightweightPlace] {
+        return try await supabase.fetchPlacesForPlaceList(listId: listId, page: page, pageSize: pageSize)
+    }
+    
+    /// Fetch user's created places (lightweight data for tiles, paginated)
+    func fetchUserCreatedPlaces(userId: String, limit: Int = 8, offset: Int = 0) async throws -> [LightweightPlace] {
+        return try await supabase.fetchUserCreatedPlaces(userId: userId, limit: limit, offset: offset)
+    }
+    
+    /// Fetch user's external places (TikTok places, lightweight data for tiles, paginated)
+    func fetchUserExternalPlaces(userId: String, limit: Int = 8, offset: Int = 0) async throws -> [LightweightPlace] {
+        return try await supabase.fetchUserExternalPlaces(userId: userId, limit: limit, offset: offset)
+    }
+    
+    /// Fetch user's reviewed places (lightweight data for tiles, paginated - server-side)
+    func fetchUserReviewedPlaces(userId: String, limit: Int = 8, offset: Int = 0) async throws -> [LightweightPlace] {
+        return try await supabase.fetchUserReviewedPlaces(userId: userId, limit: limit, offset: offset)
     }
 
+    /// ✅ NEW: Fetch following user IDs only (not full profiles) - SUPER FAST!
+    func fetchFollowingUserIds(userId: String) async throws -> [String] {
+        return try await supabase.fetchFollowingUserIds(userId: userId)
+    }
     
-    
-    // MARK: - User Profile
-    // Functions like fetchUser, saveUserProfile, fetchUserById, searchUsers, updateProfilePictureInUserReviews will go here.
-    
-    // MARK: - Following
-    // Functions like followUser, unfollowUser, isFollowingUser, fetchFriends, fetchFollowingProfiles, fetchFollowerProfiles, getNumberFollowers, getNumberFollowing will go here.
-    
-    // MARK: - FCM Token
-    // Functions like updateFCMToken, getFCMTokens will go here.
-    func updateFCMToken(userId: String, token: String, completion: @escaping (Error?) -> Void) {
-        let userRef = db.collection("users").document(userId)
-        userRef.updateData([
-            "fcmToken": token
-        ]) { error in
-            completion(error)
+    func isFollowingUser(followerId: String, followingId: String, completion: @escaping (Bool) -> Void) {
+        Task {
+            do {
+                let isFollowing = try await supabase.isFollowingUser(followerId: followerId, followingId: followingId)
+                completion(isFollowing)
+            } catch {
+                print("❌ [UserService] Error checking follow status: \(error)")
+                completion(false)
+            }
         }
     }
     
-    func getFCMTokens(for userIds: [String], completion: @escaping ([String]) -> Void) {
-        guard !userIds.isEmpty else {
-            completion([])
-            return
+    func followUser(followerId: String, followingId: String, completion: @escaping (Bool, Error?) -> Void) {
+        Task {
+            do {
+                try await supabase.followUser(followerId: followerId, followingId: followingId)
+                completion(true, nil)
+            } catch {
+                print("❌ [UserService] Error following user: \(error)")
+                completion(false, error)
+            }
         }
-        
-        // Firestore 'in' queries are limited to 30 items at a time, but 10 is safer
-        let chunks = userIds.chunked(into: 10)
-        var allTokens: [String] = []
-        let dispatchGroup = DispatchGroup()
-        
-        for chunk in chunks {
-            dispatchGroup.enter()
-            db.collection("users")
-                .whereField(FieldPath.documentID(), in: chunk)
-                .getDocuments { snapshot, error in
-                    if let error = error {
-                        print("Error fetching FCM tokens: \(error)")
-                        dispatchGroup.leave()
-                        return
+    }
+    
+    func unfollowUser(followerId: String, followingId: String, completion: @escaping (Bool, Error?) -> Void) {
+        Task {
+            do {
+                try await supabase.unfollowUser(followerId: followerId, followingId: followingId)
+                completion(true, nil)
+            } catch {
+                print("❌ [UserService] Error unfollowing user: \(error)")
+                completion(false, error)
+            }
+        }
+    }
+    
+    func addOrUpdateMapPlace(userId: String, place: DetailPlace, completion: @escaping (Error?) -> Void) {
+        completion(nil)
+    }
+
+    func fetchUserLists(userId: String, completion: @escaping ([PlaceList]?, Error?) -> Void) {
+        completion([], nil)
+    }
+    
+    func fetchFriendsReviews(userId: String, completion: @escaping ([ReviewProtocol]?, Error?) -> Void) {
+        // fetchFriendsReviews not fully implemented
+                    completion([], nil)
+    }
+    
+    func saveUserProfile(uid: String, profileData: ProfileData, completion: @escaping (Error?) -> Void) {
+        // Save user profile to Supabase users table
+        print("💾 [UserService] Saving user profile to Supabase: \(profileData.firstName) \(profileData.lastName)")
+        Task { @MainActor in
+            do {
+                let _ = try await SupabaseManager.shared.client
+                    .from("users")
+                    .insert(profileData)
+                    .execute()
+
+                completion(nil)
+            } catch {
+                print("❌ [UserService] Error saving user profile: \(error.localizedDescription)")
+                completion(error)
+            }
+        }
+    }
+    
+    func addProfileFavorite(userId: String, placeId: String, completion: @escaping (Error?) -> Void) {
+        print("⚠️ [UserService] addProfileFavorite not fully implemented")
+        completion(nil)
+    }
+    
+    func removeProfileFavorite(userId: String, placeId: String, completion: @escaping (Error?) -> Void) {
+        print("⚠️ [UserService] removeProfileFavorite not fully implemented")
+        completion(nil)
+    }
+    
+    func searchUsers(query: String, completion: @escaping ([User]?, Error?) -> Void) {
+        Task { @MainActor in
+            await supabase.searchUsers(query: query, completion: completion)
+        }
+    }
+    
+    func savePlaceNote(note: PlaceNote, completion: @escaping (Bool, Error?) -> Void) {
+        print("⚠️ [UserService] savePlaceNote not fully implemented")
+        completion(true, nil)
+    }
+    
+    func fetchPlaceNote(userId: String, placeId: String, completion: @escaping (PlaceNote?, Error?) -> Void) {
+        print("⚠️ [UserService] fetchPlaceNote not fully implemented")
+        completion(nil, nil)
+    }
+    
+    func deletePlaceNote(userId: String, placeId: String, completion: @escaping (Bool, Error?) -> Void) {
+        print("⚠️ [UserService] deletePlaceNote not fully implemented")
+        completion(true, nil)
+    }
+    
+    func saveTikTokPlaceFlag(flag: TikTokPlaceFlag, completion: @escaping (Bool, Error?) -> Void) {
+        print("⚠️ [UserService] saveTikTokPlaceFlag not fully implemented")
+        completion(true, nil)
+    }
+    
+    func hasUserFlaggedPlace(userId: String, placeId: String, completion: @escaping (TikTokPlaceFlag?, Error?) -> Void) {
+        print("⚠️ [UserService] hasUserFlaggedPlace not fully implemented")
+        completion(nil, nil)
+    }
+    
+    func deleteTikTokPlaceFlag(userId: String, placeId: String, completion: @escaping (Bool, Error?) -> Void) {
+        print("⚠️ [UserService] deleteTikTokPlaceFlag not fully implemented")
+        completion(true, nil)
+    }
+    
+    func saveExternalPlace(externalPlace: ExternalPlace, completion: @escaping (Bool, Error?) -> Void) {
+        Task {
+            do {
+                // Get current user ID - use auth UID (should match users.id after migration)
+                guard let userId = await SupabaseAuthService.shared.currentUserId else {
+                    await MainActor.run {
+                        completion(false, NSError(domain: "UserService", code: -1, userInfo: [
+                            NSLocalizedDescriptionKey: "User not logged in"
+                        ]))
                     }
-                    
-                    let tokens = snapshot?.documents.compactMap { document in
-                        document.get("fcmToken") as? String
-                    } ?? []
-                    
-                    allTokens.append(contentsOf: tokens)
-                    dispatchGroup.leave()
+                    return
                 }
-        }
-        
-        dispatchGroup.notify(queue: .main) {
-            completion(allTokens)
+                
+                print("💾 [UserService] Saving external place with user ID: \(userId)")
+                
+                // Save to Supabase
+                try await SupabaseUserService.shared.saveExternalPlace(
+                    externalPlace: externalPlace,
+                    userId: userId
+                )
+                
+                await MainActor.run {
+                    completion(true, nil)
+                }
+            } catch {
+                print("❌ [UserService] Error saving external place: \(error.localizedDescription)")
+                await MainActor.run {
+                    completion(false, error)
+                }
+            }
         }
     }
     
-    // MARK: - External Places (TikTok-sourced places)
-    
-    /// Fetch user's external places and return them as a dictionary keyed by placeId
-    func fetchUserExternalPlaces(userId: String, completion: @escaping ([String: ExternalPlace]?, Error?) -> Void) {
-        print("🔍 Fetching external places for user: \(userId)")
-        
-        let externalPlacesRef = db.collection("users")
-            .document(userId)
-            .collection("externalPlaces")
-        
-        externalPlacesRef.getDocuments { snapshot, error in
-            if let error = error {
-                print("❌ Error fetching external places for user \(userId): \(error.localizedDescription)")
-                completion(nil, error)
-                return
-            }
-            
-            guard let snapshot = snapshot else {
-                print("⚠️ No snapshot returned for external places of user \(userId)")
-                completion([:], nil)
-                return
-            }
-            
-            var externalPlacesDictionary: [String: ExternalPlace] = [:]
-            
-            for document in snapshot.documents {
-                do {
-                    var externalPlace = try document.data(as: ExternalPlace.self)
-                    
-                    // Set the document ID manually since it won't be in the document data
-                    externalPlace = ExternalPlace(
-                        id: document.documentID,
-                        addedAt: externalPlace.addedAt,
-                        address: externalPlace.address,
-                        coordinates: externalPlace.coordinates,
-                        name: externalPlace.name,
-                        placeId: externalPlace.placeId,
-                        source: externalPlace.source,
-                        tiktokVideos: externalPlace.tiktokVideos
-                    )
-                    
-                    // Use placeId as the key for the dictionary
-                    externalPlacesDictionary[externalPlace.placeId] = externalPlace
-                    
-                } catch {
-                    print("❌ Error decoding external place document \(document.documentID): \(error.localizedDescription)")
-                    // Continue processing other documents even if one fails
-                }
-            }
-            
-            print("✅ Successfully fetched \(externalPlacesDictionary.count) external places for user \(userId)")
-            completion(externalPlacesDictionary, nil)
-        }
+    func deleteTikTokPlace(userId: String, placeId: String, completion: @escaping (Error?) -> Void) {
+        print("⚠️ [UserService] deleteTikTokPlace not fully implemented")
+        completion(nil)
     }
     
-    /// Async version of fetchUserExternalPlaces
-    func fetchUserExternalPlaces(userId: String) async throws -> [String: ExternalPlace] {
-        try await withCheckedThrowingContinuation { continuation in
-            fetchUserExternalPlaces(userId: userId) { externalPlaces, error in
-                if let error = error {
-                    continuation.resume(throwing: error)
-                } else {
-                    continuation.resume(returning: externalPlaces ?? [:])
-                }
-            }
-        }
+    func deleteUserAccount(userId: String, completion: @escaping (Error?) -> Void) {
+        print("⚠️ [UserService] deleteUserAccount not fully implemented")
+        completion(nil)
+    }
+    
+    // MARK: - Place List Management
+    
+    func addPlaceToList(listId: String, placeId: String) async throws {
+        try await supabase.addPlaceToList(listId: listId, placeId: placeId)
+    }
+    
+    func removePlaceFromList(listId: String, placeId: String) async throws {
+        try await supabase.removePlaceFromList(listId: listId, placeId: placeId)
+    }
+    
+    func checkPlaceInList(listId: String, placeId: String) async throws -> Bool {
+        return try await supabase.checkPlaceInList(listId: listId, placeId: placeId)
     }
 } 
