@@ -535,8 +535,6 @@ class SupabaseUserService: ObservableObject {
     
     /// Fetch places within a place list with pagination
     func fetchPlacesForPlaceList(listId: String, page: Int = 1, pageSize: Int = 6) async throws -> [LightweightPlace] {
-        print("📍 [Supabase] Fetching places for list: \(listId), page: \(page), pageSize: \(pageSize)")
-        
         struct Params: Encodable {
             let p_list_id: String
             let p_page: Int
@@ -553,8 +551,6 @@ class SupabaseUserService: ObservableObject {
             .rpc("get_paginated_place_list_places", params: params)
             .execute()
             .value
-        
-        print("✅ [Supabase] Fetched \(places.count) places for list")
         
         return places
     }
