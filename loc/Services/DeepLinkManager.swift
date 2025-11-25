@@ -159,21 +159,26 @@ class DeepLinkManager: ObservableObject {
     private func handleTikTokFromExtension() async {
         print("🎵 [DeepLinkManager] handleTikTokFromExtension called")
         
-        // Get TikTok URL from App Group
-        let shared = UserDefaults(suiteName: "group.com.mesa.loc")
-        guard let tiktokURLString = shared?.string(forKey: "sharedTikTokURL"),
-              let tiktokURL = URL(string: tiktokURLString) else {
-            print("❌ [DeepLinkManager] No TikTok URL found in App Group")
+        // Check App Group first (preferred method)
+        if let sharedDefaults = UserDefaults(suiteName: "group.com.drewhartsfield.mesa"),
+           let tiktokURLString = sharedDefaults.string(forKey: "sharedTikTokURL") {
+            print("✅ [DeepLinkManager] Found TikTok URL in App Group: \(tiktokURLString)")
+            sharedDefaults.removeObject(forKey: "sharedTikTokURL")
+            sharedDefaults.synchronize()
+            await processTikTokURL(tiktokURLString)
             return
         }
         
-        print("✅ [DeepLinkManager] Found TikTok URL: \(tiktokURLString)")
+        // Fallback: Check standard UserDefaults
+        if let tiktokURLString = UserDefaults.standard.string(forKey: "sharedTikTokURL") {
+            print("✅ [DeepLinkManager] Found TikTok URL in standard UserDefaults: \(tiktokURLString)")
+            UserDefaults.standard.removeObject(forKey: "sharedTikTokURL")
+            UserDefaults.standard.synchronize()
+            await processTikTokURL(tiktokURLString)
+            return
+        }
         
-        // Clear the stored URL
-        shared?.removeObject(forKey: "sharedTikTokURL")
-        
-        // Process the TikTok URL
-        await processTikTokURL(tiktokURLString)
+        print("❌ [DeepLinkManager] No TikTok URL found in App Group or standard UserDefaults")
     }
     
     private func processTikTokURL(_ urlString: String) async {

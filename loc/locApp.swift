@@ -189,14 +189,36 @@ struct locApp: App {
     }
     
     private func checkForSharedTikTokURL() {
-        // Only use regular UserDefaults to avoid App Group errors
-        if let regularURL = UserDefaults.standard.string(forKey: "sharedTikTokURL") {
-            UserDefaults.standard.removeObject(forKey: "sharedTikTokURL")
+        // Check App Group first (preferred method)
+        if let sharedDefaults = UserDefaults(suiteName: "group.com.drewhartsfield.mesa"),
+           let appGroupURL = sharedDefaults.string(forKey: "sharedTikTokURL") {
+            sharedDefaults.removeObject(forKey: "sharedTikTokURL")
+            sharedDefaults.synchronize()
             
-            let deepLinkURL = URL(string: "loc://share/tiktok?url=\(regularURL.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")")!
-            Task {
-                await deepLinkViewModel.processIncomingURL(deepLinkURL)
-            }
+            print("🔗 [locApp] Found TikTok URL in App Group: \(appGroupURL)")
+            processSharedTikTokURL(appGroupURL)
+            return
+        }
+        
+        // Fallback: Check standard UserDefaults
+        if let standardURL = UserDefaults.standard.string(forKey: "sharedTikTokURL") {
+            UserDefaults.standard.removeObject(forKey: "sharedTikTokURL")
+            UserDefaults.standard.synchronize()
+            
+            print("🔗 [locApp] Found TikTok URL in standard UserDefaults: \(standardURL)")
+            processSharedTikTokURL(standardURL)
+        }
+    }
+    
+    private func processSharedTikTokURL(_ urlString: String) {
+        guard let encodedURL = urlString.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+              let deepLinkURL = URL(string: "loc://share/tiktok?url=\(encodedURL)") else {
+            print("❌ [locApp] Failed to create deep link URL from: \(urlString)")
+            return
+        }
+        
+        Task {
+            await deepLinkViewModel.processIncomingURL(deepLinkURL)
         }
     }
 }

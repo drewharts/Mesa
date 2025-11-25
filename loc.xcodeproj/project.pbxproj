@@ -7,12 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		B0384E832CE2D19A00FC72F7 /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = B0384E822CE2D19A00FC72F7 /* FirebaseAnalytics */; };
-		B0384E852CE2D19A00FC72F7 /* FirebaseAnalyticsOnDeviceConversion in Frameworks */ = {isa = PBXBuildFile; productRef = B0384E842CE2D19A00FC72F7 /* FirebaseAnalyticsOnDeviceConversion */; };
-		B0384E872CE2D19A00FC72F7 /* FirebaseAnalyticsWithoutAdIdSupport in Frameworks */ = {isa = PBXBuildFile; productRef = B0384E862CE2D19A00FC72F7 /* FirebaseAnalyticsWithoutAdIdSupport */; };
-		B0384E892CE2D19A00FC72F7 /* FirebaseAppCheck in Frameworks */ = {isa = PBXBuildFile; productRef = B0384E882CE2D19A00FC72F7 /* FirebaseAppCheck */; };
-		B0384E8B2CE2D19A00FC72F7 /* FirebaseAppDistribution-Beta in Frameworks */ = {isa = PBXBuildFile; productRef = B0384E8A2CE2D19A00FC72F7 /* FirebaseAppDistribution-Beta */; };
-		B0384E8F2CE2D54200FC72F7 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = B0384E8E2CE2D54200FC72F7 /* FirebaseAuth */; };
+		B004E8102ED66B28008E26EF /* MesaShare.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = B0667A9F2EB309CA00879683 /* MesaShare.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		B054DC612C42F5DA00C98088 /* locApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B054DC602C42F5DA00C98088 /* locApp.swift */; };
 		B054DC652C42F5DB00C98088 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B054DC642C42F5DB00C98088 /* Assets.xcassets */; };
 		B054DC682C42F5DB00C98088 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B054DC672C42F5DB00C98088 /* Preview Assets.xcassets */; };
@@ -21,7 +16,6 @@
 		B054DC7E2C42F5DB00C98088 /* locUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B054DC7D2C42F5DB00C98088 /* locUITestsLaunchTests.swift */; };
 		B054DC902C4301FB00C98088 /* GoogleMaps in Frameworks */ = {isa = PBXBuildFile; productRef = B054DC8F2C4301FB00C98088 /* GoogleMaps */; };
 		B061F1DE2C5815FA00042CB0 /* GooglePlaces in Frameworks */ = {isa = PBXBuildFile; productRef = B061F1DD2C5815FA00042CB0 /* GooglePlaces */; };
-		B0667AA92EB309CA00879683 /* MesaShare.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = B0667A9F2EB309CA00879683 /* MesaShare.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		B067944A2E9C439600B9D273 /* Auth in Frameworks */ = {isa = PBXBuildFile; productRef = B06794492E9C439600B9D273 /* Auth */; };
 		B067944C2E9C439600B9D273 /* Functions in Frameworks */ = {isa = PBXBuildFile; productRef = B067944B2E9C439600B9D273 /* Functions */; };
 		B067944E2E9C439600B9D273 /* PostgREST in Frameworks */ = {isa = PBXBuildFile; productRef = B067944D2E9C439600B9D273 /* PostgREST */; };
@@ -32,13 +26,23 @@
 		B0A819152CEA5F2A0041416F /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = B0A819142CEA5F2A0041416F /* GoogleService-Info.plist */; };
 		B0A819182CEA5F970041416F /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = B0A819172CEA5F970041416F /* GoogleSignIn */; };
 		B0A8191A2CEA5F970041416F /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = B0A819192CEA5F970041416F /* GoogleSignInSwift */; };
-		B0E659862D37436000F8527E /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = B0E659852D37436000F8527E /* FirebaseStorage */; };
-		B0EDE3F02CF7980100F33939 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = B0EDE3EF2CF7980100F33939 /* FirebaseFirestore */; };
-		B0EDE3F22CF7985900F33939 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = B0EDE3F12CF7985900F33939 /* FirebaseFirestore */; };
-		B0FE7F7C2DEFF32D006600D0 /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = B0FE7F7B2DEFF32D006600D0 /* FirebaseMessaging */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		B004E80D2ED66A5E008E26EF /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = B054DC552C42F5DA00C98088 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = B0667A9E2EB309CA00879683;
+			remoteInfo = MesaShare;
+		};
+		B004E8112ED66B28008E26EF /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = B054DC552C42F5DA00C98088 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = B0667A9E2EB309CA00879683;
+			remoteInfo = MesaShare;
+		};
 		B054DC6E2C42F5DB00C98088 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = B054DC552C42F5DA00C98088 /* Project object */;
@@ -53,23 +57,16 @@
 			remoteGlobalIDString = B054DC5C2C42F5DA00C98088;
 			remoteInfo = loc;
 		};
-		B0667AA72EB309CA00879683 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = B054DC552C42F5DA00C98088 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = B0667A9E2EB309CA00879683;
-			remoteInfo = MesaShare;
-		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
-		B05FEF3A2E1F28FB002436B7 /* Embed Foundation Extensions */ = {
+		B004E8132ED66B28008E26EF /* Embed Foundation Extensions */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
 			dstPath = "";
 			dstSubfolderSpec = 13;
 			files = (
-				B0667AA92EB309CA00879683 /* MesaShare.appex in Embed Foundation Extensions */,
+				B004E8102ED66B28008E26EF /* MesaShare.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -120,25 +117,15 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				B0FE7F7C2DEFF32D006600D0 /* FirebaseMessaging in Frameworks */,
 				B0821C682C641B9100BA126E /* CoreLocationUI.framework in Frameworks */,
-				B0EDE3F22CF7985900F33939 /* FirebaseFirestore in Frameworks */,
 				B067944A2E9C439600B9D273 /* Auth in Frameworks */,
-				B0384E872CE2D19A00FC72F7 /* FirebaseAnalyticsWithoutAdIdSupport in Frameworks */,
 				B054DC902C4301FB00C98088 /* GoogleMaps in Frameworks */,
-				B0384E852CE2D19A00FC72F7 /* FirebaseAnalyticsOnDeviceConversion in Frameworks */,
 				B067944E2E9C439600B9D273 /* PostgREST in Frameworks */,
-				B0384E8F2CE2D54200FC72F7 /* FirebaseAuth in Frameworks */,
 				B067944C2E9C439600B9D273 /* Functions in Frameworks */,
-				B0EDE3F02CF7980100F33939 /* FirebaseFirestore in Frameworks */,
 				B0A819182CEA5F970041416F /* GoogleSignIn in Frameworks */,
-				B0384E892CE2D19A00FC72F7 /* FirebaseAppCheck in Frameworks */,
-				B0384E832CE2D19A00FC72F7 /* FirebaseAnalytics in Frameworks */,
 				B061F1DE2C5815FA00042CB0 /* GooglePlaces in Frameworks */,
 				B06794522E9C439600B9D273 /* Storage in Frameworks */,
-				B0E659862D37436000F8527E /* FirebaseStorage in Frameworks */,
 				B06794542E9C439600B9D273 /* Supabase in Frameworks */,
-				B0384E8B2CE2D19A00FC72F7 /* FirebaseAppDistribution-Beta in Frameworks */,
 				B0A8191A2CEA5F970041416F /* GoogleSignInSwift in Frameworks */,
 				B06794502E9C439600B9D273 /* Realtime in Frameworks */,
 			);
@@ -256,12 +243,13 @@
 				B054DC592C42F5DA00C98088 /* Sources */,
 				B054DC5A2C42F5DA00C98088 /* Frameworks */,
 				B054DC5B2C42F5DA00C98088 /* Resources */,
-				B05FEF3A2E1F28FB002436B7 /* Embed Foundation Extensions */,
+				B004E8132ED66B28008E26EF /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
-				B0667AA82EB309CA00879683 /* PBXTargetDependency */,
+				B004E80E2ED66A5E008E26EF /* PBXTargetDependency */,
+				B004E8122ED66B28008E26EF /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				B00311FA2CDACD4B002AE03B /* Models */,
@@ -275,18 +263,8 @@
 			packageProductDependencies = (
 				B054DC8F2C4301FB00C98088 /* GoogleMaps */,
 				B061F1DD2C5815FA00042CB0 /* GooglePlaces */,
-				B0384E822CE2D19A00FC72F7 /* FirebaseAnalytics */,
-				B0384E842CE2D19A00FC72F7 /* FirebaseAnalyticsOnDeviceConversion */,
-				B0384E862CE2D19A00FC72F7 /* FirebaseAnalyticsWithoutAdIdSupport */,
-				B0384E882CE2D19A00FC72F7 /* FirebaseAppCheck */,
-				B0384E8A2CE2D19A00FC72F7 /* FirebaseAppDistribution-Beta */,
-				B0384E8E2CE2D54200FC72F7 /* FirebaseAuth */,
 				B0A819172CEA5F970041416F /* GoogleSignIn */,
 				B0A819192CEA5F970041416F /* GoogleSignInSwift */,
-				B0EDE3EF2CF7980100F33939 /* FirebaseFirestore */,
-				B0EDE3F12CF7985900F33939 /* FirebaseFirestore */,
-				B0E659852D37436000F8527E /* FirebaseStorage */,
-				B0FE7F7B2DEFF32D006600D0 /* FirebaseMessaging */,
 				B06794492E9C439600B9D273 /* Auth */,
 				B067944B2E9C439600B9D273 /* Functions */,
 				B067944D2E9C439600B9D273 /* PostgREST */,
@@ -394,7 +372,6 @@
 			packageReferences = (
 				B054DC8A2C42F95A00C98088 /* XCRemoteSwiftPackageReference "ios-maps-sdk" */,
 				B061F1DC2C5290EF00042CB0 /* XCRemoteSwiftPackageReference "ios-places-sdk" */,
-				B0384E812CE2D19A00FC72F7 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
 				B0A819162CEA5F970041416F /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
 				B06794482E9C439600B9D273 /* XCRemoteSwiftPackageReference "supabase-swift" */,
 			);
@@ -480,6 +457,16 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		B004E80E2ED66A5E008E26EF /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = B0667A9E2EB309CA00879683 /* MesaShare */;
+			targetProxy = B004E80D2ED66A5E008E26EF /* PBXContainerItemProxy */;
+		};
+		B004E8122ED66B28008E26EF /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = B0667A9E2EB309CA00879683 /* MesaShare */;
+			targetProxy = B004E8112ED66B28008E26EF /* PBXContainerItemProxy */;
+		};
 		B054DC6F2C42F5DB00C98088 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = B054DC5C2C42F5DA00C98088 /* loc */;
@@ -489,11 +476,6 @@
 			isa = PBXTargetDependency;
 			target = B054DC5C2C42F5DA00C98088 /* loc */;
 			targetProxy = B054DC782C42F5DB00C98088 /* PBXContainerItemProxy */;
-		};
-		B0667AA82EB309CA00879683 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = B0667A9E2EB309CA00879683 /* MesaShare */;
-			targetProxy = B0667AA72EB309CA00879683 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -780,7 +762,8 @@
 				INFOPLIST_FILE = MesaShare/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = MesaShare;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				INSTALL_PATH = "$(LOCAL_APPS_DIR)/PlugIns";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.5;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -790,19 +773,24 @@
 				PRODUCT_BUNDLE_IDENTIFIER = drewharts.locc.MesaShare;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
-				SKIP_INSTALL = YES;
+				SKIP_INSTALL = NO;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
 		};
 		B0667AAD2EB309CA00879683 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = MesaShare/MesaShareRelease.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -811,7 +799,8 @@
 				INFOPLIST_FILE = MesaShare/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = MesaShare;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				INSTALL_PATH = "$(LOCAL_APPS_DIR)/PlugIns";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.5;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -821,13 +810,17 @@
 				PRODUCT_BUNDLE_IDENTIFIER = drewharts.locc.MesaShare;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
-				SKIP_INSTALL = YES;
+				SKIP_INSTALL = NO;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Release;
 		};
@@ -882,14 +875,6 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		B0384E812CE2D19A00FC72F7 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 11.4.0;
-			};
-		};
 		B054DC8A2C42F95A00C98088 /* XCRemoteSwiftPackageReference "ios-maps-sdk" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/googlemaps/ios-maps-sdk";
@@ -925,36 +910,6 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		B0384E822CE2D19A00FC72F7 /* FirebaseAnalytics */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = B0384E812CE2D19A00FC72F7 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
-			productName = FirebaseAnalytics;
-		};
-		B0384E842CE2D19A00FC72F7 /* FirebaseAnalyticsOnDeviceConversion */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = B0384E812CE2D19A00FC72F7 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
-			productName = FirebaseAnalyticsOnDeviceConversion;
-		};
-		B0384E862CE2D19A00FC72F7 /* FirebaseAnalyticsWithoutAdIdSupport */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = B0384E812CE2D19A00FC72F7 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
-			productName = FirebaseAnalyticsWithoutAdIdSupport;
-		};
-		B0384E882CE2D19A00FC72F7 /* FirebaseAppCheck */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = B0384E812CE2D19A00FC72F7 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
-			productName = FirebaseAppCheck;
-		};
-		B0384E8A2CE2D19A00FC72F7 /* FirebaseAppDistribution-Beta */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = B0384E812CE2D19A00FC72F7 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
-			productName = "FirebaseAppDistribution-Beta";
-		};
-		B0384E8E2CE2D54200FC72F7 /* FirebaseAuth */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = B0384E812CE2D19A00FC72F7 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
-			productName = FirebaseAuth;
-		};
 		B054DC8F2C4301FB00C98088 /* GoogleMaps */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = B054DC8A2C42F95A00C98088 /* XCRemoteSwiftPackageReference "ios-maps-sdk" */;
@@ -1004,22 +959,6 @@
 			isa = XCSwiftPackageProductDependency;
 			package = B0A819162CEA5F970041416F /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
 			productName = GoogleSignInSwift;
-		};
-		B0E659852D37436000F8527E /* FirebaseStorage */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = FirebaseStorage;
-		};
-		B0EDE3EF2CF7980100F33939 /* FirebaseFirestore */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = FirebaseFirestore;
-		};
-		B0EDE3F12CF7985900F33939 /* FirebaseFirestore */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = FirebaseFirestore;
-		};
-		B0FE7F7B2DEFF32D006600D0 /* FirebaseMessaging */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = FirebaseMessaging;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

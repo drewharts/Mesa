@@ -21,6 +21,20 @@
                ReferencedContainer = "container:loc.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "YES"
+            buildForProfiling = "YES"
+            buildForArchiving = "YES"
+            buildForAnalyzing = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "B0667A9E2EB309CA00879683"
+               BuildableName = "MesaShare.appex"
+               BlueprintName = "MesaShare"
+               ReferencedContainer = "container:loc.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
       </BuildActionEntries>
    </BuildAction>
    <TestAction
