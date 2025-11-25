@@ -1033,12 +1033,10 @@ class ProfileViewModel: ObservableObject {
             return
         }
         
-        print("🔄 [ProfileViewModel] Starting initial load of reviewed places")
         isLoadingReviewedPlaces = true
         
         defer {
             isLoadingReviewedPlaces = false
-            print("✅ [ProfileViewModel] Completed initial load of reviewed places")
         }
         
         do {
@@ -1051,8 +1049,6 @@ class ProfileViewModel: ObservableObject {
             
             // Load full place details for display
             await loadPlaceDetailsForReviews(lightweightPlaces, userId: userId)
-            
-            print("✅ [ProfileViewModel] Loaded \(lightweightPlaces.count) lightweight reviewed places (hasMore: \(hasMoreReviews))")
         } catch {
             print("❌ [ProfileViewModel] Error loading initial reviewed places: \(error.localizedDescription)")
             // Set hasMore to false on error to prevent infinite retry loops
@@ -1079,13 +1075,11 @@ class ProfileViewModel: ObservableObject {
         
         // Calculate offset based on current count
         let offset = lightweightReviewedPlaces.count
-        print("🔄 [ProfileViewModel] Loading more reviewed places (offset: \(offset), current count: \(lightweightReviewedPlaces.count))")
         
         isLoadingMoreReviews = true
         
         defer {
             isLoadingMoreReviews = false
-            print("✅ [ProfileViewModel] Completed loading more reviewed places")
         }
         
         do {
@@ -1112,8 +1106,6 @@ class ProfileViewModel: ObservableObject {
             
             // Load full place details for display
             await loadPlaceDetailsForReviews(newUniquePlaces, userId: userId)
-            
-            print("✅ [ProfileViewModel] Loaded \(newUniquePlaces.count) more reviewed places (total: \(lightweightReviewedPlaces.count), hasMore: \(hasMoreReviews))")
         } catch {
             print("❌ [ProfileViewModel] Error loading more reviewed places: \(error.localizedDescription)")
             // Set hasMore to false on error to prevent infinite retry loops
