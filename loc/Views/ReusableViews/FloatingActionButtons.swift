@@ -2,13 +2,10 @@ import SwiftUI
 
 struct FloatingActionButtons: View {
     @EnvironmentObject var profileViewModel: ProfileViewModel
+    let searchCoordinator: SearchCoordinatorViewModel
     @Binding var isSearchBarMinimized: Bool
-    @Binding var searchIsFocused: Bool
     @Binding var sheetHeight: CGFloat
     @Binding var shouldNavigateToProfile: Bool
-    
-    let maxSheetHeight: CGFloat
-    let minSheetHeight: CGFloat
     
     var body: some View {
         VStack {
@@ -27,15 +24,11 @@ struct FloatingActionButtons: View {
     
     private var searchButton: some View {
         Button(action: {
-            withAnimation {
-                if sheetHeight == maxSheetHeight {
-                    sheetHeight = minSheetHeight
-                }
-                isSearchBarMinimized.toggle()
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                searchIsFocused = true
-            }
+            // ✅ No animation for instant response
+            sheetHeight = searchCoordinator.calculateCollapsedHeight(currentHeight: sheetHeight)
+            isSearchBarMinimized = false
+            
+            // ✅ Focus handled by SearchContainerView.onChange
         }) {
             Image(systemName: "magnifyingglass")
                 .foregroundColor(.secondary)
@@ -48,9 +41,7 @@ struct FloatingActionButtons: View {
     }
     
     private var profileButton: some View {
-        Button(action: {
-            shouldNavigateToProfile = true
-        }) {
+        Group {
             if let profilePhoto = profileViewModel.userPicture {
                 Image(uiImage: profilePhoto)
                     .resizable()
@@ -70,5 +61,14 @@ struct FloatingActionButtons: View {
                     .shadow(radius: 4)
             }
         }
+        .contentShape(Circle()) // Make entire circle tappable
+        .gesture(
+            TapGesture()
+                .onEnded { _ in
+                    // Exclusive gesture - takes priority over map tap
+                    shouldNavigateToProfile = true
+                },
+            including: .all // This gesture blocks all lower-priority gestures
+        )
     }
 } 

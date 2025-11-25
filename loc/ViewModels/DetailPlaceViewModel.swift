@@ -7,9 +7,6 @@
 
 import Foundation
 import UIKit
-import FirebaseFirestore
-import MapboxSearch
-import FirebaseAuth
 import SwiftUI
 
 @MainActor
@@ -19,6 +16,7 @@ class DetailPlaceViewModel: ObservableObject {
     @Published var placeSavers: [String: [String]] = [:] // Tracks who saved each place PlaceId -> UserIds
     @Published var placeAnnotations: [String: UIImage] = [:] // Each place annotation's combined profile images
     @Published var placeTypes: [String: String] = [:] // Tracks restaurant types
+    @Published var placeImageLoadingStates: [String: Bool] = [:] // Tracks if we've finished loading images for each place
 
     @Published var userProfilePicture: [String: UIImage] = [:] // Each user's profile picture
 
@@ -56,6 +54,9 @@ class DetailPlaceViewModel: ObservableObject {
     }
     
     func calculateAnnotationPlaces() {
+        var newAnnotations: [String: UIImage] = [:]
+        
+        // ✅ Process all places first (off main thread)
         for (placeId, userIds) in placeSavers {
             // Get up to 3 profile pictures for this place's savers
             let profilePictures = userIds.prefix(3).compactMap { userProfilePicture[$0] }
@@ -74,11 +75,13 @@ class DetailPlaceViewModel: ObservableObject {
                 combinedImage = combinedCircularImage(image1: nil)
             }
             
-            // Store the combined image in placeAnnotations
-            DispatchQueue.main.async {
-                self.placeAnnotations[placeId] = combinedImage
-                self.objectWillChange.send()
-            }
+            newAnnotations[placeId] = combinedImage
+        }
+        
+        // ✅ Single UI update for all places (reduces UI lag)
+        DispatchQueue.main.async {
+            self.placeAnnotations = newAnnotations
+            self.objectWillChange.send()
         }
     }
     
@@ -139,12 +142,12 @@ class DetailPlaceViewModel: ObservableObject {
                 return
             }
             switch result {
-            case .success(let detailPlace):
+                case .success(let detailPlace):
                 DispatchQueue.main.async {
                     self.places[placeId] = detailPlace
-                    self.fetchPlaceImage(for: placeId) // Fetch image if not already present
-                    self.calculateRestaurantType(for: detailPlace) // Calculate restaurant type
-                    self.generateColorForPlace(placeId) // Generate color for fetched place
+                    self.fetchPlaceImage(for: placeId)
+                    self.calculateRestaurantType(for: detailPlace)
+                    self.generateColorForPlace(placeId)
                     completion(detailPlace)
                 }
             case .failure(let error):
@@ -157,56 +160,100 @@ class DetailPlaceViewModel: ObservableObject {
     func fetchPlaceImage(for placeId: String) {
         guard placeImages[placeId] == nil else { return }
         
-        // Get the current user ID
-        guard let currentUserId = Auth.auth().currentUser?.uid else {
-            print("Error: Current user ID is not available")
-            DispatchQueue.main.async {
-                self.placeImages[placeId] = nil
+        // Set loading state to true when we start loading
+        placeImageLoadingStates[placeId] = true
+        
+        // This method is for normal place tiles that get images from reviews OR place's own photoUrls
+        // TikTok place tiles use AsyncImage directly with TikTok URLs
+        
+        // First, check if the place has its own photoUrls (for created places)
+        if let place = places[placeId], 
+           let photoUrls = place.photoUrls, 
+           !photoUrls.isEmpty {
+            ImageService.shared.fetchPhotosFromStorage(urls: photoUrls) { [weak self] images, error in
+                guard let self = self else { return }
+                
+                DispatchQueue.main.async {
+                    if let error = error {
+                        print("❌ [DetailPlaceViewModel] Error loading place's own images for \(placeId): \(error.localizedDescription)")
+                        self.placeImages[placeId] = UIImage()
+                    } else if let images = images, !images.isEmpty {
+                        self.placeImages[placeId] = images[0]
+                    } else {
+                        print("⚠️ [DetailPlaceViewModel] No images found in place's photoUrls for \(placeId)")
+                        self.placeImages[placeId] = UIImage()
+                    }
+                    // Mark loading as complete
+                    self.placeImageLoadingStates[placeId] = false
+                }
             }
             return
         }
         
-        // Use friends' reviews to get images (both restaurant and generic)
-        userService.fetchFriendsReviews(placeId: placeId, currentUserId: currentUserId) { [weak self] (reviews, error) in
-            guard let self = self else { return }
-            if let error = error {
-                print("Error fetching reviews for place \(placeId): \(error.localizedDescription)")
-                DispatchQueue.main.async {
-                    self.placeImages[placeId] = nil
-                }
+        // If no place photoUrls, try to get images from reviews (for reviewed places)
+        // Get the current user ID
+        Task { @MainActor in
+            guard let currentUserId = await SupabaseAuthService.shared.currentUserId else {
+                print("Error: Current user ID is not available")
+                self.placeImages[placeId] = UIImage()
+                self.placeImageLoadingStates[placeId] = false
                 return
             }
-            if let reviews = reviews {
-                // Collect all image URLs from all reviews as strings (same as review images)
-                var imageURLStrings: [String] = []
-                for review in reviews {
-                    imageURLStrings.append(contentsOf: review.images)
-                }
+            
+            self.fetchPlaceImageWithUserId(placeId: placeId, currentUserId: currentUserId)
+        }
+    }
+    
+    private func fetchPlaceImageWithUserId(placeId: String, currentUserId: String) {
+        
+        // Fetch ALL reviews for this place (not just friends' reviews) to get images for tiles
+        Task {
+            do {
+                let (reviews, _) = try await ReviewService.shared.fetchPlaceReviews(placeId: placeId, latestOnly: false)
                 
-                // If no images found, try TikTok thumbnail as fallback
-                guard !imageURLStrings.isEmpty else {
-                    self.tryTikTokThumbnailAsCover(placeId: placeId)
+                // Find reviews with images
+                let reviewsWithImages = reviews.filter { !$0.images.isEmpty }
+                
+                // Get the most recent review with images
+                guard let mostRecentReview = reviewsWithImages.first else {
+                    await MainActor.run {
+                        self.tryTikTokThumbnailAsCover(placeId: placeId)
+                    }
                     return
                 }
                 
-                // Use the same ImageService method that review images use for consistent processing
-                ImageService.shared.fetchPhotosFromStorage(urls: imageURLStrings) { [weak self] images, error in
+                // Only get the first image from the most recent review (most efficient)
+                guard let firstImageUrl = mostRecentReview.images.first else {
+                    await MainActor.run {
+                        self.tryTikTokThumbnailAsCover(placeId: placeId)
+                    }
+                    return
+                }
+                
+                
+                // Load only the first image from the most recent review
+                ImageService.shared.fetchPhotosFromStorage(urls: [firstImageUrl]) { [weak self] images, error in
                     guard let self = self else { return }
                     
                     DispatchQueue.main.async {
                         if let error = error {
-                            print("Error fetching place image for \(placeId): \(error.localizedDescription)")
-                            self.placeImages[placeId] = nil
+                            print("❌ [DetailPlaceViewModel] Error fetching place image for \(placeId): \(error.localizedDescription)")
+                            self.placeImages[placeId] = UIImage()
                         } else if let images = images, !images.isEmpty {
-                            // Use the first successfully loaded image as the place cover image
                             self.placeImages[placeId] = images[0]
                         } else {
-                            self.placeImages[placeId] = nil
+                            print("⚠️ [DetailPlaceViewModel] No images loaded for place \(placeId)")
+                            self.placeImages[placeId] = UIImage()
                         }
+                        // Mark loading as complete
+                        self.placeImageLoadingStates[placeId] = false
                     }
                 }
-            } else {
-                tryTikTokThumbnailAsCover(placeId: placeId)
+            } catch {
+                print("❌ [DetailPlaceViewModel] Error fetching reviews for place \(placeId): \(error.localizedDescription)")
+                await MainActor.run {
+                    self.tryTikTokThumbnailAsCover(placeId: placeId)
+                }
             }
         }
     }
@@ -217,8 +264,12 @@ class DetailPlaceViewModel: ObservableObject {
               let tikTokVideos = place.tikTokVideos,
               !tikTokVideos.isEmpty,
               let firstThumbnailURL = tikTokVideos.first?.thumbnailURL else {
+            print("⚠️ [DetailPlaceViewModel] No TikTok thumbnail available for place \(placeId)")
             DispatchQueue.main.async {
-                self.placeImages[placeId] = nil
+                // Set a special "no image" marker instead of nil to prevent infinite loading
+                self.placeImages[placeId] = UIImage()
+                // Mark loading as complete
+                self.placeImageLoadingStates[placeId] = false
             }
             return
         }
@@ -228,24 +279,45 @@ class DetailPlaceViewModel: ObservableObject {
     
     private func fetchTikTokThumbnailAsImage(thumbnailURL: String, placeId: String) {
         guard let url = URL(string: thumbnailURL) else {
+            print("❌ [DetailPlaceViewModel] Invalid TikTok thumbnail URL for place \(placeId): \(thumbnailURL)")
             DispatchQueue.main.async {
-                self.placeImages[placeId] = nil
+                self.placeImages[placeId] = UIImage()
+                self.placeImageLoadingStates[placeId] = false
             }
             return
         }
         
-        URLSession.shared.dataTask(with: url) { [weak self] data, _, error in
+        
+        // Create a URLRequest with timeout
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 10.0 // 10 second timeout
+        request.cachePolicy = .returnCacheDataElseLoad
+        
+        URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
             guard let self = self else { return }
             
             DispatchQueue.main.async {
                 if let error = error {
-                    print("Error fetching TikTok thumbnail for \(placeId): \(error.localizedDescription)")
-                    self.placeImages[placeId] = nil
-                } else if let data = data, let image = UIImage(data: data) {
-                    self.placeImages[placeId] = image
+                    print("❌ [DetailPlaceViewModel] Error fetching TikTok thumbnail for \(placeId): \(error.localizedDescription)")
+                    self.placeImages[placeId] = UIImage()
+                } else if let httpResponse = response as? HTTPURLResponse {
+                    if httpResponse.statusCode == 200, let data = data, !data.isEmpty {
+                        if let image = UIImage(data: data) {
+                            self.placeImages[placeId] = image
+                        } else {
+                            print("❌ [DetailPlaceViewModel] Failed to create UIImage from data for place \(placeId)")
+                            self.placeImages[placeId] = UIImage()
+                        }
+                    } else {
+                        print("❌ [DetailPlaceViewModel] HTTP error \(httpResponse.statusCode) for place \(placeId)")
+                        self.placeImages[placeId] = UIImage()
+                    }
                 } else {
-                    self.placeImages[placeId] = nil
+                    print("❌ [DetailPlaceViewModel] No response data for place \(placeId)")
+                    self.placeImages[placeId] = UIImage()
                 }
+                // Mark loading as complete
+                self.placeImageLoadingStates[placeId] = false
             }
         }.resume()
     }
@@ -262,43 +334,7 @@ class DetailPlaceViewModel: ObservableObject {
 //        }
     }
 
-    // Convert SearchResult to DetailPlace and save it
-    func searchResultToDetailPlace(place: SearchResult, completion: @escaping (DetailPlace) -> Void) {
-        // Safely unwrap mapboxId to avoid force-unwrap crash
-        guard let mapboxId = place.mapboxId else {
-            print("SearchResult has no mapboxId")
-            return
-        }
-        
-        placeService.findPlace(mapboxId: mapboxId) { [weak self] existingDetailPlace, error in
-            guard let self = self else { return }
-            
-            // Log any errors from Firestore lookup
-            if let error = error {
-                print("Error checking for existing place: \(error.localizedDescription)")
-            }
-            
-            // If place exists, return it
-            if let existingDetailPlace = existingDetailPlace {
-                // Calculate restaurant type for existing place
-                self.calculateRestaurantType(for: existingDetailPlace)
-                completion(existingDetailPlace)
-                return
-            }
-            
-            // Create new DetailPlace using the new constructor
-            let detailPlace = DetailPlace(from: place)
-            
-            // Update local state and fetch image on main thread
-            DispatchQueue.main.async {
-                self.places[detailPlace.id.uuidString] = detailPlace
-                self.fetchPlaceImage(for: detailPlace.id.uuidString)
-                self.calculateRestaurantType(for: detailPlace) // Calculate restaurant type
-                self.generateColorForPlace(detailPlace.id.uuidString) // Generate color for new place
-                completion(detailPlace)
-            }
-        }
-    }
+    // Removed MapboxSearch searchResultToDetailPlace method - now using Google Places API
     
     private func combinedCircularImage(image1: UIImage?, image2: UIImage? = nil, image3: UIImage? = nil) -> UIImage {
         let totalSize = CGSize(width: 80, height: 40)
@@ -393,6 +429,11 @@ class DetailPlaceViewModel: ObservableObject {
         }
     }
     
+    // Public method to check if a place is still loading images
+    func isPlaceImageLoading(placeId: String) -> Bool {
+        return placeImageLoadingStates[placeId] ?? false
+    }
+    
     // Initialize colors for all existing places
     func initializePlaceColors() {
         for placeId in places.keys {
@@ -400,3 +441,4 @@ class DetailPlaceViewModel: ObservableObject {
         }
     }
 }
+

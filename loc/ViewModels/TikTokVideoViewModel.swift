@@ -5,7 +5,6 @@
 
 import Foundation
 import SwiftUI
-import FirebaseAuth
 import UIKit
 
 // Debug logging flag - set to true for verbose logging, false for production
@@ -32,9 +31,11 @@ class TikTokVideoViewModel: ObservableObject {
     
     private let tikTokService = TikTokService()
     private var isRefreshing: Bool = false
+    private let externalPlaceId: String? // External place UUID for refresh
     
-    init(tikTokVideo: TikTokVideo) {
+    init(tikTokVideo: TikTokVideo, externalPlaceId: String? = nil) {
         self.tikTokVideo = tikTokVideo
+        self.externalPlaceId = externalPlaceId
     }
     
     // MARK: - Video Opening Logic
@@ -173,9 +174,18 @@ class TikTokVideoViewModel: ObservableObject {
         isRefreshing = true
         hasAttemptedRefresh = true
 
-        let userId = Auth.auth().currentUser?.uid
+        let userId = await SupabaseAuthService.shared.currentUserId
         
-        let result = await tikTokService.refreshTikTokThumbnail(for: tikTokVideo.url, userId: userId)
+        // 🔍 Log what external_place_id we have before calling refresh
+        debugLog("🎬 [TikTokVideoViewModel] Calling refreshThumbnail")
+        debugLog("   Video ID: \(tikTokVideo.videoID)")
+        debugLog("   External Place ID: \(externalPlaceId ?? "nil")")
+        
+        let result = await tikTokService.refreshTikTokThumbnail(
+            for: tikTokVideo.url, 
+            userId: userId,
+            externalPlaceId: externalPlaceId
+        )
         
         switch result {
         case .success(let newThumbnailURL):

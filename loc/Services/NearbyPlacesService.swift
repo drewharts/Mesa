@@ -7,7 +7,7 @@
 import Foundation
 
 class NearbyPlacesService {
-    private let baseURL = "https://mesa-backend-production.up.railway.app"
+    private let baseURL = "https://mesa-backend-staging.up.railway.app"
     
     func fetchNearbyPlaces(latitude: Double, longitude: Double, radiusMeters: Int = 50) async throws -> NearbyPlacesResponse {
         let urlString = "\(baseURL)/nearby-places?latitude=\(latitude)&longitude=\(longitude)&radius=\(radiusMeters)"

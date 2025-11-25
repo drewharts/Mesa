@@ -6,7 +6,6 @@
 //
 
 import Foundation
-import FirebaseFirestore
 
 struct ShareablePlace: Codable, Identifiable {
     let id: String

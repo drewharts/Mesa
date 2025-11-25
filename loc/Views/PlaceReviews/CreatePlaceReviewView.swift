@@ -7,7 +7,6 @@
 
 import SwiftUI
 import PhotosUI
-import MapboxSearch
 
 struct CreatePlaceReviewView: View {
     @Binding var isPresented: Bool

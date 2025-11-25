@@ -5,10 +5,19 @@ import Foundation
 class ServiceContainer: ObservableObject {
     static let shared = ServiceContainer()
     
-    // MARK: - Core Services
-    lazy var userService = UserService.shared
-    lazy var placeService = PlaceService.shared
-    lazy var reviewService = ReviewService.shared
+    // MARK: - Supabase Services (actively fetching from Supabase)
+    lazy var authService = SupabaseAuthService.shared
+    lazy var supabaseUserService = SupabaseUserService.shared
+    lazy var supabasePlaceService = SupabasePlaceService.shared
+    lazy var supabaseReviewService = SupabaseReviewService.shared
+    lazy var realtimeService = SupabaseRealtimeService.shared
+    
+    // MARK: - Legacy Service Wrappers (for ViewModel compatibility - delegate to Supabase)
+    lazy var userService: UserService = UserService.shared
+    lazy var placeService: PlaceService = PlaceService.shared
+    lazy var reviewService: ReviewService = ReviewService.shared
+    
+    // MARK: - Other Services (unchanged)
     lazy var imageService = ImageService.shared
     lazy var placeShareService = PlaceShareService()
     lazy var tikTokService = TikTokService()

@@ -1,7 +1,5 @@
 import Foundation
 import CoreLocation
-import FirebaseFirestore
-import MapboxSearch
 
 // MARK: - Search Service Protocols
 
@@ -136,87 +134,86 @@ struct MesaPlaceResult: PlaceResult {
 
 /// Service class for the Mesa backend API
 class MesaBackendService {
-    private let baseURL = "https://mesa-backend-production.up.railway.app"
-    private let session = URLSession.shared
+    private let baseURL = "https://mesa-backend-staging.up.railway.app"
+    private let session: URLSession
+    
+    init() {
+        // Create custom URLSession configuration to avoid connection pooling issues
+        let configuration = URLSessionConfiguration.default
+        configuration.timeoutIntervalForRequest = 30
+        configuration.timeoutIntervalForResource = 60
+        configuration.httpMaximumConnectionsPerHost = 4
+        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+        configuration.waitsForConnectivity = true
+        self.session = URLSession(configuration: configuration)
+    }
     
     /// Fetch place suggestions from Mesa backend
     func fetchSuggestions(
         query: String,
         limit: Int = 5,
         provider: String = "all",
+        latitude: Double? = nil,
+        longitude: Double? = nil,
         completion: @escaping (Result<[MesaPlaceSuggestion], Error>) -> Void
     ) {
-        print("🌐 [MesaBackendService] fetchSuggestions called with query: '\(query)', limit: \(limit), provider: '\(provider)'")
-        
         guard !query.isEmpty else {
-            print("🌐 [MesaBackendService] Query is empty, returning empty results")
             completion(.success([]))
             return
         }
-        
+
         guard var urlComponents = URLComponents(string: "\(baseURL)/search/suggestions") else {
-            print("❌ [MesaBackendService] Failed to create URL components from: \(baseURL)/search/suggestions")
             completion(.failure(NSError(domain: "MesaBackend", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"])))
             return
         }
-        
+
         // Add query parameters
-        urlComponents.queryItems = [
+        var queryItems = [
             URLQueryItem(name: "query", value: query),
             URLQueryItem(name: "limit", value: String(limit)),
             URLQueryItem(name: "provider", value: provider)
         ]
+
+        // Add location parameters if provided
+        if let latitude = latitude {
+            queryItems.append(URLQueryItem(name: "latitude", value: String(latitude)))
+        }
+        if let longitude = longitude {
+            queryItems.append(URLQueryItem(name: "longitude", value: String(longitude)))
+        }
+
+        urlComponents.queryItems = queryItems
         
         guard let url = urlComponents.url else {
-            print("❌ [MesaBackendService] Failed to create URL from components")
             completion(.failure(NSError(domain: "MesaBackend", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"])))
             return
         }
         
-        print("🌐 [MesaBackendService] Making request to: \(url.absoluteString)")
-        
         let task = session.dataTask(with: url) { data, response, error in
-            print("🌐 [MesaBackendService] Network request completed")
-            
             if let error = error {
-                print("❌ [MesaBackendService] Network error: \(error.localizedDescription)")
                 completion(.failure(error))
                 return
             }
             
             guard let httpResponse = response as? HTTPURLResponse else {
-                print("❌ [MesaBackendService] Invalid HTTP response")
                 completion(.failure(NSError(domain: "MesaBackend", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid server response"])))
                 return
             }
             
-            print("🌐 [MesaBackendService] HTTP Status Code: \(httpResponse.statusCode)")
-            
             guard (200...299).contains(httpResponse.statusCode) else {
-                print("❌ [MesaBackendService] HTTP error with status code: \(httpResponse.statusCode)")
                 completion(.failure(NSError(domain: "MesaBackend", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: "Server returned status code \(httpResponse.statusCode)"])))
                 return
             }
             
             guard let data = data else {
-                print("❌ [MesaBackendService] No data received")
                 completion(.failure(NSError(domain: "MesaBackend", code: -1, userInfo: [NSLocalizedDescriptionKey: "No data received"])))
                 return
             }
             
-            print("🌐 [MesaBackendService] Received \(data.count) bytes of data")
-            
-            // Print raw data
-            if let rawString = String(data: data, encoding: .utf8) {
-                print("📦 [MesaBackendService] Raw API Response: \(rawString)")
-            }
-            
             do {
                 let response = try JSONDecoder().decode(MesaSuggestionsResponse.self, from: data)
-                print("✅ [MesaBackendService] Successfully decoded response with \(response.suggestions.count) suggestions")
                 
                 let suggestions = response.suggestions.map { mesaSuggestion in
-                    print("🔍 [MesaBackendService] Processing suggestion: \(mesaSuggestion.name) (ID: \(mesaSuggestion.id), Source: \(mesaSuggestion.source))")
                     return MesaPlaceSuggestion(
                         id: mesaSuggestion.id,
                         name: mesaSuggestion.name,
@@ -229,36 +226,17 @@ class MesaBackendService {
                     )
                 }
                 
-                print("✅ [MesaBackendService] Successfully created \(suggestions.count) MesaPlaceSuggestion objects")
                 completion(.success(suggestions))
             } catch {
-                print("❌ [MesaBackendService] JSON decoding error: \(error.localizedDescription)")
-                
-                // Additional debugging information
-                if let decodingError = error as? DecodingError {
-                    switch decodingError {
-                    case .dataCorrupted(let context):
-                        print("❌ [MesaBackendService] Data corrupted: \(context)")
-                    case .keyNotFound(let key, let context):
-                        print("❌ [MesaBackendService] Key not found: \(key), context: \(context)")
-                    case .typeMismatch(let type, let context):
-                        print("❌ [MesaBackendService] Type mismatch: \(type), context: \(context)")
-                    case .valueNotFound(let type, let context):
-                        print("❌ [MesaBackendService] Value not found: \(type), context: \(context)")
-                    @unknown default:
-                        print("❌ [MesaBackendService] Unknown decoding error")
-                    }
-                }
-                
                 completion(.failure(error))
             }
         }
         
-        print("🌐 [MesaBackendService] Starting network request...")
         task.resume()
     }
     
     /// Handle Google place details
+    /// WARNING: This function appears to be unused/dead code
     private func handleGooglePlaceDetails(_ data: [String: Any]) -> DetailPlace {
         var additionalData: [String: String] = [:]
         
@@ -280,11 +258,12 @@ class MesaBackendService {
         
         // Create DetailPlace object
         var detailPlace = DetailPlace()
-        //TODO: I think this should be the same id that was created in the backend
+        // CRITICAL: This function should be updated to use backend-provided ID
+        // For now, creating a new UUID but this is incorrect and will orphan places
         detailPlace.id = UUID()
         detailPlace.name = data["name"] as? String ?? ""
         detailPlace.address = data["formatted_address"] as? String
-        detailPlace.coordinate = GeoPoint(latitude: latitude, longitude: longitude)
+        detailPlace.coordinate = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
         detailPlace.rating = data["rating"] as? Double
         detailPlace.openHours = additionalData["weekday_text"]?.components(separatedBy: "|")
         detailPlace.priceLevel = data["price_level"] as? String
@@ -294,6 +273,7 @@ class MesaBackendService {
     }
     
     /// Handle Mapbox place details
+    /// WARNING: This function appears to be unused/dead code
     private func handleMapboxPlaceDetails(_ data: [String: Any]) -> DetailPlace {
         // Create DetailPlace object
         var detailPlace = DetailPlace()
@@ -301,6 +281,8 @@ class MesaBackendService {
         // Extract the additional_data which contains most of the fields
         if let additionalData = data["additional_data"] as? [String: Any] {
             // Set basic fields
+            // CRITICAL: This function should be updated to use backend-provided ID
+            // For now, creating a new UUID but this is incorrect and will orphan places
             detailPlace.id = UUID()
             detailPlace.name = additionalData["name"] as? String ?? ""
             detailPlace.address = additionalData["full_address"] as? String
@@ -319,7 +301,7 @@ class MesaBackendService {
             if let coordinates = additionalData["coordinates"] as? [String: Any],
                let latitude = coordinates["latitude"] as? Double,
                let longitude = coordinates["longitude"] as? Double {
-                detailPlace.coordinate = GeoPoint(latitude: latitude, longitude: longitude)
+                detailPlace.coordinate = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
             }
             
             // Additional metadata fields are available but not currently used:
@@ -334,6 +316,7 @@ class MesaBackendService {
     }
     
     /// Handle local place details
+    /// WARNING: This function appears to be unused/dead code
     private func handleLocalPlaceDetails(_ data: [String: Any]) -> DetailPlace {
         // Create a new DetailPlace object
         var detailPlace = DetailPlace()
@@ -341,6 +324,8 @@ class MesaBackendService {
         // Extract the additional_data which contains most of the fields
         if let additionalData = data["additional_data"] as? [String: Any] {
             // Set basic fields
+            // CRITICAL: Never create a new UUID - always use the backend's ID
+            // The fallback to UUID() here is WRONG and will orphan places
             detailPlace.id = UUID(uuidString: additionalData["id"] as? String ?? "") ?? UUID()
             detailPlace.name = additionalData["name"] as? String ?? ""
             detailPlace.address = additionalData["address"] as? String
@@ -357,13 +342,60 @@ class MesaBackendService {
             if let coordinate = additionalData["coordinate"] as? [String: Any],
                let latitude = coordinate["latitude"] as? Double,
                let longitude = coordinate["longitude"] as? Double {
-                detailPlace.coordinate = GeoPoint(latitude: latitude, longitude: longitude)
+                detailPlace.coordinate = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
             }
         }
         
         return detailPlace
     }
-    
+        /// Test location-aware search functionality
+    func testLocationAwareSearch(
+        query: String = "comal",
+        completion: @escaping (Result<[String: Any], Error>) -> Void
+    ) {
+        guard var urlComponents = URLComponents(string: "\(baseURL)/search/test-location") else {
+            completion(.failure(NSError(domain: "MesaBackend", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"])))
+            return
+        }
+
+        urlComponents.queryItems = [
+            URLQueryItem(name: "query", value: query)
+        ]
+
+        guard let url = urlComponents.url else {
+            completion(.failure(NSError(domain: "MesaBackend", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"])))
+            return
+        }
+
+        let task = session.dataTask(with: url) { data, response, error in
+            if let error = error {
+                completion(.failure(error))
+                return
+            }
+
+            guard response is HTTPURLResponse else {
+                completion(.failure(NSError(domain: "MesaBackend", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid server response"])))
+                return
+            }
+
+            guard let data = data else {
+                completion(.failure(NSError(domain: "MesaBackend", code: -1, userInfo: [NSLocalizedDescriptionKey: "No data received"])))
+                return
+            }
+
+            do {
+                if let json = try JSONSerialization.jsonObject(with: data, options: []) as? [String: Any] {
+                    completion(.success(json))
+                } else {
+                    completion(.failure(NSError(domain: "MesaBackend", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid JSON response"])))
+                }
+            } catch {
+                completion(.failure(error))
+            }
+        }
+        task.resume()
+    }
+
     /// Fetch place details from Mesa backend
     func fetchPlaceDetails(
         placeId: String,
@@ -386,63 +418,46 @@ class MesaBackendService {
             return
         }
         
-        print("🌐 [MesaBackendService] fetchPlaceDetails called with placeId: '\(placeId)', source: '\(source)'")
-        print("🌐 [MesaBackendService] Fetching place details from URL: \(url.absoluteString)")
-        
         let task = session.dataTask(with: url) { data, response, error in
-            print("🌐 [MesaBackendService] fetchPlaceDetails network request completed")
-            
             if let error = error {
-                print("❌ [MesaBackendService] fetchPlaceDetails network error: \(error.localizedDescription)")
                 completion(.failure(error))
                 return
             }
             
             guard let httpResponse = response as? HTTPURLResponse else {
-                print("❌ [MesaBackendService] fetchPlaceDetails invalid HTTP response")
                 completion(.failure(NSError(domain: "MesaBackend", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid server response"])))
                 return
             }
             
-            print("🌐 [MesaBackendService] fetchPlaceDetails HTTP Status Code: \(httpResponse.statusCode)")
-            
             guard (200...299).contains(httpResponse.statusCode) else {
-                print("❌ [MesaBackendService] fetchPlaceDetails HTTP error with status code: \(httpResponse.statusCode)")
                 completion(.failure(NSError(domain: "MesaBackend", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: "Server returned status code \(httpResponse.statusCode)"])))
                 return
             }
             
             guard let data = data else {
-                print("❌ [MesaBackendService] fetchPlaceDetails no data received")
                 completion(.failure(NSError(domain: "MesaBackend", code: -1, userInfo: [NSLocalizedDescriptionKey: "No data received"])))
                 return
             }
             
-            print("🌐 [MesaBackendService] fetchPlaceDetails received \(data.count) bytes of data")
-            
-            // Print raw data
-            if let rawString = String(data: data, encoding: .utf8) {
-                print("📦 [MesaBackendService] fetchPlaceDetails Raw API Response: \(rawString)")
-            }
-            
             do {
-                print("🌐 [MesaBackendService] fetchPlaceDetails attempting to parse JSON...")
-                
                 // First parse the data into a dictionary
                 let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
-                print("🌐 [MesaBackendService] fetchPlaceDetails successfully parsed JSON")
                 
                 // Extract the "place" object
                 guard let placeDict = json?["place"] as? [String: Any] else {
-                    print("❌ [MesaBackendService] fetchPlaceDetails failed to extract 'place' object from JSON")
                     throw NSError(domain: "MesaBackend", code: -2, userInfo: [NSLocalizedDescriptionKey: "Invalid JSON structure"])
                 }
                 
-                print("🌐 [MesaBackendService] fetchPlaceDetails successfully extracted place object")
-                
                 // Create a DetailPlace object manually
                 var detailPlace = DetailPlace()
-                detailPlace.id = UUID(uuidString: placeDict["id"] as? String ?? "") ?? UUID()
+                
+                // CRITICAL: Always use the backend's ID - never create a new one!
+                // Creating a new ID would orphan the place in the backend
+                guard let idString = placeDict["id"] as? String,
+                      let placeId = UUID(uuidString: idString) else {
+                    throw NSError(domain: "MesaBackend", code: -3, userInfo: [NSLocalizedDescriptionKey: "Invalid place ID from backend"])
+                }
+                detailPlace.id = placeId
                 detailPlace.name = placeDict["name"] as? String ?? ""
                 detailPlace.address = placeDict["address"] as? String
                 detailPlace.city = placeDict["city"] as? String
@@ -453,6 +468,7 @@ class MesaBackendService {
                 detailPlace.phone = placeDict["phone"] as? String
                 detailPlace.priceLevel = placeDict["priceLevel"] as? String
                 detailPlace.rating = placeDict["rating"] as? Double
+                detailPlace.userRatingsTotal = placeDict["ratingCount"] as? Int
                 detailPlace.reservable = placeDict["reservable"] as? Bool
                 detailPlace.servesBreakfast = placeDict["servesBreakfast"] as? Bool
                 detailPlace.serversLunch = placeDict["servesLunch"] as? Bool
@@ -460,23 +476,75 @@ class MesaBackendService {
                 detailPlace.Instagram = placeDict["instagram"] as? String
                 detailPlace.X = placeDict["twitter"] as? String
                 
-                // Manually extract coordinates and create GeoPoint
+                // Manually extract coordinates and create CLLocationCoordinate2D
                 if let locationDict = placeDict["location"] as? [String: Any],
                    let latitude = locationDict["latitude"] as? Double,
                    let longitude = locationDict["longitude"] as? Double {
-                    detailPlace.coordinate = GeoPoint(latitude: latitude, longitude: longitude)
-                    print("🌐 [MesaBackendService] fetchPlaceDetails extracted coordinates: (\(latitude), \(longitude))")
+                    detailPlace.coordinate = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
                 }
                 
-                print("✅ [MesaBackendService] fetchPlaceDetails successfully created DetailPlace: \(detailPlace.name)")
                 completion(.success(detailPlace))
             } catch {
-                print("❌ [MesaBackendService] fetchPlaceDetails error parsing place details: \(error)")
                 completion(.failure(error))
             }
         }
         
-        print("🌐 [MesaBackendService] fetchPlaceDetails starting network request...")
         task.resume()
+    }
+
+    /// Fetch review photos from Supabase for a place
+    func getReviewPhotos(for placeId: String, completion: @escaping ([String]) -> Void) {
+        // TODO: Implement with Supabase
+        // For now, return empty array
+        print("⚠️ getReviewPhotos not yet implemented for Supabase - returning empty array")
+        completion([])
+        return
+        
+        /* OLD FIRESTORE CODE - DISABLED
+        let db = Firestore.firestore()
+        let reviewsRef = db.collection("places").document(placeId).collection("reviews")
+
+        // Get up to 10 reviews to ensure we find 5 photos
+        reviewsRef.limit(to: 10).getDocuments { snapshot, error in
+            guard let documents = snapshot?.documents, error == nil else {
+                print("❌ [MesaBackendService] Error fetching reviews: \(error?.localizedDescription ?? "Unknown error")")
+                completion([])
+                return
+            }
+
+            var photoUrls: [String] = []
+
+            // Loop through each review document
+            for document in documents {
+                let data = document.data()
+
+                // Extract media array from review
+                if let mediaArray = data["media"] as? [[String: Any]] {
+                    for mediaItem in mediaArray {
+                        // Check if it's an image with a URL
+                        if let type = mediaItem["type"] as? String,
+                           type == "image",
+                           let imageUrl = mediaItem["imageUrl"] as? String {
+
+                            photoUrls.append(imageUrl)
+
+                            // Stop once we have 5 photos
+                            if photoUrls.count >= 5 {
+                                break
+                            }
+                        }
+                    }
+                }
+
+                // Stop if we already have 5 photos
+                if photoUrls.count >= 5 {
+                    break
+                }
+            }
+
+            print("📸 [MesaBackendService] Found \(photoUrls.count) review photos for place \(placeId)")
+            completion(photoUrls)
+        }
+        */
     }
 }

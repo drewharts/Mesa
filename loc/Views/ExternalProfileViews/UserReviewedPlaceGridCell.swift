@@ -18,14 +18,15 @@ struct UserReviewedPlaceGridCell: View {
     @Environment(\.presentationMode) var presentationMode
 
     private func getFirstTikTokThumbnail(for place: DetailPlace) -> String? {
-        // Check place's own TikTok videos first
+        // Check place's own TikTok videos
         if let placeTikTokVideos = place.tikTokVideos,
            let firstVideo = placeTikTokVideos.first {
             return firstVideo.thumbnailURL
         }
         
-        // Check external places (user's TikTok videos for this place)
-        return userProfileViewModel.getFirstTikTokThumbnailURL(for: place.id.uuidString)
+        // For external user profiles, we don't have access to their TikTok videos
+        // Just show the review image or colored rectangle
+        return nil
     }
 
     var body: some View {
@@ -44,8 +45,24 @@ struct UserReviewedPlaceGridCell: View {
                             .foregroundColor(.gray.opacity(0.3))
                             .frame(width: cardWidth, height: cardHeight)
                     }
+                } else if let photoUrls = place.photoUrls,
+                          !photoUrls.isEmpty,
+                          let photoUrl = photoUrls.first,
+                          let url = URL(string: photoUrl) {
+                    // Show place's own photo (for created places) using AsyncImage
+                    AsyncImage(url: url) { image in
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(width: cardWidth, height: cardHeight)
+                            .clipped()
+                    } placeholder: {
+                        Rectangle()
+                            .foregroundColor(.gray.opacity(0.3))
+                            .frame(width: cardWidth, height: cardHeight)
+                    }
                 } else if let image = detailPlaceViewModel.placeImages[place.id.uuidString] {
-                    // Show place review image
+                    // Show place review image (already loaded)
                     Image(uiImage: image)
                         .resizable()
                         .aspectRatio(contentMode: .fill)
@@ -97,23 +114,11 @@ struct UserReviewedPlaceGridCell: View {
         .frame(width: cardWidth, height: cardHeight)
         .background(Color.white)
         .clipShape(RoundedRectangle(cornerRadius: 20))
-        .overlay(
-            RoundedRectangle(cornerRadius: 20)
-                .stroke(Color.white, lineWidth: 2)
-        )
         .shadow(color: Color.black.opacity(0.2), radius: 5, x: 0, y: 2)
         .contentShape(RoundedRectangle(cornerRadius: 20).inset(by: 50))
         .onTapGesture {
-            selectedPlaceVM.selectedPlace = place
-            selectedPlaceVM.isDetailSheetPresented = true
-            
-            // Dismiss the user profile sheet properly
-            userProfileViewModel.isUserDetailPresented = false
-            
-            // Also call presentationMode dismiss as backup
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                presentationMode.wrappedValue.dismiss()
-            }
+            // Use centralized navigation method from UserProfileViewModel
+            userProfileViewModel.navigateToPlaceFromProfile(place, selectedPlaceVM: selectedPlaceVM)
         }
     }
 } 

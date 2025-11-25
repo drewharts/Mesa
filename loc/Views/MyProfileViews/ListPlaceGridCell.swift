@@ -17,34 +17,20 @@ struct ListPlaceGridCell: View {
     @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
     @Environment(\.presentationMode) var presentationMode
 
-    private var tikTokVideos: [TikTokVideo] {
-        let placeTikTokVideos = place.tikTokVideos ?? []
-        let userTikTokVideos = profile.getTikTokVideos(for: place.id.uuidString)
-        
-        // Combine and deduplicate based on videoID or URL
-        var allVideos = placeTikTokVideos
-        
-        for userVideo in userTikTokVideos {
-            // Check if this video already exists (by videoID or URL)
-            let alreadyExists = allVideos.contains { existingVideo in
-                existingVideo.videoID == userVideo.videoID || existingVideo.url == userVideo.url
-            }
-            
-            if !alreadyExists {
-                allVideos.append(userVideo)
-            }
+    private var firstTikTokThumbnail: String? {
+        // Check place's own TikTok videos first
+        if let placeTikTokVideos = place.tikTokVideos,
+           let firstVideo = placeTikTokVideos.first {
+            return firstVideo.thumbnailURL
         }
         
-        return allVideos
-    }
-    
-    private var firstTikTokThumbnail: String? {
-        return tikTokVideos.first?.thumbnailURL
+        // Check user's TikTok videos for this place (uses cached data)
+        return profile.getFirstTikTokThumbnailURL(for: place.id.uuidString)
     }
 
     var body: some View {
         Button(action: {
-            selectedPlaceVM.selectedPlace = place
+            selectedPlaceVM.selectPlaceAndFetchDetails(place)
             selectedPlaceVM.isDetailSheetPresented = true
             presentationMode.wrappedValue.dismiss()
         }) {
@@ -63,8 +49,24 @@ struct ListPlaceGridCell: View {
                                 .foregroundColor(.gray.opacity(0.3))
                                 .frame(width: cardWidth, height: cardHeight)
                         }
+                    } else if let photoUrls = place.photoUrls, 
+                              !photoUrls.isEmpty,
+                              let photoUrl = photoUrls.first,
+                              let url = URL(string: photoUrl) {
+                        // Show place's own photo (for created places) using AsyncImage
+                        AsyncImage(url: url) { image in
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .frame(width: cardWidth, height: cardHeight)
+                                .clipped()
+                        } placeholder: {
+                            Rectangle()
+                                .foregroundColor(.gray.opacity(0.3))
+                                .frame(width: cardWidth, height: cardHeight)
+                        }
                     } else if let image = detailPlaceViewModel.placeImages[place.id.uuidString] {
-                        // Show place review image
+                        // Show place review image (already loaded)
                         Image(uiImage: image)
                             .resizable()
                             .aspectRatio(contentMode: .fill)
@@ -75,9 +77,6 @@ struct ListPlaceGridCell: View {
                         Rectangle()
                             .foregroundColor(detailPlaceViewModel.colorForPlace(placeId: place.id.uuidString))
                             .frame(width: cardWidth, height: cardHeight)
-                            .onAppear {
-                                profile.loadPlaceImageWithFallback(for: place)
-                            }
                     }
                     LinearGradient(
                         gradient: Gradient(colors: [
@@ -113,10 +112,6 @@ struct ListPlaceGridCell: View {
             .frame(width: cardWidth, height: cardHeight)
             .background(Color.white)
             .clipShape(RoundedRectangle(cornerRadius: 20))
-            .overlay(
-                RoundedRectangle(cornerRadius: 20)
-                    .stroke(Color.white, lineWidth: 2)
-            )
             .shadow(color: Color.black.opacity(0.2), radius: 5, x: 0, y: 2)
         }
         .contextMenu {

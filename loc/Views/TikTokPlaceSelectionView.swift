@@ -4,8 +4,11 @@ struct TikTokPlaceSelectionView: View {
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
+    @EnvironmentObject var dataManager: DataManager
+    @EnvironmentObject var userSession: UserSession
     @State private var selectedPlaceForList: DetailPlace?
     @State private var showingListSelection = false
+    @State private var listSelectionViewModel: PlaceListSelectionViewModel?
     
     var body: some View {
         NavigationView {
@@ -71,12 +74,17 @@ struct TikTokPlaceSelectionView: View {
                                 },
                                 onPlaceTapped: {
                                     print("📍 [TikTokPlaceSelectionView] Place tapped: \(place.name)")
+                                    
+                                    // Create external_place entry for this TikTok
+                                    profile.createExternalPlaceEntryForSelectedPlace(placeId: place.id.uuidString)
+                                    
                                     // First dismiss this sheet, then navigate to place detail
                                     profile.clearPlaceSelection()
 
                                     // Use a small delay to ensure sheet dismissal completes before navigation
                                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                        selectedPlaceVM.selectedPlace = place
+                                        // Animate map to place location when tapping from TikTok selection
+                                        selectedPlaceVM.selectPlaceAndFetchDetails(place, shouldAnimateMap: true)
                                         selectedPlaceVM.isDetailSheetPresented = true
                                     }
                                 }
@@ -115,13 +123,26 @@ struct TikTokPlaceSelectionView: View {
             }
         }
         .sheet(isPresented: $showingListSelection) {
-            if let place = selectedPlaceForList {
+            if let place = selectedPlaceForList,
+               let viewModel = listSelectionViewModel {
                 ListSelectionSheet(
+                    viewModel: viewModel,
                     place: place,
                     isPresented: $showingListSelection
                 )
-                .environmentObject(profile)
-                .environmentObject(detailPlaceViewModel)
+                .onDisappear {
+                    // Clean up ViewModel when sheet is dismissed
+                    listSelectionViewModel = nil
+                }
+            }
+        }
+        .onChange(of: showingListSelection) { newValue in
+            // Create ViewModel when sheet is about to be shown
+            if newValue && listSelectionViewModel == nil {
+                listSelectionViewModel = PlaceListSelectionViewModel(
+                    profile: profile,
+                    userSession: userSession
+                )
             }
         }
     }

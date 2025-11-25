@@ -1,35 +1,33 @@
 import SwiftUI
-import Firebase
-import FirebaseAuth
-import FirebaseAppCheck
-import FirebaseMessaging
 import GoogleSignIn
 import UserNotifications
+import Supabase
 
 @main
 struct locApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     
+    // Only 3 global environment objects!
     @StateObject private var locationManager: LocationManager
     @StateObject private var userSession: UserSession
-    @StateObject private var profileViewModel: ProfileViewModel
-    @StateObject private var detailPlaceViewModel: DetailPlaceViewModel
-    @StateObject private var selectedPlaceViewModel: SelectedPlaceViewModel
-    @StateObject private var userProfileViewModel: UserProfileViewModel
-    @StateObject private var searchViewModel: SearchViewModel
-    @StateObject private var notificationManager = NotificationManager.shared
-    @StateObject private var deepLinkManager: DeepLinkManager
-    @StateObject private var deepLinkViewModel: DeepLinkViewModel
-    @StateObject private var placeTypeFilterViewModel: PlaceTypeFilterViewModel
+    @StateObject private var appCoordinator = AppCoordinator()
     
-    private let dataManager: DataManager
+    // Other dependencies (not environment objects)
     private let serviceContainer = ServiceContainer.shared
+    private let selectedPlaceViewModel: SelectedPlaceViewModel
+    private let profileViewModel: ProfileViewModel
+    private let userProfileViewModel: UserProfileViewModel
+    private let detailPlaceViewModel: DetailPlaceViewModel
+    private let deepLinkViewModel: DeepLinkViewModel
+    private let deepLinkManager: DeepLinkManager
+    private let notificationManager = NotificationManager.shared
+    private let dataManager: DataManager
+    private let searchViewModel: SearchViewModel  // ✅ Staff Engineer: Create VM at app level
+    private let searchCoordinator: SearchCoordinatorViewModel  // ✅ Coordinator for search interactions
     
     init() {
-        FirebaseApp.configure()
-        let providerFactory = AppAttestProviderFactory()
-        AppCheck.setAppCheckProviderFactory(providerFactory)
-
+        // Supabase is initialized via SupabaseManager.shared
+        
         // Get services from container
         let services = ServiceContainer.shared
         services.setupServices()
@@ -53,7 +51,8 @@ struct locApp: App {
             reviewService: services.reviewService,
             placeService: services.placeService,
             userService: services.userService,
-            imageService: services.imageService
+            imageService: services.imageService,
+            detailPlaceViewModel: detailVM
         )
         
         let deepLinkMgr = DeepLinkManager(
@@ -61,7 +60,8 @@ struct locApp: App {
             userService: services.userService,
             selectedPlaceViewModel: selectedPlaceVM,
             tikTokService: services.tikTokService,
-            detailPlaceViewModel: detailVM
+            detailPlaceViewModel: detailVM,
+            profileViewModel: nil // Will be set after ProfileViewModel is created
         )
         
         let deepLinkVM = DeepLinkViewModel(
@@ -80,6 +80,9 @@ struct locApp: App {
             deepLinkManager: deepLinkMgr,
             deepLinkViewModel: deepLinkVM
         )
+        
+        // Set ProfileViewModel reference in DeepLinkManager so it can create external_place entries
+        deepLinkMgr.setProfileViewModel(profileVM)
         
         let dataMgr = DataManager(
             userService: services.userService,
@@ -103,28 +106,33 @@ struct locApp: App {
         )
         
         profileVM.userProfileViewModel = userProfileVM
-
+        
+        // ✅ Create SearchViewModel ONCE at app level (staff engineer: no recreation overhead)
         let searchVM = SearchViewModel(
             placeService: services.placeService,
-            userService: services.userService
+            userService: services.userService,
+            locationManager: location
         )
         
-        let placeTypeFilterVM = PlaceTypeFilterViewModel(
-            detailPlaceVM: detailVM,
-            profileVM: profileVM
+        // ✅ Create SearchCoordinator to handle search interactions (MVVM Coordinator Pattern)
+        let searchCoord = SearchCoordinatorViewModel(
+            selectedPlaceVM: selectedPlaceVM,
+            userProfileViewModel: userProfileVM,
+            userSession: userSess
         )
         
+        // Assign to properties
         self._locationManager = StateObject(wrappedValue: location)
         self._userSession = StateObject(wrappedValue: userSess)
-        self._profileViewModel = StateObject(wrappedValue: profileVM)
-        self._detailPlaceViewModel = StateObject(wrappedValue: detailVM)
+        self.selectedPlaceViewModel = selectedPlaceVM
+        self.profileViewModel = profileVM
+        self.userProfileViewModel = userProfileVM
+        self.detailPlaceViewModel = detailVM
+        self.deepLinkViewModel = deepLinkVM
+        self.deepLinkManager = deepLinkMgr
         self.dataManager = dataMgr
-        self._selectedPlaceViewModel = StateObject(wrappedValue: selectedPlaceVM)
-        self._userProfileViewModel = StateObject(wrappedValue: userProfileVM)
-        self._searchViewModel = StateObject(wrappedValue: searchVM)
-        self._deepLinkManager = StateObject(wrappedValue: deepLinkMgr)
-        self._deepLinkViewModel = StateObject(wrappedValue: deepLinkVM)
-        self._placeTypeFilterViewModel = StateObject(wrappedValue: placeTypeFilterVM)
+        self.searchViewModel = searchVM
+        self.searchCoordinator = searchCoord
         
         // Pass user service to AppDelegate
         appDelegate.userService = services.userService
@@ -133,73 +141,62 @@ struct locApp: App {
 
     var body: some Scene {
         WindowGroup {
-            SplashScreenView()
+            SplashScreenView(
+                selectedPlaceViewModel: selectedPlaceViewModel,
+                profileViewModel: profileViewModel,
+                userProfileViewModel: userProfileViewModel,
+                detailPlaceViewModel: detailPlaceViewModel,
+                deepLinkViewModel: deepLinkViewModel,
+                deepLinkManager: deepLinkManager,
+                notificationManager: notificationManager,
+                dataManager: dataManager,
+                serviceContainer: serviceContainer,
+                searchViewModel: searchViewModel,  // ✅ Pass to children
+                searchCoordinator: searchCoordinator  // ✅ Pass coordinator
+            )
+                // Only 3 environment objects at the root!
                 .environmentObject(userSession)
                 .environmentObject(locationManager)
-                .environmentObject(profileViewModel)
-                .environmentObject(detailPlaceViewModel)
-                .environmentObject(selectedPlaceViewModel)
-                .environmentObject(dataManager)
-                .environmentObject(userProfileViewModel)
-                .environmentObject(searchViewModel)
-                .environmentObject(notificationManager)
-                .environmentObject(serviceContainer)
-                .environmentObject(deepLinkManager)
-                .environmentObject(deepLinkViewModel)
-                .environmentObject(placeTypeFilterViewModel)
+                .environmentObject(appCoordinator)
                 .preferredColorScheme(.light)
                 .onOpenURL { url in
                     // Handle deep links for places
                     if url.scheme == "loc" {
                         // Handle all deep links through DeepLinkViewModel
                         Task {
-                            print("🔗 Received deep link in onOpenURL: \(url)")
                             await deepLinkViewModel.processIncomingURL(url)
                         }
-                    } else {
-                        print("🔗 Received non-loc deep link: \(url)")
                     }
                 }
                 .onContinueUserActivity("com.mesa.share.tiktok") { userActivity in
                     // Handle TikTok share via NSUserActivity
                     if let tikTokURL = userActivity.userInfo?["tikTokURL"] as? String {
-                        print("🎵 Received TikTok URL via NSUserActivity: \(tikTokURL)")
                         let deepLinkURL = URL(string: "loc://share/tiktok?url=\(tikTokURL.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")")!
                         Task {
                             await deepLinkViewModel.processIncomingURL(deepLinkURL)
                         }
                     }
                 }
-                .task {
-                    if let currentUser = Auth.auth().currentUser {
-                        userSession.setUserLoggedIn(uid: currentUser.uid)
-                        await dataManager.initializeProfileData(userId: currentUser.uid)
-                    }
-                    
-                    // Check for shared TikTok URLs
+                .onAppear {
+                    // Check for shared TikTok URLs on app launch
                     checkForSharedTikTokURL()
                 }
                 .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
-                    // Check again when app becomes active
+                    // Check for shared TikTok URLs when app becomes active
                     checkForSharedTikTokURL()
                 }
         }
     }
     
     private func checkForSharedTikTokURL() {
-        print("🔍 Checking for shared TikTok URLs...")
-        
         // Only use regular UserDefaults to avoid App Group errors
         if let regularURL = UserDefaults.standard.string(forKey: "sharedTikTokURL") {
-            print("🎵 Found TikTok URL in regular UserDefaults: \(regularURL)")
             UserDefaults.standard.removeObject(forKey: "sharedTikTokURL")
             
             let deepLinkURL = URL(string: "loc://share/tiktok?url=\(regularURL.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")")!
             Task {
                 await deepLinkViewModel.processIncomingURL(deepLinkURL)
             }
-        } else {
-            print("🔍 No TikTok URL found in UserDefaults")
         }
     }
 }
@@ -210,9 +207,6 @@ class AppDelegate: NSObject, UIApplicationDelegate {
 
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        
-        // Set FCM messaging delegate
-        Messaging.messaging().delegate = self
         
         // Set UNUserNotificationCenter delegate
         UNUserNotificationCenter.current().delegate = self
@@ -226,7 +220,6 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     private func requestNotificationPermissions(application: UIApplication) {
         let authOptions: UNAuthorizationOptions = [.alert, .badge, .sound]
         UNUserNotificationCenter.current().requestAuthorization(options: authOptions) { granted, error in
-            print("🔔 Notification permission granted: \(granted)")
             if let error = error {
                 print("❌ Error requesting notification permissions: \(error)")
                 return
@@ -236,7 +229,6 @@ class AppDelegate: NSObject, UIApplicationDelegate {
                 DispatchQueue.main.async {
                     // Register for remote notifications on main thread
                     application.registerForRemoteNotifications()
-                    print("📱 Registering for remote notifications...")
                 }
             } else {
                 print("⚠️ User denied notification permissions")
@@ -246,13 +238,8 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     
     // Called when APNs token is received
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
-        print("📱 APNS token received: \(deviceToken.map { String(format: "%02.2hhx", $0) }.joined())")
-        
-        // Set APNS token for FCM
-        Messaging.messaging().apnsToken = deviceToken
-        
-        // Now FCM can generate its token
-        print("🔥 APNS token set, FCM will now generate token...")
+        // TODO: Implement push notifications
+        // You can use this token for APNs directly or another push service
     }
     
     // Called when registration for remote notifications fails
@@ -271,42 +258,23 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         
         // Handle Apple Sign-In URLs
         if url.scheme == "drewharts.locc" {
-            print("🍎 Received Apple Sign-In URL in AppDelegate: \(url)")
             return true
         }
         
         // Handle deep links for places
         if url.scheme == "loc" {
-            print("🔗 Received deep link in AppDelegate: \(url)")
             Task {
                 await deepLinkViewModel?.processIncomingURL(url)
             }
             return true
-        } else {
-            print("🔗 Received non-loc deep link in AppDelegate: \(url)")
         }
         
         return false
     }
 }
 
-// MARK: - FCM Messaging Delegate
-extension AppDelegate: MessagingDelegate {
-    func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
-        print("🔥 Firebase registration token received: \(String(describing: fcmToken))")
-        
-        // Save the FCM token to Firestore if user is logged in
-        if let fcmToken = fcmToken, let currentUserId = Auth.auth().currentUser?.uid {
-            userService?.updateFCMToken(userId: currentUserId, token: fcmToken) { error in
-                if let error = error {
-                    print("❌ Error updating FCM token: \(error)")
-                } else {
-                    print("✅ FCM token successfully updated in Firestore")
-                }
-            }
-        }
-    }
-}
+// MARK: - Push Notifications (FCM removed)
+// TODO: Implement alternative push notification system (APNs, OneSignal, etc.)
 
 // MARK: - User Notification Center Delegate
 extension AppDelegate: UNUserNotificationCenterDelegate {
@@ -323,8 +291,6 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
         if let reviewId = userInfo["reviewId"] as? String,
            let placeId = userInfo["placeId"] as? String,
            let userId = userInfo["userId"] as? String {
-            print("👆 User tapped notification for review: \(reviewId) at place: \(placeId)")
-            
             // Use NotificationManager to coordinate navigation
             NotificationManager.shared.handleNotificationTap(
                 reviewId: reviewId,
@@ -338,8 +304,6 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
                 let placeId = userInfo["placeId"] as? String,
                 let type = userInfo["type"] as? String,
                 type == "comment" {
-            print("👆 User tapped notification for comment: \(commentId) on review: \(reviewId) at place: \(placeId)")
-            
             // For comments, we still navigate to the review (which will show the comments)
             // The reviewAuthorId is the person who should receive the notification
             let reviewAuthorId = userInfo["reviewAuthorId"] as? String ?? "unknown"
@@ -355,9 +319,5 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
     }
 }
 
-class AppAttestProviderFactory: NSObject, AppCheckProviderFactory {
-    func createProvider(with app: FirebaseApp) -> AppCheckProvider? {
-        return AppAttestProvider(app: app)
-    }
-}
+// Using Supabase for all backend services
 

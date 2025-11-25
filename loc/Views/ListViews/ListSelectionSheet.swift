@@ -6,9 +6,9 @@
 //
 
 import SwiftUI
-import MapboxSearch
+import CoreLocation
 
-// ListDescription
+// ListDescription - OLD (for PlaceList)
 struct ListDescription: View {
     @EnvironmentObject var profile: ProfileViewModel
     let placeList: PlaceList
@@ -27,7 +27,31 @@ struct ListDescription: View {
     }
 }
 
-// ListSelectionRowView
+// LightweightListDescription - NEW (for LightweightPlaceList)
+struct LightweightListDescription: View {
+    @EnvironmentObject var profile: ProfileViewModel
+    let list: LightweightPlaceList
+
+    // Get total place count from the list (from SQL function)
+    private var displayedPlaceCount: Int {
+        return profile.lightweightPlaceListCounts[list.list_id] ?? list.place_count
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(list.name)
+                .font(.body)
+                .foregroundStyle(Color.primary.opacity(1.0))
+
+            Text("\(displayedPlaceCount) Places")
+                .font(.caption)
+                .foregroundStyle(Color.secondary.opacity(1.0))
+        }
+        .padding(.horizontal, 15)
+    }
+}
+
+// ListSelectionRowView - OLD (for PlaceList)
 struct ListSelectionRowView: View {
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
@@ -87,26 +111,70 @@ struct ListSelectionRowView: View {
     }
 }
 
-// MARK: - ListsInSelectionSheet
-struct ListsInSelectionSheet: View {
-    @EnvironmentObject var profile: ProfileViewModel
-    @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
+// LightweightListSelectionRowView - NEW (for LightweightPlaceList)
+// Refactored to be a dumb view that delegates behavior via closures.
+struct LightweightListSelectionRowView: View {
+    let list: LightweightPlaceList
     let place: DetailPlace
-    @Binding var searchText: String
-    
-    // Filtered lists based on search text and sorted with recently created list first, then by proximity to the place
-    var filteredLists: [PlaceList] {
-        let sortedLists = profile.sortListsWithRecentFirstFromPlace(place)
-        
-        if searchText.isEmpty {
-            return sortedLists
-        } else {
-            return sortedLists.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
+    let isInList: Bool
+    let onToggle: () -> Void
+    @State private var backgroundColor: Color = Color(.systemGray5)
+
+    var body: some View {
+        Button(action: {
+            togglePlaceInList()
+        }) {
+            HStack {
+                // Display colored rectangle (or list image if available)
+                Group {
+                    Rectangle()
+                        .foregroundColor(backgroundColor)
+                        .onAppear {
+                            backgroundColor = Color(
+                                red: Double.random(in: 0.5...0.9),
+                                green: Double.random(in: 0.5...0.9),
+                                blue: Double.random(in: 0.5...0.9)
+                            )
+                        }
+                }
+                .frame(width: 75, height: 75)
+                .clipped()
+                .cornerRadius(4)
+
+                LightweightListDescription(list: list)
+
+                Spacer()
+
+                ZStack {
+                    if isInList {
+                        Circle()
+                            .fill(Color.primary)
+                            .frame(width: 24, height: 24)
+                    } else {
+                        Circle()
+                            .stroke(Color.primary, lineWidth: 2)
+                            .frame(width: 24, height: 24)
+                    }
+                }
+            }
+            .padding(.top, 20)
+            .padding(.horizontal, 15)
         }
+        .buttonStyle(PlainButtonStyle())
     }
     
+    private func togglePlaceInList() {
+        onToggle()
+    }
+}
+
+// MARK: - ListsInSelectionSheet (Lightweight - uses place coordinates!)
+struct ListsInSelectionSheet: View {
+    @ObservedObject var viewModel: PlaceListSelectionViewModel
+    let place: DetailPlace
+
     var isLoading: Bool {
-        profile.userLists.isEmpty || profile.isLoading
+        viewModel.isLoadingInitial
     }
 
     var body: some View {
@@ -120,45 +188,52 @@ struct ListsInSelectionSheet: View {
                         .foregroundColor(.secondary)
                 }
                 .padding()
-            } else if !filteredLists.isEmpty {
-                ForEach(filteredLists) { list in
-                    ListSelectionRowView(list: list, place: place)
+            } else if !viewModel.lists.isEmpty {
+                ForEach(Array(viewModel.lists.enumerated()), id: \.element.id) { index, list in
+                    LightweightListSelectionRowView(
+                        list: list,
+                        place: place,
+                        isInList: viewModel.isPlace(place, in: list),
+                        onToggle: {
+                            viewModel.toggle(place: place, in: list)
+                        }
+                    )
+                        .onAppear {
+                            // ViewModel handles the logic of when to load more
+                            Task {
+                                await viewModel.loadMoreListsIfNeeded(currentIndex: index)
+                            }
+                        }
+                }
+                
+                // Loading indicator at the bottom
+                if viewModel.isLoadingMore {
+                    HStack {
+                        Spacer()
+                        ProgressView()
+                            .padding()
+                        Spacer()
+                    }
                 }
             } else {
                 VStack(spacing: 8) {
-                    if searchText.isEmpty {
-                        Text("No lists available")
-                            .foregroundColor(.gray)
-                            .padding(.horizontal)
-                    } else {
-                        Text("No lists found")
-                            .foregroundColor(.gray)
-                            .padding(.horizontal)
-                        Text("No lists match '\(searchText)'")
-                            .font(.caption)
-                            .foregroundColor(.gray)
-                            .padding(.horizontal)
-                    }
+                    Text("No lists available")
+                        .foregroundColor(.gray)
+                        .padding(.horizontal)
                 }
             }
-        }
-        .onAppear {
-            print("🔍 [ListSelectionSheet] Lists count: \(profile.userLists.count)")
-            print("🔍 [ListSelectionSheet] Filtered lists count: \(filteredLists.count)")
-            print("🔍 [ListSelectionSheet] Is loading: \(isLoading)")
         }
     }
 }
 
 // MARK: - ListSelectionSheet
 struct ListSelectionSheet: View {
-    @EnvironmentObject var profile: ProfileViewModel
-    @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
+    @ObservedObject var viewModel: PlaceListSelectionViewModel
     let place: DetailPlace
     @Binding var isPresented: Bool
     @State private var showNewListSheet = false
-    @State private var newListName = ""
-    @State public var searchText = ""
+    @State private var errorMessage: String?
+    @State private var showError = false
 
     var body: some View {
         VStack(spacing: 10) {
@@ -182,23 +257,40 @@ struct ListSelectionSheet: View {
                 }
                 .sheet(isPresented: $showNewListSheet) {
                     NewListView(isPresented: $showNewListSheet, onSave: { listName in
-                        profile.addNewPlaceList(named: listName, city: "", emoji: "", image: "")
+                        let result = await viewModel.addNewListToSelection(
+                            named: listName, 
+                            city: "", 
+                            emoji: "", 
+                            image: ""
+                        )
+                        
+                        // Handle result explicitly
+                        switch result {
+                        case .success:
+                            break  // Sheet will dismiss via NewListView
+                        case .failure(let error):
+                            errorMessage = error.localizedDescription
+                            showError = true
+                        }
                     })
                 }
             }
             .padding(.horizontal, 20)
             .padding(.top, 10)
 
-            SkinnySearchBar(searchText: $searchText)
-
-            ListsInSelectionSheet(place: place, searchText: $searchText)
+            ListsInSelectionSheet(viewModel: viewModel, place: place)
 
             Spacer()
         }
         .cornerRadius(20)
         .padding()
-        .onAppear {
-            profile.ensureListsLoaded()
+        .task {
+            await viewModel.loadInitialLists(for: place)
+        }
+        .alert("Error Creating List", isPresented: $showError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(errorMessage ?? "Unknown error occurred")
         }
     }
 }

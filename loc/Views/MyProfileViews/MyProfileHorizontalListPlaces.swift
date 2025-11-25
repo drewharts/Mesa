@@ -35,9 +35,8 @@ struct MyProfileHorizontalListPlaces: View {
             return firstVideo.thumbnailURL
         }
         
-        // Check user's TikTok videos for this place
-        let userTikTokVideos = viewModel.getTikTokVideos(for: place.id.uuidString)
-        return userTikTokVideos.first?.thumbnailURL
+        // Check user's TikTok videos for this place (uses cached data)
+        return viewModel.getFirstTikTokThumbnailURL(for: place.id.uuidString)
     }
     
     // Check if a place should load its image (only if actually visible on screen and not already loaded)
@@ -131,7 +130,7 @@ struct MyProfileHorizontalListPlaces: View {
                 // Show loaded places
                 ForEach(places, id: \.id) { place in
                     Button(action: {
-                        selectedPlaceVM.selectedPlace = place
+                        selectedPlaceVM.selectPlaceAndFetchDetails(place)
                         selectedPlaceVM.isDetailSheetPresented = true
                         presentationMode.wrappedValue.dismiss()
                     }) {
@@ -259,12 +258,17 @@ struct MyProfileHorizontalListPlaces: View {
                             GeometryReader { geometry in
                                 Color.clear
                                     .onAppear {
-                                        placeFrames[place.id] = geometry.frame(in: .global)
-                                        updateVisiblePlaces()
+                                        let frame = geometry.frame(in: .global)
+                                        if frame.width > 0 && frame.height > 0 {
+                                            placeFrames[place.id] = frame
+                                            updateVisiblePlaces()
+                                        }
                                     }
                                     .onChange(of: geometry.frame(in: .global)) { newFrame in
-                                        placeFrames[place.id] = newFrame
-                                        updateVisiblePlaces()
+                                        if newFrame.width > 0 && newFrame.height > 0 {
+                                            placeFrames[place.id] = newFrame
+                                            updateVisiblePlaces()
+                                        }
                                     }
                             }
                         )
@@ -341,12 +345,17 @@ struct MyProfileHorizontalListPlaces: View {
                 GeometryReader { geometry in
                     Color.clear
                         .onAppear {
-                            scrollViewFrame = geometry.frame(in: .global)
-                            updateVisiblePlaces()
+                            let frame = geometry.frame(in: .global)
+                            if frame.width > 0 && frame.height > 0 {
+                                scrollViewFrame = frame
+                                updateVisiblePlaces()
+                            }
                         }
                         .onChange(of: geometry.frame(in: .global)) { newFrame in
-                            scrollViewFrame = newFrame
-                            updateVisiblePlaces()
+                            if newFrame.width > 0 && newFrame.height > 0 {
+                                scrollViewFrame = newFrame
+                                updateVisiblePlaces()
+                            }
                         }
                 }
             )

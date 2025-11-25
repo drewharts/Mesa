@@ -8,7 +8,7 @@
 import Foundation
 import SwiftUI
 import Combine
-import FirebaseFirestore
+import CoreLocation
 
 @MainActor
 class DeepLinkViewModel: ObservableObject {
@@ -77,8 +77,8 @@ class DeepLinkViewModel: ObservableObject {
         deepLinkedPlace = detailPlace
         isShowingPlaceFromDeepLink = true
         
-        // Also update the main selected place view model
-        selectedPlaceViewModel.selectedPlace = detailPlace
+        // Also update the main selected place view model - animate map to deep linked place and fetch fresh details
+        selectedPlaceViewModel.selectPlaceAndFetchDetails(detailPlace, shouldAnimateMap: true)
         selectedPlaceViewModel.isDetailSheetPresented = true
         
         // Clear pending place
@@ -96,7 +96,7 @@ class DeepLinkViewModel: ObservableObject {
         detailPlace.mapboxId = shareablePlace.mapboxId
         
         if let lat = shareablePlace.latitude, let lng = shareablePlace.longitude {
-            detailPlace.coordinate = GeoPoint(latitude: lat, longitude: lng)
+            detailPlace.coordinate = CLLocationCoordinate2D(latitude: lat, longitude: lng)
         }
         
         return detailPlace
@@ -136,8 +136,8 @@ class DeepLinkViewModel: ObservableObject {
     func navigateToDeepLinkedPlace() {
         guard let place = deepLinkedPlace else { return }
         
-        // Update the main view model to show this place
-        selectedPlaceViewModel.selectedPlace = place
+        // Update the main view model to show this place - animate map to deep linked place and fetch fresh details
+        selectedPlaceViewModel.selectPlaceAndFetchDetails(place, shouldAnimateMap: true)
         
         // Navigate to the place detail view
         isShowingPlaceFromDeepLink = true

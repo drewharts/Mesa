@@ -1,11 +1,9 @@
 import Foundation
-import FirebaseStorage
 import UIKit
+import Supabase
 
 class ImageService {
     static let shared = ImageService()
-    private let storage = FirebaseManager.shared.storage
-    private let db = FirebaseManager.shared.db
 
     private init() {}
 
@@ -14,202 +12,151 @@ class ImageService {
 
     // Add async version of updateProfilePhoto
     func updateProfilePhoto(userId: String, image: UIImage) async throws -> URL {
-        return try await withCheckedThrowingContinuation { continuation in
-            updateProfilePhoto(userId: userId, image: image) { result in
-                switch result {
-                case .success(let url):
-                    continuation.resume(returning: url)
-                case .failure(let error):
-                    continuation.resume(throwing: error)
-                }
+        print("🔄 [ImageService] updateProfilePhoto called with userId: \(userId)")
+        
+        let supabase = await SupabaseManager.shared
+        
+        // Debug authentication status first
+        await supabase.debugAuthStatus()
+        
+        // Convert UIImage to Data (JPEG format)
+        guard let imageData = image.jpegData(compressionQuality: 0.8) else {
+            print("❌ [ImageService] Failed to convert image to JPEG data")
+            throw NSError(domain: "ImageService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to convert image to JPEG data"])
+        }
+        
+        do {
+            // Get the authenticated Supabase user ID (this is what RLS policies expect)
+            let currentUser = try await supabase.auth.user()
+            let supabaseUserId = currentUser.id.uuidString
+            
+            // Create filename - use simple profile.jpg for easy replacement
+            let fileName = "profile.jpg"
+            let filePath = "\(supabaseUserId)/\(fileName)"  // Use Supabase user ID
+            
+            // Get the bucket reference
+            let bucket = await supabase.storage.from("profile_photos")
+            
+            // Upload the new profile photo with upsert to replace existing
+            _ = try await bucket.upload(
+                filePath,
+                data: imageData,
+                options: FileOptions(
+                    cacheControl: "3600",
+                    contentType: "image/jpeg",
+                    upsert: true  // This replaces the existing file
+                )
+            )
+            
+            // Get the public URL
+            let publicURL = try bucket.getPublicURL(path: filePath)
+            
+            return publicURL
+            
+        } catch {
+            print("❌ [ImageService] Failed to upload profile photo: \(error)")
+            print("❌ [ImageService] Error type: \(type(of: error))")
+            print("❌ [ImageService] Error details: \(error.localizedDescription)")
+            
+            // Try to get more specific error information
+            if let storageError = error as? StorageError {
+                print("❌ [ImageService] StorageError statusCode: \(String(describing: storageError.statusCode))")
+                print("❌ [ImageService] StorageError message: \(storageError.message)")
+                print("❌ [ImageService] StorageError error: \(String(describing: storageError.error))")
             }
+            
+            // Check if it's a network error
+            if let urlError = error as? URLError {
+                print("❌ [ImageService] URLError code: \(urlError.code)")
+                print("❌ [ImageService] URLError description: \(urlError.localizedDescription)")
+            }
+            
+            throw error
         }
     }
 
     func updateProfilePhoto(userId: String, image: UIImage, completion: @escaping (Result<URL, Error>) -> Void) {
-        // Convert UIImage to Data
-        guard let imageData = image.jpegData(compressionQuality: 0.5) else {
-            let error = NSError(domain: "ProfileFirestoreService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to convert image to data"])
-            completion(.failure(error))
-            return
-        }
-        
-        // Create a unique filename
-        let filename = "profile_photos/\(userId)_\(Date().timeIntervalSince1970).jpg"
-        let storageRef = storage.reference().child(filename)
-        
-        // Upload the image data
-        let metadata = StorageMetadata()
-        metadata.contentType = "image/jpeg"
-        
-        // First, check if user has an existing profile photo
-        let userRef = db.collection("users").document(userId)
-        userRef.getDocument { [weak self] document, error in
-            guard let self = self else { return }
-            
-            if let error = error {
-                print("Error checking existing profile photo: \(error.localizedDescription)")
-                // Continue with upload even if we can't check existing photo
-            }
-            
-            // Try to delete existing photo if it exists
-            if let existingPhotoURL = document?.data()?["profilePhotoURL"] as? String {
-                // Extract the filename from the URL
-                if let existingPhotoPath = existingPhotoURL.components(separatedBy: "/").last {
-                    let existingRef = self.storage.reference().child("profile_photos/\(existingPhotoPath)")
-                    existingRef.delete { error in
-                        if let error = error {
-                            // Only log the error if it's not a "not found" error
-                            if (error as NSError).domain != "com.google.HTTPStatus" || (error as NSError).code != 404 {
-                                print("Error deleting existing profile photo: \(error.localizedDescription)")
-                            }
-                        }
-                    }
+        Task {
+            do {
+                let url = try await updateProfilePhoto(userId: userId, image: image)
+                await MainActor.run {
+                    completion(.success(url))
                 }
-            }
-            
-            // Now upload the new photo
-            storageRef.putData(imageData, metadata: metadata) { metadata, error in
-                if let error = error {
-                    print("Error uploading profile photo: \(error.localizedDescription)")
+            } catch {
+                await MainActor.run {
                     completion(.failure(error))
-                    return
-                }
-                
-                // Wait a brief moment to ensure the upload is fully processed
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    storageRef.downloadURL { url, error in
-                        if let error = error {
-                            print("Error getting download URL: \(error.localizedDescription)")
-                            completion(.failure(error))
-                            return
-                        }
-                        
-                        guard let downloadURL = url else {
-                            let error = NSError(domain: "ProfileFirestoreService", code: -2, userInfo: [NSLocalizedDescriptionKey: "Download URL was nil"])
-                            completion(.failure(error))
-                            return
-                        }
-                        
-                        // Update the user's profile document with the new URL
-                        userRef.updateData([
-                            "profilePhotoURL": downloadURL.absoluteString
-                        ]) { error in
-                            if let error = error {
-                                print("Error updating user profile: \(error.localizedDescription)")
-                                completion(.failure(error))
-                            } else {
-                                print("Successfully updated profile photo URL")
-                                completion(.success(downloadURL))
-                            }
-                        }
-                    }
                 }
             }
         }
     }
+    
+    // MARK: - Helper Methods
+    
+    // Note: Using upsert: true in upload options automatically replaces existing files
+    // No need for separate deletion logic
 
-        func fetchPhotosFromStorage(urls: [String], completion: @escaping ([UIImage]?, Error?) -> Void) {
-        // Early exit for empty URLs
+    func fetchPhotosFromStorage(urls: [String], completion: @escaping ([UIImage]?, Error?) -> Void) {
+        // Use the same approach as the working reviewed section
         guard !urls.isEmpty else {
-            DispatchQueue.main.async {
-                completion([], nil)
-            }
+            completion([], nil)
             return
         }
         
-        var images: [UIImage] = []
-        let group = DispatchGroup()
-        var lastError: Error?
         
-        // Use OperationQueue to limit concurrent downloads
-        let downloadQueue = OperationQueue()
-        downloadQueue.maxConcurrentOperationCount = 10 // Limit concurrent downloads
-        
-        for urlString in urls {
-            // Skip invalid URLs
-            guard let url = URL(string: urlString) else {
-                print("Invalid URL: \(urlString)")
-                continue
-            }
+        Task {
+            var loadedImages: [UIImage] = []
             
-            // Check cache first
-            if let cachedImage = ImageCacheService.shared.getImage(for: url) {
-                images.append(cachedImage)
-                continue
-            }
-            
-            group.enter()
-            
-            // Create download operation
-            let operation = BlockOperation {
-                // Create a semaphore to handle the async task within the operation
-                let semaphore = DispatchSemaphore(value: 0)
-                
-                var retryCount = 0
-                let maxRetries = 2
-                
-                func attemptDownload() {
-                    // Configure the URLRequest with timeout
-                    var request = URLRequest(url: url)
-                    request.timeoutInterval = 15 // 15 seconds timeout
-                    
-                    URLSession.shared.dataTask(with: request) { data, response, error in
-                        // Handle error with retry logic
-                        if let error = error {
-                            if retryCount < maxRetries {
-                                retryCount += 1
-                                print("Retry \(retryCount) for URL: \(urlString)")
-                                attemptDownload() // Recursive retry
-                                return
-                            }
-                            
-                            print("Error downloading image after \(maxRetries) retries from \(urlString): \(error.localizedDescription)")
-                            lastError = error
-                            semaphore.signal()
-                            group.leave()
-                            return
-                        }
-                        
-                        // Process image data
-                        if let data = data {
-                            // Check for image data size and possibly downsample for large images
-                            if data.count > 1024 * 1024 { // If larger than 1MB
-                                if let downsampledImage = self.downsampleImage(data: data, to: CGSize(width: 1000, height: 1000)) {
-                                    images.append(downsampledImage)
-                                    ImageCacheService.shared.storeImage(downsampledImage, for: url)
-                                } else if let image = UIImage(data: data) {
-                                    images.append(image)
-                                    ImageCacheService.shared.storeImage(image, for: url)
-                                }
-                            } else if let image = UIImage(data: data) {
-                                images.append(image)
-                                ImageCacheService.shared.storeImage(image, for: url)
-                            }
-                        }
-                        
-                        semaphore.signal()
-                        group.leave()
-                    }.resume()
+            // Load images in parallel using TaskGroup (same as reviewed section)
+            await withTaskGroup(of: UIImage?.self) { group in
+                for urlString in urls {
+                    group.addTask {
+                        await self.loadImageFromURL(imageUrl: urlString)
+                    }
                 }
                 
-                // Start the download process
-                attemptDownload()
-                
-                // Wait for the async operation to complete
-                semaphore.wait()
+                for await image in group {
+                    if let image = image {
+                        loadedImages.append(image)
+                    }
+                }
             }
             
-            downloadQueue.addOperation(operation)
+            await MainActor.run {
+                completion(loadedImages.isEmpty ? nil : loadedImages, nil)
+            }
+        }
+    }
+    
+    /// Load image directly from URL (same approach as ProfileViewModel)
+    private func loadImageFromURL(imageUrl: String) async -> UIImage? {
+        // ✅ COMPLETE Firebase elimination - block ALL Firebase URLs, only use Supabase
+        if imageUrl.contains("firebasestorage.googleapis.com") {
+            print("🚫 [ImageService] BLOCKING Firebase Storage URL - Firebase migration complete, use Supabase only: \(imageUrl)")
+            return nil
         }
         
-        // Handle completion
-        group.notify(queue: .main) {
-            if images.isEmpty && lastError != nil {
-                completion(nil, lastError)
+        guard let url = URL(string: imageUrl) else {
+            print("⚠️ [ImageService] Invalid image URL: \(imageUrl)")
+            return nil
+        }
+        
+        do {
+            // Use the same efficient URLSession configuration as ProfileViewModel
+            let config = URLSessionConfiguration.default
+            config.timeoutIntervalForRequest = 5.0  // ✅ Reduced timeout to prevent hanging
+            config.timeoutIntervalForResource = 10.0  // ✅ Reduced timeout to prevent hanging
+            let session = URLSession(configuration: config)
+            
+            let (data, _) = try await session.data(from: url)
+            if let image = UIImage(data: data) {
+                return image
             } else {
-                completion(images, nil)
+                print("⚠️ [ImageService] Failed to create UIImage from data for \(imageUrl)")
+                return nil
             }
+        } catch {
+            print("⚠️ [ImageService] Failed to load image from URL \(imageUrl): \(error.localizedDescription)")
+            return nil
         }
     }
 
@@ -298,234 +245,173 @@ class ImageService {
             }
         }
         
-        print("📸 Compressed image from original to \(imageData.count) bytes (target: \(maxFileSize) bytes)")
         return imageData
     }
 
     func fetchPhotosFromStorage(placeId: String, returnFirstImageOnly: Bool = false, completion: @escaping ([UIImage]?, Error?) -> Void) {
-            let storageRef = storage.reference().child("reviews/\(placeId)")
-            
-            storageRef.listAll { [weak self] (result, error) in
-                guard self != nil else { return }
-                
-                if let error = error {
-                    print("Error listing files in storage for place \(placeId): \(error.localizedDescription)")
-                    completion(nil, error)
-                    return
-                }
-                
-                guard let result = result else {
-                    print("No result returned for storage path reviews/\(placeId)")
-                    completion([], nil)
-                    return
-                }
-                
-                let itemsToProcess = returnFirstImageOnly ? result.items.prefix(1) : result.items.prefix(9)
-                let itemsArray = Array(itemsToProcess) // Convert to array for indexing
-                var images: [UIImage] = []
-                var lastError: Error? = nil
-                
-                // Recursive function to fetch images one by one
-                func fetchNextImage(index: Int) {
-                    // Base case: all items processed
-                    if index >= itemsArray.count {
-                        DispatchQueue.main.async {
-                            completion(images.isEmpty && lastError == nil ? [] : images, lastError)
-                        }
-                        return
-                    }
-                    
-                    let item = itemsArray[index]
-                    item.getData(maxSize: 5 * 1024 * 1024) { data, error in
-                        if let error = error {
-                            print("Error downloading image \(item.name): \(error.localizedDescription)")
-                            lastError = error
-                        } else if let data = data, let image = UIImage(data: data) {
-                            images.append(image)
-                        }
-                        
-                        // Fetch the next image
-                        fetchNextImage(index: index + 1)
-                    }
-                }
-                
-                // Start fetching from the first item
-                fetchNextImage(index: 0)
-            }
-        }
+        // TODO: Implement with Supabase Storage
+        print("🚫 [ImageService] fetchPhotosFromStorage(placeId:) - Firebase completely removed, use Supabase only")
+        completion([], nil)
+    }
 
     func uploadImagesForReview<T: ReviewProtocol>(
         review: T,
         images: [UIImage],
         completion: @escaping (Result<[String], Error>) -> Void
     ) {
-        // If there are no images, return immediately with an empty array
-        guard !images.isEmpty else {
-            completion(.success([]))
-            return
-        }
-        
-        var downloadURLs: [String] = []
-        var errors: [Error] = []
-
-        // A DispatchGroup to wait for all uploads
-        let dispatchGroup = DispatchGroup()
-        
-        for image in images {
-            dispatchGroup.enter()
-            
-            // 1. Generate a unique name for each image
-            let imageName = UUID().uuidString
-            
-            // 2. (Optional) Decide on a path for storing your review images
-            //    For example: "reviews/{reviewId}/{imageName}.jpg"
-            let storageRef = storage.reference()
-                .child("reviews/\(review.id)/\(imageName).jpg")
-            
-            // 3. Compress the UIImage to 1MB or less
-            guard let imageData = compressImageTo1MB(image) else {
-                errors.append(
-                    NSError(domain: "FirestoreService", code: 0, userInfo: [
-                        NSLocalizedDescriptionKey: "Could not compress image to required size"
-                    ])
-                )
-                dispatchGroup.leave()
-                continue
-            }
-
-            // 4. Upload the image data
-            storageRef.putData(imageData, metadata: nil) { metadata, error in
-                if let error = error {
-                    errors.append(error)
-                    dispatchGroup.leave()
-                    return
+        Task {
+            do {
+                let urls = try await uploadImagesForReviewAsync(review: review, images: images)
+                await MainActor.run {
+                    completion(.success(urls))
                 }
-                
-                // 5. Once uploaded, fetch the download URL
-                storageRef.downloadURL { url, error in
-                    if let error = error {
-                        errors.append(error)
-                    } else if let downloadURL = url {
-                        downloadURLs.append(downloadURL.absoluteString)
-                    }
-                    dispatchGroup.leave()
+            } catch {
+                await MainActor.run {
+                    completion(.failure(error))
                 }
-            }
-        }
-        
-        // 6. When all uploads finish, call completion
-        dispatchGroup.notify(queue: .main) {
-            if let firstError = errors.first {
-                completion(.failure(firstError))
-            } else {
-                completion(.success(downloadURLs))
             }
         }
     }
+    
+    /// Async version of uploadImagesForReview
+    func uploadImagesForReviewAsync<T: ReviewProtocol>(
+        review: T,
+        images: [UIImage]
+    ) async throws -> [String] {
+        let supabase = await SupabaseManager.shared
+        
+        guard !images.isEmpty else {
+            return []
+        }
+        
+        do {
+            let currentUser = try await supabase.auth.user()
+            let supabaseUserId = currentUser.id.uuidString
+            
+            let bucket = await supabase.storage.from("review-photos")
+            
+            var uploadedUrls: [String] = []
+            
+            // Upload images sequentially to maintain order
+            for (index, image) in images.enumerated() {
+                guard let imageData = image.jpegData(compressionQuality: 0.8) else {
+                    print("❌ [ImageService] Failed to convert image \(index + 1) to JPEG data")
+                    continue
+                }
+                
+                // Compress image if needed
+                let compressedData = compressImageTo1MB(image) ?? imageData
+                
+                // Create file path: review-photos/{supabase_user_id}/{review_id}/{image_index}.jpg
+                let fileName = "image_\(index + 1).jpg"
+                let filePath = "\(supabaseUserId)/\(review.id)/\(fileName)"
+                
+                _ = try await bucket.upload(
+                    filePath,
+                    data: compressedData,
+                    options: FileOptions(
+                        cacheControl: "3600",
+                        contentType: "image/jpeg",
+                        upsert: true
+                    )
+                )
+                
+                let publicURL = try bucket.getPublicURL(path: filePath)
+                uploadedUrls.append(publicURL.absoluteString)
+            }
+            
+            return uploadedUrls
+            
+        } catch {
+            print("❌ [ImageService] Failed to upload review images: \(error)")
+            print("❌ [ImageService] Error details: \(error.localizedDescription)")
+            if let storageError = error as? StorageError {
+                print("❌ [ImageService] StorageError statusCode: \(String(describing: storageError.statusCode))")
+                print("❌ [ImageService] StorageError message: \(storageError.message)")
+                print("❌ [ImageService] StorageError error: \(String(describing: storageError.error))")
+            }
+            throw error
+        }
+    }
 
-        // Function to upload an image and update the PlaceList's image field
+    // Function to upload an image and update the PlaceList's image field
     func uploadImageAndUpdatePlaceList(userId: String, placeList: PlaceList, image: UIImage, completion: @escaping (Error?) -> Void) {
-        // 1. Generate a unique name for the image
-        let imageName = UUID().uuidString
-        let storageRef = storage.reference().child("placeListPhotos/\(userId)/\(placeList.name)/\(imageName)")
-
-        // 2. Convert the UIImage to data (e.g., JPEG)
-        guard let imageData = image.jpegData(compressionQuality: 0.8) else {
-            completion(NSError(domain: "FirestoreService", code: 0, userInfo: [NSLocalizedDescriptionKey: "Could not convert image to data"]))
-            return
-        }
-
-        // 3. Upload the image data to Firebase Storage
-        storageRef.putData(imageData, metadata: nil) { metadata, error in
-            if let error = error {
-                completion(error)
-                return
-            }
-
-            // 4. Get the download URL
-            storageRef.downloadURL { url, error in
-                if let error = error {
-                    completion(error)
-                    return
-                }
-
-                guard let downloadURL = url else {
-                    completion(NSError(domain: "FirestoreService", code: 1, userInfo: [NSLocalizedDescriptionKey: "Download URL was nil"]))
-                    return
-                }
-
-                // 5. Update the PlaceList document in Firestore
-                let placeListRef = self.db.collection("users").document(userId).collection("placeLists").document(placeList.name)
-                placeListRef.updateData([
-                    "image": downloadURL.absoluteString
-                ]) { error in
-                    completion(error)
-                }
-            }
-        }
+        // TODO: Implement with Supabase Storage
+        print("🚫 [ImageService] uploadImageAndUpdatePlaceList - Firebase completely removed, use Supabase only")
+        let error = NSError(domain: "ImageService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Firebase completely removed - use Supabase only"])
+        completion(error)
     }
 
     func uploadImagesForComment(comment: Comment, images: [UIImage], completion: @escaping (Result<[String], Error>) -> Void) {
-        // If there are no images, return immediately with an empty array
-        guard !images.isEmpty else {
-            completion(.success([]))
-            return
-        }
-        
-        var downloadURLs: [String] = []
-        var errors: [Error] = []
-
-        // A DispatchGroup to wait for all uploads
-        let dispatchGroup = DispatchGroup()
-        
-        for image in images {
-            dispatchGroup.enter()
-            
-            // 1. Generate a unique name for each image
-            let imageName = UUID().uuidString
-            
-            // 2. Store comment images in a separate folder
-            let storageRef = storage.reference()
-                .child("comments/\(comment.id)/\(imageName).jpg")
-            
-            // 3. Compress the UIImage to 1MB or less
-            guard let imageData = compressImageTo1MB(image) else {
-                errors.append(
-                    NSError(domain: "ImageService", code: 0, userInfo: [
-                        NSLocalizedDescriptionKey: "Could not compress image to required size"
-                    ])
-                )
-                dispatchGroup.leave()
-                continue
-            }
-
-            // 4. Upload the image data
-            storageRef.putData(imageData, metadata: nil) { metadata, error in
-                if let error = error {
-                    errors.append(error)
-                    dispatchGroup.leave()
-                    return
+        Task {
+            do {
+                let urls = try await uploadImagesForCommentAsync(comment: comment, images: images)
+                await MainActor.run {
+                    completion(.success(urls))
                 }
-                
-                // 5. Once uploaded, fetch the download URL
-                storageRef.downloadURL { url, error in
-                    if let error = error {
-                        errors.append(error)
-                    } else if let downloadURL = url {
-                        downloadURLs.append(downloadURL.absoluteString)
-                    }
-                    dispatchGroup.leave()
+            } catch {
+                await MainActor.run {
+                    completion(.failure(error))
                 }
-            }
-        }
-        
-        // 6. When all uploads finish, call completion
-        dispatchGroup.notify(queue: .main) {
-            if let firstError = errors.first {
-                completion(.failure(firstError))
-            } else {
-                completion(.success(downloadURLs))
             }
         }
     }
-} 
+    
+    /// Async version of uploadImagesForComment
+    func uploadImagesForCommentAsync(comment: Comment, images: [UIImage]) async throws -> [String] {
+        let supabase = await SupabaseManager.shared
+        
+        guard !images.isEmpty else {
+            return []
+        }
+        
+        do {
+            let currentUser = try await supabase.auth.user()
+            let supabaseUserId = currentUser.id.uuidString
+            
+            let bucket = await supabase.storage.from("comment_photos")
+            
+            var uploadedUrls: [String] = []
+            
+            // Upload images sequentially to maintain order
+            for (index, image) in images.enumerated() {
+                guard let imageData = image.jpegData(compressionQuality: 0.8) else {
+                    print("❌ [ImageService] Failed to convert comment image \(index + 1) to JPEG data")
+                    continue
+                }
+                
+                // Compress image if needed
+                let compressedData = compressImageTo1MB(image) ?? imageData
+                
+                // Create file path: comment-photos/{supabase_user_id}/{comment_id}/{image_index}.jpg
+                let fileName = "image_\(index + 1).jpg"
+                let filePath = "\(supabaseUserId)/\(comment.id)/\(fileName)"
+                
+                _ = try await bucket.upload(
+                    filePath,
+                    data: compressedData,
+                    options: FileOptions(
+                        cacheControl: "3600",
+                        contentType: "image/jpeg",
+                        upsert: true
+                    )
+                )
+                
+                let publicURL = try bucket.getPublicURL(path: filePath)
+                uploadedUrls.append(publicURL.absoluteString)
+            }
+            
+            return uploadedUrls
+            
+        } catch {
+            print("❌ [ImageService] Failed to upload comment images: \(error)")
+            print("❌ [ImageService] Error details: \(error.localizedDescription)")
+            if let storageError = error as? StorageError {
+                print("❌ [ImageService] StorageError statusCode: \(String(describing: storageError.statusCode))")
+                print("❌ [ImageService] StorageError message: \(storageError.message)")
+                print("❌ [ImageService] StorageError error: \(String(describing: storageError.error))")
+            }
+            throw error
+        }
+    }
+}

@@ -9,7 +9,6 @@
 // PlaceListView.swift
 
 import SwiftUI
-import MapboxSearch
 
 struct WidePlaceView: View {
     @EnvironmentObject var profile: ProfileViewModel
@@ -69,7 +68,7 @@ struct PlaceListView: View {
             ForEach(places, id: \.id) { place in
                 // Wrap the row in a Button (or NavigationLink) so it's tappable
                 Button(action: {
-                    selectedPlaceVM.selectedPlace = place
+                    selectedPlaceVM.selectPlaceAndFetchDetails(place)
                     selectedPlaceVM.isDetailSheetPresented = true
                     presentationMode.wrappedValue.dismiss()
                 }) {

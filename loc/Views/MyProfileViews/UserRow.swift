@@ -7,16 +7,21 @@
 import SwiftUI
 
 struct UserRow: View {
+    let user: ProfileData
+    let onSelectUser: () -> Void
+    
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var detailPlaceVM: DetailPlaceViewModel
     @EnvironmentObject var userSession: UserSession
-    let user: ProfileData
     @EnvironmentObject var userProfileVM: UserProfileViewModel
     
     var body: some View {
         Button(action: {
             guard let currentUserId = userSession.currentUserId else { return }
+            // Select the user first
             userProfileVM.selectUser(user, currentUserId: currentUserId)
+            // Then call the closure to switch sheets
+            onSelectUser()
         }) {
             HStack(spacing: 12) {
                 // User profile photo

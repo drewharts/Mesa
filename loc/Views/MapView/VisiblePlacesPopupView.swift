@@ -11,34 +11,32 @@ import MapKit
 struct VisiblePlacesPopupView: View {
     let mapRegion: MKCoordinateRegion?
     
-    @Environment(\.presentationMode) var presentationMode
+    @Environment(\.dismiss) var dismiss
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
-    @EnvironmentObject var placeTypeFilterVM: PlaceTypeFilterViewModel
+    @EnvironmentObject var mapViewModel: MapViewModel
+    @EnvironmentObject var profile: ProfileViewModel
     
-    @State private var placeColors: [UUID: Color] = [:]
+    @State private var placeColors: [String: Color] = [:]
+    @State private var loadedImageCount = 0
+    @State private var isLoadingImages = false
     
-    // Get all places currently visible on the map within the visible region
-    var visiblePlaces: [DetailPlace] {
-        let allFilteredPlaces = placeTypeFilterVM.getFilteredPlaces()
-        
+    // Get all places currently visible on the map from viewport annotations
+    var visiblePlaces: [PlaceAnnotation] {
         guard let mapRegion = mapRegion else {
-            return allFilteredPlaces
+            return mapViewModel.viewportAnnotations
         }
         
-        // Filter places to only include those within the visible map bounds
-        return allFilteredPlaces.filter { place in
-            guard let placeCoordinate = place.coordinate else { return false }
-            
-            let placeLat = placeCoordinate.latitude
-            let placeLon = placeCoordinate.longitude
+        // Filter annotations to only include those within the visible map bounds
+        return mapViewModel.viewportAnnotations.filter { annotation in
+            let placeLat = annotation.coordinate.latitude
+            let placeLon = annotation.coordinate.longitude
             
             // Check if place is within the visible map region
-            let region = mapRegion
-            let latMin = region.center.latitude - region.span.latitudeDelta / 2
-            let latMax = region.center.latitude + region.span.latitudeDelta / 2
-            let lonMin = region.center.longitude - region.span.longitudeDelta / 2
-            let lonMax = region.center.longitude + region.span.longitudeDelta / 2
+            let latMin = mapRegion.center.latitude - mapRegion.span.latitudeDelta / 2
+            let latMax = mapRegion.center.latitude + mapRegion.span.latitudeDelta / 2
+            let lonMin = mapRegion.center.longitude - mapRegion.span.longitudeDelta / 2
+            let lonMax = mapRegion.center.longitude + mapRegion.span.longitudeDelta / 2
             
             return placeLat >= latMin && placeLat <= latMax && 
                    placeLon >= lonMin && placeLon <= lonMax
@@ -79,13 +77,18 @@ struct VisiblePlacesPopupView: View {
                 if !visiblePlaces.isEmpty {
                     ScrollView {
                         LazyVGrid(columns: columns, spacing: 15) {
-                            ForEach(visiblePlaces, id: \.id) { place in
+                            ForEach(Array(visiblePlaces.enumerated()), id: \.element.id) { index, annotation in
                                 VisiblePlaceGridCell(
-                                    place: place,
+                                    annotation: annotation,
                                     cardWidth: cardWidth,
                                     cardHeight: cardHeight,
-                                    placeColors: $placeColors
+                                    placeColors: $placeColors,
+                                    onDismiss: { dismiss() }
                                 )
+                                .onAppear {
+                                    // Load next batch when user scrolls near the end
+                                    loadImagesIfNeeded(for: index)
+                                }
                             }
                         }
                         .padding(.horizontal, 20)
@@ -116,13 +119,15 @@ struct VisiblePlacesPopupView: View {
         .onAppear {
             // Generate colors for all visible places
             generateColorsForPlaces()
+            // Load first batch of images
+            loadNextBatch()
         }
     }
     
     private func generateColorsForPlaces() {
-        for place in visiblePlaces {
-            if placeColors[place.id] == nil {
-                placeColors[place.id] = Color(
+        for annotation in visiblePlaces {
+            if placeColors[annotation.id] == nil {
+                placeColors[annotation.id] = Color(
                     red: Double.random(in: 0.3...0.9),
                     green: Double.random(in: 0.3...0.9),
                     blue: Double.random(in: 0.3...0.9)
@@ -130,55 +135,121 @@ struct VisiblePlacesPopupView: View {
             }
         }
     }
+    
+    private func loadImagesIfNeeded(for index: Int) {
+        // Load next batch when we're 3 items away from the last loaded item
+        if index >= loadedImageCount - 3 && !isLoadingImages {
+            loadNextBatch()
+        }
+    }
+    
+    private func loadNextBatch() {
+        guard !isLoadingImages else { return }
+        
+        // Get the next 6 place IDs that haven't been loaded yet
+        let startIndex = loadedImageCount
+        let endIndex = min(startIndex + 6, visiblePlaces.count)
+        
+        guard startIndex < endIndex else { return }
+        
+        let placesToLoad = Array(visiblePlaces[startIndex..<endIndex])
+        let placeIds = placesToLoad.map { $0.id }
+        
+        isLoadingImages = true
+        
+        Task {
+            do {
+                let imageMap = try await SupabasePlaceService.shared.fetchPlaceImages(for: placeIds)
+                for placeId in placeIds {
+                    if let imageUrl = imageMap[placeId] {
+                        await loadImage(from: imageUrl, for: placeId)
+                    }
+                }
+                
+                let placesNeedingImage = await MainActor.run { () -> [String] in
+                    placeIds.filter { detailPlaceViewModel.placeImages[$0] == nil }
+                }
+                
+                if !placesNeedingImage.isEmpty {
+                    await profile.fetchFallbackImages(for: placesNeedingImage)
+                }
+                
+                await MainActor.run {
+                    loadedImageCount = endIndex
+                    isLoadingImages = false
+                }
+            } catch {
+                print("❌ Error batch loading images: \(error)")
+                await MainActor.run {
+                    loadedImageCount = endIndex
+                    isLoadingImages = false
+                }
+            }
+        }
+    }
+    
+    private func loadImage(from urlString: String, for placeId: String) async {
+        guard let url = URL(string: urlString) else { return }
+        
+        // Check if already loaded
+        guard detailPlaceViewModel.placeImages[placeId] == nil else { return }
+        
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            if let image = UIImage(data: data) {
+                await MainActor.run {
+                    detailPlaceViewModel.placeImages[placeId] = image
+                }
+            }
+        } catch {
+            print("❌ Error loading image for place \(placeId): \(error)")
+        }
+    }
 }
 
 struct VisiblePlaceGridCell: View {
-    let place: DetailPlace
+    let annotation: PlaceAnnotation
     let cardWidth: CGFloat
     let cardHeight: CGFloat
-    @Binding var placeColors: [UUID: Color]
+    @Binding var placeColors: [String: Color]
+    let onDismiss: () -> Void
     
-    @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
-    @Environment(\.presentationMode) var presentationMode
-    
-    private var tikTokVideos: [TikTokVideo] {
-        let placeTikTokVideos = place.tikTokVideos ?? []
-        let userTikTokVideos = profile.getTikTokVideos(for: place.id.uuidString)
-        
-        // Combine and deduplicate based on videoID or URL
-        var allVideos = placeTikTokVideos
-        
-        for userVideo in userTikTokVideos {
-            // Check if this video already exists (by videoID or URL)
-            let alreadyExists = allVideos.contains { existingVideo in
-                existingVideo.videoID == userVideo.videoID || existingVideo.url == userVideo.url
-            }
-            
-            if !alreadyExists {
-                allVideos.append(userVideo)
-            }
-        }
-        
-        return allVideos
-    }
+    @EnvironmentObject var profile: ProfileViewModel
     
     private var firstTikTokThumbnail: String? {
-        return tikTokVideos.first?.thumbnailURL
+        if let place = detailPlaceViewModel.places[annotation.id],
+           let videos = place.tikTokVideos,
+           let firstVideo = videos.first {
+            return firstVideo.thumbnailURL
+        }
+        
+        return profile.getFirstTikTokThumbnailURL(for: annotation.id)
+    }
+    
+    // Generate a consistent color for this place based on its ID
+    private var placeColor: Color {
+        if let color = placeColors[annotation.id] {
+            return color
+        }
+        let hash = annotation.id.hashValue
+        let hue = Double(abs(hash) % 360) / 360.0
+        return Color(hue: hue, saturation: 0.6, brightness: 0.8)
     }
     
     var body: some View {
         Button(action: {
-            selectedPlaceVM.selectedPlace = place
-            selectedPlaceVM.isDetailSheetPresented = true
-            presentationMode.wrappedValue.dismiss()
+            // Fetch full place details and navigate
+            Task {
+                await loadPlaceAndNavigate()
+            }
         }) {
             VStack(alignment: .leading, spacing: 0) {
                 ZStack(alignment: .bottom) {
-                    if let thumbnailURL = firstTikTokThumbnail {
-                        // Show TikTok thumbnail
-                        AsyncImage(url: URL(string: thumbnailURL)) { image in
+                    if let thumbnailURL = firstTikTokThumbnail,
+                       let url = URL(string: thumbnailURL) {
+                        AsyncImage(url: url) { image in
                             image
                                 .resizable()
                                 .aspectRatio(contentMode: .fill)
@@ -186,25 +257,26 @@ struct VisiblePlaceGridCell: View {
                                 .clipped()
                         } placeholder: {
                             Rectangle()
-                                .foregroundColor(.gray.opacity(0.3))
+                                .foregroundColor(placeColor)
                                 .frame(width: cardWidth, height: cardHeight)
                         }
-                    } else if let image = detailPlaceViewModel.placeImages[place.id.uuidString] {
-                        // Show place review image
+                    } else if let image = detailPlaceViewModel.placeImages[annotation.id] {
                         Image(uiImage: image)
                             .resizable()
                             .aspectRatio(contentMode: .fill)
                             .frame(width: cardWidth, height: cardHeight)
                             .clipped()
                     } else {
-                        // Show colored rectangle fallback
+                        // Show colored rectangle fallback while batch loading
                         Rectangle()
-                            .foregroundColor(detailPlaceViewModel.colorForPlace(placeId: place.id.uuidString))
+                            .foregroundColor(placeColor)
                             .frame(width: cardWidth, height: cardHeight)
                             .onAppear {
-                                profile.loadPlaceImageWithFallback(for: place)
+                                profile.ensureTikTokThumbnailCached(for: annotation.id)
                             }
                     }
+                    
+                    // Gradient overlay
                     LinearGradient(
                         gradient: Gradient(colors: [
                             Color.black.opacity(0.0),
@@ -216,21 +288,14 @@ struct VisiblePlaceGridCell: View {
                         endPoint: .bottom
                     )
                     .frame(width: cardWidth, height: cardHeight)
+                    
+                    // Place name
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(place.name)
+                        Text(annotation.name)
                             .font(.headline)
                             .foregroundColor(.white)
                             .lineLimit(1)
                             .multilineTextAlignment(.leading)
-                        
-                        // Show place type instead of city
-                        if let placeType = detailPlaceViewModel.placeTypes[place.id.uuidString] {
-                            Text(placeType)
-                                .font(.subheadline)
-                                .foregroundColor(.white.opacity(0.7))
-                                .lineLimit(1)
-                                .multilineTextAlignment(.leading)
-                        }
                     }
                     .padding(.horizontal, 12)
                     .padding(.bottom, 12)
@@ -240,12 +305,25 @@ struct VisiblePlaceGridCell: View {
             .frame(width: cardWidth, height: cardHeight)
             .background(Color.white)
             .clipShape(RoundedRectangle(cornerRadius: 20))
-            .overlay(
-                RoundedRectangle(cornerRadius: 20)
-                    .stroke(Color.white, lineWidth: 2)
-            )
             .shadow(color: Color.black.opacity(0.2), radius: 5, x: 0, y: 2)
         }
         .buttonStyle(PlainButtonStyle())
+    }
+    
+    private func loadPlaceAndNavigate() async {
+        do {
+            // Fetch the full place details
+            let fullPlace = try await PlaceService.shared.fetchPlace(withId: annotation.id)
+            
+            // Navigate to the place detail view
+            await MainActor.run {
+                // Animate map to place location when tapping from popup tile
+                selectedPlaceVM.selectPlaceAndFetchDetails(fullPlace, shouldAnimateMap: true)
+                selectedPlaceVM.isDetailSheetPresented = true
+                onDismiss()
+            }
+        } catch {
+            print("❌ Error loading place details: \(error)")
+        }
     }
 }

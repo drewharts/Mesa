@@ -1,38 +1,43 @@
+//
+//  PlaceReviewsView.swift
+//  loc
+//
+//  Refactored to use proper MVVM with PlaceReviewsViewModel
+//  Comments functionality removed for simplification
+//
+
 import SwiftUI
 
 struct PlaceReviewsView: View {
+    @ObservedObject var viewModel: PlaceReviewsViewModel
     let onPhotoTapped: ([UIImage], Int) -> Void
+    
+    // Still needed for child views (temporary)
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
-    @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var userProfileViewModel: UserProfileViewModel
-    @EnvironmentObject var userSession: UserSession
-    @EnvironmentObject var notificationManager: NotificationManager
-    @State private var activeKeyboardReviewId: String? = nil
 
     var body: some View {
         ScrollViewReader { scrollProxy in
             ScrollView {
                 VStack(spacing: 24) {
-                    if let placeId = selectedPlaceVM.selectedPlace?.id.uuidString {
-                        let loadingState = selectedPlaceVM.reviewLoadingState(forPlaceId: placeId)
-                        let reviews = selectedPlaceVM.reviews // Use view model's reviews
-                        
-                        switch loadingState {
+                    switch viewModel.loadingState {
                         case .loading:
                             ProgressView()
                                 .padding()
                                 .frame(maxWidth: .infinity)
                             
                         case .loaded:
-                            if reviews.isEmpty {
-                                Text("Be the first to write a review!")
+                        if viewModel.hasReviews {
+                            PlaceReviewsListView(
+                                viewModel: viewModel,
+                                onPhotoTapped: onPhotoTapped,
+                                scrollProxy: scrollProxy
+                            )
+                        } else {
+                            Text(viewModel.emptyStateMessage)
                                     .font(.subheadline)
                                     .foregroundColor(.gray)
                                     .padding(20)
-                            } else {
-                                PlaceReviewsListView(reviews: reviews, 
-                                                   onPhotoTapped: onPhotoTapped, 
-                                                   scrollProxy: scrollProxy)
                             }
                             
                         case .error(let error):
@@ -43,12 +48,6 @@ struct PlaceReviewsView: View {
                             
                         case .idle:
                             Text("Reviews not yet loaded")
-                                .font(.subheadline)
-                                .foregroundColor(.gray)
-                                .padding()
-                        }
-                    } else {
-                        Text("No place selected")
                             .font(.subheadline)
                             .foregroundColor(.gray)
                             .padding()
@@ -60,38 +59,31 @@ struct PlaceReviewsView: View {
             .background(Color.white)
             .padding(.horizontal, -50)
             .ignoresSafeArea(.all, edges: .all)
-            .onReceive(notificationManager.$highlightedReviewId) { reviewId in
+            .onChange(of: viewModel.highlightedReviewId) { _, reviewId in
                 if let reviewId = reviewId {
-                    // Wait for reviews to load, then scroll to the specific review
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                        withAnimation(.easeInOut(duration: 0.8)) {
-                            scrollProxy.scrollTo(reviewId, anchor: .center)
-                        }
-                        
-                        // Add haptic feedback when scrolling to the review
-                        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
-                        impactFeedback.impactOccurred()
-                        
-                        // Clear the highlighted review after scrolling
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                            notificationManager.clearHighlightedReview()
-                        }
-                    }
+                    scrollToReview(reviewId, proxy: scrollProxy)
                 }
             }
         }
         .onAppear {
-            // Check like statuses when view appears
-            if let currentUserId = userSession.currentUserId {
-                selectedPlaceVM.checkLikeStatuses(userId: currentUserId)
-            }
+            viewModel.checkLikeStatuses()
         }
     }
     
     private func scrollToReview(_ reviewId: String, proxy: ScrollViewProxy) {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            withAnimation {
-                proxy.scrollTo(reviewId, anchor: .top)
+        // Wait for reviews to load, then scroll
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            withAnimation(.easeInOut(duration: 0.8)) {
+                proxy.scrollTo(reviewId, anchor: .center)
+            }
+            
+            // Add haptic feedback
+            let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+            impactFeedback.impactOccurred()
+            
+            // Clear after scrolling
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                viewModel.clearHighlightedReview()
             }
         }
     }

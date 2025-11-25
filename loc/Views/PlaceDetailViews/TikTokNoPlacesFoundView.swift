@@ -6,7 +6,7 @@
 //
 
 import SwiftUI
-import FirebaseFirestore
+import CoreLocation
 
 struct TikTokNoPlacesFoundView: View {
     let tikTokUrl: String
@@ -233,8 +233,7 @@ struct TikTokNoPlacesFoundView: View {
     }
     
     private func assignTikTokToPlace() {
-        guard let suggestion = selectedSuggestion,
-              let userId = userSession.currentUserId else {
+        guard let suggestion = selectedSuggestion else {
             errorMessage = "Unable to assign TikTok to place"
             showingErrorAlert = true
             return
@@ -245,32 +244,26 @@ struct TikTokNoPlacesFoundView: View {
         // Create a DetailPlace from the suggestion
         let detailPlace = createDetailPlaceFromSuggestion(suggestion)
         
-        // Create external place entry with TikTok video
-        let externalTikTokVideo = createExternalTikTokVideoFromUrl()
-        let externalPlace = ExternalPlace(
-            id: detailPlace.id.uuidString,
-            addedAt: Date(),
-            address: detailPlace.address ?? "",
-            coordinates: ExternalPlaceCoordinates(
-                latitude: detailPlace.coordinate?.latitude ?? 0,
-                longitude: detailPlace.coordinate?.longitude ?? 0
-            ),
-            name: detailPlace.name,
-            placeId: detailPlace.id.uuidString,
-            source: "user_assigned",
-            tiktokVideos: [externalTikTokVideo]
-        )
+        // Add place to places dictionary so it's available for the map/UI
+        detailPlaceViewModel.places[detailPlace.id.uuidString] = detailPlace
         
-        // Save to user's external places
-        profile.saveExternalPlace(externalPlace: externalPlace) { success, error in
-            DispatchQueue.main.async {
+        // Use the unified createExternalPlaceEntry method
+        Task {
+            let success = await profile.createExternalPlaceEntry(
+                placeId: detailPlace.id.uuidString,
+                tikTokUrl: tikTokUrl,
+                source: "user_assigned",
+                place: detailPlace
+            )
+            
+            await MainActor.run {
                 isSubmitting = false
                 if success {
                     // Refresh TikTok places list
                     profile.refreshTikTokPlacesAfterImport()
                     showingSuccessAlert = true
                 } else {
-                    errorMessage = "Failed to assign TikTok: \(error?.localizedDescription ?? "Unknown error")"
+                    errorMessage = "Failed to assign TikTok to place"
                     showingErrorAlert = true
                 }
             }
@@ -282,31 +275,12 @@ struct TikTokNoPlacesFoundView: View {
         detailPlace.id = UUID(uuidString: suggestion.id) ?? UUID()
         detailPlace.name = suggestion.name
         detailPlace.address = suggestion.address
-        detailPlace.coordinate = GeoPoint(
+        detailPlace.coordinate = CLLocationCoordinate2D(
             latitude: suggestion.coordinate.latitude,
             longitude: suggestion.coordinate.longitude
         )
         detailPlace.createdAt = ISO8601DateFormatter().string(from: Date())
         return detailPlace
-    }
-    
-    private func createExternalTikTokVideoFromUrl() -> ExternalTikTokVideo {
-        // Extract basic info from the TikTok URL
-        let videoID = UUID().uuidString // Generate a temporary ID
-        let author = ExternalTikTokAuthor(
-            displayName: "Unknown",
-            username: ""
-        )
-        
-        return ExternalTikTokVideo(
-            author: author,
-            createdAt: ISO8601DateFormatter().string(from: Date()),
-            embedHtml: "",
-            hashtags: [],
-            thumbnailUrl: "",
-            url: tikTokUrl,
-            videoId: videoID
-        )
     }
     
     private func submitFlag() {

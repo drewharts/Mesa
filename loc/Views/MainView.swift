@@ -3,49 +3,124 @@
 //  loc
 //
 //  Created by Andrew Hartsfield II on 12/12/24.
+//  Refactored to enterprise architecture on 11/13/25
 //
 
-
 import SwiftUI
-import FirebaseAuth
-import MapboxSearch
+import MapKit
 
 struct MainView: View {
+    // MARK: - Global Dependencies (Only 3!)
     @EnvironmentObject var userSession: UserSession
-    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
-    @EnvironmentObject var profileViewModel: ProfileViewModel
-    @EnvironmentObject var userProfileViewModel: UserProfileViewModel
     @EnvironmentObject var locationManager: LocationManager
-    @EnvironmentObject var notificationManager: NotificationManager
-    @EnvironmentObject var viewModel: SearchViewModel
-    @EnvironmentObject var placeTypeFilterVM: PlaceTypeFilterViewModel
-    @EnvironmentObject var deepLinkViewModel: DeepLinkViewModel
-    @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
-
-    @FocusState private var searchIsFocused: Bool
-    @State private var isSearchBarMinimized = true
-    @State private var sheetHeight: CGFloat = 250
-    @State private var minSheetHeight: CGFloat = 250
-    @State private var maxSheetHeight: CGFloat = UIScreen.main.bounds.height * 0.85
+    @EnvironmentObject var appCoordinator: AppCoordinator
+    
+    // MARK: - Required ViewModels (passed from parent as @ObservedObject)
+    @ObservedObject var selectedPlaceVM: SelectedPlaceViewModel
+    @ObservedObject var profileViewModel: ProfileViewModel
+    @ObservedObject var userProfileViewModel: UserProfileViewModel
+    @ObservedObject var detailPlaceViewModel: DetailPlaceViewModel
+    @ObservedObject var deepLinkViewModel: DeepLinkViewModel
+    @ObservedObject var notificationManager: NotificationManager
+    
+    // MARK: - Pass-through ViewModels (no observation to prevent render loops)
+    let searchViewModel: SearchViewModel  // ✅ Pass-through only, no observation
+    let searchCoordinator: SearchCoordinatorViewModel  // ✅ Coordinator (no observation)
+    
+    let deepLinkManager: DeepLinkManager
+    let dataManager: DataManager
+    let serviceContainer: ServiceContainer
+    
+    // MARK: - Local UI State
+    @State private var sheetHeight: CGFloat
     @State private var shouldNavigateToProfile = false
-    @State private var triggerFocus = false
     @State private var recenterMap = false
     @State private var isCreatePlacePopupActive = false
-
+    @State private var mapPosition = MapCameraPosition.automatic
+    
+    // MARK: - Initialization
+    init(
+        selectedPlaceVM: SelectedPlaceViewModel,
+        profileViewModel: ProfileViewModel,
+        userProfileViewModel: UserProfileViewModel,
+        detailPlaceViewModel: DetailPlaceViewModel,
+        deepLinkViewModel: DeepLinkViewModel,
+        notificationManager: NotificationManager,
+        searchViewModel: SearchViewModel,
+        searchCoordinator: SearchCoordinatorViewModel,
+        deepLinkManager: DeepLinkManager,
+        dataManager: DataManager,
+        serviceContainer: ServiceContainer
+    ) {
+        self.selectedPlaceVM = selectedPlaceVM
+        self.profileViewModel = profileViewModel
+        self.userProfileViewModel = userProfileViewModel
+        self.detailPlaceViewModel = detailPlaceViewModel
+        self.deepLinkViewModel = deepLinkViewModel
+        self.notificationManager = notificationManager
+        self.searchViewModel = searchViewModel
+        self.searchCoordinator = searchCoordinator
+        self.deepLinkManager = deepLinkManager
+        self.dataManager = dataManager
+        self.serviceContainer = serviceContainer
+        
+        // Initialize sheet height to min - partially expanded on first open
+        self._sheetHeight = State(initialValue: searchCoordinator.minSheetHeight)
+    }
+    
     var body: some View {
         NavigationStack {
             ZStack {
-                mapLayer
+                // Map Container - owns MapViewModel
+                MapContainerView(
+                    mapPosition: $mapPosition,
+                    recenterMap: $recenterMap,
+                    isSearchExpanded: $appCoordinator.isSearchExpanded,
+                    isCreatePlacePopupActive: $isCreatePlacePopupActive,
+                    selectedPlaceViewModel: selectedPlaceVM,
+                    detailPlaceViewModel: detailPlaceViewModel,
+                    placeService: serviceContainer.placeService,
+                    profileViewModel: profileViewModel,
+                    onMapTap: handleMapTap
+                )
+                
+                // UI Overlay (Top Controls, FABs)
                 uiOverlayLayer
+                
+                // Search Overlay (Isolated to prevent recreation)
+                // Staff Engineer: Separate layer prevents TextField destruction on MainView re-renders
+                SearchOverlayView(
+                    searchViewModel: searchViewModel,
+                    isSearchExpanded: $appCoordinator.isSearchExpanded,
+                    searchCoordinator: searchCoordinator,
+                    onSheetHeightChange: { newHeight in
+                        sheetHeight = newHeight
+                    }
+                )
+                
+                // Place Detail Sheet (Independent Z-Layer)
+                // Moved out of VStack to prevent keyboard/layout constraints from affecting sheet height
+                placeDetailLayer
+                
                 loadingOverlay
-                noLocationAlert
             }
             .navigationBarHidden(true)
+            .navigationDestination(isPresented: $userProfileViewModel.isUserDetailPresented) {
+                UserProfileView(
+                    userId: userSession.currentUserId ?? "",
+                    UserProfileVM: userProfileViewModel
+                )
+                .environmentObject(profileViewModel)
+                .environmentObject(selectedPlaceVM)
+                .environmentObject(detailPlaceViewModel)
+            }
             .sheet(isPresented: $profileViewModel.isShowingPlaceSelection) {
                 TikTokPlaceSelectionView()
                     .environmentObject(profileViewModel)
                     .environmentObject(selectedPlaceVM)
                     .environmentObject(detailPlaceViewModel)
+                    .environmentObject(dataManager)
+                    .environmentObject(userSession)
                     .presentationDragIndicator(.visible)
             }
             .sheet(isPresented: $profileViewModel.isShowingNoPlacesFound) {
@@ -55,18 +130,16 @@ struct MainView: View {
                     .environmentObject(detailPlaceViewModel)
                     .presentationDragIndicator(.visible)
             }
-            .navigationDestination(isPresented: $shouldNavigateToProfile) {
+            .fullScreenCover(isPresented: $shouldNavigateToProfile) {
                 ProfileView()
                     .environmentObject(userProfileViewModel)
                     .environmentObject(deepLinkViewModel)
-            }
-            // Present external user profiles
-            .sheet(isPresented: $userProfileViewModel.isUserDetailPresented) {
-                UserProfileView(
-                    userId: userSession.currentUserId ?? "",
-                    UserProfileVM: userProfileViewModel
-                )
-                .environmentObject(profileViewModel)
+                    .environmentObject(selectedPlaceVM)
+                    .environmentObject(detailPlaceViewModel)
+                    .environmentObject(profileViewModel)
+                    .environmentObject(deepLinkManager)
+                    .environmentObject(dataManager)
+                    .environmentObject(serviceContainer)
             }
             .alert("No Location Found", isPresented: $deepLinkViewModel.showNoLocationAlert) {
                 Button("OK") {
@@ -78,193 +151,100 @@ struct MainView: View {
         }
         .onAppear {
             locationManager.requestLocationPermission()
-            viewModel.selectedPlaceVM = selectedPlaceVM
-            viewModel.placeTypeFilterVM = placeTypeFilterVM
-            viewModel.searchText = ""
-            
-            // Trigger immediate calculation of most frequent types
-            placeTypeFilterVM.refreshMostFrequentTypes()
         }
         .onChange(of: selectedPlaceVM.isDetailSheetPresented) { _, newValue in
             if newValue {
-                isSearchBarMinimized = true
-                searchIsFocused = false
+                appCoordinator.isSearchExpanded = false
+                // Sheet opens at partial height, user can swipe up to expand
+            } else {
+                // Reset to partial height when dismissing so next open starts at bottom
+                sheetHeight = searchCoordinator.minSheetHeight
             }
         }
-        .onChange(of: profileViewModel.userFavorites) {
-            // Recalculate filters when user favorites change
-            placeTypeFilterVM.refreshMostFrequentTypes()
-        }
-        .onChange(of: profileViewModel.userListsPlaces) {
-            // Recalculate filters when user lists change
-            placeTypeFilterVM.refreshMostFrequentTypes()
-        }
-    }
-    
-    // MARK: - Map Layer
-    private var mapLayer: some View {
-        MapView(recenterMap: $recenterMap, isSearchBarMinimized: isSearchBarMinimized, isCreatePlacePopupActive: $isCreatePlacePopupActive, onMapTap: {
-            withAnimation {
-                isSearchBarMinimized = true
-                searchIsFocused = false
+        .onChange(of: selectedPlaceVM.shouldAnimateMapToPlace) { _, newValue in
+            if newValue, let place = selectedPlaceVM.selectedPlace, let coordinate = place.coordinate {
+                withAnimation(.easeInOut(duration: 0.6)) {
+                    mapPosition = .region(MKCoordinateRegion(
+                        center: coordinate,
+                        span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
+                    ))
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    selectedPlaceVM.shouldAnimateMapToPlace = false
+                }
             }
-        })
-            .ignoresSafeArea()
-            .edgesIgnoringSafeArea(.all)
+        }
+        .onChange(of: userProfileViewModel.isUserDetailPresented) { oldValue, newValue in
+            // When navigating BACK from user profile (true -> false), ensure search is collapsed and keyboard dismissed
+            if oldValue == true && newValue == false {
+                appCoordinator.isSearchExpanded = false
+            }
+        }
     }
     
     // MARK: - UI Overlay Layer
     private var uiOverlayLayer: some View {
-        VStack(spacing: 0) {
-            topControls
-            Spacer(minLength: 0)
-            bottomSheet
-        }
-        .overlay(
-            floatingActionButtons
-        )
-    }
-    
-    // MARK: - Top Controls
-    private var topControls: some View {
-        Group {
-            if isSearchBarMinimized {
-                minimizedControls
-            } else {
-                expandedSearchControls
-            }
-        }
-    }
-    
-    // MARK: - Minimized Controls
-    private var minimizedControls: some View {
-        HStack {
-            Spacer()
-            VStack(spacing: 10) {
-                Button(action: {
-                    recenterMap = true
-                }) {
-                    Image(systemName: "location.fill")
-                        .foregroundColor(.secondary)
-                        .frame(width: 36, height: 36)
-                        .background(.ultraThinMaterial)
-                        .clipShape(Circle())
-                        .overlay(Circle().stroke(Color.gray.opacity(0.3), lineWidth: 1))
-                        .shadow(radius: 4)
+        VStack {
+            HStack {
+                Spacer()
+                VStack(spacing: 10) {
+                    Button(action: { recenterMap = true }) {
+                        Image(systemName: "location.fill")
+                            .foregroundColor(.secondary)
+                            .frame(width: 36, height: 36)
+                            .background(.ultraThinMaterial)
+                            .clipShape(Circle())
+                            .overlay(Circle().stroke(Color.gray.opacity(0.3), lineWidth: 1))
+                            .shadow(radius: 4)
+                    }
+                    .padding(.top, 10)
+                    .padding(.trailing, 20)
                 }
-                .padding(.top, 10)
-                .padding(.trailing, 20)
             }
+            .opacity(!appCoordinator.isSearchExpanded ? 1 : 0)
+            .allowsHitTesting(!appCoordinator.isSearchExpanded)
+            
+            Spacer()
+        }
+        .overlay(floatingActionButtons)
+    }
+    
+    // MARK: - Place Detail Layer
+    // Isolated layer for the bottom sheet to ensure full-screen height availability
+    private var placeDetailLayer: some View {
+        VStack(spacing: 0) {
+            Spacer(minLength: 0)
+            PlaceDetailContainerView(
+                profileViewModel: profileViewModel,
+                detailPlaceViewModel: detailPlaceViewModel,
+                serviceContainer: serviceContainer,
+                dataManager: dataManager,
+                sheetHeight: $sheetHeight,
+                minSheetHeight: searchCoordinator.minSheetHeight,
+                maxSheetHeight: searchCoordinator.maxSheetHeight
+            )
+            .environmentObject(selectedPlaceVM)
+            .environmentObject(userProfileViewModel)
+            .environmentObject(notificationManager)
         }
     }
     
     // MARK: - Floating Action Buttons
     private var floatingActionButtons: some View {
         Group {
-            if isSearchBarMinimized && !searchIsFocused && !selectedPlaceVM.isDetailSheetPresented && !isCreatePlacePopupActive {
+            if !appCoordinator.isSearchExpanded && 
+               !selectedPlaceVM.isDetailSheetPresented && 
+               !isCreatePlacePopupActive {
                 FloatingActionButtons(
-                    isSearchBarMinimized: $isSearchBarMinimized,
-                    searchIsFocused: Binding(
-                        get: { searchIsFocused },
-                        set: { searchIsFocused = $0 }
+                    searchCoordinator: searchCoordinator,
+                    isSearchBarMinimized: Binding(
+                        get: { !appCoordinator.isSearchExpanded },
+                        set: { appCoordinator.isSearchExpanded = !$0 }
                     ),
                     sheetHeight: $sheetHeight,
-                    shouldNavigateToProfile: $shouldNavigateToProfile,
-                    maxSheetHeight: maxSheetHeight,
-                    minSheetHeight: minSheetHeight
+                    shouldNavigateToProfile: $shouldNavigateToProfile
                 )
                 .environmentObject(profileViewModel)
-            }
-        }
-    }
-    
-    // MARK: - Expanded Search Controls  
-    private var expandedSearchControls: some View {
-        VStack(spacing: 16) {
-            searchBar
-            placeTypeFilterButtons
-            searchResultsContainer
-        }
-    }
-    
-    // MARK: - Search Results Container
-    private var searchResultsContainer: some View {
-        Group {
-            if !viewModel.searchResults.isEmpty || !viewModel.userResults.isEmpty || viewModel.showNoPlaceFound {
-                SearchResultsView(
-                    placeResults: viewModel.searchResults,
-                    userResults: viewModel.userResults,
-                    showNoPlaceFound: viewModel.showNoPlaceFound,
-                    searchText: viewModel.searchText,
-                    onSelectPlace: { prediction in
-                        viewModel.selectSuggestion(prediction)
-                        withAnimation {
-                            isSearchBarMinimized = true
-                            searchIsFocused = false
-                        }
-                    },
-                    onSelectUser: { user in
-                        guard let currentUserId = userSession.currentUserId else { return }
-                        userProfileViewModel.selectUser(user, currentUserId: currentUserId)
-                        withAnimation {
-                            isSearchBarMinimized = true
-                            searchIsFocused = false
-                        }
-                    }
-                )
-                .frame(maxWidth: .infinity)
-                .padding(.horizontal, 20)
-                .padding(.top, 10)
-                .padding(.bottom, 50)
-            }
-        }
-    }
-    
-    // MARK: - Search Bar
-    private var searchBar: some View {
-        TextField("Search here...", text: $viewModel.searchText)
-            .padding()
-            .background(Color.white)
-            .cornerRadius(20)
-            .shadow(color: .black.opacity(0.2), radius: 5, x: 0, y: 3)
-            .padding(.horizontal, 20)
-            .padding(.top, 20)
-            .foregroundStyle(Color.gray)
-            .focused($searchIsFocused)
-            .padding(.horizontal, 20)
-            .padding(.top, 10)
-            .padding(.bottom, -10)
-            .onChange(of: viewModel.searchText) { oldValue, newValue in
-                Task { @MainActor in
-                    placeTypeFilterVM.filterBySearchText(newValue)
-                }
-            }
-    }
-    
-    // MARK: - Place Type Filter Buttons
-    private var placeTypeFilterButtons: some View {
-        PlaceTypeFilterButtonsView(filterVM: placeTypeFilterVM)
-            .padding(.horizontal, 20)
-    }
-    
-    // MARK: - Bottom Sheet
-    private var bottomSheet: some View {
-        Group {
-            if selectedPlaceVM.isDetailSheetPresented {
-                BottomSheetView(
-                    isPresented: $selectedPlaceVM.isDetailSheetPresented,
-                    sheetHeight: $sheetHeight,
-                    minSheetHeight: minSheetHeight,
-                    maxSheetHeight: maxSheetHeight
-                ) {
-                    PlaceDetailView(
-                        sheetHeight: $sheetHeight,
-                        minSheetHeight: minSheetHeight
-                    )
-                    .environmentObject(userProfileViewModel)
-                    .environmentObject(notificationManager)
-                    .frame(maxWidth: .infinity)
-                }
             }
         }
     }
@@ -272,7 +252,9 @@ struct MainView: View {
     // MARK: - Loading Overlay
     private var loadingOverlay: some View {
         Group {
-            if deepLinkViewModel.isProcessingDeepLink || profileViewModel.isProcessingTikTok || profileViewModel.isWaitingForPlaceDetail {
+            if deepLinkViewModel.isProcessingDeepLink || 
+               profileViewModel.isProcessingTikTok || 
+               profileViewModel.isWaitingForPlaceDetail {
                 Color.black.opacity(0.4)
                     .ignoresSafeArea()
                 
@@ -287,12 +269,7 @@ struct MainView: View {
         }
     }
     
-    // MARK: - No Location Alert
-    private var noLocationAlert: some View {
-        EmptyView()
-    }
-    
-    // MARK: - Error View
+    // MARK: - Helper Views
     private var errorView: some View {
         VStack(spacing: 12) {
             Image(systemName: "exclamationmark.triangle.fill")
@@ -321,7 +298,6 @@ struct MainView: View {
         }
     }
     
-    // MARK: - Loading View
     private var loadingView: some View {
         VStack(spacing: 12) {
             ProgressView()
@@ -335,6 +311,13 @@ struct MainView: View {
             Text("Extracting place information")
                 .font(.subheadline)
                 .foregroundColor(.white.opacity(0.8))
+        }
+    }
+    
+    // MARK: - Actions
+    private func handleMapTap() {
+        withAnimation {
+            appCoordinator.isSearchExpanded = false
         }
     }
 }
