@@ -186,6 +186,119 @@ class AdminService: ObservableObject {
         }
     }
     
+    // MARK: - Create User
+    
+    /// Create a new user with email, first name, and last name
+    /// Creates both auth.users entry and public.users entry
+    func createUser(email: String, firstName: String, lastName: String) async throws -> AdminUser {
+        guard let adminClient = adminClient else {
+            throw NSError(domain: "AdminService", code: -1, userInfo: [
+                NSLocalizedDescriptionKey: "Admin mode not enabled. Please set your service_role key in AdminConfig.swift"
+            ])
+        }
+        
+        isLoading = true
+        errorMessage = nil
+        
+        defer { isLoading = false }
+        
+        // Generate a temporary password for the user
+        let tempPassword = "Mesa\(UUID().uuidString.prefix(8))!"
+        
+        do {
+            print("🔧 [AdminService] Creating new user:")
+            print("   - Email: \(email)")
+            print("   - Name: \(firstName) \(lastName)")
+            
+            // Step 1: Create auth user via Supabase Admin API
+            let createAuthURL = supabaseURL.appendingPathComponent("auth/v1/admin/users")
+            var createRequest = URLRequest(url: createAuthURL)
+            createRequest.httpMethod = "POST"
+            createRequest.setValue("Bearer \(AdminConfig.serviceRoleKey)", forHTTPHeaderField: "Authorization")
+            createRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            createRequest.setValue(AdminConfig.serviceRoleKey, forHTTPHeaderField: "apikey")
+            
+            let authUserBody: [String: Any] = [
+                "email": email,
+                "password": tempPassword,
+                "email_confirm": true,  // Auto-confirm email
+                "user_metadata": [
+                    "first_name": firstName,
+                    "last_name": lastName,
+                    "full_name": "\(firstName) \(lastName)"
+                ]
+            ]
+            createRequest.httpBody = try JSONSerialization.data(withJSONObject: authUserBody)
+            
+            let (authData, authResponse) = try await URLSession.shared.data(for: createRequest)
+            
+            guard let httpResponse = authResponse as? HTTPURLResponse else {
+                throw NSError(domain: "AdminService", code: -2, userInfo: [
+                    NSLocalizedDescriptionKey: "Invalid response from auth server"
+                ])
+            }
+            
+            guard (200...299).contains(httpResponse.statusCode) else {
+                let errorMsg = String(data: authData, encoding: .utf8) ?? "Unknown error"
+                print("❌ [AdminService] Auth user creation failed: \(errorMsg)")
+                throw NSError(domain: "AdminService", code: httpResponse.statusCode, userInfo: [
+                    NSLocalizedDescriptionKey: "Failed to create auth user: \(errorMsg)"
+                ])
+            }
+            
+            // Parse the created auth user to get the ID
+            guard let authJson = try? JSONSerialization.jsonObject(with: authData) as? [String: Any],
+                  let authUserId = authJson["id"] as? String else {
+                throw NSError(domain: "AdminService", code: -3, userInfo: [
+                    NSLocalizedDescriptionKey: "Failed to parse auth user response"
+                ])
+            }
+            
+            print("✅ [AdminService] Created auth user with ID: \(authUserId)")
+            
+            // Step 2: Create public.users entry
+            let fullName = "\(firstName) \(lastName)"
+            let fullNameLower = fullName.lowercased()
+            
+            let publicUserData: [String: Any] = [
+                "id": authUserId,
+                "email": email,
+                "first_name": firstName,
+                "last_name": lastName,
+                "full_name": fullName,
+                "full_name_lower": fullNameLower,
+                "created_at": ISO8601DateFormatter().string(from: Date())
+            ]
+            
+            try await adminClient
+                .from("users")
+                .insert(publicUserData)
+                .execute()
+            
+            print("✅ [AdminService] Created public.users entry")
+            
+            // Return the created user
+            let newUser = AdminUser(
+                id: authUserId,
+                email: email,
+                firstName: firstName,
+                lastName: lastName,
+                fullName: fullName,
+                profilePhotoUrl: nil,
+                createdAt: Date()
+            )
+            
+            print("✅ [AdminService] Successfully created user: \(fullName)")
+            return newUser
+            
+        } catch {
+            let message = "Failed to create user: \(error.localizedDescription)"
+            errorMessage = message
+            print("❌ [AdminService] \(message)")
+            throw error
+        }
+    }
+    
     // MARK: - Search Users
     
     /// Search users by name or email

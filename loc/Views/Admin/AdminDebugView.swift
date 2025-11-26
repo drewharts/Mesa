@@ -17,6 +17,7 @@ struct AdminDebugView: View {
     @State private var isSearching = false
     @State private var showAlert = false
     @State private var alertMessage = ""
+    @State private var showCreateUser = false
     @Environment(\.dismiss) private var dismiss
     
     init(dataManager: DataManager? = nil) {
@@ -41,6 +42,13 @@ struct AdminDebugView: View {
             .navigationTitle("Admin Login")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button {
+                        showCreateUser = true
+                    } label: {
+                        Image(systemName: "person.badge.plus")
+                    }
+                }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Close") {
                         dismiss()
@@ -57,6 +65,15 @@ struct AdminDebugView: View {
                 Button("OK", role: .cancel) { }
             } message: {
                 Text(alertMessage)
+            }
+            .sheet(isPresented: $showCreateUser) {
+                CreateUserSheet(
+                    adminService: adminService,
+                    onUserCreated: { newUser in
+                        // Add to list and optionally login
+                        users.insert(newUser, at: 0)
+                    }
+                )
             }
         }
         .task {
@@ -271,6 +288,128 @@ private struct AdminUserRow: View {
                 .font(.caption)
         }
         .contentShape(Rectangle())
+    }
+}
+
+// MARK: - Create User Sheet
+
+private struct CreateUserSheet: View {
+    @ObservedObject var adminService: AdminService
+    let onUserCreated: (AdminUser) -> Void
+    
+    @State private var firstName = ""
+    @State private var lastName = ""
+    @State private var email = ""
+    @State private var isCreating = false
+    @State private var showError = false
+    @State private var errorMessage = ""
+    @State private var showSuccess = false
+    @State private var createdUser: AdminUser?
+    
+    @Environment(\.dismiss) private var dismiss
+    
+    private var isFormValid: Bool {
+        !firstName.trimmingCharacters(in: .whitespaces).isEmpty &&
+        !lastName.trimmingCharacters(in: .whitespaces).isEmpty &&
+        !email.trimmingCharacters(in: .whitespaces).isEmpty &&
+        email.contains("@")
+    }
+    
+    var body: some View {
+        NavigationView {
+            Form {
+                Section {
+                    TextField("First Name", text: $firstName)
+                        .textContentType(.givenName)
+                        .autocapitalization(.words)
+                    
+                    TextField("Last Name", text: $lastName)
+                        .textContentType(.familyName)
+                        .autocapitalization(.words)
+                    
+                    TextField("Email", text: $email)
+                        .textContentType(.emailAddress)
+                        .autocapitalization(.none)
+                        .keyboardType(.emailAddress)
+                } header: {
+                    Text("User Information")
+                } footer: {
+                    Text("All fields are required. The user will be created with a temporary password.")
+                }
+                
+                Section {
+                    Button {
+                        Task {
+                            await createUser()
+                        }
+                    } label: {
+                        HStack {
+                            Spacer()
+                            if isCreating {
+                                ProgressView()
+                                    .padding(.trailing, 8)
+                                Text("Creating...")
+                            } else {
+                                Image(systemName: "person.badge.plus")
+                                Text("Create User")
+                            }
+                            Spacer()
+                        }
+                    }
+                    .disabled(!isFormValid || isCreating)
+                }
+            }
+            .navigationTitle("Create User")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+            }
+            .alert("Error", isPresented: $showError) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text(errorMessage)
+            }
+            .alert("User Created", isPresented: $showSuccess) {
+                Button("OK") {
+                    if let user = createdUser {
+                        onUserCreated(user)
+                    }
+                    dismiss()
+                }
+            } message: {
+                if let user = createdUser {
+                    Text("Successfully created user: \(user.displayName)")
+                }
+            }
+        }
+    }
+    
+    private func createUser() async {
+        isCreating = true
+        defer { isCreating = false }
+        
+        do {
+            let trimmedEmail = email.trimmingCharacters(in: .whitespaces).lowercased()
+            let trimmedFirstName = firstName.trimmingCharacters(in: .whitespaces)
+            let trimmedLastName = lastName.trimmingCharacters(in: .whitespaces)
+            
+            let newUser = try await adminService.createUser(
+                email: trimmedEmail,
+                firstName: trimmedFirstName,
+                lastName: trimmedLastName
+            )
+            
+            createdUser = newUser
+            showSuccess = true
+            
+        } catch {
+            errorMessage = error.localizedDescription
+            showError = true
+        }
     }
 }
 
