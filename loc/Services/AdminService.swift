@@ -260,15 +260,35 @@ class AdminService: ObservableObject {
             let fullName = "\(firstName) \(lastName)"
             let fullNameLower = fullName.lowercased()
             
-            let publicUserData: [String: Any] = [
-                "id": authUserId,
-                "email": email,
-                "first_name": firstName,
-                "last_name": lastName,
-                "full_name": fullName,
-                "full_name_lower": fullNameLower,
-                "created_at": ISO8601DateFormatter().string(from: Date())
-            ]
+            struct NewUserData: Codable {
+                let id: String
+                let email: String
+                let firstName: String
+                let lastName: String
+                let fullName: String
+                let fullNameLower: String
+                let createdAt: String
+                
+                enum CodingKeys: String, CodingKey {
+                    case id
+                    case email
+                    case firstName = "first_name"
+                    case lastName = "last_name"
+                    case fullName = "full_name"
+                    case fullNameLower = "full_name_lower"
+                    case createdAt = "created_at"
+                }
+            }
+            
+            let publicUserData = NewUserData(
+                id: authUserId,
+                email: email,
+                firstName: firstName,
+                lastName: lastName,
+                fullName: fullName,
+                fullNameLower: fullNameLower,
+                createdAt: ISO8601DateFormatter().string(from: Date())
+            )
             
             try await adminClient
                 .from("users")
