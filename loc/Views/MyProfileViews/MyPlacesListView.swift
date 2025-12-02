@@ -519,7 +519,7 @@ struct PaginatedReviewedPlacesView: View {
     @Environment(\.presentationMode) var presentationMode
     
     var body: some View {
-        if profile.isLoadingReviewedPlaces || (profile.lightweightReviewedPlaces.isEmpty && !profile.isLoadingReviewedPlaces) {
+        if profile.isLoadingReviewedPlaces {
             VStack {
                 Spacer()
                 ProgressView()
