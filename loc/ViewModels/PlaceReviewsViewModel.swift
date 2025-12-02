@@ -72,6 +72,19 @@ class PlaceReviewsViewModel: ObservableObject {
                 self?.highlightedReviewId = reviewId
             }
             .store(in: &cancellables)
+        
+        // Observe review changes and update the reviews array immediately
+        selectedPlaceVM.reviewsDidChange
+            .sink { [weak self] placeId in
+                guard let self = self,
+                      let currentPlaceId = self.place?.id.uuidString,
+                      placeId == currentPlaceId else { return }
+                
+                // Update the reviews array
+                self.reviews = self.selectedPlaceVM.reviews
+                self.loadingState = .loaded
+            }
+            .store(in: &cancellables)
     }
     
     // MARK: - Computed Properties

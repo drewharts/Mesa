@@ -16,6 +16,7 @@ class PlacePhotosViewModel: ObservableObject {
     // Place-level photos
     @Published private var placePhotos: [String: [UIImage]] = [:] // Cache for place-level photos by placeId
     @Published private var photoLoadingStates: [String: LoadingState] = [:] // Loading states for place photos
+    @Published private var placePhotosCachedURLs: [String: [String]] = [:] // Track URLs for main gallery to prevent duplicates
     @Published private var photoPageLimit = 9
     @Published private var lastPhotoDocument: Any? // Replaced DocumentSnapshot for Supabase migration
     @Published private var allPhotosLoaded = false
@@ -25,6 +26,7 @@ class PlacePhotosViewModel: ObservableObject {
     @Published private var reviewPhotoLoadingStates: [String: LoadingState] = [:] // Loading states for review photos
     @Published private var reviewPhotosForAbout: [String: [UIImage]] = [:] // Cache for review photos in about section by placeId
     @Published private var reviewPhotosForAboutLoadingStates: [String: LoadingState] = [:] // Loading states for review photos in about section
+    @Published private var reviewPhotosForAboutCachedURLs: [String: [String]] = [:] // Track URLs for about section to prevent duplicates
     
     // External review photos
     @Published private var externalReviewPhotosByPlace: [String: [UIImage]] = [:] // Cache for external review photos by placeId
@@ -83,41 +85,45 @@ class PlacePhotosViewModel: ObservableObject {
     
     // MARK: - Setup
     private func setupObservers() {
-        // Observe place changes
+        // Observe place changes - only for resetting state
         selectedPlaceVM.$selectedPlace
             .sink { [weak self] place in
                 guard let self = self else { return }
                 self.place = place
                 self.placeId = place?.id.uuidString ?? ""
                 
-                // Reset and load photos for new place
+                // Reset state for new place
                 if let place = place {
                     self.resetPhotoLoading()
-                    // Place photos will be loaded after reviews are ready
                     self.loadExternalReviewPhotos(for: place, reset: true)
                 }
             }
             .store(in: &cancellables)
         
-        // Observe when reviews are loaded and load photos for them
-        // We check selectedPlace changes as proxy for review updates since reviews are loaded after place selection
-        selectedPlaceVM.$selectedPlace
-            .debounce(for: .milliseconds(500), scheduler: DispatchQueue.main)
-            .sink { [weak self] place in
-                guard let self = self, let place = place else { return }
+        // Single observer for ALL review-related photo loading (initial + updates)
+        // This fires when reviews are initially loaded AND when they're added/deleted
+        selectedPlaceVM.reviewsDidChange
+            .sink { [weak self] placeId in
+                guard let self = self,
+                      let currentPlaceId = self.place?.id.uuidString,
+                      placeId == currentPlaceId else { return }
                 
-                // Load place-level photos from reviews
-                self.getPlacePhotos(for: place, loadMore: false)
-                
-                // Load photos for About section
-                self.loadReviewPhotosForAbout(for: place)
-                
-                // Load review photos and profile photos for each review
                 let reviews = self.selectedPlaceVM.reviews
+                
+                // 1. Load individual review photos (if not already loaded)
                 reviews.forEach { review in
-                    self.loadReviewPhotos(for: review)
-                    self.loadProfilePhotoFromURL(userId: review.userId, photoUrl: review.profilePhotoUrl)
+                    if self.reviewPhotoLoadingStates[review.id] == nil || 
+                       self.reviewPhotoLoadingStates[review.id] == .idle {
+                        self.loadReviewPhotos(for: review)
+                        self.loadProfilePhotoFromURL(userId: review.userId, photoUrl: review.profilePhotoUrl)
+                    }
                 }
+                
+                // 2. Incremental updates for About section (works for both initial and updates)
+                self.addNewReviewPhotosToAbout(for: reviews)
+                
+                // 3. Incremental updates for main gallery (works for both initial and updates)
+                self.addNewReviewPhotosToGallery(for: reviews)
             }
             .store(in: &cancellables)
     }
@@ -201,8 +207,10 @@ class PlacePhotosViewModel: ObservableObject {
         if let placeId = place?.id.uuidString {
             placePhotos[placeId]?.removeAll()
             photoLoadingStates[placeId] = .idle
+            placePhotosCachedURLs[placeId]?.removeAll()
             reviewPhotosForAbout[placeId]?.removeAll()
             reviewPhotosForAboutLoadingStates[placeId] = .idle
+            reviewPhotosForAboutCachedURLs[placeId]?.removeAll()
             lastPhotoDocument = nil
             allPhotosLoaded = false
             // Remove the entry entirely instead of just clearing it, so loadInitialExternalReviewPhotos can work
@@ -222,6 +230,12 @@ class PlacePhotosViewModel: ObservableObject {
         // Don't fetch if already loading
         if photoLoadingStates[placeId] == .loading && !loadMore {
             return
+        }
+        
+        // Reset when not loading more (prevents duplicates)
+        if !loadMore {
+            placePhotos[placeId] = []
+            allPhotosLoaded = false
         }
         
         photoLoadingStates[placeId] = .loading
@@ -461,6 +475,122 @@ class PlacePhotosViewModel: ObservableObject {
         } catch {
             print("Error loading image from URL: \(error.localizedDescription)")
             return nil
+        }
+    }
+    
+    // MARK: - Incremental Photo Updates (Staff Engineer Level)
+    
+    /// Incrementally add photos from new reviews to About section
+    /// Only loads photos that aren't already in the cache (URL-based tracking)
+    private func addNewReviewPhotosToAbout(for reviews: [any ReviewProtocol]) {
+        guard let placeId = place?.id.uuidString else { return }
+        
+        // Get currently cached photos
+        let currentPhotos = reviewPhotosForAbout[placeId] ?? []
+        guard currentPhotos.count < 6 else { return } // Already have max photos
+        
+        Task {
+            // Collect photo URLs from reviews (limit to first 6 total)
+            var allPhotoURLs: [String] = []
+            for review in reviews {
+                allPhotoURLs.append(contentsOf: review.images)
+                if allPhotoURLs.count >= 6 { break }
+            }
+            
+            // Build a set of cached URLs for fast lookup
+            var cachedPhotoURLs = Set<String>()
+            if let cachedURLs = self.reviewPhotosForAboutCachedURLs[placeId] {
+                cachedPhotoURLs = Set(cachedURLs)
+            }
+            
+            // Filter to only NEW URLs not in cache
+            let newURLs = Array(allPhotoURLs.filter { !cachedPhotoURLs.contains($0) }
+                .prefix(6 - currentPhotos.count))
+            
+            guard !newURLs.isEmpty else { return }
+            
+            var newImages: [UIImage] = []
+            await withTaskGroup(of: (String, UIImage?).self) { group in
+                for imageUrl in newURLs {
+                    group.addTask {
+                        let image = await self.loadImageFromURL(imageUrl: imageUrl)
+                        return (imageUrl, image)
+                    }
+                }
+                
+                for await (url, image) in group {
+                    if let image {
+                        newImages.append(image)
+                        cachedPhotoURLs.insert(url)
+                    }
+                }
+            }
+            
+            // Append new images to existing cache (incremental update)
+            var updatedPhotos = currentPhotos
+            updatedPhotos.append(contentsOf: newImages)
+            self.reviewPhotosForAbout[placeId] = updatedPhotos
+            self.reviewPhotosForAboutLoadingStates[placeId] = .loaded
+            
+            // Store the cached URLs for next time
+            self.reviewPhotosForAboutCachedURLs[placeId] = Array(cachedPhotoURLs)
+        }
+    }
+    
+    /// Incrementally add photos from new reviews to main gallery
+    /// Only loads photos that aren't already in the cache (URL-based tracking)
+    private func addNewReviewPhotosToGallery(for reviews: [any ReviewProtocol]) {
+        guard let placeId = place?.id.uuidString else { return }
+        
+        Task {
+            // Collect ALL photo URLs from reviews
+            var allPhotoURLs: [String] = []
+            for review in reviews {
+                allPhotoURLs.append(contentsOf: review.images)
+            }
+            
+            // Get cached URLs
+            var cachedPhotoURLs = Set<String>()
+            if let cachedURLs = self.placePhotosCachedURLs[placeId] {
+                cachedPhotoURLs = Set(cachedURLs)
+            }
+            
+            // Filter to only NEW URLs
+            let newURLs = Array(allPhotoURLs.filter { !cachedPhotoURLs.contains($0) }
+                .prefix(photoPageLimit))
+            
+            guard !newURLs.isEmpty else { return }
+            
+            photoLoadingStates[placeId] = .loading
+            
+            var newImages: [UIImage] = []
+            await withTaskGroup(of: (String, UIImage?).self) { group in
+                for imageUrl in newURLs {
+                    group.addTask {
+                        let image = await self.loadImageFromURL(imageUrl: imageUrl)
+                        return (imageUrl, image)
+                    }
+                }
+                
+                for await (url, image) in group {
+                    if let image {
+                        newImages.append(image)
+                        cachedPhotoURLs.insert(url)
+                    }
+                }
+            }
+            
+            // Append new images to existing cache (incremental update)
+            var updatedPhotos = self.placePhotos[placeId] ?? []
+            updatedPhotos.append(contentsOf: newImages)
+            self.placePhotos[placeId] = updatedPhotos
+            self.photoLoadingStates[placeId] = .loaded
+            
+            // Store cached URLs
+            self.placePhotosCachedURLs[placeId] = Array(cachedPhotoURLs)
+            
+            // Check if all photos are loaded
+            self.allPhotosLoaded = (updatedPhotos.count >= allPhotoURLs.count)
         }
     }
     

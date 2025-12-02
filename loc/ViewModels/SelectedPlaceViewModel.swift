@@ -8,6 +8,7 @@
 import Foundation
 import CoreLocation
 import UIKit
+import Combine
 
 // MARK: - Services
 // Note: MesaBackendService import should be available via project imports
@@ -125,6 +126,13 @@ class SelectedPlaceViewModel: ObservableObject {
     
     // Add new property to track liked reviews
     @Published private var likedReviews: Set<String> = []
+    
+    // MARK: - Review Change Publisher
+    private let reviewsDidChangeSubject = PassthroughSubject<String, Never>()
+    
+    var reviewsDidChange: AnyPublisher<String, Never> {
+        reviewsDidChangeSubject.eraseToAnyPublisher()
+    }
 
     // MARK: - Loading State Enum
     enum LoadingState: Equatable {
@@ -380,7 +388,8 @@ class SelectedPlaceViewModel: ObservableObject {
                     self.placeTikToks[placeId] = tiktoks // Store TikToks
                     self.reviewLoadingStates[placeId] = .loaded
                     
-                    // Photos are loaded automatically by PlacePhotosViewModel via observers
+                    // Notify observers that reviews are now available (both initial load and updates)
+                    self.reviewsDidChangeSubject.send(placeId)
                     
                     self.updateCurrentPlaceFullyLoaded()
                 }
@@ -408,7 +417,8 @@ class SelectedPlaceViewModel: ObservableObject {
             currentReviews.insert(review, at: 0) // Insert at the beginning
             self.placeReviews[placeId] = currentReviews
             
-            // Photos will be loaded automatically by PlacePhotosViewModel
+            // Notify observers that reviews have changed
+            self.reviewsDidChangeSubject.send(placeId)
         }
     }
     
@@ -450,6 +460,9 @@ class SelectedPlaceViewModel: ObservableObject {
                             
                             // Remove from liked reviews set if it was there
                             self.likedReviews.remove(reviewId)
+                            
+                            // Notify observers that reviews have changed
+                            self.reviewsDidChangeSubject.send(placeId)
                         }
                     }
                     completion(.success(()))
