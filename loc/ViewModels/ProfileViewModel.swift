@@ -1483,24 +1483,35 @@ class ProfileViewModel: ObservableObject {
     }
     
     /// Delete a TikTok place using LightweightPlace (for popup views)
-    func deleteTikTokPlace(_ place: LightweightPlace, completion: @escaping (Bool) -> Void) {
-        guard let userId = user?.id else {
-            completion(false)
-            return
-        }
+    /// Single Responsibility: Remove TikTok place from local state and persist to backend
+    func deleteTikTokPlace(_ place: LightweightPlace) {
+        guard let userId = user?.id else { return }
         
         let placeId = place.place_id
         
-        // Remove from lightweight places array (optimistic update)
+        // Optimistic update: Remove from all local collections immediately
+        removeFromLocalTikTokState(placeId: placeId, userId: userId)
+        
+        // Persist deletion to backend
+        userService.deleteTikTokPlace(userId: userId, placeId: placeId) { error in
+            if let error = error {
+                print("❌ [ProfileViewModel] Error deleting TikTok place: \(error.localizedDescription)")
+                // Note: Could add revert logic here if needed
+            } else {
+                print("✅ [ProfileViewModel] Successfully deleted TikTok place: \(place.name)")
+            }
+        }
+    }
+    
+    /// Helper: Remove TikTok place from all local state collections
+    /// Single Responsibility: Local state cleanup only
+    private func removeFromLocalTikTokState(placeId: String, userId: String) {
+        // Remove from lightweight places array
         lightweightExternalPlaces.removeAll { $0.place_id == placeId }
         
-        // Also remove from the other collections if present
-        if let index = allTikTokPlaceIds.firstIndex(of: placeId) {
-            allTikTokPlaceIds.remove(at: index)
-        }
-        if let index = loadedTikTokPlaceIds.firstIndex(of: placeId) {
-            loadedTikTokPlaceIds.remove(at: index)
-        }
+        // Remove from ID tracking collections
+        allTikTokPlaceIds.removeAll { $0 == placeId }
+        loadedTikTokPlaceIds.removeAll { $0 == placeId }
         userExternalPlaces.removeValue(forKey: placeId)
         
         // Remove from placeSavers (so it doesn't appear on map)
@@ -1518,19 +1529,6 @@ class ProfileViewModel: ObservableObject {
         
         // Recalculate map annotations
         detailPlaceViewModel.calculateAnnotationPlaces()
-        
-        // Call backend to delete
-        userService.deleteTikTokPlace(userId: userId, placeId: placeId) { [weak self] error in
-            DispatchQueue.main.async {
-                if let error = error {
-                    print("❌ [ProfileViewModel] Error deleting TikTok place: \(error.localizedDescription)")
-                    completion(false)
-                } else {
-                    print("✅ [ProfileViewModel] Successfully deleted TikTok place: \(place.name)")
-                    completion(true)
-                }
-            }
-        }
     }
     
     private func revertTikTokPlaceDeletion(_ place: DetailPlace) {

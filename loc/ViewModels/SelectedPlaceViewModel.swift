@@ -257,6 +257,19 @@ class SelectedPlaceViewModel: ObservableObject {
         }
     }
     
+    /// Navigate to a place by ID - fetches place details and presents the detail sheet
+    /// Single Responsibility: Coordinate place navigation from lightweight place references
+    func navigateToPlace(placeId: String, onDismiss: (() -> Void)? = nil) {
+        Task {
+            guard let detailPlace = try? await PlaceService.shared.fetchPlace(withId: placeId) else { return }
+            await MainActor.run {
+                self.selectPlaceAndFetchDetails(detailPlace, shouldAnimateMap: true)
+                self.isDetailSheetPresented = true
+                onDismiss?()
+            }
+        }
+    }
+    
     /// Select a place and fetch fresh details from backend
     /// Use this when a user clicks on a place from lists, maps, etc.
     func selectPlaceAndFetchDetails(_ place: DetailPlace, shouldAnimateMap: Bool = true) {
