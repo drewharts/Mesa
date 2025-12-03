@@ -265,8 +265,19 @@ class SelectedPlaceViewModel: ObservableObject {
         }
     }
     
+    // MARK: - Place Selection
+    
+    /// Select a place that already has complete details (e.g., from search results)
+    /// Single Responsibility: Set selection state only, no network calls
+    /// Use when place data is already fresh/complete (search returns full DetailPlace)
+    func selectPlace(_ place: DetailPlace, shouldAnimateMap: Bool = true) {
+        selectedPlace = place
+        shouldAnimateMapToPlace = shouldAnimateMap
+    }
+    
     /// Select a place and fetch fresh details from backend
-    /// Use this when a user clicks on a place from lists, maps, etc.
+    /// Single Responsibility: Set selection state AND refresh data from network
+    /// Use when place data may be stale/incomplete (map annotations, deep links)
     func selectPlaceAndFetchDetails(_ place: DetailPlace, shouldAnimateMap: Bool = true) {
         // Backend now accepts UUID and handles everything automatically
         // Just send the UUID as place_id and "google" as provider
