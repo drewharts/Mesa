@@ -1482,6 +1482,55 @@ class ProfileViewModel: ObservableObject {
         }
     }
     
+    /// Delete a TikTok place using LightweightPlace (for popup views)
+    /// Single Responsibility: Remove TikTok place from local state and persist to backend
+    func deleteTikTokPlace(_ place: LightweightPlace) {
+        guard let userId = user?.id else { return }
+        
+        let placeId = place.place_id
+        
+        // Optimistic update: Remove from all local collections immediately
+        removeFromLocalTikTokState(placeId: placeId, userId: userId)
+        
+        // Persist deletion to backend
+        userService.deleteTikTokPlace(userId: userId, placeId: placeId) { error in
+            if let error = error {
+                print("❌ [ProfileViewModel] Error deleting TikTok place: \(error.localizedDescription)")
+                // Note: Could add revert logic here if needed
+            } else {
+                print("✅ [ProfileViewModel] Successfully deleted TikTok place: \(place.name)")
+            }
+        }
+    }
+    
+    /// Helper: Remove TikTok place from all local state collections
+    /// Single Responsibility: Local state cleanup only
+    private func removeFromLocalTikTokState(placeId: String, userId: String) {
+        // Remove from lightweight places array
+        lightweightExternalPlaces.removeAll { $0.place_id == placeId }
+        
+        // Remove from ID tracking collections
+        allTikTokPlaceIds.removeAll { $0 == placeId }
+        loadedTikTokPlaceIds.removeAll { $0 == placeId }
+        userExternalPlaces.removeValue(forKey: placeId)
+        
+        // Remove from placeSavers (so it doesn't appear on map)
+        if var savers = detailPlaceViewModel.placeSavers[placeId] {
+            savers.removeAll { $0 == userId }
+            if savers.isEmpty {
+                detailPlaceViewModel.placeSavers.removeValue(forKey: placeId)
+            } else {
+                detailPlaceViewModel.placeSavers[placeId] = savers
+            }
+        }
+        
+        // Remove from places dictionary
+        detailPlaceViewModel.places.removeValue(forKey: placeId)
+        
+        // Recalculate map annotations
+        detailPlaceViewModel.calculateAnnotationPlaces()
+    }
+    
     private func revertTikTokPlaceDeletion(_ place: DetailPlace) {
         let placeId = place.id.uuidString
         
