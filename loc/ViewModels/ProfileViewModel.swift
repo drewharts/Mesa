@@ -1482,6 +1482,57 @@ class ProfileViewModel: ObservableObject {
         }
     }
     
+    /// Delete a TikTok place using LightweightPlace (for popup views)
+    func deleteTikTokPlace(_ place: LightweightPlace, completion: @escaping (Bool) -> Void) {
+        guard let userId = user?.id else {
+            completion(false)
+            return
+        }
+        
+        let placeId = place.place_id
+        
+        // Remove from lightweight places array (optimistic update)
+        lightweightExternalPlaces.removeAll { $0.place_id == placeId }
+        
+        // Also remove from the other collections if present
+        if let index = allTikTokPlaceIds.firstIndex(of: placeId) {
+            allTikTokPlaceIds.remove(at: index)
+        }
+        if let index = loadedTikTokPlaceIds.firstIndex(of: placeId) {
+            loadedTikTokPlaceIds.remove(at: index)
+        }
+        userExternalPlaces.removeValue(forKey: placeId)
+        
+        // Remove from placeSavers (so it doesn't appear on map)
+        if var savers = detailPlaceViewModel.placeSavers[placeId] {
+            savers.removeAll { $0 == userId }
+            if savers.isEmpty {
+                detailPlaceViewModel.placeSavers.removeValue(forKey: placeId)
+            } else {
+                detailPlaceViewModel.placeSavers[placeId] = savers
+            }
+        }
+        
+        // Remove from places dictionary
+        detailPlaceViewModel.places.removeValue(forKey: placeId)
+        
+        // Recalculate map annotations
+        detailPlaceViewModel.calculateAnnotationPlaces()
+        
+        // Call backend to delete
+        userService.deleteTikTokPlace(userId: userId, placeId: placeId) { [weak self] error in
+            DispatchQueue.main.async {
+                if let error = error {
+                    print("❌ [ProfileViewModel] Error deleting TikTok place: \(error.localizedDescription)")
+                    completion(false)
+                } else {
+                    print("✅ [ProfileViewModel] Successfully deleted TikTok place: \(place.name)")
+                    completion(true)
+                }
+            }
+        }
+    }
+    
     private func revertTikTokPlaceDeletion(_ place: DetailPlace) {
         let placeId = place.id.uuidString
         

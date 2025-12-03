@@ -11,7 +11,10 @@ struct TikTokPopupPlaceCard: View {
     let cardHeight: CGFloat
     
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
+    @EnvironmentObject var profile: ProfileViewModel
     @Environment(\.presentationMode) var presentationMode
+    
+    @State private var showDeleteConfirmation = false
     
     private var placeColor: Color {
         let hash = place.place_id.hashValue
@@ -32,7 +35,14 @@ struct TikTokPopupPlaceCard: View {
         .cornerRadius(20)
         .shadow(color: Color.black.opacity(0.2), radius: 5, x: 0, y: 2)
         .onTapGesture { navigateToPlace() }
+        .onLongPressGesture { showDeleteConfirmation = true }
         .onAppear { prefetchThumbnail() }
+        .alert("Delete TikTok Place", isPresented: $showDeleteConfirmation) {
+            Button("Cancel", role: .cancel) { }
+            Button("Delete", role: .destructive) { deletePlace() }
+        } message: {
+            Text("Are you sure you want to delete \"\(place.name)\"? This action cannot be undone.")
+        }
     }
     
     private var thumbnailImage: some View {
@@ -119,6 +129,14 @@ struct TikTokPopupPlaceCard: View {
     private func prefetchThumbnail() {
         guard let tiktokUrl = place.tiktok_url else { return }
         Task { _ = await TikTokMetadataCache.shared.getMetadata(for: tiktokUrl) }
+    }
+    
+    private func deletePlace() {
+        profile.deleteTikTokPlace(place) { success in
+            if !success {
+                print("❌ Failed to delete TikTok place: \(place.name)")
+            }
+        }
     }
 }
 
