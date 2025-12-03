@@ -8,7 +8,6 @@
 import Foundation
 import CoreLocation
 import UIKit
-import Combine
 
 // MARK: - Services
 // Note: MesaBackendService import should be available via project imports
@@ -126,13 +125,6 @@ class SelectedPlaceViewModel: ObservableObject {
     
     // Add new property to track liked reviews
     @Published private var likedReviews: Set<String> = []
-    
-    // MARK: - Review Change Publisher
-    private let reviewsDidChangeSubject = PassthroughSubject<String, Never>()
-    
-    var reviewsDidChange: AnyPublisher<String, Never> {
-        reviewsDidChangeSubject.eraseToAnyPublisher()
-    }
 
     // MARK: - Loading State Enum
     enum LoadingState: Equatable {
@@ -265,19 +257,21 @@ class SelectedPlaceViewModel: ObservableObject {
         }
     }
     
-    // MARK: - Place Selection
-    
-    /// Select a place that already has complete details (e.g., from search results)
-    /// Single Responsibility: Set selection state only, no network calls
-    /// Use when place data is already fresh/complete (search returns full DetailPlace)
-    func selectPlace(_ place: DetailPlace, shouldAnimateMap: Bool = true) {
-        selectedPlace = place
-        shouldAnimateMapToPlace = shouldAnimateMap
+    /// Navigate to a place by ID - fetches place details and presents the detail sheet
+    /// Single Responsibility: Coordinate place navigation from lightweight place references
+    func navigateToPlace(placeId: String, onDismiss: (() -> Void)? = nil) {
+        Task {
+            guard let detailPlace = try? await PlaceService.shared.fetchPlace(withId: placeId) else { return }
+            await MainActor.run {
+                self.selectPlaceAndFetchDetails(detailPlace, shouldAnimateMap: true)
+                self.isDetailSheetPresented = true
+                onDismiss?()
+            }
+        }
     }
     
     /// Select a place and fetch fresh details from backend
-    /// Single Responsibility: Set selection state AND refresh data from network
-    /// Use when place data may be stale/incomplete (map annotations, deep links)
+    /// Use this when a user clicks on a place from lists, maps, etc.
     func selectPlaceAndFetchDetails(_ place: DetailPlace, shouldAnimateMap: Bool = true) {
         // Backend now accepts UUID and handles everything automatically
         // Just send the UUID as place_id and "google" as provider
@@ -399,8 +393,7 @@ class SelectedPlaceViewModel: ObservableObject {
                     self.placeTikToks[placeId] = tiktoks // Store TikToks
                     self.reviewLoadingStates[placeId] = .loaded
                     
-                    // Notify observers that reviews are now available (both initial load and updates)
-                    self.reviewsDidChangeSubject.send(placeId)
+                    // Photos are loaded automatically by PlacePhotosViewModel via observers
                     
                     self.updateCurrentPlaceFullyLoaded()
                 }
@@ -428,8 +421,7 @@ class SelectedPlaceViewModel: ObservableObject {
             currentReviews.insert(review, at: 0) // Insert at the beginning
             self.placeReviews[placeId] = currentReviews
             
-            // Notify observers that reviews have changed
-            self.reviewsDidChangeSubject.send(placeId)
+            // Photos will be loaded automatically by PlacePhotosViewModel
         }
     }
     
@@ -471,9 +463,6 @@ class SelectedPlaceViewModel: ObservableObject {
                             
                             // Remove from liked reviews set if it was there
                             self.likedReviews.remove(reviewId)
-                            
-                            // Notify observers that reviews have changed
-                            self.reviewsDidChangeSubject.send(placeId)
                         }
                     }
                     completion(.success(()))
