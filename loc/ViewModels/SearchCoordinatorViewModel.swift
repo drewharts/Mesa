@@ -40,8 +40,10 @@ class SearchCoordinatorViewModel {
     /// Handle place selection from search
     /// Single Responsibility: Coordinate place detail presentation
     /// Returns the sheet height that should be set (starts at partial height)
+    /// Note: Uses selectPlace (not selectPlaceAndFetchDetails) because search
+    /// results already return complete DetailPlace data - no need to re-fetch
     func handlePlaceSelection(_ detailPlace: DetailPlace) -> CGFloat {
-        selectedPlaceVM?.selectPlaceAndFetchDetails(detailPlace, shouldAnimateMap: true)
+        selectedPlaceVM?.selectPlace(detailPlace, shouldAnimateMap: true)
         selectedPlaceVM?.isDetailSheetPresented = true
         
         return minSheetHeight
