@@ -84,26 +84,6 @@ struct MyPlacesListView: View {
                                     .animation(.easeInOut(duration: 0.3), value: selectedTab)
                             }
                         }
-                        
-                        Button(action: { 
-                            withAnimation(.easeInOut(duration: 0.3)) {
-                                selectedTab = 2
-                                displayPageIndicators()
-                            }
-                        }) {
-                            VStack(spacing: 4) {
-                                Text("TikTok")
-                                    .font(.subheadline)
-                                    .fontWeight(selectedTab == 2 ? .semibold : .regular)
-                                    .foregroundColor(selectedTab == 2 ? .black : .gray)
-                                    .frame(minHeight: 20)
-                                
-                                Rectangle()
-                                    .fill(selectedTab == 2 ? Color.black : Color.clear)
-                                    .frame(width: 50, height: 2)
-                                    .animation(.easeInOut(duration: 0.3), value: selectedTab)
-                            }
-                        }
                     }
                     .padding(.top, 20)
                     .padding(.bottom, 10)
@@ -122,7 +102,7 @@ struct MyPlacesListView: View {
                             insertion: .move(edge: .leading).combined(with: .opacity),
                             removal: .move(edge: .trailing).combined(with: .opacity)
                         ))
-                    } else if selectedTab == 1 {
+                    } else {
                         // Reviewed Places (with pagination)
                         PaginatedReviewedPlacesView(
                             columns: columns,
@@ -134,26 +114,6 @@ struct MyPlacesListView: View {
                             insertion: .move(edge: .trailing).combined(with: .opacity),
                             removal: .move(edge: .leading).combined(with: .opacity)
                         ))
-                    } else {
-                        // TikTok Places (lightweight - no Firebase!)
-                        PaginatedTikTokPlacesView(
-                            columns: columns,
-                            cardWidth: cardWidth,
-                            cardHeight: cardHeight,
-                            colorForPlace: colorForPlace
-                        )
-                        .transition(.asymmetric(
-                            insertion: .move(edge: .trailing).combined(with: .opacity),
-                            removal: .move(edge: .leading).combined(with: .opacity)
-                        ))
-                        .onAppear {
-                            // Load external places when TikTok tab appears (MVVM: call ViewModel)
-                            if profile.lightweightExternalPlaces.isEmpty {
-                                Task {
-                                    await profile.loadInitialExternalPlaces()
-                                }
-                            }
-                        }
                     }
                 }
                 .gesture(
@@ -165,21 +125,13 @@ struct MyPlacesListView: View {
                             // Only respond to primarily horizontal swipes
                             if abs(horizontalMovement) > 50 && abs(horizontalMovement) > verticalMovement {
                                 withAnimation(.easeInOut(duration: 0.3)) {
-                                    if horizontalMovement > 0 {
+                                    if horizontalMovement > 0 && selectedTab == 1 {
                                         // Swipe right: go to previous tab
-                                        if selectedTab == 1 {
-                                            selectedTab = 0 // Reviewed -> Created
-                                        } else if selectedTab == 2 {
-                                            selectedTab = 1 // TikTok -> Reviewed
-                                        }
+                                        selectedTab = 0 // Reviewed -> Created
                                         displayPageIndicators()
-                                    } else if horizontalMovement < 0 {
+                                    } else if horizontalMovement < 0 && selectedTab == 0 {
                                         // Swipe left: go to next tab
-                                        if selectedTab == 0 {
-                                            selectedTab = 1 // Created -> Reviewed
-                                        } else if selectedTab == 1 {
-                                            selectedTab = 2 // Reviewed -> TikTok
-                                        }
+                                        selectedTab = 1 // Created -> Reviewed
                                         displayPageIndicators()
                                     }
                                 }
@@ -191,7 +143,7 @@ struct MyPlacesListView: View {
                 VStack {
                     Spacer()
                     HStack(spacing: 8) {
-                        ForEach(0..<3, id: \.self) { index in
+                        ForEach(0..<2, id: \.self) { index in
                             Circle()
                                 .fill(selectedTab == index ? Color.gray : Color.gray.opacity(0.3))
                                 .frame(width: 8, height: 8)
@@ -673,216 +625,6 @@ struct PlaceGridCell: View {
         }
         .onLongPressGesture {
             onLongPress?()
-        }
-    }
-}
-
-// MARK: - Paginated TikTok Places View (Lightweight - No Firebase!)
-struct PaginatedTikTokPlacesView: View {
-    let columns: [GridItem]
-    let cardWidth: CGFloat
-    let cardHeight: CGFloat
-    let colorForPlace: (DetailPlace) -> Color
-    
-    @EnvironmentObject var profile: ProfileViewModel
-    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
-    @EnvironmentObject var dataManager: DataManager
-    @Environment(\.presentationMode) var presentationMode
-    
-    var body: some View {
-        if profile.isLoadingTikTokPlaces {
-            VStack {
-                Spacer()
-                ProgressView()
-                Spacer()
-            }
-        } else if profile.lightweightExternalPlaces.isEmpty {
-            VStack(spacing: 20) {
-                Image(systemName: "video.slash")
-                    .font(.system(size: 50))
-                    .foregroundColor(.gray.opacity(0.5))
-                
-                VStack(spacing: 8) {
-                    Text("No TikTok Places")
-                        .font(.title3)
-                        .fontWeight(.medium)
-                        .foregroundColor(.primary)
-                    
-                    Text("Places you add from TikTok videos will appear here")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 40)
-                }
-            }
-            .padding(.top, 100)
-        } else {
-            ScrollView {
-                LazyVGrid(columns: columns, spacing: 15) {
-                    ForEach(Array(profile.lightweightExternalPlaces.enumerated()), id: \.element.id) { index, place in
-                        LightweightPlaceGridCell(
-                            place: place,
-                            cardWidth: cardWidth,
-                            cardHeight: cardHeight
-                        )
-                        .onAppear {
-                            // Trigger pagination when reaching the last item (MVVM: call ViewModel)
-                            // Defensive check: prevent race conditions from rapid scrolling
-                            if index == profile.lightweightExternalPlaces.count - 1 
-                                && profile.hasMoreExternalPlaces 
-                                && !profile.isLoadingMoreExternalPlaces {
-                                Task {
-                                    await profile.loadMoreExternalPlaces()
-                                }
-                            }
-                        }
-                    }
-                    
-                    // Loading indicator at bottom of content (enterprise-quality)
-                    if profile.isLoadingMoreExternalPlaces {
-                        HStack {
-                            Spacer()
-                            VStack(spacing: 12) {
-                                ProgressView()
-                                    .scaleEffect(1.0)
-                                Text("Loading...")
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
-                            }
-                            .padding(.vertical, 30)
-                            Spacer()
-                        }
-                        .gridCellColumns(2)
-                    }
-                }
-                .padding(.horizontal, 20)
-                .padding(.top, 10)
-            }
-        }
-    }
-}
-
-// MARK: - TikTokPlaceGridCell
-struct TikTokPlaceGridCell: View {
-    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
-    @EnvironmentObject var profile: ProfileViewModel
-    @Environment(\.presentationMode) var presentationMode
-    
-    let place: DetailPlace
-    let cardWidth: CGFloat
-    let cardHeight: CGFloat
-    let color: Color
-    let externalPlace: ExternalPlace?
-    let isPriorityTile: Bool // New parameter to indicate if this is in the first 8 tiles
-    
-    @State private var showDeleteConfirmation = false
-    
-    // Get first TikTok thumbnail URL for this place
-    private func getFirstTikTokThumbnail() -> String? {
-        guard let url = externalPlace?.url else { return nil }
-        return TikTokMetadataCache.shared.getCachedThumbnailUrl(for: url)
-    }
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            ZStack(alignment: .bottom) {
-                // Check for TikTok thumbnails first, then review image, then colored rectangle
-                if let firstTikTokThumbnail = getFirstTikTokThumbnail() {
-                    AsyncImage(url: URL(string: firstTikTokThumbnail)) { image in
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .frame(width: cardWidth, height: cardHeight)
-                            .clipped()
-                    } placeholder: {
-                        ZStack {
-                            Rectangle()
-                                .foregroundColor(color)
-                                .frame(width: cardWidth, height: cardHeight)
-                            
-                            // Show loading indicator for priority tiles only if still loading
-                            if isPriorityTile && profile.detailPlaceViewModel.isPlaceImageLoading(placeId: place.id.uuidString) {
-                                ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                    .scaleEffect(0.8)
-                            }
-                        }
-                    }
-                } else if let image = profile.detailPlaceViewModel.placeImages[place.id.uuidString], 
-                          image.size.width > 0 && image.size.height > 0 {
-                    Image(uiImage: image)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .frame(width: cardWidth, height: cardHeight)
-                        .clipped()
-                } else {
-                    ZStack {
-                        Rectangle()
-                            .foregroundColor(color)
-                            .frame(width: cardWidth, height: cardHeight)
-                        
-                        // Show loading indicator for priority tiles only if still loading
-                        if isPriorityTile && profile.detailPlaceViewModel.isPlaceImageLoading(placeId: place.id.uuidString) {
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                .scaleEffect(0.8)
-                        }
-                    }
-                }
-                
-                // Gradient overlay for text readability
-                LinearGradient(
-                    gradient: Gradient(colors: [.clear, .black.opacity(0.7)]),
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .frame(height: 60)
-                
-                // Place info - only name and city
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(place.name)
-                        .font(.headline)
-                        .foregroundColor(.white)
-                        .lineLimit(1)
-                        .multilineTextAlignment(.leading)
-                    
-                    if let city = place.city {
-                        Text(city)
-                            .font(.caption)
-                            .foregroundColor(.white.opacity(0.8))
-                            .lineLimit(1)
-                            .multilineTextAlignment(.leading)
-                    }
-                }
-                .padding(.horizontal, 12)
-                .padding(.bottom, 8)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-        }
-        .frame(width: cardWidth, height: cardHeight)
-        .background(Color.white)
-        .cornerRadius(20)
-        .shadow(color: Color.black.opacity(0.2), radius: 5, x: 0, y: 2)
-        .onTapGesture {
-            selectedPlaceVM.selectPlaceAndFetchDetails(place)
-            selectedPlaceVM.isDetailSheetPresented = true
-            presentationMode.wrappedValue.dismiss()
-        }
-        .onLongPressGesture {
-            showDeleteConfirmation = true
-        }
-        .alert("Delete TikTok Place", isPresented: $showDeleteConfirmation) {
-            Button("Cancel", role: .cancel) { }
-            Button("Delete", role: .destructive) {
-                profile.deleteTikTokPlace(place) { success in
-                    if success {
-                    } else {
-                        print("❌ Failed to delete TikTok place: \(place.name)")
-                    }
-                }
-            }
-        } message: {
-            Text("Are you sure you want to delete \"\(place.name)\"? This action cannot be undone.")
         }
     }
 }

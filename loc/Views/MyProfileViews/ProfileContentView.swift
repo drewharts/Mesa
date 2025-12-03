@@ -38,8 +38,9 @@ struct ProfileContentView: View {
                         .padding(.top, 15)
                         .padding(.horizontal, 20)
                     
-                    // Favorites & Lists
+                    // Favorites, TikToks & Lists
                     ProfileFavoriteListView()
+                    ProfileTikToksView()
                     ProfileViewListsView()
 
                     // No Location Data Error
