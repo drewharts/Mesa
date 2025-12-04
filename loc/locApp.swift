@@ -107,6 +107,9 @@ struct locApp: App {
         
         profileVM.userProfileViewModel = userProfileVM
         
+        // Set UserProfileViewModel reference in DeepLinkManager for external user list navigation
+        deepLinkMgr.setUserProfileViewModel(userProfileVM)
+        
         // ✅ Create SearchViewModel ONCE at app level (staff engineer: no recreation overhead)
         let searchVM = SearchViewModel(
             placeService: services.placeService,

@@ -141,6 +141,20 @@ struct MainView: View {
                     .environmentObject(dataManager)
                     .environmentObject(serviceContainer)
             }
+            .sheet(isPresented: $deepLinkManager.showSharedListSheet, onDismiss: {
+                deepLinkManager.sharedListData = nil
+            }) {
+                if let sharedListData = deepLinkManager.sharedListData {
+                    SharedListDeepLinkView(
+                        sharedListData: sharedListData,
+                        userProfileViewModel: userProfileViewModel,
+                        selectedPlaceVM: selectedPlaceVM
+                    )
+                    .environmentObject(profileViewModel)
+                    .environmentObject(detailPlaceViewModel)
+                    .environmentObject(userSession)
+                }
+            }
             .alert("No Location Found", isPresented: $deepLinkViewModel.showNoLocationAlert) {
                 Button("OK") {
                     deepLinkViewModel.dismissNoLocationAlert()

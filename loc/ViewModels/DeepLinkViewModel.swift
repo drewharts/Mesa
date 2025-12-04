@@ -65,7 +65,6 @@ class DeepLinkViewModel: ObservableObject {
     
     @MainActor
     func processIncomingURL(_ url: URL) async {
-        print("🔗 [DeepLinkViewModel] processIncomingURL called with: \(url.absoluteString)")
         await deepLinkManager.processDeepLink(url)
     }
     

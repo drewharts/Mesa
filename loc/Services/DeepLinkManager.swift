@@ -9,11 +9,22 @@ import Foundation
 import SwiftUI
 import CoreLocation
 
+/// Data for displaying a shared list from a deep link
+struct SharedListData {
+    let lists: [PlaceList]
+    let initialIndex: Int
+    let ownerProfile: ProfileData
+}
+
 @MainActor
 class DeepLinkManager: ObservableObject {
     @Published var pendingPlace: ShareablePlace?
     @Published var pendingList: (lists: [PlaceList], initialIndex: Int)?
     @Published var isProcessingDeepLink = false
+    
+    // For showing shared lists (works globally, not tied to a specific view)
+    @Published var showSharedListSheet = false
+    @Published var sharedListData: SharedListData?
     
     // Callback for showing no location alerts
     var onNoLocationFound: ((String) -> Void)?
@@ -24,6 +35,7 @@ class DeepLinkManager: ObservableObject {
     private let tikTokService: TikTokService
     private let detailPlaceViewModel: DetailPlaceViewModel
     private weak var profileViewModel: ProfileViewModel?
+    private weak var userProfileViewModel: UserProfileViewModel?
     
     // Deduplication mechanism for TikTok URLs
     private static var recentlyProcessedURLs: Set<String> = []
@@ -44,6 +56,11 @@ class DeepLinkManager: ObservableObject {
     /// Set the ProfileViewModel reference (called after ProfileViewModel is created)
     func setProfileViewModel(_ profileViewModel: ProfileViewModel) {
         self.profileViewModel = profileViewModel
+    }
+    
+    /// Set the UserProfileViewModel reference for external user navigation
+    func setUserProfileViewModel(_ userProfileViewModel: UserProfileViewModel) {
+        self.userProfileViewModel = userProfileViewModel
     }
     
     // MARK: - Deep Link Processing
@@ -89,36 +106,59 @@ class DeepLinkManager: ObservableObject {
             return
         }
         
-        userService.fetchUserLists(userId: shareableList.userId) { [weak self] lists, error in
-            guard let self = self else { return }
-            
-            if error != nil {
-                return
-            }
-            
-            guard let lists = lists, !lists.isEmpty else {
-                return
-            }
-            
-            if let initialIndex = lists.firstIndex(where: { $0.id.uuidString == shareableList.id }) {
-                DispatchQueue.main.async {
-                    self.pendingList = (lists: lists, initialIndex: initialIndex)
+        // Fetch the list owner's profile and their lists
+        do {
+            // First, fetch the user's profile to get their info
+            let ownerProfile = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<ProfileData, Error>) in
+                userService.fetchUserById(userId: shareableList.userId) { result in
+                    switch result {
+                    case .success(let profile):
+                        continuation.resume(returning: profile)
+                    case .failure(let error):
+                        continuation.resume(throwing: error)
+                    }
                 }
             }
+            
+            // Fetch the user's lists
+            let lists = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<[PlaceList], Error>) in
+                userService.fetchUserLists(userId: shareableList.userId) { lists, error in
+                    if let error = error {
+                        continuation.resume(throwing: error)
+                    } else if let lists = lists {
+                        continuation.resume(returning: lists)
+                    } else {
+                        continuation.resume(returning: [])
+                    }
+                }
+            }
+            
+            guard !lists.isEmpty else { return }
+            
+            // Find the specific list
+            guard let initialIndex = lists.firstIndex(where: { $0.id.uuidString == shareableList.id }) else {
+                return
+            }
+            
+            // Show the shared list sheet globally
+            await MainActor.run {
+                self.sharedListData = SharedListData(
+                    lists: lists,
+                    initialIndex: initialIndex,
+                    ownerProfile: ownerProfile
+                )
+                self.showSharedListSheet = true
+            }
+            
+        } catch {
+            print("❌ [DeepLinkManager] Error fetching list data: \(error)")
         }
     }
     
     private func handlePlaceDeepLink(_ url: URL) async {
-        print("📍 [DeepLinkManager] handlePlaceDeepLink called with URL: \(url.absoluteString)")
-        
         guard let shareablePlace = ShareablePlace.from(url: url) else {
-            print("❌ [DeepLinkManager] Failed to parse ShareablePlace from URL")
-            print("❌ [DeepLinkManager] URL details - scheme: \(url.scheme ?? "nil"), host: \(url.host ?? "nil"), path: \(url.path)")
-            print("❌ [DeepLinkManager] Query items: \(URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? [])")
             return
         }
-        
-        print("✅ [DeepLinkManager] Parsed ShareablePlace: \(shareablePlace.name), id: \(shareablePlace.id)")
         
         // Place deep links should navigate immediately without processing UI
         await loadPlaceDetails(shareablePlace)
