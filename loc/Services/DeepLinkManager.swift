@@ -109,9 +109,16 @@ class DeepLinkManager: ObservableObject {
     }
     
     private func handlePlaceDeepLink(_ url: URL) async {
+        print("📍 [DeepLinkManager] handlePlaceDeepLink called with URL: \(url.absoluteString)")
+        
         guard let shareablePlace = ShareablePlace.from(url: url) else {
+            print("❌ [DeepLinkManager] Failed to parse ShareablePlace from URL")
+            print("❌ [DeepLinkManager] URL details - scheme: \(url.scheme ?? "nil"), host: \(url.host ?? "nil"), path: \(url.path)")
+            print("❌ [DeepLinkManager] Query items: \(URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? [])")
             return
         }
+        
+        print("✅ [DeepLinkManager] Parsed ShareablePlace: \(shareablePlace.name), id: \(shareablePlace.id)")
         
         // Place deep links should navigate immediately without processing UI
         await loadPlaceDetails(shareablePlace)
