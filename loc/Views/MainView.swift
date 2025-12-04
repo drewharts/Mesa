@@ -27,7 +27,7 @@ struct MainView: View {
     let searchViewModel: SearchViewModel  // ✅ Pass-through only, no observation
     let searchCoordinator: SearchCoordinatorViewModel  // ✅ Coordinator (no observation)
     
-    let deepLinkManager: DeepLinkManager
+    @ObservedObject var deepLinkManager: DeepLinkManager
     let dataManager: DataManager
     let serviceContainer: ServiceContainer
     
