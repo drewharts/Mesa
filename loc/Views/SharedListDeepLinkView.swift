@@ -143,7 +143,7 @@ struct SharedListDeepLinkView: View {
                 }
                 
                 // Place count
-                Text("\(currentList.places?.count ?? 0) places")
+                Text("\(currentList.places.count) places")
                     .font(.caption)
                     .foregroundColor(.gray)
             }
