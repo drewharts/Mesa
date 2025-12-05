@@ -523,10 +523,6 @@ class UserService: ObservableObject {
         completion(nil)
     }
 
-    func fetchUserLists(userId: String, completion: @escaping ([PlaceList]?, Error?) -> Void) {
-        completion([], nil)
-    }
-    
     func fetchFriendsReviews(userId: String, completion: @escaping ([ReviewProtocol]?, Error?) -> Void) {
         // fetchFriendsReviews not fully implemented
                     completion([], nil)

@@ -20,11 +20,9 @@ class PlacePhotosViewModel: ObservableObject {
     @Published private var lastPhotoDocument: Any? // Replaced DocumentSnapshot for Supabase migration
     @Published private var allPhotosLoaded = false
     
-    // Review photos
+    // MARK: - Review Photos State
     @Published private var reviewPhotos: [String: [UIImage]] = [:] // Cache for review photos by reviewId
     @Published private var reviewPhotoLoadingStates: [String: LoadingState] = [:] // Loading states for review photos
-    @Published private var reviewPhotosForAbout: [String: [UIImage]] = [:] // Cache for review photos in about section by placeId
-    @Published private var reviewPhotosForAboutLoadingStates: [String: LoadingState] = [:] // Loading states for review photos in about section
     
     // External review photos
     @Published private var externalReviewPhotosByPlace: [String: [UIImage]] = [:] // Cache for external review photos by placeId
@@ -83,43 +81,50 @@ class PlacePhotosViewModel: ObservableObject {
     
     // MARK: - Setup
     private func setupObservers() {
-        // Observe place changes
+        // Observe place changes - reset state when place changes
         selectedPlaceVM.$selectedPlace
             .sink { [weak self] place in
                 guard let self = self else { return }
                 self.place = place
                 self.placeId = place?.id.uuidString ?? ""
                 
-                // Reset and load photos for new place
                 if let place = place {
                     self.resetPhotoLoading()
-                    // Place photos will be loaded after reviews are ready
                     self.loadExternalReviewPhotos(for: place, reset: true)
                 }
             }
             .store(in: &cancellables)
         
-        // Observe when reviews are loaded and load photos for them
-        // We check selectedPlace changes as proxy for review updates since reviews are loaded after place selection
+        // Observe when reviews are initially loaded (debounced to wait for reviews to arrive)
         selectedPlaceVM.$selectedPlace
             .debounce(for: .milliseconds(500), scheduler: DispatchQueue.main)
             .sink { [weak self] place in
                 guard let self = self, let place = place else { return }
-                
-                // Load place-level photos from reviews
-                self.getPlacePhotos(for: place, loadMore: false)
-                
-                // Load photos for About section
-                self.loadReviewPhotosForAbout(for: place)
-                
-                // Load review photos and profile photos for each review
-                let reviews = self.selectedPlaceVM.reviews
-                reviews.forEach { review in
-                    self.loadReviewPhotos(for: review)
-                    self.loadProfilePhotoFromURL(userId: review.userId, photoUrl: review.profilePhotoUrl)
-                }
+                self.loadPhotosForCurrentReviews(place: place)
             }
             .store(in: &cancellables)
+        
+        // Observe when reviews are added/modified (e.g., after submitting a new review)
+        selectedPlaceVM.$reviewsUpdateCounter
+            .dropFirst() // Skip initial value
+            .sink { [weak self] _ in
+                guard let self = self, let place = self.place else { return }
+                self.loadPhotosForCurrentReviews(place: place)
+            }
+            .store(in: &cancellables)
+    }
+    
+    /// Loads photos for all current reviews - called when reviews are loaded or updated
+    private func loadPhotosForCurrentReviews(place: DetailPlace) {
+        // Load place-level photo gallery from review images
+        getPlacePhotos(for: place, loadMore: false)
+        
+        // Load individual review photos and profile photos
+        let reviews = selectedPlaceVM.reviews
+        for review in reviews {
+            loadReviewPhotos(for: review)
+            loadProfilePhotoFromURL(userId: review.userId, photoUrl: review.profilePhotoUrl)
+        }
     }
     
     // MARK: - Public Computed Properties
@@ -197,23 +202,25 @@ class PlacePhotosViewModel: ObservableObject {
     }
     
     // MARK: - Private Methods
+    
+    /// Resets all photo caches and loading states when switching to a new place
     private func resetPhotoLoading() {
-        if let placeId = place?.id.uuidString {
-            placePhotos[placeId]?.removeAll()
-            photoLoadingStates[placeId] = .idle
-            reviewPhotosForAbout[placeId]?.removeAll()
-            reviewPhotosForAboutLoadingStates[placeId] = .idle
-            lastPhotoDocument = nil
-            allPhotosLoaded = false
-            // Remove the entry entirely instead of just clearing it, so loadInitialExternalReviewPhotos can work
-            externalReviewPhotosByPlace.removeValue(forKey: placeId)
-            externalReviewPhotoLoadingStates[placeId] = .idle
-            externalReviewPhotosAllLoadedByPlace[placeId] = false
-            externalReviewImageURLCache[placeId]?.removeAll()
-            externalReviewReviewOffsets[placeId] = 0
-            externalReviewPhotoCursor[placeId] = 0
-            externalReviewReviewHasMore[placeId] = true
-        }
+        guard let placeId = place?.id.uuidString else { return }
+        
+        // Reset place-level photo gallery
+        placePhotos[placeId]?.removeAll()
+        photoLoadingStates[placeId] = .idle
+        lastPhotoDocument = nil
+        allPhotosLoaded = false
+        
+        // Reset external review photos
+        externalReviewPhotosByPlace.removeValue(forKey: placeId)
+        externalReviewPhotoLoadingStates[placeId] = .idle
+        externalReviewPhotosAllLoadedByPlace[placeId] = false
+        externalReviewImageURLCache[placeId]?.removeAll()
+        externalReviewReviewOffsets[placeId] = 0
+        externalReviewPhotoCursor[placeId] = 0
+        externalReviewReviewHasMore[placeId] = true
     }
     
     private func getPlacePhotos(for place: DetailPlace, loadMore: Bool = false) {
@@ -541,57 +548,6 @@ class PlacePhotosViewModel: ObservableObject {
         self.loadReviewPhotos(for: review)
     }
     
-    /// Load photos for the About section (limited to first 6 for performance)
-    func loadReviewPhotosForAbout(for place: DetailPlace) {
-        let placeId = place.id.uuidString
-        
-        // Don't fetch if already loading
-        if reviewPhotosForAboutLoadingStates[placeId] == .loading {
-            return
-        }
-        
-        reviewPhotosForAboutLoadingStates[placeId] = .loading
-        
-        // Use cached reviews to get photo URLs (reviews are already loaded at this point)
-        Task {
-            let reviews = selectedPlaceVM.reviews
-            
-            // Extract photo URLs from reviews
-            var photoURLs: [String] = []
-            for review in reviews {
-                photoURLs.append(contentsOf: review.images)
-            }
-            
-            // If no photos found, mark as loaded with empty array
-            if photoURLs.isEmpty {
-                self.reviewPhotosForAbout[placeId] = []
-                self.reviewPhotosForAboutLoadingStates[placeId] = .loaded
-                return
-            }
-            
-            // Load the first few images for the about section (limit to avoid loading too many)
-            let urlsToLoad = Array(photoURLs.prefix(6))
-            var loadedImages: [UIImage] = []
-            
-            await withTaskGroup(of: UIImage?.self) { group in
-                for imageUrl in urlsToLoad {
-                    group.addTask {
-                        await self.loadImageFromURL(imageUrl: imageUrl)
-                    }
-                }
-                
-                for await image in group {
-                    if let image {
-                        loadedImages.append(image)
-                    }
-                }
-            }
-            
-            self.reviewPhotosForAbout[placeId] = loadedImages
-            self.reviewPhotosForAboutLoadingStates[placeId] = .loaded
-        }
-    }
-    
     // MARK: - Profile Photos
     
     /// Load profile photo from URL (URL comes from SQL JOIN with users table)
@@ -631,14 +587,6 @@ class PlacePhotosViewModel: ObservableObject {
     
     func profilePhotoLoadingState(forUserId userId: String) -> LoadingState {
         return profilePhotoLoadingStates[userId] ?? .idle
-    }
-    
-    func reviewPhotosForAbout(forPlaceId placeId: String) -> [UIImage] {
-        return reviewPhotosForAbout[placeId] ?? []
-    }
-    
-    func reviewPhotosForAboutLoadingState(forPlaceId placeId: String) -> LoadingState {
-        return reviewPhotosForAboutLoadingStates[placeId] ?? .idle
     }
 }
 

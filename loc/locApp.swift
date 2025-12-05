@@ -107,6 +107,12 @@ struct locApp: App {
         
         profileVM.userProfileViewModel = userProfileVM
         
+        // Set UserProfileViewModel reference in DeepLinkManager for external user list navigation
+        deepLinkMgr.setUserProfileViewModel(userProfileVM)
+        
+        // Set UserSession reference in DeepLinkManager for accessing current user ID
+        deepLinkMgr.setUserSession(userSess)
+        
         // ✅ Create SearchViewModel ONCE at app level (staff engineer: no recreation overhead)
         let searchVM = SearchViewModel(
             placeService: services.placeService,
@@ -160,11 +166,18 @@ struct locApp: App {
                 .environmentObject(appCoordinator)
                 .preferredColorScheme(.light)
                 .onOpenURL { url in
-                    // Handle deep links for places
+                    // Handle deep links (loc:// scheme)
                     if url.scheme == "loc" {
-                        // Handle all deep links through DeepLinkViewModel
                         Task {
                             await deepLinkViewModel.processIncomingURL(url)
+                        }
+                    }
+                    // Handle Universal Links (https:// from our domain)
+                    else if url.scheme == "https" && url.host == "mesa-backend-staging.up.railway.app" {
+                        if let deepLinkURL = convertUniversalLinkToDeepLink(url) {
+                            Task {
+                                await deepLinkViewModel.processIncomingURL(deepLinkURL)
+                            }
                         }
                     }
                 }
@@ -220,6 +233,41 @@ struct locApp: App {
         Task {
             await deepLinkViewModel.processIncomingURL(deepLinkURL)
         }
+    }
+    
+    /// Converts a Universal Link URL to the internal deep link format
+    /// Example: https://mesa-backend-staging.up.railway.app/place/abc123?name=... -> loc://place/abc123?name=...
+    private func convertUniversalLinkToDeepLink(_ url: URL) -> URL? {
+        let path = url.path
+        
+        guard let incomingComponents = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
+            return nil
+        }
+        
+        if path.hasPrefix("/place/") {
+            let placeId = String(path.dropFirst("/place/".count))
+            
+            var deepLinkComponents = URLComponents()
+            deepLinkComponents.scheme = "loc"
+            deepLinkComponents.host = "place"
+            deepLinkComponents.path = "/\(placeId)"
+            deepLinkComponents.queryItems = incomingComponents.queryItems
+            
+            return deepLinkComponents.url
+            
+        } else if path.hasPrefix("/list/") {
+            let listId = String(path.dropFirst("/list/".count))
+            
+            var deepLinkComponents = URLComponents()
+            deepLinkComponents.scheme = "loc"
+            deepLinkComponents.host = "list"
+            deepLinkComponents.path = "/\(listId)"
+            deepLinkComponents.queryItems = incomingComponents.queryItems
+            
+            return deepLinkComponents.url
+        }
+        
+        return nil
     }
 }
 

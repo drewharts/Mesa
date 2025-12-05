@@ -171,24 +171,15 @@ class SupabasePlaceService: ObservableObject {
 
     struct PlaceListRecord: Codable {
         let id: String
-        let user_id: String
+        let user_id: String?
         let name: String
         let description: String?
-        let cover_image_url: String?
-        let is_public: Bool
-        let average_location: String? // PostGIS geometry as WKT string
+        let average_location: String? // PostGIS geometry (cast to text in query)
+        let is_public: Bool?
+        let image: String?
+        let created_at: String?
+        let updated_at: String?
         let distance_meters: Double? // Distance from user location (when sorted by proximity)
-
-        enum CodingKeys: String, CodingKey {
-            case id
-            case user_id
-            case name
-            case description
-            case cover_image_url
-            case is_public
-            case average_location
-            case distance_meters
-        }
     }
     
     // MARK: - Fetch Places (matching Firebase PlaceService interface)
@@ -995,12 +986,12 @@ class SupabasePlaceService: ObservableObject {
             id: UUID(uuidString: record.id) ?? UUID(),
             name: record.name,
             places: [], // Empty initially - places will be loaded separately
-            city: "", // Not available in PlaceListRecord, will be populated later
+            city: "", // Not stored in database
             emoji: "📋", // Default emoji
-            image: record.cover_image_url,
-            sortOrder: 0, // Not used anymore - kept for backward compatibility
+            image: record.image,
+            sortOrder: 0,
             averageCoordinate: averageCoordinate,
-            lastCoordinateUpdate: nil // Not available in PlaceListRecord
+            lastCoordinateUpdate: nil
         )
     }
 
@@ -1145,9 +1136,9 @@ class SupabasePlaceService: ObservableObject {
                         name: record.name,
                         places: [], // Will be loaded lazily via place_list_items query
                         city: "",
-                        emoji: "📍", // Default emoji
-                        image: record.cover_image_url,
-                        sortOrder: 0, // Not used anymore - kept for backward compatibility
+                        emoji: "📍",
+                        image: record.image,
+                        sortOrder: 0,
                         averageCoordinate: parseGeometryToCoordinate(record.average_location),
                         lastCoordinateUpdate: nil
                     )
@@ -1188,9 +1179,10 @@ class SupabasePlaceService: ObservableObject {
                         .value
                 } else {
                     // Fallback to regular sorting if no location available - use created_at (newest first)
+                    let selectColumns = "id, user_id, name, description, average_location::text, is_public, image, created_at, updated_at"
                     records = try await supabase.client
                         .from("place_lists")
-                        .select()
+                        .select(selectColumns)
                         .eq("user_id", value: userId)
                         .order("created_at", ascending: false)
                         .execute()
@@ -1205,9 +1197,9 @@ class SupabasePlaceService: ObservableObject {
                         name: record.name,
                         places: [], // Will be loaded lazily via place_list_items query
                         city: "",
-                        emoji: "📍", // Default emoji
-                        image: record.cover_image_url,
-                        sortOrder: 0, // Not used anymore - kept for backward compatibility
+                        emoji: "📍",
+                        image: record.image,
+                        sortOrder: 0,
                         averageCoordinate: parseGeometryToCoordinate(record.average_location),
                         lastCoordinateUpdate: nil
                     )
@@ -1224,10 +1216,13 @@ class SupabasePlaceService: ObservableObject {
 
     func fetchLists(userId: String) async throws -> [PlaceList] {
         do {
+            // Select specific columns and cast geometry to text
+            let selectColumns = "id, user_id, name, description, average_location::text, is_public, image, created_at, updated_at"
+            
             // Try querying with the profile user ID first
             var records: [PlaceListRecord] = try await supabase.client
                 .from("place_lists")
-                .select()
+                .select(selectColumns)
                 .eq("user_id", value: userId)
                 .order("created_at", ascending: false)
                 .execute()
@@ -1240,7 +1235,7 @@ class SupabasePlaceService: ObservableObject {
                     let authUserId = session.user.id.uuidString
                     records = try await supabase.client
                         .from("place_lists")
-                        .select()
+                        .select(selectColumns)
                         .eq("user_id", value: authUserId)
                         .order("created_at", ascending: false)
                         .execute()
@@ -1258,9 +1253,9 @@ class SupabasePlaceService: ObservableObject {
                     name: record.name,
                     places: [], // Will be loaded lazily via place_list_items query
                     city: "",
-                    emoji: "📍", // Default emoji
-                    image: record.cover_image_url,
-                    sortOrder: 0, // Not used anymore - kept for backward compatibility
+                    emoji: "📍",
+                    image: record.image,
+                    sortOrder: 0,
                     averageCoordinate: parseGeometryToCoordinate(record.average_location),
                     lastCoordinateUpdate: nil
                 )
@@ -1279,13 +1274,13 @@ class SupabasePlaceService: ObservableObject {
         // Generate a new UUID for the list
         let listId = UUID().uuidString
         
-        // Create the insert struct
+        // Create the insert struct - only columns that exist in database
         struct NewPlaceListRecord: Encodable {
             let id: String
             let user_id: String
             let name: String
             let description: String?
-            let cover_image_url: String?
+            let image: String?
             let is_public: Bool
         }
         
@@ -1294,7 +1289,7 @@ class SupabasePlaceService: ObservableObject {
             user_id: userId,
             name: name,
             description: nil,
-            cover_image_url: image.isEmpty ? nil : image,
+            image: image.isEmpty ? nil : image,
             is_public: false
         )
         
@@ -1342,9 +1337,10 @@ class SupabasePlaceService: ObservableObject {
                     .value
             } else {
                 // Fallback to regular sorting if no location available - use created_at (newest first)
+                let selectColumns = "id, user_id, name, description, average_location::text, is_public, image, created_at, updated_at"
                 records = try await supabase.client
                     .from("place_lists")
-                    .select()
+                    .select(selectColumns)
                     .eq("user_id", value: userId)
                     .order("created_at", ascending: false)
                     .execute()
@@ -1359,9 +1355,9 @@ class SupabasePlaceService: ObservableObject {
                     name: record.name,
                     places: [], // Will be loaded lazily via place_list_items query
                     city: "",
-                    emoji: "📍", // Default emoji
-                    image: record.cover_image_url,
-                    sortOrder: 0, // Not used anymore - kept for backward compatibility
+                    emoji: "📍",
+                    image: record.image,
+                    sortOrder: 0,
                     averageCoordinate: parseGeometryToCoordinate(record.average_location),
                     lastCoordinateUpdate: nil
                 )
