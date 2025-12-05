@@ -118,6 +118,9 @@ class SelectedPlaceViewModel: ObservableObject {
     @Published private var placeTikToks: [String: [TikTokVideo]] = [:] // Cache for TikToks by placeId
     @Published private var restaurantTypes: [String: String] = [:] // Dictionary to store restaurant types by placeId
     
+    /// Increments whenever reviews are modified - allows observers to react to review changes
+    @Published private(set) var reviewsUpdateCounter: Int = 0
+    
     @Published var placeRating: Double = 0
     
     @Published private var reviewLoadingStates: [String: LoadingState] = [:] // Loading states for reviews
@@ -421,7 +424,8 @@ class SelectedPlaceViewModel: ObservableObject {
             currentReviews.insert(review, at: 0) // Insert at the beginning
             self.placeReviews[placeId] = currentReviews
             
-            // Photos will be loaded automatically by PlacePhotosViewModel
+            // Notify observers that reviews have changed (triggers photo reload in PlacePhotosViewModel)
+            self.reviewsUpdateCounter += 1
         }
     }
     
