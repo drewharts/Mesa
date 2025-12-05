@@ -110,6 +110,9 @@ struct locApp: App {
         // Set UserProfileViewModel reference in DeepLinkManager for external user list navigation
         deepLinkMgr.setUserProfileViewModel(userProfileVM)
         
+        // Set UserSession reference in DeepLinkManager for accessing current user ID
+        deepLinkMgr.setUserSession(userSess)
+        
         // ✅ Create SearchViewModel ONCE at app level (staff engineer: no recreation overhead)
         let searchVM = SearchViewModel(
             placeService: services.placeService,

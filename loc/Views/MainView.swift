@@ -27,7 +27,7 @@ struct MainView: View {
     let searchViewModel: SearchViewModel  // ✅ Pass-through only, no observation
     let searchCoordinator: SearchCoordinatorViewModel  // ✅ Coordinator (no observation)
     
-    @ObservedObject var deepLinkManager: DeepLinkManager
+    let deepLinkManager: DeepLinkManager
     let dataManager: DataManager
     let serviceContainer: ServiceContainer
     
@@ -140,20 +140,6 @@ struct MainView: View {
                     .environmentObject(deepLinkManager)
                     .environmentObject(dataManager)
                     .environmentObject(serviceContainer)
-            }
-            .sheet(isPresented: $deepLinkManager.showSharedListSheet, onDismiss: {
-                deepLinkManager.sharedListData = nil
-            }) {
-                if let sharedListData = deepLinkManager.sharedListData {
-                    SharedListDeepLinkView(
-                        sharedListData: sharedListData,
-                        userProfileViewModel: userProfileViewModel,
-                        selectedPlaceVM: selectedPlaceVM
-                    )
-                    .environmentObject(profileViewModel)
-                    .environmentObject(detailPlaceViewModel)
-                    .environmentObject(userSession)
-                }
             }
             .alert("No Location Found", isPresented: $deepLinkViewModel.showNoLocationAlert) {
                 Button("OK") {

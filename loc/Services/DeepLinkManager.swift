@@ -9,42 +9,41 @@ import Foundation
 import SwiftUI
 import CoreLocation
 
-/// Data for displaying a shared list from a deep link
-struct SharedListData {
-    let lists: [PlaceList]
-    let initialIndex: Int
-    let ownerProfile: ProfileData
-}
-
 @MainActor
 class DeepLinkManager: ObservableObject {
     @Published var pendingPlace: ShareablePlace?
     @Published var pendingList: (lists: [PlaceList], initialIndex: Int)?
     @Published var isProcessingDeepLink = false
     
-    // For showing shared lists (works globally, not tied to a specific view)
-    @Published var showSharedListSheet = false
-    @Published var sharedListData: SharedListData?
-    
     // Callback for showing no location alerts
     var onNoLocationFound: ((String) -> Void)?
     
+    // MARK: - Dependencies
     private let placeService: PlaceService
     private let userService: UserService
     private let selectedPlaceViewModel: SelectedPlaceViewModel
     private let tikTokService: TikTokService
     private let detailPlaceViewModel: DetailPlaceViewModel
+    
+    // Weak references to avoid retain cycles (set after init due to circular dependencies)
     private weak var profileViewModel: ProfileViewModel?
     private weak var userProfileViewModel: UserProfileViewModel?
+    private weak var userSession: UserSession?
     
-    // Deduplication mechanism for TikTok URLs
+    // MARK: - TikTok Processing State
     private static var recentlyProcessedURLs: Set<String> = []
     private static var urlProcessingQueue = DispatchQueue(label: "url-processing", qos: .userInitiated)
-    
-    // Store TikTok URL during processing to create external_place entry
     private var currentProcessingTikTokUrl: String?
     
-    init(placeService: PlaceService, userService: UserService, selectedPlaceViewModel: SelectedPlaceViewModel, tikTokService: TikTokService = TikTokService(), detailPlaceViewModel: DetailPlaceViewModel, profileViewModel: ProfileViewModel? = nil) {
+    // MARK: - Initialization
+    init(
+        placeService: PlaceService,
+        userService: UserService,
+        selectedPlaceViewModel: SelectedPlaceViewModel,
+        tikTokService: TikTokService = TikTokService(),
+        detailPlaceViewModel: DetailPlaceViewModel,
+        profileViewModel: ProfileViewModel? = nil
+    ) {
         self.placeService = placeService
         self.userService = userService
         self.selectedPlaceViewModel = selectedPlaceViewModel
@@ -53,14 +52,18 @@ class DeepLinkManager: ObservableObject {
         self.profileViewModel = profileViewModel
     }
     
-    /// Set the ProfileViewModel reference (called after ProfileViewModel is created)
+    // MARK: - Dependency Injection (post-init due to circular dependencies)
+    
     func setProfileViewModel(_ profileViewModel: ProfileViewModel) {
         self.profileViewModel = profileViewModel
     }
     
-    /// Set the UserProfileViewModel reference for external user navigation
     func setUserProfileViewModel(_ userProfileViewModel: UserProfileViewModel) {
         self.userProfileViewModel = userProfileViewModel
+    }
+    
+    func setUserSession(_ userSession: UserSession) {
+        self.userSession = userSession
     }
     
     // MARK: - Deep Link Processing
@@ -103,56 +106,26 @@ class DeepLinkManager: ObservableObject {
     
     private func handleListDeepLink(_ url: URL) async {
         guard let shareableList = ShareableList.from(url: url) else {
+            print("❌ [DeepLinkManager] Failed to parse ShareableList from URL")
             return
         }
         
-        // Fetch the list owner's profile and their lists
-        do {
-            // First, fetch the user's profile to get their info
-            let ownerProfile = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<ProfileData, Error>) in
-                userService.fetchUserById(userId: shareableList.userId) { result in
-                    switch result {
-                    case .success(let profile):
-                        continuation.resume(returning: profile)
-                    case .failure(let error):
-                        continuation.resume(throwing: error)
-                    }
-                }
-            }
-            
-            // Fetch the user's lists
-            let lists = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<[PlaceList], Error>) in
-                userService.fetchUserLists(userId: shareableList.userId) { lists, error in
-                    if let error = error {
-                        continuation.resume(throwing: error)
-                    } else if let lists = lists {
-                        continuation.resume(returning: lists)
-                    } else {
-                        continuation.resume(returning: [])
-                    }
-                }
-            }
-            
-            guard !lists.isEmpty else { return }
-            
-            // Find the specific list
-            guard let initialIndex = lists.firstIndex(where: { $0.id.uuidString == shareableList.id }) else {
-                return
-            }
-            
-            // Show the shared list sheet globally
-            await MainActor.run {
-                self.sharedListData = SharedListData(
-                    lists: lists,
-                    initialIndex: initialIndex,
-                    ownerProfile: ownerProfile
-                )
-                self.showSharedListSheet = true
-            }
-            
-        } catch {
-            print("❌ [DeepLinkManager] Error fetching list data: \(error)")
+        guard let userProfileViewModel = userProfileViewModel else {
+            print("❌ [DeepLinkManager] UserProfileViewModel not set, cannot navigate to profile")
+            return
         }
+        
+        guard let currentUserId = userSession?.currentUserId else {
+            print("❌ [DeepLinkManager] No current user ID available")
+            return
+        }
+        
+        // Delegate to UserProfileViewModel - it owns the profile navigation responsibility
+        userProfileViewModel.navigateToUserWithList(
+            userId: shareableList.userId,
+            listId: shareableList.id,
+            currentUserId: currentUserId
+        )
     }
     
     private func handlePlaceDeepLink(_ url: URL) async {
