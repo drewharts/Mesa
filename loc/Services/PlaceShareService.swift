@@ -11,19 +11,21 @@ import SwiftUI
 
 class PlaceShareService: ObservableObject {
     
+    // MARK: - Universal Links Base URL
+    private let universalLinkHost = "mesa-backend-staging.up.railway.app"
+    
     // MARK: - Share Place Methods
     
     @MainActor
     func sharePlace(_ detailPlace: DetailPlace) {
         let shareablePlace = ShareablePlace(from: detailPlace)
-        let imageURL = getFirstImageURL(from: detailPlace)
-        sharePlace(shareablePlace, withImage: imageURL)
+        sharePlace(shareablePlace)
     }
     
     @MainActor
     func sharePlace(_ detailPlace: DetailPlace, withImage imageURL: String?) {
         let shareablePlace = ShareablePlace(from: detailPlace)
-        sharePlace(shareablePlace, withImage: imageURL)
+        sharePlace(shareablePlace)
     }
     
     @MainActor
@@ -35,37 +37,19 @@ class PlaceShareService: ObservableObject {
     @MainActor
     func sharePlace(_ nearbyPlace: NearbyPlaceFeature, withImage imageURL: String?) {
         let shareablePlace = ShareablePlace(from: nearbyPlace)
-        sharePlace(shareablePlace, withImage: imageURL)
+        sharePlace(shareablePlace)
     }
     
     @MainActor
     private func sharePlace(_ shareablePlace: ShareablePlace) {
-        guard shareablePlace.deepLinkURL != nil else {
-            print("❌ Failed to generate deep link URL for place: \(shareablePlace.name)")
+        guard let universalLink = generateUniversalLinkURL(for: shareablePlace) else {
+            print("❌ Failed to generate Universal Link URL for place: \(shareablePlace.name)")
             return
         }
         
-        // Generate web URL for rich previews
-        let webURL = generateWebURL(for: shareablePlace)
-        
         let shareText = createShareText(for: shareablePlace)
-        let activityItems: [Any] = [shareText, webURL] // Share web URL for beautiful previews with auto-redirect
-        
-        presentShareSheet(with: activityItems)
-    }
-    
-    @MainActor
-    private func sharePlace(_ shareablePlace: ShareablePlace, withImage imageURL: String?) {
-        guard shareablePlace.deepLinkURL != nil else {
-            print("❌ Failed to generate deep link URL for place: \(shareablePlace.name)")
-            return
-        }
-        
-        // Generate web URL for rich previews with image
-        let webURL = generateWebURL(for: shareablePlace, withImage: imageURL)
-        
-        let shareText = createShareText(for: shareablePlace)
-        let activityItems: [Any] = [shareText, webURL] // Share web URL for beautiful previews with auto-redirect
+        // Share Universal Link - opens app directly AND shows rich previews in messaging apps
+        let activityItems: [Any] = [shareText, universalLink]
         
         presentShareSheet(with: activityItems)
     }
@@ -76,16 +60,14 @@ class PlaceShareService: ObservableObject {
     func shareList(_ placeList: PlaceList, userId: String) {
         let shareableList = ShareableList(from: placeList, userId: userId)
         
-        guard shareableList.deepLinkURL != nil else {
-            print("❌ Failed to generate deep link URL for list: \(shareableList.name)")
+        guard let universalLink = generateUniversalLinkURL(for: shareableList) else {
+            print("❌ Failed to generate Universal Link URL for list: \(shareableList.name)")
             return
         }
         
-        // Generate web URL for rich previews
-        let webURL = generateWebURL(for: shareableList)
-        
         let shareText = createShareText(for: shareableList)
-        let activityItems: [Any] = [shareText, webURL] // Share web URL for beautiful previews with auto-redirect
+        // Share Universal Link - opens app directly AND shows rich previews in messaging apps
+        let activityItems: [Any] = [shareText, universalLink]
         
         presentShareSheet(with: activityItems)
     }
@@ -94,10 +76,14 @@ class PlaceShareService: ObservableObject {
     func shareLightweightList(_ lightweightList: LightweightPlaceList, userId: String) {
         let shareableList = ShareableLightweightList(from: lightweightList, userId: userId)
 
-        let shareText = createShareText(for: shareableList)
+        guard let universalLink = generateUniversalLinkURL(for: shareableList) else {
+            print("❌ Failed to generate Universal Link URL for list: \(shareableList.name)")
+            return
+        }
 
-        // Use share sheet - Mesa share extension will now handle list sharing properly
-        let activityItems: [Any] = [shareText]
+        let shareText = createShareText(for: shareableList)
+        // Share Universal Link - opens app directly AND shows rich previews in messaging apps
+        let activityItems: [Any] = [shareText, universalLink]
         presentShareSheet(with: activityItems)
     }
 
@@ -175,29 +161,25 @@ class PlaceShareService: ObservableObject {
     
     func generateShareURL(for detailPlace: DetailPlace) -> URL? {
         let shareablePlace = ShareablePlace(from: detailPlace)
-        return shareablePlace.deepLinkURL
+        return generateUniversalLinkURL(for: shareablePlace)
     }
     
     func generateShareURL(for nearbyPlace: NearbyPlaceFeature) -> URL? {
         let shareablePlace = ShareablePlace(from: nearbyPlace)
-        return shareablePlace.deepLinkURL
+        return generateUniversalLinkURL(for: shareablePlace)
     }
     
-    // MARK: - Web URL Generation
+    // MARK: - Universal Link URL Generation
     
-    private func generateWebURL(for shareablePlace: ShareablePlace) -> URL {
-        return generateWebURL(for: shareablePlace, withImage: nil)
-    }
-    
-    private func generateWebURL(for shareablePlace: ShareablePlace, withImage imageURL: String?) -> URL {
+    /// Generates a Universal Link URL for a place
+    /// Format: https://us-central1-locc-7598c.cloudfunctions.net/place/[id]?name=...&address=...
+    private func generateUniversalLinkURL(for shareablePlace: ShareablePlace) -> URL? {
         var components = URLComponents()
         components.scheme = "https"
-        components.host = "us-central1-locc-7598c.cloudfunctions.net"
-        components.path = "/serveWebPreview"
+        components.host = universalLinkHost
+        components.path = "/place/\(shareablePlace.id)"
         
         var queryItems: [URLQueryItem] = []
-        queryItems.append(URLQueryItem(name: "type", value: "place"))
-        queryItems.append(URLQueryItem(name: "id", value: shareablePlace.id))
         queryItems.append(URLQueryItem(name: "name", value: shareablePlace.name))
         
         if let address = shareablePlace.address {
@@ -208,52 +190,53 @@ class PlaceShareService: ObservableObject {
             queryItems.append(URLQueryItem(name: "city", value: city))
         }
         
-        // Add mapboxId if available for better place identification
         if let mapboxId = shareablePlace.mapboxId {
             queryItems.append(URLQueryItem(name: "mapboxId", value: mapboxId))
         }
         
-        // Add image URL if provided
-        if let imageURL = imageURL {
-            queryItems.append(URLQueryItem(name: "image", value: imageURL))
+        if let lat = shareablePlace.latitude {
+            queryItems.append(URLQueryItem(name: "lat", value: String(lat)))
+        }
+        
+        if let lng = shareablePlace.longitude {
+            queryItems.append(URLQueryItem(name: "lng", value: String(lng)))
         }
         
         components.queryItems = queryItems
-        return components.url ?? URL(string: "https://mesa-backend-staging.up.railway.app")!
+        return components.url
     }
     
-    private func generateWebURL(for shareableList: ShareableList) -> URL {
+    /// Generates a Universal Link URL for a list
+    /// Format: https://us-central1-locc-7598c.cloudfunctions.net/list/[id]?name=...&city=...&userId=...
+    private func generateUniversalLinkURL(for shareableList: ShareableList) -> URL? {
         var components = URLComponents()
         components.scheme = "https"
-        components.host = "us-central1-locc-7598c.cloudfunctions.net"
-        components.path = "/serveWebPreview"
+        components.host = universalLinkHost
+        components.path = "/list/\(shareableList.id)"
         
         var queryItems: [URLQueryItem] = []
-        queryItems.append(URLQueryItem(name: "type", value: "list"))
-        queryItems.append(URLQueryItem(name: "id", value: shareableList.id))
         queryItems.append(URLQueryItem(name: "name", value: shareableList.name))
         queryItems.append(URLQueryItem(name: "city", value: shareableList.city))
         queryItems.append(URLQueryItem(name: "userId", value: shareableList.userId))
         
         components.queryItems = queryItems
-        return components.url ?? URL(string: "https://mesa-backend-staging.up.railway.app")!
+        return components.url
     }
     
-    private func generateWebURL(for shareableList: ShareableLightweightList) -> URL {
+    /// Generates a Universal Link URL for a lightweight list
+    private func generateUniversalLinkURL(for shareableList: ShareableLightweightList) -> URL? {
         var components = URLComponents()
         components.scheme = "https"
-        components.host = "us-central1-locc-7598c.cloudfunctions.net"
-        components.path = "/serveWebPreview"
+        components.host = universalLinkHost
+        components.path = "/list/\(shareableList.id)"
         
         var queryItems: [URLQueryItem] = []
-        queryItems.append(URLQueryItem(name: "type", value: "list"))
-        queryItems.append(URLQueryItem(name: "id", value: shareableList.id))
         queryItems.append(URLQueryItem(name: "name", value: shareableList.name))
         queryItems.append(URLQueryItem(name: "city", value: shareableList.city))
         queryItems.append(URLQueryItem(name: "userId", value: shareableList.userId))
         
         components.queryItems = queryItems
-        return components.url ?? URL(string: "https://mesa-backend-staging.up.railway.app")!
+        return components.url
     }
     
     // MARK: - Image Helpers

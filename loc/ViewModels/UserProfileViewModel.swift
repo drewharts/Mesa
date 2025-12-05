@@ -10,17 +10,31 @@ import SwiftUI
 
 @MainActor
 class UserProfileViewModel: ObservableObject {
+    // MARK: - Profile Navigation State
     @Published var selectedUser: ProfileData?
     @Published var isUserDetailPresented = false
     
-    // Lightweight objects for external user profile
+    // MARK: - External Profile Data
     @Published var userFavorites: [FavoritePlace] = []
     @Published var userLists: [LightweightPlaceList] = []
     @Published var placeListPlaces: [String: [LightweightPlace]] = [:] // [listId: places]
     
-    // Lazy loading properties
+    // MARK: - Deep Link List Popup State (ViewModel owns presentation logic)
+    @Published var shouldShowListPopup = false
+    @Published var pendingListIndex: Int?
+    private var pendingListIdToOpen: String?
+    
+    // MARK: - List Pagination State
+    @Published var isLoadingMoreLists: Bool = false
+    private var currentListPage: Int = 1
+    private var hasMoreLists: Bool = true
+    private let listsPerPage: Int = 6
+    
+    // MARK: - List Places Loading State
     private var loadedListIds: Set<String> = []
     private var loadingListIds: Set<String> = []
+    
+    // MARK: - Social State
     @Published var isFollowing: Bool = false
     @Published var followers: Int = 0
     
@@ -64,10 +78,25 @@ class UserProfileViewModel: ObservableObject {
     func selectUser(_ user: ProfileData, currentUserId: String) {
         self.selectedUser = user
         self.isUserDetailPresented = true
+        
+        // Reset all state for new user
+        resetListPaginationState()
+        
         self.checkIfFollowing(currentUserId: currentUserId)
         self.fetchProfileFavorites(userId: user.id)
         self.fetchLists(userId: user.id)
         self.fetchFollowers(userId: user.id)
+    }
+    
+    /// Resets all list-related state when switching to a new user profile
+    private func resetListPaginationState() {
+        userLists = []
+        placeListPlaces = [:]
+        loadedListIds = []
+        loadingListIds = []
+        currentListPage = 1
+        hasMoreLists = true
+        isLoadingMoreLists = false
     }
     
     func fetchAndSelectUser(userId: String, currentUserId: String) {
@@ -79,6 +108,40 @@ class UserProfileViewModel: ObservableObject {
                 print("Error fetching user profile: \(error.localizedDescription)")
             }
         }
+    }
+    
+    // MARK: - Deep Link Navigation
+    
+    /// Navigates to a user's profile and queues a specific list to auto-open
+    /// Called by DeepLinkManager when handling list deep links
+    func navigateToUserWithList(userId: String, listId: String, currentUserId: String) {
+        // Store the pending list ID - will be matched when lists load
+        self.pendingListIdToOpen = listId
+        self.shouldShowListPopup = false
+        self.pendingListIndex = nil
+        
+        userService.fetchUserById(userId: userId) { [weak self] result in
+            switch result {
+            case .success(let profileData):
+                self?.selectUser(profileData, currentUserId: currentUserId)
+            case .failure(let error):
+                print("Error fetching user profile: \(error.localizedDescription)")
+                self?.clearPendingListState()
+            }
+        }
+    }
+    
+    /// Called by View when list popup is dismissed
+    func onListPopupDismissed() {
+        shouldShowListPopup = false
+        pendingListIndex = nil
+    }
+    
+    /// Clears all pending list state
+    private func clearPendingListState() {
+        pendingListIdToOpen = nil
+        pendingListIndex = nil
+        shouldShowListPopup = false
     }
     
     func fetchFollowers(userId: String) {
@@ -214,7 +277,7 @@ class UserProfileViewModel: ObservableObject {
                         userLatitude: userLocation.latitude,
                         userLongitude: userLocation.longitude,
                         page: 1,
-                        pageSize: 6
+                        pageSize: listsPerPage
                     )
                 } else {
                     // Fallback: fetch lists without proximity sorting
@@ -224,19 +287,104 @@ class UserProfileViewModel: ObservableObject {
                 
                 await MainActor.run {
                     self.userLists = lists
+                    self.currentListPage = 1
+                    self.hasMoreLists = lists.count >= self.listsPerPage
+                    self.checkAndShowPendingList(lists: lists)
                 }
                 
-                // Load places for each list (first 6 places per list)
-                for list in lists.prefix(3) {
-                    await loadPlacesForList(listId: list.list_id)
-                }
+                // Preload places for first few visible lists
+                await preloadPlacesForLists(Array(lists.prefix(3)))
                 
             } catch {
                 print("❌ [UserProfileViewModel] Error fetching lists: \(error)")
                 await MainActor.run {
                     self.userLists = []
+                    self.hasMoreLists = false
+                    self.clearPendingListState()
                 }
             }
+        }
+    }
+    
+    // MARK: - List Pagination
+    
+    /// Fetches the next page of lists from the backend
+    /// Called by View when user scrolls near the end of the list
+    func fetchMoreLists() {
+        guard canFetchMoreLists else { return }
+        guard let userId = selectedUser?.id else { return }
+        
+        isLoadingMoreLists = true
+        let nextPage = currentListPage + 1
+        let userLocation = dataManager.currentUserLocation
+        
+        Task {
+            do {
+                guard let userLocation = userLocation else {
+                    await MainActor.run { self.isLoadingMoreLists = false }
+                    return
+                }
+                
+                let newLists = try await userService.fetchPlaceListsByProximity(
+                    userId: userId,
+                    userLatitude: userLocation.latitude,
+                    userLongitude: userLocation.longitude,
+                    page: nextPage,
+                    pageSize: listsPerPage
+                )
+                
+                await MainActor.run {
+                    self.userLists.append(contentsOf: newLists)
+                    self.currentListPage = nextPage
+                    self.hasMoreLists = newLists.count >= self.listsPerPage
+                    self.isLoadingMoreLists = false
+                }
+                
+                // Preload places for newly fetched lists
+                await preloadPlacesForLists(Array(newLists.prefix(3)))
+                
+            } catch {
+                print("❌ [UserProfileViewModel] Error fetching more lists: \(error)")
+                await MainActor.run {
+                    self.isLoadingMoreLists = false
+                }
+            }
+        }
+    }
+    
+    /// Whether more lists can be fetched (not loading and more available)
+    private var canFetchMoreLists: Bool {
+        return hasMoreLists && !isLoadingMoreLists
+    }
+    
+    /// Preloads places for a batch of lists
+    private func preloadPlacesForLists(_ lists: [LightweightPlaceList]) async {
+        for list in lists {
+            await loadPlacesForList(listId: list.list_id)
+        }
+    }
+    
+    /// Checks if there's a pending list to open and triggers popup if found
+    private func checkAndShowPendingList(lists: [LightweightPlaceList]) {
+        guard let pendingListId = pendingListIdToOpen else { return }
+        
+        if let index = lists.firstIndex(where: { $0.list_id == pendingListId }) {
+            // Load places for this list before showing popup
+            Task {
+                await loadPlacesForList(listId: pendingListId)
+                
+                await MainActor.run {
+                    self.pendingListIndex = index
+                    // Small delay to allow profile view to settle
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        self.shouldShowListPopup = true
+                        self.pendingListIdToOpen = nil
+                    }
+                }
+            }
+        } else {
+            // List not found, clear pending state
+            pendingListIdToOpen = nil
         }
     }
     
@@ -268,28 +416,27 @@ class UserProfileViewModel: ObservableObject {
     }
     
     /// Load more lists when user scrolls (lazy loading)
-    func loadMoreListsIfNeeded() {
-        // Find the next 3 lists that haven't been loaded yet
-        let unloadedLists = userLists.filter { !loadedListIds.contains($0.list_id) && !loadingListIds.contains($0.list_id) }
-        let nextThreeLists = Array(unloadedLists.prefix(3))
+    /// Preloads places for lists that are becoming visible but haven't loaded their places yet
+    /// This is called as user scrolls to lazy-load place data for each list
+    func preloadPlacesForVisibleLists() {
+        let unloadedLists = userLists.filter { 
+            !loadedListIds.contains($0.list_id) && !loadingListIds.contains($0.list_id) 
+        }
+        let listsToLoad = Array(unloadedLists.prefix(3))
         
-        guard !nextThreeLists.isEmpty else { return }
+        guard !listsToLoad.isEmpty else { return }
         
         Task {
-            // Mark as loading
             await MainActor.run {
-                for list in nextThreeLists {
+                for list in listsToLoad {
                     self.loadingListIds.insert(list.list_id)
                 }
             }
             
-            // Load places for these lists
-            for list in nextThreeLists {
-                await loadPlacesForList(listId: list.list_id)
-            }
+            await preloadPlacesForLists(listsToLoad)
             
             await MainActor.run {
-                for list in nextThreeLists {
+                for list in listsToLoad {
                     self.loadingListIds.remove(list.list_id)
                 }
             }

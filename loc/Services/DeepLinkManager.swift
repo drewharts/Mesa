@@ -18,21 +18,32 @@ class DeepLinkManager: ObservableObject {
     // Callback for showing no location alerts
     var onNoLocationFound: ((String) -> Void)?
     
+    // MARK: - Dependencies
     private let placeService: PlaceService
     private let userService: UserService
     private let selectedPlaceViewModel: SelectedPlaceViewModel
     private let tikTokService: TikTokService
     private let detailPlaceViewModel: DetailPlaceViewModel
-    private weak var profileViewModel: ProfileViewModel?
     
-    // Deduplication mechanism for TikTok URLs
+    // Weak references to avoid retain cycles (set after init due to circular dependencies)
+    private weak var profileViewModel: ProfileViewModel?
+    private weak var userProfileViewModel: UserProfileViewModel?
+    private weak var userSession: UserSession?
+    
+    // MARK: - TikTok Processing State
     private static var recentlyProcessedURLs: Set<String> = []
     private static var urlProcessingQueue = DispatchQueue(label: "url-processing", qos: .userInitiated)
-    
-    // Store TikTok URL during processing to create external_place entry
     private var currentProcessingTikTokUrl: String?
     
-    init(placeService: PlaceService, userService: UserService, selectedPlaceViewModel: SelectedPlaceViewModel, tikTokService: TikTokService = TikTokService(), detailPlaceViewModel: DetailPlaceViewModel, profileViewModel: ProfileViewModel? = nil) {
+    // MARK: - Initialization
+    init(
+        placeService: PlaceService,
+        userService: UserService,
+        selectedPlaceViewModel: SelectedPlaceViewModel,
+        tikTokService: TikTokService = TikTokService(),
+        detailPlaceViewModel: DetailPlaceViewModel,
+        profileViewModel: ProfileViewModel? = nil
+    ) {
         self.placeService = placeService
         self.userService = userService
         self.selectedPlaceViewModel = selectedPlaceViewModel
@@ -41,9 +52,18 @@ class DeepLinkManager: ObservableObject {
         self.profileViewModel = profileViewModel
     }
     
-    /// Set the ProfileViewModel reference (called after ProfileViewModel is created)
+    // MARK: - Dependency Injection (post-init due to circular dependencies)
+    
     func setProfileViewModel(_ profileViewModel: ProfileViewModel) {
         self.profileViewModel = profileViewModel
+    }
+    
+    func setUserProfileViewModel(_ userProfileViewModel: UserProfileViewModel) {
+        self.userProfileViewModel = userProfileViewModel
+    }
+    
+    func setUserSession(_ userSession: UserSession) {
+        self.userSession = userSession
     }
     
     // MARK: - Deep Link Processing
@@ -86,26 +106,26 @@ class DeepLinkManager: ObservableObject {
     
     private func handleListDeepLink(_ url: URL) async {
         guard let shareableList = ShareableList.from(url: url) else {
+            print("❌ [DeepLinkManager] Failed to parse ShareableList from URL")
             return
         }
         
-        userService.fetchUserLists(userId: shareableList.userId) { [weak self] lists, error in
-            guard let self = self else { return }
-            
-            if error != nil {
-                return
-            }
-            
-            guard let lists = lists, !lists.isEmpty else {
-                return
-            }
-            
-            if let initialIndex = lists.firstIndex(where: { $0.id.uuidString == shareableList.id }) {
-                DispatchQueue.main.async {
-                    self.pendingList = (lists: lists, initialIndex: initialIndex)
-                }
-            }
+        guard let userProfileViewModel = userProfileViewModel else {
+            print("❌ [DeepLinkManager] UserProfileViewModel not set, cannot navigate to profile")
+            return
         }
+        
+        guard let currentUserId = userSession?.currentUserId else {
+            print("❌ [DeepLinkManager] No current user ID available")
+            return
+        }
+        
+        // Delegate to UserProfileViewModel - it owns the profile navigation responsibility
+        userProfileViewModel.navigateToUserWithList(
+            userId: shareableList.userId,
+            listId: shareableList.id,
+            currentUserId: currentUserId
+        )
     }
     
     private func handlePlaceDeepLink(_ url: URL) async {

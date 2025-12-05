@@ -8,52 +8,121 @@
 
 import SwiftUI
 
+/// Displays a user's place lists with lazy loading
+/// Single Responsibility: Renders list UI and binds to ViewModel state
 struct UserProfileListsView: View {
     @ObservedObject var viewModel: UserProfileViewModel
-    var placeLists: [LightweightPlaceList]
+    let placeLists: [LightweightPlaceList]
+    
     @State private var placeColors: [UUID: Color] = [:]
+    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            Text("LISTS")
-                .font(.subheadline)
-                .fontWeight(.medium)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.leading, 20)
-                .foregroundStyle(.black)
-
-            if placeLists.isEmpty {
-                Text("No lists available")
-                    .font(.subheadline)
-                    .foregroundColor(.gray)
-                    .padding(.leading, 20)
-            } else {
-                LazyVStack(spacing: 16) {
-                    ForEach(placeLists, id: \.id) { list in
-                        UserProfileLightweightListSection(
-                            viewModel: viewModel,
-                            list: list,
-                            places: viewModel.placeListPlaces[list.list_id] ?? [],
-                            allLists: placeLists,
-                            currentIndex: placeLists.firstIndex(where: { $0.id == list.id }) ?? 0,
-                            placeColors: $placeColors
-                        )
-                        .onAppear {
-                            // Lazy load places for this list if not loaded yet
-                            if viewModel.placeListPlaces[list.list_id] == nil {
-                                viewModel.loadPlacesForList(list)
-                            }
-                            
-                            // Load more lists when approaching the end
-                            if let lastThreeIndex = placeLists.dropLast(3).lastIndex(where: { $0.id == list.id }),
-                               lastThreeIndex == placeLists.index(placeLists.endIndex, offsetBy: -3) {
-                                viewModel.loadMoreListsIfNeeded()
-                            }
-                        }
-                    }
+            sectionHeader
+            listContent
+        }
+        .sheet(isPresented: $viewModel.shouldShowListPopup, onDismiss: {
+            viewModel.onListPopupDismissed()
+        }) {
+            deepLinkListPopup
+        }
+    }
+    
+    // MARK: - View Components
+    
+    private var sectionHeader: some View {
+        Text("LISTS")
+            .font(.subheadline)
+            .fontWeight(.medium)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.leading, 20)
+            .foregroundStyle(.black)
+    }
+    
+    @ViewBuilder
+    private var listContent: some View {
+        if placeLists.isEmpty {
+            emptyState
+        } else {
+            listItems
+        }
+    }
+    
+    private var emptyState: some View {
+        Text("No lists available")
+            .font(.subheadline)
+            .foregroundColor(.gray)
+            .padding(.leading, 20)
+    }
+    
+    private var listItems: some View {
+        LazyVStack(spacing: 16) {
+            ForEach(placeLists, id: \.id) { list in
+                UserProfileLightweightListSection(
+                    viewModel: viewModel,
+                    list: list,
+                    places: viewModel.placeListPlaces[list.list_id] ?? [],
+                    allLists: placeLists,
+                    currentIndex: placeLists.firstIndex(where: { $0.id == list.id }) ?? 0,
+                    placeColors: $placeColors
+                )
+                .onAppear {
+                    handleListAppear(list)
                 }
             }
+            
+            // Loading indicator for pagination
+            if viewModel.isLoadingMoreLists {
+                paginationLoadingIndicator
+            }
         }
+    }
+    
+    private var paginationLoadingIndicator: some View {
+        HStack {
+            Spacer()
+            ProgressView()
+                .padding(.vertical, 16)
+            Spacer()
+        }
+    }
+    
+    @ViewBuilder
+    private var deepLinkListPopup: some View {
+        if let index = viewModel.pendingListIndex, index < placeLists.count {
+            ExternalUserLightweightListPopupView(
+                viewModel: viewModel,
+                lists: placeLists,
+                initialListIndex: index,
+                placeColors: $placeColors
+            )
+            .environmentObject(selectedPlaceVM)
+        }
+    }
+    
+    // MARK: - Event Handlers
+    
+    private func handleListAppear(_ list: LightweightPlaceList) {
+        // Lazy load places for this list if not loaded yet
+        if viewModel.placeListPlaces[list.list_id] == nil {
+            viewModel.loadPlacesForList(list)
+        }
+        
+        // Fetch more lists from backend when approaching the end
+        if isNearEndOfLists(list) {
+            viewModel.fetchMoreLists()
+        }
+    }
+    
+    /// Returns true if this list is near the end, triggering pagination
+    private func isNearEndOfLists(_ list: LightweightPlaceList) -> Bool {
+        guard placeLists.count >= 3 else { return false }
+        guard let currentIndex = placeLists.firstIndex(where: { $0.id == list.id }) else { return false }
+        
+        // Trigger when viewing one of the last 3 items
+        let threshold = placeLists.count - 3
+        return currentIndex >= threshold
     }
 }
 
