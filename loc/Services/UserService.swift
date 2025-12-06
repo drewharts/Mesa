@@ -453,6 +453,11 @@ class UserService: ObservableObject {
         return try await supabase.fetchPlaceListsByProximity(userId: userId, userLatitude: userLatitude, userLongitude: userLongitude, page: page, pageSize: pageSize)
     }
     
+    /// Fetch a single place list by ID (for deep link navigation)
+    func fetchPlaceListById(listId: String) async throws -> LightweightPlaceList? {
+        return try await supabase.fetchPlaceListById(listId: listId)
+    }
+    
     /// Search place lists by name with pagination
     func searchPlaceLists(userId: String, query: String, page: Int = 1, pageSize: Int = 20) async throws -> [LightweightPlaceList] {
         return try await supabase.searchPlaceLists(userId: userId, query: query, page: page, pageSize: pageSize)

@@ -495,6 +495,29 @@ class SupabaseUserService: ObservableObject {
         }
     }
     
+    /// Fetch a single place list by ID
+    /// Used for deep link navigation when the list isn't in the first paginated results
+    func fetchPlaceListById(listId: String) async throws -> LightweightPlaceList? {
+        struct Params: Encodable {
+            let p_list_id: String
+        }
+        
+        let params = Params(p_list_id: listId)
+        
+        do {
+            let lists: [LightweightPlaceList] = try await supabase.client
+                .rpc("get_single_place_list_by_id", params: params)
+                .execute()
+                .value
+            
+            print("✅ [Supabase] Fetched place list by ID: \(listId), found: \(lists.first?.name ?? "nil")")
+            return lists.first
+        } catch {
+            print("❌ [Supabase] Error fetching place list by ID: \(error)")
+            throw error
+        }
+    }
+    
     /// Search place lists by name with pagination (server-side filtering)
     func searchPlaceLists(userId: String, query: String, page: Int = 1, pageSize: Int = 20) async throws -> [LightweightPlaceList] {
         struct SearchListRecord: Codable {
