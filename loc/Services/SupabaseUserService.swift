@@ -816,6 +816,41 @@ class SupabaseUserService: ObservableObject {
         
         return result
     }
+    
+    /// Fetch review images from the regular reviews table (user-created reviews)
+    /// This is a fallback when get_latest_review_photo SQL function returns NULL
+    func fetchRegularReviewImages(for placeIds: [String]) async throws -> [String: String] {
+        guard !placeIds.isEmpty else {
+            return [:]
+        }
+        
+        struct ReviewImageRecord: Codable {
+            let place_id: String
+            let images: [String]?
+        }
+        
+        let records: [ReviewImageRecord] = try await supabase.client
+            .from("reviews")
+            .select("place_id, images")
+            .in("place_id", values: placeIds)
+            .order("timestamp", ascending: false)
+            .execute()
+            .value
+        
+        var result: [String: String] = [:]
+        
+        for record in records {
+            // Skip if we already have an image for this place
+            guard result[record.place_id] == nil else { continue }
+            // Get the first non-empty image URL
+            if let images = record.images,
+               let firstImage = images.first(where: { !$0.isEmpty }) {
+                result[record.place_id] = firstImage
+            }
+        }
+        
+        return result
+    }
 }
 
 // MARK: - Supabase Data Models

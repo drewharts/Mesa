@@ -2671,9 +2671,24 @@ class ProfileViewModel: ObservableObject {
         
         guard !remaining.isEmpty else { return }
         
+        // Try regular user reviews first (from reviews table)
         do {
-            let reviewImages = try await SupabaseUserService.shared.fetchExternalReviewImages(for: Array(remaining))
-            for (placeId, imageUrl) in reviewImages {
+            let regularReviewImages = try await SupabaseUserService.shared.fetchRegularReviewImages(for: Array(remaining))
+            for (placeId, imageUrl) in regularReviewImages {
+                guard detailPlaceViewModel.placeImages[placeId] == nil else { continue }
+                loadRemoteImageAsPlaceImage(placeId: placeId, imageURL: imageUrl)
+            }
+        } catch {
+            print("❌ [ProfileViewModel] Error fetching regular review images: \(error.localizedDescription)")
+        }
+        
+        remaining = remaining.filter { detailPlaceViewModel.placeImages[$0] == nil }
+        guard !remaining.isEmpty else { return }
+        
+        // Finally try external reviews (from external_reviews table - Google, etc.)
+        do {
+            let externalReviewImages = try await SupabaseUserService.shared.fetchExternalReviewImages(for: Array(remaining))
+            for (placeId, imageUrl) in externalReviewImages {
                 guard detailPlaceViewModel.placeImages[placeId] == nil else { continue }
                 loadRemoteImageAsPlaceImage(placeId: placeId, imageURL: imageUrl)
             }
