@@ -800,25 +800,37 @@ class DataManager: ObservableObject {
                 guard let self = self else { return }
                 
                 let pageSize = 6 // Consistent page size for initial load and pagination
-                let placeLists = (try? await self.userService.fetchPlaceListsByProximity(
+                
+                // Fetch owned lists and shared lists in parallel
+                async let ownedListsTask = self.userService.fetchPlaceListsByProximity(
                     userId: userId,
                     userLatitude: location.latitude,
                     userLongitude: location.longitude,
                     page: 1,
                     pageSize: pageSize
-                )) ?? []
+                )
+                async let sharedListsTask = CollaborationService.shared.fetchSharedLists(userId: userId)
+                
+                let ownedLists = (try? await ownedListsTask) ?? []
+                let sharedLists = (try? await sharedListsTask) ?? []
+                
+                // Convert shared lists to LightweightPlaceList format and merge
+                let sharedAsLightweight = sharedLists.map { $0.toLightweightPlaceList() }
+                let allLists = ownedLists + sharedAsLightweight
+                
+                print("📋 [DataManager] Loaded \(ownedLists.count) owned lists + \(sharedLists.count) shared lists")
                 
                 // Update place lists on main thread
                 await MainActor.run {
-                    self.profileViewModel.lightweightPlaceLists = placeLists
+                    self.profileViewModel.lightweightPlaceLists = allLists
                     self.profileViewModel.placeListsCurrentPage = 1
-                    // Set hasMore based on whether we got a full page
-                    self.profileViewModel.hasMorePlaceLists = placeLists.count >= pageSize
+                    // Set hasMore based on whether we got a full page of owned lists
+                    self.profileViewModel.hasMorePlaceLists = ownedLists.count >= pageSize
                 }
                 
                 // Load places for each list
-                if !placeLists.isEmpty {
-                    await self.loadPlacesForLists(placeLists)
+                if !allLists.isEmpty {
+                    await self.loadPlacesForLists(allLists)
                 }
             }
         } else {

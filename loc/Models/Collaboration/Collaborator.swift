@@ -79,6 +79,8 @@ struct SharedListInfo: Codable, Identifiable {
     let ownerPhotoUrl: String?
     let userRole: String
     let addedAt: Date?
+    let collaboratorPhotos: [String]?
+    let collaboratorCount: Int?
     
     var id: String { listId }
     
@@ -94,10 +96,32 @@ struct SharedListInfo: Codable, Identifiable {
         case ownerPhotoUrl = "owner_photo_url"
         case userRole = "user_role"
         case addedAt = "added_at"
+        case collaboratorPhotos = "collaborator_photos"
+        case collaboratorCount = "collaborator_count"
     }
     
     var collaboratorRole: CollaboratorRole {
         CollaboratorRole(rawValue: userRole) ?? .editor
+    }
+    
+    /// Convert to LightweightPlaceList for unified display
+    func toLightweightPlaceList() -> LightweightPlaceList {
+        return LightweightPlaceList(
+            list_id: listId,
+            name: name,
+            is_public: isPublic,
+            image: image,
+            created_at: nil,
+            updated_at: nil,
+            distance_meters: nil,
+            place_count: placeCount,
+            city: city,
+            collaborator_count: collaboratorCount,
+            is_shared: true,
+            owner_name: ownerName,
+            owner_photo_url: ownerPhotoUrl,
+            collaborator_photos: collaboratorPhotos
+        )
     }
 }
 

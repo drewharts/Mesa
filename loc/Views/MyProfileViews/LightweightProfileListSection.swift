@@ -44,11 +44,15 @@ struct LightweightProfileListSection: View {
                     
                     // Show owner name if this is a shared list
                     if list.isSharedWithMe, let ownerName = list.owner_name {
-                        SharedListIndicator(ownerName: ownerName)
+                        SharedListIndicator(
+                            ownerName: ownerName,
+                            ownerPhotoUrl: list.owner_photo_url,
+                            collaboratorPhotos: list.collaborator_photos
+                        )
                     } else {
-                    Text("\(totalPlaceCount) place\(totalPlaceCount == 1 ? "" : "s")")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                        Text("\(totalPlaceCount) place\(totalPlaceCount == 1 ? "" : "s")")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
                     }
                 }
                 

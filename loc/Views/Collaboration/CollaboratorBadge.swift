@@ -48,24 +48,73 @@ struct CollaboratorBadge: View {
 
 // MARK: - Shared List Indicator
 
-/// A more prominent indicator showing the list is shared
+/// A more prominent indicator showing the list is shared with owner photo
 struct SharedListIndicator: View {
     let ownerName: String?
+    var ownerPhotoUrl: String? = nil
+    var collaboratorPhotos: [String]? = nil
+    
+    private var firstName: String {
+        ownerName?.components(separatedBy: " ").first ?? "Someone"
+    }
     
     var body: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "person.2.fill")
-                .font(.caption)
+        HStack(spacing: 8) {
+            // Owner avatar
+            AsyncImage(url: URL(string: ownerPhotoUrl ?? "")) { phase in
+                switch phase {
+                case .success(let image):
+                    image.resizable().scaledToFill()
+                default:
+                    Circle()
+                        .fill(Color.blue.opacity(0.2))
+                        .overlay(
+                            Text(firstName.prefix(1).uppercased())
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundColor(.blue)
+                        )
+                }
+            }
+            .frame(width: 20, height: 20)
+            .clipShape(Circle())
             
-            if let ownerName = ownerName {
-                Text("Shared by \(ownerName)")
-                    .font(.caption)
-            } else {
-                Text("Shared list")
-                    .font(.caption)
+            Text("Shared by \(firstName)")
+                .font(.caption)
+                .foregroundColor(.secondary)
+            
+            // Show other collaborators if any
+            if let photos = collaboratorPhotos, !photos.isEmpty {
+                HStack(spacing: -6) {
+                    ForEach(Array(photos.prefix(3).enumerated()), id: \.offset) { index, photoUrl in
+                        AsyncImage(url: URL(string: photoUrl)) { phase in
+                            switch phase {
+                            case .success(let image):
+                                image.resizable().scaledToFill()
+                            default:
+                                Circle()
+                                    .fill(Color.gray.opacity(0.3))
+                            }
+                        }
+                        .frame(width: 16, height: 16)
+                        .clipShape(Circle())
+                        .overlay(Circle().stroke(Color(.systemBackground), lineWidth: 1))
+                        .zIndex(Double(3 - index))
+                    }
+                    
+                    if photos.count > 3 {
+                        Circle()
+                            .fill(Color.gray.opacity(0.7))
+                            .frame(width: 16, height: 16)
+                            .overlay(
+                                Text("+\(photos.count - 3)")
+                                    .font(.system(size: 8, weight: .semibold))
+                                    .foregroundColor(.white)
+                            )
+                            .overlay(Circle().stroke(Color(.systemBackground), lineWidth: 1))
+                    }
+                }
             }
         }
-        .foregroundColor(.secondary)
     }
 }
 
@@ -91,8 +140,17 @@ struct SharedListIndicator: View {
         Divider()
         
         VStack(alignment: .leading, spacing: 8) {
-        SharedListIndicator(ownerName: "Sarah")
-        SharedListIndicator(ownerName: nil)
+            SharedListIndicator(ownerName: "Sarah Jones")
+            SharedListIndicator(
+                ownerName: "Sarah Jones",
+                ownerPhotoUrl: nil,
+                collaboratorPhotos: ["url1", "url2"]
+            )
+            SharedListIndicator(
+                ownerName: "Sarah Jones",
+                ownerPhotoUrl: nil,
+                collaboratorPhotos: ["url1", "url2", "url3", "url4", "url5"]
+            )
         }
     }
     .padding()

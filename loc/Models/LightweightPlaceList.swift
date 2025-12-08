@@ -16,7 +16,9 @@ struct LightweightPlaceList: Codable, Identifiable {
     var collaborator_count: Int?
     var is_shared: Bool?
     var owner_name: String?
+    var owner_photo_url: String?
     var user_role: String?
+    var collaborator_photos: [String]?
     
     var id: String { list_id }
     
@@ -43,7 +45,9 @@ struct LightweightPlaceList: Codable, Identifiable {
         case collaborator_count
         case is_shared
         case owner_name
+        case owner_photo_url
         case user_role
+        case collaborator_photos
         // Intentionally omitting average_location - we don't need it
     }
     
@@ -62,7 +66,9 @@ struct LightweightPlaceList: Codable, Identifiable {
         collaborator_count: Int? = nil,
         is_shared: Bool? = nil,
         owner_name: String? = nil,
-        user_role: String? = nil
+        owner_photo_url: String? = nil,
+        user_role: String? = nil,
+        collaborator_photos: [String]? = nil
     ) {
         self.list_id = list_id
         self.name = name
@@ -76,6 +82,8 @@ struct LightweightPlaceList: Codable, Identifiable {
         self.collaborator_count = collaborator_count
         self.is_shared = is_shared
         self.owner_name = owner_name
+        self.owner_photo_url = owner_photo_url
         self.user_role = user_role
+        self.collaborator_photos = collaborator_photos
     }
 }
