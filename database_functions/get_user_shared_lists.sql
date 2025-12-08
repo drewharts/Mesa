@@ -28,7 +28,7 @@ BEGIN
         pl.name,
         pl.is_public,
         pl.image,
-        (SELECT COUNT(*) FROM place_list_items WHERE list_id = pl.id) AS place_count,
+        (SELECT COUNT(*) FROM place_list_items pli WHERE pli.list_id = pl.id) AS place_count,
         NULL::TEXT AS city,
         pl.user_id AS owner_id,
         u.full_name AS owner_name,
