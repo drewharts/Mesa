@@ -90,7 +90,7 @@ class AddCollaboratorViewModel: ObservableObject {
     
     private func searchUsers(query: String) async {
         do {
-            let users = try await withCheckedThrowingContinuation { continuation in
+            let users: [User] = try await withCheckedThrowingContinuation { continuation in
                 userService.searchUsers(query: query) { users, error in
                     if let error = error {
                         continuation.resume(throwing: error)
@@ -151,7 +151,7 @@ class AddCollaboratorViewModel: ObservableObject {
                 userId: user.id,
                 role: selectedRole.rawValue,
                 userName: user.fullName,
-                profilePhotoUrl: user.profilePhotoURL
+                profilePhotoUrl: user.profilePhotoURL?.absoluteString
             )
             
             // Update local state
