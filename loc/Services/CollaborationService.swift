@@ -106,37 +106,52 @@ class CollaborationService {
     // MARK: - Add Collaborator
     
     /// Add a user as a collaborator to a list
+    /// Uses RPC function for proper authorization handling
     func addCollaborator(
         listId: String,
         userId: String,
         role: CollaboratorRole,
         addedBy: String
     ) async throws {
-        // Validate: can't add yourself
-        guard userId != addedBy else {
-            throw CollaborationError.cannotAddSelf
-        }
-        
-        let record = CollaboratorInsertRecord(
-            list_id: listId,
-            user_id: userId,
-            role: role.rawValue,
-            added_by: addedBy
+        let params = AddCollaboratorParams(
+            p_list_id: listId,
+            p_user_id: userId,
+            p_role: role.rawValue,
+            p_added_by: addedBy
         )
         
         do {
-            try await supabase.client
-                .from("place_list_collaborators")
-                .insert(record)
+            let result: AddCollaboratorResult = try await supabase.client
+                .rpc("add_list_collaborator", params: params)
                 .execute()
+                .value
             
-            print("✅ [CollaborationService] Added collaborator \(userId) to list \(listId) as \(role.rawValue)")
-        } catch {
-            // Check for duplicate constraint violation
-            if error.localizedDescription.contains("duplicate") ||
-               error.localizedDescription.contains("unique") {
-                throw CollaborationError.alreadyCollaborator
+            if result.success {
+                print("✅ [CollaborationService] Added collaborator \(userId) to list \(listId) as \(role.rawValue)")
+            } else {
+                let errorMessage = result.error ?? "Unknown error"
+                print("❌ [CollaborationService] Failed to add collaborator: \(errorMessage)")
+                
+                // Map error messages to appropriate errors
+                if errorMessage.contains("already a collaborator") {
+                    throw CollaborationError.alreadyCollaborator
+                } else if errorMessage.contains("Not authorized") {
+                    throw CollaborationError.notAuthorized
+                } else if errorMessage.contains("Not authenticated") {
+                    throw CollaborationError.notAuthenticated
+                } else if errorMessage.contains("User not found") {
+                    throw CollaborationError.userNotFound
+                } else if errorMessage.contains("Cannot add yourself") {
+                    throw CollaborationError.cannotAddSelf
+                } else if errorMessage.contains("List not found") {
+                    throw CollaborationError.listNotFound
+                } else {
+                    throw NSError(domain: "CollaborationService", code: -1, userInfo: [NSLocalizedDescriptionKey: errorMessage])
+                }
             }
+        } catch let error as CollaborationError {
+            throw error
+        } catch {
             print("❌ [CollaborationService] Failed to add collaborator: \(error)")
             throw error
         }
@@ -280,11 +295,17 @@ private extension CollaborationService {
         let p_user_id: String
     }
     
-    struct CollaboratorInsertRecord: Encodable {
-        let list_id: String
-        let user_id: String
-        let role: String
-        let added_by: String
+    struct AddCollaboratorParams: Encodable {
+        let p_list_id: String
+        let p_user_id: String
+        let p_role: String
+        let p_added_by: String
+    }
+    
+    struct AddCollaboratorResult: Decodable {
+        let success: Bool
+        let error: String?
+        let collaborator_id: String?
     }
     
     struct OwnerCheckResult: Decodable {
