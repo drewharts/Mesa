@@ -653,4 +653,64 @@ class UserService: ObservableObject {
     func checkPlaceInList(listId: String, placeId: String) async throws -> Bool {
         return try await supabase.checkPlaceInList(listId: listId, placeId: placeId)
     }
+    
+    // MARK: - Place Savers
+    
+    /// Fetches all users who have saved a specific place (via favorites, lists, TikToks, or reviews)
+    /// - Parameters:
+    ///   - placeId: The ID of the place to check
+    ///   - requestingUserId: Optional - filters to only show the user + users they follow
+    /// - Returns: Array of PlaceSaverProfile containing user info
+    func fetchPlaceSavers(placeId: String, requestingUserId: String?) async throws -> [PlaceSaverProfile] {
+        // Build parameters for RPC call (database uses TEXT type)
+        var params: [String: String] = ["p_place_id": placeId]
+        if let requestingId = requestingUserId {
+            params["p_requesting_user_id"] = requestingId
+        }
+        
+        let response: [PlaceSaverProfile] = try await SupabaseManager.shared.client
+            .rpc("get_place_savers", params: params)
+            .execute()
+            .value
+        
+        print("✅ [UserService] Fetched \(response.count) savers for place \(placeId.prefix(8))...")
+        return response
+    }
+}
+
+// MARK: - Place Saver Response Model
+
+/// Response model for get_place_savers database function
+struct PlaceSaverProfile: Codable, Identifiable {
+    let userId: String
+    let fullName: String?
+    let profilePhotoUrl: String?
+    
+    var id: String { userId }
+    
+    enum CodingKeys: String, CodingKey {
+        case userId = "user_id"
+        case fullName = "full_name"
+        case profilePhotoUrl = "profile_photo_url"
+    }
+    
+    /// Convert to ProfileData for compatibility with existing UI components
+    func toProfileData() -> ProfileData {
+        // Convert String URL to URL type
+        let photoURL: URL? = profilePhotoUrl.flatMap { URL(string: $0) }
+        
+        return ProfileData(
+            id: userId,
+            firstName: fullName?.components(separatedBy: " ").first ?? "",
+            lastName: fullName?.components(separatedBy: " ").dropFirst().joined(separator: " ") ?? "",
+            email: "",
+            profilePhotoURL: photoURL,
+            phoneNumber: "",
+            fullNameLower: fullName?.lowercased() ?? "",
+            fullName: fullName ?? "Unknown",
+            fcmToken: nil,
+            firebaseUid: nil,
+            supabaseUid: nil
+        )
+    }
 } 
