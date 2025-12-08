@@ -369,22 +369,58 @@ class UserProfileViewModel: ObservableObject {
         guard let pendingListId = pendingListIdToOpen else { return }
         
         if let index = lists.firstIndex(where: { $0.list_id == pendingListId }) {
-            // Load places for this list before showing popup
+            // Found in current page - show popup
+            showListPopupAtIndex(index, listId: pendingListId)
+        } else {
+            // List not in first page - fetch it specifically (for deep links)
+            print("📋 [UserProfileViewModel] List \(pendingListId) not in first page, fetching directly...")
             Task {
-                await loadPlacesForList(listId: pendingListId)
+                await fetchAndShowSpecificList(listId: pendingListId)
+            }
+        }
+    }
+    
+    /// Fetches a specific list by ID and shows it (for deep links when list isn't in first page)
+    private func fetchAndShowSpecificList(listId: String) async {
+        do {
+            guard let list = try await userService.fetchPlaceListById(listId: listId) else {
+                print("❌ [UserProfileViewModel] Could not find list with ID: \(listId)")
+                await MainActor.run { self.clearPendingListState() }
+                return
+            }
+            
+            await MainActor.run {
+                // Insert at the beginning so it appears first
+                if !self.userLists.contains(where: { $0.list_id == listId }) {
+                    self.userLists.insert(list, at: 0)
+                }
                 
-                await MainActor.run {
-                    self.pendingListIndex = index
-                    // Small delay to allow profile view to settle
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                        self.shouldShowListPopup = true
-                        self.pendingListIdToOpen = nil
-                    }
+                // Now find the index and show popup
+                if let index = self.userLists.firstIndex(where: { $0.list_id == listId }) {
+                    self.showListPopupAtIndex(index, listId: listId)
+                } else {
+                    self.clearPendingListState()
                 }
             }
-        } else {
-            // List not found, clear pending state
-            pendingListIdToOpen = nil
+        } catch {
+            print("❌ [UserProfileViewModel] Error fetching specific list: \(error)")
+            await MainActor.run { self.clearPendingListState() }
+        }
+    }
+    
+    /// Shows the list popup at a specific index after loading its places
+    private func showListPopupAtIndex(_ index: Int, listId: String) {
+        Task {
+            await loadPlacesForList(listId: listId)
+            
+            await MainActor.run {
+                self.pendingListIndex = index
+                // Small delay to allow profile view to settle
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    self.shouldShowListPopup = true
+                    self.pendingListIdToOpen = nil
+                }
+            }
         }
     }
     

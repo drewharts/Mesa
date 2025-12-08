@@ -54,6 +54,7 @@ struct PlaceDetailView: View {
                         }
                     )
                     .environmentObject(userProfileViewModel)
+                    .environmentObject(detailPlaceViewModel)
                     .scrollDisabled(!isScrollingEnabled)
                 }
             }
@@ -70,8 +71,12 @@ struct PlaceDetailView: View {
                         notificationManager: serviceContainer.notificationManager,
                         selectedPlaceVM: selectedPlaceVM,
                         profileVM: profile,
-                        userSession: userSession
+                        userSession: userSession,
+                        detailPlaceViewModel: detailPlaceViewModel
                     )
+                    
+                    // Configure savers VM for navigation
+                    tabsViewModel?.configureSaversViewModel(userProfileViewModel: userProfileViewModel)
                     
                     // Calculate travel time now that ViewModel is created
                     if let place = selectedPlaceVM.selectedPlace,

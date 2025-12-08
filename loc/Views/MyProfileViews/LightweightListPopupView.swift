@@ -202,21 +202,14 @@ struct LightweightListPopupView: View {
         
         Task {
             do {
-                let morePlaces = try await dataManager.fetchPlacesForPlaceList(
+                // Use DataManager method that also updates placeSavers
+                let morePlaces = try await dataManager.loadMorePlacesForList(
                     listId: currentList.list_id,
                     page: nextPage,
                     pageSize: 6
                 )
                 
                 await MainActor.run {
-                    // Append new places to the profile state
-                    if var existingPlaces = profile.lightweightPlaceListPlaces[currentList.list_id] {
-                        existingPlaces.append(contentsOf: morePlaces)
-                        profile.lightweightPlaceListPlaces[currentList.list_id] = existingPlaces
-                    } else {
-                        profile.lightweightPlaceListPlaces[currentList.list_id] = morePlaces
-                    }
-                    
                     currentPage = nextPage
                     // Keep loading if we got 6 or more places, stop if we got fewer than 6
                     hasMorePlaces = morePlaces.count >= 6

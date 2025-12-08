@@ -35,6 +35,7 @@ class PlaceDetailTabsViewModel: ObservableObject {
     let notesTabViewModel: NotesTabViewModel
     let reviewsViewModel: PlaceReviewsViewModel
     let travelTimeViewModel: TravelTimeViewModel
+    var placeSaversViewModel: PlaceSaversViewModel
     
     // MARK: - Published Properties (What the View Needs)
     @Published var placeName: String = "Loading..."
@@ -46,6 +47,10 @@ class PlaceDetailTabsViewModel: ObservableObject {
     @Published var showMaxFavoritesAlert: Bool = false
     @Published var currentPlace: DetailPlace?
     
+    // Forwarded from PlaceSaversViewModel (enables view re-render when savers change)
+    @Published var showSaversIndicator: Bool = false
+    @Published var saverCount: Int = 0
+    
     private var cancellables = Set<AnyCancellable>()
     
     // MARK: - Initialization
@@ -55,7 +60,8 @@ class PlaceDetailTabsViewModel: ObservableObject {
          notificationManager: NotificationManager,
          selectedPlaceVM: SelectedPlaceViewModel,
          profileVM: ProfileViewModel,
-         userSession: UserSession) {
+         userSession: UserSession,
+         detailPlaceViewModel: DetailPlaceViewModel) {
         self.placeService = placeService
         self.reviewService = reviewService
         self.userService = userService
@@ -100,6 +106,12 @@ class PlaceDetailTabsViewModel: ObservableObject {
             selectedPlaceVM: selectedPlaceVM
         )
         
+        self.placeSaversViewModel = PlaceSaversViewModel(
+            userService: userService,
+            detailPlaceViewModel: detailPlaceViewModel,
+            userSession: userSession
+        )
+        
         setupObservers()
     }
     
@@ -135,6 +147,29 @@ class PlaceDetailTabsViewModel: ObservableObject {
         // Observe favorites alert
         profileVM.$showMaxFavoritesAlert
             .assign(to: &$showMaxFavoritesAlert)
+        
+        // Forward PlaceSaversViewModel state to trigger view updates
+        // IMPORTANT: Set up this observer BEFORE the place observer so state is forwarded correctly
+        // This is necessary because child VM changes don't automatically trigger parent view re-render
+        placeSaversViewModel.$totalSaverCount
+            .sink { [weak self] count in
+                self?.saverCount = count
+                self?.showSaversIndicator = count > 0
+            }
+            .store(in: &cancellables)
+        
+        // Update placeSaversViewModel when place changes
+        // This fires immediately with current value, so saver count observer above must be set up first
+        selectedPlaceVM.$selectedPlace
+            .sink { [weak self] place in
+                self?.placeSaversViewModel.setPlace(place?.id.uuidString)
+            }
+            .store(in: &cancellables)
+    }
+    
+    /// Configure savers VM with navigation dependency (call from View)
+    func configureSaversViewModel(userProfileViewModel: UserProfileViewModel) {
+        placeSaversViewModel.configure(userProfileViewModel: userProfileViewModel)
     }
     
     private func handlePlaceChanged(_ place: DetailPlace?) {

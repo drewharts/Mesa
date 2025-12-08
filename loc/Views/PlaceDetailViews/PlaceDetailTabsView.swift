@@ -19,10 +19,16 @@ struct PlaceDetailTabsView: View {
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var userProfileViewModel: UserProfileViewModel
     @EnvironmentObject var userSession: UserSession
+    @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
 
     @Environment(\.isScrollingEnabled) var isScrollingEnabled
     @Binding var showNoPhoneNumberAlert: Bool
     let onPhotoTapped: ([UIImage], Int) -> Void
+    
+    // MARK: - View-Owned Presentation State (Enterprise Pattern)
+    // Sheet presentation is a UI concern, owned by View not ViewModel
+    @State private var showingSaversSheet = false
+    @State private var travelSelectorState: TravelTimeSelectorState?
     
     var body: some View {
         ScrollView {
@@ -38,7 +44,7 @@ struct PlaceDetailTabsView: View {
                 }
                 .padding(.bottom, 3)
                 
-                // MARK: - Row: Type / Google Maps / Drive Time
+                // MARK: - Row: Type / Google Maps / Drive Time / Saved By
                 HStack(spacing: 10) {
                     if let restaurantType = viewModel.restaurantType {
                         Text(restaurantType)
@@ -61,10 +67,19 @@ struct PlaceDetailTabsView: View {
                     }
                     
                     TravelTimeSelector(viewModel: viewModel.travelTimeViewModel)
+                    
+                    // Saved By indicator - tappable to show sheet
+                    if viewModel.showSaversIndicator {
+                        SavedByIndicator(
+                            savers: viewModel.placeSaversViewModel.saversForDisplay(limit: 3),
+                            additionalCount: viewModel.placeSaversViewModel.additionalSaverCount,
+                            onTap: { showingSaversSheet = true }
+                        )
+                    }
                 }
                 .padding(.bottom, 10)
                 
-                // MARK: - Row: REVIEWS / Rating / ABOUT / Avatars
+                // MARK: - Row: REVIEWS / Rating / ABOUT
                 HStack(spacing: 12) {
                     Button(action: {
                         viewModel.selectTab(.reviews)
@@ -138,8 +153,6 @@ struct PlaceDetailTabsView: View {
                                 alignment: .bottom
                             )
                     }
-                    
-                    ProfileCirclesView(placeId: selectedPlaceVM.selectedPlace?.id.uuidString)
                 }
                 .padding(.bottom, 10)
                 
@@ -182,6 +195,149 @@ struct PlaceDetailTabsView: View {
         } message: {
             Text("You already have 6 favorites. Remove one before adding a new one.")
         }
+        // Savers Sheet - View owns presentation state (Enterprise Pattern)
+        .sheet(isPresented: $showingSaversSheet) {
+            PlaceSaversSheetView(
+                viewModel: viewModel.placeSaversViewModel,
+                placeName: viewModel.placeName
+            )
+            .environmentObject(profile)
+            .presentationDetents(saversSheetDetents)
+            .presentationDragIndicator(.visible)
+        }
+        // Travel Time Selector - capture state from child via PreferenceKey
+        .onPreferenceChange(TravelTimeSelectorStateKey.self) { state in
+            travelSelectorState = state
+        }
+        // Render expanded menu at root level for proper z-ordering
+        .overlay {
+            if let state = travelSelectorState, state.isExpanded {
+                travelTimeSelectorOverlay(state: state)
+            }
+        }
+    }
+    
+    // MARK: - Dynamic Sheet Height
+    
+    /// Calculates appropriate sheet detents based on number of savers
+    private var saversSheetDetents: Set<PresentationDetent> {
+        let count = viewModel.placeSaversViewModel.totalSaverCount
+        let calculatedHeight = calculateSheetHeight(for: count)
+        
+        // For small lists, use exact height; for larger lists, allow expansion
+        if count <= 4 {
+            return [.height(calculatedHeight)]
+        } else {
+            return [.height(calculatedHeight), .large]
+        }
+    }
+    
+    /// Calculates sheet height based on number of savers
+    private func calculateSheetHeight(for count: Int) -> CGFloat {
+        let headerHeight: CGFloat = 100      // "Saved by" header + count
+        let rowHeight: CGFloat = 74          // Each user row
+        let bottomPadding: CGFloat = 40      // Safe area padding
+        let maxHeight: CGFloat = 450         // Cap for reasonable size
+        
+        let calculatedHeight = headerHeight + (CGFloat(count) * rowHeight) + bottomPadding
+        return min(calculatedHeight, maxHeight)
+    }
+    
+    // MARK: - Travel Time Selector Overlay (Enterprise Pattern)
+    
+    /// Renders expanded menu at root level, positioned at button location
+    /// This ensures proper z-ordering above all nested content
+    @ViewBuilder
+    private func travelTimeSelectorOverlay(state: TravelTimeSelectorState) -> some View {
+        GeometryReader { geo in
+            // Convert global frame to local coordinate space
+            let localFrame = CGRect(
+                x: state.frame.minX - geo.frame(in: .global).minX,
+                y: state.frame.maxY - geo.frame(in: .global).minY + 8,
+                width: state.frame.width,
+                height: 0
+            )
+            
+            TravelTimeSelectorExpandedMenu(
+                viewModel: viewModel.travelTimeViewModel,
+                selectedIndex: state.selectedIndex,
+                onSelect: { transportType in
+                    viewModel.travelTimeViewModel.switchTransportType(to: transportType)
+                    viewModel.travelTimeViewModel.saveDefaultTransportType(transportType)
+                },
+                onDismiss: { }
+            )
+            .position(x: localFrame.minX + 90, y: localFrame.minY + 100)
+            .transition(.scale(scale: 0.8, anchor: .top).combined(with: .opacity))
+            .animation(.easeOut(duration: 0.2), value: state.isExpanded)
+        }
+        .ignoresSafeArea()
+    }
+}
+
+// MARK: - Saved By Indicator (Dumb Display Component - No ViewModel)
+
+private struct SavedByIndicator: View {
+    // MARK: - Pure Data Parameters (No ViewModel!)
+    let savers: [ProfileData]
+    let additionalCount: Int
+    let onTap: () -> Void
+    
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 4) {
+                // Overlapping profile circles in their own container
+                HStack(spacing: -8) {
+                    ForEach(savers, id: \.id) { saver in
+                        if let photoURL = saver.profilePhotoURL {
+                            AsyncImage(url: photoURL) { phase in
+                                switch phase {
+                                case .success(let image):
+                                    image
+                                        .resizable()
+                                        .scaledToFill()
+                                        .frame(width: 24, height: 24)
+                                        .clipShape(Circle())
+                                        .overlay(
+                                            Circle().stroke(Color.white, lineWidth: 2)
+                                        )
+                                case .failure, .empty:
+                                    placeholderCircle(for: saver)
+                                @unknown default:
+                                    placeholderCircle(for: saver)
+                                }
+                            }
+                            .frame(width: 24, height: 24)
+                        } else {
+                            placeholderCircle(for: saver)
+                        }
+                    }
+                }
+                
+                // +X indicator outside the overlapping circles
+                if additionalCount > 0 {
+                    Text("+\(additionalCount)")
+                        .font(.caption2)
+                        .fontWeight(.medium)
+                        .foregroundColor(.gray)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+    }
+    
+    private func placeholderCircle(for saver: ProfileData) -> some View {
+        Circle()
+            .fill(Color(.systemGray4))
+            .frame(width: 24, height: 24)
+            .overlay(
+                Text(saver.fullName.prefix(1))
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundColor(.white)
+            )
+            .overlay(
+                Circle().stroke(Color.white, lineWidth: 2)
+            )
     }
 }
 
@@ -268,7 +424,8 @@ struct PlaceDetailTabsView: View {
                 notificationManager: NotificationManager.shared,
                 selectedPlaceVM: selectedPlaceVM,
                 profileVM: profileVM,
-                userSession: userSession
+                userSession: userSession,
+                detailPlaceViewModel: detailPlaceVM
             )
             
             return PlaceDetailTabsView(
@@ -282,6 +439,7 @@ struct PlaceDetailTabsView: View {
             .environmentObject(selectedPlaceVM)
             .environmentObject(userProfileVM)
             .environmentObject(userSession)
+            .environmentObject(detailPlaceVM)
             .environment(\.isScrollingEnabled, true)
             .padding()
         }

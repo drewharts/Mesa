@@ -495,6 +495,29 @@ class SupabaseUserService: ObservableObject {
         }
     }
     
+    /// Fetch a single place list by ID
+    /// Used for deep link navigation when the list isn't in the first paginated results
+    func fetchPlaceListById(listId: String) async throws -> LightweightPlaceList? {
+        struct Params: Encodable {
+            let p_list_id: String
+        }
+        
+        let params = Params(p_list_id: listId)
+        
+        do {
+            let lists: [LightweightPlaceList] = try await supabase.client
+                .rpc("get_single_place_list_by_id", params: params)
+                .execute()
+                .value
+            
+            print("✅ [Supabase] Fetched place list by ID: \(listId), found: \(lists.first?.name ?? "nil")")
+            return lists.first
+        } catch {
+            print("❌ [Supabase] Error fetching place list by ID: \(error)")
+            throw error
+        }
+    }
+    
     /// Search place lists by name with pagination (server-side filtering)
     func searchPlaceLists(userId: String, query: String, page: Int = 1, pageSize: Int = 20) async throws -> [LightweightPlaceList] {
         struct SearchListRecord: Codable {
@@ -788,6 +811,41 @@ class SupabaseUserService: ObservableObject {
             guard let mediaItems = record.media else { continue }
             if let imageUrl = mediaItems.first(where: { ($0.type ?? "").lowercased() == "image" && ($0.imageUrl?.isEmpty == false) })?.imageUrl {
                 result[record.place_id] = imageUrl
+            }
+        }
+        
+        return result
+    }
+    
+    /// Fetch review images from the regular reviews table (user-created reviews)
+    /// This is a fallback when get_latest_review_photo SQL function returns NULL
+    func fetchRegularReviewImages(for placeIds: [String]) async throws -> [String: String] {
+        guard !placeIds.isEmpty else {
+            return [:]
+        }
+        
+        struct ReviewImageRecord: Codable {
+            let place_id: String
+            let images: [String]?
+        }
+        
+        let records: [ReviewImageRecord] = try await supabase.client
+            .from("reviews")
+            .select("place_id, images")
+            .in("place_id", values: placeIds)
+            .order("timestamp", ascending: false)
+            .execute()
+            .value
+        
+        var result: [String: String] = [:]
+        
+        for record in records {
+            // Skip if we already have an image for this place
+            guard result[record.place_id] == nil else { continue }
+            // Get the first non-empty image URL
+            if let images = record.images,
+               let firstImage = images.first(where: { !$0.isEmpty }) {
+                result[record.place_id] = firstImage
             }
         }
         
