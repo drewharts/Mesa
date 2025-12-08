@@ -22,6 +22,7 @@ struct LightweightListPopupView: View {
     @State private var isLoadingMore: Bool = false
     @State private var hasMorePlaces: Bool = true
     @State private var currentPage: Int = 1
+    @State private var showCollaboratorsSheet: Bool = false
     
     // Convenience initializer for single list (backward compatibility)
     init(list: LightweightPlaceList, places: [LightweightPlace], placeColors: Binding<[UUID: Color]>) {
@@ -73,7 +74,7 @@ struct LightweightListPopupView: View {
             VStack(spacing: 0) {
                 // Header with list name and controls
                 VStack(spacing: 12) {
-                    // Top bar with close button and share button
+                    // Top bar with close button, collaborators button, and share button
                     HStack {
                         Button(action: {
                             presentationMode.wrappedValue.dismiss()
@@ -84,8 +85,24 @@ struct LightweightListPopupView: View {
                         
                         Spacer()
                         
-                        // Share button
+                        // Collaborators button (only for list owner)
                         if let userId = profile.user?.id {
+                            Button {
+                                showCollaboratorsSheet = true
+                            } label: {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "person.2")
+                                        .foregroundColor(.primary)
+                                    if currentList.hasCollaborators {
+                                        Text("\(currentList.collaborator_count ?? 0)")
+                                            .font(.caption)
+                                            .fontWeight(.medium)
+                                            .foregroundColor(.primary)
+                                    }
+                                }
+                            }
+                            
+                            // Share button
                             LightweightListShareButton(lightweightList: currentList, userId: userId)
                         }
                     }
@@ -180,6 +197,19 @@ struct LightweightListPopupView: View {
         .onAppear {
             // Load places for the current list
             loadPlacesForCurrentList()
+        }
+        .sheet(isPresented: $showCollaboratorsSheet) {
+            if let userId = profile.user?.id {
+                let viewModel = CollaboratorListViewModel(
+                    listId: currentList.list_id,
+                    isOwner: true  // This popup is only shown for user's own lists
+                )
+                CollaboratorsSheet(
+                    viewModel: viewModel,
+                    listId: currentList.list_id,
+                    currentUserId: userId
+                )
+            }
         }
     }
     
