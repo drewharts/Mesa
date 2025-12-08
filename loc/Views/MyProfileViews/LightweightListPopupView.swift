@@ -200,12 +200,7 @@ struct LightweightListPopupView: View {
         }
         .sheet(isPresented: $showCollaboratorsSheet) {
             if let userId = profile.user?.id {
-                let viewModel = CollaboratorListViewModel(
-                    listId: currentList.list_id,
-                    isOwner: true  // This popup is only shown for user's own lists
-                )
-                CollaboratorsSheet(
-                    viewModel: viewModel,
+                ManageCollaboratorsSheet(
                     listId: currentList.list_id,
                     currentUserId: userId
                 )
