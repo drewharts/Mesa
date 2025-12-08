@@ -55,13 +55,13 @@ class CollaborationService {
         let params = FetchCollaboratorsParams(p_list_id: listId)
         
         do {
-            let collaborators: [LightweightCollaborator] = try await supabase.client
-                .rpc("get_list_collaborators", params: params)
-                .execute()
-                .value
-            
-            print("✅ [CollaborationService] Fetched \(collaborators.count) collaborators for list \(listId)")
-            return collaborators
+        let collaborators: [LightweightCollaborator] = try await supabase.client
+            .rpc("get_list_collaborators", params: params)
+            .execute()
+            .value
+        
+        print("✅ [CollaborationService] Fetched \(collaborators.count) collaborators for list \(listId)")
+        return collaborators
         } catch {
             print("❌ [CollaborationService] Failed to fetch collaborators: \(error)")
             throw error
@@ -73,13 +73,13 @@ class CollaborationService {
         let params = SharedListsParams(p_user_id: userId)
         
         do {
-            let lists: [SharedListInfo] = try await supabase.client
-                .rpc("get_user_shared_lists", params: params)
-                .execute()
-                .value
-            
-            print("✅ [CollaborationService] Fetched \(lists.count) shared lists for user")
-            return lists
+        let lists: [SharedListInfo] = try await supabase.client
+            .rpc("get_user_shared_lists", params: params)
+            .execute()
+            .value
+        
+        print("✅ [CollaborationService] Fetched \(lists.count) shared lists for user")
+        return lists
         } catch {
             print("❌ [CollaborationService] Failed to fetch shared lists: \(error)")
             throw error
@@ -93,9 +93,9 @@ class CollaborationService {
         do {
             let results: [ListCollaborationInfo] = try await supabase.client
                 .rpc("get_list_with_collaboration_info", params: params)
-                .execute()
-                .value
-            
+            .execute()
+            .value
+        
             return results.first
         } catch {
             print("❌ [CollaborationService] Failed to get list info: \(error)")
@@ -123,11 +123,11 @@ class CollaborationService {
         do {
             let result: AddCollaboratorResult = try await supabase.client
                 .rpc("add_list_collaborator", params: params)
-                .execute()
+            .execute()
                 .value
-            
+        
             if result.success {
-                print("✅ [CollaborationService] Added collaborator \(userId) to list \(listId) as \(role.rawValue)")
+        print("✅ [CollaborationService] Added collaborator \(userId) to list \(listId) as \(role.rawValue)")
             } else {
                 let errorMessage = result.error ?? "Unknown error"
                 print("❌ [CollaborationService] Failed to add collaborator: \(errorMessage)")
@@ -162,13 +162,13 @@ class CollaborationService {
     /// Remove a collaborator from a list by collaborator record ID
     func removeCollaborator(collaboratorId: String) async throws {
         do {
-            try await supabase.client
-                .from("place_list_collaborators")
-                .delete()
-                .eq("id", value: collaboratorId)
-                .execute()
-            
-            print("✅ [CollaborationService] Removed collaborator \(collaboratorId)")
+        try await supabase.client
+            .from("place_list_collaborators")
+            .delete()
+            .eq("id", value: collaboratorId)
+            .execute()
+        
+        print("✅ [CollaborationService] Removed collaborator \(collaboratorId)")
         } catch {
             print("❌ [CollaborationService] Failed to remove collaborator: \(error)")
             throw error
@@ -178,14 +178,14 @@ class CollaborationService {
     /// Remove self from a shared list (leave list)
     func leaveList(listId: String, userId: String) async throws {
         do {
-            try await supabase.client
-                .from("place_list_collaborators")
-                .delete()
-                .eq("list_id", value: listId)
-                .eq("user_id", value: userId)
-                .execute()
-            
-            print("✅ [CollaborationService] User \(userId) left list \(listId)")
+        try await supabase.client
+            .from("place_list_collaborators")
+            .delete()
+            .eq("list_id", value: listId)
+            .eq("user_id", value: userId)
+            .execute()
+        
+        print("✅ [CollaborationService] User \(userId) left list \(listId)")
         } catch {
             print("❌ [CollaborationService] Failed to leave list: \(error)")
             throw error
@@ -197,13 +197,13 @@ class CollaborationService {
     /// Update a collaborator's role
     func updateRole(collaboratorId: String, newRole: CollaboratorRole) async throws {
         do {
-            try await supabase.client
-                .from("place_list_collaborators")
-                .update(["role": newRole.rawValue])
-                .eq("id", value: collaboratorId)
-                .execute()
-            
-            print("✅ [CollaborationService] Updated collaborator \(collaboratorId) role to \(newRole.rawValue)")
+        try await supabase.client
+            .from("place_list_collaborators")
+            .update(["role": newRole.rawValue])
+            .eq("id", value: collaboratorId)
+            .execute()
+        
+        print("✅ [CollaborationService] Updated collaborator \(collaboratorId) role to \(newRole.rawValue)")
         } catch {
             print("❌ [CollaborationService] Failed to update role: \(error)")
             throw error

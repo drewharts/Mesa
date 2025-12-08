@@ -25,8 +25,8 @@ struct CollaboratorBadge: View {
             
             switch style {
             case .compact:
-                if collaboratorCount > 0 {
-                    Text("\(collaboratorCount)")
+            if collaboratorCount > 0 {
+                Text("\(collaboratorCount)")
                         .font(.caption2)
                         .fontWeight(.medium)
                 }
@@ -85,14 +85,14 @@ struct SharedListIndicator: View {
         }
         
         HStack(spacing: 12) {
-            CollaboratorBadge(collaboratorCount: 0, style: .minimal)
+        CollaboratorBadge(collaboratorCount: 0, style: .minimal)
         }
         
         Divider()
         
         VStack(alignment: .leading, spacing: 8) {
-            SharedListIndicator(ownerName: "Sarah")
-            SharedListIndicator(ownerName: nil)
+        SharedListIndicator(ownerName: "Sarah")
+        SharedListIndicator(ownerName: nil)
         }
     }
     .padding()

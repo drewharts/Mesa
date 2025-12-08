@@ -31,11 +31,11 @@ struct LightweightProfileListSection: View {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 8) {
-                        Text(list.name)
-                            .font(.headline)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.primary)
-                        
+                    Text(list.name)
+                        .font(.headline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.primary)
+                    
                         // Show collaboration badge if list has collaborators
                         if list.hasCollaborators {
                             CollaboratorBadge(collaboratorCount: list.collaborator_count ?? 0)
@@ -46,9 +46,9 @@ struct LightweightProfileListSection: View {
                     if list.isSharedWithMe, let ownerName = list.owner_name {
                         SharedListIndicator(ownerName: ownerName)
                     } else {
-                        Text("\(totalPlaceCount) place\(totalPlaceCount == 1 ? "" : "s")")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                    Text("\(totalPlaceCount) place\(totalPlaceCount == 1 ? "" : "s")")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                     }
                 }
                 

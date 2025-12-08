@@ -2,6 +2,12 @@
 -- FUNCTION: add_list_collaborator
 -- Purpose: Add a collaborator to a list with proper authorization
 -- Uses SECURITY DEFINER to bypass RLS and handle auth internally
+-- 
+-- IMPORTANT: Handles Firebase ID vs Supabase Auth ID mapping
+-- - auth.uid() returns Supabase Auth UUID
+-- - users.id contains Firebase UID
+-- - users.supabase_uid maps to auth.uid()
+-- - place_lists.user_id uses Firebase UID
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION add_list_collaborator(
@@ -13,21 +19,42 @@ CREATE OR REPLACE FUNCTION add_list_collaborator(
 RETURNS JSON AS $$
 DECLARE
     v_owner_id TEXT;
-    v_caller_id TEXT;
+    v_caller_supabase_uid TEXT;
+    v_caller_firebase_id TEXT;
     v_added_by TEXT;
     v_new_id TEXT;
 BEGIN
-    -- Get the authenticated user
-    v_caller_id := auth.uid()::TEXT;
+    -- Get the authenticated user's Supabase auth UID
+    v_caller_supabase_uid := auth.uid()::TEXT;
     
-    IF v_caller_id IS NULL THEN
+    IF v_caller_supabase_uid IS NULL THEN
         RETURN json_build_object(
             'success', false,
             'error', 'Not authenticated'
         );
     END IF;
     
-    -- Get the list owner
+    -- Look up the user's Firebase ID from their Supabase UID
+    -- The users table has: id = Firebase UID, supabase_uid = Supabase Auth UID
+    SELECT id INTO v_caller_firebase_id
+    FROM users
+    WHERE LOWER(supabase_uid) = LOWER(v_caller_supabase_uid);
+    
+    IF v_caller_firebase_id IS NULL THEN
+        -- Fallback: maybe the user's id IS the supabase_uid (for newer users)
+        SELECT id INTO v_caller_firebase_id
+        FROM users
+        WHERE LOWER(id) = LOWER(v_caller_supabase_uid);
+    END IF;
+    
+    IF v_caller_firebase_id IS NULL THEN
+        RETURN json_build_object(
+            'success', false,
+            'error', 'User profile not found for authenticated user'
+        );
+    END IF;
+    
+    -- Get the list owner (stored as Firebase ID)
     SELECT user_id INTO v_owner_id
     FROM place_lists
     WHERE id = p_list_id;
@@ -39,17 +66,18 @@ BEGIN
         );
     END IF;
     
-    -- Check authorization: caller must be the list owner
-    -- Compare case-insensitively to handle UUID case differences
-    IF LOWER(v_owner_id) != LOWER(v_caller_id) THEN
+    -- Check authorization: caller's Firebase ID must match list owner
+    IF LOWER(v_owner_id) != LOWER(v_caller_firebase_id) THEN
         RETURN json_build_object(
             'success', false,
-            'error', 'Not authorized - only the list owner can add collaborators'
+            'error', 'Not authorized - only the list owner can add collaborators',
+            'debug_owner', v_owner_id,
+            'debug_caller', v_caller_firebase_id
         );
     END IF;
     
     -- Can't add yourself as collaborator
-    IF LOWER(p_user_id) = LOWER(v_caller_id) THEN
+    IF LOWER(p_user_id) = LOWER(v_caller_firebase_id) THEN
         RETURN json_build_object(
             'success', false,
             'error', 'Cannot add yourself as a collaborator'
@@ -64,7 +92,7 @@ BEGIN
         );
     END IF;
     
-    -- Check if user exists
+    -- Check if target user exists (by their Firebase ID which is users.id)
     IF NOT EXISTS (SELECT 1 FROM users WHERE LOWER(id) = LOWER(p_user_id)) THEN
         RETURN json_build_object(
             'success', false,
@@ -84,13 +112,13 @@ BEGIN
         );
     END IF;
     
-    -- Use provided added_by or default to caller
-    v_added_by := COALESCE(p_added_by, v_caller_id);
+    -- Use provided added_by or default to caller's Firebase ID
+    v_added_by := COALESCE(p_added_by, v_caller_firebase_id);
     
     -- Generate new ID
     v_new_id := uuid_generate_v4()::TEXT;
     
-    -- Insert the collaborator
+    -- Insert the collaborator (using Firebase IDs to match existing schema)
     INSERT INTO place_list_collaborators (id, list_id, user_id, role, added_by, added_at)
     VALUES (v_new_id, p_list_id, p_user_id, p_role, v_added_by, NOW());
     
@@ -115,4 +143,3 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Grant execute permission to authenticated users
 GRANT EXECUTE ON FUNCTION add_list_collaborator(TEXT, TEXT, TEXT, TEXT) TO authenticated;
-
