@@ -56,7 +56,7 @@ struct LightweightCollaborator: Codable, Identifiable, Equatable {
     // MARK: - Computed Properties
     
     var collaboratorRole: CollaboratorRole {
-        CollaboratorRole(rawValue: role) ?? .viewer
+        CollaboratorRole(rawValue: role) ?? .editor
     }
     
     var displayName: String {
@@ -97,7 +97,7 @@ struct SharedListInfo: Codable, Identifiable {
     }
     
     var collaboratorRole: CollaboratorRole {
-        CollaboratorRole(rawValue: userRole) ?? .viewer
+        CollaboratorRole(rawValue: userRole) ?? .editor
     }
 }
 
