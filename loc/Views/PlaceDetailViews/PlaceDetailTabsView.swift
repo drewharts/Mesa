@@ -28,6 +28,7 @@ struct PlaceDetailTabsView: View {
     // MARK: - View-Owned Presentation State (Enterprise Pattern)
     // Sheet presentation is a UI concern, owned by View not ViewModel
     @State private var showingSaversSheet = false
+    @State private var travelSelectorState: TravelTimeSelectorState?
     
     var body: some View {
         ScrollView {
@@ -204,6 +205,16 @@ struct PlaceDetailTabsView: View {
             .presentationDetents(saversSheetDetents)
             .presentationDragIndicator(.visible)
         }
+        // Travel Time Selector - capture state from child via PreferenceKey
+        .onPreferenceChange(TravelTimeSelectorStateKey.self) { state in
+            travelSelectorState = state
+        }
+        // Render expanded menu at root level for proper z-ordering
+        .overlay {
+            if let state = travelSelectorState, state.isExpanded {
+                travelTimeSelectorOverlay(state: state)
+            }
+        }
     }
     
     // MARK: - Dynamic Sheet Height
@@ -230,6 +241,37 @@ struct PlaceDetailTabsView: View {
         
         let calculatedHeight = headerHeight + (CGFloat(count) * rowHeight) + bottomPadding
         return min(calculatedHeight, maxHeight)
+    }
+    
+    // MARK: - Travel Time Selector Overlay (Enterprise Pattern)
+    
+    /// Renders expanded menu at root level, positioned at button location
+    /// This ensures proper z-ordering above all nested content
+    @ViewBuilder
+    private func travelTimeSelectorOverlay(state: TravelTimeSelectorState) -> some View {
+        GeometryReader { geo in
+            // Convert global frame to local coordinate space
+            let localFrame = CGRect(
+                x: state.frame.minX - geo.frame(in: .global).minX,
+                y: state.frame.maxY - geo.frame(in: .global).minY + 8,
+                width: state.frame.width,
+                height: 0
+            )
+            
+            TravelTimeSelectorExpandedMenu(
+                viewModel: viewModel.travelTimeViewModel,
+                selectedIndex: state.selectedIndex,
+                onSelect: { transportType in
+                    viewModel.travelTimeViewModel.switchTransportType(to: transportType)
+                    viewModel.travelTimeViewModel.saveDefaultTransportType(transportType)
+                },
+                onDismiss: { }
+            )
+            .position(x: localFrame.minX + 90, y: localFrame.minY + 100)
+            .transition(.scale(scale: 0.8, anchor: .top).combined(with: .opacity))
+            .animation(.easeOut(duration: 0.2), value: state.isExpanded)
+        }
+        .ignoresSafeArea()
     }
 }
 
