@@ -70,16 +70,14 @@ struct CollaboratorsSheet: View {
                         onRemove: {
                             Task { await viewModel.removeCollaborator(collaborator) }
                         },
-                        onRoleChange: { newRole in
-                            Task { await viewModel.updateRole(collaborator, to: newRole) }
-                        }
+                        onRoleChange: nil  // All collaborators are editors, no role change needed
                     )
                 }
             } header: {
                 Text("\(viewModel.collaboratorCount) collaborator\(viewModel.collaboratorCount == 1 ? "" : "s")")
             } footer: {
                 if viewModel.canManageCollaborators {
-                    Text("Editors can add and remove places. Viewers can only view the list.")
+                    Text("Collaborators can add and remove places from this list.")
                         .font(.caption)
                 }
             }

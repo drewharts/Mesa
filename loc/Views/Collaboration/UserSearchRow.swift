@@ -10,7 +10,6 @@ import SwiftUI
 
 struct UserSearchRow: View {
     let user: ProfileData
-    let selectedRole: CollaboratorRole
     let isAdding: Bool
     let onAdd: () -> Void
     
@@ -111,7 +110,6 @@ struct UserSearchRow: View {
                 firebaseUid: nil,
                 supabaseUid: nil
             ),
-            selectedRole: .editor,
             isAdding: false,
             onAdd: { print("Add tapped") }
         )
@@ -130,7 +128,6 @@ struct UserSearchRow: View {
                 firebaseUid: nil,
                 supabaseUid: nil
             ),
-            selectedRole: .viewer,
             isAdding: true,
             onAdd: {}
         )

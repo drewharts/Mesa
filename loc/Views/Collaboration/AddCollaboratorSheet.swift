@@ -17,7 +17,6 @@ struct AddCollaboratorSheet: View {
         NavigationStack {
             VStack(spacing: 0) {
                 searchBar
-                roleSelector
                 Divider()
                 searchResults
             }
@@ -67,29 +66,6 @@ struct AddCollaboratorSheet: View {
         .background(Color(.systemGray6))
         .cornerRadius(10)
         .padding()
-    }
-    
-    // MARK: - Role Selector
-    
-    private var roleSelector: some View {
-        HStack {
-            Text("Add as:")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-            
-            Picker("Role", selection: $viewModel.selectedRole) {
-                ForEach(CollaboratorRole.allCases, id: \.self) { role in
-                    Label(role.shortName, systemImage: role.icon)
-                        .tag(role)
-                }
-            }
-            .pickerStyle(.segmented)
-            .frame(maxWidth: 200)
-            
-            Spacer()
-        }
-        .padding(.horizontal)
-        .padding(.bottom, 12)
     }
     
     // MARK: - Search Results
@@ -142,7 +118,7 @@ struct AddCollaboratorSheet: View {
             Text("Search for users")
                 .font(.headline)
             
-            Text("Enter a name or email to find people to add")
+            Text("Find people to collaborate on this list")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
@@ -156,7 +132,6 @@ struct AddCollaboratorSheet: View {
             ForEach(viewModel.searchResults) { user in
                 UserSearchRow(
                     user: user,
-                    selectedRole: viewModel.selectedRole,
                     isAdding: viewModel.isAdding,
                     onAdd: {
                         Task {

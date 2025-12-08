@@ -5,36 +5,28 @@
 //  Enum defining collaboration permission levels
 //  Single Responsibility: Define role types and their display properties
 //
+//  Note: Currently only 'editor' role exists - all collaborators can edit
+//
 
 import Foundation
 
 enum CollaboratorRole: String, Codable, CaseIterable {
-    case viewer = "viewer"
     case editor = "editor"
     
     var displayName: String {
-        switch self {
-        case .viewer: return "Can view"
-        case .editor: return "Can edit"
-        }
+        return "Can edit"
     }
     
     var shortName: String {
-        switch self {
-        case .viewer: return "Viewer"
-        case .editor: return "Editor"
-        }
+        return "Editor"
     }
     
     var icon: String {
-        switch self {
-        case .viewer: return "eye"
-        case .editor: return "pencil"
-        }
+        return "pencil"
     }
     
     var canEdit: Bool {
-        self == .editor
+        return true
     }
 }
 

@@ -81,25 +81,9 @@ struct CollaboratorRow: View {
     
     private func ownerMenu(onRemove: @escaping () -> Void) -> some View {
         Menu {
-            // Role change options
-            if let onRoleChange = onRoleChange {
-                Section("Change Role") {
-                    ForEach(CollaboratorRole.allCases, id: \.self) { role in
-                        Button {
-                            onRoleChange(role)
-                        } label: {
-                            Label(role.displayName, systemImage: role.icon)
-                        }
-                        .disabled(role.rawValue == collaborator.role)
-                    }
-                }
-            }
-            
-            // Remove option
-            Section {
-                Button(role: .destructive, action: onRemove) {
-                    Label("Remove", systemImage: "person.badge.minus")
-                }
+            // Remove option (no role change needed - all collaborators are editors)
+            Button(role: .destructive, action: onRemove) {
+                Label("Remove", systemImage: "person.badge.minus")
             }
         } label: {
             Image(systemName: "ellipsis.circle")
