@@ -21,6 +21,7 @@ class ServiceContainer: ObservableObject {
     lazy var imageService = ImageService.shared
     lazy var placeShareService = PlaceShareService()
     lazy var tikTokService = TikTokService()
+    lazy var collaborationService = CollaborationService.shared
     
     // MARK: - Managers
     lazy var locationManager = LocationManager()
