@@ -243,40 +243,41 @@ private struct SavedByIndicator: View {
     
     var body: some View {
         Button(action: onTap) {
-            HStack(spacing: -8) {
-                // Show up to 3 profile circles using AsyncImage
-                ForEach(savers, id: \.id) { saver in
-                    if let photoURL = saver.profilePhotoURL {
-                        AsyncImage(url: photoURL) { phase in
-                            switch phase {
-                            case .success(let image):
-                                image
-                                    .resizable()
-                                    .scaledToFill()
-                                    .frame(width: 24, height: 24)
-                                    .clipShape(Circle())
-                                    .overlay(
-                                        Circle().stroke(Color.white, lineWidth: 2)
-                                    )
-                            case .failure, .empty:
-                                placeholderCircle(for: saver)
-                            @unknown default:
-                                placeholderCircle(for: saver)
+            HStack(spacing: 4) {
+                // Overlapping profile circles in their own container
+                HStack(spacing: -8) {
+                    ForEach(savers, id: \.id) { saver in
+                        if let photoURL = saver.profilePhotoURL {
+                            AsyncImage(url: photoURL) { phase in
+                                switch phase {
+                                case .success(let image):
+                                    image
+                                        .resizable()
+                                        .scaledToFill()
+                                        .frame(width: 24, height: 24)
+                                        .clipShape(Circle())
+                                        .overlay(
+                                            Circle().stroke(Color.white, lineWidth: 2)
+                                        )
+                                case .failure, .empty:
+                                    placeholderCircle(for: saver)
+                                @unknown default:
+                                    placeholderCircle(for: saver)
+                                }
                             }
+                            .frame(width: 24, height: 24)
+                        } else {
+                            placeholderCircle(for: saver)
                         }
-                        .frame(width: 24, height: 24)
-                    } else {
-                        placeholderCircle(for: saver)
                     }
                 }
                 
-                // +X indicator if more than 3
+                // +X indicator outside the overlapping circles
                 if additionalCount > 0 {
                     Text("+\(additionalCount)")
                         .font(.caption2)
                         .fontWeight(.medium)
                         .foregroundColor(.gray)
-                        .padding(.leading, 4)
                 }
             }
         }
