@@ -13,10 +13,10 @@ struct LightweightPlaceList: Codable, Identifiable {
     
     // MARK: - Optional Collaboration Fields
     // These are populated when fetching shared lists or lists with collaboration info
-    let collaborator_count: Int?
-    let is_shared: Bool?
-    let owner_name: String?
-    let user_role: String?
+    var collaborator_count: Int?
+    var is_shared: Bool?
+    var owner_name: String?
+    var user_role: String?
     
     var id: String { list_id }
     
@@ -45,5 +45,37 @@ struct LightweightPlaceList: Codable, Identifiable {
         case owner_name
         case user_role
         // Intentionally omitting average_location - we don't need it
+    }
+    
+    // MARK: - Custom Initializer with Defaults
+    // Provides backward compatibility for existing code
+    init(
+        list_id: String,
+        name: String,
+        is_public: Bool,
+        image: String?,
+        created_at: String?,
+        updated_at: String?,
+        distance_meters: Double?,
+        place_count: Int,
+        city: String?,
+        collaborator_count: Int? = nil,
+        is_shared: Bool? = nil,
+        owner_name: String? = nil,
+        user_role: String? = nil
+    ) {
+        self.list_id = list_id
+        self.name = name
+        self.is_public = is_public
+        self.image = image
+        self.created_at = created_at
+        self.updated_at = updated_at
+        self.distance_meters = distance_meters
+        self.place_count = place_count
+        self.city = city
+        self.collaborator_count = collaborator_count
+        self.is_shared = is_shared
+        self.owner_name = owner_name
+        self.user_role = user_role
     }
 }
