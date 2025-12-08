@@ -27,7 +27,7 @@ struct UserSearchRow: View {
     // MARK: - Profile Image
     
     private var profileImage: some View {
-        AsyncImage(url: URL(string: user.profilePhotoURL ?? "")) { phase in
+        AsyncImage(url: user.profilePhotoURL) { phase in
             switch phase {
             case .success(let image):
                 image
