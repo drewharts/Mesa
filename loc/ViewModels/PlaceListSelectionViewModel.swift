@@ -202,19 +202,26 @@ class PlaceListSelectionViewModel: ObservableObject {
             )
             
             if !moreLists.isEmpty {
-                // Insert new owned lists BEFORE shared lists
-                let insertIndex = lists.count - sharedLists.count
-                lists.insert(contentsOf: moreLists, at: insertIndex)
-                currentPage = nextPage
-                hasMore = moreLists.count >= pageSize
+                // Deduplicate: filter out any lists already in our collection
+                let existingIds = Set(lists.map { $0.list_id })
+                let newUniqueLists = moreLists.filter { !existingIds.contains($0.list_id) }
                 
-                // Load place membership data in BACKGROUND (non-blocking)
-                // Follows Single Responsibility: Pagination ≠ Data Enrichment
-                if let placeId = currentPlace?.id.uuidString {
-                    Task {
-                        await loadPlaceMembershipForLists(moreLists, placeId: placeId)
+                if !newUniqueLists.isEmpty {
+                    // Insert new owned lists BEFORE shared lists
+                    let insertIndex = lists.count - sharedLists.count
+                    lists.insert(contentsOf: newUniqueLists, at: insertIndex)
+                    
+                    // Load place membership data in BACKGROUND (non-blocking)
+                    // Follows Single Responsibility: Pagination ≠ Data Enrichment
+                    if let placeId = currentPlace?.id.uuidString {
+                        Task {
+                            await loadPlaceMembershipForLists(newUniqueLists, placeId: placeId)
+                        }
                     }
                 }
+                
+                currentPage = nextPage
+                hasMore = moreLists.count >= pageSize
             } else {
                 hasMore = false
             }
