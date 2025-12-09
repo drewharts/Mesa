@@ -55,6 +55,37 @@ class ProfileViewModel: ObservableObject {
     @Published var hasMorePlaceLists: Bool = true
     var placeListsCurrentPage: Int = 1
     
+    // MARK: - Initial List Loading State
+    /// True while initial list fetch (owned + shared) is in progress
+    @Published var isLoadingInitialLists: Bool = false
+    
+    // MARK: - List Filter State
+    @Published var showOnlySharedLists: Bool = false
+    
+    /// Returns filtered lists based on current filter state
+    var filteredPlaceLists: [LightweightPlaceList] {
+        if showOnlySharedLists {
+            return lightweightPlaceLists.filter { $0.isCollaborative }
+        }
+        return lightweightPlaceLists
+    }
+    
+    /// Count of collaborative lists (shared with you OR you shared with others)
+    var collaborativeListCount: Int {
+        lightweightPlaceLists.filter { $0.isCollaborative }.count
+    }
+    
+    /// Whether there are any collaborative lists to filter
+    var hasSharedLists: Bool {
+        collaborativeListCount > 0
+    }
+    
+    /// Whether the Shared filter button should be interactive
+    /// Disabled while initial load is in progress to prevent confusing empty states
+    var canInteractWithSharedFilter: Bool {
+        !isLoadingInitialLists
+    }
+    
     // Save-to-list sheet pagination (separate from profile view pagination)
     @Published var userFollowing: [ProfileData] = []
     @Published var userFollowers: [ProfileData] = []
@@ -1567,10 +1598,48 @@ class ProfileViewModel: ObservableObject {
     
     // MARK: - Reviewed Places Access
     
-    /// Check if the current user has reviewed a specific place
-    /// Check if user has reviewed a place (server-side pagination)
+    /// Cached set of place IDs the user has reviewed (for unvisited filtering)
+    /// Loaded on-demand when needed for a specific set of places
+    @Published var verifiedReviewedPlaceIds: Set<String> = []
+    @Published var isLoadingVerifiedReviewedIds: Bool = false
+    
+    /// Check if user has reviewed a place (quick check against paginated data)
+    /// Note: For accurate filtering, use loadVerifiedReviewedPlaceIds() first
     func hasReviewedPlace(placeId: String) -> Bool {
         return lightweightReviewedPlaces.contains { $0.place_id == placeId }
+    }
+    
+    /// Check if user has reviewed a place (using database-verified IDs)
+    /// More accurate than hasReviewedPlace() - use after calling loadVerifiedReviewedPlaceIds()
+    func hasVerifiedReviewedPlace(placeId: String) -> Bool {
+        return verifiedReviewedPlaceIds.contains(placeId)
+    }
+    
+    /// Load verified reviewed place IDs from database for accurate filtering
+    /// Call this with the place IDs you want to filter, then use hasVerifiedReviewedPlace()
+    func loadVerifiedReviewedPlaceIds(for placeIds: [String]) async {
+        guard let userId = user?.id else { return }
+        guard !placeIds.isEmpty else { return }
+        guard !isLoadingVerifiedReviewedIds else { return }
+        
+        isLoadingVerifiedReviewedIds = true
+        
+        do {
+            let ids = try await SupabaseReviewService.shared.getReviewedPlaceIds(
+                userId: userId,
+                placeIds: placeIds
+            )
+            verifiedReviewedPlaceIds = ids
+        } catch {
+            print("❌ [ProfileViewModel] Error loading verified reviewed IDs: \(error)")
+        }
+        
+        isLoadingVerifiedReviewedIds = false
+    }
+    
+    /// Clear verified reviewed place IDs (call when switching contexts)
+    func clearVerifiedReviewedPlaceIds() {
+        verifiedReviewedPlaceIds = []
     }
     
     // MARK: - List Sorting by Distance

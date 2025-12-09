@@ -11,7 +11,32 @@ struct LightweightPlaceList: Codable, Identifiable {
     let place_count: Int
     let city: String?
     
+    // MARK: - Optional Collaboration Fields
+    // These are populated when fetching shared lists or lists with collaboration info
+    var collaborator_count: Int?
+    var is_shared: Bool?
+    var owner_name: String?
+    var owner_photo_url: String?
+    var user_role: String?
+    var collaborator_photos: [String]?
+    
     var id: String { list_id }
+    
+    /// Convenience: Check if this list has collaborators
+    var hasCollaborators: Bool {
+        (collaborator_count ?? 0) > 0
+    }
+    
+    /// Convenience: Check if this is a shared list (user is not owner)
+    var isSharedWithMe: Bool {
+        is_shared ?? false
+    }
+    
+    /// Convenience: Check if this list involves any collaboration
+    /// True if: shared with you OR you own it but shared with others
+    var isCollaborative: Bool {
+        isSharedWithMe || hasCollaborators
+    }
     
     enum CodingKeys: String, CodingKey {
         case list_id
@@ -23,6 +48,48 @@ struct LightweightPlaceList: Codable, Identifiable {
         case distance_meters
         case place_count
         case city
+        case collaborator_count
+        case is_shared
+        case owner_name
+        case owner_photo_url
+        case user_role
+        case collaborator_photos
         // Intentionally omitting average_location - we don't need it
+    }
+    
+    // MARK: - Custom Initializer with Defaults
+    // Provides backward compatibility for existing code
+    init(
+        list_id: String,
+        name: String,
+        is_public: Bool,
+        image: String?,
+        created_at: String?,
+        updated_at: String?,
+        distance_meters: Double?,
+        place_count: Int,
+        city: String?,
+        collaborator_count: Int? = nil,
+        is_shared: Bool? = nil,
+        owner_name: String? = nil,
+        owner_photo_url: String? = nil,
+        user_role: String? = nil,
+        collaborator_photos: [String]? = nil
+    ) {
+        self.list_id = list_id
+        self.name = name
+        self.is_public = is_public
+        self.image = image
+        self.created_at = created_at
+        self.updated_at = updated_at
+        self.distance_meters = distance_meters
+        self.place_count = place_count
+        self.city = city
+        self.collaborator_count = collaborator_count
+        self.is_shared = is_shared
+        self.owner_name = owner_name
+        self.owner_photo_url = owner_photo_url
+        self.user_role = user_role
+        self.collaborator_photos = collaborator_photos
     }
 }

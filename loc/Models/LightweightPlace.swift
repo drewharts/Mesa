@@ -1,7 +1,7 @@
 import Foundation
 
 /// Lightweight place data for tiles (used for both place list items and my places)
-struct LightweightPlace: Codable, Identifiable {
+struct LightweightPlace: Codable, Identifiable, Equatable {
     let place_id: String
     let name: String
     let latest_review_photo: String?

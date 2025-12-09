@@ -35,9 +35,21 @@ struct LightweightProfileListSection: View {
                         .fontWeight(.semibold)
                         .foregroundColor(.primary)
                     
-                    Text("\(totalPlaceCount) place\(totalPlaceCount == 1 ? "" : "s")")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                    // Show owner name if this is a shared list (collaborator view)
+                    if list.isSharedWithMe, let ownerName = list.owner_name {
+                        SharedByIndicator(
+                            ownerName: ownerName,
+                            ownerPhotoUrl: list.owner_photo_url,
+                            collaboratorPhotos: list.collaborator_photos
+                        )
+                    } else {
+                        // Owner view - show place count and collaborators if shared
+                        SharedWithIndicator(
+                            collaboratorPhotos: list.collaborator_photos,
+                            collaboratorCount: list.collaborator_count ?? 0,
+                            placeCount: totalPlaceCount
+                        )
+                    }
                 }
                 
                 Spacer()
