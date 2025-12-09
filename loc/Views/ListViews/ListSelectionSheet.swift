@@ -299,6 +299,8 @@ struct ListsInSelectionSheet: View {
                 }
             }
         }
+        // Force complete rebuild when filter changes to fix LazyVStack layout issues
+        .id(viewModel.showOnlyShared)
     }
     
     private var emptyStateView: some View {
