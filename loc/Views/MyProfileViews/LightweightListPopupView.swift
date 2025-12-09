@@ -40,9 +40,22 @@ struct LightweightListPopupView: View {
         self._currentListIndex = State(initialValue: initialListIndex)
     }
     
-    // Current list being displayed
+    // Current list being displayed (uses passed lists, not profile.lightweightPlaceLists for filtered support)
     private var currentList: LightweightPlaceList {
-        profile.lightweightPlaceLists[currentListIndex]
+        guard currentListIndex >= 0 && currentListIndex < lists.count else {
+            return lists.first ?? LightweightPlaceList(
+                list_id: "",
+                name: "Unknown",
+                is_public: false,
+                image: nil,
+                created_at: nil,
+                updated_at: nil,
+                distance_meters: nil,
+                place_count: 0,
+                city: nil
+            )
+        }
+        return lists[currentListIndex]
     }
     
     // Same layout as original popup
@@ -120,9 +133,9 @@ struct LightweightListPopupView: View {
                             .font(.caption)
                             .foregroundColor(.gray)
                         
-                        // Show list counter if multiple lists and we have total count
-                        if profile.lightweightPlaceLists.count > 1 && profile.totalListCount > 0 {
-                            Text("\(currentListIndex + 1) of \(profile.totalListCount)")
+                        // Show list counter if multiple lists (uses passed lists count)
+                        if lists.count > 1 {
+                            Text("\(currentListIndex + 1) of \(lists.count)")
                                 .font(.caption2)
                                 .foregroundColor(.gray)
                         }
@@ -150,13 +163,13 @@ struct LightweightListPopupView: View {
                 }
                 .padding(.bottom, 10)
                 
-                // Content with swiping support
-                if profile.lightweightPlaceLists.count > 1 {
+                // Content with swiping support (uses passed lists for filtered support)
+                if lists.count > 1 {
                     // Multiple lists - use TabView for swiping
                     TabView(selection: $currentListIndex) {
-                        ForEach(profile.lightweightPlaceLists.indices, id: \.self) { index in
+                        ForEach(lists.indices, id: \.self) { index in
                             ListContentView(
-                                list: profile.lightweightPlaceLists[index],
+                                list: lists[index],
                                 placeColors: $placeColors,
                                 showOnlyUnvisited: $showOnlyUnvisited,
                                 isLoadingMore: $isLoadingMore,
@@ -177,8 +190,9 @@ struct LightweightListPopupView: View {
                         // Reload reviewed IDs for new list's places via ViewModel
                         loadReviewedPlaceIdsViaViewModel()
                         
-                        // Load more lists when approaching the end (3rd-to-last list)
-                        if newIndex >= profile.lightweightPlaceLists.count - 3 {
+                        // Load more lists when approaching the end (only if using full list, not filtered)
+                        // Note: When using filtered lists, we don't load more lists
+                        if newIndex >= lists.count - 3 && lists.count == profile.lightweightPlaceLists.count {
                             loadMoreListsIfNeeded()
                         }
                     }
