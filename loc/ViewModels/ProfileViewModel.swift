@@ -1630,7 +1630,6 @@ class ProfileViewModel: ObservableObject {
                 placeIds: placeIds
             )
             verifiedReviewedPlaceIds = ids
-            print("✅ [ProfileViewModel] Loaded \(ids.count) verified reviewed place IDs")
         } catch {
             print("❌ [ProfileViewModel] Error loading verified reviewed IDs: \(error)")
         }

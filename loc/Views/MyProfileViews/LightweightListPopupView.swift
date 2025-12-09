@@ -256,8 +256,6 @@ struct LightweightListPopupView: View {
                     hasMorePlaces = morePlaces.count >= 6
                     isLoadingMore = false
                 }
-                
-                print("✅ [LightweightListPopupView] Loaded \(morePlaces.count) more places for list (page \(nextPage))")
             } catch {
                 await MainActor.run {
                     isLoadingMore = false

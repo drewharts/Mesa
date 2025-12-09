@@ -140,7 +140,6 @@ class SupabaseReviewService: ObservableObject {
             .execute()
             .value
         
-        print("✅ [SupabaseReviewService] User has reviewed \(reviewedIds.count) of \(placeIds.count) places")
         return Set(reviewedIds)
     }
     
