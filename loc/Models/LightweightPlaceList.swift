@@ -32,6 +32,12 @@ struct LightweightPlaceList: Codable, Identifiable {
         is_shared ?? false
     }
     
+    /// Convenience: Check if this list involves any collaboration
+    /// True if: shared with you OR you own it but shared with others
+    var isCollaborative: Bool {
+        isSharedWithMe || hasCollaborators
+    }
+    
     enum CodingKeys: String, CodingKey {
         case list_id
         case name

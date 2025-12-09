@@ -32,21 +32,22 @@ class PlaceListSelectionViewModel: ObservableObject {
     // MARK: - Computed Properties
     
     /// Returns filtered lists based on current filter state
+    /// When filter is active, shows lists that are collaborative (shared with you OR you shared with others)
     var filteredLists: [LightweightPlaceList] {
         if showOnlyShared {
-            return lists.filter { $0.isSharedWithMe }
+            return lists.filter { $0.isCollaborative }
         }
         return lists
     }
     
-    /// Count of shared lists for UI display
-    var sharedListCount: Int {
-        lists.filter { $0.isSharedWithMe }.count
+    /// Count of collaborative lists (shared with you OR you shared with others)
+    var collaborativeListCount: Int {
+        lists.filter { $0.isCollaborative }.count
     }
     
-    /// Whether there are any shared lists to filter
+    /// Whether there are any collaborative lists to filter
     var hasSharedLists: Bool {
-        sharedListCount > 0
+        collaborativeListCount > 0
     }
     
     // MARK: - Dependencies

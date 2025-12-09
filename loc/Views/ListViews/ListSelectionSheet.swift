@@ -144,9 +144,10 @@ struct LightweightListSelectionRowView: View {
 
                 Spacer()
                 
-                // Collaborator avatars for shared lists (before checkmark)
-                if list.isSharedWithMe {
+                // Collaborator avatars for ANY collaborative list (shared with you OR you shared)
+                if list.isCollaborative {
                     InlineCollaboratorAvatars(
+                        isOwnedByMe: !list.isSharedWithMe,
                         ownerPhotoUrl: list.owner_photo_url,
                         ownerName: list.owner_name,
                         collaboratorPhotos: list.collaborator_photos
@@ -180,53 +181,61 @@ struct LightweightListSelectionRowView: View {
 // MARK: - Inline Collaborator Avatars
 // DUMB Component: Compact avatar stack for inline display in list rows
 private struct InlineCollaboratorAvatars: View {
+    let isOwnedByMe: Bool        // If true, don't show owner avatar (you ARE the owner)
     let ownerPhotoUrl: String?
     let ownerName: String?
     let collaboratorPhotos: [String]?
     
     private let avatarSize: CGFloat = 24
     
+    /// How many collaborator avatars to show (more if we're not showing owner)
+    private var maxCollaboratorAvatars: Int {
+        isOwnedByMe ? 3 : 2
+    }
+    
     var body: some View {
         HStack(spacing: -8) {
-            // Owner avatar
-            avatarView(
-                photoUrl: ownerPhotoUrl,
-                fallbackInitial: ownerName?.prefix(1).uppercased() ?? "?",
-                isOwner: true
-            )
+            // Owner avatar (only for lists shared WITH you)
+            if !isOwnedByMe {
+                avatarView(
+                    photoUrl: ownerPhotoUrl,
+                    fallbackInitial: ownerName?.prefix(1).uppercased() ?? "?",
+                    isPrimary: true
+                )
+            }
             
-            // Collaborator avatars (up to 2)
+            // Collaborator avatars
             if let photos = collaboratorPhotos {
-                ForEach(Array(photos.prefix(2).enumerated()), id: \.offset) { index, photoUrl in
+                ForEach(Array(photos.prefix(maxCollaboratorAvatars).enumerated()), id: \.offset) { index, photoUrl in
                     avatarView(
                         photoUrl: photoUrl,
                         fallbackInitial: "?",
-                        isOwner: false
+                        isPrimary: isOwnedByMe && index == 0
                     )
                     .zIndex(Double(-index - 1))
                 }
                 
                 // Overflow badge
-                if photos.count > 2 {
-                    overflowBadge(count: photos.count - 2)
+                if photos.count > maxCollaboratorAvatars {
+                    overflowBadge(count: photos.count - maxCollaboratorAvatars)
                         .zIndex(-4)
                 }
             }
         }
     }
     
-    private func avatarView(photoUrl: String?, fallbackInitial: String, isOwner: Bool) -> some View {
+    private func avatarView(photoUrl: String?, fallbackInitial: String, isPrimary: Bool) -> some View {
         AsyncImage(url: URL(string: photoUrl ?? "")) { phase in
             switch phase {
             case .success(let image):
                 image.resizable().scaledToFill()
             default:
                 Circle()
-                    .fill(isOwner ? Color.blue.opacity(0.3) : Color.gray.opacity(0.3))
+                    .fill(Color.gray.opacity(0.3))
                     .overlay(
                         Text(fallbackInitial)
                             .font(.system(size: 10, weight: .semibold))
-                            .foregroundColor(isOwner ? .blue : .gray)
+                            .foregroundColor(.gray)
                     )
             }
         }
@@ -237,7 +246,7 @@ private struct InlineCollaboratorAvatars: View {
     
     private func overflowBadge(count: Int) -> some View {
         Circle()
-            .fill(Color.blue.opacity(0.8))
+            .fill(Color.gray.opacity(0.6))
             .frame(width: avatarSize, height: avatarSize)
             .overlay(
                 Text("+\(count)")
@@ -364,53 +373,62 @@ struct ListSelectionSheet: View {
     // MARK: - Header
     
     private var sheetHeader: some View {
-        HStack {
-            // Shared filter on left (only if there are shared lists)
-            if viewModel.hasSharedLists {
-                sharedFilterButton
-            } else {
-                // Empty space for balance when no shared lists
-                Color.clear
-                    .frame(width: 32, height: 32)
-            }
+        VStack(spacing: 0) {
+            // Drag indicator
+            RoundedRectangle(cornerRadius: 2.5)
+                .fill(Color.gray.opacity(0.4))
+                .frame(width: 36, height: 5)
+                .padding(.top, 8)
+                .padding(.bottom, 16)
             
-            Spacer()
+            // Title and buttons row
+            HStack {
+                // Shared filter on left (only if there are shared lists)
+                if viewModel.hasSharedLists {
+                    sharedFilterButton
+                } else {
+                    // Empty space for balance when no shared lists
+                    Color.clear
+                        .frame(width: 70, height: 32)
+                }
+                
+                Spacer()
 
-            Text("Save to list")
-                .font(.headline)
+                Text("Save to list")
+                    .font(.headline)
 
-            Spacer()
+                Spacer()
 
-            Button(action: {
-                showNewListSheet = true
-            }) {
-                Image(systemName: "plus")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.gray)
-                    .frame(width: 32, height: 32)
-                    .background(Circle().fill(Color(.systemGray5)))
+                Button(action: {
+                    showNewListSheet = true
+                }) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(.gray)
+                        .frame(width: 32, height: 32)
+                        .background(Circle().fill(Color(.systemGray5)))
+                }
+                .sheet(isPresented: $showNewListSheet) {
+                    NewListView(isPresented: $showNewListSheet, onSave: { listName in
+                        let result = await viewModel.addNewListToSelection(
+                            named: listName, 
+                            city: "", 
+                            emoji: "", 
+                            image: ""
+                        )
+                        
+                        switch result {
+                        case .success:
+                            break
+                        case .failure(let error):
+                            errorMessage = error.localizedDescription
+                            showError = true
+                        }
+                    })
+                }
             }
-            .sheet(isPresented: $showNewListSheet) {
-                NewListView(isPresented: $showNewListSheet, onSave: { listName in
-                    let result = await viewModel.addNewListToSelection(
-                        named: listName, 
-                        city: "", 
-                        emoji: "", 
-                        image: ""
-                    )
-                    
-                    switch result {
-                    case .success:
-                        break
-                    case .failure(let error):
-                        errorMessage = error.localizedDescription
-                        showError = true
-                    }
-                })
-            }
+            .padding(.horizontal, 20)
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 12)
     }
     
     // MARK: - Shared Filter Button
