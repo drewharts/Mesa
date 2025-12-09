@@ -125,6 +125,55 @@ struct SharedListInfo: Codable, Identifiable {
     }
 }
 
+// MARK: - Collaborative Owned List Info
+
+/// Information about a list OWNED by the user that has collaborators
+/// Used to ensure all collaborative lists appear in Shared filter (not paginated)
+struct CollaborativeOwnedList: Codable, Identifiable {
+    let listId: String
+    let name: String
+    let isPublic: Bool
+    let image: String?
+    let placeCount: Int
+    let city: String?
+    let collaboratorPhotos: [String]?
+    let collaboratorCount: Int
+    
+    var id: String { listId }
+    
+    enum CodingKeys: String, CodingKey {
+        case listId = "list_id"
+        case name
+        case isPublic = "is_public"
+        case image
+        case placeCount = "place_count"
+        case city
+        case collaboratorPhotos = "collaborator_photos"
+        case collaboratorCount = "collaborator_count"
+    }
+    
+    /// Convert to LightweightPlaceList for unified display
+    /// Note: is_shared = false because user OWNS this list (they shared it with others)
+    func toLightweightPlaceList() -> LightweightPlaceList {
+        return LightweightPlaceList(
+            list_id: listId,
+            name: name,
+            is_public: isPublic,
+            image: image,
+            created_at: nil,
+            updated_at: nil,
+            distance_meters: nil,
+            place_count: placeCount,
+            city: city,
+            collaborator_count: collaboratorCount,
+            is_shared: false, // User owns this list
+            owner_name: nil,  // User is the owner
+            owner_photo_url: nil,
+            collaborator_photos: collaboratorPhotos
+        )
+    }
+}
+
 // MARK: - List Collaboration Info
 
 /// Collaboration information for a specific list

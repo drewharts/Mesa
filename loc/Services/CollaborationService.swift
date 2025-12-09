@@ -86,6 +86,25 @@ class CollaborationService {
         }
     }
     
+    /// Fetch all lists OWNED by user that have collaborators
+    /// Not paginated - ensures all collaborative lists appear in Shared filter
+    func fetchCollaborativeOwnedLists(userId: String) async throws -> [CollaborativeOwnedList] {
+        let params = SharedListsParams(p_user_id: userId)
+        
+        do {
+            let lists: [CollaborativeOwnedList] = try await supabase.client
+                .rpc("get_user_collaborative_owned_lists", params: params)
+                .execute()
+                .value
+            
+            print("✅ [CollaborationService] Fetched \(lists.count) collaborative owned lists for user")
+            return lists
+        } catch {
+            print("❌ [CollaborationService] Failed to fetch collaborative owned lists: \(error)")
+            throw error
+        }
+    }
+    
     /// Get collaboration info for a specific list
     func getListCollaborationInfo(listId: String, userId: String) async throws -> ListCollaborationInfo? {
         let params = ListInfoParams(p_list_id: listId, p_user_id: userId)

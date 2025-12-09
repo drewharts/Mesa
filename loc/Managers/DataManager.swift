@@ -813,7 +813,8 @@ class DataManager: ObservableObject {
                 
                 let pageSize = 6 // Consistent page size for initial load and pagination
                 
-                // Fetch owned lists and shared lists in parallel
+                // Fetch owned lists, shared lists, AND collaborative owned lists in parallel
+                // This ensures ALL collaborative lists are available for the Shared filter
                 async let ownedListsTask = self.userService.fetchPlaceListsByProximity(
                     userId: userId,
                     userLatitude: location.latitude,
@@ -822,15 +823,28 @@ class DataManager: ObservableObject {
                     pageSize: pageSize
                 )
                 async let sharedListsTask = CollaborationService.shared.fetchSharedLists(userId: userId)
+                async let collaborativeOwnedTask = CollaborationService.shared.fetchCollaborativeOwnedLists(userId: userId)
                 
                 let ownedLists = (try? await ownedListsTask) ?? []
                 let sharedLists = (try? await sharedListsTask) ?? []
+                let collaborativeOwnedLists = (try? await collaborativeOwnedTask) ?? []
                 
-                // Convert shared lists to LightweightPlaceList format and merge
+                // Convert collaborative lists to LightweightPlaceList format
                 let sharedAsLightweight = sharedLists.map { $0.toLightweightPlaceList() }
-                let allLists = ownedLists + sharedAsLightweight
+                let collaborativeOwnedAsLightweight = collaborativeOwnedLists.map { $0.toLightweightPlaceList() }
                 
-                print("📋 [DataManager] Loaded \(ownedLists.count) owned lists + \(sharedLists.count) shared lists")
+                // Get IDs of lists already in owned lists (to avoid duplicates)
+                let ownedListIds = Set(ownedLists.map { $0.list_id })
+                
+                // Filter out collaborative owned lists that are already in paginated owned lists
+                let additionalCollaborativeLists = collaborativeOwnedAsLightweight.filter { 
+                    !ownedListIds.contains($0.list_id) 
+                }
+                
+                // Merge: owned (paginated) + collaborative owned (not in page 1) + shared with me
+                let allLists = ownedLists + additionalCollaborativeLists + sharedAsLightweight
+                
+                print("📋 [DataManager] Loaded \(ownedLists.count) owned lists + \(additionalCollaborativeLists.count) additional collaborative owned + \(sharedLists.count) shared lists")
                 
                 // Update place lists on main thread
                 await MainActor.run {

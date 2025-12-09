@@ -2,8 +2,11 @@
 //  ListHeaderView.swift
 //  loc
 //
-//  DUMB Component: Header for lists section with filter and add buttons
-//  Single Responsibility: Display header with shared filter and add list actions
+//  DUMB Component: Header for lists section with LISTS label and action buttons
+//  Single Responsibility: Display header with title, shared filter, and add list actions
+//
+//  Layout: [LISTS label] ... [Shared button] [Plus button]
+//  Matches FAVORITES and TIKTOKS header style
 //
 //  Accepts state from ViewModel, contains no business logic
 //
@@ -25,20 +28,29 @@ struct ListHeaderView: View {
     
     var body: some View {
         HStack {
-            // Shared filter on left (only show if there are shared lists OR loading)
-            if hasSharedLists || !isFilterEnabled {
-                sharedFilterButton
-            }
+            // LISTS label on left (matches FAVORITES/TIKTOKS style)
+            Text("LISTS")
+                .font(.headline)
+                .fontWeight(.semibold)
+                .foregroundColor(.primary)
             
             Spacer()
             
-            // Add list button (matches ListSelectionSheet style)
-            Button(action: onAddList) {
-                Image(systemName: "plus")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.gray)
-                    .frame(width: 32, height: 32)
-                    .background(Circle().fill(Color(.systemGray5)))
+            // Action buttons on right
+            HStack(spacing: 12) {
+                // Shared filter button (only show if there are shared lists OR loading)
+                if hasSharedLists || !isFilterEnabled {
+                    sharedFilterButton
+                }
+                
+                // Add list button (matches ListSelectionSheet style)
+                Button(action: onAddList) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(.gray)
+                        .frame(width: 32, height: 32)
+                        .background(Circle().fill(Color(.systemGray5)))
+                }
             }
         }
         .padding(.horizontal, 20)
