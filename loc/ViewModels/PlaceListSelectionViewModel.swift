@@ -26,6 +26,29 @@ class PlaceListSelectionViewModel: ObservableObject {
     @Published var hasMore: Bool = true
     @Published var placeMembership: [String: Bool] = [:] // listId -> isPlaceInList
     
+    // MARK: - Filter State
+    @Published var showOnlyShared: Bool = false
+    
+    // MARK: - Computed Properties
+    
+    /// Returns filtered lists based on current filter state
+    var filteredLists: [LightweightPlaceList] {
+        if showOnlyShared {
+            return lists.filter { $0.isSharedWithMe }
+        }
+        return lists
+    }
+    
+    /// Count of shared lists for UI display
+    var sharedListCount: Int {
+        lists.filter { $0.isSharedWithMe }.count
+    }
+    
+    /// Whether there are any shared lists to filter
+    var hasSharedLists: Bool {
+        sharedListCount > 0
+    }
+    
     // MARK: - Dependencies
     private let profile: ProfileViewModel
     private let placeListService: PlaceListService
