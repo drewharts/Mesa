@@ -3,7 +3,15 @@
 //  loc
 //
 //  Created by Cursor on 3/1/25.
-//  ViewModel responsible for "Save to List" flow
+//
+//  SMART ViewModel: Manages "Save to List" selection flow
+//  Single Responsibility: List selection state for adding places to lists
+//
+//  Features:
+//  - Loads OWNED lists (sorted by proximity to place)
+//  - Loads SHARED lists (where user is a collaborator)
+//  - Tracks which lists already contain the place
+//  - Handles pagination for owned lists
 //
 
 import Foundation
@@ -21,6 +29,7 @@ class PlaceListSelectionViewModel: ObservableObject {
     // MARK: - Dependencies
     private let profile: ProfileViewModel
     private let placeListService: PlaceListService
+    private let collaborationService: CollaborationService
     private let userSession: UserSession
     
     // MARK: - Internal State
@@ -29,13 +38,16 @@ class PlaceListSelectionViewModel: ObservableObject {
     private let pageSize: Int = 10  // Load 10 lists at a time
     private var hasLoadedOnce: Bool = false
     private var currentPlace: DetailPlace?
+    private var sharedLists: [LightweightPlaceList] = [] // Cached shared lists (don't paginate)
     
     // MARK: - Init
     init(profile: ProfileViewModel,
          placeListService: PlaceListService = PlaceListService.shared,
+         collaborationService: CollaborationService = .shared,
          userSession: UserSession) {
         self.profile = profile
         self.placeListService = placeListService
+        self.collaborationService = collaborationService
         self.userSession = userSession
     }
     
@@ -61,30 +73,60 @@ class PlaceListSelectionViewModel: ObservableObject {
         hasMore = true
         isLoadingInitial = true
         placeMembership.removeAll()
+        sharedLists = []
         
+        // Fetch owned lists AND shared lists in parallel
+        async let ownedListsTask = fetchOwnedLists(userId: userId, coord: coord)
+        async let sharedListsTask = fetchSharedLists(userId: userId)
+        
+        let (ownedLists, fetchedSharedLists) = await (ownedListsTask, sharedListsTask)
+        
+        // Cache shared lists for later (they don't paginate)
+        sharedLists = fetchedSharedLists
+        
+        // Merge: owned lists first, then shared lists
+        let allLists = ownedLists + fetchedSharedLists
+        lists = allLists
+        hasMore = ownedLists.count >= pageSize
+        hasLoadedOnce = true
+        
+        print("📋 [PlaceListSelectionVM] Loaded \(ownedLists.count) owned + \(fetchedSharedLists.count) shared lists")
+        
+        // Load place membership data for all lists (so we can show checkmarks)
+        if !allLists.isEmpty {
+            await loadPlaceMembershipForLists(allLists, placeId: place.id.uuidString)
+        }
+        
+        isLoadingInitial = false
+    }
+    
+    // MARK: - Private Fetch Methods
+    
+    /// Fetches user's owned lists sorted by proximity to the place
+    private func fetchOwnedLists(userId: String, coord: CLLocationCoordinate2D) async -> [LightweightPlaceList] {
         do {
-            let fetchedLists = try await placeListService.fetchListsByProximity(
+            return try await placeListService.fetchListsByProximity(
                 userId: userId,
                 latitude: coord.latitude,
                 longitude: coord.longitude,
                 page: 1,
                 pageSize: pageSize
             )
-            
-            lists = fetchedLists
-            hasMore = fetchedLists.count >= pageSize
-            hasLoadedOnce = true
-            
-            // Load place membership data for each list (so we can show checkmarks)
-            if !fetchedLists.isEmpty {
-                await loadPlaceMembershipForLists(fetchedLists, placeId: place.id.uuidString)
-            }
         } catch {
-            lists = []
-            hasMore = false
+            print("❌ [PlaceListSelectionVM] Failed to fetch owned lists: \(error)")
+            return []
         }
-        
-        isLoadingInitial = false
+    }
+    
+    /// Fetches lists shared with the user (where user is a collaborator)
+    private func fetchSharedLists(userId: String) async -> [LightweightPlaceList] {
+        do {
+            let sharedListInfos = try await collaborationService.fetchSharedLists(userId: userId)
+            return sharedListInfos.map { $0.toLightweightPlaceList() }
+        } catch {
+            print("❌ [PlaceListSelectionVM] Failed to fetch shared lists: \(error)")
+            return []
+        }
     }
     
     func loadMoreListsIfNeeded(currentIndex: Int) async {
@@ -96,8 +138,11 @@ class PlaceListSelectionViewModel: ObservableObject {
             return
         }
         
-        // Load when we're within 3 items of the end (earlier trigger for smoother UX)
-        guard currentIndex >= lists.count - 3 else {
+        // Calculate position in owned lists only (shared lists are at the end and don't paginate)
+        let ownedListCount = lists.count - sharedLists.count
+        
+        // Load when we're within 3 items of the end of OWNED lists
+        guard currentIndex >= ownedListCount - 3 else {
             return
         }
         
@@ -114,12 +159,13 @@ class PlaceListSelectionViewModel: ObservableObject {
             )
             
             if !moreLists.isEmpty {
-                lists.append(contentsOf: moreLists)
+                // Insert new owned lists BEFORE shared lists
+                let insertIndex = lists.count - sharedLists.count
+                lists.insert(contentsOf: moreLists, at: insertIndex)
                 currentPage = nextPage
                 hasMore = moreLists.count >= pageSize
                 
-                // ✅ CRITICAL FIX: Load place membership data in BACKGROUND (non-blocking)
-                // This allows pagination to continue immediately without waiting for checkmarks
+                // Load place membership data in BACKGROUND (non-blocking)
                 // Follows Single Responsibility: Pagination ≠ Data Enrichment
                 if let placeId = currentPlace?.id.uuidString {
                     Task {
@@ -133,7 +179,7 @@ class PlaceListSelectionViewModel: ObservableObject {
             // Don't set hasMore to false on error - allow retry
         }
         
-        // ✅ CRITICAL: Release lock immediately so next page can load
+        // Release lock immediately so next page can load
         isLoadingMore = false
     }
     
@@ -212,6 +258,7 @@ class PlaceListSelectionViewModel: ObservableObject {
         let newCount = max(0, oldList.place_count + delta)
         
         // Create updated list with new count (struct is immutable)
+        // Preserve all collaboration fields
         let updatedList = LightweightPlaceList(
             list_id: oldList.list_id,
             name: oldList.name,
@@ -221,7 +268,13 @@ class PlaceListSelectionViewModel: ObservableObject {
             updated_at: oldList.updated_at,
             distance_meters: oldList.distance_meters,
             place_count: newCount,
-            city: oldList.city
+            city: oldList.city,
+            collaborator_count: oldList.collaborator_count,
+            is_shared: oldList.is_shared,
+            owner_name: oldList.owner_name,
+            owner_photo_url: oldList.owner_photo_url,
+            user_role: oldList.user_role,
+            collaborator_photos: oldList.collaborator_photos
         )
         
         lists[index] = updatedList

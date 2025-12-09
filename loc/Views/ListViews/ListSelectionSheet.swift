@@ -28,6 +28,7 @@ struct ListDescription: View {
 }
 
 // LightweightListDescription - NEW (for LightweightPlaceList)
+// DUMB Component: Displays list name and place count (or shared info)
 struct LightweightListDescription: View {
     @EnvironmentObject var profile: ProfileViewModel
     let list: LightweightPlaceList
@@ -36,6 +37,10 @@ struct LightweightListDescription: View {
     private var displayedPlaceCount: Int {
         return profile.lightweightPlaceListCounts[list.list_id] ?? list.place_count
     }
+    
+    private var ownerFirstName: String? {
+        list.owner_name?.components(separatedBy: " ").first
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -43,9 +48,21 @@ struct LightweightListDescription: View {
                 .font(.body)
                 .foregroundStyle(Color.primary.opacity(1.0))
 
-            Text("\(displayedPlaceCount) Places")
+            // Show different subtitle for shared vs owned lists
+            if list.isSharedWithMe, let ownerName = ownerFirstName {
+                HStack(spacing: 4) {
+                    Text("\(displayedPlaceCount) Places")
+                    Text("•")
+                        .foregroundStyle(Color.secondary.opacity(0.5))
+                    Text("Shared by \(ownerName)")
+                }
                 .font(.caption)
                 .foregroundStyle(Color.secondary.opacity(1.0))
+            } else {
+                Text("\(displayedPlaceCount) Places")
+                    .font(.caption)
+                    .foregroundStyle(Color.secondary.opacity(1.0))
+            }
         }
         .padding(.horizontal, 15)
     }
