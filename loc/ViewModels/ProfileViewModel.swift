@@ -55,6 +55,10 @@ class ProfileViewModel: ObservableObject {
     @Published var hasMorePlaceLists: Bool = true
     var placeListsCurrentPage: Int = 1
     
+    // MARK: - Initial List Loading State
+    /// True while initial list fetch (owned + shared) is in progress
+    @Published var isLoadingInitialLists: Bool = false
+    
     // MARK: - List Filter State
     @Published var showOnlySharedLists: Bool = false
     
@@ -74,6 +78,12 @@ class ProfileViewModel: ObservableObject {
     /// Whether there are any collaborative lists to filter
     var hasSharedLists: Bool {
         collaborativeListCount > 0
+    }
+    
+    /// Whether the Shared filter button should be interactive
+    /// Disabled while initial load is in progress to prevent confusing empty states
+    var canInteractWithSharedFilter: Bool {
+        !isLoadingInitialLists
     }
     
     // Save-to-list sheet pagination (separate from profile view pagination)

@@ -5,21 +5,28 @@
 //  DUMB Component: Header for lists section with filter and add buttons
 //  Single Responsibility: Display header with shared filter and add list actions
 //
+//  Accepts state from ViewModel, contains no business logic
+//
 //  Created by Andrew Hartsfield II on 5/29/25.
 //
 import SwiftUI
 import UIKit
 
 struct ListHeaderView: View {
+    // MARK: - Parameters (passed from ViewModel via View)
+    
     var showOnlyShared: Bool
     var hasSharedLists: Bool
+    var isFilterEnabled: Bool = true  // Default enabled for backward compatibility
     var onToggleFilter: () -> Void
     var onAddList: () -> Void
     
+    // MARK: - Body
+    
     var body: some View {
         HStack {
-            // Shared filter on left (only show if there are shared lists)
-            if hasSharedLists {
+            // Shared filter on left (only show if there are shared lists OR loading)
+            if hasSharedLists || !isFilterEnabled {
                 sharedFilterButton
             }
             
@@ -46,19 +53,43 @@ struct ListHeaderView: View {
             }
         } label: {
             HStack(spacing: 4) {
-                Image(systemName: "person.2.fill")
-                    .font(.system(size: 10))
+                if !isFilterEnabled {
+                    // Show loading indicator when disabled
+                    ProgressView()
+                        .scaleEffect(0.6)
+                        .frame(width: 12, height: 12)
+                } else {
+                    Image(systemName: "person.2.fill")
+                        .font(.system(size: 10))
+                }
                 Text("Shared")
                     .font(.subheadline)
             }
-            .foregroundColor(showOnlyShared ? .white : .primary)
+            .foregroundColor(buttonForegroundColor)
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
             .background(
                 Capsule()
-                    .fill(showOnlyShared ? Color.primary : Color(.systemGray5))
+                    .fill(buttonBackgroundColor)
             )
         }
+        .disabled(!isFilterEnabled)
+    }
+    
+    // MARK: - Computed Colors (SRP: Visual state derived from parameters)
+    
+    private var buttonForegroundColor: Color {
+        if !isFilterEnabled {
+            return .secondary
+        }
+        return showOnlyShared ? .white : .primary
+    }
+    
+    private var buttonBackgroundColor: Color {
+        if !isFilterEnabled {
+            return Color(.systemGray5)
+        }
+        return showOnlyShared ? Color.primary : Color(.systemGray5)
     }
 }
 
@@ -70,6 +101,7 @@ struct ListHeaderView: View {
         ListHeaderView(
             showOnlyShared: false,
             hasSharedLists: true,
+            isFilterEnabled: true,
             onToggleFilter: {},
             onAddList: {}
         )
@@ -78,6 +110,16 @@ struct ListHeaderView: View {
         ListHeaderView(
             showOnlyShared: true,
             hasSharedLists: true,
+            isFilterEnabled: true,
+            onToggleFilter: {},
+            onAddList: {}
+        )
+        
+        Text("Loading state (disabled)").font(.caption2).foregroundColor(.gray)
+        ListHeaderView(
+            showOnlyShared: false,
+            hasSharedLists: false,
+            isFilterEnabled: false,
             onToggleFilter: {},
             onAddList: {}
         )
@@ -86,6 +128,7 @@ struct ListHeaderView: View {
         ListHeaderView(
             showOnlyShared: false,
             hasSharedLists: false,
+            isFilterEnabled: true,
             onToggleFilter: {},
             onAddList: {}
         )

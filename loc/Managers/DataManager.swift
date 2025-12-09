@@ -796,8 +796,20 @@ class DataManager: ObservableObject {
         
         // Load place lists in background - don't block UI
         if let location = userLocation {
+            // Set loading state BEFORE spawning background task (SRP: DataManager coordinates state)
+            await MainActor.run {
+                self.profileViewModel.isLoadingInitialLists = true
+            }
+            
             Task.detached(priority: .userInitiated) { [weak self] in
                 guard let self = self else { return }
+                
+                // Guaranteed cleanup of loading state (staff engineer pattern)
+                defer {
+                    Task { @MainActor in
+                        self.profileViewModel.isLoadingInitialLists = false
+                    }
+                }
                 
                 let pageSize = 6 // Consistent page size for initial load and pagination
                 
