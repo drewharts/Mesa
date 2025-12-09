@@ -26,8 +26,8 @@ RETURNS TABLE(
     collaborator_count BIGINT,
     collaborator_photos TEXT[]
 )
-LANGUAGE plpgsql
-SECURITY DEFINER
+ LANGUAGE plpgsql
+ SECURITY DEFINER
 AS $function$
 BEGIN
     RETURN QUERY
@@ -46,15 +46,15 @@ BEGIN
         combined.collaborator_photos
     FROM (
         -- Lists WITH average_location (sorted by proximity)
-        SELECT 
-            pl.id AS list_id,
-            pl.name,
-            pl.average_location,
-            pl.is_public,
-            pl.image,
-            pl.created_at,
-            pl.updated_at,
-            ST_Distance(pl.average_location, p_user_location) AS distance_meters,
+    SELECT 
+        pl.id AS list_id,
+        pl.name,
+        pl.average_location,
+        pl.is_public,
+        pl.image,
+        pl.created_at,
+        pl.updated_at,
+        ST_Distance(pl.average_location, p_user_location) AS distance_meters,
             (SELECT COUNT(*) FROM place_list_items pli WHERE pli.list_id = pl.id) AS place_count,
             (SELECT COUNT(*) FROM place_list_collaborators plc WHERE plc.list_id = pl.id) AS collaborator_count,
             (
@@ -68,9 +68,9 @@ BEGIN
                 ) collab_photos
             ) AS collaborator_photos,
             0 AS sort_order  -- Lists with location come first
-        FROM place_lists pl
-        WHERE pl.user_id = p_user_id
-            AND pl.average_location IS NOT NULL
+    FROM place_lists pl
+    WHERE pl.user_id = p_user_id
+        AND pl.average_location IS NOT NULL
         
         UNION ALL
         

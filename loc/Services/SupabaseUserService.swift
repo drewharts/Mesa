@@ -1041,5 +1041,24 @@ extension SupabaseUserService {
         
         print("✅ [SupabaseUserService] Successfully saved external place: \(externalPlaceId)")
     }
+    
+    // MARK: - External Place Deletion
+    
+    /// Deletes all external_places records for a user and place combination
+    /// Single Responsibility: Execute Supabase delete operation for external places
+    /// - Parameters:
+    ///   - userId: The user's ID (Firebase UID)
+    ///   - placeId: The place ID to remove from user's saved TikToks
+    /// - Throws: Database errors if deletion fails
+    func deleteExternalPlaces(userId: String, placeId: String) async throws {
+        try await supabase.client
+            .from("external_places")
+            .delete()
+            .eq("user_id", value: userId)
+            .eq("place_id", value: placeId)
+            .execute()
+        
+        print("✅ [SupabaseUserService] Deleted external places for user \(userId), place \(placeId)")
+    }
 }
 
