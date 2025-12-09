@@ -26,26 +26,31 @@ struct ProfileViewListsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             ListHeaderView(
+                showOnlyShared: profile.showOnlySharedLists,
+                hasSharedLists: profile.hasSharedLists,
+                onToggleFilter: {
+                    profile.showOnlySharedLists.toggle()
+                },
                 onAddList: {
                     showingNewListSheet = true
                 }
             )
 
-            if !profile.lightweightPlaceLists.isEmpty {
+            if !profile.filteredPlaceLists.isEmpty {
                 LazyVStack(spacing: 16) {
-                    ForEach(Array(profile.lightweightPlaceLists.enumerated()), id: \.element.id) { index, list in
+                    ForEach(Array(profile.filteredPlaceLists.enumerated()), id: \.element.id) { index, list in
                         LightweightProfileListSection(
                             list: list,
                             places: profile.lightweightPlaceListPlaces[list.list_id] ?? [],
-                            allLists: profile.lightweightPlaceLists,
+                            allLists: profile.filteredPlaceLists,
                             currentIndex: index,
                             placeColors: $placeColors
                         )
                         .onAppear {
-                            // Trigger pagination when approaching the end
-                            if profile.shouldLoadMorePlaceLists(
+                            // Trigger pagination when approaching the end (only for non-filtered view)
+                            if !profile.showOnlySharedLists && profile.shouldLoadMorePlaceLists(
                                 currentItem: list,
-                                filteredLists: profile.lightweightPlaceLists,
+                                filteredLists: profile.filteredPlaceLists,
                                 isSearching: false
                             ) {
                                 Task {
@@ -66,11 +71,26 @@ struct ProfileViewListsView: View {
                     }
                 }
             } else {
-                VStack(spacing: 8) {
-                    Text("No lists available")
-                        .foregroundColor(.gray)
-                        .padding(.horizontal)
+                // Empty state - differentiate between no lists and no filtered results
+                VStack(spacing: 12) {
+                    if profile.showOnlySharedLists {
+                        Image(systemName: "person.2")
+                            .font(.system(size: 32))
+                            .foregroundColor(.gray.opacity(0.5))
+                        Text("No shared lists")
+                            .font(.subheadline)
+                            .foregroundColor(.gray)
+                        Text("Lists shared with you or that you've shared will appear here")
+                            .font(.caption)
+                            .foregroundColor(.gray.opacity(0.7))
+                            .multilineTextAlignment(.center)
+                    } else {
+                        Text("No lists available")
+                            .foregroundColor(.gray)
+                    }
                 }
+                .padding(.horizontal)
+                .padding(.vertical, 20)
             }
         }
         .sheet(isPresented: $showingImagePicker) {

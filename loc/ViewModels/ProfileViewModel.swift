@@ -55,6 +55,27 @@ class ProfileViewModel: ObservableObject {
     @Published var hasMorePlaceLists: Bool = true
     var placeListsCurrentPage: Int = 1
     
+    // MARK: - List Filter State
+    @Published var showOnlySharedLists: Bool = false
+    
+    /// Returns filtered lists based on current filter state
+    var filteredPlaceLists: [LightweightPlaceList] {
+        if showOnlySharedLists {
+            return lightweightPlaceLists.filter { $0.isCollaborative }
+        }
+        return lightweightPlaceLists
+    }
+    
+    /// Count of collaborative lists (shared with you OR you shared with others)
+    var collaborativeListCount: Int {
+        lightweightPlaceLists.filter { $0.isCollaborative }.count
+    }
+    
+    /// Whether there are any collaborative lists to filter
+    var hasSharedLists: Bool {
+        collaborativeListCount > 0
+    }
+    
     // Save-to-list sheet pagination (separate from profile view pagination)
     @Published var userFollowing: [ProfileData] = []
     @Published var userFollowers: [ProfileData] = []
