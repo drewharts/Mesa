@@ -385,9 +385,9 @@ struct ListSelectionSheet: View {
             }) {
                 Image(systemName: "plus")
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.blue)
+                    .foregroundColor(.gray)
                     .frame(width: 32, height: 32)
-                    .background(Circle().fill(Color.blue.opacity(0.1)))
+                    .background(Circle().fill(Color(.systemGray5)))
             }
             .sheet(isPresented: $showNewListSheet) {
                 NewListView(isPresented: $showNewListSheet, onSave: { listName in
@@ -430,12 +430,12 @@ struct ListSelectionSheet: View {
                     Text("Shared (\(viewModel.sharedListCount))")
                         .font(.subheadline)
                 }
-                .foregroundColor(viewModel.showOnlyShared ? .white : .blue)
+                .foregroundColor(viewModel.showOnlyShared ? .white : .primary)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
                 .background(
                     Capsule()
-                        .fill(viewModel.showOnlyShared ? Color.blue : Color.blue.opacity(0.1))
+                        .fill(viewModel.showOnlyShared ? Color.primary : Color(.systemGray5))
                 )
             }
         }
