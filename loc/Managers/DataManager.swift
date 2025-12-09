@@ -781,33 +781,82 @@ class DataManager: ObservableObject {
             profileViewModel.isFollowersLoading = false
             profileViewModel.isFollowingLoading = false
             profileViewModel.isMyPlacesLoading = false
+            
+            // Update placeSavers for favorites so "Saved By" feature works
+            for favorite in favoritePlaces {
+                let placeId = favorite.place_id
+                if self.detailPlaceViewModel.placeSavers[placeId] == nil {
+                    self.detailPlaceViewModel.placeSavers[placeId] = [userId]
+                } else if !self.detailPlaceViewModel.placeSavers[placeId]!.contains(userId) {
+                    self.detailPlaceViewModel.placeSavers[placeId]!.append(userId)
+                }
+            }
+            print("📍 [DataManager] Updated placeSavers with \(favoritePlaces.count) favorites")
         }
         
         // Load place lists in background - don't block UI
         if let location = userLocation {
+            // Set loading state BEFORE spawning background task (SRP: DataManager coordinates state)
+            await MainActor.run {
+                self.profileViewModel.isLoadingInitialLists = true
+            }
+            
             Task.detached(priority: .userInitiated) { [weak self] in
                 guard let self = self else { return }
                 
+                // Guaranteed cleanup of loading state (staff engineer pattern)
+                defer {
+                    Task { @MainActor in
+                        self.profileViewModel.isLoadingInitialLists = false
+                    }
+                }
+                
                 let pageSize = 6 // Consistent page size for initial load and pagination
-                let placeLists = (try? await self.userService.fetchPlaceListsByProximity(
+                
+                // Fetch owned lists, shared lists, AND collaborative owned lists in parallel
+                // This ensures ALL collaborative lists are available for the Shared filter
+                async let ownedListsTask = self.userService.fetchPlaceListsByProximity(
                     userId: userId,
                     userLatitude: location.latitude,
                     userLongitude: location.longitude,
                     page: 1,
                     pageSize: pageSize
-                )) ?? []
+                )
+                async let sharedListsTask = CollaborationService.shared.fetchSharedLists(userId: userId)
+                async let collaborativeOwnedTask = CollaborationService.shared.fetchCollaborativeOwnedLists(userId: userId)
+                
+                let ownedLists = (try? await ownedListsTask) ?? []
+                let sharedLists = (try? await sharedListsTask) ?? []
+                let collaborativeOwnedLists = (try? await collaborativeOwnedTask) ?? []
+                
+                // Convert collaborative lists to LightweightPlaceList format
+                let sharedAsLightweight = sharedLists.map { $0.toLightweightPlaceList() }
+                let collaborativeOwnedAsLightweight = collaborativeOwnedLists.map { $0.toLightweightPlaceList() }
+                
+                // Get IDs of lists already in owned lists (to avoid duplicates)
+                let ownedListIds = Set(ownedLists.map { $0.list_id })
+                
+                // Filter out collaborative owned lists that are already in paginated owned lists
+                let additionalCollaborativeLists = collaborativeOwnedAsLightweight.filter { 
+                    !ownedListIds.contains($0.list_id) 
+                }
+                
+                // Merge: owned (paginated) + collaborative owned (not in page 1) + shared with me
+                let allLists = ownedLists + additionalCollaborativeLists + sharedAsLightweight
+                
+                print("📋 [DataManager] Loaded \(ownedLists.count) owned lists + \(additionalCollaborativeLists.count) additional collaborative owned + \(sharedLists.count) shared lists")
                 
                 // Update place lists on main thread
                 await MainActor.run {
-                    self.profileViewModel.lightweightPlaceLists = placeLists
+                    self.profileViewModel.lightweightPlaceLists = allLists
                     self.profileViewModel.placeListsCurrentPage = 1
-                    // Set hasMore based on whether we got a full page
-                    self.profileViewModel.hasMorePlaceLists = placeLists.count >= pageSize
+                    // Set hasMore based on whether we got a full page of owned lists
+                    self.profileViewModel.hasMorePlaceLists = ownedLists.count >= pageSize
                 }
                 
                 // Load places for each list
-                if !placeLists.isEmpty {
-                    await self.loadPlacesForLists(placeLists)
+                if !allLists.isEmpty {
+                    await self.loadPlacesForLists(allLists)
                 }
             }
         } else {
@@ -963,6 +1012,35 @@ class DataManager: ObservableObject {
         return try await userService.fetchPlacesForPlaceList(listId: listId, page: page, pageSize: pageSize)
     }
     
+    /// Load more places for a list (pagination) and update placeSavers
+    /// Returns the loaded places for the caller to use
+    func loadMorePlacesForList(listId: String, page: Int, pageSize: Int = 6) async throws -> [LightweightPlace] {
+        let places = try await userService.fetchPlacesForPlaceList(listId: listId, page: page, pageSize: pageSize)
+        
+        await MainActor.run {
+            // Append to existing places
+            if var existingPlaces = profileViewModel.lightweightPlaceListPlaces[listId] {
+                existingPlaces.append(contentsOf: places)
+                profileViewModel.lightweightPlaceListPlaces[listId] = existingPlaces
+            } else {
+                profileViewModel.lightweightPlaceListPlaces[listId] = places
+            }
+            
+            // Update placeSavers for the current user so "Saved By" feature works
+            guard let currentUserId = self.userSession.currentUserId else { return }
+            for place in places {
+                let placeId = place.place_id
+                if self.detailPlaceViewModel.placeSavers[placeId] == nil {
+                    self.detailPlaceViewModel.placeSavers[placeId] = [currentUserId]
+                } else if !self.detailPlaceViewModel.placeSavers[placeId]!.contains(currentUserId) {
+                    self.detailPlaceViewModel.placeSavers[placeId]!.append(currentUserId)
+                }
+            }
+        }
+        
+        return places
+    }
+    
     /// Load the first 6 places for each place list (background task)
     func loadPlacesForLightweightList(listId: String) async {
         do {
@@ -970,6 +1048,17 @@ class DataManager: ObservableObject {
             
             await MainActor.run {
                 profileViewModel.lightweightPlaceListPlaces[listId] = places
+                
+                // Update placeSavers for the current user so "Saved By" feature works
+                guard let currentUserId = self.userSession.currentUserId else { return }
+                for place in places {
+                    let placeId = place.place_id
+                    if self.detailPlaceViewModel.placeSavers[placeId] == nil {
+                        self.detailPlaceViewModel.placeSavers[placeId] = [currentUserId]
+                    } else if !self.detailPlaceViewModel.placeSavers[placeId]!.contains(currentUserId) {
+                        self.detailPlaceViewModel.placeSavers[placeId]!.append(currentUserId)
+                    }
+                }
             }
         } catch {
             print("❌ [DataManager] Error loading places for list \(listId): \(error.localizedDescription)")
@@ -1009,10 +1098,26 @@ class DataManager: ObservableObject {
         }
         
         // Single main thread update - prevents multiple view re-renders
+        // Also update placeSavers for the current user so "Saved By" feature works
         await MainActor.run {
+            guard let currentUserId = self.userSession.currentUserId else { return }
+            
             for (listId, places) in allPlaces {
                 profileViewModel.lightweightPlaceListPlaces[listId] = places
+                
+                // Update placeSavers for each place in the list
+                for place in places {
+                    let placeId = place.place_id
+                    if self.detailPlaceViewModel.placeSavers[placeId] == nil {
+                        self.detailPlaceViewModel.placeSavers[placeId] = [currentUserId]
+                    } else if !self.detailPlaceViewModel.placeSavers[placeId]!.contains(currentUserId) {
+                        self.detailPlaceViewModel.placeSavers[placeId]!.append(currentUserId)
+                    }
+                }
             }
+            
+            print("📍 [DataManager] Updated placeSavers with \(allPlaces.values.flatMap { $0 }.count) places from lists")
+            print("📍 [DataManager] Total placeSavers count: \(self.detailPlaceViewModel.placeSavers.count)")
         }
     }
     

@@ -120,6 +120,29 @@ class SupabaseReviewService: ObservableObject {
         }
     }
     
+    // MARK: - Reviewed Place Checks
+    
+    /// Check which places from a given list the user has reviewed
+    /// Returns an array of place IDs that the user HAS reviewed
+    /// Used for "show only unvisited" filtering
+    func getReviewedPlaceIds(userId: String, placeIds: [String]) async throws -> Set<String> {
+        guard !placeIds.isEmpty else { return [] }
+        
+        struct Params: Encodable {
+            let p_user_id: String
+            let p_place_ids: [String]
+        }
+        
+        let params = Params(p_user_id: userId, p_place_ids: placeIds)
+        
+        let reviewedIds: [String] = try await supabase.client
+            .rpc("get_user_reviewed_place_ids", params: params)
+            .execute()
+            .value
+        
+        return Set(reviewedIds)
+    }
+    
     // MARK: - User Reviews
     
     func fetchUserReviews(userId: String) async throws -> [RestaurantReview] {

@@ -2,69 +2,102 @@
 //  TravelTimeSelector.swift
 //  loc
 //
-//  Created by Assistant on [current date]
+//  Travel time display with expandable transport type selector
+//  Uses PreferenceKey pattern for proper overlay rendering at parent level
 //
 
 import SwiftUI
+
+// MARK: - PreferenceKey for Position & State
+
+/// Preference key to pass selector state and position up the view hierarchy
+struct TravelTimeSelectorStateKey: PreferenceKey {
+    static var defaultValue: TravelTimeSelectorState? = nil
+    
+    static func reduce(value: inout TravelTimeSelectorState?, nextValue: () -> TravelTimeSelectorState?) {
+        value = nextValue() ?? value
+    }
+}
+
+/// State passed up to parent for overlay rendering
+struct TravelTimeSelectorState: Equatable {
+    let frame: CGRect
+    let isExpanded: Bool
+    let selectedIndex: Int?
+}
+
+// MARK: - Travel Time Selector
 
 struct TravelTimeSelector: View {
     @ObservedObject var viewModel: TravelTimeViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var locationManager: LocationManager
 
+    // View owns expanded state (presentation concern)
     @State private var isExpanded = false
-    @State private var dragOffset: CGFloat = 0
-    @State private var selectedTransportType: MapKitService.TransportType?
+    @State private var selectedIndex: Int? = nil
+    @State private var buttonFrame: CGRect = .zero
 
-    private let buttonSize: CGFloat = 32
-    private let expandedSize: CGFloat = 120
     private let animationDuration: Double = 0.2
 
     var body: some View {
-        ZStack {
-            backgroundOverlay
-            mainContent
+        mainTimeDisplay
+            .background(
+                GeometryReader { geo in
+                    Color.clear
+                        .preference(
+                            key: TravelTimeSelectorStateKey.self,
+                            value: TravelTimeSelectorState(
+                                frame: geo.frame(in: .global),
+                                isExpanded: isExpanded,
+                                selectedIndex: selectedIndex
+                            )
+                        )
+                        .onAppear {
+                            buttonFrame = geo.frame(in: .global)
+                        }
+                        .onChange(of: geo.frame(in: .global)) { newFrame in
+                            buttonFrame = newFrame
+                        }
+                }
+            )
+    }
+
+    private var mainTimeDisplay: some View {
+        HStack(spacing: 4) {
+            Image(systemName: viewModel.currentTransportType.iconName)
+                .font(.subheadline)
+                .foregroundColor(.gray)
+
+            Text(viewModel.travelTime)
+                .font(.subheadline)
+                .foregroundColor(.gray)
         }
-        .animation(.easeInOut(duration: animationDuration), value: isExpanded)
-        .environment(\.allowChildDrag, isExpanded)
-    }
-
-    private var backgroundOverlay: some View {
-        Group {
-            if isExpanded {
-                Color.clear
-                    .contentShape(Rectangle())
-                    .allowsHitTesting(true)
-            }
-        }
-    }
-
-    private var mainContent: some View {
-        transportSelector
-    }
-
-    private var transportSelector: some View {
-        ZStack {
-            // Main time display (only shown when not expanded)
-            mainTimeDisplay
-
-            // Expanded menu (only shown when expanded, appears above everything)
-            if isExpanded {
-                expandedMenu
-                    .zIndex(1000) // Ensure it appears above all other content
+        .opacity(isExpanded ? 0.3 : 1)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            guard !isExpanded else { return }
+            print("👆 [TravelTimeSelector] Tap gesture triggered")
+            if let place = selectedPlaceVM.selectedPlace,
+               let currentLocation = locationManager.currentLocation {
+                viewModel.openNavigation(for: place, currentLocation: currentLocation.coordinate)
+            } else {
+                print("❌ [TravelTimeSelector] Missing place or location data")
             }
         }
         .gesture(
             LongPressGesture(minimumDuration: 0.3)
-                .sequenced(before: DragGesture(minimumDistance: 0))
+                .sequenced(before: DragGesture(minimumDistance: 0, coordinateSpace: .global))
                 .onChanged { value in
                     switch value {
                     case .first(true):
-                        // Long press detected - expand menu
-                        print("👆 [TravelTimeSelector] Long press detected - expanding menu")
-                        expandMenu()
+                        // Long press started
+                        withAnimation(.easeOut(duration: animationDuration)) {
+                            isExpanded = true
+                        }
+                        print("👆 [TravelTimeSelector] Long press - expanding")
                     case .second(true, let drag?):
-                        // Drag started after long press - handle selection
+                        // Dragging after long press
                         handleDrag(drag)
                     default:
                         break
@@ -73,118 +106,93 @@ struct TravelTimeSelector: View {
                 .onEnded { value in
                     switch value {
                     case .second(true, _):
-                        // Drag ended - execute selection
+                        // Drag ended - select if valid
                         handleDragEnd()
                     default:
+                        // Just long press without drag
                         break
                     }
                 }
         )
     }
-
-    private var availableTransportTypes: [MapKitService.TransportType] {
-        // Always show all transport types, but they'll show "N/A" if not available
-        MapKitService.TransportType.allCases
-    }
-
-    private var expandedMenu: some View {
-        Group {
-            if isExpanded {
-                VStack(spacing: 8) {
-                    ForEach(availableTransportTypes, id: \.self) { transportType in
-                        TransportTypeButton(
-                            transportType: transportType,
-                            isSelected: selectedTransportType == transportType,
-                            currentTime: viewModel.travelTimes[transportType] ?? "N/A",
-                            onTap: {
-                                selectTransportType(transportType)
-                                collapseMenu()
-                            }
-                        )
-                    }
+    
+    // MARK: - Drag Handling
+    
+    private func handleDrag(_ drag: DragGesture.Value) {
+        // Calculate which item is being hovered based on drag location
+        // Menu appears below button, each item is ~52pt tall
+        let menuTop = buttonFrame.maxY + 10
+        let itemHeight: CGFloat = 52
+        let dragY = drag.location.y
+        
+        if dragY > menuTop {
+            let relativeY = dragY - menuTop
+            let index = Int(relativeY / itemHeight)
+            let transportTypes = MapKitService.TransportType.allCases
+            
+            if index >= 0 && index < transportTypes.count {
+                if selectedIndex != index {
+                    selectedIndex = index
+                    // Haptic feedback
+                    let generator = UISelectionFeedbackGenerator()
+                    generator.selectionChanged()
                 }
-                .padding(.vertical, 12)
-                .background(Color.white)
-                .clipShape(RoundedRectangle(cornerRadius: 20))
-                .shadow(radius: 8)
-                .transition(.scale.combined(with: .opacity))
+            } else {
+                selectedIndex = nil
             }
-        }
-    }
-
-    private var mainTimeDisplay: some View {
-        Group {
-            if !isExpanded {
-                HStack(spacing: 4) {
-                    Image(systemName: viewModel.currentTransportType.iconName)
-                        .font(.subheadline)
-                        .foregroundColor(.gray)
-
-                    Text(viewModel.travelTime)
-                        .font(.subheadline)
-                        .foregroundColor(.gray)
-                }
-                .onTapGesture {
-                    print("👆 [TravelTimeSelector] Tap gesture triggered")
-                    // Single tap opens navigation
-                    if let place = selectedPlaceVM.selectedPlace,
-                       let currentLocation = locationManager.currentLocation {
-                        viewModel.openNavigation(for: place, currentLocation: currentLocation.coordinate)
-                    } else {
-                        print("❌ [TravelTimeSelector] Missing place or location data")
-                    }
-                }
-            }
-        }
-    }
-
-    // MARK: - Helper Methods
-
-    private func expandMenu() {
-        isExpanded = true
-    }
-
-    private func collapseMenu() {
-        isExpanded = false
-        selectedTransportType = nil
-        dragOffset = 0
-    }
-
-    private func handleDrag(_ value: DragGesture.Value) {
-        let location = value.location
-
-        // Simple calculation: each button is 44 points + 8 points spacing
-        let itemHeight: CGFloat = 44
-        let spacing: CGFloat = 8
-        let totalItemHeight = itemHeight + spacing
-
-        // Calculate which item the finger is over
-        let itemIndex = Int(location.y / totalItemHeight)
-
-        if itemIndex >= 0 && itemIndex < availableTransportTypes.count {
-            selectedTransportType = availableTransportTypes[itemIndex]
         } else {
-            selectedTransportType = nil
+            selectedIndex = nil
         }
     }
-
+    
     private func handleDragEnd() {
-        if let transportType = selectedTransportType {
-            selectTransportType(transportType)
+        if let index = selectedIndex {
+            let transportTypes = MapKitService.TransportType.allCases
+            if index < transportTypes.count {
+                let selected = transportTypes[index]
+                print("🎯 [TravelTimeSelector] Selected: \(selected.displayName)")
+                viewModel.switchTransportType(to: selected)
+                viewModel.saveDefaultTransportType(selected)
+            }
         }
-        collapseMenu()
-    }
-
-    private func selectTransportType(_ transportType: MapKitService.TransportType) {
-        print("🎯 [TravelTimeSelector] Switching to transport type: \(transportType.displayName)")
-        viewModel.switchTransportType(to: transportType)
-        // Save as default preference
-        viewModel.saveDefaultTransportType(transportType)
-        print("✅ [TravelTimeSelector] Current transport type is now: \(viewModel.currentTransportType.displayName)")
+        
+        withAnimation(.easeIn(duration: animationDuration)) {
+            isExpanded = false
+            selectedIndex = nil
+        }
     }
 }
 
-// MARK: - Transport Type Button Component
+// MARK: - Expanded Menu View (Rendered by Parent)
+
+struct TravelTimeSelectorExpandedMenu: View {
+    let viewModel: TravelTimeViewModel
+    let selectedIndex: Int?
+    let onSelect: (MapKitService.TransportType) -> Void
+    let onDismiss: () -> Void
+    
+    var body: some View {
+        VStack(spacing: 8) {
+            ForEach(Array(MapKitService.TransportType.allCases.enumerated()), id: \.element) { index, transportType in
+                TransportTypeButton(
+                    transportType: transportType,
+                    isSelected: selectedIndex == index,
+                    currentTime: viewModel.travelTimes[transportType] ?? "N/A",
+                    onTap: {
+                        onSelect(transportType)
+                    }
+                )
+            }
+        }
+        .padding(.vertical, 12)
+        .frame(width: 200)
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .shadow(radius: 8)
+    }
+}
+
+// MARK: - Transport Type Button
 
 struct TransportTypeButton: View {
     let transportType: MapKitService.TransportType
@@ -197,7 +205,7 @@ struct TransportTypeButton: View {
             HStack {
                 Image(systemName: transportType.iconName)
                     .font(.title3)
-                    .foregroundColor(iconColor)
+                    .foregroundColor(isSelected ? .white : iconColor)
                     .frame(width: isSelected ? 36 : 44, height: isSelected ? 36 : 44)
                     .background(isSelected ? Color.blue : Color.clear)
                     .clipShape(Circle())
@@ -227,10 +235,7 @@ struct TransportTypeButton: View {
     }
 
     private var displayTime: String {
-        if currentTime == "N/A" {
-            return "Not available"
-        }
-        return currentTime
+        currentTime == "N/A" ? "Not available" : currentTime
     }
 
     private var iconColor: Color {

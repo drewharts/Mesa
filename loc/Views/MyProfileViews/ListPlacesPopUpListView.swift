@@ -6,6 +6,8 @@
 //
 import SwiftUI
 
+// DUMB Component: Displays list places in grid with unvisited filtering
+// Uses ProfileViewModel for reviewed place state (no local business logic)
 struct ListPlacesPopUpListView: View {
     let list: PlaceList
 
@@ -31,13 +33,13 @@ struct ListPlacesPopUpListView: View {
         return placeIds.compactMap { detailPlaceViewModel.places[$0] }
     }
     
-    // Filtered places based on visited status
+    // Filtered places based on visited status (uses ViewModel's database-verified reviewed IDs)
     var filteredPlaces: [DetailPlace] {
         guard showOnlyUnvisited else { return places }
         
-        // Filter out places that the current user has reviewed
+        // Filter out places that the current user has reviewed (checked against ViewModel)
         return places.filter { place in
-            !profile.hasReviewedPlace(placeId: place.id.uuidString)
+            !profile.hasVerifiedReviewedPlace(placeId: place.id.uuidString)
         }
     }
 
@@ -111,8 +113,22 @@ struct ListPlacesPopUpListView: View {
             }
         }
         .onAppear {
-            // Ensure reviewed places are loaded for filtering
-            profile.loadMyReviewedPlacesWithPagination()
+            // Load reviewed place IDs from database via ViewModel for accurate filtering
+            loadReviewedPlaceIdsViaViewModel()
+        }
+        .onChange(of: places) { _, _ in
+            // Reload reviewed IDs when places change via ViewModel
+            loadReviewedPlaceIdsViaViewModel()
+        }
+    }
+    
+    // MARK: - Helper Methods
+    
+    /// Delegate to ViewModel to load reviewed place IDs (no business logic here)
+    private func loadReviewedPlaceIdsViaViewModel() {
+        let placeIds = places.map { $0.id.uuidString }
+        Task {
+            await profile.loadVerifiedReviewedPlaceIds(for: placeIds)
         }
     }
 }

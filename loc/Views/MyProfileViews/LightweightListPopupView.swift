@@ -22,6 +22,7 @@ struct LightweightListPopupView: View {
     @State private var isLoadingMore: Bool = false
     @State private var hasMorePlaces: Bool = true
     @State private var currentPage: Int = 1
+    @State private var showCollaboratorsSheet: Bool = false
     
     // Convenience initializer for single list (backward compatibility)
     init(list: LightweightPlaceList, places: [LightweightPlace], placeColors: Binding<[UUID: Color]>) {
@@ -39,9 +40,22 @@ struct LightweightListPopupView: View {
         self._currentListIndex = State(initialValue: initialListIndex)
     }
     
-    // Current list being displayed
+    // Current list being displayed (uses passed lists, not profile.lightweightPlaceLists for filtered support)
     private var currentList: LightweightPlaceList {
-        profile.lightweightPlaceLists[currentListIndex]
+        guard currentListIndex >= 0 && currentListIndex < lists.count else {
+            return lists.first ?? LightweightPlaceList(
+                list_id: "",
+                name: "Unknown",
+                is_public: false,
+                image: nil,
+                created_at: nil,
+                updated_at: nil,
+                distance_meters: nil,
+                place_count: 0,
+                city: nil
+            )
+        }
+        return lists[currentListIndex]
     }
     
     // Same layout as original popup
@@ -58,13 +72,13 @@ struct LightweightListPopupView: View {
         return profile.lightweightPlaceListPlaces[currentList.list_id] ?? []
     }
     
-    // Filtered places based on visited status
+    // Filtered places based on visited status (uses ViewModel's database-verified reviewed IDs)
     var filteredPlaces: [LightweightPlace] {
         guard showOnlyUnvisited else { return allPlaces }
         
-        // Filter out places that the current user has reviewed
+        // Filter out places that the current user has reviewed (checked against ViewModel)
         return allPlaces.filter { place in
-            !profile.hasReviewedPlace(placeId: place.place_id)
+            !profile.hasVerifiedReviewedPlace(placeId: place.place_id)
         }
     }
     
@@ -73,7 +87,7 @@ struct LightweightListPopupView: View {
             VStack(spacing: 0) {
                 // Header with list name and controls
                 VStack(spacing: 12) {
-                    // Top bar with close button and share button
+                    // Top bar with close button, collaborators button, and share button
                     HStack {
                         Button(action: {
                             presentationMode.wrappedValue.dismiss()
@@ -84,8 +98,24 @@ struct LightweightListPopupView: View {
                         
                         Spacer()
                         
-                        // Share button
+                        // Collaborators button (only for list owner)
                         if let userId = profile.user?.id {
+                            Button {
+                                showCollaboratorsSheet = true
+                            } label: {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "person.2")
+                                        .foregroundColor(.primary)
+                                    if currentList.hasCollaborators {
+                                        Text("\(currentList.collaborator_count ?? 0)")
+                                            .font(.caption)
+                                            .fontWeight(.medium)
+                                            .foregroundColor(.primary)
+                                    }
+                                }
+                            }
+                            
+                            // Share button
                             LightweightListShareButton(lightweightList: currentList, userId: userId)
                         }
                     }
@@ -102,13 +132,6 @@ struct LightweightListPopupView: View {
                         Text("\(currentList.place_count) place\(currentList.place_count == 1 ? "" : "s")")
                             .font(.caption)
                             .foregroundColor(.gray)
-                        
-                        // Show list counter if multiple lists and we have total count
-                        if profile.lightweightPlaceLists.count > 1 && profile.totalListCount > 0 {
-                            Text("\(currentListIndex + 1) of \(profile.totalListCount)")
-                                .font(.caption2)
-                                .foregroundColor(.gray)
-                        }
                     }
                     .padding(.horizontal, 20)
                     
@@ -133,13 +156,13 @@ struct LightweightListPopupView: View {
                 }
                 .padding(.bottom, 10)
                 
-                // Content with swiping support
-                if profile.lightweightPlaceLists.count > 1 {
+                // Content with swiping support (uses passed lists for filtered support)
+                if lists.count > 1 {
                     // Multiple lists - use TabView for swiping
                     TabView(selection: $currentListIndex) {
-                        ForEach(profile.lightweightPlaceLists.indices, id: \.self) { index in
+                        ForEach(lists.indices, id: \.self) { index in
                             ListContentView(
-                                list: profile.lightweightPlaceLists[index],
+                                list: lists[index],
                                 placeColors: $placeColors,
                                 showOnlyUnvisited: $showOnlyUnvisited,
                                 isLoadingMore: $isLoadingMore,
@@ -157,8 +180,12 @@ struct LightweightListPopupView: View {
                         hasMorePlaces = true
                         currentPage = 1
                         
-                        // Load more lists when approaching the end (3rd-to-last list)
-                        if newIndex >= profile.lightweightPlaceLists.count - 3 {
+                        // Reload reviewed IDs for new list's places via ViewModel
+                        loadReviewedPlaceIdsViaViewModel()
+                        
+                        // Load more lists when approaching the end (only if using full list, not filtered)
+                        // Note: When using filtered lists, we don't load more lists
+                        if newIndex >= lists.count - 3 && lists.count == profile.lightweightPlaceLists.count {
                             loadMoreListsIfNeeded()
                         }
                     }
@@ -180,6 +207,20 @@ struct LightweightListPopupView: View {
         .onAppear {
             // Load places for the current list
             loadPlacesForCurrentList()
+            // Load reviewed place IDs from database via ViewModel for accurate filtering
+            loadReviewedPlaceIdsViaViewModel()
+        }
+        .onChange(of: allPlaces) { _, _ in
+            // Reload reviewed IDs when places change via ViewModel
+            loadReviewedPlaceIdsViaViewModel()
+        }
+        .sheet(isPresented: $showCollaboratorsSheet) {
+            if let userId = profile.user?.id {
+                ManageCollaboratorsSheet(
+                    listId: currentList.list_id,
+                    currentUserId: userId
+                )
+            }
         }
     }
     
@@ -202,28 +243,19 @@ struct LightweightListPopupView: View {
         
         Task {
             do {
-                let morePlaces = try await dataManager.fetchPlacesForPlaceList(
+                // Use DataManager method that also updates placeSavers
+                let morePlaces = try await dataManager.loadMorePlacesForList(
                     listId: currentList.list_id,
                     page: nextPage,
                     pageSize: 6
                 )
                 
                 await MainActor.run {
-                    // Append new places to the profile state
-                    if var existingPlaces = profile.lightweightPlaceListPlaces[currentList.list_id] {
-                        existingPlaces.append(contentsOf: morePlaces)
-                        profile.lightweightPlaceListPlaces[currentList.list_id] = existingPlaces
-                    } else {
-                        profile.lightweightPlaceListPlaces[currentList.list_id] = morePlaces
-                    }
-                    
                     currentPage = nextPage
                     // Keep loading if we got 6 or more places, stop if we got fewer than 6
                     hasMorePlaces = morePlaces.count >= 6
                     isLoadingMore = false
                 }
-                
-                print("✅ [LightweightListPopupView] Loaded \(morePlaces.count) more places for list (page \(nextPage))")
             } catch {
                 await MainActor.run {
                     isLoadingMore = false
@@ -245,9 +277,19 @@ struct LightweightListPopupView: View {
             }
         }
     }
+    
+    /// Delegate to ViewModel to load reviewed place IDs (no business logic here)
+    private func loadReviewedPlaceIdsViaViewModel() {
+        let placeIds = allPlaces.map { $0.place_id }
+        Task {
+            await profile.loadVerifiedReviewedPlaceIds(for: placeIds)
+        }
+    }
 }
 
 // MARK: - List Content View
+// DUMB Component: Displays list places in grid, delegates actions via closures
+// Uses ProfileViewModel for reviewed place filtering (no local business logic)
 
 struct ListContentView: View {
     let list: LightweightPlaceList
@@ -274,13 +316,13 @@ struct ListContentView: View {
         return profile.lightweightPlaceListPlaces[list.list_id] ?? []
     }
     
-    // Filtered places based on visited status
+    // Filtered places based on visited status (uses ViewModel's database-verified reviewed IDs)
     var filteredPlaces: [LightweightPlace] {
         guard showOnlyUnvisited else { return allPlaces }
         
-        // Filter out places that the current user has reviewed
+        // Filter out places that the current user has reviewed (checked against ViewModel)
         return allPlaces.filter { place in
-            !profile.hasReviewedPlace(placeId: place.place_id)
+            !profile.hasVerifiedReviewedPlace(placeId: place.place_id)
         }
     }
     
