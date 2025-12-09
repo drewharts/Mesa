@@ -15,6 +15,10 @@ struct ListPlacesPopUpListView: View {
     @Environment(\.presentationMode) var presentationMode
     
     @State private var showOnlyUnvisited: Bool = false
+    
+    // MARK: - Reviewed Places State (for accurate unvisited filtering)
+    @State private var reviewedPlaceIds: Set<String> = []
+    @State private var isLoadingReviewedIds: Bool = false
 
     // Reduced width to create more space between cards
     private let cardWidth: CGFloat = UIScreen.main.bounds.width / 2 - 35 // Increased spacing from edges
@@ -31,13 +35,13 @@ struct ListPlacesPopUpListView: View {
         return placeIds.compactMap { detailPlaceViewModel.places[$0] }
     }
     
-    // Filtered places based on visited status
+    // Filtered places based on visited status (uses database-verified reviewed IDs)
     var filteredPlaces: [DetailPlace] {
         guard showOnlyUnvisited else { return places }
         
-        // Filter out places that the current user has reviewed
+        // Filter out places that the current user has reviewed (checked against database)
         return places.filter { place in
-            !profile.hasReviewedPlace(placeId: place.id.uuidString)
+            !reviewedPlaceIds.contains(place.id.uuidString)
         }
     }
 
@@ -111,8 +115,45 @@ struct ListPlacesPopUpListView: View {
             }
         }
         .onAppear {
-            // Ensure reviewed places are loaded for filtering
-            profile.loadMyReviewedPlacesWithPagination()
+            // Load reviewed place IDs from database for accurate filtering
+            loadReviewedPlaceIds()
+        }
+        .onChange(of: places) { _, _ in
+            // Reload reviewed IDs when places change
+            loadReviewedPlaceIds()
+        }
+    }
+    
+    // MARK: - Helper Methods
+    
+    /// Load reviewed place IDs from database for accurate unvisited filtering
+    private func loadReviewedPlaceIds() {
+        guard let userId = profile.user?.id else { return }
+        
+        let placeIds = places.map { $0.id.uuidString }
+        guard !placeIds.isEmpty else { return }
+        
+        // Don't reload if already loading
+        guard !isLoadingReviewedIds else { return }
+        
+        isLoadingReviewedIds = true
+        
+        Task {
+            do {
+                let ids = try await SupabaseReviewService.shared.getReviewedPlaceIds(
+                    userId: userId,
+                    placeIds: placeIds
+                )
+                await MainActor.run {
+                    self.reviewedPlaceIds = ids
+                    self.isLoadingReviewedIds = false
+                }
+            } catch {
+                print("❌ [ListPlacesPopUpListView] Error loading reviewed place IDs: \(error)")
+                await MainActor.run {
+                    self.isLoadingReviewedIds = false
+                }
+            }
         }
     }
 }

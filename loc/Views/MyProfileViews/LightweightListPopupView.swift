@@ -24,6 +24,10 @@ struct LightweightListPopupView: View {
     @State private var currentPage: Int = 1
     @State private var showCollaboratorsSheet: Bool = false
     
+    // MARK: - Reviewed Places State (for accurate unvisited filtering)
+    @State private var reviewedPlaceIds: Set<String> = []
+    @State private var isLoadingReviewedIds: Bool = false
+    
     // Convenience initializer for single list (backward compatibility)
     init(list: LightweightPlaceList, places: [LightweightPlace], placeColors: Binding<[UUID: Color]>) {
         self.lists = [list]
@@ -59,13 +63,13 @@ struct LightweightListPopupView: View {
         return profile.lightweightPlaceListPlaces[currentList.list_id] ?? []
     }
     
-    // Filtered places based on visited status
+    // Filtered places based on visited status (uses database-verified reviewed IDs)
     var filteredPlaces: [LightweightPlace] {
         guard showOnlyUnvisited else { return allPlaces }
         
-        // Filter out places that the current user has reviewed
+        // Filter out places that the current user has reviewed (checked against database)
         return allPlaces.filter { place in
-            !profile.hasReviewedPlace(placeId: place.place_id)
+            !reviewedPlaceIds.contains(place.place_id)
         }
     }
     
@@ -162,6 +166,7 @@ struct LightweightListPopupView: View {
                                 isLoadingMore: $isLoadingMore,
                                 hasMorePlaces: $hasMorePlaces,
                                 currentPage: $currentPage,
+                                reviewedPlaceIds: reviewedPlaceIds,
                                 onLoadMore: loadMoreIfNeeded
                             )
                             .tag(index)
@@ -173,6 +178,9 @@ struct LightweightListPopupView: View {
                         isLoadingMore = false
                         hasMorePlaces = true
                         currentPage = 1
+                        
+                        // Reload reviewed IDs for new list's places
+                        loadReviewedPlaceIds()
                         
                         // Load more lists when approaching the end (3rd-to-last list)
                         if newIndex >= profile.lightweightPlaceLists.count - 3 {
@@ -188,6 +196,7 @@ struct LightweightListPopupView: View {
                         isLoadingMore: $isLoadingMore,
                         hasMorePlaces: $hasMorePlaces,
                         currentPage: $currentPage,
+                        reviewedPlaceIds: reviewedPlaceIds,
                         onLoadMore: loadMoreIfNeeded
                     )
                 }
@@ -197,6 +206,12 @@ struct LightweightListPopupView: View {
         .onAppear {
             // Load places for the current list
             loadPlacesForCurrentList()
+            // Load reviewed place IDs from database for accurate filtering
+            loadReviewedPlaceIds()
+        }
+        .onChange(of: allPlaces) { _, _ in
+            // Reload reviewed IDs when places change
+            loadReviewedPlaceIds()
         }
         .sheet(isPresented: $showCollaboratorsSheet) {
             if let userId = profile.user?.id {
@@ -263,6 +278,37 @@ struct LightweightListPopupView: View {
             }
         }
     }
+    
+    /// Load reviewed place IDs from database for accurate unvisited filtering
+    private func loadReviewedPlaceIds() {
+        guard let userId = profile.user?.id else { return }
+        
+        let placeIds = allPlaces.map { $0.place_id }
+        guard !placeIds.isEmpty else { return }
+        
+        // Don't reload if already loading
+        guard !isLoadingReviewedIds else { return }
+        
+        isLoadingReviewedIds = true
+        
+        Task {
+            do {
+                let ids = try await SupabaseReviewService.shared.getReviewedPlaceIds(
+                    userId: userId,
+                    placeIds: placeIds
+                )
+                await MainActor.run {
+                    self.reviewedPlaceIds = ids
+                    self.isLoadingReviewedIds = false
+                }
+            } catch {
+                print("❌ [LightweightListPopupView] Error loading reviewed place IDs: \(error)")
+                await MainActor.run {
+                    self.isLoadingReviewedIds = false
+                }
+            }
+        }
+    }
 }
 
 // MARK: - List Content View
@@ -274,6 +320,7 @@ struct ListContentView: View {
     @Binding var isLoadingMore: Bool
     @Binding var hasMorePlaces: Bool
     @Binding var currentPage: Int
+    let reviewedPlaceIds: Set<String>  // Database-verified reviewed place IDs
     let onLoadMore: () -> Void
     
     @EnvironmentObject var profile: ProfileViewModel
@@ -292,13 +339,13 @@ struct ListContentView: View {
         return profile.lightweightPlaceListPlaces[list.list_id] ?? []
     }
     
-    // Filtered places based on visited status
+    // Filtered places based on visited status (uses database-verified reviewed IDs)
     var filteredPlaces: [LightweightPlace] {
         guard showOnlyUnvisited else { return allPlaces }
         
-        // Filter out places that the current user has reviewed
+        // Filter out places that the current user has reviewed (checked against database)
         return allPlaces.filter { place in
-            !profile.hasReviewedPlace(placeId: place.place_id)
+            !reviewedPlaceIds.contains(place.place_id)
         }
     }
     
