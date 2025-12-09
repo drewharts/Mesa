@@ -30,29 +30,25 @@ struct LightweightProfileListSection: View {
             // List header with title and place count
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 8) {
                     Text(list.name)
                         .font(.headline)
                         .fontWeight(.semibold)
                         .foregroundColor(.primary)
                     
-                        // Show collaboration badge if list has collaborators
-                        if list.hasCollaborators {
-                            CollaboratorBadge(collaboratorCount: list.collaborator_count ?? 0)
-                        }
-                    }
-                    
-                    // Show owner name if this is a shared list
+                    // Show owner name if this is a shared list (collaborator view)
                     if list.isSharedWithMe, let ownerName = list.owner_name {
-                        SharedListIndicator(
+                        SharedByIndicator(
                             ownerName: ownerName,
                             ownerPhotoUrl: list.owner_photo_url,
                             collaboratorPhotos: list.collaborator_photos
                         )
                     } else {
-                        Text("\(totalPlaceCount) place\(totalPlaceCount == 1 ? "" : "s")")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                        // Owner view - show place count and collaborators if shared
+                        SharedWithIndicator(
+                            collaboratorPhotos: list.collaborator_photos,
+                            collaboratorCount: list.collaborator_count ?? 0,
+                            placeCount: totalPlaceCount
+                        )
                     }
                 }
                 
