@@ -180,6 +180,7 @@ struct LightweightListSelectionRowView: View {
 
 // MARK: - Inline Collaborator Avatars
 // DUMB Component: Compact avatar stack for inline display in list rows
+// Uses CachedProfileImage for proper caching and loading states
 private struct InlineCollaboratorAvatars: View {
     let isOwnedByMe: Bool        // If true, don't show owner avatar (you ARE the owner)
     let ownerPhotoUrl: String?
@@ -197,21 +198,23 @@ private struct InlineCollaboratorAvatars: View {
         HStack(spacing: -8) {
             // Owner avatar (only for lists shared WITH you)
             if !isOwnedByMe {
-                avatarView(
-                    photoUrl: ownerPhotoUrl,
-                    fallbackInitial: ownerName?.prefix(1).uppercased() ?? "?",
-                    isPrimary: true
+                CachedProfileImage(
+                    url: ownerPhotoUrl,
+                    size: avatarSize,
+                    fallbackInitial: String(ownerName?.prefix(1).uppercased() ?? "?")
                 )
+                .overlay(Circle().stroke(Color(.systemBackground), lineWidth: 2))
             }
             
             // Collaborator avatars
             if let photos = collaboratorPhotos {
                 ForEach(Array(photos.prefix(maxCollaboratorAvatars).enumerated()), id: \.offset) { index, photoUrl in
-                    avatarView(
-                        photoUrl: photoUrl,
-                        fallbackInitial: "?",
-                        isPrimary: isOwnedByMe && index == 0
+                    CachedProfileImage(
+                        url: photoUrl,
+                        size: avatarSize,
+                        fallbackInitial: "?"
                     )
+                    .overlay(Circle().stroke(Color(.systemBackground), lineWidth: 2))
                     .zIndex(Double(-index - 1))
                 }
                 
@@ -222,26 +225,6 @@ private struct InlineCollaboratorAvatars: View {
                 }
             }
         }
-    }
-    
-    private func avatarView(photoUrl: String?, fallbackInitial: String, isPrimary: Bool) -> some View {
-        AsyncImage(url: URL(string: photoUrl ?? "")) { phase in
-            switch phase {
-            case .success(let image):
-                image.resizable().scaledToFill()
-            default:
-                Circle()
-                    .fill(Color.gray.opacity(0.3))
-                    .overlay(
-                        Text(fallbackInitial)
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundColor(.gray)
-                    )
-            }
-        }
-        .frame(width: avatarSize, height: avatarSize)
-        .clipShape(Circle())
-        .overlay(Circle().stroke(Color(.systemBackground), lineWidth: 2))
     }
     
     private func overflowBadge(count: Int) -> some View {
