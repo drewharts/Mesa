@@ -168,11 +168,11 @@ struct LightweightListSelectionRowView: View {
             if isInList {
                 Circle()
                     .fill(Color.primary)
-                    .frame(width: 24, height: 24)
+                    .frame(width: 20, height: 20)
             } else {
                 Circle()
-                    .stroke(Color.primary, lineWidth: 2)
-                    .frame(width: 24, height: 24)
+                    .stroke(Color.primary, lineWidth: 1.5)
+                    .frame(width: 20, height: 20)
             }
         }
     }
@@ -381,50 +381,48 @@ struct ListSelectionSheet: View {
                 .padding(.top, 8)
                 .padding(.bottom, 16)
             
-            // Title and buttons row
-            HStack {
-                // Shared filter on left (only if there are shared lists)
-                if viewModel.hasSharedLists {
-                    sharedFilterButton
-                } else {
-                    // Empty space for balance when no shared lists
-                    Color.clear
-                        .frame(width: 70, height: 32)
-                }
-                
-                Spacer()
-
+            // Title and buttons row - ZStack for true centering
+            ZStack {
+                // Centered title
                 Text("Save to list")
                     .font(.headline)
+                
+                // Buttons on sides
+                HStack {
+                    // Shared filter on left (only if there are shared lists)
+                    if viewModel.hasSharedLists {
+                        sharedFilterButton
+                    }
+                    
+                    Spacer()
 
-                Spacer()
-
-                Button(action: {
-                    showNewListSheet = true
-                }) {
-                    Image(systemName: "plus")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(.gray)
-                        .frame(width: 32, height: 32)
-                        .background(Circle().fill(Color(.systemGray5)))
-                }
-                .sheet(isPresented: $showNewListSheet) {
-                    NewListView(isPresented: $showNewListSheet, onSave: { listName in
-                        let result = await viewModel.addNewListToSelection(
-                            named: listName, 
-                            city: "", 
-                            emoji: "", 
-                            image: ""
-                        )
-                        
-                        switch result {
-                        case .success:
-                            break
-                        case .failure(let error):
-                            errorMessage = error.localizedDescription
-                            showError = true
-                        }
-                    })
+                    Button(action: {
+                        showNewListSheet = true
+                    }) {
+                        Image(systemName: "plus")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(.gray)
+                            .frame(width: 32, height: 32)
+                            .background(Circle().fill(Color(.systemGray5)))
+                    }
+                    .sheet(isPresented: $showNewListSheet) {
+                        NewListView(isPresented: $showNewListSheet, onSave: { listName in
+                            let result = await viewModel.addNewListToSelection(
+                                named: listName, 
+                                city: "", 
+                                emoji: "", 
+                                image: ""
+                            )
+                            
+                            switch result {
+                            case .success:
+                                break
+                            case .failure(let error):
+                                errorMessage = error.localizedDescription
+                                showError = true
+                            }
+                        })
+                    }
                 }
             }
             .padding(.horizontal, 20)
