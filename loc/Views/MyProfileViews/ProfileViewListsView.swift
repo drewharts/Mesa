@@ -187,31 +187,3 @@ struct ProfileViewListsView: View {
         }
     }
 }
-        .sheet(isPresented: $showingImagePicker) {
-            ImagePicker(images: $inputImage, selectionLimit: 1)
-        }
-        .sheet(isPresented: $showingNewListSheet) {
-            NewListView(isPresented: $showingNewListSheet, onSave: { listName in
-                let _ = await profile.addNewPlaceList(named: listName, city: "", emoji: "", image: "")
-                // Result is ignored here - user will see the list appear in their profile
-            })
-        }
-        .sheet(isPresented: .constant(deepLinkManager.hasPendingList()), onDismiss: {
-            deepLinkManager.clearPendingList()
-        }) {
-            if let pendingList = deepLinkManager.pendingList {
-                SwipeableListPopupView(
-                    lists: pendingList.lists,
-                    initialListIndex: pendingList.initialIndex,
-                    placeColors: $placeColors
-                )
-            }
-        }
-        .onChange(of: selectedPlaceVM.isDetailSheetPresented) {
-            if selectedPlaceVM.isDetailSheetPresented == true {
-                presentationMode.wrappedValue.dismiss()
-            }
-        }
-    }
-    
-}
