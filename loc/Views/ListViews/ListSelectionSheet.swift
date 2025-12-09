@@ -166,16 +166,11 @@ struct LightweightListSelectionRowView: View {
         ZStack {
             if isInList {
                 Circle()
-                    .fill(Color.blue)
+                    .fill(Color.primary)
                     .frame(width: 24, height: 24)
-                    .overlay(
-                        Image(systemName: "checkmark")
-                            .font(.system(size: 12, weight: .bold))
-                            .foregroundColor(.white)
-                    )
             } else {
                 Circle()
-                    .stroke(Color.gray.opacity(0.4), lineWidth: 2)
+                    .stroke(Color.primary, lineWidth: 2)
                     .frame(width: 24, height: 24)
             }
         }
@@ -287,25 +282,17 @@ struct ListsInSelectionSheet: View {
     private var listContent: some View {
         LazyVStack(spacing: 0) {
             ForEach(Array(viewModel.filteredLists.enumerated()), id: \.element.id) { index, list in
-                VStack(spacing: 0) {
-                    LightweightListSelectionRowView(
-                        list: list,
-                        place: place,
-                        isInList: viewModel.isPlace(place, in: list),
-                        onToggle: {
-                            viewModel.toggle(place: place, in: list)
-                        }
-                    )
-                    .onAppear {
-                        Task {
-                            await viewModel.loadMoreListsIfNeeded(currentIndex: index)
-                        }
+                LightweightListSelectionRowView(
+                    list: list,
+                    place: place,
+                    isInList: viewModel.isPlace(place, in: list),
+                    onToggle: {
+                        viewModel.toggle(place: place, in: list)
                     }
-                    
-                    // Divider between rows
-                    if index < viewModel.filteredLists.count - 1 {
-                        Divider()
-                            .padding(.leading, 16)
+                )
+                .onAppear {
+                    Task {
+                        await viewModel.loadMoreListsIfNeeded(currentIndex: index)
                     }
                 }
             }
