@@ -341,16 +341,12 @@ struct ListSelectionSheet: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Header
+            // Header with integrated filter
             sheetHeader
             
-            Divider()
-            
-            // Filter bar (only show if there are shared lists)
-            if viewModel.hasSharedLists {
-                filterBar
-                Divider()
-            }
+            // Breathing room
+            Spacer()
+                .frame(height: 16)
             
             // List content
             ListsInSelectionSheet(viewModel: viewModel, place: place)
@@ -369,9 +365,14 @@ struct ListSelectionSheet: View {
     
     private var sheetHeader: some View {
         HStack {
-            // Spacer for balance
-            Color.clear
-                .frame(width: 32, height: 32)
+            // Shared filter on left (only if there are shared lists)
+            if viewModel.hasSharedLists {
+                sharedFilterButton
+            } else {
+                // Empty space for balance when no shared lists
+                Color.clear
+                    .frame(width: 32, height: 32)
+            }
             
             Spacer()
 
@@ -412,34 +413,28 @@ struct ListSelectionSheet: View {
         .padding(.vertical, 12)
     }
     
-    // MARK: - Filter Bar
+    // MARK: - Shared Filter Button
     
-    private var filterBar: some View {
-        HStack {
-            Spacer()
-            
-            // Shared lists filter toggle
-            Button {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    viewModel.showOnlyShared.toggle()
-                }
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "person.2.fill")
-                        .font(.system(size: 12))
-                    Text("Shared (\(viewModel.sharedListCount))")
-                        .font(.subheadline)
-                }
-                .foregroundColor(viewModel.showOnlyShared ? .white : .primary)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(
-                    Capsule()
-                        .fill(viewModel.showOnlyShared ? Color.primary : Color(.systemGray5))
-                )
+    private var sharedFilterButton: some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                viewModel.showOnlyShared.toggle()
             }
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: "person.2.fill")
+                    .font(.system(size: 10))
+                Text("Shared")
+                    .font(.subheadline)
+            }
+            .foregroundColor(viewModel.showOnlyShared ? .white : .primary)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(
+                Capsule()
+                    .fill(viewModel.showOnlyShared ? Color.primary : Color(.systemGray5))
+            )
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 8)
     }
+    
 }
