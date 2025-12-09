@@ -22,9 +22,9 @@ BEGIN
         pl.id AS list_id,
         pl.name,
         pl.is_public,
-        pl.cover_image_url AS image,
+        pl.image AS image,
         (SELECT COUNT(*) FROM place_list_items pli WHERE pli.list_id = pl.id) AS place_count,
-        pl.city,
+        NULL::TEXT AS city,
         -- Get array of collaborator profile photos (limit to 5)
         (
             SELECT ARRAY_AGG(collab_user.profile_photo_url)
