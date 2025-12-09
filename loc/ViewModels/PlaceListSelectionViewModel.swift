@@ -99,22 +99,32 @@ class PlaceListSelectionViewModel: ObservableObject {
         placeMembership.removeAll()
         sharedLists = []
         
-        // Fetch owned lists AND shared lists in parallel
+        // Fetch owned lists, shared lists, AND collaborative owned lists in parallel
+        // This ensures ALL collaborative lists are available for the "Shared" filter
         async let ownedListsTask = fetchOwnedLists(userId: userId, coord: coord)
         async let sharedListsTask = fetchSharedLists(userId: userId)
+        async let collaborativeOwnedTask = fetchCollaborativeOwnedLists(userId: userId)
         
-        let (ownedLists, fetchedSharedLists) = await (ownedListsTask, sharedListsTask)
+        let (ownedLists, fetchedSharedLists, collaborativeOwnedLists) = await (ownedListsTask, sharedListsTask, collaborativeOwnedTask)
         
         // Cache shared lists for later (they don't paginate)
         sharedLists = fetchedSharedLists
         
-        // Merge: owned lists first, then shared lists
-        let allLists = ownedLists + fetchedSharedLists
+        // Get IDs of lists already in owned lists (to avoid duplicates)
+        let ownedListIds = Set(ownedLists.map { $0.list_id })
+        
+        // Filter out collaborative owned lists that are already in paginated owned lists
+        let additionalCollaborativeLists = collaborativeOwnedLists.filter { 
+            !ownedListIds.contains($0.list_id) 
+        }
+        
+        // Merge: owned (paginated) + additional collaborative owned + shared with me
+        let allLists = ownedLists + additionalCollaborativeLists + fetchedSharedLists
         lists = allLists
         hasMore = ownedLists.count >= pageSize
         hasLoadedOnce = true
         
-        print("📋 [PlaceListSelectionVM] Loaded \(ownedLists.count) owned + \(fetchedSharedLists.count) shared lists")
+        print("📋 [PlaceListSelectionVM] Loaded \(ownedLists.count) owned + \(additionalCollaborativeLists.count) collab owned + \(fetchedSharedLists.count) shared lists")
         
         // Load place membership data for all lists (so we can show checkmarks)
         if !allLists.isEmpty {
@@ -149,6 +159,18 @@ class PlaceListSelectionViewModel: ObservableObject {
             return sharedListInfos.map { $0.toLightweightPlaceList() }
         } catch {
             print("❌ [PlaceListSelectionVM] Failed to fetch shared lists: \(error)")
+            return []
+        }
+    }
+    
+    /// Fetches user's owned lists that have collaborators
+    /// This ensures collaborative owned lists appear in "Shared" filter even if not in first page
+    private func fetchCollaborativeOwnedLists(userId: String) async -> [LightweightPlaceList] {
+        do {
+            let collaborativeOwnedInfos = try await collaborationService.fetchCollaborativeOwnedLists(userId: userId)
+            return collaborativeOwnedInfos.map { $0.toLightweightPlaceList() }
+        } catch {
+            print("❌ [PlaceListSelectionVM] Failed to fetch collaborative owned lists: \(error)")
             return []
         }
     }
