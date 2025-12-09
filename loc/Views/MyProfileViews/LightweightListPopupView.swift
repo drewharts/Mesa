@@ -132,13 +132,6 @@ struct LightweightListPopupView: View {
                         Text("\(currentList.place_count) place\(currentList.place_count == 1 ? "" : "s")")
                             .font(.caption)
                             .foregroundColor(.gray)
-                        
-                        // Show list counter if multiple lists (uses passed lists count)
-                        if lists.count > 1 {
-                            Text("\(currentListIndex + 1) of \(lists.count)")
-                                .font(.caption2)
-                                .foregroundColor(.gray)
-                        }
                     }
                     .padding(.horizontal, 20)
                     
