@@ -139,17 +139,19 @@ struct LightweightListSelectionRowView: View {
     var body: some View {
         Button(action: onToggle) {
             HStack(spacing: 12) {
-                // Thumbnail: avatars for shared lists, empty for owned
-                ListRowThumbnail(
-                    isShared: list.isSharedWithMe,
-                    ownerPhotoUrl: list.owner_photo_url,
-                    ownerName: list.owner_name,
-                    collaboratorPhotos: list.collaborator_photos
-                )
-
+                // List info on the left
                 LightweightListDescription(list: list)
 
                 Spacer()
+                
+                // Collaborator avatars for shared lists (before checkmark)
+                if list.isSharedWithMe {
+                    InlineCollaboratorAvatars(
+                        ownerPhotoUrl: list.owner_photo_url,
+                        ownerName: list.owner_name,
+                        collaboratorPhotos: list.collaborator_photos
+                    )
+                }
 
                 // Selection indicator
                 selectionIndicator
@@ -177,6 +179,77 @@ struct LightweightListSelectionRowView: View {
                     .frame(width: 24, height: 24)
             }
         }
+    }
+}
+
+// MARK: - Inline Collaborator Avatars
+// DUMB Component: Compact avatar stack for inline display in list rows
+private struct InlineCollaboratorAvatars: View {
+    let ownerPhotoUrl: String?
+    let ownerName: String?
+    let collaboratorPhotos: [String]?
+    
+    private let avatarSize: CGFloat = 24
+    
+    var body: some View {
+        HStack(spacing: -8) {
+            // Owner avatar
+            avatarView(
+                photoUrl: ownerPhotoUrl,
+                fallbackInitial: ownerName?.prefix(1).uppercased() ?? "?",
+                isOwner: true
+            )
+            
+            // Collaborator avatars (up to 2)
+            if let photos = collaboratorPhotos {
+                ForEach(Array(photos.prefix(2).enumerated()), id: \.offset) { index, photoUrl in
+                    avatarView(
+                        photoUrl: photoUrl,
+                        fallbackInitial: "?",
+                        isOwner: false
+                    )
+                    .zIndex(Double(-index - 1))
+                }
+                
+                // Overflow badge
+                if photos.count > 2 {
+                    overflowBadge(count: photos.count - 2)
+                        .zIndex(-4)
+                }
+            }
+        }
+    }
+    
+    private func avatarView(photoUrl: String?, fallbackInitial: String, isOwner: Bool) -> some View {
+        AsyncImage(url: URL(string: photoUrl ?? "")) { phase in
+            switch phase {
+            case .success(let image):
+                image.resizable().scaledToFill()
+            default:
+                Circle()
+                    .fill(isOwner ? Color.blue.opacity(0.3) : Color.gray.opacity(0.3))
+                    .overlay(
+                        Text(fallbackInitial)
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundColor(isOwner ? .blue : .gray)
+                    )
+            }
+        }
+        .frame(width: avatarSize, height: avatarSize)
+        .clipShape(Circle())
+        .overlay(Circle().stroke(Color(.systemBackground), lineWidth: 2))
+    }
+    
+    private func overflowBadge(count: Int) -> some View {
+        Circle()
+            .fill(Color.blue.opacity(0.8))
+            .frame(width: avatarSize, height: avatarSize)
+            .overlay(
+                Text("+\(count)")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundColor(.white)
+            )
+            .overlay(Circle().stroke(Color(.systemBackground), lineWidth: 2))
     }
 }
 
@@ -232,7 +305,7 @@ struct ListsInSelectionSheet: View {
                     // Divider between rows
                     if index < viewModel.filteredLists.count - 1 {
                         Divider()
-                            .padding(.leading, 88) // Align with text, past thumbnail
+                            .padding(.leading, 16)
                     }
                 }
             }
@@ -356,10 +429,6 @@ struct ListSelectionSheet: View {
     
     private var filterBar: some View {
         HStack {
-            Text("Filter")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-            
             Spacer()
             
             // Shared lists filter toggle
@@ -384,7 +453,6 @@ struct ListSelectionSheet: View {
             }
         }
         .padding(.horizontal, 20)
-        .padding(.vertical, 10)
-        .background(Color(.systemGray6).opacity(0.5))
+        .padding(.vertical, 8)
     }
 }
