@@ -110,21 +110,18 @@ class PlaceListSelectionViewModel: ObservableObject {
         // Cache shared lists for later (they don't paginate)
         sharedLists = fetchedSharedLists
         
-        // Get IDs of lists already in owned lists (to avoid duplicates)
-        let ownedListIds = Set(ownedLists.map { $0.list_id })
-        
-        // Filter out collaborative owned lists that are already in paginated owned lists
-        let additionalCollaborativeLists = collaborativeOwnedLists.filter { 
-            !ownedListIds.contains($0.list_id) 
-        }
-        
-        // Merge: owned (paginated) + additional collaborative owned + shared with me
-        let allLists = ownedLists + additionalCollaborativeLists + fetchedSharedLists
-        lists = allLists
+        // Merge with proper deduplication to prevent duplicate IDs in ForEach
+        // Priority: owned lists > collaborative owned > shared with me
+        let uniqueLists = deduplicateLists(
+            ownedLists: ownedLists,
+            collaborativeOwnedLists: collaborativeOwnedLists,
+            sharedLists: fetchedSharedLists
+        )
+        lists = uniqueLists
         hasMore = ownedLists.count >= pageSize
         hasLoadedOnce = true
         
-        print("📋 [PlaceListSelectionVM] Loaded \(ownedLists.count) owned + \(additionalCollaborativeLists.count) collab owned + \(fetchedSharedLists.count) shared lists")
+        print("📋 [PlaceListSelectionVM] Loaded \(uniqueLists.count) unique lists (from \(ownedLists.count) owned + \(collaborativeOwnedLists.count) collab + \(fetchedSharedLists.count) shared)")
         
         // Load place membership data for all lists (so we can show checkmarks)
         if !allLists.isEmpty {
@@ -230,6 +227,45 @@ class PlaceListSelectionViewModel: ObservableObject {
     }
     
     // MARK: - Private Helpers
+    
+    /// Deduplicates lists from multiple sources, preserving priority order
+    /// Single Responsibility: Ensure unique list IDs to prevent ForEach rendering issues
+    /// - Parameters:
+    ///   - ownedLists: User's owned lists (highest priority)
+    ///   - collaborativeOwnedLists: Owned lists with collaborators
+    ///   - sharedLists: Lists shared with the user
+    /// - Returns: Array of unique lists with no duplicate IDs
+    private func deduplicateLists(
+        ownedLists: [LightweightPlaceList],
+        collaborativeOwnedLists: [LightweightPlaceList],
+        sharedLists: [LightweightPlaceList]
+    ) -> [LightweightPlaceList] {
+        var seenIds = Set<String>()
+        var uniqueLists: [LightweightPlaceList] = []
+        
+        // Add owned lists first (highest priority - maintains proximity sorting)
+        for list in ownedLists {
+            if seenIds.insert(list.list_id).inserted {
+                uniqueLists.append(list)
+            }
+        }
+        
+        // Add collaborative owned lists not already in owned lists
+        for list in collaborativeOwnedLists {
+            if seenIds.insert(list.list_id).inserted {
+                uniqueLists.append(list)
+            }
+        }
+        
+        // Add shared lists not already seen
+        for list in sharedLists {
+            if seenIds.insert(list.list_id).inserted {
+                uniqueLists.append(list)
+            }
+        }
+        
+        return uniqueLists
+    }
     
     /// Load place membership data for lists using direct database checks
     /// This checks if the specific place is in each list without loading all places
