@@ -124,8 +124,8 @@ class PlaceListSelectionViewModel: ObservableObject {
         print("📋 [PlaceListSelectionVM] Loaded \(uniqueLists.count) unique lists (from \(ownedLists.count) owned + \(collaborativeOwnedLists.count) collab + \(fetchedSharedLists.count) shared)")
         
         // Load place membership data for all lists (so we can show checkmarks)
-        if !allLists.isEmpty {
-            await loadPlaceMembershipForLists(allLists, placeId: place.id.uuidString)
+        if !uniqueLists.isEmpty {
+            await loadPlaceMembershipForLists(uniqueLists, placeId: place.id.uuidString)
         }
         
         isLoadingInitial = false
