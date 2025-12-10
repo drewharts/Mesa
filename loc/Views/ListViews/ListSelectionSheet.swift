@@ -51,7 +51,7 @@ struct LightweightListDescription: View {
             // Show different subtitle for shared vs owned lists
             if list.isSharedWithMe, let ownerName = ownerFirstName {
                 HStack(spacing: 4) {
-                    Text("\(displayedPlaceCount) Places")
+            Text("\(displayedPlaceCount) Places")
                     Text("•")
                         .foregroundStyle(Color.secondary.opacity(0.5))
                     Text("Shared by \(ownerName)")
@@ -143,7 +143,7 @@ struct LightweightListSelectionRowView: View {
                 LightweightListDescription(list: list)
 
                 Spacer()
-                
+
                 // Collaborator avatars for ANY collaborative list (shared with you OR you shared)
                 if list.isCollaborative {
                     InlineCollaboratorAvatars(
@@ -164,18 +164,18 @@ struct LightweightListSelectionRowView: View {
     }
     
     private var selectionIndicator: some View {
-        ZStack {
-            if isInList {
-                Circle()
-                    .fill(Color.primary)
+                ZStack {
+                    if isInList {
+                        Circle()
+                            .fill(Color.primary)
                     .frame(width: 20, height: 20)
-            } else {
-                Circle()
+                    } else {
+                        Circle()
                     .stroke(Color.primary, lineWidth: 1.5)
                     .frame(width: 20, height: 20)
+                    }
+                }
             }
-        }
-    }
 }
 
 // MARK: - Inline Collaborator Avatars
@@ -204,7 +204,7 @@ private struct InlineCollaboratorAvatars: View {
                     fallbackInitial: String(ownerName?.prefix(1).uppercased() ?? "?")
                 )
                 .overlay(Circle().stroke(Color(.systemBackground), lineWidth: 2))
-            }
+        }
             
             // Collaborator avatars
             if let photos = collaboratorPhotos {
@@ -261,44 +261,46 @@ struct ListsInSelectionSheet: View {
     // MARK: - Subviews
     
     private var loadingView: some View {
-        VStack(spacing: 12) {
-            ProgressView()
-                .frame(width: 20, height: 20)
-            Text("Loading your lists...")
-                .font(.caption)
-                .foregroundColor(.secondary)
-        }
-        .padding()
+                VStack(spacing: 12) {
+                    ProgressView()
+                        .frame(width: 20, height: 20)
+                    Text("Loading your lists...")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .padding()
     }
     
     private var listContent: some View {
         LazyVStack(spacing: 0) {
             ForEach(Array(viewModel.filteredLists.enumerated()), id: \.element.id) { index, list in
-                LightweightListSelectionRowView(
-                    list: list,
-                    place: place,
-                    isInList: viewModel.isPlace(place, in: list),
-                    onToggle: {
-                        viewModel.toggle(place: place, in: list)
-                    }
-                )
-                .onAppear {
-                    Task {
-                        await viewModel.loadMoreListsIfNeeded(currentIndex: index)
+                    LightweightListSelectionRowView(
+                        list: list,
+                        place: place,
+                        isInList: viewModel.isPlace(place, in: list),
+                        onToggle: {
+                            viewModel.toggle(place: place, in: list)
+                        }
+                    )
+                        .onAppear {
+                            Task {
+                                await viewModel.loadMoreListsIfNeeded(currentIndex: index)
+                            }
+                        }
+                }
+                
+                // Loading indicator at the bottom
+                if viewModel.isLoadingMore {
+                    HStack {
+                        Spacer()
+                        ProgressView()
+                            .padding()
+                        Spacer()
                     }
                 }
-            }
-            
-            // Loading indicator at the bottom
-            if viewModel.isLoadingMore {
-                HStack {
-                    Spacer()
-                    ProgressView()
-                        .padding()
-                    Spacer()
-                }
-            }
         }
+        // Force complete rebuild when filter changes to fix LazyVStack layout issues
+        .id(viewModel.showOnlyShared)
     }
     
     private var emptyStateView: some View {
@@ -314,8 +316,8 @@ struct ListsInSelectionSheet: View {
                     .font(.caption)
                     .foregroundColor(.gray.opacity(0.7))
             } else {
-                Text("No lists available")
-                    .foregroundColor(.gray)
+                    Text("No lists available")
+                        .foregroundColor(.gray)
             }
         }
         .padding(.vertical, 40)
@@ -337,7 +339,7 @@ struct ListSelectionSheet: View {
             sheetHeader
             
             // Breathing room
-            Spacer()
+                Spacer()
                 .frame(height: 16)
             
             // List content
@@ -376,35 +378,35 @@ struct ListSelectionSheet: View {
                     if viewModel.hasSharedLists {
                         sharedFilterButton
                     }
-                    
-                    Spacer()
 
-                    Button(action: {
-                        showNewListSheet = true
-                    }) {
-                        Image(systemName: "plus")
+                Spacer()
+
+                Button(action: {
+                    showNewListSheet = true
+                }) {
+                    Image(systemName: "plus")
                             .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(.gray)
+                        .foregroundColor(.gray)
                             .frame(width: 32, height: 32)
                             .background(Circle().fill(Color(.systemGray5)))
-                    }
-                    .sheet(isPresented: $showNewListSheet) {
-                        NewListView(isPresented: $showNewListSheet, onSave: { listName in
-                            let result = await viewModel.addNewListToSelection(
-                                named: listName, 
-                                city: "", 
-                                emoji: "", 
-                                image: ""
-                            )
-                            
-                            switch result {
-                            case .success:
+                }
+                .sheet(isPresented: $showNewListSheet) {
+                    NewListView(isPresented: $showNewListSheet, onSave: { listName in
+                        let result = await viewModel.addNewListToSelection(
+                            named: listName, 
+                            city: "", 
+                            emoji: "", 
+                            image: ""
+                        )
+                        
+                        switch result {
+                        case .success:
                                 break
-                            case .failure(let error):
-                                errorMessage = error.localizedDescription
-                                showError = true
-                            }
-                        })
+                        case .failure(let error):
+                            errorMessage = error.localizedDescription
+                            showError = true
+                        }
+                    })
                     }
                 }
             }
@@ -418,14 +420,14 @@ struct ListSelectionSheet: View {
         Button {
             withAnimation(.easeInOut(duration: 0.2)) {
                 viewModel.showOnlyShared.toggle()
-            }
+        }
         } label: {
             HStack(spacing: 4) {
                 Image(systemName: "person.2.fill")
                     .font(.system(size: 10))
                 Text("Shared")
                     .font(.subheadline)
-            }
+        }
             .foregroundColor(viewModel.showOnlyShared ? .white : .primary)
             .padding(.horizontal, 10)
             .padding(.vertical, 6)

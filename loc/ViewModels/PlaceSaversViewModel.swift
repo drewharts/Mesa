@@ -89,30 +89,39 @@ class PlaceSaversViewModel: ObservableObject {
     
     // MARK: - Computed Properties
     
-    /// Number of additional savers beyond visible circles (for "+X" display)
-    var additionalSaverCount: Int {
-        max(0, totalSaverCount - 3)
-    }
-    
-    /// Whether to show the savers indicator at all
-    var shouldShowSaversIndicator: Bool {
-        totalSaverCount > 0
-    }
-    
-    /// Savers excluding current user (for display in list)
+    /// Savers excluding current user (for indicator and sheet list)
+    /// Rationale: "Saved by" is about social discovery - you already know you saved it
     var displayableSavers: [ProfileData] {
         guard let currentUserId = userSession.currentUserId else { return savers }
         return savers.filter { $0.id != currentUserId }
     }
     
-    /// Get first N saver IDs for profile circle display
-    func saverIdsForDisplay(limit: Int = 3) -> [String] {
-        return Array(savers.prefix(limit).map { $0.id })
+    /// Count of savers excluding current user (for indicator)
+    var displayableSaverCount: Int {
+        displayableSavers.count
     }
     
-    /// Get first N savers (ProfileData) for profile circle display
+    /// Number of additional savers beyond visible circles (for "+X" display)
+    /// Excludes current user - only shows count of OTHER savers
+    var additionalSaverCount: Int {
+        max(0, displayableSaverCount - 3)
+    }
+    
+    /// Whether to show the savers indicator at all
+    /// Only show if OTHER people (not just you) have saved this place
+    var shouldShowSaversIndicator: Bool {
+        displayableSaverCount > 0
+    }
+    
+    /// Get first N saver IDs for profile circle display (excluding current user)
+    func saverIdsForDisplay(limit: Int = 3) -> [String] {
+        return Array(displayableSavers.prefix(limit).map { $0.id })
+    }
+    
+    /// Get first N savers (ProfileData) for profile circle display (excluding current user)
+    /// Shows only OTHER people who saved this place - you don't need to see your own face
     func saversForDisplay(limit: Int = 3) -> [ProfileData] {
-        return Array(savers.prefix(limit))
+        return Array(displayableSavers.prefix(limit))
     }
     
     // MARK: - Private Methods

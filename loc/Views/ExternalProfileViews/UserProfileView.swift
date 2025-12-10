@@ -37,7 +37,9 @@ struct UserProfileView: View {
                                         )
                                     }
                                 }
-                            }
+                            },
+                            totalPlacesCount: UserProfileVM.totalPlacesCount,
+                            userName: UserProfileVM.selectedUser?.firstName ?? UserProfileVM.selectedUser?.fullName ?? ""
                         )
 
                         // Name

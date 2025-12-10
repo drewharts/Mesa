@@ -443,6 +443,11 @@ class UserService: ObservableObject {
         return try await supabase.getTotalListCount(forUserId: userId)
     }
     
+    // COUNT ONLY - Returns unique places count (saved + reviewed + created)
+    func getTotalPlacesCount(forUserId userId: String) async throws -> Int {
+        return try await supabase.getTotalPlacesCount(forUserId: userId)
+    }
+    
     /// Fetch user favorites using optimized SQL function
     func fetchUserFavorites(userId: String) async throws -> [FavoritePlace] {
         return try await supabase.fetchUserFavorites(userId: userId)
@@ -630,9 +635,26 @@ class UserService: ObservableObject {
         }
     }
     
+    /// Deletes a TikTok place (external place) from the user's saved places
+    /// Single Responsibility: Coordinate deletion via SupabaseUserService
+    /// - Parameters:
+    ///   - userId: The user's ID
+    ///   - placeId: The place ID to delete
+    ///   - completion: Callback with optional error
     func deleteTikTokPlace(userId: String, placeId: String, completion: @escaping (Error?) -> Void) {
-        print("⚠️ [UserService] deleteTikTokPlace not fully implemented")
-        completion(nil)
+        Task {
+            do {
+                try await supabase.deleteExternalPlaces(userId: userId, placeId: placeId)
+                await MainActor.run {
+                    completion(nil)
+                }
+            } catch {
+                print("❌ [UserService] Error deleting TikTok place: \(error)")
+                await MainActor.run {
+                    completion(error)
+                }
+            }
+        }
     }
     
     func deleteUserAccount(userId: String, completion: @escaping (Error?) -> Void) {

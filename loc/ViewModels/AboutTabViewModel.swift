@@ -19,6 +19,7 @@ class AboutTabViewModel: ObservableObject {
     // MARK: - Child ViewModels
     let tikTokVideosViewModel: TikTokVideosViewModel
     let placePhotosViewModel: PlacePhotosViewModel
+    let customPlaceCreatorViewModel: CustomPlaceCreatorViewModel
     
     // MARK: - Dependencies
     private let selectedPlaceVM: SelectedPlaceViewModel
@@ -27,9 +28,11 @@ class AboutTabViewModel: ObservableObject {
     // MARK: - Initialization
     init(tikTokVideosViewModel: TikTokVideosViewModel,
          placePhotosViewModel: PlacePhotosViewModel,
+         customPlaceCreatorViewModel: CustomPlaceCreatorViewModel,
          selectedPlaceVM: SelectedPlaceViewModel) {
         self.tikTokVideosViewModel = tikTokVideosViewModel
         self.placePhotosViewModel = placePhotosViewModel
+        self.customPlaceCreatorViewModel = customPlaceCreatorViewModel
         self.selectedPlaceVM = selectedPlaceVM
         
         setupObservers()
@@ -42,6 +45,8 @@ class AboutTabViewModel: ObservableObject {
             .sink { [weak self] place in
                 self?.place = place
                 self?.placeId = place?.id.uuidString ?? ""
+                // Update custom place creator VM when place changes
+                self?.customPlaceCreatorViewModel.setPlace(place)
             }
             .store(in: &cancellables)
     }
@@ -57,6 +62,11 @@ class AboutTabViewModel: ObservableObject {
     
     var placeDescription: String {
         place?.description ?? "No description available"
+    }
+    
+    /// Whether this is a custom place
+    var isCustomPlace: Bool {
+        place?.isCustom == true
     }
 }
 

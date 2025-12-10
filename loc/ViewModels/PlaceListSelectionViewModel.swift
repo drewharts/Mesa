@@ -99,26 +99,33 @@ class PlaceListSelectionViewModel: ObservableObject {
         placeMembership.removeAll()
         sharedLists = []
         
-        // Fetch owned lists AND shared lists in parallel
+        // Fetch owned lists, shared lists, AND collaborative owned lists in parallel
+        // This ensures ALL collaborative lists are available for the "Shared" filter
         async let ownedListsTask = fetchOwnedLists(userId: userId, coord: coord)
         async let sharedListsTask = fetchSharedLists(userId: userId)
+    async let collaborativeOwnedTask = fetchCollaborativeOwnedLists(userId: userId)
+    
+    let (ownedLists, fetchedSharedLists, collaborativeOwnedLists) = await (ownedListsTask, sharedListsTask, collaborativeOwnedTask)
+    
+    // Cache shared lists for later (they don't paginate)
+    sharedLists = fetchedSharedLists
+    
+    // Merge with proper deduplication to prevent duplicate IDs in ForEach
+    // Priority: owned lists > collaborative owned > shared with me
+    let uniqueLists = deduplicateLists(
+        ownedLists: ownedLists,
+        collaborativeOwnedLists: collaborativeOwnedLists,
+        sharedLists: fetchedSharedLists
+    )
+    lists = uniqueLists
+    hasMore = ownedLists.count >= pageSize
+    hasLoadedOnce = true
         
-        let (ownedLists, fetchedSharedLists) = await (ownedListsTask, sharedListsTask)
-        
-        // Cache shared lists for later (they don't paginate)
-        sharedLists = fetchedSharedLists
-        
-        // Merge: owned lists first, then shared lists
-        let allLists = ownedLists + fetchedSharedLists
-        lists = allLists
-        hasMore = ownedLists.count >= pageSize
-        hasLoadedOnce = true
-        
-        print("📋 [PlaceListSelectionVM] Loaded \(ownedLists.count) owned + \(fetchedSharedLists.count) shared lists")
+        print("📋 [PlaceListSelectionVM] Loaded \(uniqueLists.count) unique lists (from \(ownedLists.count) owned + \(collaborativeOwnedLists.count) collab + \(fetchedSharedLists.count) shared)")
         
         // Load place membership data for all lists (so we can show checkmarks)
-        if !allLists.isEmpty {
-            await loadPlaceMembershipForLists(allLists, placeId: place.id.uuidString)
+        if !uniqueLists.isEmpty {
+            await loadPlaceMembershipForLists(uniqueLists, placeId: place.id.uuidString)
         }
         
         isLoadingInitial = false
@@ -153,6 +160,18 @@ class PlaceListSelectionViewModel: ObservableObject {
         }
     }
     
+    /// Fetches user's owned lists that have collaborators
+    /// This ensures collaborative owned lists appear in "Shared" filter even if not in first page
+    private func fetchCollaborativeOwnedLists(userId: String) async -> [LightweightPlaceList] {
+        do {
+            let collaborativeOwnedInfos = try await collaborationService.fetchCollaborativeOwnedLists(userId: userId)
+            return collaborativeOwnedInfos.map { $0.toLightweightPlaceList() }
+        } catch {
+            print("❌ [PlaceListSelectionVM] Failed to fetch collaborative owned lists: \(error)")
+            return []
+        }
+    }
+    
     func loadMoreListsIfNeeded(currentIndex: Int) async {
         // Guard: Already loading or no more to load
         guard !isLoadingMore,
@@ -183,19 +202,26 @@ class PlaceListSelectionViewModel: ObservableObject {
             )
             
             if !moreLists.isEmpty {
-                // Insert new owned lists BEFORE shared lists
-                let insertIndex = lists.count - sharedLists.count
-                lists.insert(contentsOf: moreLists, at: insertIndex)
-                currentPage = nextPage
-                hasMore = moreLists.count >= pageSize
+                // Deduplicate: filter out any lists already in our collection
+                let existingIds = Set(lists.map { $0.list_id })
+                let newUniqueLists = moreLists.filter { !existingIds.contains($0.list_id) }
                 
-                // Load place membership data in BACKGROUND (non-blocking)
-                // Follows Single Responsibility: Pagination ≠ Data Enrichment
-                if let placeId = currentPlace?.id.uuidString {
-                    Task {
-                        await loadPlaceMembershipForLists(moreLists, placeId: placeId)
+                if !newUniqueLists.isEmpty {
+                    // Insert new owned lists BEFORE shared lists
+                    let insertIndex = lists.count - sharedLists.count
+                    lists.insert(contentsOf: newUniqueLists, at: insertIndex)
+                    
+                    // Load place membership data in BACKGROUND (non-blocking)
+                    // Follows Single Responsibility: Pagination ≠ Data Enrichment
+                    if let placeId = currentPlace?.id.uuidString {
+                        Task {
+                            await loadPlaceMembershipForLists(newUniqueLists, placeId: placeId)
+                        }
                     }
                 }
+                
+                currentPage = nextPage
+                hasMore = moreLists.count >= pageSize
             } else {
                 hasMore = false
             }
@@ -208,6 +234,45 @@ class PlaceListSelectionViewModel: ObservableObject {
     }
     
     // MARK: - Private Helpers
+    
+    /// Deduplicates lists from multiple sources, preserving priority order
+    /// Single Responsibility: Ensure unique list IDs to prevent ForEach rendering issues
+    /// - Parameters:
+    ///   - ownedLists: User's owned lists (highest priority)
+    ///   - collaborativeOwnedLists: Owned lists with collaborators
+    ///   - sharedLists: Lists shared with the user
+    /// - Returns: Array of unique lists with no duplicate IDs
+    private func deduplicateLists(
+        ownedLists: [LightweightPlaceList],
+        collaborativeOwnedLists: [LightweightPlaceList],
+        sharedLists: [LightweightPlaceList]
+    ) -> [LightweightPlaceList] {
+        var seenIds = Set<String>()
+        var uniqueLists: [LightweightPlaceList] = []
+        
+        // Add owned lists first (highest priority - maintains proximity sorting)
+        for list in ownedLists {
+            if seenIds.insert(list.list_id).inserted {
+                uniqueLists.append(list)
+            }
+        }
+        
+        // Add collaborative owned lists not already in owned lists
+        for list in collaborativeOwnedLists {
+            if seenIds.insert(list.list_id).inserted {
+                uniqueLists.append(list)
+            }
+        }
+        
+        // Add shared lists not already seen
+        for list in sharedLists {
+            if seenIds.insert(list.list_id).inserted {
+                uniqueLists.append(list)
+            }
+        }
+        
+        return uniqueLists
+    }
     
     /// Load place membership data for lists using direct database checks
     /// This checks if the specific place is in each list without loading all places

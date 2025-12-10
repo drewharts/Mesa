@@ -44,10 +44,10 @@ struct ListHeaderView: View {
                 }
                 
                 // Add list button (matches ListSelectionSheet style)
-                Button(action: onAddList) {
+            Button(action: onAddList) {
                     Image(systemName: "plus")
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(.gray)
+                    .foregroundColor(.gray)
                         .frame(width: 32, height: 32)
                         .background(Circle().fill(Color(.systemGray5)))
                 }

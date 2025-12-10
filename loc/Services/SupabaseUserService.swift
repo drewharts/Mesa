@@ -388,6 +388,21 @@ class SupabaseUserService: ObservableObject {
         return response.first?.lists_count ?? 0
     }
     
+    /// Get total unique places count for a user (saved + reviewed + created)
+    /// Uses database function that deduplicates across all sources
+    func getTotalPlacesCount(forUserId userId: String) async throws -> Int {
+        struct PlacesCount: Codable {
+            let total_places_count: Int
+        }
+        
+        let response: [PlacesCount] = try await supabase.client
+            .rpc("get_user_total_places_count", params: ["p_user_id": userId])
+            .execute()
+            .value
+        
+        return response.first?.total_places_count ?? 0
+    }
+    
     /// Check if a user is following another user
     func isFollowingUser(followerId: String, followingId: String) async throws -> Bool {
         struct FollowingRecord: Codable {
@@ -1040,6 +1055,25 @@ extension SupabaseUserService {
             .execute()
         
         print("✅ [SupabaseUserService] Successfully saved external place: \(externalPlaceId)")
+    }
+    
+    // MARK: - External Place Deletion
+    
+    /// Deletes all external_places records for a user and place combination
+    /// Single Responsibility: Execute Supabase delete operation for external places
+    /// - Parameters:
+    ///   - userId: The user's ID (Firebase UID)
+    ///   - placeId: The place ID to remove from user's saved TikToks
+    /// - Throws: Database errors if deletion fails
+    func deleteExternalPlaces(userId: String, placeId: String) async throws {
+        try await supabase.client
+            .from("external_places")
+            .delete()
+            .eq("user_id", value: userId)
+            .eq("place_id", value: placeId)
+            .execute()
+        
+        print("✅ [SupabaseUserService] Deleted external places for user \(userId), place \(placeId)")
     }
 }
 

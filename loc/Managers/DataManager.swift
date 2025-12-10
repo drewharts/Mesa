@@ -754,6 +754,7 @@ class DataManager: ObservableObject {
     /// FAST: Load all profile counts, favorites, and place lists in parallel (~20-50ms total!)
     /// Called when profile view appears
     func loadProfileCounts(userId: String) async {
+        
         profileViewModel.isFollowersLoading = true
         profileViewModel.isFollowingLoading = true
         profileViewModel.isMyPlacesLoading = true
@@ -767,14 +768,17 @@ class DataManager: ObservableObject {
         async let myPlaces: Int = (try? await userService.getNumberMyPlaces(forUserId: userId)) ?? 0
         async let totalLists: Int = (try? await userService.getTotalListCount(forUserId: userId)) ?? 0
         async let favorites: [FavoritePlace] = (try? await userService.fetchUserFavorites(userId: userId)) ?? []
+        async let totalUniquePlaces: Int = (try? await userService.getTotalPlacesCount(forUserId: userId)) ?? 0
         
-        let (followersCount, followingCount, myPlacesCount, totalListCount, favoritePlaces) = await (followers, following, myPlaces, totalLists, favorites)
+        let (followersCount, followingCount, myPlacesCount, totalListCount, favoritePlaces, totalUniquePlacesCount) = await (followers, following, myPlaces, totalLists, favorites, totalUniquePlaces)
         
         // Update counts and favorites immediately - don't wait for place lists
         await MainActor.run {
             profileViewModel.followersCount = followersCount
             profileViewModel.followingCount = followingCount
             profileViewModel.totalListCount = totalListCount
+            profileViewModel.totalUniquePlacesCount = totalUniquePlacesCount
+            print("🔢 [DataManager] Set totalUniquePlacesCount = \(totalUniquePlacesCount)")
             // Update my places count - we'll store this as the count of myPlaces array
             profileViewModel.myPlaces = Array(repeating: "", count: myPlacesCount) // Placeholder IDs
             profileViewModel.lightweightFavorites = favoritePlaces

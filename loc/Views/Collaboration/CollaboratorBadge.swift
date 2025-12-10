@@ -25,8 +25,8 @@ struct CollaboratorBadge: View {
             
             switch style {
             case .compact:
-                if collaboratorCount > 0 {
-                    Text("\(collaboratorCount)")
+            if collaboratorCount > 0 {
+                Text("\(collaboratorCount)")
                         .font(.caption2)
                         .fontWeight(.medium)
                 }

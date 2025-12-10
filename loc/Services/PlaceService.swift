@@ -313,4 +313,12 @@ class PlaceService: ObservableObject {
             SupabasePlaceService.shared.deletePlaceFromAllPlaces(placeId: placeId, completion: completion)
         }
     }
+    
+    // MARK: - Custom Place Creator
+    
+    /// Fetch the creator of a custom place
+    /// Returns nil if the place is not a custom place or has no creator
+    func fetchCustomPlaceCreator(placeId: String) async throws -> CustomPlaceCreator? {
+        return try await supabase.fetchCustomPlaceCreator(placeId: placeId)
+    }
 }
