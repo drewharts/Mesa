@@ -117,8 +117,8 @@ struct LightweightListPopupView: View {
                                 }
                             }
                             
-                            // Share button
-                            LightweightListShareButton(lightweightList: currentList, userId: userId)
+                            // Share button (circular style to match avatars)
+                            LightweightListShareButton(lightweightList: currentList, userId: userId, style: .circular)
                         }
                     }
                     .padding(.horizontal, 20)
