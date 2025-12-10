@@ -25,9 +25,8 @@ BEGIN
         u.full_name AS creator_full_name,
         u.profile_photo_url AS creator_profile_photo_url
     FROM my_places mp
-    INNER JOIN users u ON mp.user_id::TEXT = u.id::TEXT
+    INNER JOIN users u ON mp.user_id = u.id::TEXT
     WHERE mp.place_id = p_place_id
-    ORDER BY mp.timestamp ASC  -- First person to add it is the creator
     LIMIT 1;
 END;
 $function$;
