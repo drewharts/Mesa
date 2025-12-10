@@ -2,9 +2,9 @@
 //  CustomPlaceCreatorView.swift
 //  loc
 //
-//  Displays "Created by [User]" for custom places.
-//  This is a "Dumb Component" - it only displays data passed to it.
-//  All data fetching is handled by CustomPlaceCreatorViewModel.
+//  Displays "Created by [profile picture]" for custom places.
+//  Shows in the type row of PlaceDetailTabsView.
+//  This is a display component - data fetching handled by CustomPlaceCreatorViewModel.
 //
 
 import SwiftUI
@@ -15,9 +15,9 @@ struct CustomPlaceCreatorView: View {
     
     @ObservedObject var viewModel: CustomPlaceCreatorViewModel
     
-    // MARK: - Optional Navigation Callback
+    // MARK: - Navigation Callback
     
-    /// Called when user taps on the creator name to navigate to their profile
+    /// Called when user taps to navigate to creator's profile
     var onCreatorTapped: ((String) -> Void)?
     
     // MARK: - Body
@@ -26,8 +26,8 @@ struct CustomPlaceCreatorView: View {
         Group {
             if viewModel.isLoading {
                 loadingView
-            } else if let creatorName = viewModel.creatorName {
-                creatorBadge(name: creatorName)
+            } else if viewModel.hasCreator {
+                creatorBadge
             }
             // Show nothing if no creator or hasn't loaded
         }
@@ -36,35 +36,59 @@ struct CustomPlaceCreatorView: View {
     // MARK: - Subviews
     
     private var loadingView: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 4) {
             ProgressView()
-                .scaleEffect(0.7)
-            
-            Text("Loading creator...")
-                .font(.caption)
-                .foregroundColor(.gray)
+                .scaleEffect(0.6)
         }
     }
     
-    private func creatorBadge(name: String) -> some View {
+    private var creatorBadge: some View {
         Button(action: handleCreatorTap) {
-            HStack(spacing: 6) {
-                Image(systemName: "person.fill.badge.plus")
-                    .font(.caption)
-                    .foregroundColor(.blue)
-                
+            HStack(spacing: 4) {
                 Text("Created by")
-                    .font(.caption)
+                    .font(.subheadline)
                     .foregroundColor(.gray)
                 
-                Text(name)
-                    .font(.caption)
-                    .fontWeight(.medium)
-                    .foregroundColor(.blue)
+                // Profile picture
+                profilePicture
             }
         }
         .buttonStyle(.plain)
         .disabled(onCreatorTapped == nil)
+    }
+    
+    @ViewBuilder
+    private var profilePicture: some View {
+        if let photoUrl = viewModel.creatorPhotoUrl, let url = URL(string: photoUrl) {
+            AsyncImage(url: url) { phase in
+                switch phase {
+                case .success(let image):
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: 20, height: 20)
+                        .clipShape(Circle())
+                case .failure, .empty:
+                    initialsCircle
+                @unknown default:
+                    initialsCircle
+                }
+            }
+        } else {
+            initialsCircle
+        }
+    }
+    
+    private var initialsCircle: some View {
+        Circle()
+            .fill(Color(.systemGray5))
+            .frame(width: 20, height: 20)
+            .overlay(
+                Text(viewModel.creatorName?.prefix(1).uppercased() ?? "?")
+                    .font(.caption2)
+                    .fontWeight(.medium)
+                    .foregroundColor(.gray)
+            )
     }
     
     // MARK: - Actions
@@ -97,4 +121,3 @@ struct CustomPlaceCreatorView: View {
     return CustomPlaceCreatorView(viewModel: viewModel)
         .padding()
 }
-

@@ -184,12 +184,9 @@ class PlaceDetailTabsViewModel: ObservableObject {
         isCustomPlace = place?.isCustom == true
         
         if let place = place {
-            // Custom places show "Custom" as type, others use category-based type
-            if place.isCustom == true {
-                restaurantType = "Custom"
-            } else {
-                restaurantType = getRestaurantType(for: place)
-            }
+            // For custom places, view shows "Created by [photo]" instead of type
+            // Still compute type in case we want to show both in the future
+            restaurantType = getRestaurantType(for: place)
         } else {
             restaurantType = nil
         }

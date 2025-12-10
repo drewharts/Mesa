@@ -44,9 +44,18 @@ struct PlaceDetailTabsView: View {
                 }
                 .padding(.bottom, 3)
                 
-                // MARK: - Row: Type / Google Maps / Drive Time / Saved By
+                // MARK: - Row: Type / Created By / Google Maps / Drive Time / Saved By
                 HStack(spacing: 10) {
-                    if let restaurantType = viewModel.restaurantType {
+                    // Show "Created by [photo]" for custom places, otherwise show type
+                    if viewModel.isCustomPlace {
+                        CustomPlaceCreatorView(
+                            viewModel: viewModel.aboutTabViewModel.customPlaceCreatorViewModel,
+                            onCreatorTapped: { userId in
+                                guard let currentUserId = userSession.currentUserId else { return }
+                                userProfileViewModel.fetchAndSelectUser(userId: userId, currentUserId: currentUserId)
+                            }
+                        )
+                    } else if let restaurantType = viewModel.restaurantType {
                         Text(restaurantType)
                             .font(.subheadline)
                             .foregroundColor(.gray)
