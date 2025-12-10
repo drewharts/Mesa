@@ -40,6 +40,7 @@ class PlaceDetailTabsViewModel: ObservableObject {
     // MARK: - Published Properties (What the View Needs)
     @Published var placeName: String = "Loading..."
     @Published var restaurantType: String?
+    @Published var isCustomPlace: Bool = false
     @Published var placeRating: Double = 0.0
     @Published var hasReviews: Bool = false
     @Published var reviewCount: Int = 0
@@ -81,9 +82,14 @@ class PlaceDetailTabsViewModel: ObservableObject {
             selectedPlaceVM: selectedPlaceVM
         )
         
+        let customPlaceCreatorVM = CustomPlaceCreatorViewModel(
+            placeService: placeService
+        )
+        
         self.aboutTabViewModel = AboutTabViewModel(
             tikTokVideosViewModel: tikTokVM,
             placePhotosViewModel: photosVM,
+            customPlaceCreatorViewModel: customPlaceCreatorVM,
             selectedPlaceVM: selectedPlaceVM
         )
         
@@ -175,9 +181,15 @@ class PlaceDetailTabsViewModel: ObservableObject {
     private func handlePlaceChanged(_ place: DetailPlace?) {
         currentPlace = place
         placeName = place?.name ?? "Loading..."
+        isCustomPlace = place?.isCustom == true
         
         if let place = place {
-            restaurantType = getRestaurantType(for: place)
+            // Custom places show "Custom" as type, others use category-based type
+            if place.isCustom == true {
+                restaurantType = "Custom"
+            } else {
+                restaurantType = getRestaurantType(for: place)
+            }
         } else {
             restaurantType = nil
         }

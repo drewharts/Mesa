@@ -21,12 +21,24 @@ struct AboutTabContent: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // 1. DUMB COMPONENT: Pure display of place info
+            // 1. SMART COMPONENT: Custom place creator info (only shows for custom places)
+            if viewModel.isCustomPlace {
+                CustomPlaceCreatorView(
+                    viewModel: viewModel.customPlaceCreatorViewModel,
+                    onCreatorTapped: { userId in
+                        // Navigation to creator's profile could be handled here
+                        print("Navigate to creator: \(userId)")
+                    }
+                )
+                .padding(.bottom, 8)
+            }
+            
+            // 2. DUMB COMPONENT: Pure display of place info
             if let place = viewModel.place {
                 PlaceInfoSection(place: place)
             }
             
-            // 2. SMART COMPONENT: TikTok videos with their own ViewModel
+            // 3. SMART COMPONENT: TikTok videos with their own ViewModel
             TikTokVideosSection(
                 viewModel: viewModel.tikTokVideosViewModel,
                 placeId: viewModel.placeId,
@@ -35,7 +47,7 @@ struct AboutTabContent: View {
             .environmentObject(profile)
             .environmentObject(userSession)
             
-            // 3. SMART COMPONENT: Photos with its own ViewModel
+            // 4. SMART COMPONENT: Photos with its own ViewModel
             PlacePhotosView(
                 viewModel: viewModel.placePhotosViewModel,
                 onPhotoTapped: onPhotoTapped
@@ -94,10 +106,15 @@ struct AboutTabContent: View {
         selectedPlaceVM: selectedPlaceVM
     )
     
+    let customPlaceCreatorVM = CustomPlaceCreatorViewModel(
+        placeService: services.placeService
+    )
+    
     // Create coordinator ViewModel
     let aboutVM = AboutTabViewModel(
         tikTokVideosViewModel: tikTokVM,
         placePhotosViewModel: photosVM,
+        customPlaceCreatorViewModel: customPlaceCreatorVM,
         selectedPlaceVM: selectedPlaceVM
     )
     
