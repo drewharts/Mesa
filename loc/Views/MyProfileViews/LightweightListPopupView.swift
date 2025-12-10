@@ -98,20 +98,22 @@ struct LightweightListPopupView: View {
                         
                         Spacer()
                         
-                        // Collaborators button (only for list owner)
+                        // Collaborators button with profile avatars
                         if let userId = profile.user?.id {
                             Button {
                                 showCollaboratorsSheet = true
                             } label: {
-                                HStack(spacing: 4) {
+                                // Show profile picture avatars for collaborators (like map annotations)
+                                if currentList.hasCollaborators || currentList.isSharedWithMe {
+                                    CollaboratorAvatarsButton(
+                                        isSharedWithMe: currentList.isSharedWithMe,
+                                        ownerPhotoUrl: currentList.owner_photo_url,
+                                        collaboratorPhotos: currentList.collaborator_photos
+                                    )
+                                } else {
+                                    // Just show person.2 icon when no collaborators (for adding)
                                     Image(systemName: "person.2")
                                         .foregroundColor(.primary)
-                                    if currentList.hasCollaborators {
-                                        Text("\(currentList.collaborator_count ?? 0)")
-                                            .font(.caption)
-                                            .fontWeight(.medium)
-                                            .foregroundColor(.primary)
-                                    }
                                 }
                             }
                             
@@ -378,6 +380,85 @@ struct ListContentView: View {
 }
 
 // Note: LightweightPlaceGridCell is defined in MyPlacesListView.swift and used here
+
+// MARK: - Collaborator Avatars Button
+// DUMB Component: Shows overlapping profile pictures for collaborators (like map annotations)
+// Single Responsibility: Display compact avatar stack for list popup header
+
+private struct CollaboratorAvatarsButton: View {
+    let isSharedWithMe: Bool
+    let ownerPhotoUrl: String?
+    let collaboratorPhotos: [String]?
+    
+    private let avatarSize: CGFloat = 24
+    private let maxAvatars = 3
+    
+    var body: some View {
+        HStack(spacing: -8) {
+            // Show owner avatar if this list is shared with you
+            if isSharedWithMe, let ownerUrl = ownerPhotoUrl {
+                avatarCircle(url: ownerUrl)
+                    .zIndex(0)
+            }
+            
+            // Collaborator avatars
+            if let photos = collaboratorPhotos {
+                let visibleCount = isSharedWithMe ? maxAvatars - 1 : maxAvatars
+                
+                ForEach(Array(photos.prefix(visibleCount).enumerated()), id: \.offset) { index, photoUrl in
+                    avatarCircle(url: photoUrl)
+                        .zIndex(Double(-index - 1))
+                }
+                
+                // Overflow count badge
+                if photos.count > visibleCount {
+                    overflowBadge(count: photos.count - visibleCount)
+                        .zIndex(-10)
+                }
+            }
+        }
+    }
+    
+    private func avatarCircle(url: String) -> some View {
+        AsyncImage(url: URL(string: url)) { phase in
+            switch phase {
+            case .success(let image):
+                image
+                    .resizable()
+                    .scaledToFill()
+            case .failure, .empty:
+                placeholderCircle
+            @unknown default:
+                placeholderCircle
+            }
+        }
+        .frame(width: avatarSize, height: avatarSize)
+        .clipShape(Circle())
+        .overlay(Circle().stroke(Color.white, lineWidth: 2))
+    }
+    
+    private var placeholderCircle: some View {
+        Circle()
+            .fill(Color(.systemGray4))
+            .overlay(
+                Text("?")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundColor(.white)
+            )
+    }
+    
+    private func overflowBadge(count: Int) -> some View {
+        Circle()
+            .fill(Color(.systemGray4))
+            .frame(width: avatarSize, height: avatarSize)
+            .overlay(
+                Text("+\(count)")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundColor(.primary)
+            )
+            .overlay(Circle().stroke(Color.white, lineWidth: 2))
+    }
+}
 
 // Preview
 struct LightweightListPopupView_Previews: PreviewProvider {
