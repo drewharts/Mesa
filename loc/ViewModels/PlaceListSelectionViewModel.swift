@@ -103,23 +103,23 @@ class PlaceListSelectionViewModel: ObservableObject {
         // This ensures ALL collaborative lists are available for the "Shared" filter
         async let ownedListsTask = fetchOwnedLists(userId: userId, coord: coord)
         async let sharedListsTask = fetchSharedLists(userId: userId)
-        async let collaborativeOwnedTask = fetchCollaborativeOwnedLists(userId: userId)
-        
-        let (ownedLists, fetchedSharedLists, collaborativeOwnedLists) = await (ownedListsTask, sharedListsTask, collaborativeOwnedTask)
-        
-        // Cache shared lists for later (they don't paginate)
-        sharedLists = fetchedSharedLists
-        
-        // Merge with proper deduplication to prevent duplicate IDs in ForEach
-        // Priority: owned lists > collaborative owned > shared with me
-        let uniqueLists = deduplicateLists(
-            ownedLists: ownedLists,
-            collaborativeOwnedLists: collaborativeOwnedLists,
-            sharedLists: fetchedSharedLists
-        )
-        lists = uniqueLists
-        hasMore = ownedLists.count >= pageSize
-        hasLoadedOnce = true
+    async let collaborativeOwnedTask = fetchCollaborativeOwnedLists(userId: userId)
+    
+    let (ownedLists, fetchedSharedLists, collaborativeOwnedLists) = await (ownedListsTask, sharedListsTask, collaborativeOwnedTask)
+    
+    // Cache shared lists for later (they don't paginate)
+    sharedLists = fetchedSharedLists
+    
+    // Merge with proper deduplication to prevent duplicate IDs in ForEach
+    // Priority: owned lists > collaborative owned > shared with me
+    let uniqueLists = deduplicateLists(
+        ownedLists: ownedLists,
+        collaborativeOwnedLists: collaborativeOwnedLists,
+        sharedLists: fetchedSharedLists
+    )
+    lists = uniqueLists
+    hasMore = ownedLists.count >= pageSize
+    hasLoadedOnce = true
         
         print("📋 [PlaceListSelectionVM] Loaded \(uniqueLists.count) unique lists (from \(ownedLists.count) owned + \(collaborativeOwnedLists.count) collab + \(fetchedSharedLists.count) shared)")
         

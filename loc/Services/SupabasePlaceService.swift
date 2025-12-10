@@ -820,6 +820,30 @@ class SupabasePlaceService: ObservableObject {
         }
     }
     
+    // MARK: - Custom Place Creator
+    
+    /// Fetch the creator of a custom place
+    /// Returns nil if the place is not a custom place or has no creator
+    func fetchCustomPlaceCreator(placeId: String) async throws -> CustomPlaceCreator? {
+        do {
+            struct CreatorParams: Encodable {
+                let p_place_id: String
+            }
+            
+            let params = CreatorParams(p_place_id: placeId)
+            
+            let response: [CustomPlaceCreator] = try await supabase.client
+                .rpc("get_custom_place_creator", params: params)
+                .execute()
+                .value
+            
+            return response.first
+        } catch {
+            print("❌ [Supabase] Error fetching custom place creator: \(error)")
+            throw error
+        }
+    }
+    
     // MARK: - On-Demand Place Details
     
     /// Fetch full place details for a specific place ID (called when user taps a marker)

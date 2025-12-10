@@ -13,18 +13,48 @@ struct ProfilePictureView: View {
     @EnvironmentObject var profile: ProfileViewModel
     @State private var showingImagePicker = false
     @State private var showingFullScreen = false
+    @State private var showingPlacesCount = false
     @State private var inputImage: [UIImage] = []
     @State private var hasProcessedImage = false
     
+    // MARK: - Constants
+    private let profileSize: CGFloat = 100
+    
+    // MARK: - Subtle Places Count Badge (Apple-style)
+    private var placesCountBadge: some View {
+        let count = profile.totalUniquePlacesCount
+        let displayText = count >= 1000 ? "\(count / 1000)k+" : "\(count)"
+        
+        return Button(action: {
+            showingPlacesCount = true
+        }) {
+            Text(displayText)
+                .font(.system(size: 11, weight: .medium, design: .rounded))
+                .foregroundColor(.secondary)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 3)
+                .background(
+                    Capsule()
+                        .fill(.ultraThinMaterial)
+                )
+                .overlay(
+                    Capsule()
+                        .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
+                )
+        }
+        .buttonStyle(.plain)
+        .offset(x: 8, y: 4)
+    }
+    
     var body: some View {
-        ZStack {
+        ZStack(alignment: .bottomTrailing) {
             // Main profile image
             Group {
                 if let profilePhoto = profile.userPicture {
                     Image(uiImage: profilePhoto)
                         .resizable()
                         .scaledToFill()
-                        .frame(width: 100, height: 100)
+                        .frame(width: profileSize, height: profileSize)
                         .clipShape(Circle())
                         .shadow(radius: 4)
                 } else {
@@ -32,7 +62,7 @@ struct ProfilePictureView: View {
                         .resizable()
                         .scaledToFit()
                         .foregroundColor(.blue)
-                        .frame(width: 100, height: 100)
+                        .frame(width: profileSize, height: profileSize)
                         .clipShape(Circle())
                         .shadow(radius: 4)
                 }
@@ -56,13 +86,24 @@ struct ProfilePictureView: View {
             if profile.isUploadingProfilePhoto {
                 Circle()
                     .fill(Color.black.opacity(0.6))
-                    .frame(width: 100, height: 100)
+                    .frame(width: profileSize, height: profileSize)
                     .overlay(
                         ProgressView()
                             .progressViewStyle(CircularProgressViewStyle(tint: .white))
                             .scaleEffect(1.2)
                     )
             }
+            
+            // Places count badge - inline implementation (no separate file needed)
+            if profile.totalUniquePlacesCount > 0 {
+                placesCountBadge
+            }
+        }
+        .onAppear {
+            print("🔢 [ProfilePictureView] totalUniquePlacesCount = \(profile.totalUniquePlacesCount)")
+        }
+        .onChange(of: profile.totalUniquePlacesCount) { oldValue, newValue in
+            print("🔢 [ProfilePictureView] totalUniquePlacesCount changed: \(oldValue) -> \(newValue)")
         }
         .sheet(isPresented: $showingImagePicker) {
             ImagePicker(images: $inputImage, selectionLimit: 1)
@@ -109,6 +150,11 @@ struct ProfilePictureView: View {
                     }
                 }
             }
+        }
+        .alert("Places Saved", isPresented: $showingPlacesCount) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("You have \(profile.totalUniquePlacesCount) places saved across all your lists, favorites, and reviews.")
         }
     }
 }

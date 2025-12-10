@@ -388,6 +388,21 @@ class SupabaseUserService: ObservableObject {
         return response.first?.lists_count ?? 0
     }
     
+    /// Get total unique places count for a user (saved + reviewed + created)
+    /// Uses database function that deduplicates across all sources
+    func getTotalPlacesCount(forUserId userId: String) async throws -> Int {
+        struct PlacesCount: Codable {
+            let total_places_count: Int
+        }
+        
+        let response: [PlacesCount] = try await supabase.client
+            .rpc("get_user_total_places_count", params: ["p_user_id": userId])
+            .execute()
+            .value
+        
+        return response.first?.total_places_count ?? 0
+    }
+    
     /// Check if a user is following another user
     func isFollowingUser(followerId: String, followingId: String) async throws -> Bool {
         struct FollowingRecord: Codable {

@@ -60,15 +60,18 @@ class SelectedPlaceViewModel: ObservableObject {
             return
         }
 
-        fetchCompletePlaceDetails(for: place) { [weak self] updatedPlace in
+        fetchCompletePlaceDetails(for: place) { [weak self] freshPlace in
             guard let self = self else { return }
 
             DispatchQueue.main.async {
-                if let updatedPlace = updatedPlace {
+                if let freshPlace = freshPlace {
+                    // Merge fresh data while preserving local-only properties (e.g., isCustom)
+                    let mergedPlace = self.mergePlaceData(original: place, fresh: freshPlace)
+                    
                     self.isUpdatingPlaceDetails = true
-                    self.selectedPlace = updatedPlace
+                    self.selectedPlace = mergedPlace
                     self.isUpdatingPlaceDetails = false
-                    self.continueWithPlaceSetup(place: updatedPlace, currentLocation: currentLocation)
+                    self.continueWithPlaceSetup(place: mergedPlace, currentLocation: currentLocation)
                 } else {
                     print("❌ [SelectedPlaceViewModel] Failed to get complete details, continuing with current data")
                     self.continueWithPlaceSetup(place: place, currentLocation: currentLocation)
@@ -109,6 +112,21 @@ class SelectedPlaceViewModel: ObservableObject {
                 completion(nil)
             }
         }
+    }
+    
+    // MARK: - Place Data Merging
+    
+    /// Merges fresh backend data with original place, preserving local-only properties.
+    /// Single Responsibility: Handles data merging without side effects.
+    /// 
+    /// Properties preserved from original:
+    /// - `isCustom`: Backend doesn't know about custom places
+    /// - `id`: Always keep the original ID
+    private func mergePlaceData(original: DetailPlace, fresh: DetailPlace) -> DetailPlace {
+        var merged = fresh
+        merged.id = original.id
+        merged.isCustom = original.isCustom
+        return merged
     }
     @Published var isDetailSheetPresented: Bool = false
     @Published var isRestaurantOpen: Bool = false // New property to track open status
@@ -298,14 +316,13 @@ class SelectedPlaceViewModel: ObservableObject {
 
                     self.isFetchingFreshDetails = false
 
-                    // Preserve the original ID and merge fresh data
-                    var updatedPlace = freshPlace
-                    updatedPlace.id = place.id
+                    // Merge fresh data while preserving local-only properties (e.g., isCustom)
+                    let mergedPlace = self.mergePlaceData(original: place, fresh: freshPlace)
                     
-                    self.selectedPlace = updatedPlace
+                    self.selectedPlace = mergedPlace
                     
                     // Update Firestore in background
-                    self.updatePlaceInFirestore(updatedPlace)
+                    self.updatePlaceInFirestore(mergedPlace)
                 }
                 
             case .failure(let error):

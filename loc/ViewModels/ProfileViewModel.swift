@@ -112,6 +112,7 @@ class ProfileViewModel: ObservableObject {
      @Published var followersCount: Int = 0
      @Published var followingCount: Int = 0
      @Published var totalListCount: Int = 0
+     @Published var totalUniquePlacesCount: Int = 0  // Total unique places (saved + reviewed + created)
      
      // Follow error handling
      @Published var showFollowError: Bool = false

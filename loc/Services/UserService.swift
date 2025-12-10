@@ -443,6 +443,11 @@ class UserService: ObservableObject {
         return try await supabase.getTotalListCount(forUserId: userId)
     }
     
+    // COUNT ONLY - Returns unique places count (saved + reviewed + created)
+    func getTotalPlacesCount(forUserId userId: String) async throws -> Int {
+        return try await supabase.getTotalPlacesCount(forUserId: userId)
+    }
+    
     /// Fetch user favorites using optimized SQL function
     func fetchUserFavorites(userId: String) async throws -> [FavoritePlace] {
         return try await supabase.fetchUserFavorites(userId: userId)
