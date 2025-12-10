@@ -98,27 +98,32 @@ struct LightweightListPopupView: View {
                         
                         Spacer()
                         
-                        // Collaborators button with profile avatars
+                        // Collaborators button with profile avatars + Share button
                         if let userId = profile.user?.id {
-                            Button {
-                                showCollaboratorsSheet = true
-                            } label: {
-                                // Show profile picture avatars for collaborators (like map annotations)
-                                if currentList.hasCollaborators || currentList.isSharedWithMe {
-                                    CollaboratorAvatarsButton(
-                                        isSharedWithMe: currentList.isSharedWithMe,
-                                        ownerPhotoUrl: currentList.owner_photo_url,
-                                        collaboratorPhotos: currentList.collaborator_photos
-                                    )
-                                } else {
-                                    // Just show person.2 icon when no collaborators (for adding)
-                                    Image(systemName: "person.2")
-                                        .foregroundColor(.primary)
+                            HStack(alignment: .center, spacing: 12) {
+                                // Collaborators button
+                                Button {
+                                    showCollaboratorsSheet = true
+                                } label: {
+                                    // Show profile picture avatars for collaborators (like map annotations)
+                                    if currentList.hasCollaborators || currentList.isSharedWithMe {
+                                        CollaboratorAvatarsButton(
+                                            isSharedWithMe: currentList.isSharedWithMe,
+                                            ownerPhotoUrl: currentList.owner_photo_url,
+                                            collaboratorPhotos: currentList.collaborator_photos
+                                        )
+                                    } else {
+                                        // Just show person.2 icon when no collaborators (for adding)
+                                        Image(systemName: "person.2")
+                                            .font(.system(size: 20, weight: .regular))
+                                            .foregroundColor(.primary)
+                                    }
                                 }
+                                .frame(minWidth: 44, minHeight: 44) // Tap target
+                                
+                                // Share button (Apple style - clean and simple)
+                                LightweightListShareButton(lightweightList: currentList, userId: userId, style: .apple)
                             }
-                            
-                            // Share button (circular style to match avatars)
-                            LightweightListShareButton(lightweightList: currentList, userId: userId, style: .circular)
                         }
                     }
                     .padding(.horizontal, 20)

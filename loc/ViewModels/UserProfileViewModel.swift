@@ -37,6 +37,7 @@ class UserProfileViewModel: ObservableObject {
     // MARK: - Social State
     @Published var isFollowing: Bool = false
     @Published var followers: Int = 0
+    @Published var totalPlacesCount: Int = 0  // Total unique places (saved + reviewed + created)
     
     // Follow error handling
     @Published var showFollowError: Bool = false
@@ -81,11 +82,13 @@ class UserProfileViewModel: ObservableObject {
         
         // Reset all state for new user
         resetListPaginationState()
+        totalPlacesCount = 0
         
         self.checkIfFollowing(currentUserId: currentUserId)
         self.fetchProfileFavorites(userId: user.id)
         self.fetchLists(userId: user.id)
         self.fetchFollowers(userId: user.id)
+        self.fetchTotalPlacesCount(userId: user.id)
     }
     
     /// Resets all list-related state when switching to a new user profile
@@ -151,6 +154,19 @@ class UserProfileViewModel: ObservableObject {
                 return
             }
             self.followers = count
+        }
+    }
+    
+    func fetchTotalPlacesCount(userId: String) {
+        Task {
+            do {
+                let count = try await userService.getTotalPlacesCount(forUserId: userId)
+                await MainActor.run {
+                    self.totalPlacesCount = count
+                }
+            } catch {
+                print("❌ [UserProfileVM] Error fetching total places count: \(error)")
+            }
         }
     }
     

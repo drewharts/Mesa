@@ -8,10 +8,8 @@ struct LightweightListShareButton: View {
     
     enum ShareButtonStyle {
         case `default`  // Original icon-only style
-        case circular   // Matches avatar aesthetic (24px circle with white border)
+        case apple      // Clean Apple-style with larger tap target
     }
-    
-    private let circularSize: CGFloat = 24
     
     var body: some View {
         Button(action: {
@@ -21,16 +19,13 @@ struct LightweightListShareButton: View {
             case .default:
                 Image(systemName: "square.and.arrow.up")
                     .foregroundColor(.primary)
-            case .circular:
-                Circle()
-                    .fill(Color.black)
-                    .frame(width: circularSize, height: circularSize)
-                    .overlay(
-                        Image(systemName: "square.and.arrow.up")
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundColor(.white)
-                    )
-                    .overlay(Circle().stroke(Color.white, lineWidth: 2))
+            case .apple:
+                // Clean Apple-style share button
+                Image(systemName: "square.and.arrow.up")
+                    .font(.system(size: 20, weight: .regular))
+                    .foregroundColor(.primary)
+                    .frame(width: 44, height: 44) // Apple HIG minimum tap target
+                    .contentShape(Rectangle()) // Ensure full frame is tappable
             }
         }
         .buttonStyle(PlainButtonStyle())
