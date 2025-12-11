@@ -25,6 +25,7 @@ class PlaceDetailTabsViewModel: ObservableObject {
     private let reviewService: ReviewService
     private let userService: UserService
     private let notificationManager: NotificationManager
+    private let placeShareService: PlaceShareService
     
     // Reference to shared state (temporary until fully refactored)
     private let selectedPlaceVM: SelectedPlaceViewModel
@@ -52,6 +53,10 @@ class PlaceDetailTabsViewModel: ObservableObject {
     @Published var showSaversIndicator: Bool = false
     @Published var saverCount: Int = 0
     
+    // MARK: - Place Actions State
+    /// Whether the current place is saved in any of the user's lists
+    @Published var isPlaceInList: Bool = false
+    
     private var cancellables = Set<AnyCancellable>()
     
     // MARK: - Initialization
@@ -59,6 +64,7 @@ class PlaceDetailTabsViewModel: ObservableObject {
          reviewService: ReviewService,
          userService: UserService,
          notificationManager: NotificationManager,
+         placeShareService: PlaceShareService,
          selectedPlaceVM: SelectedPlaceViewModel,
          profileVM: ProfileViewModel,
          userSession: UserSession,
@@ -67,6 +73,7 @@ class PlaceDetailTabsViewModel: ObservableObject {
         self.reviewService = reviewService
         self.userService = userService
         self.notificationManager = notificationManager
+        self.placeShareService = placeShareService
         self.selectedPlaceVM = selectedPlaceVM
         self.profileVM = profileVM
         
@@ -105,7 +112,8 @@ class PlaceDetailTabsViewModel: ObservableObject {
             photosViewModel: photosVM,
             selectedPlaceVM: selectedPlaceVM,
             notificationManager: notificationManager,
-            userSession: userSession
+            userSession: userSession,
+            profileVM: profileVM
         )
         
         self.travelTimeViewModel = TravelTimeViewModel(
@@ -150,9 +158,13 @@ class PlaceDetailTabsViewModel: ObservableObject {
             }
             .store(in: &cancellables)
         
-        // Observe favorites alert
+        // Observe favorites alert - only forward when becoming true to avoid loops
         profileVM.$showMaxFavoritesAlert
-            .assign(to: &$showMaxFavoritesAlert)
+            .filter { $0 == true }
+            .sink { [weak self] _ in
+                self?.showMaxFavoritesAlert = true
+            }
+            .store(in: &cancellables)
         
         // Forward PlaceSaversViewModel state to trigger view updates
         // IMPORTANT: Set up this observer BEFORE the place observer so state is forwarded correctly
@@ -171,6 +183,21 @@ class PlaceDetailTabsViewModel: ObservableObject {
                 self?.placeSaversViewModel.setPlace(place?.id.uuidString)
             }
             .store(in: &cancellables)
+        
+        // Observe place list changes to update isPlaceInList state
+        // Combines place changes with list changes to recompute saved state
+        Publishers.CombineLatest(
+            selectedPlaceVM.$selectedPlace,
+            profileVM.$lightweightPlaceLists
+        )
+        .sink { [weak self] place, _ in
+            guard let self = self, let place = place else {
+                self?.isPlaceInList = false
+                return
+            }
+            self.isPlaceInList = self.profileVM.isPlaceInAnyList(placeId: place.id.uuidString)
+        }
+        .store(in: &cancellables)
     }
     
     /// Configure savers VM with navigation dependency (call from View)
@@ -201,6 +228,18 @@ class PlaceDetailTabsViewModel: ObservableObject {
     // MARK: - Actions (What the View Can Trigger)
     func selectTab(_ tab: DetailTab) {
         selectedTab = tab
+    }
+    
+    /// Shares the current place using the system share sheet
+    func sharePlace() {
+        guard let place = currentPlace else { return }
+        placeShareService.sharePlace(place)
+    }
+    
+    /// Resets the max favorites alert state in both this ViewModel and the source ProfileViewModel
+    func dismissMaxFavoritesAlert() {
+        showMaxFavoritesAlert = false
+        profileVM.showMaxFavoritesAlert = false
     }
     
     func openGoogleMaps() {

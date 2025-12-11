@@ -51,7 +51,9 @@ struct PlaceDetailView: View {
                             galleryPhotos = photos
                             selectedImageIndex = index
                             showPhotoGallery = true
-                        }
+                        },
+                        onAddToList: { showListSelection = true },
+                        onAddReview: { showCreateReview = true }
                     )
                     .environmentObject(userProfileViewModel)
                     .environmentObject(detailPlaceViewModel)
@@ -69,6 +71,7 @@ struct PlaceDetailView: View {
                         reviewService: serviceContainer.reviewService,
                         userService: serviceContainer.userService,
                         notificationManager: serviceContainer.notificationManager,
+                        placeShareService: serviceContainer.placeShareService,
                         selectedPlaceVM: selectedPlaceVM,
                         profileVM: profile,
                         userSession: userSession,
@@ -102,15 +105,13 @@ struct PlaceDetailView: View {
                         isPresented: $showListSelection
                     )
                     .onDisappear {
-                        // Clean up ViewModel when sheet is dismissed
                         listSelectionViewModel = nil
                     }
                 } else {
                     Text("No place selected")
                 }
             }
-            .onChange(of: showListSelection) { newValue in
-                // Create ViewModel when sheet is about to be shown
+            .onChange(of: showListSelection) { oldValue, newValue in
                 if newValue && listSelectionViewModel == nil {
                     listSelectionViewModel = PlaceListSelectionViewModel(
                         profile: profile,
@@ -147,29 +148,6 @@ struct PlaceDetailView: View {
                 }
             }
 
-            // Action button overlay - top right
-            VStack {
-                HStack {
-                    Spacer()
-                    if let place = selectedPlaceVM.selectedPlace {
-                        PlaceActionButton(
-                            place: place,
-                            onAddToList: {
-                                showListSelection = true
-                            },
-                            onAddReview: {
-                                showCreateReview = true
-                            }
-                        )
-                        .environmentObject(profile)
-                        .environmentObject(userSession)
-                        .environmentObject(serviceContainer)
-                    }
-                }
-                .padding(.horizontal, 16)
-                .padding(.top, 8)
-                Spacer()
-            }
 
 
             // Photo Gallery Overlay

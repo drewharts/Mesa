@@ -25,6 +25,10 @@ struct PlaceDetailTabsView: View {
     @Binding var showNoPhoneNumberAlert: Bool
     let onPhotoTapped: ([UIImage], Int) -> Void
     
+    // MARK: - Action Callbacks (passed from parent)
+    let onAddToList: () -> Void
+    let onAddReview: () -> Void
+    
     // MARK: - View-Owned Presentation State (Enterprise Pattern)
     // Sheet presentation is a UI concern, owned by View not ViewModel
     @State private var showingSaversSheet = false
@@ -33,14 +37,30 @@ struct PlaceDetailTabsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 5) {
-                // MARK: - Top Row: Title + Icons
-                HStack(alignment: .center) {
+                // MARK: - Top Row: Title + Share/Save Buttons
+                HStack(alignment: .top) {
                     Text(viewModel.placeName)
                         .font(.largeTitle)
                         .fontWeight(.bold)
                         .foregroundColor(.black)
                     
                     Spacer()
+                    
+                    // Save to List Button - state from ViewModel
+                    Button(action: onAddToList) {
+                        Image(systemName: viewModel.isPlaceInList ? "bookmark.fill" : "bookmark")
+                            .font(.title3)
+                            .foregroundColor(viewModel.isPlaceInList ? .blue : .gray)
+                            .frame(width: 32, height: 32)
+                    }
+                    
+                    // Share Button - delegates to ViewModel
+                    Button(action: viewModel.sharePlace) {
+                        Image(systemName: "square.and.arrow.up")
+                            .font(.title3)
+                            .foregroundColor(.gray)
+                            .frame(width: 32, height: 32)
+                    }
                 }
                 .padding(.bottom, 3)
                 
@@ -177,10 +197,11 @@ struct PlaceDetailTabsView: View {
                 case .reviews:
                     PlaceReviewsView(
                         viewModel: viewModel.reviewsViewModel,
-                        onPhotoTapped: onPhotoTapped
+                        onPhotoTapped: onPhotoTapped,
+                        onAddReview: onAddReview
                     )
                     .environmentObject(selectedPlaceVM)
-                        .environmentObject(userProfileViewModel)
+                    .environmentObject(userProfileViewModel)
                 case .notes:
                     NotesTabContent(viewModel: viewModel.notesTabViewModel)
                 }
@@ -200,7 +221,9 @@ struct PlaceDetailTabsView: View {
             )
         }
         .alert("Max Favorites Reached", isPresented: $viewModel.showMaxFavoritesAlert) {
-            Button("OK", role: .cancel) { }
+            Button("OK", role: .cancel) {
+                viewModel.dismissMaxFavoritesAlert()
+            }
         } message: {
             Text("You already have 6 favorites. Remove one before adding a new one.")
         }
@@ -458,6 +481,7 @@ private struct SavedByIndicator: View {
                 reviewService: services.reviewService,
                 userService: services.userService,
                 notificationManager: NotificationManager.shared,
+                placeShareService: services.placeShareService,
                 selectedPlaceVM: selectedPlaceVM,
                 profileVM: profileVM,
                 userSession: userSession,
@@ -469,7 +493,9 @@ private struct SavedByIndicator: View {
                 showNoPhoneNumberAlert: $showNoPhoneNumberAlert,
                 onPhotoTapped: { photos, index in
                     print("Tapped photo at index: \(index)")
-                }
+                },
+                onAddToList: { print("Add to list tapped") },
+                onAddReview: { print("Add review tapped") }
             )
             .environmentObject(profileVM)
             .environmentObject(selectedPlaceVM)
