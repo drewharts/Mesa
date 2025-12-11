@@ -33,9 +33,7 @@ struct TravelTimeSelector: View {
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var locationManager: LocationManager
 
-    // View owns expanded state (presentation concern)
-    @State private var isExpanded = false
-    @State private var selectedIndex: Int? = nil
+    // Frame tracking for menu positioning (presentation concern only)
     @State private var buttonFrame: CGRect = .zero
 
     private let animationDuration: Double = 0.2
@@ -49,8 +47,8 @@ struct TravelTimeSelector: View {
                             key: TravelTimeSelectorStateKey.self,
                             value: TravelTimeSelectorState(
                                 frame: geo.frame(in: .global),
-                                isExpanded: isExpanded,
-                                selectedIndex: selectedIndex
+                                isExpanded: viewModel.isMenuExpanded,
+                                selectedIndex: viewModel.selectedMenuIndex
                             )
                         )
                         .onAppear {
@@ -73,10 +71,10 @@ struct TravelTimeSelector: View {
                 .font(.subheadline)
                 .foregroundColor(.gray)
         }
-        .opacity(isExpanded ? 0.3 : 1)
+        .opacity(viewModel.isMenuExpanded ? 0.3 : 1)
         .contentShape(Rectangle())
         .onTapGesture {
-            guard !isExpanded else { return }
+            guard !viewModel.isMenuExpanded else { return }
             print("👆 [TravelTimeSelector] Tap gesture triggered")
             if let place = selectedPlaceVM.selectedPlace,
                let currentLocation = locationManager.currentLocation {
@@ -91,74 +89,55 @@ struct TravelTimeSelector: View {
                 .onChanged { value in
                     switch value {
                     case .first(true):
-                        // Long press started
+                        // Long press started - expand menu
                         withAnimation(.easeOut(duration: animationDuration)) {
-                            isExpanded = true
+                            viewModel.expandMenu()
                         }
                         print("👆 [TravelTimeSelector] Long press - expanding")
                     case .second(true, let drag?):
-                        // Dragging after long press
-                        handleDrag(drag)
+                        // Dragging after long press - update selection
+                        updateDragSelection(drag)
                     default:
                         break
                     }
                 }
-                .onEnded { value in
-                    switch value {
-                    case .second(true, _):
-                        // Drag ended - select if valid
-                        handleDragEnd()
-                    default:
-                        // Just long press without drag
-                        break
+                .onEnded { _ in
+                    // Gesture ended - confirm selection if any, then collapse
+                    withAnimation(.easeIn(duration: animationDuration)) {
+                        _ = viewModel.confirmMenuSelection()
                     }
                 }
         )
     }
     
-    // MARK: - Drag Handling
+    // MARK: - Drag Selection
     
-    private func handleDrag(_ drag: DragGesture.Value) {
+    /// Updates the selected menu index based on drag position
+    /// Provides haptic feedback when selection changes
+    private func updateDragSelection(_ drag: DragGesture.Value) {
         // Calculate which item is being hovered based on drag location
         // Menu appears below button, each item is ~52pt tall
         let menuTop = buttonFrame.maxY + 10
         let itemHeight: CGFloat = 52
         let dragY = drag.location.y
         
-        if dragY > menuTop {
+        let newIndex: Int? = {
+            guard dragY > menuTop else { return nil }
+            
             let relativeY = dragY - menuTop
             let index = Int(relativeY / itemHeight)
             let transportTypes = MapKitService.TransportType.allCases
             
-            if index >= 0 && index < transportTypes.count {
-                if selectedIndex != index {
-                    selectedIndex = index
-                    // Haptic feedback
-                    let generator = UISelectionFeedbackGenerator()
-                    generator.selectionChanged()
-                }
-            } else {
-                selectedIndex = nil
-            }
-        } else {
-            selectedIndex = nil
-        }
-    }
-    
-    private func handleDragEnd() {
-        if let index = selectedIndex {
-            let transportTypes = MapKitService.TransportType.allCases
-            if index < transportTypes.count {
-                let selected = transportTypes[index]
-                print("🎯 [TravelTimeSelector] Selected: \(selected.displayName)")
-                viewModel.switchTransportType(to: selected)
-                viewModel.saveDefaultTransportType(selected)
-            }
-        }
+            return (index >= 0 && index < transportTypes.count) ? index : nil
+        }()
         
-        withAnimation(.easeIn(duration: animationDuration)) {
-            isExpanded = false
-            selectedIndex = nil
+        // Provide haptic feedback when selection changes
+        if newIndex != viewModel.selectedMenuIndex {
+            if newIndex != nil {
+                let generator = UISelectionFeedbackGenerator()
+                generator.selectionChanged()
+            }
+            viewModel.updateSelectedIndex(newIndex)
         }
     }
 }

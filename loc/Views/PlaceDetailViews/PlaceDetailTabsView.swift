@@ -255,32 +255,59 @@ struct PlaceDetailTabsView: View {
     // MARK: - Travel Time Selector Overlay (Enterprise Pattern)
     
     /// Renders expanded menu at root level, positioned at button location
+    /// Includes a dismiss background layer for tap-outside-to-close functionality
     /// This ensures proper z-ordering above all nested content
     @ViewBuilder
     private func travelTimeSelectorOverlay(state: TravelTimeSelectorState) -> some View {
-        GeometryReader { geo in
-            // Convert global frame to local coordinate space
-            let localFrame = CGRect(
-                x: state.frame.minX - geo.frame(in: .global).minX,
-                y: state.frame.maxY - geo.frame(in: .global).minY + 8,
-                width: state.frame.width,
-                height: 0
-            )
+        ZStack {
+            // Dismiss layer - behind menu, captures taps outside
+            dismissBackground
             
-            TravelTimeSelectorExpandedMenu(
-                viewModel: viewModel.travelTimeViewModel,
-                selectedIndex: state.selectedIndex,
-                onSelect: { transportType in
-                    viewModel.travelTimeViewModel.switchTransportType(to: transportType)
-                    viewModel.travelTimeViewModel.saveDefaultTransportType(transportType)
-                },
-                onDismiss: { }
-            )
-            .position(x: localFrame.minX + 90, y: localFrame.minY + 100)
-            .transition(.scale(scale: 0.8, anchor: .top).combined(with: .opacity))
-            .animation(.easeOut(duration: 0.2), value: state.isExpanded)
+            // Menu positioned at button location
+            GeometryReader { geo in
+                let localFrame = CGRect(
+                    x: state.frame.minX - geo.frame(in: .global).minX,
+                    y: state.frame.maxY - geo.frame(in: .global).minY + 8,
+                    width: state.frame.width,
+                    height: 0
+                )
+                
+                TravelTimeSelectorExpandedMenu(
+                    viewModel: viewModel.travelTimeViewModel,
+                    selectedIndex: state.selectedIndex,
+                    onSelect: { transportType in
+                        withAnimation(.easeIn(duration: 0.2)) {
+                            viewModel.travelTimeViewModel.switchTransportType(to: transportType)
+                            viewModel.travelTimeViewModel.saveDefaultTransportType(transportType)
+                            viewModel.travelTimeViewModel.collapseMenu()
+                        }
+                    },
+                    onDismiss: {
+                        withAnimation(.easeIn(duration: 0.2)) {
+                            viewModel.travelTimeViewModel.collapseMenu()
+                        }
+                    }
+                )
+                .position(x: localFrame.minX + 90, y: localFrame.minY + 100)
+                .transition(.scale(scale: 0.8, anchor: .top).combined(with: .opacity))
+                .animation(.easeOut(duration: 0.2), value: state.isExpanded)
+            }
         }
         .ignoresSafeArea()
+    }
+    
+    // MARK: - Menu Dismiss Background
+    
+    /// Full-screen transparent layer that dismisses the transport menu when tapped
+    /// Uses minimal opacity to remain invisible while capturing taps outside the menu
+    private var dismissBackground: some View {
+        Color.black.opacity(0.001)
+            .ignoresSafeArea()
+            .onTapGesture {
+                withAnimation(.easeIn(duration: 0.2)) {
+                    viewModel.travelTimeViewModel.collapseMenu()
+                }
+            }
     }
 }
 

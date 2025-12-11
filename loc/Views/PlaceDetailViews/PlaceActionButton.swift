@@ -81,11 +81,15 @@ struct PlaceActionButton: View {
     
     var body: some View {
         ZStack {
-            // Background that prevents sheet dragging when menu is expanded
+            // Background that dismisses menu when tapping outside
             if isExpanded {
                 Color.clear
                     .contentShape(Rectangle())
-                    .allowsHitTesting(true)
+                    .onTapGesture {
+                        withAnimation(.easeInOut(duration: animationDuration)) {
+                            collapseMenu()
+                        }
+                    }
             }
             
             // Main button and expanded menu
@@ -120,7 +124,10 @@ struct PlaceActionButton: View {
                         // Main button - only show when not expanded
                         if !isExpanded {
                             Button(action: {
-                                // Single tap does nothing - only long press expands
+                                // Single tap expands the menu
+                                withAnimation(.easeInOut(duration: animationDuration)) {
+                                    expandMenu()
+                                }
                             }) {
                                 ThreeDotsTriangle()
                                     .frame(width: buttonSize, height: buttonSize)
@@ -148,10 +155,11 @@ struct PlaceActionButton: View {
                             .onEnded { value in
                                 switch value {
                                 case .second(true, _):
-                                    // Drag ended - execute selection
+                                    // Drag ended - execute selection if any
                                     handleDragEnd()
                                 default:
-                                    break
+                                    // Long press without drag - just collapse menu
+                                    collapseMenu()
                                 }
                             }
                     )
