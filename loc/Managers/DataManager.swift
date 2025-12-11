@@ -1120,54 +1120,9 @@ class DataManager: ObservableObject {
                 }
             }
             
-            // Mark data as freshly loaded for staleness tracking
-            profileViewModel.markListPlacesAsRefreshed()
-            
             print("📍 [DataManager] Updated placeSavers with \(allPlaces.values.flatMap { $0 }.count) places from lists")
             print("📍 [DataManager] Total placeSavers count: \(self.detailPlaceViewModel.placeSavers.count)")
         }
-    }
-    
-    // MARK: - List Places Refresh
-    
-    /// Refreshes list places data if stale, fetching fresh data from database
-    /// This ensures `latest_review_photo` and other fields reflect current database state
-    /// - Parameter forceRefresh: If true, refreshes regardless of staleness
-    func refreshListPlacesIfNeeded(forceRefresh: Bool = false) async {
-        // Skip if already refreshing
-        guard !profileViewModel.isRefreshingListPlaces else {
-            print("⏭️ [DataManager] Skipping refresh - already in progress")
-            return
-        }
-        
-        // Skip if data is fresh (unless forced)
-        guard forceRefresh || profileViewModel.isListPlacesDataStale else {
-            print("✅ [DataManager] List places data is fresh, skipping refresh")
-            return
-        }
-        
-        // Get visible lists to refresh
-        let listsToRefresh = profileViewModel.lightweightPlaceLists
-        guard !listsToRefresh.isEmpty else {
-            print("⏭️ [DataManager] No lists to refresh")
-            return
-        }
-        
-        await MainActor.run {
-            profileViewModel.setListPlacesRefreshing(true)
-        }
-        
-        print("🔄 [DataManager] Refreshing list places data for \(listsToRefresh.count) lists")
-        
-        // Re-fetch places for all lists (reuses existing parallel loading logic)
-        await loadPlacesForLists(listsToRefresh)
-        
-        await MainActor.run {
-            profileViewModel.markListPlacesAsRefreshed()
-            profileViewModel.setListPlacesRefreshing(false)
-        }
-        
-        print("✅ [DataManager] List places refresh complete")
     }
     
     // Loads all places the user has reviewed, even if not in favorites or lists

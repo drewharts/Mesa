@@ -55,14 +55,6 @@ class ProfileViewModel: ObservableObject {
     @Published var hasMorePlaceLists: Bool = true
     var placeListsCurrentPage: Int = 1
     
-    // MARK: - List Places Cache Staleness Tracking
-    /// Timestamp when list places were last refreshed from database
-    private var listPlacesLastRefreshedAt: Date?
-    /// Duration after which list places data is considered stale (5 minutes)
-    private let listPlacesStalenessThreshold: TimeInterval = 300
-    /// Flag to track if a refresh is currently in progress
-    @Published private(set) var isRefreshingListPlaces: Bool = false
-    
     // MARK: - Initial List Loading State
     /// True while initial list fetch (owned + shared) is in progress
     @Published var isLoadingInitialLists: Bool = false
@@ -92,33 +84,6 @@ class ProfileViewModel: ObservableObject {
     /// Disabled while initial load is in progress to prevent confusing empty states
     var canInteractWithSharedFilter: Bool {
         !isLoadingInitialLists
-    }
-    
-    // MARK: - List Places Cache Management
-    
-    /// Returns true if the list places data is stale and should be refreshed
-    /// Data is considered stale if never loaded or older than staleness threshold
-    var isListPlacesDataStale: Bool {
-        guard let lastRefresh = listPlacesLastRefreshedAt else {
-            return true // Never loaded
-        }
-        return Date().timeIntervalSince(lastRefresh) > listPlacesStalenessThreshold
-    }
-    
-    /// Called by DataManager after successfully refreshing list places data
-    func markListPlacesAsRefreshed() {
-        listPlacesLastRefreshedAt = Date()
-    }
-    
-    /// Invalidates the list places cache, forcing next access to refresh
-    /// Call this after actions that modify place data (e.g., adding external reviews)
-    func invalidateListPlacesCache() {
-        listPlacesLastRefreshedAt = nil
-    }
-    
-    /// Sets the refresh loading state (called by DataManager)
-    func setListPlacesRefreshing(_ isRefreshing: Bool) {
-        isRefreshingListPlaces = isRefreshing
     }
     
     // Save-to-list sheet pagination (separate from profile view pagination)

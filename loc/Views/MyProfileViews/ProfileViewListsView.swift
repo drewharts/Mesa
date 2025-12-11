@@ -132,10 +132,6 @@ struct ProfileViewListsView: View {
                 paginationLoadingView
             }
         }
-        .task {
-            // Refresh list places data if stale (e.g., photos added since last load)
-            await dataManager.refreshListPlacesIfNeeded()
-        }
     }
     
     // MARK: - Empty State View
