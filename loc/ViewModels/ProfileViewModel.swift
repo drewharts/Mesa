@@ -1014,7 +1014,10 @@ class ProfileViewModel: ObservableObject {
      }
     
      func isPlaceInAnyList(placeId: String) -> Bool {
-         return userListsPlaces.values.contains { $0.contains(placeId) }
+         // Check if current user is in placeSavers for this place
+         // placeSavers is consistently updated when places are added/removed from lists
+         guard let userId = userSession.currentUserId else { return false }
+         return detailPlaceViewModel.placeSavers[placeId]?.contains(userId) ?? false
      }
 
     /// Returns a dictionary mapping each PlaceList's id to the count of places in that list

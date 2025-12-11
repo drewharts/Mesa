@@ -30,6 +30,9 @@ class PlaceDetailTabsViewModel: ObservableObject {
     // Reference to shared state (temporary until fully refactored)
     private let selectedPlaceVM: SelectedPlaceViewModel
     private let profileVM: ProfileViewModel
+    private let detailPlaceViewModel: DetailPlaceViewModel
+    private let userSession: UserSession
+    private let placeListService = PlaceListService.shared
     
     // MARK: - Child ViewModels
     let aboutTabViewModel: AboutTabViewModel
@@ -76,6 +79,8 @@ class PlaceDetailTabsViewModel: ObservableObject {
         self.placeShareService = placeShareService
         self.selectedPlaceVM = selectedPlaceVM
         self.profileVM = profileVM
+        self.detailPlaceViewModel = detailPlaceViewModel
+        self.userSession = userSession
         
         // Create child ViewModels
         let tikTokVM = TikTokVideosViewModel(
@@ -184,21 +189,46 @@ class PlaceDetailTabsViewModel: ObservableObject {
             }
             .store(in: &cancellables)
         
-        // Observe place list membership changes to update isPlaceInList state
-        // Must watch userListsPlaces since isPlaceInAnyList() checks that dictionary
-        // Triggers on: selected place change OR any list's places array change
-        Publishers.CombineLatest(
-            selectedPlaceVM.$selectedPlace,
-            profileVM.$userListsPlaces
-        )
-        .sink { [weak self] place, _ in
-            guard let self = self, let place = place else {
-                self?.isPlaceInList = false
-                return
+        // Check place list membership when place changes (database source of truth)
+        selectedPlaceVM.$selectedPlace
+            .sink { [weak self] place in
+                guard let self = self else { return }
+                Task {
+                    await self.checkPlaceListMembership(place: place)
+                }
             }
-            self.isPlaceInList = self.profileVM.isPlaceInAnyList(placeId: place.id.uuidString)
+            .store(in: &cancellables)
+        
+        // Optimistic updates: also observe placeSavers for immediate UI feedback
+        // This fires when user adds/removes place from list without waiting for DB
+        detailPlaceViewModel.$placeSavers
+            .sink { [weak self] savers in
+                guard let self = self,
+                      let place = self.selectedPlaceVM.selectedPlace,
+                      let userId = self.userSession.currentUserId else { return }
+                self.isPlaceInList = savers[place.id.uuidString]?.contains(userId) ?? false
+            }
+            .store(in: &cancellables)
+    }
+    
+    /// Check if the current place is saved in any of the user's lists (database call)
+    private func checkPlaceListMembership(place: DetailPlace?) async {
+        guard let place = place, let userId = userSession.currentUserId else {
+            isPlaceInList = false
+            return
         }
-        .store(in: &cancellables)
+        
+        do {
+            let isSaved = try await placeListService.isPlaceInAnyUserList(
+                userId: userId,
+                placeId: place.id.uuidString
+            )
+            isPlaceInList = isSaved
+        } catch {
+            print("❌ [PlaceDetailTabsVM] Error checking place list membership: \(error)")
+            // Fall back to local check on error
+            isPlaceInList = detailPlaceViewModel.placeSavers[place.id.uuidString]?.contains(userId) ?? false
+        }
     }
     
     /// Configure savers VM with navigation dependency (call from View)

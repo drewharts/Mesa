@@ -50,7 +50,7 @@ struct PlaceDetailTabsView: View {
                     Button(action: onAddToList) {
                         Image(systemName: viewModel.isPlaceInList ? "bookmark.fill" : "bookmark")
                             .font(.title3)
-                            .foregroundColor(viewModel.isPlaceInList ? .blue : .gray)
+                            .foregroundColor(.gray)
                             .frame(width: 32, height: 32)
                     }
                     
@@ -60,6 +60,7 @@ struct PlaceDetailTabsView: View {
                             .font(.title3)
                             .foregroundColor(.gray)
                             .frame(width: 32, height: 32)
+                            .offset(y: -1)  // Optical alignment with bookmark
                     }
                 }
                 .padding(.bottom, 3)
