@@ -184,11 +184,12 @@ class PlaceDetailTabsViewModel: ObservableObject {
             }
             .store(in: &cancellables)
         
-        // Observe place list changes to update isPlaceInList state
-        // Combines place changes with list changes to recompute saved state
+        // Observe place list membership changes to update isPlaceInList state
+        // Must watch userListsPlaces since isPlaceInAnyList() checks that dictionary
+        // Triggers on: selected place change OR any list's places array change
         Publishers.CombineLatest(
             selectedPlaceVM.$selectedPlace,
-            profileVM.$lightweightPlaceLists
+            profileVM.$userListsPlaces
         )
         .sink { [weak self] place, _ in
             guard let self = self, let place = place else {

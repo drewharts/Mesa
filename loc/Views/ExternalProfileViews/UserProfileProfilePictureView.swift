@@ -16,6 +16,34 @@ struct UserProfileProfilePictureView: View {
     
     // MARK: - Constants
     private let profileSize: CGFloat = 120
+    
+    @State private var showingPlacesCount = false
+    
+    // MARK: - Subtle Places Count Badge (matches own profile style)
+    private var placesCountBadge: some View {
+        let displayText = totalPlacesCount >= 1000 ? "\(totalPlacesCount / 1000)k+" : "\(totalPlacesCount)"
+        
+        return Button(action: {
+            showingPlacesCount = true
+        }) {
+            Text(displayText)
+                .font(.system(size: 11, weight: .medium, design: .rounded))
+                .foregroundColor(.secondary)
+                .frame(minWidth: 24)  // Ensures badge extends past circle edge for single digits
+                .padding(.horizontal, 6)
+                .padding(.vertical, 3)
+                .background(
+                    Capsule()
+                        .fill(.ultraThinMaterial)
+                )
+                .overlay(
+                    Capsule()
+                        .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
+                )
+        }
+        .buttonStyle(.plain)
+        .offset(x: 4, y: 0)  // Pull badge onto the circle for visible overlap
+    }
 
     var body: some View {
         VStack(spacing: 16) {
@@ -26,14 +54,9 @@ struct UserProfileProfilePictureView: View {
                     .clipShape(Circle())
                     .shadow(radius: 4)
                 
-                // Places count badge
+                // Places count badge - subtle style matching own profile
                 if totalPlacesCount > 0 {
-                    PlacesCountBadgeView(
-                        count: totalPlacesCount,
-                        userName: userName,
-                        isOwnProfile: false
-                    )
-                    .offset(x: 4, y: 4)
+                    placesCountBadge
                 }
             }
             
@@ -50,6 +73,11 @@ struct UserProfileProfilePictureView: View {
             }
         }
         .padding(.top, 40)
+        .alert("Places Saved", isPresented: $showingPlacesCount) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("\(userName) has \(totalPlacesCount) places saved across all their lists, favorites, and reviews.")
+        }
     }
     
     // MARK: - Subviews
