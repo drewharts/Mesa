@@ -168,33 +168,55 @@ struct PlacePreviewCard: View {
                     Group {
                         // Image loading matching popup view implementation
                         if let thumbnailURL = getFirstTikTokThumbnail(for: place) {
-                            // Show TikTok thumbnail
-                            AsyncImage(url: URL(string: thumbnailURL)) { image in
-                                image
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fill)
-                                    .frame(maxWidth: .infinity, maxHeight: 80)
-                                    .clipped()
-                            } placeholder: {
-                                Rectangle()
-                                    .foregroundColor(.gray.opacity(0.3))
-                                    .frame(maxWidth: .infinity, maxHeight: 80)
+                            // Show TikTok thumbnail with proper phase handling
+                            AsyncImage(url: URL(string: thumbnailURL)) { phase in
+                                switch phase {
+                                case .success(let image):
+                                    image
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fill)
+                                        .frame(maxWidth: .infinity, maxHeight: 80)
+                                        .clipped()
+                                case .failure:
+                                    Rectangle()
+                                        .foregroundColor(detailPlaceViewModel.colorForPlace(placeId: place.id.uuidString))
+                                        .frame(maxWidth: .infinity, maxHeight: 80)
+                                case .empty:
+                                    Rectangle()
+                                        .foregroundColor(.gray.opacity(0.3))
+                                        .frame(maxWidth: .infinity, maxHeight: 80)
+                                @unknown default:
+                                    Rectangle()
+                                        .foregroundColor(detailPlaceViewModel.colorForPlace(placeId: place.id.uuidString))
+                                        .frame(maxWidth: .infinity, maxHeight: 80)
+                                }
                             }
                         } else if let photoUrls = place.photoUrls,
                                   !photoUrls.isEmpty,
                                   let photoUrl = photoUrls.first,
                                   let url = URL(string: photoUrl) {
-                            // Show place's own photo (for created places) using AsyncImage
-                            AsyncImage(url: url) { image in
-                                image
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fill)
-                                    .frame(maxWidth: .infinity, maxHeight: 80)
-                                    .clipped()
-                            } placeholder: {
-                                Rectangle()
-                                    .foregroundColor(.gray.opacity(0.3))
-                                    .frame(maxWidth: .infinity, maxHeight: 80)
+                            // Show place's own photo (for created places) with proper phase handling
+                            AsyncImage(url: url) { phase in
+                                switch phase {
+                                case .success(let image):
+                                    image
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fill)
+                                        .frame(maxWidth: .infinity, maxHeight: 80)
+                                        .clipped()
+                                case .failure:
+                                    Rectangle()
+                                        .foregroundColor(detailPlaceViewModel.colorForPlace(placeId: place.id.uuidString))
+                                        .frame(maxWidth: .infinity, maxHeight: 80)
+                                case .empty:
+                                    Rectangle()
+                                        .foregroundColor(.gray.opacity(0.3))
+                                        .frame(maxWidth: .infinity, maxHeight: 80)
+                                @unknown default:
+                                    Rectangle()
+                                        .foregroundColor(detailPlaceViewModel.colorForPlace(placeId: place.id.uuidString))
+                                        .frame(maxWidth: .infinity, maxHeight: 80)
+                                }
                             }
                         } else if let image = detailPlaceViewModel.placeImages[place.id.uuidString], 
                                   image.size.width > 0 && image.size.height > 0 {
