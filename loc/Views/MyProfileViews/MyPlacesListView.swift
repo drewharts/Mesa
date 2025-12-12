@@ -348,46 +348,72 @@ struct LightweightPlaceGridCell: View {
                 // Check for TikTok thumbnail first, then review photo, then colored rectangle
                 if let tiktokUrl = place.tiktok_url,
                    let thumbnailURL = TikTokMetadataCache.shared.getCachedThumbnailUrl(for: tiktokUrl) {
-                    // Show TikTok thumbnail
-                    AsyncImage(url: URL(string: thumbnailURL)) { image in
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .frame(width: cardWidth, height: cardHeight)
-                            .clipped()
-                    } placeholder: {
-                        Rectangle()
-                            .foregroundColor(placeColor)
-                            .frame(width: cardWidth, height: cardHeight)
-                            .overlay(
-                                ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                    .scaleEffect(0.8)
-                            )
-                            .onAppear {
-                                // Prefetch TikTok metadata if not cached
-                                Task {
-                                    _ = await TikTokMetadataCache.shared.getMetadata(for: tiktokUrl)
+                    // Show TikTok thumbnail with proper phase handling
+                    AsyncImage(url: URL(string: thumbnailURL)) { phase in
+                        switch phase {
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .frame(width: cardWidth, height: cardHeight)
+                                .clipped()
+                        case .failure:
+                            // Fallback to colored rectangle on failure
+                            Rectangle()
+                                .foregroundColor(placeColor)
+                                .frame(width: cardWidth, height: cardHeight)
+                        case .empty:
+                            // Loading state with progress indicator
+                            Rectangle()
+                                .foregroundColor(placeColor)
+                                .frame(width: cardWidth, height: cardHeight)
+                                .overlay(
+                                    ProgressView()
+                                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                        .scaleEffect(0.8)
+                                )
+                                .onAppear {
+                                    // Prefetch TikTok metadata if not cached
+                                    Task {
+                                        _ = await TikTokMetadataCache.shared.getMetadata(for: tiktokUrl)
+                                    }
                                 }
-                            }
+                        @unknown default:
+                            Rectangle()
+                                .foregroundColor(placeColor)
+                                .frame(width: cardWidth, height: cardHeight)
+                        }
                     }
                 } else if let photoUrl = place.latest_review_photo, let url = URL(string: photoUrl) {
-                    // Show review photo
-                    AsyncImage(url: url) { image in
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .frame(width: cardWidth, height: cardHeight)
-                            .clipped()
-                    } placeholder: {
-                        Rectangle()
-                            .foregroundColor(placeColor)
-                            .frame(width: cardWidth, height: cardHeight)
-                            .overlay(
-                                ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                    .scaleEffect(0.8)
-                            )
+                    // Show review photo with proper phase handling
+                    AsyncImage(url: url) { phase in
+                        switch phase {
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .frame(width: cardWidth, height: cardHeight)
+                                .clipped()
+                        case .failure:
+                            // Fallback to colored rectangle on failure
+                            Rectangle()
+                                .foregroundColor(placeColor)
+                                .frame(width: cardWidth, height: cardHeight)
+                        case .empty:
+                            // Loading state with progress indicator
+                            Rectangle()
+                                .foregroundColor(placeColor)
+                                .frame(width: cardWidth, height: cardHeight)
+                                .overlay(
+                                    ProgressView()
+                                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                        .scaleEffect(0.8)
+                                )
+                        @unknown default:
+                            Rectangle()
+                                .foregroundColor(placeColor)
+                                .frame(width: cardWidth, height: cardHeight)
+                        }
                     }
                 } else {
                     // No photo - show colored background

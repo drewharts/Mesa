@@ -266,33 +266,55 @@ struct UserProfileLightweightPlacePreviewCard: View {
                         // Check for TikTok thumbnail first, then review photo, then colored rectangle
                         if let tiktokUrl = place.tiktok_url,
                            let thumbnailURL = TikTokMetadataCache.shared.getCachedThumbnailUrl(for: tiktokUrl) {
-                            AsyncImage(url: URL(string: thumbnailURL)) { image in
-                                image
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fill)
-                                    .frame(maxWidth: .infinity, maxHeight: 80)
-                                    .clipped()
-                            } placeholder: {
-                                Rectangle()
-                                    .foregroundColor(.gray.opacity(0.3))
-                                    .frame(maxWidth: .infinity, maxHeight: 80)
-                                    .onAppear {
-                                        Task {
-                                            _ = await TikTokMetadataCache.shared.getMetadata(for: tiktokUrl)
-    }
-}
+                            AsyncImage(url: URL(string: thumbnailURL)) { phase in
+                                switch phase {
+                                case .success(let image):
+                                    image
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fill)
+                                        .frame(maxWidth: .infinity, maxHeight: 80)
+                                        .clipped()
+                                case .failure:
+                                    Rectangle()
+                                        .foregroundColor(placeColor)
+                                        .frame(maxWidth: .infinity, maxHeight: 80)
+                                case .empty:
+                                    Rectangle()
+                                        .foregroundColor(.gray.opacity(0.3))
+                                        .frame(maxWidth: .infinity, maxHeight: 80)
+                                        .onAppear {
+                                            Task {
+                                                _ = await TikTokMetadataCache.shared.getMetadata(for: tiktokUrl)
+                                            }
+                                        }
+                                @unknown default:
+                                    Rectangle()
+                                        .foregroundColor(placeColor)
+                                        .frame(maxWidth: .infinity, maxHeight: 80)
+                                }
                             }
                         } else if let photoUrl = place.latest_review_photo, let url = URL(string: photoUrl) {
-                            AsyncImage(url: url) { image in
-                                image
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fill)
-                                    .frame(maxWidth: .infinity, maxHeight: 80)
-                                    .clipped()
-                            } placeholder: {
-                                Rectangle()
-                                    .foregroundColor(.gray.opacity(0.3))
-                                    .frame(maxWidth: .infinity, maxHeight: 80)
+                            AsyncImage(url: url) { phase in
+                                switch phase {
+                                case .success(let image):
+                                    image
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fill)
+                                        .frame(maxWidth: .infinity, maxHeight: 80)
+                                        .clipped()
+                                case .failure:
+                                    Rectangle()
+                                        .foregroundColor(placeColor)
+                                        .frame(maxWidth: .infinity, maxHeight: 80)
+                                case .empty:
+                                    Rectangle()
+                                        .foregroundColor(.gray.opacity(0.3))
+                                        .frame(maxWidth: .infinity, maxHeight: 80)
+                                @unknown default:
+                                    Rectangle()
+                                        .foregroundColor(placeColor)
+                                        .frame(maxWidth: .infinity, maxHeight: 80)
+                                }
                             }
                         } else {
                             Rectangle()
@@ -542,46 +564,68 @@ struct ExternalUserListPlaceCard: View {
                 // Check for TikTok thumbnail first, then review photo, then colored rectangle
                 if let tiktokUrl = place.tiktok_url,
                    let thumbnailURL = TikTokMetadataCache.shared.getCachedThumbnailUrl(for: tiktokUrl) {
-                    // Show TikTok thumbnail
-                    AsyncImage(url: URL(string: thumbnailURL)) { image in
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .frame(width: cardWidth, height: cardHeight)
-                            .clipped()
-                    } placeholder: {
-                        Rectangle()
-                            .foregroundColor(placeColor)
-                            .frame(width: cardWidth, height: cardHeight)
-                            .overlay(
-                                ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                    .scaleEffect(0.8)
-                            )
-                            .onAppear {
-                                // Prefetch TikTok metadata if not cached
-                                Task {
-                                    _ = await TikTokMetadataCache.shared.getMetadata(for: tiktokUrl)
+                    // Show TikTok thumbnail with proper phase handling
+                    AsyncImage(url: URL(string: thumbnailURL)) { phase in
+                        switch phase {
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .frame(width: cardWidth, height: cardHeight)
+                                .clipped()
+                        case .failure:
+                            Rectangle()
+                                .foregroundColor(placeColor)
+                                .frame(width: cardWidth, height: cardHeight)
+                        case .empty:
+                            Rectangle()
+                                .foregroundColor(placeColor)
+                                .frame(width: cardWidth, height: cardHeight)
+                                .overlay(
+                                    ProgressView()
+                                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                        .scaleEffect(0.8)
+                                )
+                                .onAppear {
+                                    // Prefetch TikTok metadata if not cached
+                                    Task {
+                                        _ = await TikTokMetadataCache.shared.getMetadata(for: tiktokUrl)
+                                    }
                                 }
-                            }
+                        @unknown default:
+                            Rectangle()
+                                .foregroundColor(placeColor)
+                                .frame(width: cardWidth, height: cardHeight)
+                        }
                     }
                 } else if let photoUrl = place.latest_review_photo, let url = URL(string: photoUrl) {
-                    // Show review photo
-                    AsyncImage(url: url) { image in
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .frame(width: cardWidth, height: cardHeight)
-                            .clipped()
-                    } placeholder: {
-                        Rectangle()
-                            .foregroundColor(placeColor)
-                            .frame(width: cardWidth, height: cardHeight)
-                            .overlay(
-                                ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                    .scaleEffect(0.8)
-                            )
+                    // Show review photo with proper phase handling
+                    AsyncImage(url: url) { phase in
+                        switch phase {
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .frame(width: cardWidth, height: cardHeight)
+                                .clipped()
+                        case .failure:
+                            Rectangle()
+                                .foregroundColor(placeColor)
+                                .frame(width: cardWidth, height: cardHeight)
+                        case .empty:
+                            Rectangle()
+                                .foregroundColor(placeColor)
+                                .frame(width: cardWidth, height: cardHeight)
+                                .overlay(
+                                    ProgressView()
+                                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                        .scaleEffect(0.8)
+                                )
+                        @unknown default:
+                            Rectangle()
+                                .foregroundColor(placeColor)
+                                .frame(width: cardWidth, height: cardHeight)
+                        }
                     }
                 } else {
                     // No photo - show colored background

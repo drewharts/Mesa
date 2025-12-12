@@ -158,33 +158,59 @@ struct LightweightPlacePreviewCard: View {
                         // Check for TikTok thumbnail first, then review photo, then colored rectangle
                         if let tiktokUrl = place.tiktok_url,
                            let thumbnailURL = TikTokMetadataCache.shared.getCachedThumbnailUrl(for: tiktokUrl) {
-                            AsyncImage(url: URL(string: thumbnailURL)) { image in
-                                image
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fill)
-                                    .frame(maxWidth: .infinity, maxHeight: 80)
-                                    .clipped()
-                            } placeholder: {
-                                Rectangle()
-                                    .foregroundColor(.gray.opacity(0.3))
-                                    .frame(maxWidth: .infinity, maxHeight: 80)
-                                    .onAppear {
-                                        Task {
-                                            _ = await TikTokMetadataCache.shared.getMetadata(for: tiktokUrl)
+                            AsyncImage(url: URL(string: thumbnailURL)) { phase in
+                                switch phase {
+                                case .success(let image):
+                                    image
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fill)
+                                        .frame(maxWidth: .infinity, maxHeight: 80)
+                                        .clipped()
+                                case .failure:
+                                    // Fallback to colored rectangle on failure
+                                    Rectangle()
+                                        .foregroundColor(placeColor)
+                                        .frame(maxWidth: .infinity, maxHeight: 80)
+                                case .empty:
+                                    // Loading state
+                                    Rectangle()
+                                        .foregroundColor(.gray.opacity(0.3))
+                                        .frame(maxWidth: .infinity, maxHeight: 80)
+                                        .onAppear {
+                                            Task {
+                                                _ = await TikTokMetadataCache.shared.getMetadata(for: tiktokUrl)
+                                            }
                                         }
-                                    }
+                                @unknown default:
+                                    Rectangle()
+                                        .foregroundColor(placeColor)
+                                        .frame(maxWidth: .infinity, maxHeight: 80)
+                                }
                             }
                         } else if let photoUrl = place.latest_review_photo, let url = URL(string: photoUrl) {
-                            AsyncImage(url: url) { image in
-                                image
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fill)
-                                    .frame(maxWidth: .infinity, maxHeight: 80)
-                                    .clipped()
-                            } placeholder: {
-                                Rectangle()
-                                    .foregroundColor(.gray.opacity(0.3))
-                                    .frame(maxWidth: .infinity, maxHeight: 80)
+                            AsyncImage(url: url) { phase in
+                                switch phase {
+                                case .success(let image):
+                                    image
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fill)
+                                        .frame(maxWidth: .infinity, maxHeight: 80)
+                                        .clipped()
+                                case .failure:
+                                    // Fallback to colored rectangle on failure
+                                    Rectangle()
+                                        .foregroundColor(placeColor)
+                                        .frame(maxWidth: .infinity, maxHeight: 80)
+                                case .empty:
+                                    // Loading state
+                                    Rectangle()
+                                        .foregroundColor(.gray.opacity(0.3))
+                                        .frame(maxWidth: .infinity, maxHeight: 80)
+                                @unknown default:
+                                    Rectangle()
+                                        .foregroundColor(placeColor)
+                                        .frame(maxWidth: .infinity, maxHeight: 80)
+                                }
                             }
                         } else {
                             Rectangle()
