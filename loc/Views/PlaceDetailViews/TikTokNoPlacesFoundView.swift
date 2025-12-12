@@ -247,27 +247,14 @@ struct TikTokNoPlacesFoundView: View {
         // Add place to places dictionary so it's available for the map/UI
         detailPlaceViewModel.places[detailPlace.id.uuidString] = detailPlace
         
-        // Use the unified createExternalPlaceEntry method
-        Task {
-            let success = await profile.createExternalPlaceEntry(
-                placeId: detailPlace.id.uuidString,
-                tikTokUrl: tikTokUrl,
-                source: "user_assigned",
-                place: detailPlace
-            )
-            
-            await MainActor.run {
-                isSubmitting = false
-                if success {
-                    // Refresh TikTok places list
-                    profile.refreshTikTokPlacesAfterImport()
-                    showingSuccessAlert = true
-                } else {
-                    errorMessage = "Failed to assign TikTok to place"
-                    showingErrorAlert = true
-                }
-            }
-        }
+        // Note: external_place entry creation is handled by the backend
+        // The frontend no longer directly inserts into the external_places table
+        
+        isSubmitting = false
+        
+        // Refresh TikTok places list
+        profile.refreshTikTokPlacesAfterImport()
+        showingSuccessAlert = true
     }
     
     private func createDetailPlaceFromSuggestion(_ suggestion: MesaPlaceSuggestion) -> DetailPlace {
