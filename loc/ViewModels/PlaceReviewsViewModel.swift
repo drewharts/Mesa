@@ -18,12 +18,16 @@ class PlaceReviewsViewModel: ObservableObject {
     @Published var place: DetailPlace?
     @Published var highlightedReviewId: String?
     
+    /// Whether the current place is in the user's favorites
+    @Published var isFavorited: Bool = false
+    
     // MARK: - Dependencies
     private let reviewService: ReviewService
     private let photosVM: PlacePhotosViewModel  // Direct dependency for photos
     private let selectedPlaceVM: SelectedPlaceViewModel  // Temporary until fully refactored
     private let notificationManager: NotificationManager
     private let userSession: UserSession
+    private let profileVM: ProfileViewModel
     
     private var cancellables = Set<AnyCancellable>()
     
@@ -40,12 +44,14 @@ class PlaceReviewsViewModel: ObservableObject {
          photosViewModel: PlacePhotosViewModel,
          selectedPlaceVM: SelectedPlaceViewModel,
          notificationManager: NotificationManager,
-         userSession: UserSession) {
+         userSession: UserSession,
+         profileVM: ProfileViewModel) {
         self.reviewService = reviewService
         self.photosVM = photosViewModel
         self.selectedPlaceVM = selectedPlaceVM
         self.notificationManager = notificationManager
         self.userSession = userSession
+        self.profileVM = profileVM
         
         setupObservers()
     }
@@ -72,6 +78,21 @@ class PlaceReviewsViewModel: ObservableObject {
                 self?.highlightedReviewId = reviewId
             }
             .store(in: &cancellables)
+        
+        // Observe favorite state changes
+        // Combines place changes with favorites changes to recompute favorited state
+        Publishers.CombineLatest(
+            selectedPlaceVM.$selectedPlace,
+            profileVM.$lightweightFavorites
+        )
+        .sink { [weak self] place, _ in
+            guard let self = self, let place = place else {
+                self?.isFavorited = false
+                return
+            }
+            self.isFavorited = self.profileVM.isPlaceFavorite(placeId: place.id.uuidString)
+        }
+        .store(in: &cancellables)
     }
     
     // MARK: - Computed Properties
@@ -109,6 +130,16 @@ class PlaceReviewsViewModel: ObservableObject {
     func checkLikeStatuses() {
         guard let userId = userSession.currentUserId else { return }
         selectedPlaceVM.checkLikeStatuses(userId: userId)
+    }
+    
+    /// Toggles the favorite state for the current place
+    func toggleFavorite() {
+        guard let place = place else { return }
+        if isFavorited {
+            profileVM.removeFavoritePlace(place: place)
+        } else {
+            profileVM.addFavoritePlace(place: place)
+        }
     }
     
     // MARK: - Photo Management (Direct Access)

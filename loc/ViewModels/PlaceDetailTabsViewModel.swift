@@ -25,10 +25,14 @@ class PlaceDetailTabsViewModel: ObservableObject {
     private let reviewService: ReviewService
     private let userService: UserService
     private let notificationManager: NotificationManager
+    private let placeShareService: PlaceShareService
     
     // Reference to shared state (temporary until fully refactored)
     private let selectedPlaceVM: SelectedPlaceViewModel
     private let profileVM: ProfileViewModel
+    private let detailPlaceViewModel: DetailPlaceViewModel
+    private let userSession: UserSession
+    private let placeListService = PlaceListService.shared
     
     // MARK: - Child ViewModels
     let aboutTabViewModel: AboutTabViewModel
@@ -52,6 +56,10 @@ class PlaceDetailTabsViewModel: ObservableObject {
     @Published var showSaversIndicator: Bool = false
     @Published var saverCount: Int = 0
     
+    // MARK: - Place Actions State
+    /// Whether the current place is saved in any of the user's lists
+    @Published var isPlaceInList: Bool = false
+    
     private var cancellables = Set<AnyCancellable>()
     
     // MARK: - Initialization
@@ -59,6 +67,7 @@ class PlaceDetailTabsViewModel: ObservableObject {
          reviewService: ReviewService,
          userService: UserService,
          notificationManager: NotificationManager,
+         placeShareService: PlaceShareService,
          selectedPlaceVM: SelectedPlaceViewModel,
          profileVM: ProfileViewModel,
          userSession: UserSession,
@@ -67,8 +76,11 @@ class PlaceDetailTabsViewModel: ObservableObject {
         self.reviewService = reviewService
         self.userService = userService
         self.notificationManager = notificationManager
+        self.placeShareService = placeShareService
         self.selectedPlaceVM = selectedPlaceVM
         self.profileVM = profileVM
+        self.detailPlaceViewModel = detailPlaceViewModel
+        self.userSession = userSession
         
         // Create child ViewModels
         let tikTokVM = TikTokVideosViewModel(
@@ -105,7 +117,8 @@ class PlaceDetailTabsViewModel: ObservableObject {
             photosViewModel: photosVM,
             selectedPlaceVM: selectedPlaceVM,
             notificationManager: notificationManager,
-            userSession: userSession
+            userSession: userSession,
+            profileVM: profileVM
         )
         
         self.travelTimeViewModel = TravelTimeViewModel(
@@ -150,9 +163,13 @@ class PlaceDetailTabsViewModel: ObservableObject {
             }
             .store(in: &cancellables)
         
-        // Observe favorites alert
+        // Observe favorites alert - only forward when becoming true to avoid loops
         profileVM.$showMaxFavoritesAlert
-            .assign(to: &$showMaxFavoritesAlert)
+            .filter { $0 == true }
+            .sink { [weak self] _ in
+                self?.showMaxFavoritesAlert = true
+            }
+            .store(in: &cancellables)
         
         // Forward PlaceSaversViewModel state to trigger view updates
         // IMPORTANT: Set up this observer BEFORE the place observer so state is forwarded correctly
@@ -171,6 +188,47 @@ class PlaceDetailTabsViewModel: ObservableObject {
                 self?.placeSaversViewModel.setPlace(place?.id.uuidString)
             }
             .store(in: &cancellables)
+        
+        // Check place list membership when place changes (database source of truth)
+        selectedPlaceVM.$selectedPlace
+            .sink { [weak self] place in
+                guard let self = self else { return }
+                Task {
+                    await self.checkPlaceListMembership(place: place)
+                }
+            }
+            .store(in: &cancellables)
+        
+        // Optimistic updates: also observe placeSavers for immediate UI feedback
+        // This fires when user adds/removes place from list without waiting for DB
+        detailPlaceViewModel.$placeSavers
+            .sink { [weak self] savers in
+                guard let self = self,
+                      let place = self.selectedPlaceVM.selectedPlace,
+                      let userId = self.userSession.currentUserId else { return }
+                self.isPlaceInList = savers[place.id.uuidString]?.contains(userId) ?? false
+            }
+            .store(in: &cancellables)
+    }
+    
+    /// Check if the current place is saved in any of the user's lists (database call)
+    private func checkPlaceListMembership(place: DetailPlace?) async {
+        guard let place = place, let userId = userSession.currentUserId else {
+            isPlaceInList = false
+            return
+        }
+        
+        do {
+            let isSaved = try await placeListService.isPlaceInAnyUserList(
+                userId: userId,
+                placeId: place.id.uuidString
+            )
+            isPlaceInList = isSaved
+        } catch {
+            print("❌ [PlaceDetailTabsVM] Error checking place list membership: \(error)")
+            // Fall back to local check on error
+            isPlaceInList = detailPlaceViewModel.placeSavers[place.id.uuidString]?.contains(userId) ?? false
+        }
     }
     
     /// Configure savers VM with navigation dependency (call from View)
@@ -201,6 +259,18 @@ class PlaceDetailTabsViewModel: ObservableObject {
     // MARK: - Actions (What the View Can Trigger)
     func selectTab(_ tab: DetailTab) {
         selectedTab = tab
+    }
+    
+    /// Shares the current place using the system share sheet
+    func sharePlace() {
+        guard let place = currentPlace else { return }
+        placeShareService.sharePlace(place)
+    }
+    
+    /// Resets the max favorites alert state in both this ViewModel and the source ProfileViewModel
+    func dismissMaxFavoritesAlert() {
+        showMaxFavoritesAlert = false
+        profileVM.showMaxFavoritesAlert = false
     }
     
     func openGoogleMaps() {

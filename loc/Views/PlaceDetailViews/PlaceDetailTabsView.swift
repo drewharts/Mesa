@@ -25,6 +25,10 @@ struct PlaceDetailTabsView: View {
     @Binding var showNoPhoneNumberAlert: Bool
     let onPhotoTapped: ([UIImage], Int) -> Void
     
+    // MARK: - Action Callbacks (passed from parent)
+    let onAddToList: () -> Void
+    let onAddReview: () -> Void
+    
     // MARK: - View-Owned Presentation State (Enterprise Pattern)
     // Sheet presentation is a UI concern, owned by View not ViewModel
     @State private var showingSaversSheet = false
@@ -33,14 +37,31 @@ struct PlaceDetailTabsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 5) {
-                // MARK: - Top Row: Title + Icons
-                HStack(alignment: .center) {
+                // MARK: - Top Row: Title + Share/Save Buttons
+                HStack(alignment: .top) {
                     Text(viewModel.placeName)
                         .font(.largeTitle)
                         .fontWeight(.bold)
                         .foregroundColor(.black)
                     
                     Spacer()
+                    
+                    // Save to List Button - state from ViewModel
+                    Button(action: onAddToList) {
+                        Image(systemName: viewModel.isPlaceInList ? "bookmark.fill" : "bookmark")
+                            .font(.title3)
+                            .foregroundColor(.gray)
+                            .frame(width: 32, height: 32)
+                    }
+                    
+                    // Share Button - delegates to ViewModel
+                    Button(action: viewModel.sharePlace) {
+                        Image(systemName: "square.and.arrow.up")
+                            .font(.title3)
+                            .foregroundColor(.gray)
+                            .frame(width: 32, height: 32)
+                            .offset(y: -1)  // Optical alignment with bookmark
+                    }
                 }
                 .padding(.bottom, 3)
                 
@@ -177,10 +198,11 @@ struct PlaceDetailTabsView: View {
                 case .reviews:
                     PlaceReviewsView(
                         viewModel: viewModel.reviewsViewModel,
-                        onPhotoTapped: onPhotoTapped
+                        onPhotoTapped: onPhotoTapped,
+                        onAddReview: onAddReview
                     )
                     .environmentObject(selectedPlaceVM)
-                        .environmentObject(userProfileViewModel)
+                    .environmentObject(userProfileViewModel)
                 case .notes:
                     NotesTabContent(viewModel: viewModel.notesTabViewModel)
                 }
@@ -200,7 +222,9 @@ struct PlaceDetailTabsView: View {
             )
         }
         .alert("Max Favorites Reached", isPresented: $viewModel.showMaxFavoritesAlert) {
-            Button("OK", role: .cancel) { }
+            Button("OK", role: .cancel) {
+                viewModel.dismissMaxFavoritesAlert()
+            }
         } message: {
             Text("You already have 6 favorites. Remove one before adding a new one.")
         }
@@ -255,32 +279,59 @@ struct PlaceDetailTabsView: View {
     // MARK: - Travel Time Selector Overlay (Enterprise Pattern)
     
     /// Renders expanded menu at root level, positioned at button location
+    /// Includes a dismiss background layer for tap-outside-to-close functionality
     /// This ensures proper z-ordering above all nested content
     @ViewBuilder
     private func travelTimeSelectorOverlay(state: TravelTimeSelectorState) -> some View {
-        GeometryReader { geo in
-            // Convert global frame to local coordinate space
-            let localFrame = CGRect(
-                x: state.frame.minX - geo.frame(in: .global).minX,
-                y: state.frame.maxY - geo.frame(in: .global).minY + 8,
-                width: state.frame.width,
-                height: 0
-            )
+        ZStack {
+            // Dismiss layer - behind menu, captures taps outside
+            dismissBackground
             
-            TravelTimeSelectorExpandedMenu(
-                viewModel: viewModel.travelTimeViewModel,
-                selectedIndex: state.selectedIndex,
-                onSelect: { transportType in
-                    viewModel.travelTimeViewModel.switchTransportType(to: transportType)
-                    viewModel.travelTimeViewModel.saveDefaultTransportType(transportType)
-                },
-                onDismiss: { }
-            )
-            .position(x: localFrame.minX + 90, y: localFrame.minY + 100)
-            .transition(.scale(scale: 0.8, anchor: .top).combined(with: .opacity))
-            .animation(.easeOut(duration: 0.2), value: state.isExpanded)
+            // Menu positioned at button location
+            GeometryReader { geo in
+                let localFrame = CGRect(
+                    x: state.frame.minX - geo.frame(in: .global).minX,
+                    y: state.frame.maxY - geo.frame(in: .global).minY + 8,
+                    width: state.frame.width,
+                    height: 0
+                )
+                
+                TravelTimeSelectorExpandedMenu(
+                    viewModel: viewModel.travelTimeViewModel,
+                    selectedIndex: state.selectedIndex,
+                    onSelect: { transportType in
+                        withAnimation(.easeIn(duration: 0.2)) {
+                            viewModel.travelTimeViewModel.switchTransportType(to: transportType)
+                            viewModel.travelTimeViewModel.saveDefaultTransportType(transportType)
+                            viewModel.travelTimeViewModel.collapseMenu()
+                        }
+                    },
+                    onDismiss: {
+                        withAnimation(.easeIn(duration: 0.2)) {
+                            viewModel.travelTimeViewModel.collapseMenu()
+                        }
+                    }
+                )
+                .position(x: localFrame.minX + 90, y: localFrame.minY + 100)
+                .transition(.scale(scale: 0.8, anchor: .top).combined(with: .opacity))
+                .animation(.easeOut(duration: 0.2), value: state.isExpanded)
+            }
         }
         .ignoresSafeArea()
+    }
+    
+    // MARK: - Menu Dismiss Background
+    
+    /// Full-screen transparent layer that dismisses the transport menu when tapped
+    /// Uses minimal opacity to remain invisible while capturing taps outside the menu
+    private var dismissBackground: some View {
+        Color.black.opacity(0.001)
+            .ignoresSafeArea()
+            .onTapGesture {
+                withAnimation(.easeIn(duration: 0.2)) {
+                    viewModel.travelTimeViewModel.collapseMenu()
+                }
+            }
     }
 }
 
@@ -431,6 +482,7 @@ private struct SavedByIndicator: View {
                 reviewService: services.reviewService,
                 userService: services.userService,
                 notificationManager: NotificationManager.shared,
+                placeShareService: services.placeShareService,
                 selectedPlaceVM: selectedPlaceVM,
                 profileVM: profileVM,
                 userSession: userSession,
@@ -442,7 +494,9 @@ private struct SavedByIndicator: View {
                 showNoPhoneNumberAlert: $showNoPhoneNumberAlert,
                 onPhotoTapped: { photos, index in
                     print("Tapped photo at index: \(index)")
-                }
+                },
+                onAddToList: { print("Add to list tapped") },
+                onAddReview: { print("Add review tapped") }
             )
             .environmentObject(profileVM)
             .environmentObject(selectedPlaceVM)

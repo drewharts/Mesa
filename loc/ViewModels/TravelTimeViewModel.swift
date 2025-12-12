@@ -18,6 +18,12 @@ class TravelTimeViewModel: ObservableObject {
     @Published var travelTimes: [MapKitService.TransportType: String] = [:]
     @Published var place: DetailPlace?
     
+    // MARK: - Menu Expansion State
+    /// Controls whether the transport type selection menu is expanded
+    @Published private(set) var isMenuExpanded: Bool = false
+    /// Currently highlighted menu item index during drag gesture
+    @Published private(set) var selectedMenuIndex: Int? = nil
+    
     // MARK: - Dependencies
     private let selectedPlaceVM: SelectedPlaceViewModel  // Temporary until fully refactored
     private var cancellables = Set<AnyCancellable>()
@@ -153,6 +159,42 @@ class TravelTimeViewModel: ObservableObject {
     func saveDefaultTransportType(_ transportType: MapKitService.TransportType) {
         UserDefaults.standard.set(transportType.rawValue, forKey: "defaultTransportType")
         currentTransportType = transportType
+    }
+    
+    // MARK: - Menu Expansion Control
+    
+    /// Expands the transport type selection menu
+    func expandMenu() {
+        isMenuExpanded = true
+    }
+    
+    /// Collapses the transport type selection menu and resets selection state
+    func collapseMenu() {
+        isMenuExpanded = false
+        selectedMenuIndex = nil
+    }
+    
+    /// Updates the highlighted menu item during drag gesture
+    /// - Parameter index: The index of the transport type being hovered, or nil if none
+    func updateSelectedIndex(_ index: Int?) {
+        selectedMenuIndex = index
+    }
+    
+    /// Selects the transport type at the current menu index and collapses the menu
+    /// - Returns: true if a selection was made, false otherwise
+    @discardableResult
+    func confirmMenuSelection() -> Bool {
+        defer { collapseMenu() }
+        
+        guard let index = selectedMenuIndex else { return false }
+        
+        let transportTypes = MapKitService.TransportType.allCases
+        guard index >= 0, index < transportTypes.count else { return false }
+        
+        let selected = transportTypes[index]
+        switchTransportType(to: selected)
+        saveDefaultTransportType(selected)
+        return true
     }
     
     func openNavigation(for place: DetailPlace, currentLocation: CLLocationCoordinate2D) {

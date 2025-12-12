@@ -31,6 +31,7 @@ struct ProfilePictureView: View {
             Text(displayText)
                 .font(.system(size: 11, weight: .medium, design: .rounded))
                 .foregroundColor(.secondary)
+                .frame(minWidth: 24)  // Ensures badge extends past circle edge for single digits
                 .padding(.horizontal, 6)
                 .padding(.vertical, 3)
                 .background(

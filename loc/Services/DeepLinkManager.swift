@@ -375,25 +375,7 @@ class DeepLinkManager: ObservableObject {
             pendingPlace = nil
         }
         
-        // Create external_place entry if we have a TikTok URL
-        if let tikTokUrl = tikTokUrl ?? currentProcessingTikTokUrl {
-            print("💾 [DeepLinkManager] Creating external_place entry for TikTok: \(tikTokUrl)")
-            if let profileViewModel = profileViewModel {
-                let success = await profileViewModel.createExternalPlaceEntry(
-                    placeId: place.id.uuidString,
-                    tikTokUrl: tikTokUrl,
-                    place: place
-                )
-                if success {
-                    print("✅ [DeepLinkManager] Successfully created external_place entry")
-                } else {
-                    print("❌ [DeepLinkManager] Failed to create external_place entry")
-                }
-            } else {
-                print("⚠️ [DeepLinkManager] ProfileViewModel not available, cannot create external_place entry")
-            }
-            currentProcessingTikTokUrl = nil
-        }
+        currentProcessingTikTokUrl = nil
     }
     
     // MARK: - Public Methods

@@ -121,6 +121,29 @@ class PlaceListService {
         }
     }
     
+    /// Check if a place is in ANY of the user's lists (database function)
+    /// Used for bookmark icon state in place detail view
+    func isPlaceInAnyUserList(userId: String, placeId: String) async throws -> Bool {
+        struct BoolResult: Decodable {
+            let is_place_in_user_lists: Bool
+        }
+        
+        do {
+            let result: Bool = try await supabase.client
+                .rpc("is_place_in_user_lists", params: [
+                    "p_user_id": userId,
+                    "p_place_id": placeId
+                ])
+                .execute()
+                .value
+            
+            return result
+        } catch {
+            print("❌ [PlaceListService] Error checking if place is in any user list: \(error)")
+            throw error
+        }
+    }
+    
     // MARK: - Create Place List
     
     /// Create a new place list for a user
