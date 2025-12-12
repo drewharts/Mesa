@@ -12,10 +12,6 @@ struct ProfileContentView: View {
     @EnvironmentObject var profile: ProfileViewModel
     @ObservedObject var photoImportVM: PhotoImportViewModel
     
-    @State private var showDeleteAccountConfirmation = false
-    @State private var isDeletingAccount = false
-    @State private var deleteAccountError: String?
-    
     var body: some View {
         ZStack {
             ScrollView {
@@ -144,102 +140,10 @@ struct ProfileContentView: View {
                         .shadow(radius: 10)
                     }
 
-                    // Logout Button
-                    Button(action: {
-                        profile.logout()
-                    }) {
-                        Text("Log Out")
-                            .fontWeight(.semibold)
-                            .foregroundColor(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(Color.red)
-                            .cornerRadius(8)
-                    }
-                    .padding(.horizontal, 40)
-                    
-                    // Delete Account Button
-                    Button(action: {
-                        showDeleteAccountConfirmation = true
-                    }) {
-                        Text("Delete Account")
-                            .fontWeight(.semibold)
-                            .foregroundColor(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(Color.black)
-                            .cornerRadius(8)
-                    }
-                    .padding(.horizontal, 40)
-                    .padding(.top, 10)
+                    // Account actions (logout/delete) moved to toolbar AccountMenuView
                 }
                 .padding(.top, 20)
                 .padding(.bottom, 40)
-            }
-        }
-        .alert("Delete Account", isPresented: $showDeleteAccountConfirmation) {
-            Button("Cancel", role: .cancel) {
-                showDeleteAccountConfirmation = false
-                deleteAccountError = nil
-            }
-            Button("Delete", role: .destructive) {
-                deleteAccount()
-            }
-        } message: {
-            Text("Are you sure you want to delete your account? This action cannot be undone and will permanently remove all your data, including places, reviews, lists, and followers.")
-        }
-        .alert("Error", isPresented: .constant(deleteAccountError != nil)) {
-            Button("OK") {
-                deleteAccountError = nil
-            }
-        } message: {
-            if let error = deleteAccountError {
-                Text(error)
-            }
-        }
-        .overlay(
-            // Loading overlay
-            Group {
-                if isDeletingAccount {
-                    ZStack {
-                        Color.black.opacity(0.3)
-                            .ignoresSafeArea()
-                        
-                        VStack(spacing: 16) {
-                            ProgressView()
-                                .scaleEffect(1.5)
-                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                            
-                            Text("Deleting Account...")
-                                .font(.headline)
-                                .foregroundColor(.white)
-                            
-                            Text("This may take a few moments")
-                                .font(.subheadline)
-                                .foregroundColor(.white.opacity(0.8))
-                        }
-                        .padding(30)
-                        .background(Color.black.opacity(0.8))
-                        .cornerRadius(15)
-                    }
-                }
-            }
-        )
-    }
-    
-    private func deleteAccount() {
-        isDeletingAccount = true
-        deleteAccountError = nil
-        
-        profile.deleteAccount { success, errorMessage in
-            isDeletingAccount = false
-            
-            if success {
-                // Account deletion successful - user will be logged out automatically
-                showDeleteAccountConfirmation = false
-            } else {
-                // Show error message
-                deleteAccountError = errorMessage ?? "Failed to delete account. Please try again."
             }
         }
     }
