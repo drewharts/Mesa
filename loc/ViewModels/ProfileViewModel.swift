@@ -138,6 +138,12 @@ class ProfileViewModel: ObservableObject {
     @Published var noPlacesFoundTikTokUrl: String = ""
     private var currentProcessingTikTokUrl: String? = nil // Store URL during processing
     
+    // MARK: - Account Management State
+    @Published var showDeleteAccountWarning: Bool = false      // First warning
+    @Published var showDeleteAccountConfirmation: Bool = false // Final confirmation
+    @Published var isDeletingAccount: Bool = false
+    @Published var deleteAccountError: String?
+    
     // Lazy loading state for lists
     @Published var loadedListIds: Set<UUID> = []
     @Published var loadingListIds: Set<UUID> = []
@@ -2931,6 +2937,48 @@ class ProfileViewModel: ObservableObject {
     }
     
     // MARK: - Account Deletion
+    
+    /// Show initial delete account warning (Step 1 of 2)
+    func showDeleteWarning() {
+        showDeleteAccountWarning = true
+    }
+    
+    /// Proceed to final confirmation (Step 2 of 2)
+    func proceedToFinalConfirmation() {
+        showDeleteAccountWarning = false
+        showDeleteAccountConfirmation = true
+    }
+    
+    /// Cancel delete account flow
+    func cancelDeleteAccount() {
+        showDeleteAccountWarning = false
+        showDeleteAccountConfirmation = false
+        deleteAccountError = nil
+    }
+    
+    /// Initiate account deletion with UI state management
+    /// Staff Engineer: Single entry point for delete account execution
+    func initiateAccountDeletion() {
+        isDeletingAccount = true
+        deleteAccountError = nil
+        
+        deleteAccount { [weak self] success, errorMessage in
+            guard let self = self else { return }
+            
+            self.isDeletingAccount = false
+            
+            if success {
+                self.showDeleteAccountConfirmation = false
+            } else {
+                self.deleteAccountError = errorMessage ?? "Failed to delete account. Please try again."
+            }
+        }
+    }
+    
+    /// Clear delete account error state
+    func clearDeleteAccountError() {
+        deleteAccountError = nil
+    }
     
     /// Delete user account and all associated data
     func deleteAccount(completion: @escaping (Bool, String?) -> Void) {

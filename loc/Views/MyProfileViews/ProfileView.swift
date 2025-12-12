@@ -85,6 +85,13 @@ struct ProfileView: View {
                     .environmentObject(placeVM)
                     .presentationDragIndicator(.visible)
             }
+            // Staff Engineer: Reactive logout - dismiss fullScreenCover when user logs out
+            .onChange(of: userSession.isUserLoggedIn) { _, isLoggedIn in
+                if !isLoggedIn {
+                    presentationMode.wrappedValue.dismiss()
+                }
+            }
+            .modifier(AccountManagementModifier(profile: profile))
     }
     
     private var mainContent: some View {
@@ -183,33 +190,46 @@ struct ToolbarModifier: ViewModifier {
         content
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button(action: {
-                        presentationMode.dismiss()
-                    }) {
-                        HStack {
-                            Image(systemName: "chevron.left")
-                                .foregroundColor(.black)
-                            Text("Back")
-                                .foregroundColor(.black)
-                        }
-                    }
+                    backButton
                 }
             }
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    PhotosPicker(
-                        selection: $photoImportVM.selectedItems,
-                        maxSelectionCount: 10,
-                        matching: .images,
-                        photoLibrary: .shared()
-                    ) {
-                        Image(systemName: "photo.badge.plus")
-                            .foregroundColor(.black)
-                            .font(.body)
-                    }
-                    .padding(.trailing, 10)
+                    trailingToolbarItems
                 }
             }
+    }
+    
+    // MARK: - Toolbar Components
+    
+    private var backButton: some View {
+        Button(action: {
+            presentationMode.dismiss()
+        }) {
+            HStack {
+                Image(systemName: "chevron.left")
+                    .foregroundColor(.black)
+                Text("Back")
+                    .foregroundColor(.black)
+            }
+        }
+    }
+    
+    private var trailingToolbarItems: some View {
+        HStack(spacing: 16) {
+            PhotosPicker(
+                selection: $photoImportVM.selectedItems,
+                maxSelectionCount: 10,
+                matching: .images,
+                photoLibrary: .shared()
+            ) {
+                Image(systemName: "photo.badge.plus")
+                    .foregroundColor(.black)
+                    .font(.body)
+            }
+            
+            AccountMenuView()
+        }
     }
 }
 
@@ -399,6 +419,87 @@ struct StateChangesModifier: ViewModifier {
                 selectedPlaceVM: selectedPlaceVM,
                 placeVM: placeVM
             )
+        }
+    }
+}
+
+// MARK: - Account Management Modifier
+/// Single Responsibility: Handles delete account two-step confirmation and loading state UI
+struct AccountManagementModifier: ViewModifier {
+    @ObservedObject var profile: ProfileViewModel
+    
+    func body(content: Content) -> some View {
+        content
+            // Step 1: Initial Warning
+            .alert("Delete Account?", isPresented: $profile.showDeleteAccountWarning) {
+                Button("Cancel", role: .cancel) {
+                    profile.cancelDeleteAccount()
+                }
+                Button("Continue", role: .destructive) {
+                    profile.proceedToFinalConfirmation()
+                }
+            } message: {
+                Text("This will permanently delete your account and all your data including:\n\n• All saved places\n• Your reviews and photos\n• Your lists\n• Followers and following\n\nThis action cannot be undone.")
+            }
+            // Step 2: Final Confirmation
+            .alert("⚠️ Final Warning", isPresented: $profile.showDeleteAccountConfirmation) {
+                Button("Cancel", role: .cancel) {
+                    profile.cancelDeleteAccount()
+                }
+                Button("Delete Forever", role: .destructive) {
+                    profile.initiateAccountDeletion()
+                }
+            } message: {
+                Text("Are you absolutely sure? Your account and all data will be permanently deleted. This cannot be recovered.")
+            }
+            // Error Alert
+            .alert("Error", isPresented: deleteAccountErrorBinding) {
+                Button("OK") {
+                    profile.clearDeleteAccountError()
+                }
+            } message: {
+                if let error = profile.deleteAccountError {
+                    Text(error)
+                }
+            }
+            .overlay(deletingAccountOverlay)
+    }
+    
+    // MARK: - Computed Properties
+    
+    private var deleteAccountErrorBinding: Binding<Bool> {
+        Binding(
+            get: { profile.deleteAccountError != nil },
+            set: { if !$0 { profile.clearDeleteAccountError() } }
+        )
+    }
+    
+    // MARK: - Overlay Views
+    
+    @ViewBuilder
+    private var deletingAccountOverlay: some View {
+        if profile.isDeletingAccount {
+            ZStack {
+                Color.black.opacity(0.3)
+                    .ignoresSafeArea()
+                
+                VStack(spacing: 16) {
+                    ProgressView()
+                        .scaleEffect(1.5)
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                    
+                    Text("Deleting Account...")
+                        .font(.headline)
+                        .foregroundColor(.white)
+                    
+                    Text("This may take a few moments")
+                        .font(.subheadline)
+                        .foregroundColor(.white.opacity(0.8))
+                }
+                .padding(30)
+                .background(Color.black.opacity(0.8))
+                .cornerRadius(15)
+            }
         }
     }
 }
