@@ -213,8 +213,8 @@ class SelectedPlaceViewModel: ObservableObject {
     // MARK: - Private Methods
     private func loadData(for place: DetailPlace, currentLocation: CLLocationCoordinate2D) {
         
-        // Compute whether the restaurant is open now
-        let openNow = isRestaurantOpenNow(place)
+        // Compute whether the restaurant is open now using OpenStatusService
+        let openNow = OpenStatusService.isOpen(place)
         
         // Calculate and store restaurant type
         calculateAndStoreRestaurantType(for: place)
@@ -334,50 +334,6 @@ class SelectedPlaceViewModel: ObservableObject {
                     self.handleSelectedPlaceChange()
                 }
             }
-        }
-    }
-    
-    
-    func isRestaurantOpenNow(_ place: DetailPlace) -> Bool {
-        guard let openHours = place.openHours, !openHours.isEmpty else { return false }
-        
-        let now = Date()
-        let calendar = Calendar.current
-        let currentWeekday = calendar.component(.weekday, from: now) // Sunday=1, ..., Saturday=7
-        let currentHour = calendar.component(.hour, from: now)
-        let currentMinute = calendar.component(.minute, from: now)
-        let currentMinutesSinceWeekStart = ((currentWeekday - 1) * 24 * 60) + (currentHour * 60) + currentMinute
-
-        switch openHours[0] {
-        case "always_opened":
-            return true
-        case "temporarily_closed", "permanently_closed":
-            return false
-        default:
-            for periodString in openHours {
-                if !periodString.contains("-") || periodString.hasPrefix("note:") { continue }
-                
-                let components = periodString.split(separator: "-")
-                guard components.count == 2 else { continue }
-                
-                let openParts = components[0].split(separator: ":")
-                let closeParts = components[1].split(separator: ":")
-                guard openParts.count == 3, closeParts.count == 3,
-                      let openDay = Int(openParts[0]), let openHour = Int(openParts[1]), let openMinute = Int(openParts[2]),
-                      let closeDay = Int(closeParts[0]), let closeHour = Int(closeParts[1]), let closeMinute = Int(closeParts[2]) else {
-                    continue
-                }
-                
-                // No adjustment needed since OpenPeriod already uses Sunday=1, ..., Saturday=7
-                let openMinutes = ((openDay - 1) * 24 * 60) + (openHour * 60) + openMinute
-                var closeMinutes = ((closeDay - 1) * 24 * 60) + (closeHour * 60) + closeMinute
-                
-                if closeMinutes <= openMinutes { closeMinutes += 7 * 24 * 60 } // Handle overnight periods
-                if currentMinutesSinceWeekStart >= openMinutes && currentMinutesSinceWeekStart <= closeMinutes {
-                    return true
-                }
-            }
-            return false
         }
     }
     

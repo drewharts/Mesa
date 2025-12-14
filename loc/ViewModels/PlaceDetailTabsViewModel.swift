@@ -39,6 +39,7 @@ class PlaceDetailTabsViewModel: ObservableObject {
     let notesTabViewModel: NotesTabViewModel
     let reviewsViewModel: PlaceReviewsViewModel
     let travelTimeViewModel: TravelTimeViewModel
+    let openStatusViewModel: OpenStatusViewModel
     var placeSaversViewModel: PlaceSaversViewModel
     
     // MARK: - Published Properties (What the View Needs)
@@ -122,6 +123,10 @@ class PlaceDetailTabsViewModel: ObservableObject {
         )
         
         self.travelTimeViewModel = TravelTimeViewModel(
+            selectedPlaceVM: selectedPlaceVM
+        )
+        
+        self.openStatusViewModel = OpenStatusViewModel(
             selectedPlaceVM: selectedPlaceVM
         )
         

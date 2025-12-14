@@ -65,7 +65,7 @@ struct PlaceDetailTabsView: View {
                 }
                 .padding(.bottom, 3)
                 
-                // MARK: - Row: Type / Created By / Google Maps / Drive Time / Saved By
+                // MARK: - Row: Type / Open Status / Google Maps / Drive Time / Saved By
                 HStack(spacing: 10) {
                     // Show "Created by [photo]" for custom places, otherwise show type
                     if viewModel.isCustomPlace {
@@ -81,6 +81,9 @@ struct PlaceDetailTabsView: View {
                             .font(.subheadline)
                             .foregroundColor(.gray)
                     }
+                    
+                    // Open/Closed Status Badge
+                    OpenStatusBadgeView(status: viewModel.openStatusViewModel.status)
                     
                     Button(action: {
                         viewModel.openGoogleMaps()
