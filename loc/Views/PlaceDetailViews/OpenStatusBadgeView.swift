@@ -14,19 +14,32 @@ struct OpenStatusBadgeView: View {
     // MARK: - Properties
     
     let status: OpenStatus
+    var onTap: (() -> Void)? = nil
     
     // MARK: - Body
     
     var body: some View {
         if status.shouldDisplay {
-            Text(status.displayText)
-                .font(.caption)
-                .fontWeight(.medium)
-                .foregroundColor(textColor)
+            Button(action: { onTap?() }) {
+                HStack(spacing: 4) {
+                    Text(status.displayText)
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundColor(textColor)
+                    
+                    // Show chevron if tappable
+                    if onTap != nil {
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 8, weight: .semibold))
+                            .foregroundColor(textColor.opacity(0.8))
+                    }
+                }
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
                 .background(backgroundColor)
                 .cornerRadius(6)
+            }
+            .buttonStyle(.plain)
         }
     }
     

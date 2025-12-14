@@ -32,6 +32,7 @@ struct PlaceDetailTabsView: View {
     // MARK: - View-Owned Presentation State (Enterprise Pattern)
     // Sheet presentation is a UI concern, owned by View not ViewModel
     @State private var showingSaversSheet = false
+    @State private var showingHoursSheet = false
     @State private var travelSelectorState: TravelTimeSelectorState?
     
     var body: some View {
@@ -82,8 +83,10 @@ struct PlaceDetailTabsView: View {
                             .foregroundColor(.gray)
                     }
                     
-                    // Open/Closed Status Badge
-                    OpenStatusBadgeView(status: viewModel.openStatus)
+                    // Open/Closed Status Badge - tappable to show hours
+                    OpenStatusBadgeView(status: viewModel.openStatus) {
+                        showingHoursSheet = true
+                    }
                     
                     Button(action: {
                         viewModel.openGoogleMaps()
@@ -239,6 +242,16 @@ struct PlaceDetailTabsView: View {
             )
             .environmentObject(profile)
             .presentationDetents(saversSheetDetents)
+            .presentationDragIndicator(.visible)
+        }
+        // Hours Sheet - shows full opening hours when status badge is tapped
+        .sheet(isPresented: $showingHoursSheet) {
+            PlaceHoursSheetView(
+                placeName: viewModel.placeName,
+                openHours: viewModel.currentPlace?.openHours,
+                currentStatus: viewModel.openStatus
+            )
+            .presentationDetents([.medium])
             .presentationDragIndicator(.visible)
         }
         // Travel Time Selector - capture state from child via PreferenceKey
