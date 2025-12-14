@@ -57,6 +57,9 @@ class PlaceDetailTabsViewModel: ObservableObject {
     @Published var showSaversIndicator: Bool = false
     @Published var saverCount: Int = 0
     
+    // Forwarded from OpenStatusViewModel (enables view re-render when status changes)
+    @Published var openStatus: OpenStatus = .unknown
+    
     // MARK: - Place Actions State
     /// Whether the current place is saved in any of the user's lists
     @Published var isPlaceInList: Bool = false
@@ -183,6 +186,14 @@ class PlaceDetailTabsViewModel: ObservableObject {
             .sink { [weak self] count in
                 self?.saverCount = count
                 self?.showSaversIndicator = count > 0
+            }
+            .store(in: &cancellables)
+        
+        // Forward OpenStatusViewModel state to trigger view updates
+        // This is necessary because child VM changes don't automatically trigger parent view re-render
+        openStatusViewModel.$status
+            .sink { [weak self] status in
+                self?.openStatus = status
             }
             .store(in: &cancellables)
         

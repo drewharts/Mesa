@@ -83,7 +83,7 @@ struct PlaceDetailTabsView: View {
                     }
                     
                     // Open/Closed Status Badge
-                    OpenStatusBadgeView(status: viewModel.openStatusViewModel.status)
+                    OpenStatusBadgeView(status: viewModel.openStatus)
                     
                     Button(action: {
                         viewModel.openGoogleMaps()
