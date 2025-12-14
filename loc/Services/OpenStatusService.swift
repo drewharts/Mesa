@@ -142,6 +142,16 @@ struct OpenStatusService {
         let currentMinute = calendar.component(.minute, from: now)
         let currentTimeMinutes = currentHour * 60 + currentMinute
         
+        // First, check if we're in the overnight period from YESTERDAY
+        // (e.g., it's 12:30 AM and yesterday's hours were "9 AM–1 AM")
+        if let overnightStatus = checkOvernightFromYesterday(
+            currentWeekday: currentWeekday,
+            currentTimeMinutes: currentTimeMinutes,
+            openHours: openHours
+        ) {
+            return overnightStatus
+        }
+        
         // Find today's hours
         guard let todayHours = findHoursForDay(weekday: currentWeekday, in: openHours) else {
             return .unknown
@@ -149,30 +159,26 @@ struct OpenStatusService {
         
         // Check if closed today
         if todayHours.lowercased() == "closed" {
-            // Check if opening tomorrow
-            let tomorrowWeekday = (currentWeekday % 7) + 1
-            if let tomorrowHours = findHoursForDay(weekday: tomorrowWeekday, in: openHours),
-               tomorrowHours.lowercased() != "closed" {
-                if let (openTime, _) = parseTimeRange(tomorrowHours) {
-                    let minutesUntilMidnight = (24 * 60) - currentTimeMinutes
-                    let totalMinutesUntilOpen = minutesUntilMidnight + openTime
-                    if totalMinutesUntilOpen <= openingSoonThresholdMinutes {
-                        return .openingSoon(minutesRemaining: totalMinutesUntilOpen)
-                    }
-                }
-            }
-            return .closed
+            return checkOpeningSoon(
+                currentWeekday: currentWeekday,
+                currentTimeMinutes: currentTimeMinutes,
+                openHours: openHours
+            )
         }
         
         // Parse today's time range
-        guard let (openTime, closeTime) = parseTimeRange(todayHours) else {
+        guard let (openTime, rawCloseTime) = parseTimeRange(todayHours) else {
             // If we can't parse but it's not "Closed", assume open
             return .open
         }
         
+        // Handle overnight hours (e.g., "9 AM–12 AM" or "9 AM–1 AM")
+        // If close time is less than or equal to open time, it means closing is after midnight
+        let closeTime = rawCloseTime <= openTime ? rawCloseTime + (24 * 60) : rawCloseTime
+        
         // Check current status
         if currentTimeMinutes < openTime {
-            // Before opening
+            // Before opening - check if opening soon
             let minutesUntilOpen = openTime - currentTimeMinutes
             if minutesUntilOpen <= openingSoonThresholdMinutes {
                 return .openingSoon(minutesRemaining: minutesUntilOpen)
@@ -189,6 +195,62 @@ struct OpenStatusService {
             // After closing
             return .closed
         }
+    }
+    
+    /// Checks if we're currently in an overnight period that started yesterday
+    /// e.g., It's 12:30 AM and yesterday was open "9 AM–1 AM"
+    private static func checkOvernightFromYesterday(
+        currentWeekday: Int,
+        currentTimeMinutes: Int,
+        openHours: [String]
+    ) -> OpenStatus? {
+        // Only relevant in early morning hours (before ~6 AM typically)
+        guard currentTimeMinutes < 6 * 60 else { return nil }
+        
+        // Get yesterday's weekday (Sunday=1, so Saturday=7)
+        let yesterdayWeekday = currentWeekday == 1 ? 7 : currentWeekday - 1
+        
+        guard let yesterdayHours = findHoursForDay(weekday: yesterdayWeekday, in: openHours),
+              yesterdayHours.lowercased() != "closed",
+              let (openTime, rawCloseTime) = parseTimeRange(yesterdayHours) else {
+            return nil
+        }
+        
+        // Check if yesterday had overnight hours
+        let isOvernight = rawCloseTime <= openTime
+        guard isOvernight else { return nil }
+        
+        // Yesterday's close time extends into today
+        // If current time is before that close time, we're still open
+        if currentTimeMinutes < rawCloseTime {
+            let minutesUntilClose = rawCloseTime - currentTimeMinutes
+            if minutesUntilClose <= closingSoonThresholdMinutes {
+                return .closingSoon(minutesRemaining: minutesUntilClose)
+            }
+            return .open
+        }
+        
+        return nil
+    }
+    
+    /// Checks if the place is opening soon (for when today is closed)
+    private static func checkOpeningSoon(
+        currentWeekday: Int,
+        currentTimeMinutes: Int,
+        openHours: [String]
+    ) -> OpenStatus {
+        let tomorrowWeekday = (currentWeekday % 7) + 1
+        if let tomorrowHours = findHoursForDay(weekday: tomorrowWeekday, in: openHours),
+           tomorrowHours.lowercased() != "closed" {
+            if let (openTime, _) = parseTimeRange(tomorrowHours) {
+                let minutesUntilMidnight = (24 * 60) - currentTimeMinutes
+                let totalMinutesUntilOpen = minutesUntilMidnight + openTime
+                if totalMinutesUntilOpen <= openingSoonThresholdMinutes {
+                    return .openingSoon(minutesRemaining: totalMinutesUntilOpen)
+                }
+            }
+        }
+        return .closed
     }
     
     /// Finds hours string for a given weekday from the openHours array
