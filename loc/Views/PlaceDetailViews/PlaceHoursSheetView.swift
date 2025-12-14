@@ -166,29 +166,91 @@ struct DayHours: Identifiable {
 struct HoursFormatter {
     
     private static let dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
-    private static let shortDayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+    
+    private static let dayNameToIndex: [String: Int] = [
+        "sunday": 0, "monday": 1, "tuesday": 2, "wednesday": 3,
+        "thursday": 4, "friday": 5, "saturday": 6
+    ]
     
     /// Formats raw openHours data into display-friendly format
     static func formatHours(_ openHours: [String]) -> [DayHours] {
         guard let first = openHours.first else { return [] }
         
         // Handle special status strings
-        switch first {
-        case "always_opened":
+        switch first.lowercased() {
+        case "always_opened", "open 24 hours":
             return createAllDaysHours(hours: "Open 24 hours")
         case "temporarily_closed":
             return createAllDaysHours(hours: "Temporarily Closed", isClosed: true)
         case "permanently_closed":
             return createAllDaysHours(hours: "Permanently Closed", isClosed: true)
         default:
+            break
+        }
+        
+        // Detect format: human-readable ("Monday: 12–9 PM") vs period ("1:9:0-1:21:0")
+        if isHumanReadableFormat(first) {
+            return parseHumanReadableHours(openHours)
+        } else {
             return parsePeriodsToHours(openHours)
         }
     }
     
+    /// Detects if hours are in human-readable format like "Monday: 12–9 PM"
+    private static func isHumanReadableFormat(_ entry: String) -> Bool {
+        let lowercased = entry.lowercased()
+        for dayName in dayNameToIndex.keys {
+            if lowercased.hasPrefix(dayName) {
+                return true
+            }
+        }
+        return false
+    }
+    
+    // MARK: - Human-Readable Format Parsing
+    
+    private static func parseHumanReadableHours(_ openHours: [String]) -> [DayHours] {
+        // Build a dictionary of day -> hours
+        var dayHoursMap: [Int: String] = [:]
+        
+        for entry in openHours {
+            let lowercased = entry.lowercased()
+            
+            for (dayName, dayIndex) in dayNameToIndex {
+                if lowercased.hasPrefix(dayName) {
+                    // Extract hours part after "Day: "
+                    if let colonIndex = entry.firstIndex(of: ":") {
+                        let hoursStart = entry.index(after: colonIndex)
+                        let hoursString = String(entry[hoursStart...]).trimmingCharacters(in: .whitespaces)
+                        dayHoursMap[dayIndex] = hoursString
+                    }
+                    break
+                }
+            }
+        }
+        
+        let today = getCurrentDayIndex()
+        
+        // Create DayHours for each day, starting from today
+        return (0..<7).map { offset in
+            let dayIndex = (today + offset) % 7
+            let hoursString = dayHoursMap[dayIndex] ?? "Hours not available"
+            let isClosed = hoursString.lowercased() == "closed"
+            
+            return DayHours(
+                day: dayNames[dayIndex],
+                hours: hoursString,
+                isToday: offset == 0,
+                isClosed: isClosed
+            )
+        }
+    }
+    
+    // MARK: - Period Format Parsing (Legacy)
+    
     private static func createAllDaysHours(hours: String, isClosed: Bool = false) -> [DayHours] {
         let today = getCurrentDayIndex()
         return (0..<7).map { index in
-            // Reorder to start from today's day of week
             let dayIndex = (index + today) % 7
             return DayHours(
                 day: dayNames[dayIndex],
@@ -200,7 +262,6 @@ struct HoursFormatter {
     }
     
     private static func parsePeriodsToHours(_ openHours: [String]) -> [DayHours] {
-        // Group periods by day
         var dayPeriods: [Int: [(open: String, close: String)]] = [:]
         
         for periodString in openHours {
@@ -234,7 +295,6 @@ struct HoursFormatter {
         
         let today = getCurrentDayIndex()
         
-        // Create DayHours for each day, starting from today
         return (0..<7).map { offset in
             let dayIndex = (today + offset) % 7
             let periods = dayPeriods[dayIndex] ?? []
