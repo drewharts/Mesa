@@ -57,7 +57,7 @@ class UserProfileViewModel: ObservableObject {
     
     private let placeService: PlaceService
     private let userService: UserService
-    private let reviewService: ReviewService
+    private let postService: PostService
     
     private let dataManager: DataManager
     private let detailPlaceViewModel: DetailPlaceViewModel
@@ -67,13 +67,13 @@ class UserProfileViewModel: ObservableObject {
         detailPlaceViewModel: DetailPlaceViewModel,
         placeService: PlaceService,
         userService: UserService,
-        reviewService: ReviewService
+        postService: PostService
     ) {
         self.dataManager = dataManager
         self.detailPlaceViewModel = detailPlaceViewModel
         self.placeService = placeService
         self.userService = userService
-        self.reviewService = reviewService
+        self.postService = postService
     }
     
     func selectUser(_ user: ProfileData, currentUserId: String) {
@@ -574,21 +574,19 @@ class UserProfileViewModel: ObservableObject {
             }
             
             do {
-                let restaurantReviews: [RestaurantReview] = try await reviewService.fetchUserReviews(userId: userId)
-                let genericReviews: [GenericReview] = try await reviewService.fetchUserGenericReviews(userId: userId)
-                let allReviews: [ReviewProtocol] = restaurantReviews + genericReviews
+                let allPosts = try await postService.fetchUserPosts(userId: userId)
                 
-                // Sort reviews by timestamp (most recent first) and get unique place IDs while preserving order
-                let sortedReviews = allReviews.sorted { $0.timestamp > $1.timestamp }
+                // Sort posts by timestamp (most recent first) and get unique place IDs while preserving order
+                let sortedPosts = allPosts.sorted { $0.timestamp > $1.timestamp }
 
-                // Get unique place IDs while preserving the order of most recently reviewed places
+                // Get unique place IDs while preserving the order of most recently posted places
                 var seenPlaceIds = Set<String>()
-                let uniquePlaceIds: [String] = sortedReviews.compactMap { review in
-                    if seenPlaceIds.contains(review.placeId) {
+                let uniquePlaceIds: [String] = sortedPosts.compactMap { post in
+                    if seenPlaceIds.contains(post.placeId) {
                         return nil
                     }
-                    seenPlaceIds.insert(review.placeId)
-                    return review.placeId
+                    seenPlaceIds.insert(post.placeId)
+                    return post.placeId
                 }
 
                 await MainActor.run {
@@ -597,7 +595,7 @@ class UserProfileViewModel: ObservableObject {
                     hasMoreReviews[userId] = !allReviewedPlaceIds[userId]!.isEmpty
                 }
             } catch {
-                print("Error fetching user reviews for pagination: \(error.localizedDescription)")
+                print("Error fetching user posts for pagination: \(error.localizedDescription)")
                 await MainActor.run {
                     isLoadingReviewedPlaces = false
                 }

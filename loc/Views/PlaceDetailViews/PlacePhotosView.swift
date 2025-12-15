@@ -64,14 +64,14 @@ struct PlacePhotosView: View {
     let services = ServiceContainer.shared
     let selectedPlaceVM = SelectedPlaceViewModel(
         locationManager: LocationManager(),
-        reviewService: services.reviewService,
+        postService: services.postService,
         placeService: services.placeService,
         userService: services.userService,
         imageService: services.imageService
     )
     
     let photosViewModel = PlacePhotosViewModel(
-        reviewService: services.reviewService,
+        postService: services.postService,
         selectedPlaceVM: selectedPlaceVM
     )
     

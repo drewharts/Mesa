@@ -206,24 +206,24 @@ class DetailPlaceViewModel: ObservableObject {
     
     private func fetchPlaceImageWithUserId(placeId: String, currentUserId: String) {
         
-        // Fetch ALL reviews for this place (not just friends' reviews) to get images for tiles
+        // Fetch ALL posts for this place (not just friends' posts) to get images for tiles
         Task {
             do {
-                let (reviews, _) = try await ReviewService.shared.fetchPlaceReviews(placeId: placeId, latestOnly: false)
+                let (posts, _) = try await PostService.shared.fetchPosts(placeId: placeId, latestOnly: false)
                 
-                // Find reviews with images
-                let reviewsWithImages = reviews.filter { !$0.images.isEmpty }
+                // Find posts with images
+                let postsWithImages = posts.filter { !$0.images.isEmpty }
                 
-                // Get the most recent review with images
-                guard let mostRecentReview = reviewsWithImages.first else {
+                // Get the most recent post with images
+                guard let mostRecentPost = postsWithImages.first else {
                     await MainActor.run {
                         self.tryTikTokThumbnailAsCover(placeId: placeId)
                     }
                     return
                 }
                 
-                // Only get the first image from the most recent review (most efficient)
-                guard let firstImageUrl = mostRecentReview.images.first else {
+                // Only get the first image from the most recent post (most efficient)
+                guard let firstImageUrl = mostRecentPost.images.first else {
                     await MainActor.run {
                         self.tryTikTokThumbnailAsCover(placeId: placeId)
                     }
@@ -231,7 +231,7 @@ class DetailPlaceViewModel: ObservableObject {
                 }
                 
                 
-                // Load only the first image from the most recent review
+                // Load only the first image from the most recent post
                 ImageService.shared.fetchPhotosFromStorage(urls: [firstImageUrl]) { [weak self] images, error in
                     guard let self = self else { return }
                     
@@ -250,7 +250,7 @@ class DetailPlaceViewModel: ObservableObject {
                     }
                 }
             } catch {
-                print("❌ [DetailPlaceViewModel] Error fetching reviews for place \(placeId): \(error.localizedDescription)")
+                print("❌ [DetailPlaceViewModel] Error fetching posts for place \(placeId): \(error.localizedDescription)")
                 await MainActor.run {
                     self.tryTikTokThumbnailAsCover(placeId: placeId)
                 }

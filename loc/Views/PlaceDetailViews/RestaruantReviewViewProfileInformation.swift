@@ -1,7 +1,7 @@
 import SwiftUI
 
-struct RestaruantReviewViewProfileInformation: View {
-    let review: ReviewProtocol
+struct PostProfileInformationView: View {
+    let post: PlacePost
     @ObservedObject var photosViewModel: PlacePhotosViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var profile: ProfileViewModel
@@ -10,27 +10,24 @@ struct RestaruantReviewViewProfileInformation: View {
     @State private var shouldNavigateToProfile = false
 
     var body: some View {
-        HStack(alignment: .center, spacing: 16) { // Increased spacing between photo and text
+        HStack(alignment: .center, spacing: 16) {
             // Profile Photo from Cache
-            if let profilePhoto = photosViewModel.profilePhoto(forUserId: review.userId) {
+            if let profilePhoto = photosViewModel.profilePhoto(forUserId: post.userId) {
                 Image(uiImage: profilePhoto)
                     .resizable()
                     .scaledToFill()
                     .frame(width: 50, height: 50)
                     .clipShape(Circle())
                     .onTapGesture {
-                        // Check if this is the logged-in user's profile
                         guard let currentUserId = userSession.currentUserId else { return }
                         
-                        if review.userId == currentUserId {
-                            // Show the user's own profile page directly
+                        if post.userId == currentUserId {
                             shouldNavigateToProfile = true
                         } else {
-                            // For other users, fetch and show their profile
-                            userProfileViewModel.fetchAndSelectUser(userId: review.userId, currentUserId: currentUserId)
+                            userProfileViewModel.fetchAndSelectUser(userId: post.userId, currentUserId: currentUserId)
                         }
                     }
-            } else if photosViewModel.profilePhotoLoadingState(forUserId: review.userId) == .loading {
+            } else if photosViewModel.profilePhotoLoadingState(forUserId: post.userId) == .loading {
                 ProgressView()
                     .frame(width: 50, height: 50)
             } else {
@@ -42,27 +39,27 @@ struct RestaruantReviewViewProfileInformation: View {
             }
 
             VStack(alignment: .leading, spacing: 4) {
-                Text("\(review.userFirstName) \(review.userLastName)")
+                Text("\(post.userFirstName) \(post.userLastName)")
                     .font(.headline)
                     .foregroundColor(.black)
 
-                Text(formattedTimestamp(review.timestamp))
+                Text(formattedTimestamp(post.timestamp))
                     .font(.footnote)
                     .foregroundColor(.gray)
                 
-                // Add likes button and count
+                // Likes button and count
                 HStack(spacing: 4) {
                     Button(action: {
                         guard let currentUserId = userSession.currentUserId else { return }
-                        selectedPlaceVM.likeReview(review, userId: currentUserId)
+                        selectedPlaceVM.likePost(post, userId: currentUserId)
                     }) {
-                                            Image(systemName: "heart.fill")
-                        .foregroundColor((userSession.currentUserId != nil && review.userId == userSession.currentUserId) ? .gray : (selectedPlaceVM.isReviewLiked(review.id) ? .red : .gray))
-                        .opacity((userSession.currentUserId != nil && review.userId == userSession.currentUserId) ? 0.3 : 0.7)
-                }
-                .disabled(userSession.currentUserId != nil && review.userId == userSession.currentUserId)
+                        Image(systemName: "heart.fill")
+                            .foregroundColor((userSession.currentUserId != nil && post.userId == userSession.currentUserId) ? .gray : (selectedPlaceVM.isPostLiked(post.id) ? .red : .gray))
+                            .opacity((userSession.currentUserId != nil && post.userId == userSession.currentUserId) ? 0.3 : 0.7)
+                    }
+                    .disabled(userSession.currentUserId != nil && post.userId == userSession.currentUserId)
                     
-                    Text("\(review.likes)")
+                    Text("\(post.likes)")
                         .font(.footnote)
                         .foregroundColor(.gray)
                 }
@@ -76,7 +73,6 @@ struct RestaruantReviewViewProfileInformation: View {
         }
     }
 
-    // Helper function to format timestamp
     private func formattedTimestamp(_ date: Date) -> String {
         let now = Date()
         let calendar = Calendar.current
@@ -94,12 +90,5 @@ struct RestaruantReviewViewProfileInformation: View {
             formatter.timeStyle = .none
             return formatter.string(from: date)
         }
-    }
-
-    private var timestampFormatter: DateFormatter {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .none
-        return formatter
     }
 }

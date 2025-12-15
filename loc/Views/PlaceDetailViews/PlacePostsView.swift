@@ -1,19 +1,17 @@
 //
-//  PlaceReviewsView.swift
+//  PlacePostsView.swift
 //  loc
 //
-//  Refactored to use proper MVVM with PlaceReviewsViewModel
-//  Comments functionality removed for simplification
+//  Main view for displaying place posts feed
 //
 
 import SwiftUI
 
-struct PlaceReviewsView: View {
-    @ObservedObject var viewModel: PlaceReviewsViewModel
+struct PlacePostsView: View {
+    @ObservedObject var viewModel: PlacePostsViewModel
     let onPhotoTapped: ([UIImage], Int) -> Void
-    let onAddReview: () -> Void
+    let onAddPost: () -> Void
     
-    // Still needed for child views (temporary)
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var userProfileViewModel: UserProfileViewModel
 
@@ -21,37 +19,34 @@ struct PlaceReviewsView: View {
         ScrollViewReader { scrollProxy in
             ScrollView {
                 VStack(spacing: 24) {
-                    // MARK: - Action Buttons Row
-                    reviewActionButtons
+                    // Action Buttons Row
+                    postActionButtons
                     
                     switch viewModel.loadingState {
-                        case .loading:
-                            ProgressView()
-                                .padding()
-                                .frame(maxWidth: .infinity)
-                            
-                        case .loaded:
-                        if viewModel.hasReviews {
-                            PlaceReviewsListView(
+                    case .loading:
+                        ProgressView()
+                            .padding()
+                            .frame(maxWidth: .infinity)
+                        
+                    case .loaded:
+                        if viewModel.hasPosts {
+                            PlacePostsListView(
                                 viewModel: viewModel,
                                 onPhotoTapped: onPhotoTapped,
                                 scrollProxy: scrollProxy
                             )
                         } else {
-                            Text(viewModel.emptyStateMessage)
-                                    .font(.subheadline)
-                                    .foregroundColor(.gray)
-                                    .padding(20)
-                            }
-                            
-                        case .error(let error):
-                            Text("Failed to load reviews: \(error.localizedDescription)")
-                                .font(.subheadline)
-                                .foregroundColor(.red)
-                                .padding()
-                            
-                        case .idle:
-                            Text("Reviews not yet loaded")
+                            emptyStateView
+                        }
+                        
+                    case .error(let error):
+                        Text("Failed to load posts: \(error.localizedDescription)")
+                            .font(.subheadline)
+                            .foregroundColor(.red)
+                            .padding()
+                        
+                    case .idle:
+                        Text("Posts not yet loaded")
                             .font(.subheadline)
                             .foregroundColor(.gray)
                             .padding()
@@ -63,9 +58,9 @@ struct PlaceReviewsView: View {
             .background(Color.white)
             .padding(.horizontal, -50)
             .ignoresSafeArea(.all, edges: .all)
-            .onChange(of: viewModel.highlightedReviewId) { _, reviewId in
-                if let reviewId = reviewId {
-                    scrollToReview(reviewId, proxy: scrollProxy)
+            .onChange(of: viewModel.highlightedPostId) { _, postId in
+                if let postId = postId {
+                    scrollToPost(postId, proxy: scrollProxy)
                 }
             }
         }
@@ -74,16 +69,16 @@ struct PlaceReviewsView: View {
         }
     }
     
-    // MARK: - Review Action Buttons
+    // MARK: - Action Buttons
     
-    private var reviewActionButtons: some View {
+    private var postActionButtons: some View {
         HStack(spacing: 10) {
-            // Add Review Button - gray style, compact
-            Button(action: onAddReview) {
+            // Share Post Button
+            Button(action: onAddPost) {
                 HStack(spacing: 4) {
                     Image(systemName: "plus.circle.fill")
                         .font(.caption)
-                    Text("Add Review")
+                    Text("Share Post")
                         .font(.caption)
                         .fontWeight(.medium)
                 }
@@ -94,7 +89,7 @@ struct PlaceReviewsView: View {
                 .cornerRadius(16)
             }
             
-            // Favorite Button - icon only, compact
+            // Favorite Button
             Button(action: viewModel.toggleFavorite) {
                 Image(systemName: viewModel.isFavorited ? "star.fill" : "star")
                     .font(.body)
@@ -110,21 +105,36 @@ struct PlaceReviewsView: View {
         .padding(.top, 8)
     }
     
-    private func scrollToReview(_ reviewId: String, proxy: ScrollViewProxy) {
-        // Wait for reviews to load, then scroll
+    private var emptyStateView: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "bubble.left.and.bubble.right")
+                .font(.largeTitle)
+                .foregroundColor(.gray.opacity(0.5))
+            
+            Text("No posts yet")
+                .font(.headline)
+                .foregroundColor(.gray)
+            
+            Text("Be the first to share your experience!")
+                .font(.subheadline)
+                .foregroundColor(.gray.opacity(0.7))
+        }
+        .padding(40)
+    }
+    
+    private func scrollToPost(_ postId: String, proxy: ScrollViewProxy) {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
             withAnimation(.easeInOut(duration: 0.8)) {
-                proxy.scrollTo(reviewId, anchor: .center)
+                proxy.scrollTo(postId, anchor: .center)
             }
             
-            // Add haptic feedback
             let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
             impactFeedback.impactOccurred()
             
-            // Clear after scrolling
             DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                viewModel.clearHighlightedReview()
+                viewModel.clearHighlightedPost()
             }
         }
     }
 }
+

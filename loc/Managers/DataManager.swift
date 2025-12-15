@@ -15,7 +15,7 @@ class DataManager: ObservableObject {
     // Firestore Services
     private let userService: UserService
     private let placeService: PlaceService
-    private let reviewService: ReviewService
+    private let postService: PostService
     
     private let userSession: UserSession
     private let locationManager: LocationManager
@@ -25,7 +25,7 @@ class DataManager: ObservableObject {
     init(
         userService: UserService,
         placeService: PlaceService,
-        reviewService: ReviewService,
+        postService: PostService,
         userSession: UserSession,
         locationManager: LocationManager,
         profileViewModel: ProfileViewModel,
@@ -33,7 +33,7 @@ class DataManager: ObservableObject {
     ) {
         self.userService = userService
         self.placeService = placeService
-        self.reviewService = reviewService
+        self.postService = postService
         self.userSession = userSession
         self.locationManager = locationManager
         self.profileViewModel = profileViewModel
@@ -1125,30 +1125,27 @@ class DataManager: ObservableObject {
         }
     }
     
-    // Loads all places the user has reviewed, even if not in favorites or lists
+    // Loads all places the user has posted about, even if not in favorites or lists
     func loadUserReviewedPlaces(userId: String) async {
         do {
-            // Fetch all reviews (RestaurantReview and GenericReview) in parallel
-            async let restaurantReviews: [RestaurantReview] = try await reviewService.fetchUserReviews(userId: userId)
-            async let genericReviews: [GenericReview] = try await reviewService.fetchUserGenericReviews(userId: userId)
-            
-            let allReviews: [ReviewProtocol] = (try await restaurantReviews) + (try await genericReviews)
+            // Fetch all posts for the user
+            let allPosts = try await postService.fetchUserPosts(userId: userId)
 
-            // Sort reviews by timestamp (most recent first) and get unique place IDs while preserving order
-            let sortedReviews = allReviews.sorted { $0.timestamp > $1.timestamp }
+            // Sort posts by timestamp (most recent first) and get unique place IDs while preserving order
+            let sortedPosts = allPosts.sorted { $0.timestamp > $1.timestamp }
 
-            // Get unique place IDs while preserving the order of most recently reviewed places
+            // Get unique place IDs while preserving the order of most recently posted places
             var seenPlaceIds = Set<String>()
-            let placeIds: [String] = sortedReviews.compactMap { review in
-                if seenPlaceIds.contains(review.placeId) {
+            let placeIds: [String] = sortedPosts.compactMap { post in
+                if seenPlaceIds.contains(post.placeId) {
                     return nil
                 }
-                seenPlaceIds.insert(review.placeId)
-                return review.placeId
+                seenPlaceIds.insert(post.placeId)
+                return post.placeId
             }
             
-            // Note: Reviewed places are now loaded via server-side pagination
-            // This legacy method is kept for compatibility but reviews are managed by ProfileViewModel
+            // Note: Posted places are now loaded via server-side pagination
+            // This legacy method is kept for compatibility but posts are managed by ProfileViewModel
 
             // Process place details in batches
             let batchSize = 10
@@ -1163,7 +1160,7 @@ class DataManager: ObservableObject {
                 }
             }
         } catch {
-            print("Error loading user reviewed places: \(error.localizedDescription)")
+            print("Error loading user posted places: \(error.localizedDescription)")
         }
     }
     

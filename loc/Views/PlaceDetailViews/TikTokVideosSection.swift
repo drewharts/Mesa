@@ -98,7 +98,7 @@ struct TikTokVideosSection: View {
     
     let selectedPlaceVM = SelectedPlaceViewModel(
         locationManager: locationManager,
-        reviewService: services.reviewService,
+        postService: services.postService,
         placeService: services.placeService,
         userService: services.userService,
         imageService: services.imageService,
@@ -117,7 +117,7 @@ struct TikTokVideosSection: View {
         detailPlaceViewModel: detailPlaceVM,
         imageService: services.imageService,
         placeService: services.placeService,
-        reviewService: services.reviewService,
+        postService: services.postService,
         locationManager: locationManager,
         deepLinkManager: services.deepLinkManager,
         deepLinkViewModel: nil

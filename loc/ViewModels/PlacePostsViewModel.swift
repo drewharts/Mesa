@@ -1,9 +1,8 @@
 //
-//  PlaceReviewsViewModel.swift
+//  PlacePostsViewModel.swift
 //  loc
 //
-//  Created by Cursor on 1/22/25.
-//  Manages place reviews display with proper MVVM separation
+//  ViewModel for displaying place posts feed
 //
 
 import Foundation
@@ -11,20 +10,18 @@ import UIKit
 import Combine
 
 @MainActor
-class PlaceReviewsViewModel: ObservableObject {
+class PlacePostsViewModel: ObservableObject {
     // MARK: - Published State
-    @Published var reviews: [any ReviewProtocol] = []
+    @Published var posts: [PlacePost] = []
     @Published var loadingState: LoadingState = .idle
     @Published var place: DetailPlace?
-    @Published var highlightedReviewId: String?
-    
-    /// Whether the current place is in the user's favorites
+    @Published var highlightedPostId: String?
     @Published var isFavorited: Bool = false
     
     // MARK: - Dependencies
-    private let reviewService: ReviewService
-    private let photosVM: PlacePhotosViewModel  // Direct dependency for photos
-    private let selectedPlaceVM: SelectedPlaceViewModel  // Temporary until fully refactored
+    private let postService: PostService
+    private let photosVM: PlacePhotosViewModel
+    private let selectedPlaceVM: SelectedPlaceViewModel
     private let notificationManager: NotificationManager
     private let userSession: UserSession
     private let profileVM: ProfileViewModel
@@ -40,13 +37,13 @@ class PlaceReviewsViewModel: ObservableObject {
     }
     
     // MARK: - Initialization
-    init(reviewService: ReviewService,
+    init(postService: PostService,
          photosViewModel: PlacePhotosViewModel,
          selectedPlaceVM: SelectedPlaceViewModel,
          notificationManager: NotificationManager,
          userSession: UserSession,
          profileVM: ProfileViewModel) {
-        self.reviewService = reviewService
+        self.postService = postService
         self.photosVM = photosViewModel
         self.selectedPlaceVM = selectedPlaceVM
         self.notificationManager = notificationManager
@@ -58,29 +55,24 @@ class PlaceReviewsViewModel: ObservableObject {
     
     // MARK: - Setup
     private func setupObservers() {
-        // Observe place changes and update reviews
         selectedPlaceVM.$selectedPlace
             .sink { [weak self] place in
                 guard let self = self else { return }
                 self.place = place
-                // Update reviews from computed property
-                self.reviews = self.selectedPlaceVM.reviews
+                self.posts = self.selectedPlaceVM.posts
                 
                 if let placeId = place?.id.uuidString {
-                    self.loadReviews(for: placeId)
+                    self.loadPosts(for: placeId)
                 }
             }
             .store(in: &cancellables)
         
-        // Observe notification highlights
         notificationManager.$highlightedReviewId
-            .sink { [weak self] reviewId in
-                self?.highlightedReviewId = reviewId
+            .sink { [weak self] postId in
+                self?.highlightedPostId = postId
             }
             .store(in: &cancellables)
         
-        // Observe favorite state changes
-        // Combines place changes with favorites changes to recompute favorited state
         Publishers.CombineLatest(
             selectedPlaceVM.$selectedPlace,
             profileVM.$lightweightFavorites
@@ -96,12 +88,12 @@ class PlaceReviewsViewModel: ObservableObject {
     }
     
     // MARK: - Computed Properties
-    var hasReviews: Bool {
-        !reviews.isEmpty
+    var hasPosts: Bool {
+        !posts.isEmpty
     }
     
     var emptyStateMessage: String {
-        "Be the first to write a review!"
+        "Be the first to share your experience!"
     }
     
     var photosViewModel: PlacePhotosViewModel {
@@ -109,12 +101,9 @@ class PlaceReviewsViewModel: ObservableObject {
     }
     
     // MARK: - Actions
-    func loadReviews(for placeId: String) {
-        // Reviews are already loaded via selectedPlaceVM observers
-        // This maintains current functionality during migration
-        let vmLoadingState = selectedPlaceVM.reviewLoadingState(forPlaceId: placeId)
+    func loadPosts(for placeId: String) {
+        let vmLoadingState = selectedPlaceVM.postLoadingState(forPlaceId: placeId)
         
-        // Convert SelectedPlaceVM.LoadingState to PlaceReviewsViewModel.LoadingState
         switch vmLoadingState {
         case .idle:
             loadingState = .idle
@@ -132,7 +121,6 @@ class PlaceReviewsViewModel: ObservableObject {
         selectedPlaceVM.checkLikeStatuses(userId: userId)
     }
     
-    /// Toggles the favorite state for the current place
     func toggleFavorite() {
         guard let place = place else { return }
         if isFavorited {
@@ -142,32 +130,28 @@ class PlaceReviewsViewModel: ObservableObject {
         }
     }
     
-    // MARK: - Photo Management (Direct Access)
-    func getPhotoLoadingState<T: ReviewProtocol>(for review: T) -> PlacePhotosViewModel.LoadingState {
-        photosVM.photoLoadingState(for: review)
+    // MARK: - Photo Management
+    func getPhotoLoadingState(for post: PlacePost) -> PlacePhotosViewModel.LoadingState {
+        photosVM.photoLoadingState(forPostId: post.id)
     }
     
-    func getPhotos<T: ReviewProtocol>(for review: T) -> [UIImage] {
-        photosVM.photos(for: review)
+    func getPhotos(for post: PlacePost) -> [UIImage] {
+        photosVM.photos(forPostId: post.id)
     }
     
-    func loadMorePhotos(for reviewId: String, allImageUrls: [String]) {
-        photosVM.loadMoreReviewPhotos(for: reviewId, allImageUrls: allImageUrls)
+    func loadMorePhotos(for postId: String, allImageUrls: [String]) {
+        photosVM.loadMorePostPhotos(for: postId, allImageUrls: allImageUrls)
     }
     
-    func reloadPhotos<T: ReviewProtocol>(for review: T) {
-        photosVM.reloadReviewPhotos(for: review)
+    func reloadPhotos(for post: PlacePost) {
+        photosVM.reloadPostPhotos(for: post)
     }
     
-    func getProfilePhotoLoadingState(forUserId userId: String) -> PlacePhotosViewModel.LoadingState {
-        photosVM.profilePhotoLoadingState(forUserId: userId)
+    func getPost(by id: String) -> PlacePost? {
+        selectedPlaceVM.getPost(by: id)
     }
     
-    func getReview(by id: String) -> (any ReviewProtocol)? {
-        selectedPlaceVM.getReview(by: id)
-    }
-    
-    func clearHighlightedReview() {
+    func clearHighlightedPost() {
         notificationManager.clearHighlightedReview()
     }
 }
