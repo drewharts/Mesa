@@ -171,19 +171,8 @@ struct PlaceDetailTabsView: View {
     
     private var tabBar: some View {
         HStack(spacing: 12) {
-            tabButton(title: "REVIEWS", tab: DetailTab.reviews)
+            tabButton(title: "FEED", tab: DetailTab.reviews)
             tabButton(title: "NOTES", tab: DetailTab.notes)
-            
-            if viewModel.hasPosts && viewModel.placeRating > 0 {
-                Text(String(format: "%.1f", viewModel.placeRating))
-                    .font(.caption)
-                    .foregroundColor(.black)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 4)
-                    .background(Color.yellow)
-                    .cornerRadius(10)
-            }
-            
             tabButton(title: "ABOUT", tab: DetailTab.about)
         }
         .padding(.bottom, 10)

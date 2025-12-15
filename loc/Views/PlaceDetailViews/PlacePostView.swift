@@ -226,11 +226,20 @@ struct PlacePostView: View {
         let calendar = Calendar.current
         let components = calendar.dateComponents([.minute, .hour, .day], from: date, to: now)
         
-        if let minutes = components.minute, minutes < 60 && (components.hour ?? 0) == 0 && (components.day ?? 0) == 0 {
+        let minutes = components.minute ?? 0
+        let hours = components.hour ?? 0
+        let days = components.day ?? 0
+        
+        // Handle edge cases (future dates or clock skew)
+        if days < 0 || hours < 0 || minutes < 0 {
+            return "Just now"
+        }
+        
+        if days == 0 && hours == 0 && minutes < 60 {
             return minutes == 0 ? "Just now" : "\(minutes)m"
-        } else if let hours = components.hour, hours < 24 && (components.day ?? 0) == 0 {
+        } else if days == 0 && hours < 24 {
             return "\(hours)h"
-        } else if let days = components.day {
+        } else if days > 0 {
             return "\(days)d"
         } else {
             let formatter = DateFormatter()

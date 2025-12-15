@@ -55,6 +55,14 @@ class PlacePostsViewModel: ObservableObject {
     
     // MARK: - Setup
     private func setupObservers() {
+        observePlaceChanges()
+        observePostUpdates()
+        observeHighlightedPost()
+        observeFavoriteStatus()
+    }
+    
+    /// Observes when the selected place changes to load initial posts
+    private func observePlaceChanges() {
         selectedPlaceVM.$selectedPlace
             .sink { [weak self] place in
                 guard let self = self else { return }
@@ -66,13 +74,30 @@ class PlacePostsViewModel: ObservableObject {
                 }
             }
             .store(in: &cancellables)
-        
+    }
+    
+    /// Observes when posts are added, modified, or deleted to refresh the feed
+    private func observePostUpdates() {
+        selectedPlaceVM.$postsUpdateCounter
+            .dropFirst() // Skip initial value to avoid redundant updates on setup
+            .sink { [weak self] _ in
+                guard let self = self else { return }
+                self.posts = self.selectedPlaceVM.posts
+            }
+            .store(in: &cancellables)
+    }
+    
+    /// Observes deep link notifications to highlight specific posts
+    private func observeHighlightedPost() {
         notificationManager.$highlightedReviewId
             .sink { [weak self] postId in
                 self?.highlightedPostId = postId
             }
             .store(in: &cancellables)
-        
+    }
+    
+    /// Observes favorite status changes for the current place
+    private func observeFavoriteStatus() {
         Publishers.CombineLatest(
             selectedPlaceVM.$selectedPlace,
             profileVM.$lightweightFavorites
