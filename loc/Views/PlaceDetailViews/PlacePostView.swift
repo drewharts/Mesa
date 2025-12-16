@@ -33,10 +33,9 @@ struct PlacePostView: View {
             // Post Text (if any)
             if !post.text.isEmpty {
                 Text(post.text)
-                    .font(.body)
+                    .font(.subheadline)
                     .foregroundColor(.primary)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal)
             }
             
             // Photos
@@ -74,7 +73,6 @@ struct PlacePostView: View {
             
             Spacer()
         }
-        .padding(.horizontal)
     }
     
     @ViewBuilder
@@ -152,7 +150,6 @@ struct PlacePostView: View {
                     .padding(.top, 8)
             }
             .frame(height: 150)
-            .padding(.horizontal)
             
         case .loaded:
             if !postPhotos.isEmpty {
@@ -175,7 +172,6 @@ struct PlacePostView: View {
                                 }
                         }
                     }
-                    .padding(.horizontal)
                 }
             }
             

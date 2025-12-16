@@ -17,47 +17,41 @@ struct PlacePostsView: View {
 
     var body: some View {
         ScrollViewReader { scrollProxy in
-            ScrollView {
-                VStack(spacing: 24) {
-                    // Action Buttons Row
-                    postActionButtons
+            VStack(spacing: 24) {
+                // Action Buttons Row
+                postActionButtons
+                
+                switch viewModel.loadingState {
+                case .loading:
+                    ProgressView()
+                        .padding()
+                        .frame(maxWidth: .infinity)
                     
-                    switch viewModel.loadingState {
-                    case .loading:
-                        ProgressView()
-                            .padding()
-                            .frame(maxWidth: .infinity)
-                        
-                    case .loaded:
-                        if viewModel.hasPosts {
-                            PlacePostsListView(
-                                viewModel: viewModel,
-                                onPhotoTapped: onPhotoTapped,
-                                scrollProxy: scrollProxy
-                            )
-                        } else {
-                            emptyStateView
-                        }
-                        
-                    case .error(let error):
-                        Text("Failed to load posts: \(error.localizedDescription)")
-                            .font(.subheadline)
-                            .foregroundColor(.red)
-                            .padding()
-                        
-                    case .idle:
-                        Text("Posts not yet loaded")
-                            .font(.subheadline)
-                            .foregroundColor(.gray)
-                            .padding()
+                case .loaded:
+                    if viewModel.hasPosts {
+                        PlacePostsListView(
+                            viewModel: viewModel,
+                            onPhotoTapped: onPhotoTapped,
+                            scrollProxy: scrollProxy
+                        )
+                    } else {
+                        emptyStateView
                     }
+                    
+                case .error(let error):
+                    Text("Failed to load posts: \(error.localizedDescription)")
+                        .font(.subheadline)
+                        .foregroundColor(.red)
+                        .padding()
+                    
+                case .idle:
+                    Text("Posts not yet loaded")
+                        .font(.subheadline)
+                        .foregroundColor(.gray)
+                        .padding()
                 }
-                .frame(maxWidth: .infinity)
-                .background(Color.white)
             }
-            .background(Color.white)
-            .padding(.horizontal, -50)
-            .ignoresSafeArea(.all, edges: .all)
+            .frame(maxWidth: .infinity)
             .onChange(of: viewModel.highlightedPostId) { _, postId in
                 if let postId = postId {
                     scrollToPost(postId, proxy: scrollProxy)
@@ -101,7 +95,6 @@ struct PlacePostsView: View {
             
             Spacer()
         }
-        .padding(.horizontal, 50)
         .padding(.top, 8)
     }
     

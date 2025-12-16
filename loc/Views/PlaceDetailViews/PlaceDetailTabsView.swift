@@ -44,7 +44,7 @@ struct PlaceDetailTabsView: View {
                 tabBar
                 tabContent
             }
-            .padding(.horizontal, 30)
+            .padding(.horizontal, 24)
         }
         .scrollDisabled(!isScrollingEnabled)
         .navigationBarTitleDisplayMode(.inline)
@@ -100,7 +100,7 @@ struct PlaceDetailTabsView: View {
     // MARK: - Header Row (Extracted for compiler performance)
     
     private var headerRow: some View {
-        HStack(alignment: .top) {
+        HStack(alignment: .center) {
             Button(action: {
                 viewModel.openGoogleMaps()
             }) {
@@ -125,7 +125,6 @@ struct PlaceDetailTabsView: View {
                     .font(.title3)
                     .foregroundColor(.gray)
                     .frame(width: 32, height: 32)
-                    .offset(y: -1)
             }
         }
         .padding(.bottom, 3)

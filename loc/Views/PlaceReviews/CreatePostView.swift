@@ -151,16 +151,18 @@ struct CreatePostView: View {
                                     inputImages.remove(at: index)
                                 }) {
                                     Image(systemName: "xmark.circle.fill")
-                                        .font(.title3)
-                                        .foregroundColor(.white)
-                                        .background(Circle().fill(Color.black.opacity(0.5)))
+                                        .font(.title2)
+                                        .symbolRenderingMode(.palette)
+                                        .foregroundStyle(.white, .black.opacity(0.6))
                                 }
-                                .offset(x: 6, y: -6)
+                                .offset(x: 8, y: -8)
                             }
+                            .padding(.top, 10) // Room for X button above image
+                            .padding(.trailing, 10) // Room for X button on right
                         }
                     }
+                    .padding(.leading, 4)
                 }
-                .frame(height: 110)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

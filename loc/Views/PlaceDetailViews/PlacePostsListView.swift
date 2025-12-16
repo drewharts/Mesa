@@ -28,7 +28,6 @@ struct PlacePostsListView: View {
                 onPhotoTapped: onPhotoTapped
             )
             .id(post.id)
-            .padding(.horizontal)
             .padding(.vertical, 8)
             .background(viewModel.highlightedPostId == post.id ?
                         Color.blue.opacity(0.1) : Color.white)
