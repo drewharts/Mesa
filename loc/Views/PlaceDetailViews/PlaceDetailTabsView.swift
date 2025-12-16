@@ -32,182 +32,19 @@ struct PlaceDetailTabsView: View {
     // MARK: - View-Owned Presentation State (Enterprise Pattern)
     // Sheet presentation is a UI concern, owned by View not ViewModel
     @State private var showingSaversSheet = false
+    @State private var showingHoursSheet = false
     @State private var travelSelectorState: TravelTimeSelectorState?
     
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 5) {
-                // MARK: - Top Row: Title + Share/Save Buttons
-                HStack(alignment: .top) {
-                    Text(viewModel.placeName)
-                        .font(.largeTitle)
-                        .fontWeight(.bold)
-                        .foregroundColor(.black)
-                    
-                    Spacer()
-                    
-                    // Save to List Button - state from ViewModel
-                    Button(action: onAddToList) {
-                        Image(systemName: viewModel.isPlaceInList ? "bookmark.fill" : "bookmark")
-                            .font(.title3)
-                            .foregroundColor(.gray)
-                            .frame(width: 32, height: 32)
-                    }
-                    
-                    // Share Button - delegates to ViewModel
-                    Button(action: viewModel.sharePlace) {
-                        Image(systemName: "square.and.arrow.up")
-                            .font(.title3)
-                            .foregroundColor(.gray)
-                            .frame(width: 32, height: 32)
-                            .offset(y: -1)  // Optical alignment with bookmark
-                    }
-                }
-                .padding(.bottom, 3)
+                headerRow
+                infoRow
                 
-                // MARK: - Row: Type / Created By / Google Maps / Drive Time / Saved By
-                HStack(spacing: 10) {
-                    // Show "Created by [photo]" for custom places, otherwise show type
-                    if viewModel.isCustomPlace {
-                        CustomPlaceCreatorView(
-                            viewModel: viewModel.aboutTabViewModel.customPlaceCreatorViewModel,
-                            onCreatorTapped: { userId in
-                                guard let currentUserId = userSession.currentUserId else { return }
-                                userProfileViewModel.fetchAndSelectUser(userId: userId, currentUserId: currentUserId)
-                            }
-                        )
-                    } else if let restaurantType = viewModel.restaurantType {
-                        Text(restaurantType)
-                            .font(.subheadline)
-                            .foregroundColor(.gray)
-                    }
-                    
-                    Button(action: {
-                        viewModel.openGoogleMaps()
-                    }) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "map.fill")
-                                .font(.subheadline)
-                                .foregroundColor(Color.green.opacity(0.8))
-                            
-                            Text("Maps")
-                                .font(.subheadline)
-                                .foregroundColor(Color.green.opacity(0.8))
-                        }
-                    }
-                    
-                    TravelTimeSelector(viewModel: viewModel.travelTimeViewModel)
-                    
-                    // Saved By indicator - tappable to show sheet
-                    if viewModel.showSaversIndicator {
-                        SavedByIndicator(
-                            savers: viewModel.placeSaversViewModel.saversForDisplay(limit: 3),
-                            additionalCount: viewModel.placeSaversViewModel.additionalSaverCount,
-                            onTap: { showingSaversSheet = true }
-                        )
-                    }
-                }
-                .padding(.bottom, 10)
-                
-                // MARK: - Row: REVIEWS / Rating / ABOUT
-                HStack(spacing: 12) {
-                    Button(action: {
-                        viewModel.selectTab(.reviews)
-                    }) {
-                        Text("REVIEWS")
-                            .font(.subheadline)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.black)
-                            .padding(.bottom, 5)
-                            .overlay(
-                                Group {
-                                    if viewModel.selectedTab == .reviews {
-                                        Rectangle()
-                                            .fill(Color.blue)
-                                            .frame(height: 3)
-                                            .offset(y: 6)
-                                    }
-                                },
-                                alignment: .bottom
-                            )
-                    }
-                    
-                    Button(action: {
-                        viewModel.selectTab(.notes)
-                    }) {
-                        Text("NOTES")
-                            .font(.subheadline)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.black)
-                            .padding(.bottom, 5)
-                            .overlay(
-                                Group {
-                                    if viewModel.selectedTab == .notes {
-                                        Rectangle()
-                                            .fill(Color.blue)
-                                            .frame(height: 3)
-                                            .offset(y: 6)
-                                    }
-                                },
-                                alignment: .bottom
-                            )
-                    }
-                    
-                    if viewModel.hasReviews && viewModel.placeRating > 0 {
-                        Text(String(format: "%.1f", viewModel.placeRating))
-                            .font(.caption)
-                            .foregroundColor(.black)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 4)
-                            .background(Color.yellow)
-                            .cornerRadius(10)
-                    }
-                    
-                    Button(action: {
-                        viewModel.selectTab(.about)
-                    }) {
-                        Text("ABOUT")
-                            .font(.subheadline)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.black)
-                            .padding(.bottom, 5)
-                            .overlay(
-                                Group {
-                                    if viewModel.selectedTab == .about {
-                                        Rectangle()
-                                            .fill(Color.blue)
-                                            .frame(height: 3)
-                                            .offset(y: 6)
-                                    }
-                                },
-                                alignment: .bottom
-                            )
-                    }
-                }
-                .padding(.bottom, 10)
-                
-                // MARK: - Tab-Specific Content
-                switch viewModel.selectedTab {
-                case .about:
-                    AboutTabContent(
-                        viewModel: viewModel.aboutTabViewModel,
-                        onPhotoTapped: onPhotoTapped
-                    )
-                    .environmentObject(profile)
-                    .environmentObject(userSession)
-                case .reviews:
-                    PlaceReviewsView(
-                        viewModel: viewModel.reviewsViewModel,
-                        onPhotoTapped: onPhotoTapped,
-                        onAddReview: onAddReview
-                    )
-                    .environmentObject(selectedPlaceVM)
-                    .environmentObject(userProfileViewModel)
-                case .notes:
-                    NotesTabContent(viewModel: viewModel.notesTabViewModel)
-                }
+                tabBar
+                tabContent
             }
-            .padding(.horizontal, 30)
+            .padding(.horizontal, 24)
         }
         .scrollDisabled(!isScrollingEnabled)
         .navigationBarTitleDisplayMode(.inline)
@@ -238,6 +75,16 @@ struct PlaceDetailTabsView: View {
             .presentationDetents(saversSheetDetents)
             .presentationDragIndicator(.visible)
         }
+        // Hours Sheet - shows full opening hours when status badge is tapped
+        .sheet(isPresented: $showingHoursSheet) {
+            PlaceHoursSheetView(
+                placeName: viewModel.placeName,
+                openHours: viewModel.currentPlace?.openHours,
+                currentStatus: viewModel.openStatus
+            )
+            .presentationDetents([.medium])
+            .presentationDragIndicator(.visible)
+        }
         // Travel Time Selector - capture state from child via PreferenceKey
         .onPreferenceChange(TravelTimeSelectorStateKey.self) { state in
             travelSelectorState = state
@@ -247,6 +94,134 @@ struct PlaceDetailTabsView: View {
             if let state = travelSelectorState, state.isExpanded {
                 travelTimeSelectorOverlay(state: state)
             }
+        }
+    }
+    
+    // MARK: - Header Row (Extracted for compiler performance)
+    
+    private var headerRow: some View {
+        HStack(alignment: .center) {
+            Button(action: {
+                viewModel.openGoogleMaps()
+            }) {
+                Text(viewModel.placeName)
+                    .font(.largeTitle)
+                    .fontWeight(.bold)
+                    .foregroundColor(.black)
+            }
+            .buttonStyle(.plain)
+            
+            Spacer()
+            
+            Button(action: onAddToList) {
+                Image(systemName: viewModel.isPlaceInList ? "bookmark.fill" : "bookmark")
+                    .font(.title3)
+                    .foregroundColor(.gray)
+                    .frame(width: 32, height: 32)
+            }
+            
+            Button(action: viewModel.sharePlace) {
+                Image(systemName: "square.and.arrow.up")
+                    .font(.title3)
+                    .foregroundColor(.gray)
+                    .frame(width: 32, height: 32)
+            }
+        }
+        .padding(.bottom, 3)
+    }
+    
+    // MARK: - Info Row (Extracted for compiler performance)
+    
+    @ViewBuilder
+    private var infoRow: some View {
+        HStack(spacing: 10) {
+            if viewModel.isCustomPlace {
+                CustomPlaceCreatorView(
+                    viewModel: viewModel.aboutTabViewModel.customPlaceCreatorViewModel,
+                    onCreatorTapped: { userId in
+                        guard let currentUserId = userSession.currentUserId else { return }
+                        userProfileViewModel.fetchAndSelectUser(userId: userId, currentUserId: currentUserId)
+                    }
+                )
+            } else if let restaurantType = viewModel.restaurantType {
+                Text(restaurantType)
+                    .font(.subheadline)
+                    .foregroundColor(.gray)
+            }
+            
+            OpenStatusBadgeView(status: viewModel.openStatus) {
+                showingHoursSheet = true
+            }
+            
+            TravelTimeSelector(viewModel: viewModel.travelTimeViewModel)
+            
+            if viewModel.showSaversIndicator {
+                SavedByIndicator(
+                    savers: viewModel.placeSaversViewModel.saversForDisplay(limit: 3),
+                    additionalCount: viewModel.placeSaversViewModel.additionalSaverCount,
+                    onTap: { showingSaversSheet = true }
+                )
+            }
+        }
+        .padding(.bottom, 10)
+    }
+    
+    // MARK: - Tab Bar (Extracted for compiler performance)
+    
+    private var tabBar: some View {
+        HStack(spacing: 12) {
+            tabButton(title: "FEED", tab: DetailTab.reviews)
+            tabButton(title: "NOTES", tab: DetailTab.notes)
+            tabButton(title: "ABOUT", tab: DetailTab.about)
+        }
+        .padding(.bottom, 10)
+    }
+    
+    private func tabButton(title: String, tab: DetailTab) -> some View {
+        Button(action: {
+            viewModel.selectTab(tab)
+        }) {
+            Text(title)
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .foregroundColor(.black)
+                .padding(.bottom, 5)
+                .overlay(
+                    Group {
+                        if viewModel.selectedTab == tab {
+                            Rectangle()
+                                .fill(Color.blue)
+                                .frame(height: 3)
+                                .offset(y: 6)
+                        }
+                    },
+                    alignment: .bottom
+                )
+        }
+    }
+    
+    // MARK: - Tab Content (Extracted for compiler performance)
+    
+    @ViewBuilder
+    private var tabContent: some View {
+        switch viewModel.selectedTab {
+        case .about:
+            AboutTabContent(
+                viewModel: viewModel.aboutTabViewModel,
+                onPhotoTapped: onPhotoTapped
+            )
+            .environmentObject(profile)
+            .environmentObject(userSession)
+        case .reviews:
+            PlacePostsView(
+                viewModel: viewModel.postsViewModel,
+                onPhotoTapped: onPhotoTapped,
+                onAddPost: onAddReview
+            )
+            .environmentObject(selectedPlaceVM)
+            .environmentObject(userProfileViewModel)
+        case .notes:
+            NotesTabContent(viewModel: viewModel.notesTabViewModel)
         }
     }
     
@@ -418,7 +393,7 @@ private struct SavedByIndicator: View {
             
             let selectedPlaceVM = SelectedPlaceViewModel(
                 locationManager: locationManager,
-                reviewService: services.reviewService,
+                postService: services.postService,
                 placeService: services.placeService,
                 userService: services.userService,
                 imageService: services.imageService,
@@ -437,7 +412,7 @@ private struct SavedByIndicator: View {
                 detailPlaceViewModel: detailPlaceVM,
                 imageService: services.imageService,
                 placeService: services.placeService,
-                reviewService: services.reviewService,
+                postService: services.postService,
                 locationManager: locationManager,
                 deepLinkManager: services.deepLinkManager,
                 deepLinkViewModel: nil
@@ -446,7 +421,7 @@ private struct SavedByIndicator: View {
             let dataManager = DataManager(
                 userService: services.userService,
                 placeService: services.placeService,
-                reviewService: services.reviewService,
+                postService: services.postService,
                 userSession: userSession,
                 locationManager: locationManager,
                 profileViewModel: profileVM,
@@ -458,7 +433,7 @@ private struct SavedByIndicator: View {
                 detailPlaceViewModel: detailPlaceVM,
                 placeService: services.placeService,
                 userService: services.userService,
-                reviewService: services.reviewService
+                postService: services.postService
             )
             
             // Create a mock place and set it
@@ -479,7 +454,7 @@ private struct SavedByIndicator: View {
             // Create the new ViewModel (Our Single Source of Truth!)
             let tabsViewModel = PlaceDetailTabsViewModel(
                 placeService: services.placeService,
-                reviewService: services.reviewService,
+                postService: services.postService,
                 userService: services.userService,
                 notificationManager: NotificationManager.shared,
                 placeShareService: services.placeShareService,

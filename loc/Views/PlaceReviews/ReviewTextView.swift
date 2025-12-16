@@ -1,5 +1,5 @@
 //
-//  ReviewTextView.swift
+//  PostTextView.swift
 //  loc
 //
 //  Created by Andrew Hartsfield II on 1/18/25.
@@ -8,12 +8,12 @@
 
 import SwiftUI
 
-struct ReviewTextView: View {
-    @Binding var reviewText: String
+struct PostTextView: View {
+    @Binding var postText: String
 
     var body: some View {
         ZStack(alignment: .topLeading) {
-            TextEditor(text: $reviewText)
+            TextEditor(text: $postText)
                 .font(.subheadline)
                 .frame(height: 100)
                 .scrollContentBackground(.hidden)
@@ -21,8 +21,8 @@ struct ReviewTextView: View {
                 .cornerRadius(8)
                 .foregroundStyle(.black)
 
-            if reviewText.isEmpty {
-                Text("Anything interesting?")
+            if postText.isEmpty {
+                Text("What was your experience like?")
                     .font(.subheadline)
                     .foregroundColor(.black)
                     .font(.footnote)

@@ -601,6 +601,19 @@ class SupabasePlaceService: ObservableObject {
         }
     }
     
+    /// Ensures a place exists in the database before creating posts/reviews
+    /// Uses upsert to insert if not exists, or do nothing if already present
+    func ensurePlaceExists(place: DetailPlace) async throws {
+        let placeData = convertToPlaceData(place)
+        
+        try await supabase.client
+            .from("places")
+            .upsert(placeData, onConflict: "id")
+            .execute()
+        
+        print("✅ [Supabase] Place ensured in database: \(place.id.uuidString)")
+    }
+    
     func addToMyPlaces(userId: String, place: DetailPlace, completion: @escaping (Error?) -> Void) {
         Task {
             do {

@@ -20,7 +20,7 @@ class PhotoImportViewModel: ObservableObject {
     @Published var isLoadingNearbyPlaces: Bool = false
     @Published var showPlaceSelection: Bool = false
     @Published var selectedPlace: NearbyPlaceFeature?
-    @Published var showReviewTypeSelection: Bool = false
+    @Published var showPostCreation: Bool = false
     @Published var noLocationDataError: Bool = false
     @Published var shouldNavigateToPlaceDetail: Bool = false
     @Published var createdPlaceForDetail: DetailPlace?
@@ -198,7 +198,7 @@ class PhotoImportViewModel: ObservableObject {
     func selectPlace(_ place: NearbyPlaceFeature) {
         selectedPlace = place
         showPlaceSelection = false
-        showReviewTypeSelection = true
+        showPostCreation = true
         
         // Track if this is a user-created place (will be saved later when review is submitted)
         isUserCreatedPlace = place.properties.source == "user_created"
@@ -330,7 +330,7 @@ class PhotoImportViewModel: ObservableObject {
         shouldNavigateToPlaceDetail = true
         
         // Clear all other states
-        showReviewTypeSelection = false
+        showPostCreation = false
         showPlaceSelection = false
     }
     
@@ -358,7 +358,7 @@ class PhotoImportViewModel: ObservableObject {
         nearbyPlaces = []
         selectedPlace = nil
         showPlaceSelection = false
-        showReviewTypeSelection = false
+        showPostCreation = false
         noLocationDataError = false
         shouldNavigateToPlaceDetail = false
         createdPlaceForDetail = nil

@@ -97,7 +97,7 @@ class ProfileViewModel: ObservableObject {
     private let userService: UserService
     private let imageService: ImageService
     private let placeService: PlaceService
-    private let reviewService: ReviewService
+    private let postService: PostService
      internal let detailPlaceViewModel: DetailPlaceViewModel
      private let userSession: UserSession
     private var deepLinkManager: DeepLinkManager?
@@ -187,13 +187,13 @@ class ProfileViewModel: ObservableObject {
     private let locationManager: LocationManager
     private var cancellables = Set<AnyCancellable>()
     
-    init(userSession: UserSession, userService: UserService, detailPlaceViewModel: DetailPlaceViewModel, imageService: ImageService, placeService: PlaceService, reviewService: ReviewService, locationManager: LocationManager, deepLinkManager: DeepLinkManager? = nil, deepLinkViewModel: DeepLinkViewModel? = nil, userProfileViewModel: UserProfileViewModel? = nil) {
+    init(userSession: UserSession, userService: UserService, detailPlaceViewModel: DetailPlaceViewModel, imageService: ImageService, placeService: PlaceService, postService: PostService, locationManager: LocationManager, deepLinkManager: DeepLinkManager? = nil, deepLinkViewModel: DeepLinkViewModel? = nil, userProfileViewModel: UserProfileViewModel? = nil) {
          self.userService = userService
          self.detailPlaceViewModel = detailPlaceViewModel
         self.userSession = userSession
         self.imageService = imageService
         self.placeService = placeService
-        self.reviewService = reviewService
+        self.postService = postService
         self.locationManager = locationManager
         self.deepLinkManager = deepLinkManager
         self.deepLinkViewModel = deepLinkViewModel
@@ -1107,31 +1107,31 @@ class ProfileViewModel: ObservableObject {
         detailPlaceViewModel.calculateAnnotationPlaces()
     }
     
-    /// Fetch review images for a batch of places to enhance the place display
-    private func fetchReviewImagesForPlaces(_ placeIds: [String], userId: String) async {
+    /// Fetch post images for a batch of places to enhance the place display
+    private func fetchPostImagesForPlaces(_ placeIds: [String], userId: String) async {
         // Collect all image URLs first
         var imageUrlsToLoad: [(placeId: String, imageUrl: String)] = []
         
-        // Fetch reviews for these places to get images
+        // Fetch posts for these places to get images
         for placeId in placeIds {
             do {
-                // Get the most recent review for this place by this user
-                let (reviews, _) = try await reviewService.fetchPlaceReviews(placeId: placeId, latestOnly: false)
-                let userReviews = reviews.filter { $0.userId == userId }
+                // Get the most recent post for this place by this user
+                let (posts, _) = try await postService.fetchPosts(placeId: placeId, latestOnly: false)
+                let userPosts = posts.filter { $0.userId == userId }
                 
-                if let mostRecentReview = userReviews.first(where: { !$0.images.isEmpty }),
-                   let imageUrl = mostRecentReview.images.first,
+                if let mostRecentPost = userPosts.first(where: { !$0.images.isEmpty }),
+                   let imageUrl = mostRecentPost.images.first,
                    detailPlaceViewModel.placeImages[placeId] == nil {
                     imageUrlsToLoad.append((placeId: placeId, imageUrl: imageUrl))
                 }
             } catch {
-                print("⚠️ [ProfileViewModel] Failed to fetch review images for place \(placeId): \(error.localizedDescription)")
+                print("⚠️ [ProfileViewModel] Failed to fetch post images for place \(placeId): \(error.localizedDescription)")
             }
         }
         
         // Load all images in parallel
         if !imageUrlsToLoad.isEmpty {
-            // Loading review images in parallel
+            // Loading post images in parallel
             await withTaskGroup(of: Void.self) { group in
                 for (placeId, imageUrl) in imageUrlsToLoad {
                     group.addTask {
@@ -1194,37 +1194,34 @@ class ProfileViewModel: ObservableObject {
         return lightweightReviewedPlaces.count
     }
     
-    // User reviews for display in My Places
-    @Published var userReviews: [ReviewProtocol] = []
-    @Published var isLoadingUserReviews: Bool = false
+    // User posts for display in My Places
+    @Published var userPosts: [PlacePost] = []
+    @Published var isLoadingUserPosts: Bool = false
     
-    /// Load the last 8 reviews made by the user
-    func loadUserReviews() async {
+    /// Load the last 8 posts made by the user
+    func loadUserPosts() async {
         guard let userId = user?.id else { return }
         
         await MainActor.run {
-            isLoadingUserReviews = true
+            isLoadingUserPosts = true
         }
         
         do {
-            // Fetch both restaurant and generic reviews
-            async let restaurantReviews: [RestaurantReview] = try await reviewService.fetchUserReviews(userId: userId)
-            async let genericReviews: [GenericReview] = try await reviewService.fetchUserGenericReviews(userId: userId)
-            
-            let allReviews: [ReviewProtocol] = (try await restaurantReviews) + (try await genericReviews)
+            // Fetch all posts for the user
+            let allPosts = try await postService.fetchUserPosts(userId: userId)
             
             // Sort by timestamp (most recent first) and take the last 8
-            let sortedReviews = allReviews.sorted { $0.timestamp > $1.timestamp }
-            let last8Reviews = Array(sortedReviews.prefix(8))
+            let sortedPosts = allPosts.sorted { $0.timestamp > $1.timestamp }
+            let last8Posts = Array(sortedPosts.prefix(8))
             
             await MainActor.run {
-                userReviews = last8Reviews
-                isLoadingUserReviews = false
+                userPosts = last8Posts
+                isLoadingUserPosts = false
             }
         } catch {
-            print("❌ [ProfileViewModel] Error loading user reviews: \(error.localizedDescription)")
+            print("❌ [ProfileViewModel] Error loading user posts: \(error.localizedDescription)")
             await MainActor.run {
-                isLoadingUserReviews = false
+                isLoadingUserPosts = false
             }
         }
     }

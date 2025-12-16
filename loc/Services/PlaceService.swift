@@ -253,6 +253,12 @@ class PlaceService: ObservableObject {
         }
     }
     
+    /// Ensures a place exists in the database (upsert - insert if not exists)
+    /// Call this before creating posts to satisfy foreign key constraints
+    func ensurePlaceExists(place: DetailPlace) async throws {
+        try await SupabasePlaceService.shared.ensurePlaceExists(place: place)
+    }
+    
     func addToMyPlaces(userId: String, place: DetailPlace, completion: @escaping (Error?) -> Void) {
         Task { @MainActor in
             SupabasePlaceService.shared.addToMyPlaces(userId: userId, place: place, completion: completion)

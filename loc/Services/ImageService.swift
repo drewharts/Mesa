@@ -254,14 +254,14 @@ class ImageService {
         completion([], nil)
     }
 
-    func uploadImagesForReview<T: ReviewProtocol>(
-        review: T,
+    func uploadImagesForPost(
+        post: PlacePost,
         images: [UIImage],
         completion: @escaping (Result<[String], Error>) -> Void
     ) {
         Task {
             do {
-                let urls = try await uploadImagesForReviewAsync(review: review, images: images)
+                let urls = try await uploadImagesForPostAsync(post: post, images: images)
                 await MainActor.run {
                     completion(.success(urls))
                 }
@@ -273,9 +273,9 @@ class ImageService {
         }
     }
     
-    /// Async version of uploadImagesForReview
-    func uploadImagesForReviewAsync<T: ReviewProtocol>(
-        review: T,
+    /// Async version of uploadImagesForPost
+    func uploadImagesForPostAsync(
+        post: PlacePost,
         images: [UIImage]
     ) async throws -> [String] {
         let supabase = await SupabaseManager.shared
@@ -302,9 +302,9 @@ class ImageService {
                 // Compress image if needed
                 let compressedData = compressImageTo1MB(image) ?? imageData
                 
-                // Create file path: review-photos/{supabase_user_id}/{review_id}/{image_index}.jpg
+                // Create file path: review-photos/{supabase_user_id}/{post_id}/{image_index}.jpg
                 let fileName = "image_\(index + 1).jpg"
-                let filePath = "\(supabaseUserId)/\(review.id)/\(fileName)"
+                let filePath = "\(supabaseUserId)/\(post.id)/\(fileName)"
                 
                 _ = try await bucket.upload(
                     filePath,
@@ -323,7 +323,7 @@ class ImageService {
             return uploadedUrls
             
         } catch {
-            print("❌ [ImageService] Failed to upload review images: \(error)")
+            print("❌ [ImageService] Failed to upload post images: \(error)")
             print("❌ [ImageService] Error details: \(error.localizedDescription)")
             if let storageError = error as? StorageError {
                 print("❌ [ImageService] StorageError statusCode: \(String(describing: storageError.statusCode))")

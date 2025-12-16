@@ -8,14 +8,11 @@ import SwiftUI
 struct ProfileTikToksView: View {
     @EnvironmentObject var profile: ProfileViewModel
     @State private var showingTikToksPopup = false
+    @State private var showingHelpSheet = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("TIKTOKS")
-                .font(.headline)
-                .fontWeight(.semibold)
-                .foregroundColor(.primary)
-                .padding(.horizontal, 20)
+            headerRow
             
             tiktoksCard
             
@@ -30,7 +27,31 @@ struct ProfileTikToksView: View {
         .sheet(isPresented: $showingTikToksPopup) {
             TikToksPopupView()
         }
+        .sheet(isPresented: $showingHelpSheet) {
+            TikTokImportHelpView()
+        }
     }
+    
+    // MARK: - Header Row
+    
+    private var headerRow: some View {
+        HStack {
+            Text("TIKTOKS")
+                .font(.headline)
+                .fontWeight(.semibold)
+                .foregroundColor(.primary)
+            
+            Button(action: { showingHelpSheet = true }) {
+                Image(systemName: "questionmark.circle")
+                    .font(.subheadline)
+                    .foregroundColor(.gray)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 20)
+    }
+    
+    // MARK: - TikToks Card
     
     private var tiktoksCard: some View {
         Button(action: { showingTikToksPopup = true }) {
