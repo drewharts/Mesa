@@ -90,7 +90,8 @@ class PlacePostViewModel: ObservableObject {
     }
     
     private func savePost(_ post: PlacePost, completion: @escaping (Result<PlacePost, Error>) -> Void) {
-        postService.savePost(post) { [weak self] result in
+        // Service layer handles ensuring place exists (FK constraint)
+        postService.savePost(post, forPlace: place) { [weak self] result in
             DispatchQueue.main.async {
                 self?.isLoading = false
                 switch result {

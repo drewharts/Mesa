@@ -3,6 +3,7 @@
 //  loc
 //
 //  Service for managing place posts - delegates to SupabasePostService
+//  Single Responsibility: Orchestrates post operations and ensures data integrity
 //
 
 import Foundation
@@ -10,8 +11,11 @@ import Foundation
 class PostService: ObservableObject {
     static let shared = PostService()
     private let supabase = SupabasePostService.shared
+    private let placeService: SupabasePlaceService
     
-    private init() {}
+    private init(placeService: SupabasePlaceService = .shared) {
+        self.placeService = placeService
+    }
     
     // MARK: - Fetch Posts
     
@@ -25,6 +29,30 @@ class PostService: ObservableObject {
     
     // MARK: - Save Post
     
+    /// Saves a post, ensuring the associated place exists in the database first.
+    /// This handles the foreign key constraint on reviews.place_id automatically.
+    func savePost(_ post: PlacePost, forPlace place: DetailPlace, completion: @escaping (Result<Void, Error>) -> Void) {
+        Task { @MainActor in
+            do {
+                // Ensure place exists before saving post (satisfies FK constraint)
+                try await placeService.ensurePlaceExists(place: place)
+                
+                // Now save the post
+                await supabase.savePost(post: post) { error in
+                    if let error = error {
+                        completion(.failure(error))
+                    } else {
+                        completion(.success(()))
+                    }
+                }
+            } catch {
+                completion(.failure(error))
+            }
+        }
+    }
+    
+    /// Legacy method for saving posts when place is already guaranteed to exist
+    @available(*, deprecated, message: "Use savePost(_:forPlace:) to ensure place exists")
     func savePost(_ post: PlacePost, completion: @escaping (Result<Void, Error>) -> Void) {
         Task { @MainActor in
             await supabase.savePost(post: post) { error in
