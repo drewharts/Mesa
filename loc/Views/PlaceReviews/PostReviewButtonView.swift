@@ -8,9 +8,9 @@
 
 import SwiftUI
 
-struct PostReviewButtonView: View {
+struct SharePostButtonView: View {
     @Binding var highlighted: Bool
-    @Binding var isLoading: Bool  // Use binding to ViewModel's loading state
+    @Binding var isLoading: Bool
     let action: () -> Void
 
     var body: some View {
@@ -18,7 +18,7 @@ struct PostReviewButtonView: View {
             action()
         }) {
             if isLoading {
-                ProgressView()  // Show loading indicator
+                ProgressView()
                     .progressViewStyle(CircularProgressViewStyle())
                     .frame(maxWidth: .infinity)
                     .padding(.vertical)
@@ -26,7 +26,7 @@ struct PostReviewButtonView: View {
                     .background(highlighted ? Color.green : Color.gray.opacity(0.2))
                     .cornerRadius(20)
             } else {
-                Text("POST REVIEW")
+                Text("SHARE POST")
                     .bold()
                     .frame(maxWidth: .infinity)
                     .padding(.vertical)
@@ -36,6 +36,6 @@ struct PostReviewButtonView: View {
                     .cornerRadius(20)
             }
         }
-        .disabled(isLoading)  // Disable button while loading
+        .disabled(isLoading)
     }
 }

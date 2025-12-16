@@ -16,7 +16,7 @@ struct PlaceDetailView: View {
     @State private var galleryPhotos: [UIImage] = []
     @State private var showNoPhoneNumberAlert = false
     @State private var showListSelection = false
-    @State private var showCreateReview = false
+    @State private var showCreatePost = false
     @State private var listSelectionViewModel: PlaceListSelectionViewModel?
 
     @EnvironmentObject var profile: ProfileViewModel
@@ -53,7 +53,7 @@ struct PlaceDetailView: View {
                             showPhotoGallery = true
                         },
                         onAddToList: { showListSelection = true },
-                        onAddReview: { showCreateReview = true }
+                        onAddReview: { showCreatePost = true }
                     )
                     .environmentObject(userProfileViewModel)
                     .environmentObject(detailPlaceViewModel)
@@ -62,13 +62,12 @@ struct PlaceDetailView: View {
             }
             .padding(.vertical)
             .frame(maxWidth: .infinity)
-            .blur(radius: showPhotoGallery ? 10 : 0)
             .onAppear {
                 // Initialize the ViewModel when the view appears
                 if tabsViewModel == nil {
                     tabsViewModel = PlaceDetailTabsViewModel(
                         placeService: serviceContainer.placeService,
-                        reviewService: serviceContainer.reviewService,
+                        postService: serviceContainer.postService,
                         userService: serviceContainer.userService,
                         notificationManager: serviceContainer.notificationManager,
                         placeShareService: serviceContainer.placeShareService,
@@ -119,10 +118,10 @@ struct PlaceDetailView: View {
                     )
                 }
             }
-            .sheet(isPresented: $showCreateReview) {
+            .sheet(isPresented: $showCreatePost) {
                 if let selectedPlace = selectedPlaceVM.selectedPlace {
-                    CreatePlaceReviewView(
-                        isPresented: $showCreateReview,
+                    CreatePostView(
+                        isPresented: $showCreatePost,
                         place: selectedPlace,
                         userId: userSession.currentUserId ?? "",
                         profilePhotoUrl: profile.user?.profilePhotoURL?.absoluteString ?? "",
@@ -150,15 +149,16 @@ struct PlaceDetailView: View {
 
 
 
-            // Photo Gallery Overlay
+            // Photo Gallery Overlay (Pinterest-style) - fills entire sheet
             if showPhotoGallery, let selectedIndex = selectedImageIndex {
-                PhotoGalleryView(
+                PinterestPhotoGalleryView(
                     photos: galleryPhotos,
                     initialIndex: selectedIndex,
                     isPresented: $showPhotoGallery
                 )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .transition(.opacity)
-                .animation(.easeInOut, value: showPhotoGallery)
+                .zIndex(100)
             }
         }
     }

@@ -22,7 +22,7 @@ enum DetailTab {
 class PlaceDetailTabsViewModel: ObservableObject {
     // MARK: - Dependencies (Services, not other ViewModels)
     private let placeService: PlaceService
-    private let reviewService: ReviewService
+    private let postService: PostService
     private let userService: UserService
     private let notificationManager: NotificationManager
     private let placeShareService: PlaceShareService
@@ -37,8 +37,9 @@ class PlaceDetailTabsViewModel: ObservableObject {
     // MARK: - Child ViewModels
     let aboutTabViewModel: AboutTabViewModel
     let notesTabViewModel: NotesTabViewModel
-    let reviewsViewModel: PlaceReviewsViewModel
+    let postsViewModel: PlacePostsViewModel
     let travelTimeViewModel: TravelTimeViewModel
+    let openStatusViewModel: OpenStatusViewModel
     var placeSaversViewModel: PlaceSaversViewModel
     
     // MARK: - Published Properties (What the View Needs)
@@ -46,8 +47,8 @@ class PlaceDetailTabsViewModel: ObservableObject {
     @Published var restaurantType: String?
     @Published var isCustomPlace: Bool = false
     @Published var placeRating: Double = 0.0
-    @Published var hasReviews: Bool = false
-    @Published var reviewCount: Int = 0
+    @Published var hasPosts: Bool = false
+    @Published var postCount: Int = 0
     @Published var selectedTab: DetailTab = .about
     @Published var showMaxFavoritesAlert: Bool = false
     @Published var currentPlace: DetailPlace?
@@ -55,6 +56,9 @@ class PlaceDetailTabsViewModel: ObservableObject {
     // Forwarded from PlaceSaversViewModel (enables view re-render when savers change)
     @Published var showSaversIndicator: Bool = false
     @Published var saverCount: Int = 0
+    
+    // Forwarded from OpenStatusViewModel (enables view re-render when status changes)
+    @Published var openStatus: OpenStatus = .unknown
     
     // MARK: - Place Actions State
     /// Whether the current place is saved in any of the user's lists
@@ -64,7 +68,7 @@ class PlaceDetailTabsViewModel: ObservableObject {
     
     // MARK: - Initialization
     init(placeService: PlaceService,
-         reviewService: ReviewService,
+         postService: PostService,
          userService: UserService,
          notificationManager: NotificationManager,
          placeShareService: PlaceShareService,
@@ -73,7 +77,7 @@ class PlaceDetailTabsViewModel: ObservableObject {
          userSession: UserSession,
          detailPlaceViewModel: DetailPlaceViewModel) {
         self.placeService = placeService
-        self.reviewService = reviewService
+        self.postService = postService
         self.userService = userService
         self.notificationManager = notificationManager
         self.placeShareService = placeShareService
@@ -90,7 +94,7 @@ class PlaceDetailTabsViewModel: ObservableObject {
         )
         
         let photosVM = PlacePhotosViewModel(
-            reviewService: reviewService,
+            postService: postService,
             selectedPlaceVM: selectedPlaceVM
         )
         
@@ -112,8 +116,8 @@ class PlaceDetailTabsViewModel: ObservableObject {
             userSession: userSession
         )
         
-        self.reviewsViewModel = PlaceReviewsViewModel(
-            reviewService: reviewService,
+        self.postsViewModel = PlacePostsViewModel(
+            postService: postService,
             photosViewModel: photosVM,
             selectedPlaceVM: selectedPlaceVM,
             notificationManager: notificationManager,
@@ -122,6 +126,10 @@ class PlaceDetailTabsViewModel: ObservableObject {
         )
         
         self.travelTimeViewModel = TravelTimeViewModel(
+            selectedPlaceVM: selectedPlaceVM
+        )
+        
+        self.openStatusViewModel = OpenStatusViewModel(
             selectedPlaceVM: selectedPlaceVM
         )
         
@@ -143,21 +151,21 @@ class PlaceDetailTabsViewModel: ObservableObject {
             }
             .store(in: &cancellables)
         
-        // Observe reviews changes
+        // Observe posts changes
         selectedPlaceVM.$selectedPlace
             .combineLatest(selectedPlaceVM.$placeRating)
             .sink { [weak self] place, rating in
                 guard let self = self else { return }
                 self.placeRating = rating
-                self.hasReviews = !self.selectedPlaceVM.reviews.isEmpty
-                self.reviewCount = self.selectedPlaceVM.reviews.count
+                self.hasPosts = !self.selectedPlaceVM.posts.isEmpty
+                self.postCount = self.selectedPlaceVM.posts.count
             }
             .store(in: &cancellables)
         
         // Observe notification highlights
         notificationManager.$highlightedReviewId
-            .sink { [weak self] reviewId in
-                if reviewId != nil {
+            .sink { [weak self] postId in
+                if postId != nil {
                     self?.selectedTab = .reviews
                 }
             }
@@ -178,6 +186,14 @@ class PlaceDetailTabsViewModel: ObservableObject {
             .sink { [weak self] count in
                 self?.saverCount = count
                 self?.showSaversIndicator = count > 0
+            }
+            .store(in: &cancellables)
+        
+        // Forward OpenStatusViewModel state to trigger view updates
+        // This is necessary because child VM changes don't automatically trigger parent view re-render
+        openStatusViewModel.$status
+            .sink { [weak self] status in
+                self?.openStatus = status
             }
             .store(in: &cancellables)
         
@@ -249,8 +265,8 @@ class PlaceDetailTabsViewModel: ObservableObject {
             restaurantType = nil
         }
         
-        // Set default tab based on reviews
-        if selectedPlaceVM.reviews.isEmpty {
+        // Set default tab based on posts
+        if selectedPlaceVM.posts.isEmpty {
             selectedTab = .about
         }
     }

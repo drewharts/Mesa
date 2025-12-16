@@ -14,7 +14,7 @@ import UIKit
 
 @MainActor
 class SelectedPlaceViewModel: ObservableObject {
-    private let reviewService: ReviewService
+    private let postService: PostService
     private let userService: UserService
     private let placeService: PlaceService
     private let imageService: ImageService
@@ -23,9 +23,9 @@ class SelectedPlaceViewModel: ObservableObject {
     private let locationManager: LocationManager
     private weak var detailPlaceViewModel: DetailPlaceViewModel?
 
-    init(locationManager: LocationManager, reviewService: ReviewService, placeService: PlaceService, userService: UserService, imageService: ImageService, mesaBackendService: MesaBackendService = MesaBackendService(), detailPlaceViewModel: DetailPlaceViewModel? = nil) {
+    init(locationManager: LocationManager, postService: PostService, placeService: PlaceService, userService: UserService, imageService: ImageService, mesaBackendService: MesaBackendService = MesaBackendService(), detailPlaceViewModel: DetailPlaceViewModel? = nil) {
         self.locationManager = locationManager
-        self.reviewService = reviewService
+        self.postService = postService
         self.placeService = placeService
         self.userService = userService
         self.imageService = imageService
@@ -90,14 +90,14 @@ class SelectedPlaceViewModel: ObservableObject {
     private func continueWithPlaceSetup(place: DetailPlace, currentLocation: CLLocationCoordinate2D) {
         loadData(for: place, currentLocation: currentLocation)
         
-        // Load reviews (photos will be loaded automatically by PlacePhotosViewModel)
-        loadReviews(for: place)
+        // Load posts (photos will be loaded automatically by PlacePhotosViewModel)
+        loadPosts(for: place)
 
         // Set Google rating from the place data
         placeRating = place.rating ?? 0
 
         // Clear previous likes when loading a new place
-        likedReviews.removeAll()
+        likedPosts.removeAll()
     }
 
     private func fetchCompletePlaceDetails(for place: DetailPlace, completion: @escaping (DetailPlace?) -> Void) {
@@ -119,33 +119,40 @@ class SelectedPlaceViewModel: ObservableObject {
     /// Merges fresh backend data with original place, preserving local-only properties.
     /// Single Responsibility: Handles data merging without side effects.
     /// 
-    /// Properties preserved from original:
+    /// Properties preserved from original when fresh is nil/empty:
     /// - `isCustom`: Backend doesn't know about custom places
     /// - `id`: Always keep the original ID
+    /// - `openHours`: Preserve if fresh data doesn't have it
     private func mergePlaceData(original: DetailPlace, fresh: DetailPlace) -> DetailPlace {
         var merged = fresh
         merged.id = original.id
         merged.isCustom = original.isCustom
+        
+        // Preserve openHours from original if fresh doesn't have it
+        if merged.openHours == nil || merged.openHours?.isEmpty == true {
+            merged.openHours = original.openHours
+        }
+        
         return merged
     }
     @Published var isDetailSheetPresented: Bool = false
     @Published var isRestaurantOpen: Bool = false // New property to track open status
     @Published var allowAutoPresent: Bool = true
     @Published var shouldAnimateMapToPlace: Bool = false // Track if map should animate to place location
-    @Published private var placeReviews: [String: [any ReviewProtocol]] = [:] // Cache for reviews by placeId
+    @Published private var placePosts: [String: [PlacePost]] = [:] // Cache for posts by placeId
     @Published private var placeTikToks: [String: [TikTokVideo]] = [:] // Cache for TikToks by placeId
     @Published private var restaurantTypes: [String: String] = [:] // Dictionary to store restaurant types by placeId
     
-    /// Increments whenever reviews are modified - allows observers to react to review changes
-    @Published private(set) var reviewsUpdateCounter: Int = 0
+    /// Increments whenever posts are modified - allows observers to react to post changes
+    @Published private(set) var postsUpdateCounter: Int = 0
     
     @Published var placeRating: Double = 0
     
-    @Published private var reviewLoadingStates: [String: LoadingState] = [:] // Loading states for reviews
+    @Published private var postLoadingStates: [String: LoadingState] = [:] // Loading states for posts
     @Published var isCurrentPlaceFullyLoaded: Bool = false
     
-    // Add new property to track liked reviews
-    @Published private var likedReviews: Set<String> = []
+    // Add new property to track liked posts
+    @Published private var likedPosts: Set<String> = []
 
     // MARK: - Loading State Enum
     enum LoadingState: Equatable {
@@ -178,24 +185,24 @@ class SelectedPlaceViewModel: ObservableObject {
             return
         }
         
-        let reviewState = reviewLoadingStates[placeId] ?? .idle
+        let postState = postLoadingStates[placeId] ?? .idle
 
-        // Consider loaded if reviews are either loaded or in error state
+        // Consider loaded if posts are either loaded or in error state
         // (we don't want to wait forever if there's an error)
         // Photos are managed independently by PlacePhotosViewModel
-        let reviewsReady: Bool
-        switch reviewState {
+        let postsReady: Bool
+        switch postState {
         case .loaded, .error:
-            reviewsReady = true
+            postsReady = true
         case .idle, .loading:
-            reviewsReady = false
+            postsReady = false
         }
 
         // Note: Photos are loaded separately by PlacePhotosViewModel and don't block
         // the main place detail view from loading. Each section shows its own loading state.
 
         let wasLoaded = isCurrentPlaceFullyLoaded
-        isCurrentPlaceFullyLoaded = reviewsReady
+        isCurrentPlaceFullyLoaded = postsReady
         
         // Debug logging when the state changes
         // Place is now fully loaded
@@ -213,8 +220,8 @@ class SelectedPlaceViewModel: ObservableObject {
     // MARK: - Private Methods
     private func loadData(for place: DetailPlace, currentLocation: CLLocationCoordinate2D) {
         
-        // Compute whether the restaurant is open now
-        let openNow = isRestaurantOpenNow(place)
+        // Compute whether the restaurant is open now using OpenStatusService
+        let openNow = OpenStatusService.isOpen(place)
         
         // Calculate and store restaurant type
         calculateAndStoreRestaurantType(for: place)
@@ -337,81 +344,37 @@ class SelectedPlaceViewModel: ObservableObject {
         }
     }
     
-    
-    func isRestaurantOpenNow(_ place: DetailPlace) -> Bool {
-        guard let openHours = place.openHours, !openHours.isEmpty else { return false }
-        
-        let now = Date()
-        let calendar = Calendar.current
-        let currentWeekday = calendar.component(.weekday, from: now) // Sunday=1, ..., Saturday=7
-        let currentHour = calendar.component(.hour, from: now)
-        let currentMinute = calendar.component(.minute, from: now)
-        let currentMinutesSinceWeekStart = ((currentWeekday - 1) * 24 * 60) + (currentHour * 60) + currentMinute
-
-        switch openHours[0] {
-        case "always_opened":
-            return true
-        case "temporarily_closed", "permanently_closed":
-            return false
-        default:
-            for periodString in openHours {
-                if !periodString.contains("-") || periodString.hasPrefix("note:") { continue }
-                
-                let components = periodString.split(separator: "-")
-                guard components.count == 2 else { continue }
-                
-                let openParts = components[0].split(separator: ":")
-                let closeParts = components[1].split(separator: ":")
-                guard openParts.count == 3, closeParts.count == 3,
-                      let openDay = Int(openParts[0]), let openHour = Int(openParts[1]), let openMinute = Int(openParts[2]),
-                      let closeDay = Int(closeParts[0]), let closeHour = Int(closeParts[1]), let closeMinute = Int(closeParts[2]) else {
-                    continue
-                }
-                
-                // No adjustment needed since OpenPeriod already uses Sunday=1, ..., Saturday=7
-                let openMinutes = ((openDay - 1) * 24 * 60) + (openHour * 60) + openMinute
-                var closeMinutes = ((closeDay - 1) * 24 * 60) + (closeHour * 60) + closeMinute
-                
-                if closeMinutes <= openMinutes { closeMinutes += 7 * 24 * 60 } // Handle overnight periods
-                if currentMinutesSinceWeekStart >= openMinutes && currentMinutesSinceWeekStart <= closeMinutes {
-                    return true
-                }
-            }
-            return false
-        }
-    }
-    
-    private func loadReviews(for place: DetailPlace) {
+    private func loadPosts(for place: DetailPlace) {
         let placeId = place.id.uuidString
         DispatchQueue.main.async {
-            self.reviewLoadingStates[placeId] = .loading
+            self.postLoadingStates[placeId] = .loading
         }
         
         // Use Task to handle async call to get current user ID
         Task { @MainActor in
             guard let currentUserId = await SupabaseAuthService.shared.currentUserId else {
                 print("Error: Current user ID is not available")
-                self.reviewLoadingStates[placeId] = .error(NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "User not logged in"]))
-                self.placeReviews[placeId] = []
+                self.postLoadingStates[placeId] = .error(NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "User not logged in"]))
+                self.placePosts[placeId] = []
                 self.updateCurrentPlaceFullyLoaded()
                 return
             }
             
-            self.loadReviewsWithUserId(placeId: placeId, currentUserId: currentUserId)
+            self.loadPostsWithUserId(placeId: placeId, currentUserId: currentUserId)
         }
     }
     
-    private func loadReviewsWithUserId(placeId: String, currentUserId: String) {
+    private func loadPostsWithUserId(placeId: String, currentUserId: String) {
         
-        // Fetch reviews AND TikToks for the specific place in a single query
+        // Fetch posts AND TikToks for the specific place in a single query
         Task {
             do {
-                let (reviews, tiktoks) = try await reviewService.fetchPlaceReviews(placeId: placeId, latestOnly: false)
+                let (posts, tiktoks) = try await postService.fetchPosts(placeId: placeId, latestOnly: false)
                 
                 await MainActor.run {
-                    self.placeReviews[placeId] = reviews
+                    self.placePosts[placeId] = posts
                     self.placeTikToks[placeId] = tiktoks // Store TikToks
-                    self.reviewLoadingStates[placeId] = .loaded
+                    self.postLoadingStates[placeId] = .loaded
                     
                     // Photos are loaded automatically by PlacePhotosViewModel via observers
                     
@@ -419,9 +382,9 @@ class SelectedPlaceViewModel: ObservableObject {
                 }
             } catch {
                 await MainActor.run {
-                    print("❌ [SelectedPlaceViewModel] Error fetching reviews/TikToks for place \(placeId): \(error.localizedDescription)")
-                    self.reviewLoadingStates[placeId] = .error(error)
-                    self.placeReviews[placeId] = []
+                    print("❌ [SelectedPlaceViewModel] Error fetching posts/TikToks for place \(placeId): \(error.localizedDescription)")
+                    self.postLoadingStates[placeId] = .error(error)
+                    self.placePosts[placeId] = []
                     self.placeTikToks[placeId] = []
                     
                     self.updateCurrentPlaceFullyLoaded()
@@ -432,74 +395,74 @@ class SelectedPlaceViewModel: ObservableObject {
     
     
     // MARK: - Public Methods
-    func addReview<T: ReviewProtocol>(_ review: T) {
+    func addPost(_ post: PlacePost) {
         guard let placeId = selectedPlace?.id.uuidString else { return }
         
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
-            var currentReviews = self.placeReviews[placeId] ?? []
-            currentReviews.insert(review, at: 0) // Insert at the beginning
-            self.placeReviews[placeId] = currentReviews
+            var currentPosts = self.placePosts[placeId] ?? []
+            currentPosts.insert(post, at: 0) // Insert at the beginning
+            self.placePosts[placeId] = currentPosts
             
-            // Notify observers that reviews have changed (triggers photo reload in PlacePhotosViewModel)
-            self.reviewsUpdateCounter += 1
+            // Notify observers that posts have changed (triggers photo reload in PlacePhotosViewModel)
+            self.postsUpdateCounter += 1
         }
     }
     
-    /// Get a review by its ID to access original data
-    func getReview(by reviewId: String) -> (any ReviewProtocol)? {
-        // Search through all place reviews to find the review with matching ID
-        for reviews in placeReviews.values {
-            if let review = reviews.first(where: { $0.id == reviewId }) {
-                return review
+    /// Get a post by its ID to access original data
+    func getPost(by postId: String) -> PlacePost? {
+        // Search through all place posts to find the post with matching ID
+        for posts in placePosts.values {
+            if let post = posts.first(where: { $0.id == postId }) {
+                return post
             }
         }
         return nil
     }
     
-    func deleteReview(reviewId: String, completion: @escaping (Result<Void, Error>) -> Void) {
+    func deletePost(postId: String, completion: @escaping (Result<Void, Error>) -> Void) {
         guard let placeId = selectedPlace?.id.uuidString else {
             completion(.failure(NSError(domain: "SelectedPlaceViewModel", code: -1, userInfo: [NSLocalizedDescriptionKey: "No selected place"])))
             return
         }
         
-        // Find the review to get the userId
-        guard let review = placeReviews[placeId]?.first(where: { $0.id == reviewId }) else {
-            completion(.failure(NSError(domain: "SelectedPlaceViewModel", code: -1, userInfo: [NSLocalizedDescriptionKey: "Review not found in cache"])))
+        // Find the post to get the userId
+        guard let post = placePosts[placeId]?.first(where: { $0.id == postId }) else {
+            completion(.failure(NSError(domain: "SelectedPlaceViewModel", code: -1, userInfo: [NSLocalizedDescriptionKey: "Post not found in cache"])))
             return
         }
         
-        reviewService.deleteReview(reviewId: reviewId) { [weak self] result in
+        postService.deletePost(postId: postId) { [weak self] result in
             guard let self = self else { return }
             
             switch result {
             case .success:
                 DispatchQueue.main.async {
-                    // Remove the review from local cache
-                    if var currentReviews = self.placeReviews[placeId] {
-                        // Find and remove the review
-                        if let index = currentReviews.firstIndex(where: { $0.id == reviewId }) {
-                            currentReviews.remove(at: index)
-                            self.placeReviews[placeId] = currentReviews
+                    // Remove the post from local cache
+                    if var currentPosts = self.placePosts[placeId] {
+                        // Find and remove the post
+                        if let index = currentPosts.firstIndex(where: { $0.id == postId }) {
+                            currentPosts.remove(at: index)
+                            self.placePosts[placeId] = currentPosts
                             
-                            // Remove from liked reviews set if it was there
-                            self.likedReviews.remove(reviewId)
+                            // Remove from liked posts set if it was there
+                            self.likedPosts.remove(postId)
                         }
                     }
                     completion(.success(()))
                 }
                 
             case .failure(let error):
-                print("❌ Failed to delete review: \(error.localizedDescription)")
+                print("❌ Failed to delete post: \(error.localizedDescription)")
                 completion(.failure(error))
             }
         }
     }
     
-    func formattedTimestamp<T: ReviewProtocol>(for review: T) -> String {
+    func formattedTimestamp(for post: PlacePost) -> String {
         let now = Date()
         let calendar = Calendar.current
-        let components = calendar.dateComponents([.minute, .hour, .day], from: review.timestamp, to: now)
+        let components = calendar.dateComponents([.minute, .hour, .day], from: post.timestamp, to: now)
         
         if let minutes = components.minute, minutes < 60 && (components.hour ?? 0) == 0 && (components.day ?? 0) == 0 {
             return minutes == 0 ? "Just now" : "\(minutes)m"
@@ -511,38 +474,25 @@ class SelectedPlaceViewModel: ObservableObject {
             let formatter = DateFormatter()
             formatter.dateStyle = .short
             formatter.timeStyle = .none
-            return formatter.string(from: review.timestamp)
+            return formatter.string(from: post.timestamp)
         }
     }
     
     // Update the method to take userId as parameter
     func checkLikeStatuses(userId: String) {
         guard let placeId = selectedPlace?.id.uuidString,
-              let reviews = placeReviews[placeId] else { return }
+              let posts = placePosts[placeId] else { return }
         
         // Clear previous likes before checking
-        likedReviews.removeAll()
+        likedPosts.removeAll()
         
-        reviews.forEach { review in
-            reviewService.hasUserLikedReview(userId: userId, placeId: placeId, reviewId: review.id) { [weak self] result in
-                DispatchQueue.main.async {
-                    switch result {
-                    case .success(let isLiked):
-                        if isLiked {
-                            self?.likedReviews.insert(review.id)
-                        }
-                    case .failure(let error):
-                        print("❌ Error checking if review is liked: \(error)")
-                    }
-                }
-            }
-        }
+        // TODO: Implement like status checking with PostService
     }
     
     // MARK: - Public Accessors
-    var reviews: [any ReviewProtocol] {
+    var posts: [PlacePost] {
         guard let placeId = selectedPlace?.id.uuidString else { return [] }
-        return placeReviews[placeId] ?? []
+        return placePosts[placeId] ?? []
     }
 
     var tiktokVideos: [TikTokVideo] {
@@ -550,17 +500,17 @@ class SelectedPlaceViewModel: ObservableObject {
         return placeTikToks[placeId] ?? []
     }
 
-    func reviewLoadingState(forPlaceId placeId: String) -> LoadingState {
-        return reviewLoadingStates[placeId] ?? .idle
+    func postLoadingState(forPlaceId placeId: String) -> LoadingState {
+        return postLoadingStates[placeId] ?? .idle
     }
     
-    func likeReview<T: ReviewProtocol>(_ review: T, userId: String) {
+    func likePost(_ post: PlacePost, userId: String) {
         // TODO: Implement proper like/unlike logic with Supabase
     }
 
-    // Add helper method to check if a review is liked
-    func isReviewLiked(_ reviewId: String) -> Bool {
-        return likedReviews.contains(reviewId)
+    // Add helper method to check if a post is liked
+    func isPostLiked(_ postId: String) -> Bool {
+        return likedPosts.contains(postId)
     }
 
     func createNewPlace(idString: String?, name: String, description: String?, coordinate: CLLocationCoordinate2D, userId: String, profileVM: ProfileViewModel? = nil, detailPlaceVM: DetailPlaceViewModel? = nil) {

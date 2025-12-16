@@ -662,7 +662,7 @@ struct UserReviewsView: View {
     @Environment(\.presentationMode) var presentationMode
     
     var body: some View {
-        if profile.isLoadingUserReviews {
+        if profile.isLoadingUserPosts {
             VStack {
                 Spacer()
                 ProgressView()
@@ -674,17 +674,17 @@ struct UserReviewsView: View {
             }
             .onAppear {
                 Task {
-                    await profile.loadUserReviews()
+                    await profile.loadUserPosts()
                 }
             }
-        } else if profile.userReviews.isEmpty {
+        } else if profile.userPosts.isEmpty {
             VStack(spacing: 16) {
                 Spacer()
-                Text("No Reviews Yet")
+                Text("No Posts Yet")
                     .font(.title3)
                     .fontWeight(.medium)
                     .foregroundColor(.gray)
-                Text("When you review a place, it'll appear here.")
+                Text("When you post about a place, it'll appear here.")
                     .font(.body)
                     .foregroundColor(.gray)
                     .multilineTextAlignment(.center)
@@ -694,8 +694,8 @@ struct UserReviewsView: View {
         } else {
             ScrollView {
                 LazyVStack(spacing: 12) {
-                    ForEach(profile.userReviews, id: \.id) { review in
-                        ReviewCard(review: review)
+                    ForEach(profile.userPosts, id: \.id) { post in
+                        PostCard(post: post)
                     }
                 }
                 .padding(.horizontal, 20)
@@ -703,16 +703,16 @@ struct UserReviewsView: View {
             }
             .onAppear {
                 Task {
-                    await profile.loadUserReviews()
+                    await profile.loadUserPosts()
                 }
             }
         }
     }
 }
 
-// MARK: - Review Card
-struct ReviewCard: View {
-    let review: ReviewProtocol
+// MARK: - Post Card
+struct PostCard: View {
+    let post: PlacePost
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var profile: ProfileViewModel
     @Environment(\.presentationMode) var presentationMode
@@ -722,51 +722,48 @@ struct ReviewCard: View {
             // Header with place name and date
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(review.placeName)
+                    Text(post.placeName)
                         .font(.headline)
                         .fontWeight(.semibold)
                         .foregroundColor(.black)
                     
-                    Text(formatDate(review.timestamp))
+                    Text(formatDate(post.timestamp))
                         .font(.caption)
                         .foregroundColor(.gray)
                 }
                 
                 Spacer()
                 
-                // Review type indicator
-                Text(review.type.rawValue.capitalized)
-                    .font(.caption)
-                    .fontWeight(.medium)
-                    .foregroundColor(.white)
+                // Sentiment badge if provided
+                if let wouldReturn = post.wouldReturn {
+                    HStack(spacing: 4) {
+                        Image(systemName: wouldReturn ? "hand.thumbsup.fill" : "hand.thumbsdown.fill")
+                            .font(.caption2)
+                        Text(wouldReturn ? "Would go back" : "Wouldn't revisit")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                    }
+                    .foregroundColor(wouldReturn ? .green : .red)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
-                    .background(review.type == .restaurant ? Color.blue : Color.green)
+                    .background(wouldReturn ? Color.green.opacity(0.1) : Color.red.opacity(0.1))
                     .cornerRadius(8)
+                }
             }
             
-            // Review text
-            if !review.reviewText.isEmpty {
-                Text(review.reviewText)
+            // Post text
+            if !post.text.isEmpty {
+                Text(post.text)
                     .font(.body)
                     .foregroundColor(.black)
                     .lineLimit(3)
             }
             
-            // Restaurant-specific ratings
-            if let restaurantReview = review as? RestaurantReview {
-                HStack(spacing: 16) {
-                    ReviewRatingView(title: "Food", rating: restaurantReview.foodRating)
-                    ReviewRatingView(title: "Service", rating: restaurantReview.serviceRating)
-                    ReviewRatingView(title: "Ambience", rating: restaurantReview.ambienceRating)
-                }
-            }
-            
             // Images if available
-            if !review.images.isEmpty {
+            if !post.images.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
-                        ForEach(review.images.prefix(3), id: \.self) { imageUrl in
+                        ForEach(post.images.prefix(3), id: \.self) { imageUrl in
                             AsyncImage(url: URL(string: imageUrl)) { image in
                                 image
                                     .resizable()
@@ -789,7 +786,7 @@ struct ReviewCard: View {
         .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
         .onTapGesture {
             // Navigate to place detail
-            if let place = profile.detailPlaceViewModel.places[review.placeId] {
+            if let place = profile.detailPlaceViewModel.places[post.placeId] {
                 selectedPlaceVM.selectPlaceAndFetchDetails(place)
                 presentationMode.wrappedValue.dismiss()
             }
@@ -803,7 +800,7 @@ struct ReviewCard: View {
     }
 }
 
-// MARK: - Review Rating View
+// MARK: - Post Rating View (kept for backwards compatibility)
 struct ReviewRatingView: View {
     let title: String
     let rating: Double

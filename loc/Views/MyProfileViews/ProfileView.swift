@@ -19,9 +19,8 @@ struct ProfileView: View {
     @StateObject private var photoImportVM = PhotoImportViewModel()
     @StateObject private var tikTokService = TikTokService()
     
-    @State private var showCreateReview = false
-    @State private var selectedReviewType: CreatePlaceReviewView.ReviewType = .restaurant
-    @State private var reviewWasSubmitted = false
+    @State private var showCreatePost = false
+    @State private var postWasSubmitted = false
     
     // Track if we've already done initial data refresh
     @State private var hasRefreshedPlaces = false
@@ -56,18 +55,15 @@ struct ProfileView: View {
                 photoImportVM: photoImportVM,
                 profile: profile,
                 placeVM: placeVM,
-                showCreateReview: $showCreateReview,
-                selectedReviewType: selectedReviewType,
-                reviewWasSubmitted: $reviewWasSubmitted,
-                onGenericReview: navigateToGenericReview,
-                onRestaurantReview: navigateToRestaurantReview
+                showCreatePost: $showCreatePost,
+                postWasSubmitted: $postWasSubmitted
             ))
             .modifier(StateChangesModifier(
                 photoImportVM: photoImportVM,
                 profile: profile,
                 placeVM: placeVM,
-                showCreateReview: $showCreateReview,
-                reviewWasSubmitted: $reviewWasSubmitted,
+                showCreatePost: $showCreatePost,
+                postWasSubmitted: $postWasSubmitted,
                 tikTokService: tikTokService,
                 hasRefreshedPlaces: $hasRefreshedPlaces
             ))
@@ -167,16 +163,9 @@ struct ProfileView: View {
         }
     }
     
-    private func navigateToRestaurantReview() {
-        selectedReviewType = .restaurant
-        photoImportVM.showReviewTypeSelection = false
-        showCreateReview = true
-    }
-    
-    private func navigateToGenericReview() {
-        selectedReviewType = .generic
-        photoImportVM.showReviewTypeSelection = false
-        showCreateReview = true
+    private func navigateToCreatePost() {
+        photoImportVM.showPostCreation = false
+        showCreatePost = true
     }
 }
 
@@ -238,25 +227,15 @@ struct SheetsModifier: ViewModifier {
     @ObservedObject var profile: ProfileViewModel
     @ObservedObject var placeVM: DetailPlaceViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
-    @Binding var showCreateReview: Bool
-    let selectedReviewType: CreatePlaceReviewView.ReviewType
+    @Binding var showCreatePost: Bool
     @EnvironmentObject var userSession: UserSession
     @EnvironmentObject var dataManager: DataManager
-    @Binding var reviewWasSubmitted: Bool
-    let onGenericReview: () -> Void
-    let onRestaurantReview: () -> Void
+    @Binding var postWasSubmitted: Bool
     
     func body(content: Content) -> some View {
         content
             .sheet(isPresented: $photoImportVM.showPlaceSelection) {
                 PlaceSelectionView(photoImportVM: photoImportVM)
-            }
-            .sheet(isPresented: $photoImportVM.showReviewTypeSelection) {
-                ReviewTypeSelectionView(
-                    photoImportVM: photoImportVM,
-                    onGenericReview: onGenericReview,
-                    onRestaurantReview: onRestaurantReview
-                )
             }
             .sheet(isPresented: $profile.isShowingPlaceSelection) {
                 TikTokPlaceSelectionView()
@@ -274,26 +253,25 @@ struct SheetsModifier: ViewModifier {
                     .environmentObject(placeVM)
                     .presentationDragIndicator(.visible)
             }
-            .fullScreenCover(isPresented: $showCreateReview) {
-                reviewScreen
+            .fullScreenCover(isPresented: $showCreatePost) {
+                createPostScreen
             }
     }
     
-    private var reviewScreen: some View {
+    private var createPostScreen: some View {
         Group {
             if let selectedPlace = photoImportVM.selectedPlace,
                !photoImportVM.selectedImages.isEmpty {
-                CreatePlaceReviewView(
-                    isPresented: $showCreateReview,
+                CreatePostView(
+                    isPresented: $showCreatePost,
                     place: profile.convertToDetailPlace(selectedPlace),
                     userId: userSession.currentUserId ?? "",
                     profilePhotoUrl: profile.user?.profilePhotoURL?.absoluteString ?? "",
                     userFirstName: profile.user?.firstName ?? "",
                     userLastName: profile.user?.lastName ?? "",
                     preselectedImages: photoImportVM.selectedImages,
-                    reviewType: selectedReviewType,
-                    onReviewSubmitted: { place in
-                        handleReviewSubmission(place: place)
+                    onPostSubmitted: { place in
+                        handlePostSubmission(place: place)
                     }
                 )
             } else {
@@ -302,8 +280,8 @@ struct SheetsModifier: ViewModifier {
         }
     }
     
-    private func handleReviewSubmission(place: DetailPlace) {
-        reviewWasSubmitted = true
+    private func handlePostSubmission(place: DetailPlace) {
+        postWasSubmitted = true
         
         Task {
             await photoImportVM.saveSelectedPlaceAfterReview()
@@ -311,7 +289,7 @@ struct SheetsModifier: ViewModifier {
             // End the photo import flow before navigating
             await MainActor.run {
                 photoImportVM.isInPhotoImportFlow = false
-                showCreateReview = false
+                showCreatePost = false
             }
             
             // Allow time for the sheet to dismiss before navigating
@@ -323,8 +301,6 @@ struct SheetsModifier: ViewModifier {
             }
         }
     }
-    
-
 }
 
 struct StateChangesModifier: ViewModifier {
@@ -334,8 +310,8 @@ struct StateChangesModifier: ViewModifier {
     @EnvironmentObject var userSession: UserSession
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var deepLinkViewModel: DeepLinkViewModel
-    @Binding var showCreateReview: Bool
-    @Binding var reviewWasSubmitted: Bool
+    @Binding var showCreatePost: Bool
+    @Binding var postWasSubmitted: Bool
     @ObservedObject var tikTokService: TikTokService
     @Binding var hasRefreshedPlaces: Bool  // Track if refresh already happened
     
@@ -359,8 +335,14 @@ struct StateChangesModifier: ViewModifier {
                     placeVM: placeVM
                 )
             }
-            .onChange(of: showCreateReview) {
-                handleCreateReviewChange()
+            .onChange(of: showCreatePost) {
+                handleCreatePostChange()
+            }
+            .onChange(of: photoImportVM.showPostCreation) {
+                if photoImportVM.showPostCreation {
+                    photoImportVM.showPostCreation = false
+                    showCreatePost = true
+                }
             }
             .onChange(of: photoImportVM.shouldNavigateToPlaceDetail) {
                 handlePlaceDetailNavigation()
@@ -384,10 +366,10 @@ struct StateChangesModifier: ViewModifier {
         }
     }
     
-    private func handleCreateReviewChange() {
-        if !showCreateReview {
-            if reviewWasSubmitted {
-                reviewWasSubmitted = false
+    private func handleCreatePostChange() {
+        if !showCreatePost {
+            if postWasSubmitted {
+                postWasSubmitted = false
                 DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
                     photoImportVM.clearSelection()
                 }

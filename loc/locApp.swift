@@ -48,7 +48,7 @@ struct locApp: App {
         
         let selectedPlaceVM = SelectedPlaceViewModel(
             locationManager: location,
-            reviewService: services.reviewService,
+            postService: services.postService,
             placeService: services.placeService,
             userService: services.userService,
             imageService: services.imageService,
@@ -75,7 +75,7 @@ struct locApp: App {
             detailPlaceViewModel: detailVM,
             imageService: services.imageService,
             placeService: services.placeService,
-            reviewService: services.reviewService,
+            postService: services.postService,
             locationManager: location,
             deepLinkManager: deepLinkMgr,
             deepLinkViewModel: deepLinkVM
@@ -87,7 +87,7 @@ struct locApp: App {
         let dataMgr = DataManager(
             userService: services.userService,
             placeService: services.placeService,
-            reviewService: services.reviewService,
+            postService: services.postService,
             userSession: userSess,
             locationManager: location,
             profileViewModel: profileVM,
@@ -102,7 +102,7 @@ struct locApp: App {
             detailPlaceViewModel: detailVM,
             placeService: services.placeService,
             userService: services.userService,
-            reviewService: services.reviewService
+            postService: services.postService
         )
         
         profileVM.userProfileViewModel = userProfileVM

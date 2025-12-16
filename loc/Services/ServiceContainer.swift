@@ -9,13 +9,13 @@ class ServiceContainer: ObservableObject {
     lazy var authService = SupabaseAuthService.shared
     lazy var supabaseUserService = SupabaseUserService.shared
     lazy var supabasePlaceService = SupabasePlaceService.shared
-    lazy var supabaseReviewService = SupabaseReviewService.shared
+    lazy var supabasePostService = SupabasePostService.shared
     lazy var realtimeService = SupabaseRealtimeService.shared
     
     // MARK: - Legacy Service Wrappers (for ViewModel compatibility - delegate to Supabase)
     lazy var userService: UserService = UserService.shared
     lazy var placeService: PlaceService = PlaceService.shared
-    lazy var reviewService: ReviewService = ReviewService.shared
+    lazy var postService: PostService = PostService.shared
     
     // MARK: - Other Services (unchanged)
     lazy var imageService = ImageService.shared
@@ -30,7 +30,7 @@ class ServiceContainer: ObservableObject {
         let dummyLocationManager = LocationManager()
         let dummySelectedPlaceVM = SelectedPlaceViewModel(
             locationManager: dummyLocationManager,
-            reviewService: self.reviewService,
+            postService: self.postService,
             placeService: self.placeService,
             userService: self.userService,
             imageService: self.imageService

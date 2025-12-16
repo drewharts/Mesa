@@ -533,9 +533,9 @@ class UserService: ObservableObject {
         completion(nil)
     }
 
-    func fetchFriendsReviews(userId: String, completion: @escaping ([ReviewProtocol]?, Error?) -> Void) {
-        // fetchFriendsReviews not fully implemented
-                    completion([], nil)
+    func fetchFriendsPosts(userId: String, completion: @escaping ([PlacePost]?, Error?) -> Void) {
+        // fetchFriendsPosts not fully implemented
+        completion([], nil)
     }
     
     func saveUserProfile(uid: String, profileData: ProfileData, completion: @escaping (Error?) -> Void) {

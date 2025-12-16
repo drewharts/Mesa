@@ -47,8 +47,14 @@ class PlacePhotosViewModel: ObservableObject {
     private let maxExternalReviewRetries = 3 // Maximum retry attempts for external reviews
     private let externalReviewRetryDelay: TimeInterval = 2.0 // Delay between retries in seconds
     
+    // MARK: - Deduplication Tracking
+    // Tracks URLs that have already been loaded to prevent duplicates
+    private var loadedPlacePhotoURLs: [String: Set<String>] = [:]      // placeId -> loaded internal photo URLs
+    private var loadedExternalPhotoURLs: [String: Set<String>] = [:]   // placeId -> loaded external photo URLs
+    private var externalSeenURLs: [String: Set<String>] = [:]          // placeId -> seen external URLs (for URL cache dedup)
+    
     // MARK: - Dependencies
-    private let reviewService: ReviewService
+    private let postService: PostService
     private let selectedPlaceVM: SelectedPlaceViewModel  // Temporary until fully refactored
     private var cancellables = Set<AnyCancellable>()
     
@@ -72,8 +78,8 @@ class PlacePhotosViewModel: ObservableObject {
     }
     
     // MARK: - Initialization
-    init(reviewService: ReviewService, selectedPlaceVM: SelectedPlaceViewModel) {
-        self.reviewService = reviewService
+    init(postService: PostService, selectedPlaceVM: SelectedPlaceViewModel) {
+        self.postService = postService
         self.selectedPlaceVM = selectedPlaceVM
         
         setupObservers()
@@ -95,35 +101,35 @@ class PlacePhotosViewModel: ObservableObject {
             }
             .store(in: &cancellables)
         
-        // Observe when reviews are initially loaded (debounced to wait for reviews to arrive)
+        // Observe when posts are initially loaded (debounced to wait for posts to arrive)
         selectedPlaceVM.$selectedPlace
             .debounce(for: .milliseconds(500), scheduler: DispatchQueue.main)
             .sink { [weak self] place in
                 guard let self = self, let place = place else { return }
-                self.loadPhotosForCurrentReviews(place: place)
+                self.loadPhotosForCurrentPosts(place: place)
             }
             .store(in: &cancellables)
         
-        // Observe when reviews are added/modified (e.g., after submitting a new review)
-        selectedPlaceVM.$reviewsUpdateCounter
+        // Observe when posts are added/modified (e.g., after submitting a new post)
+        selectedPlaceVM.$postsUpdateCounter
             .dropFirst() // Skip initial value
             .sink { [weak self] _ in
                 guard let self = self, let place = self.place else { return }
-                self.loadPhotosForCurrentReviews(place: place)
+                self.loadPhotosForCurrentPosts(place: place)
             }
             .store(in: &cancellables)
     }
     
-    /// Loads photos for all current reviews - called when reviews are loaded or updated
-    private func loadPhotosForCurrentReviews(place: DetailPlace) {
-        // Load place-level photo gallery from review images
+    /// Loads photos for all current posts - called when posts are loaded or updated
+    private func loadPhotosForCurrentPosts(place: DetailPlace) {
+        // Load place-level photo gallery from post images
         getPlacePhotos(for: place, loadMore: false)
         
-        // Load individual review photos and profile photos
-        let reviews = selectedPlaceVM.reviews
-        for review in reviews {
-            loadReviewPhotos(for: review)
-            loadProfilePhotoFromURL(userId: review.userId, photoUrl: review.profilePhotoUrl)
+        // Load individual post photos and profile photos
+        let posts = selectedPlaceVM.posts
+        for post in posts {
+            loadPostPhotos(for: post)
+            loadProfilePhotoFromURL(userId: post.userId, photoUrl: post.profilePhotoUrl)
         }
     }
     
@@ -221,6 +227,11 @@ class PlacePhotosViewModel: ObservableObject {
         externalReviewReviewOffsets[placeId] = 0
         externalReviewPhotoCursor[placeId] = 0
         externalReviewReviewHasMore[placeId] = true
+        
+        // Reset deduplication tracking
+        loadedPlacePhotoURLs[placeId]?.removeAll()
+        loadedExternalPhotoURLs[placeId]?.removeAll()
+        externalSeenURLs[placeId]?.removeAll()
     }
     
     private func getPlacePhotos(for place: DetailPlace, loadMore: Bool = false) {
@@ -233,72 +244,111 @@ class PlacePhotosViewModel: ObservableObject {
         
         photoLoadingStates[placeId] = .loading
         
-        // Use cached reviews to get photos (reviews are already loaded at this point)
         Task {
-            let reviews = selectedPlaceVM.reviews
+            let urlsToFetch = collectUniquePhotoURLs(for: placeId)
             
-            var photoURLs: [String] = []
-            for review in reviews {
-                photoURLs.append(contentsOf: review.images)
-            }
-            
-            // If no photos found in any reviews, mark as loaded
-            if photoURLs.isEmpty {
+            // If no new photos to load, mark as complete
+            if urlsToFetch.isEmpty {
                 self.photoLoadingStates[placeId] = .loaded
-                self.placePhotos[placeId] = []
+                if self.placePhotos[placeId] == nil {
+                    self.placePhotos[placeId] = []
+                }
                 self.allPhotosLoaded = true
                 return
             }
             
-            // Paginate the photo URLs
-            let startIndex = self.placePhotos[placeId]?.count ?? 0
-            let endIndex = min(startIndex + self.photoPageLimit, photoURLs.count)
+            // Load images in parallel
+            let loadedImages = await loadImagesInParallel(from: urlsToFetch)
             
-            guard startIndex < endIndex else {
-                // No more photos to load
-                self.allPhotosLoaded = true
-                self.photoLoadingStates[placeId] = .loaded
-                return
-            }
+            // Track loaded URLs and update cache
+            markURLsAsLoaded(urlsToFetch, for: placeId, isExternal: false)
+            appendPhotos(loadedImages, for: placeId)
             
-            let urlsToFetch = Array(photoURLs[startIndex..<endIndex])
-            
-            // Load images in parallel using TaskGroup
-            var loadedImages: [UIImage] = []
-            
-            await withTaskGroup(of: UIImage?.self) { group in
-                for url in urlsToFetch {
-                    group.addTask {
-                        await self.loadImageFromURL(imageUrl: url)
-                    }
-                }
-                
-                for await image in group {
-                    if let image {
-                        loadedImages.append(image)
-                    }
-                }
-            }
-            
-            // Update cache with new images
-            var currentPhotos = self.placePhotos[placeId] ?? []
-            currentPhotos.append(contentsOf: loadedImages)
-            self.placePhotos[placeId] = currentPhotos
-            
-            // Update loading state
             self.photoLoadingStates[placeId] = .loaded
-            
-            // Check if all photos are loaded
-            if endIndex >= photoURLs.count {
-                self.allPhotosLoaded = true
+        }
+    }
+    
+    // MARK: - Photo Deduplication Helpers
+    
+    /// Collects unique photo URLs from posts, excluding already-loaded URLs
+    /// Single Responsibility: URL collection and deduplication
+    private func collectUniquePhotoURLs(for placeId: String) -> [String] {
+        let posts = selectedPlaceVM.posts
+        let loadedURLs = loadedPlacePhotoURLs[placeId] ?? []
+        
+        // Use ordered set approach to maintain order while deduplicating
+        var seenURLs = Set<String>()
+        var uniqueURLs: [String] = []
+        
+        for post in posts {
+            for url in post.images {
+                // Skip if already loaded or already seen in this batch
+                guard !loadedURLs.contains(url), !seenURLs.contains(url) else { continue }
+                seenURLs.insert(url)
+                uniqueURLs.append(url)
             }
         }
+        
+        // Apply page limit
+        let limit = min(photoPageLimit, uniqueURLs.count)
+        return Array(uniqueURLs.prefix(limit))
+    }
+    
+    /// Marks URLs as loaded to prevent future duplicate loads
+    private func markURLsAsLoaded(_ urls: [String], for placeId: String, isExternal: Bool) {
+        if isExternal {
+            if loadedExternalPhotoURLs[placeId] == nil {
+                loadedExternalPhotoURLs[placeId] = []
+            }
+            loadedExternalPhotoURLs[placeId]?.formUnion(urls)
+        } else {
+            if loadedPlacePhotoURLs[placeId] == nil {
+                loadedPlacePhotoURLs[placeId] = []
+            }
+            loadedPlacePhotoURLs[placeId]?.formUnion(urls)
+        }
+    }
+    
+    /// Appends photos to the cache, maintaining order
+    private func appendPhotos(_ images: [UIImage], for placeId: String) {
+        if placePhotos[placeId] == nil {
+            placePhotos[placeId] = []
+        }
+        placePhotos[placeId]?.append(contentsOf: images)
+    }
+    
+    /// Loads images in parallel from URLs
+    /// Single Responsibility: Parallel image loading
+    private func loadImagesInParallel(from urls: [String]) async -> [UIImage] {
+        guard !urls.isEmpty else { return [] }
+        
+        // Use dictionary to maintain URL -> Image mapping for order preservation
+        var urlToImage: [String: UIImage] = [:]
+        
+        await withTaskGroup(of: (String, UIImage?).self) { group in
+            for url in urls {
+                group.addTask {
+                    let image = await self.loadImageFromURL(imageUrl: url)
+                    return (url, image)
+                }
+            }
+            
+            for await (url, image) in group {
+                if let image = image {
+                    urlToImage[url] = image
+                }
+            }
+        }
+        
+        // Return images in original URL order
+        return urls.compactMap { urlToImage[$0] }
     }
     
     // MARK: - External Review Photos
     private struct ExternalReviewPaginationState {
         let placeId: String
         var cachedURLs: [String]
+        var seenURLs: Set<String>  // Track seen URLs to prevent duplicates
         var reviewOffset: Int
         var hasMoreReviews: Bool
         var photoCursor: Int
@@ -306,38 +356,32 @@ class PlacePhotosViewModel: ObservableObject {
     
     private func extendExternalReviewURLs(placeId: String, state: inout ExternalReviewPaginationState) async throws {
         while state.cachedURLs.count < state.photoCursor + externalReviewPhotoBatchSize && state.hasMoreReviews {
-            let page = try await reviewService.fetchExternalReviewMedia(
+            let page = try await postService.fetchExternalReviewMedia(
                 placeId: placeId,
                 reviewOffset: state.reviewOffset,
                 reviewLimit: externalReviewReviewBatchSize
             )
             
-            state.cachedURLs.append(contentsOf: page.urls)
+            // Deduplicate URLs before adding to cache
+            let newUniqueURLs = deduplicateExternalURLs(page.urls, state: &state)
+            state.cachedURLs.append(contentsOf: newUniqueURLs)
             state.reviewOffset = page.nextReviewOffset
             state.hasMoreReviews = page.hasMore
         }
     }
     
-    private func loadExternalReviewImages(from urls: [String]) async -> [UIImage] {
-        guard !urls.isEmpty else { return [] }
+    /// Deduplicates external review URLs, filtering out already-seen URLs
+    /// Single Responsibility: URL deduplication for external reviews
+    private func deduplicateExternalURLs(_ urls: [String], state: inout ExternalReviewPaginationState) -> [String] {
+        var uniqueURLs: [String] = []
         
-        var loadedImages: [UIImage] = []
-        
-        await withTaskGroup(of: UIImage?.self) { group in
-            for url in urls {
-                group.addTask {
-                    await self.loadImageFromURL(imageUrl: url)
-                }
-            }
-            
-            for await image in group {
-                if let image {
-                    loadedImages.append(image)
-                }
-            }
+        for url in urls {
+            guard !state.seenURLs.contains(url) else { continue }
+            state.seenURLs.insert(url)
+            uniqueURLs.append(url)
         }
         
-        return loadedImages
+        return uniqueURLs
     }
     
     private func loadExternalReviewPhotos(for place: DetailPlace, reset: Bool) {
@@ -371,7 +415,10 @@ class PlacePhotosViewModel: ObservableObject {
             return
         }
         
-        let urlsToLoad = Array(state.cachedURLs.dropFirst(state.photoCursor).prefix(externalReviewPhotoBatchSize))
+        // Get URLs to load, filtering out already-loaded ones
+        let candidateURLs = Array(state.cachedURLs.dropFirst(state.photoCursor).prefix(externalReviewPhotoBatchSize))
+        let loadedURLs = loadedExternalPhotoURLs[placeId] ?? []
+        let urlsToLoad = candidateURLs.filter { !loadedURLs.contains($0) }
         
         // If no reviews found and we're still within retry limit, retry
         if urlsToLoad.isEmpty && state.cachedURLs.isEmpty && !state.hasMoreReviews {
@@ -390,10 +437,15 @@ class PlacePhotosViewModel: ObservableObject {
         
         // Load images if we have URLs, otherwise mark as loaded (empty state)
         if urlsToLoad.isEmpty {
+            // Still advance cursor even if all URLs were already loaded
+            state.photoCursor += candidateURLs.count
             updateExternalReviewPaginationState(state, newImages: [], loadingState: .loaded)
         } else {
-            let loadedImages = await loadExternalReviewImages(from: urlsToLoad)
-            state.photoCursor += urlsToLoad.count
+            let loadedImages = await loadImagesInParallel(from: urlsToLoad)
+            state.photoCursor += candidateURLs.count
+            
+            // Track loaded URLs to prevent future duplicates
+            markURLsAsLoaded(urlsToLoad, for: placeId, isExternal: true)
             
             // Reset retry count on success
             self.externalReviewRetryAttempts[placeId] = 0
@@ -410,16 +462,19 @@ class PlacePhotosViewModel: ObservableObject {
             externalReviewPhotoCursor[placeId] = 0
             externalReviewReviewHasMore[placeId] = true
             externalReviewPhotosAllLoadedByPlace[placeId] = false
+            externalSeenURLs[placeId] = []
         }
         
         let cachedURLs = externalReviewImageURLCache[placeId] ?? []
         let reviewOffset = externalReviewReviewOffsets[placeId] ?? 0
         let hasMore = externalReviewReviewHasMore[placeId] ?? true
         let cursor = externalReviewPhotoCursor[placeId] ?? 0
+        let seenURLs = externalSeenURLs[placeId] ?? []
         
         return ExternalReviewPaginationState(
             placeId: placeId,
             cachedURLs: cachedURLs,
+            seenURLs: seenURLs,
             reviewOffset: reviewOffset,
             hasMoreReviews: hasMore,
             photoCursor: cursor
@@ -439,6 +494,7 @@ class PlacePhotosViewModel: ObservableObject {
         externalReviewReviewOffsets[state.placeId] = state.reviewOffset
         externalReviewReviewHasMore[state.placeId] = state.hasMoreReviews
         externalReviewPhotoCursor[state.placeId] = state.photoCursor
+        externalSeenURLs[state.placeId] = state.seenURLs  // Persist seen URLs for deduplication
         
         let noMorePhotos = !state.hasMoreReviews && state.photoCursor >= state.cachedURLs.count
         externalReviewPhotosAllLoadedByPlace[state.placeId] = noMorePhotos
@@ -471,22 +527,22 @@ class PlacePhotosViewModel: ObservableObject {
         }
     }
     
-    // MARK: - Review Photos
+    // MARK: - Post Photos
     
-    /// Load photos for a specific review (loads first 4 initially for performance)
-    func loadReviewPhotos<T: ReviewProtocol>(for review: T) {
-        let reviewId = review.id
-        guard !review.images.isEmpty else {
-            reviewPhotos[reviewId] = []
-            reviewPhotoLoadingStates[reviewId] = .loaded
+    /// Load photos for a specific post (loads first 4 initially for performance)
+    func loadPostPhotos(for post: PlacePost) {
+        let postId = post.id
+        guard !post.images.isEmpty else {
+            reviewPhotos[postId] = []
+            reviewPhotoLoadingStates[postId] = .loaded
             return
         }
         
-        reviewPhotoLoadingStates[reviewId] = .loading
+        reviewPhotoLoadingStates[postId] = .loading
         
         // Load only the first 4 images initially for better performance
-        let initialImageCount = min(4, review.images.count)
-        let initialImageUrls = Array(review.images.prefix(initialImageCount))
+        let initialImageCount = min(4, post.images.count)
+        let initialImageUrls = Array(post.images.prefix(initialImageCount))
         
         // Load initial images in parallel using TaskGroup
         Task {
@@ -506,14 +562,14 @@ class PlacePhotosViewModel: ObservableObject {
                 }
             }
             
-            self.reviewPhotos[reviewId] = loadedImages
-            self.reviewPhotoLoadingStates[reviewId] = .loaded
+            self.reviewPhotos[postId] = loadedImages
+            self.reviewPhotoLoadingStates[postId] = .loaded
         }
     }
     
-    /// Load more photos for a specific review when user scrolls
-    func loadMoreReviewPhotos(for reviewId: String, allImageUrls: [String]) {
-        guard let currentPhotos = reviewPhotos[reviewId],
+    /// Load more photos for a specific post when user scrolls
+    func loadMorePostPhotos(for postId: String, allImageUrls: [String]) {
+        guard let currentPhotos = reviewPhotos[postId],
               currentPhotos.count < allImageUrls.count else {
             return // Already loaded all photos or no photos to load
         }
@@ -539,13 +595,13 @@ class PlacePhotosViewModel: ObservableObject {
                 }
             }
             
-            self.reviewPhotos[reviewId]?.append(contentsOf: newImages)
+            self.reviewPhotos[postId]?.append(contentsOf: newImages)
         }
     }
     
-    /// Public method to reload review photos
-    func reloadReviewPhotos<T: ReviewProtocol>(for review: T) {
-        self.loadReviewPhotos(for: review)
+    /// Public method to reload post photos
+    func reloadPostPhotos(for post: PlacePost) {
+        self.loadPostPhotos(for: post)
     }
     
     // MARK: - Profile Photos
@@ -571,14 +627,14 @@ class PlacePhotosViewModel: ObservableObject {
         }
     }
     
-    // MARK: - Public Accessors for Review & Profile Photos
+    // MARK: - Public Accessors for Post & Profile Photos
     
-    func photos(for review: any ReviewProtocol) -> [UIImage] {
-        return reviewPhotos[review.id] ?? []
+    func photos(forPostId postId: String) -> [UIImage] {
+        return reviewPhotos[postId] ?? []
     }
     
-    func photoLoadingState(for review: any ReviewProtocol) -> LoadingState {
-        return reviewPhotoLoadingStates[review.id] ?? .idle
+    func photoLoadingState(forPostId postId: String) -> LoadingState {
+        return reviewPhotoLoadingStates[postId] ?? .idle
     }
     
     func profilePhoto(forUserId userId: String) -> UIImage? {
