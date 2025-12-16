@@ -62,7 +62,6 @@ struct PlaceDetailView: View {
             }
             .padding(.vertical)
             .frame(maxWidth: .infinity)
-            .blur(radius: showPhotoGallery ? 10 : 0)
             .onAppear {
                 // Initialize the ViewModel when the view appears
                 if tabsViewModel == nil {
@@ -150,15 +149,16 @@ struct PlaceDetailView: View {
 
 
 
-            // Photo Gallery Overlay
+            // Photo Gallery Overlay (Pinterest-style) - fills entire sheet
             if showPhotoGallery, let selectedIndex = selectedImageIndex {
-                PhotoGalleryView(
+                PinterestPhotoGalleryView(
                     photos: galleryPhotos,
                     initialIndex: selectedIndex,
                     isPresented: $showPhotoGallery
                 )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .transition(.opacity)
-                .animation(.easeInOut, value: showPhotoGallery)
+                .zIndex(100)
             }
         }
     }
