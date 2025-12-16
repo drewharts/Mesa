@@ -11,7 +11,7 @@ import AuthenticationServices
 struct LoginView: View {
     @ObservedObject var viewModel: LoginViewModel
     @EnvironmentObject var userSession: UserSession
-    @State private var showContent = false
+    @State private var showSheet = false
     
     // MARK: - Brand Colors
     private let mesaCharcoal = Color(red: 45/255, green: 45/255, blue: 45/255)
@@ -21,42 +21,37 @@ struct LoginView: View {
     
     var body: some View {
         ZStack {
-            // Soft gradient background
-            LinearGradient(
-                colors: [
-                    Color(red: 200/255, green: 200/255, blue: 210/255),
-                    Color(red: 180/255, green: 180/255, blue: 195/255)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
+            // Splash screen background
+            mesaCharcoal
+                .ignoresSafeArea()
             
-            // Floating card
-            VStack(spacing: 0) {
+            // Mesa logo centered
+            Image("SplashScreen")
+                .resizable()
+                .scaledToFill()
+                .ignoresSafeArea()
+            
+            // Bottom sheet
+            VStack {
                 Spacer()
                 
-                loginCard
-                    .opacity(showContent ? 1 : 0)
-                    .offset(y: showContent ? 0 : 30)
-                
-                Spacer()
-                Spacer()
+                loginSheet
+                    .offset(y: showSheet ? 0 : 400)
             }
-            .padding(.horizontal, 24)
+            .ignoresSafeArea(edges: .bottom)
         }
         .onAppear {
-            withAnimation(.easeOut(duration: 0.6).delay(0.1)) {
-                showContent = true
+            withAnimation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.3)) {
+                showSheet = true
             }
         }
     }
     
-    // MARK: - Login Card
-    private var loginCard: some View {
+    // MARK: - Login Sheet
+    private var loginSheet: some View {
         VStack(alignment: .leading, spacing: 24) {
-            // Logo
-            logoSection
+            // Drag indicator
+            dragIndicator
             
             // Title and subtitle
             titleSection
@@ -68,23 +63,29 @@ struct LoginView: View {
             errorSection
         }
         .padding(.horizontal, 28)
-        .padding(.top, 36)
-        .padding(.bottom, 40)
+        .padding(.top, 12)
+        .padding(.bottom, 50)
         .background(
-            RoundedRectangle(cornerRadius: 32, style: .continuous)
-                .fill(cardBackground)
-                .shadow(color: .black.opacity(0.08), radius: 30, x: 0, y: 10)
+            UnevenRoundedRectangle(
+                topLeadingRadius: 32,
+                topTrailingRadius: 32,
+                style: .continuous
+            )
+            .fill(cardBackground)
+            .shadow(color: .black.opacity(0.15), radius: 30, x: 0, y: -10)
         )
     }
     
-    // MARK: - Logo Section
-    private var logoSection: some View {
-        Image("MesaLogo")
-            .resizable()
-            .scaledToFit()
-            .frame(width: 72, height: 72)
-            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .shadow(color: mesaCharcoal.opacity(0.3), radius: 8, x: 0, y: 4)
+    // MARK: - Drag Indicator
+    private var dragIndicator: some View {
+        HStack {
+            Spacer()
+            RoundedRectangle(cornerRadius: 3)
+                .fill(subtleGray)
+                .frame(width: 40, height: 5)
+            Spacer()
+        }
+        .padding(.bottom, 8)
     }
     
     // MARK: - Title Section
