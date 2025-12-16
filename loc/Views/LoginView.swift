@@ -124,7 +124,7 @@ struct LoginView: View {
                         .frame(width: 20, height: 20)
                     
                     Text("Continue with Google")
-                        .font(.system(size: 17, weight: .semibold))
+                        .font(.system(size: 19, weight: .medium))
                         .foregroundColor(mesaCharcoal)
                 }
                 .frame(maxWidth: .infinity)
