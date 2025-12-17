@@ -45,11 +45,7 @@ struct PlaceNoteDisplayView: View {
                 
                 // Link if present
                 if let link = viewModel.placeNote?.link, !link.isEmpty {
-                    Button(action: {
-                        if let url = URL(string: link) {
-                            UIApplication.shared.open(url)
-                        }
-                    }) {
+                    Button(action: viewModel.openLink) {
                         HStack(spacing: 4) {
                             Image(systemName: "link")
                                 .font(.system(size: 10))

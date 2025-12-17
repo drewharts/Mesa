@@ -9,63 +9,47 @@ import SwiftUI
 import PhotosUI
 
 struct CreatePostView: View {
-    @Binding var isPresented: Bool
-    @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var selectedPlace: SelectedPlaceViewModel
     @Environment(\.dismiss) private var dismiss
     
+    @StateObject private var viewModel: PlacePostViewModel
+    
+    @State private var showingImagePicker = false
     @State private var showAlert = false
     @State private var alertMessage = ""
     
-    let place: DetailPlace
-
-    @StateObject private var viewModel: PlacePostViewModel
-    
-    // Image picker states
-    @State private var showingImagePicker = false
-    @State private var inputImages: [UIImage] = []
-    
-    // Optional sections visibility
-    @State private var showTextSection = false
-    @State private var showSentimentSection = false
-    
     let onPostSubmitted: ((DetailPlace) -> Void)?
     
-    // Match sheet corner radius
-    private let cornerRadius: CGFloat = 16
+    // MARK: - Init
     
-    init(isPresented: Binding<Bool>, place: DetailPlace, userId: String, profilePhotoUrl: String, userFirstName: String, userLastName: String, preselectedImages: [UIImage] = [], onPostSubmitted: ((DetailPlace) -> Void)? = nil) {
-        self._isPresented = isPresented
-        self.place = place
+    init(place: DetailPlace,
+         userId: String,
+         profilePhotoUrl: String,
+         userFirstName: String,
+         userLastName: String,
+         preselectedImages: [UIImage] = [],
+         onPostSubmitted: ((DetailPlace) -> Void)? = nil) {
+        
         self.onPostSubmitted = onPostSubmitted
-
+        
         _viewModel = StateObject(
             wrappedValue: PlacePostViewModel(
                 place: place,
                 userId: userId,
                 userFirstName: userFirstName,
                 userLastName: userLastName,
-                profilePhotoUrl: profilePhotoUrl
+                profilePhotoUrl: profilePhotoUrl,
+                preselectedImages: preselectedImages
             )
         )
-        
-        self._inputImages = State(initialValue: preselectedImages)
-    }
-    
-    private var canSubmit: Bool {
-        !inputImages.isEmpty || !viewModel.postText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     var body: some View {
         NavigationView {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
-                    // Photo section (primary action)
-                    photoSection
-                    
-                    // Optional sections with + buttons
-                    optionalSectionsArea
-                    
+                    PostPhotoSection(viewModel: viewModel, showingImagePicker: $showingImagePicker)
+                    PostOptionalSections(viewModel: viewModel)
                     Spacer(minLength: 40)
                 }
                 .padding(.horizontal)
@@ -74,13 +58,12 @@ struct CreatePostView: View {
             .onTapGesture {
                 UIApplication.shared.endEditing()
             }
-            .navigationTitle(place.name)
+            .navigationTitle(viewModel.place.name)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") {
                         dismiss()
-                        isPresented = false
                     }
                     .disabled(viewModel.isLoading)
                 }
@@ -92,7 +75,7 @@ struct CreatePostView: View {
                             submitPost()
                         }
                         .fontWeight(.semibold)
-                        .disabled(!canSubmit)
+                        .disabled(!viewModel.canSubmit)
                     }
                 }
             }
@@ -103,137 +86,147 @@ struct CreatePostView: View {
             }
         }
         .sheet(isPresented: $showingImagePicker) {
-            MultiImagePicker(images: $inputImages, selectionLimit: 0)
-        }
-        .onAppear {
-            // Show sections if there's existing content
-            showTextSection = !viewModel.postText.isEmpty
-            showSentimentSection = viewModel.wouldReturn != nil
+            MultiImagePicker(images: Binding(
+                get: { viewModel.images },
+                set: { viewModel.images = $0 }
+            ), selectionLimit: 0)
         }
     }
     
-    // MARK: - Photo Section
+    // MARK: - Actions
     
-    private var photoSection: some View {
+    private func submitPost() {
+        viewModel.submitPost { result in
+            switch result {
+            case .success(let savedPost):
+                selectedPlace.addPost(savedPost)
+                dismiss()
+                onPostSubmitted?(viewModel.place)
+                
+            case .failure(let error):
+                alertMessage = error.localizedDescription
+                showAlert = true
+            }
+        }
+    }
+}
+
+// MARK: - Photo Section
+
+private struct PostPhotoSection: View {
+    @ObservedObject var viewModel: PlacePostViewModel
+    @Binding var showingImagePicker: Bool
+    
+    private let cornerRadius: CGFloat = 16
+    
+    var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Selected images preview
-            if !inputImages.isEmpty {
+            if !viewModel.images.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 12) {
-                        ForEach(Array(inputImages.enumerated()), id: \.offset) { index, image in
-                            ZStack(alignment: .topTrailing) {
-                                Image(uiImage: image)
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fill)
-                                    .frame(width: 100, height: 100)
-                                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                                
-                                // Remove button
-                                Button(action: {
-                                    inputImages.remove(at: index)
-                                }) {
-                                    Image(systemName: "xmark.circle.fill")
-                                        .font(.title2)
-                                        .symbolRenderingMode(.palette)
-                                        .foregroundStyle(.white, .black.opacity(0.6))
-                                }
-                                .offset(x: 8, y: -8)
-                            }
-                            .padding(.top, 10)
-                            .padding(.trailing, 10)
+                        ForEach(Array(viewModel.images.enumerated()), id: \.offset) { index, image in
+                            imageCell(image: image, index: index)
                         }
-                        
-                        // Add more photos button (inline with images)
-                        addPhotoButton
+                        addPhotoButton(compact: true)
                     }
                 }
             } else {
-                // Large add photos button when empty
-                addPhotoButton
+                addPhotoButton(compact: false)
             }
         }
     }
     
-    private var addPhotoButton: some View {
+    private func imageCell(image: UIImage, index: Int) -> some View {
+        ZStack(alignment: .topTrailing) {
+            Image(uiImage: image)
+                .resizable()
+                .aspectRatio(contentMode: .fill)
+                .frame(width: 100, height: 100)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+            
+            Button(action: { viewModel.removeImage(at: index) }) {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.title2)
+                    .symbolRenderingMode(.palette)
+                    .foregroundStyle(.white, .black.opacity(0.6))
+            }
+            .offset(x: 8, y: -8)
+        }
+        .padding(.top, 10)
+        .padding(.trailing, 10)
+    }
+    
+    private func addPhotoButton(compact: Bool) -> some View {
         Button(action: { showingImagePicker = true }) {
             VStack(spacing: 8) {
                 Image(systemName: "camera.fill")
                     .font(.title2)
-                if inputImages.isEmpty {
+                if !compact {
                     Text("Add Photos")
                         .font(.subheadline)
                         .fontWeight(.medium)
                 }
             }
             .foregroundColor(.gray)
-            .frame(width: inputImages.isEmpty ? nil : 100, height: 100)
-            .frame(maxWidth: inputImages.isEmpty ? .infinity : nil)
+            .frame(width: compact ? 100 : nil, height: 100)
+            .frame(maxWidth: compact ? nil : .infinity)
             .background(Color(.systemGray6))
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
         }
     }
+}
+
+// MARK: - Optional Sections
+
+private struct PostOptionalSections: View {
+    @ObservedObject var viewModel: PlacePostViewModel
     
-    // MARK: - Optional Sections Area
-    
-    private var optionalSectionsArea: some View {
+    var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            // Text section (expandable)
-            if showTextSection || !viewModel.postText.isEmpty {
-                textSection
+            if viewModel.showCaptionSection || !viewModel.postText.isEmpty {
+                PostCaptionSection(viewModel: viewModel)
             }
             
-            // Sentiment section (expandable)
-            if showSentimentSection || viewModel.wouldReturn != nil {
-                sentimentSection
+            if viewModel.showSentimentSection || viewModel.wouldReturn != nil {
+                PostSentimentSection(viewModel: viewModel)
             }
             
-            // Add buttons row for collapsed sections
             addButtonsRow
         }
     }
     
     @ViewBuilder
     private var addButtonsRow: some View {
-        let showCaptionButton = !showTextSection && viewModel.postText.isEmpty
-        let showSentimentButton = !showSentimentSection && viewModel.wouldReturn == nil
-        
-        if showCaptionButton || showSentimentButton {
+        if viewModel.shouldShowCaptionButton || viewModel.shouldShowSentimentButton {
             HStack(spacing: 12) {
-                if showCaptionButton {
-                    addOptionButton(title: "Caption", icon: "text.bubble") {
+                if viewModel.shouldShowCaptionButton {
+                    AddOptionButton(title: "Caption", icon: "text.bubble") {
                         withAnimation(.easeInOut(duration: 0.2)) {
-                            showTextSection = true
+                            viewModel.showCaption()
                         }
                     }
                 }
                 
-                if showSentimentButton {
-                    addOptionButton(title: "Would Return?", icon: "hand.thumbsup") {
+                if viewModel.shouldShowSentimentButton {
+                    AddOptionButton(title: "Would Return?", icon: "hand.thumbsup") {
                         withAnimation(.easeInOut(duration: 0.2)) {
-                            showSentimentSection = true
+                            viewModel.showSentiment()
                         }
                     }
                 }
             }
         }
     }
+}
+
+// MARK: - Caption Section
+
+private struct PostCaptionSection: View {
+    @ObservedObject var viewModel: PlacePostViewModel
     
-    private func addOptionButton(title: String, icon: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: 6) {
-                Image(systemName: "plus.circle.fill")
-                    .font(.system(size: 14))
-                Text(title)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-            }
-            .foregroundColor(.gray)
-        }
-    }
+    private let cornerRadius: CGFloat = 16
     
-    // MARK: - Text Section
-    
-    private var textSection: some View {
+    var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text("Caption")
@@ -245,8 +238,7 @@ struct CreatePostView: View {
                 
                 Button(action: {
                     withAnimation(.easeInOut(duration: 0.2)) {
-                        viewModel.postText = ""
-                        showTextSection = false
+                        viewModel.hideCaption()
                     }
                 }) {
                     Image(systemName: "xmark.circle.fill")
@@ -280,10 +272,16 @@ struct CreatePostView: View {
         }
         .transition(.opacity.combined(with: .move(edge: .top)))
     }
+}
+
+// MARK: - Sentiment Section
+
+private struct PostSentimentSection: View {
+    @ObservedObject var viewModel: PlacePostViewModel
     
-    // MARK: - Sentiment Section
+    private let cornerRadius: CGFloat = 16
     
-    private var sentimentSection: some View {
+    var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text("Would you go back?")
@@ -295,8 +293,7 @@ struct CreatePostView: View {
                 
                 Button(action: {
                     withAnimation(.easeInOut(duration: 0.2)) {
-                        viewModel.wouldReturn = nil
-                        showSentimentSection = false
+                        viewModel.hideSentiment()
                     }
                 }) {
                     Image(systemName: "xmark.circle.fill")
@@ -306,30 +303,62 @@ struct CreatePostView: View {
             }
             
             HStack(spacing: 12) {
-                sentimentButton(
+                SentimentButton(
                     title: "Yes",
                     icon: "hand.thumbsup.fill",
                     isSelected: viewModel.wouldReturn == true,
-                    color: .green
+                    color: .green,
+                    cornerRadius: cornerRadius
                 ) {
-                    viewModel.wouldReturn = viewModel.wouldReturn == true ? nil : true
+                    viewModel.toggleWouldReturn(true)
                 }
                 
-                sentimentButton(
+                SentimentButton(
                     title: "No",
                     icon: "hand.thumbsdown.fill",
                     isSelected: viewModel.wouldReturn == false,
-                    color: .red
+                    color: .red,
+                    cornerRadius: cornerRadius
                 ) {
-                    viewModel.wouldReturn = viewModel.wouldReturn == false ? nil : false
+                    viewModel.toggleWouldReturn(false)
                 }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .transition(.opacity.combined(with: .move(edge: .top)))
     }
+}
+
+// MARK: - Reusable Components
+
+private struct AddOptionButton: View {
+    let title: String
+    let icon: String
+    let action: () -> Void
     
-    private func sentimentButton(title: String, icon: String, isSelected: Bool, color: Color, action: @escaping () -> Void) -> some View {
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Image(systemName: "plus.circle.fill")
+                    .font(.system(size: 14))
+                Text(title)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+            }
+            .foregroundColor(.gray)
+        }
+    }
+}
+
+private struct SentimentButton: View {
+    let title: String
+    let icon: String
+    let isSelected: Bool
+    let color: Color
+    let cornerRadius: CGFloat
+    let action: () -> Void
+    
+    var body: some View {
         Button(action: action) {
             HStack(spacing: 6) {
                 Image(systemName: icon)
@@ -343,26 +372,6 @@ struct CreatePostView: View {
             .padding(.vertical, 10)
             .background(isSelected ? color : color.opacity(0.1))
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
-        }
-    }
-    
-    // MARK: - Submit
-    
-    private func submitPost() {
-        viewModel.images = inputImages
-        
-        viewModel.submitPost { result in
-            switch result {
-            case .success(let savedPost):
-                selectedPlace.addPost(savedPost)
-                dismiss()
-                isPresented = false
-                onPostSubmitted?(place)
-                
-            case .failure(let error):
-                alertMessage = error.localizedDescription
-                showAlert = true
-            }
         }
     }
 }

@@ -8,6 +8,7 @@
 
 import Foundation
 import Combine
+import UIKit
 
 @MainActor
 class NotesTabViewModel: ObservableObject {
@@ -151,6 +152,14 @@ class NotesTabViewModel: ObservableObject {
     func cancelEditing() {
         loadExistingNoteToFields()
         isEditing = false
+    }
+    
+    /// Opens the link associated with the note
+    func openLink() {
+        guard let link = placeNote?.link,
+              !link.isEmpty,
+              let url = URL(string: link) else { return }
+        UIApplication.shared.open(url)
     }
     
     // MARK: - Private Helpers

@@ -265,7 +265,6 @@ struct SheetsModifier: ViewModifier {
             if let selectedPlace = photoImportVM.selectedPlace,
                !photoImportVM.selectedImages.isEmpty {
                 CreatePostView(
-                    isPresented: $showCreatePost,
                     place: profile.convertToDetailPlace(selectedPlace),
                     userId: userSession.currentUserId ?? "",
                     profilePhotoUrl: profile.user?.profilePhotoURL?.absoluteString ?? "",
@@ -276,6 +275,7 @@ struct SheetsModifier: ViewModifier {
                         handlePostSubmission(place: place)
                     }
                 )
+                .environmentObject(selectedPlaceVM)
             } else {
                 EmptyView()
             }

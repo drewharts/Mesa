@@ -121,13 +121,13 @@ struct PlaceDetailView: View {
             .sheet(isPresented: $showCreatePost) {
                 if let selectedPlace = selectedPlaceVM.selectedPlace {
                     CreatePostView(
-                        isPresented: $showCreatePost,
                         place: selectedPlace,
                         userId: userSession.currentUserId ?? "",
                         profilePhotoUrl: profile.user?.profilePhotoURL?.absoluteString ?? "",
                         userFirstName: profile.user?.firstName ?? "",
                         userLastName: profile.user?.lastName ?? ""
                     )
+                    .environmentObject(selectedPlaceVM)
                     .presentationDetents([.medium, .large])
                     .presentationDragIndicator(.visible)
                 } else {
