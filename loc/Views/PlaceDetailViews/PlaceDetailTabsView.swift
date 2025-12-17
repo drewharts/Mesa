@@ -33,6 +33,7 @@ struct PlaceDetailTabsView: View {
     // Sheet presentation is a UI concern, owned by View not ViewModel
     @State private var showingSaversSheet = false
     @State private var showingHoursSheet = false
+    @State private var showingNoteSheet = false
     @State private var travelSelectorState: TravelTimeSelectorState?
     
     var body: some View {
@@ -84,6 +85,12 @@ struct PlaceDetailTabsView: View {
             )
             .presentationDetents([.medium])
             .presentationDragIndicator(.visible)
+        }
+        // Note Sheet - edit private notes for this place
+        .sheet(isPresented: $showingNoteSheet) {
+            PlaceNoteSheetView(viewModel: viewModel.notesTabViewModel)
+                .presentationDetents([.medium])
+                .presentationDragIndicator(.visible)
         }
         // Travel Time Selector - capture state from child via PreferenceKey
         .onPreferenceChange(TravelTimeSelectorStateKey.self) { state in
@@ -171,7 +178,6 @@ struct PlaceDetailTabsView: View {
     private var tabBar: some View {
         HStack(spacing: 12) {
             tabButton(title: "FEED", tab: DetailTab.reviews)
-            tabButton(title: "NOTES", tab: DetailTab.notes)
             tabButton(title: "ABOUT", tab: DetailTab.about)
         }
         .padding(.bottom, 10)
@@ -216,12 +222,11 @@ struct PlaceDetailTabsView: View {
             PlacePostsView(
                 viewModel: viewModel.postsViewModel,
                 onPhotoTapped: onPhotoTapped,
-                onAddPost: onAddReview
+                onAddPost: onAddReview,
+                onAddNote: { showingNoteSheet = true }
             )
             .environmentObject(selectedPlaceVM)
             .environmentObject(userProfileViewModel)
-        case .notes:
-            NotesTabContent(viewModel: viewModel.notesTabViewModel)
         }
     }
     

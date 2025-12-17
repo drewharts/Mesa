@@ -128,6 +128,8 @@ struct PlaceDetailView: View {
                         userFirstName: profile.user?.firstName ?? "",
                         userLastName: profile.user?.lastName ?? ""
                     )
+                    .presentationDetents([.medium, .large])
+                    .presentationDragIndicator(.visible)
                 } else {
                     Text("No place selected")
                 }

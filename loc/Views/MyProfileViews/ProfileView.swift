@@ -253,8 +253,10 @@ struct SheetsModifier: ViewModifier {
                     .environmentObject(placeVM)
                     .presentationDragIndicator(.visible)
             }
-            .fullScreenCover(isPresented: $showCreatePost) {
+            .sheet(isPresented: $showCreatePost) {
                 createPostScreen
+                    .presentationDetents([.medium, .large])
+                    .presentationDragIndicator(.visible)
             }
     }
     

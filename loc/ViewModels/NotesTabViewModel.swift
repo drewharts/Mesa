@@ -142,6 +142,17 @@ class NotesTabViewModel: ObservableObject {
         showingDeleteAlert = true
     }
     
+    /// Prepare fields for editing (called when sheet appears)
+    func prepareForEditing() {
+        loadExistingNoteToFields()
+    }
+    
+    /// Cancel editing without saving (revert to original values)
+    func cancelEditing() {
+        loadExistingNoteToFields()
+        isEditing = false
+    }
+    
     // MARK: - Private Helpers
     private func loadNote(for placeId: String) {
         guard let userId = currentUserId else { return }

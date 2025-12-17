@@ -2,7 +2,7 @@
 //  CreatePostView.swift
 //  loc
 //
-//  Simplified post creation - share photos and/or text with optional sentiment
+//  Simplified post creation as a sheet - share photos and/or text with optional sentiment
 //
 
 import SwiftUI
@@ -12,9 +12,9 @@ struct CreatePostView: View {
     @Binding var isPresented: Bool
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var selectedPlace: SelectedPlaceViewModel
-    @State private var showButtonHighlight = false
+    @Environment(\.dismiss) private var dismiss
+    
     @State private var showAlert = false
-    @State private var showSuccessAlert = false
     @State private var alertMessage = ""
     
     let place: DetailPlace
@@ -25,7 +25,14 @@ struct CreatePostView: View {
     @State private var showingImagePicker = false
     @State private var inputImages: [UIImage] = []
     
+    // Optional sections visibility
+    @State private var showTextSection = false
+    @State private var showSentimentSection = false
+    
     let onPostSubmitted: ((DetailPlace) -> Void)?
+    
+    // Match sheet corner radius
+    private let cornerRadius: CGFloat = 16
     
     init(isPresented: Binding<Bool>, place: DetailPlace, userId: String, profilePhotoUrl: String, userFirstName: String, userLastName: String, preselectedImages: [UIImage] = [], onPostSubmitted: ((DetailPlace) -> Void)? = nil) {
         self._isPresented = isPresented
@@ -45,20 +52,6 @@ struct CreatePostView: View {
         self._inputImages = State(initialValue: preselectedImages)
     }
     
-    private var btnBack: some View {
-        Button(action: {
-            guard !viewModel.isLoading else { return }
-            isPresented = false
-        }) {
-            HStack {
-                Image(systemName: "chevron.left")
-                    .aspectRatio(contentMode: .fit)
-                    .foregroundColor(.black)
-            }
-        }
-        .disabled(viewModel.isLoading)
-    }
-    
     private var canSubmit: Bool {
         !inputImages.isEmpty || !viewModel.postText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
@@ -66,74 +59,63 @@ struct CreatePostView: View {
     var body: some View {
         NavigationView {
             ScrollView {
-                VStack(spacing: 20) {
-                    // Header
-                    headerSection
-                    
-                    // Photo upload section
+                VStack(alignment: .leading, spacing: 20) {
+                    // Photo section (primary action)
                     photoSection
                     
-                    // Text input section
-                    textSection
+                    // Optional sections with + buttons
+                    optionalSectionsArea
                     
-                    // Sentiment selection (optional)
-                    sentimentSection
-                    
-                    // Submit button
-                    submitButton
+                    Spacer(minLength: 40)
                 }
-                .padding(.horizontal, 24)
-                .padding(.vertical, 16)
+                .padding(.horizontal)
+                .padding(.top, 8)
             }
             .onTapGesture {
                 UIApplication.shared.endEditing()
             }
-            .background(Color.white)
+            .navigationTitle(place.name)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        dismiss()
+                        isPresented = false
+                    }
+                    .disabled(viewModel.isLoading)
+                }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    if viewModel.isLoading {
+                        ProgressView()
+                    } else {
+                        Button("Share") {
+                            submitPost()
+                        }
+                        .fontWeight(.semibold)
+                        .disabled(!canSubmit)
+                    }
+                }
+            }
+            .alert("Post Failed", isPresented: $showAlert) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text(alertMessage)
+            }
         }
-        .navigationBarBackButtonHidden(true)
-        .navigationBarItems(leading: btnBack)
         .sheet(isPresented: $showingImagePicker) {
             MultiImagePicker(images: $inputImages, selectionLimit: 0)
         }
-    }
-    
-    // MARK: - Header Section
-    
-    private var headerSection: some View {
-        VStack(spacing: 8) {
-            Text(place.name)
-                .font(.title2)
-                .fontWeight(.bold)
-                .foregroundColor(.black)
-                .multilineTextAlignment(.center)
-            
-            Text("Share your experience")
-                .font(.subheadline)
-                .foregroundColor(.gray)
+        .onAppear {
+            // Show sections if there's existing content
+            showTextSection = !viewModel.postText.isEmpty
+            showSentimentSection = viewModel.wouldReturn != nil
         }
-        .padding(.top, 8)
     }
     
     // MARK: - Photo Section
     
     private var photoSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Upload button
-            Button(action: { showingImagePicker = true }) {
-                HStack {
-                    Image(systemName: "camera.fill")
-                        .font(.body)
-                    Text(inputImages.isEmpty ? "Add Photos" : "Add More Photos")
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                }
-                .foregroundColor(.blue)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-                .background(Color.blue.opacity(0.1))
-                .cornerRadius(20)
-            }
-            
             // Selected images preview
             if !inputImages.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -144,7 +126,7 @@ struct CreatePostView: View {
                                     .resizable()
                                     .aspectRatio(contentMode: .fill)
                                     .frame(width: 100, height: 100)
-                                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))
                                 
                                 // Remove button
                                 Button(action: {
@@ -157,142 +139,214 @@ struct CreatePostView: View {
                                 }
                                 .offset(x: 8, y: -8)
                             }
-                            .padding(.top, 10) // Room for X button above image
-                            .padding(.trailing, 10) // Room for X button on right
+                            .padding(.top, 10)
+                            .padding(.trailing, 10)
+                        }
+                        
+                        // Add more photos button (inline with images)
+                        addPhotoButton
+                    }
+                }
+            } else {
+                // Large add photos button when empty
+                addPhotoButton
+            }
+        }
+    }
+    
+    private var addPhotoButton: some View {
+        Button(action: { showingImagePicker = true }) {
+            VStack(spacing: 8) {
+                Image(systemName: "camera.fill")
+                    .font(.title2)
+                if inputImages.isEmpty {
+                    Text("Add Photos")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                }
+            }
+            .foregroundColor(.gray)
+            .frame(width: inputImages.isEmpty ? nil : 100, height: 100)
+            .frame(maxWidth: inputImages.isEmpty ? .infinity : nil)
+            .background(Color(.systemGray6))
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+        }
+    }
+    
+    // MARK: - Optional Sections Area
+    
+    private var optionalSectionsArea: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            // Text section (expandable)
+            if showTextSection || !viewModel.postText.isEmpty {
+                textSection
+            }
+            
+            // Sentiment section (expandable)
+            if showSentimentSection || viewModel.wouldReturn != nil {
+                sentimentSection
+            }
+            
+            // Add buttons row for collapsed sections
+            addButtonsRow
+        }
+    }
+    
+    @ViewBuilder
+    private var addButtonsRow: some View {
+        let showCaptionButton = !showTextSection && viewModel.postText.isEmpty
+        let showSentimentButton = !showSentimentSection && viewModel.wouldReturn == nil
+        
+        if showCaptionButton || showSentimentButton {
+            HStack(spacing: 12) {
+                if showCaptionButton {
+                    addOptionButton(title: "Caption", icon: "text.bubble") {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            showTextSection = true
                         }
                     }
-                    .padding(.leading, 4)
+                }
+                
+                if showSentimentButton {
+                    addOptionButton(title: "Would Return?", icon: "hand.thumbsup") {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            showSentimentSection = true
+                        }
+                    }
                 }
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+    
+    private func addOptionButton(title: String, icon: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Image(systemName: "plus.circle.fill")
+                    .font(.system(size: 14))
+                Text(title)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+            }
+            .foregroundColor(.gray)
+        }
     }
     
     // MARK: - Text Section
     
     private var textSection: some View {
         VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Caption")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundColor(.secondary)
+                
+                Spacer()
+                
+                Button(action: {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        viewModel.postText = ""
+                        showTextSection = false
+                    }
+                }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundColor(.gray)
+                        .font(.system(size: 18))
+                }
+            }
+            
             ZStack(alignment: .topLeading) {
                 TextEditor(text: $viewModel.postText)
                     .font(.body)
-                    .frame(minHeight: 100)
+                    .frame(minHeight: 80)
                     .scrollContentBackground(.hidden)
-                    .background(Color.gray.opacity(0.1))
-                    .cornerRadius(12)
-                    .foregroundStyle(.black)
+                    .padding(12)
+                    .background(Color(.systemGray6))
+                    .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: cornerRadius)
+                            .stroke(Color(.systemGray4), lineWidth: 1)
+                    )
 
                 if viewModel.postText.isEmpty {
                     Text("What was your experience like?")
                         .font(.body)
                         .foregroundColor(.gray)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 12)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 20)
                         .allowsHitTesting(false)
                 }
             }
         }
+        .transition(.opacity.combined(with: .move(edge: .top)))
     }
     
     // MARK: - Sentiment Section
     
     private var sentimentSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Would you go back?")
-                .font(.subheadline)
-                .foregroundColor(.gray)
+            HStack {
+                Text("Would you go back?")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundColor(.secondary)
+                
+                Spacer()
+                
+                Button(action: {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        viewModel.wouldReturn = nil
+                        showSentimentSection = false
+                    }
+                }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundColor(.gray)
+                        .font(.system(size: 18))
+                }
+            }
             
             HStack(spacing: 12) {
-                // Would go back button
                 sentimentButton(
-                    title: "Would go back",
+                    title: "Yes",
                     icon: "hand.thumbsup.fill",
                     isSelected: viewModel.wouldReturn == true,
                     color: .green
                 ) {
-                    if viewModel.wouldReturn == true {
-                        viewModel.wouldReturn = nil
-                    } else {
-                        viewModel.wouldReturn = true
-                    }
+                    viewModel.wouldReturn = viewModel.wouldReturn == true ? nil : true
                 }
                 
-                // Wouldn't revisit button
                 sentimentButton(
-                    title: "Wouldn't revisit",
+                    title: "No",
                     icon: "hand.thumbsdown.fill",
                     isSelected: viewModel.wouldReturn == false,
                     color: .red
                 ) {
-                    if viewModel.wouldReturn == false {
-                        viewModel.wouldReturn = nil
-                    } else {
-                        viewModel.wouldReturn = false
-                    }
+                    viewModel.wouldReturn = viewModel.wouldReturn == false ? nil : false
                 }
             }
-            
-            Text("Optional - tap to select or deselect")
-                .font(.caption)
-                .foregroundColor(.gray.opacity(0.7))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .transition(.opacity.combined(with: .move(edge: .top)))
     }
     
     private func sentimentButton(title: String, icon: String, isSelected: Bool, color: Color, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 6) {
                 Image(systemName: icon)
-                    .font(.caption)
+                    .font(.subheadline)
                 Text(title)
-                    .font(.caption)
+                    .font(.subheadline)
                     .fontWeight(.medium)
             }
             .foregroundColor(isSelected ? .white : color)
-            .padding(.horizontal, 14)
+            .padding(.horizontal, 16)
             .padding(.vertical, 10)
             .background(isSelected ? color : color.opacity(0.1))
-            .cornerRadius(20)
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
         }
     }
     
-    // MARK: - Submit Button
-    
-    private var submitButton: some View {
-        Button(action: submitPost) {
-            if viewModel.isLoading {
-                ProgressView()
-                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-                    .background(Color.blue)
-                    .cornerRadius(25)
-            } else {
-                Text("Share Post")
-                    .font(.headline)
-                    .fontWeight(.semibold)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-                    .background(canSubmit ? Color.blue : Color.gray.opacity(0.3))
-                    .foregroundColor(canSubmit ? .white : .gray)
-                    .cornerRadius(25)
-            }
-        }
-        .disabled(!canSubmit || viewModel.isLoading)
-        .padding(.top, 8)
-        .alert("Post Failed", isPresented: $showAlert) {
-            Button("OK", role: .cancel) { }
-        } message: {
-            Text(alertMessage)
-        }
-        .alert("Posted!", isPresented: $showSuccessAlert) {
-            Button("OK") {
-                isPresented = false
-                onPostSubmitted?(place)
-            }
-        } message: {
-            Text("Your post has been shared!")
-        }
-    }
+    // MARK: - Submit
     
     private func submitPost() {
         viewModel.images = inputImages
@@ -301,7 +355,9 @@ struct CreatePostView: View {
             switch result {
             case .success(let savedPost):
                 selectedPlace.addPost(savedPost)
-                showSuccessAlert = true
+                dismiss()
+                isPresented = false
+                onPostSubmitted?(place)
                 
             case .failure(let error):
                 alertMessage = error.localizedDescription
@@ -310,4 +366,3 @@ struct CreatePostView: View {
         }
     }
 }
-
