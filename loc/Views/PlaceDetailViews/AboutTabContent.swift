@@ -19,6 +19,9 @@ struct AboutTabContent: View {
     
     let onPhotoTapped: ([UIImage], Int) -> Void
     
+    // MARK: - View-Owned Presentation State
+    @State private var showingNoteSheet = false
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // NOTE: CustomPlaceCreatorView moved to PlaceDetailTabsView type row
@@ -28,7 +31,13 @@ struct AboutTabContent: View {
                 PlaceInfoSection(place: place)
             }
             
-            // 2. SMART COMPONENT: TikTok videos with their own ViewModel
+            // 2. User's private note (only shown if note exists)
+            PlaceNoteDisplayView(
+                viewModel: viewModel.notesViewModel,
+                onEditTapped: { showingNoteSheet = true }
+            )
+            
+            // 3. SMART COMPONENT: TikTok videos with their own ViewModel
             TikTokVideosSection(
                 viewModel: viewModel.tikTokVideosViewModel,
                 placeId: viewModel.placeId,
@@ -37,12 +46,17 @@ struct AboutTabContent: View {
             .environmentObject(profile)
             .environmentObject(userSession)
             
-            // 3. SMART COMPONENT: Photos with its own ViewModel
+            // 4. SMART COMPONENT: Photos with its own ViewModel
             PlacePhotosView(
                 viewModel: viewModel.placePhotosViewModel,
                 onPhotoTapped: onPhotoTapped
             )
             .padding(.top, 20)
+        }
+        .sheet(isPresented: $showingNoteSheet) {
+            PlaceNoteSheetView(viewModel: viewModel.notesViewModel)
+                .presentationDetents([.medium])
+                .presentationDragIndicator(.visible)
         }
     }
 }
@@ -100,11 +114,19 @@ struct AboutTabContent: View {
         placeService: services.placeService
     )
     
+    let notesVM = NotesTabViewModel(
+        userService: services.userService,
+        selectedPlaceVM: selectedPlaceVM,
+        profileVM: profileVM,
+        userSession: userSession
+    )
+    
     // Create coordinator ViewModel
     let aboutVM = AboutTabViewModel(
         tikTokVideosViewModel: tikTokVM,
         placePhotosViewModel: photosVM,
         customPlaceCreatorViewModel: customPlaceCreatorVM,
+        notesViewModel: notesVM,
         selectedPlaceVM: selectedPlaceVM
     )
     

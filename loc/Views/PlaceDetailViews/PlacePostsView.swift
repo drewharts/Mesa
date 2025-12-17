@@ -11,6 +11,7 @@ struct PlacePostsView: View {
     @ObservedObject var viewModel: PlacePostsViewModel
     let onPhotoTapped: ([UIImage], Int) -> Void
     let onAddPost: () -> Void
+    let onAddNote: () -> Void
     
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var userProfileViewModel: UserProfileViewModel
@@ -90,6 +91,16 @@ struct PlacePostsView: View {
                     .foregroundColor(viewModel.isFavorited ? .yellow : .gray)
                     .frame(width: 32, height: 32)
                     .background(viewModel.isFavorited ? Color.yellow.opacity(0.15) : Color.gray.opacity(0.1))
+                    .cornerRadius(16)
+            }
+            
+            // Private Note Button
+            Button(action: onAddNote) {
+                Image(systemName: "note.text")
+                    .font(.body)
+                    .foregroundColor(.gray)
+                    .frame(width: 32, height: 32)
+                    .background(Color.gray.opacity(0.1))
                     .cornerRadius(16)
             }
             

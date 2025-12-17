@@ -20,6 +20,7 @@ class AboutTabViewModel: ObservableObject {
     let tikTokVideosViewModel: TikTokVideosViewModel
     let placePhotosViewModel: PlacePhotosViewModel
     let customPlaceCreatorViewModel: CustomPlaceCreatorViewModel
+    let notesViewModel: NotesTabViewModel
     
     // MARK: - Dependencies
     private let selectedPlaceVM: SelectedPlaceViewModel
@@ -29,10 +30,12 @@ class AboutTabViewModel: ObservableObject {
     init(tikTokVideosViewModel: TikTokVideosViewModel,
          placePhotosViewModel: PlacePhotosViewModel,
          customPlaceCreatorViewModel: CustomPlaceCreatorViewModel,
+         notesViewModel: NotesTabViewModel,
          selectedPlaceVM: SelectedPlaceViewModel) {
         self.tikTokVideosViewModel = tikTokVideosViewModel
         self.placePhotosViewModel = placePhotosViewModel
         self.customPlaceCreatorViewModel = customPlaceCreatorViewModel
+        self.notesViewModel = notesViewModel
         self.selectedPlaceVM = selectedPlaceVM
         
         setupObservers()

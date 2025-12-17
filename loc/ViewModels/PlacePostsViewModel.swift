@@ -96,18 +96,25 @@ class PlacePostsViewModel: ObservableObject {
             .store(in: &cancellables)
     }
     
-    /// Observes favorite status changes for the current place
+    /// Observes favorite status changes for the current place.
+    /// Monitors both lightweightFavorites and userFavorites since isPlaceFavorite checks both.
     private func observeFavoriteStatus() {
-        Publishers.CombineLatest(
+        Publishers.CombineLatest3(
             selectedPlaceVM.$selectedPlace,
-            profileVM.$lightweightFavorites
+            profileVM.$lightweightFavorites,
+            profileVM.$userFavorites
         )
-        .sink { [weak self] place, _ in
+        .receive(on: RunLoop.main) // Ensure UI updates on main thread
+        .sink { [weak self] place, _, _ in
             guard let self = self, let place = place else {
                 self?.isFavorited = false
                 return
             }
-            self.isFavorited = self.profileVM.isPlaceFavorite(placeId: place.id.uuidString)
+            let newFavoriteState = self.profileVM.isPlaceFavorite(placeId: place.id.uuidString)
+            if self.isFavorited != newFavoriteState {
+                print("⭐ [PlacePostsVM] Favorite status changed: \(self.isFavorited) → \(newFavoriteState)")
+                self.isFavorited = newFavoriteState
+            }
         }
         .store(in: &cancellables)
     }

@@ -15,7 +15,6 @@ import Combine
 enum DetailTab {
     case about
     case reviews
-    case notes
 }
 
 @MainActor
@@ -102,18 +101,19 @@ class PlaceDetailTabsViewModel: ObservableObject {
             placeService: placeService
         )
         
-        self.aboutTabViewModel = AboutTabViewModel(
-            tikTokVideosViewModel: tikTokVM,
-            placePhotosViewModel: photosVM,
-            customPlaceCreatorViewModel: customPlaceCreatorVM,
-            selectedPlaceVM: selectedPlaceVM
-        )
-        
         self.notesTabViewModel = NotesTabViewModel(
             userService: userService,
             selectedPlaceVM: selectedPlaceVM,
             profileVM: profileVM,
             userSession: userSession
+        )
+        
+        self.aboutTabViewModel = AboutTabViewModel(
+            tikTokVideosViewModel: tikTokVM,
+            placePhotosViewModel: photosVM,
+            customPlaceCreatorViewModel: customPlaceCreatorVM,
+            notesViewModel: self.notesTabViewModel,
+            selectedPlaceVM: selectedPlaceVM
         )
         
         self.postsViewModel = PlacePostsViewModel(
