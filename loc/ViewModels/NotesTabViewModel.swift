@@ -8,6 +8,7 @@
 
 import Foundation
 import Combine
+import UIKit
 
 @MainActor
 class NotesTabViewModel: ObservableObject {
@@ -140,6 +141,25 @@ class NotesTabViewModel: ObservableObject {
     
     func showDeleteAlert() {
         showingDeleteAlert = true
+    }
+    
+    /// Prepare fields for editing (called when sheet appears)
+    func prepareForEditing() {
+        loadExistingNoteToFields()
+    }
+    
+    /// Cancel editing without saving (revert to original values)
+    func cancelEditing() {
+        loadExistingNoteToFields()
+        isEditing = false
+    }
+    
+    /// Opens the link associated with the note
+    func openLink() {
+        guard let link = placeNote?.link,
+              !link.isEmpty,
+              let url = URL(string: link) else { return }
+        UIApplication.shared.open(url)
     }
     
     // MARK: - Private Helpers

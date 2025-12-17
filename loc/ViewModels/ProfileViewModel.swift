@@ -661,82 +661,128 @@ class ProfileViewModel: ObservableObject {
          // Skip sorting for individual place removals to avoid frequent re-sorting
      }
     
-     func addFavoritePlace(place: DetailPlace) {
-        guard let userId = userSession.currentUserId else { return }
-        // Prevent duplicates and enforce max 6 favorites
-        if lightweightFavorites.count >= 6 {
-            showMaxFavoritesAlert = true
+    /// Adds a place to favorites with server-side validation.
+    /// Uses FavoritesService for atomic check-and-insert to prevent race conditions.
+    func addFavoritePlace(place: DetailPlace) {
+        guard let userId = userSession.currentUserId else {
+            print("⚠️ [ProfileViewModel] Cannot add favorite: no user ID")
             return
         }
         
-        // Check if already favorited
-        if lightweightFavorites.contains(where: { $0.place_id == place.id.uuidString }) {
+        let placeId = place.id.uuidString
+        
+        // Quick client-side check (server will also validate)
+        if lightweightFavorites.contains(where: { $0.place_id == placeId }) {
+            print("ℹ️ [ProfileViewModel] Place already favorited locally: \(placeId)")
             return
         }
         
-        // Optimistic UI update - add immediately to lightweightFavorites
+        // Optimistic UI update - add immediately for responsive UX
         let newFavorite = FavoritePlace(
-            place_id: place.id.uuidString,
+            place_id: placeId,
             name: place.name,
             latest_review_photo: place.photoUrls?.first
         )
         lightweightFavorites.append(newFavorite)
         
         // Also update legacy userFavorites array
-        if !userFavorites.contains(place.id.uuidString) {
-            userFavorites.append(place.id.uuidString)
+        if !userFavorites.contains(placeId) {
+            userFavorites.append(placeId)
         }
         
-        // Persist to Supabase favorites table (only IDs, not full place data)
-        placeService.addFavorite(userId: userId, placeId: place.id.uuidString) { [weak self] error in
-            if let error = error {
-                print("❌ Error adding profile favorite: \(error)")
-                // Revert optimistic update on failure
-                DispatchQueue.main.async {
-                    self?.lightweightFavorites.removeAll { $0.place_id == place.id.uuidString }
-                    self?.userFavorites.removeAll { $0 == place.id.uuidString }
+        // Update placeSavers for map display
+        updatePlaceSavers(placeId: placeId, userId: userId, isAdding: true)
+        
+        // Persist using FavoritesService (server-side validation)
+        Task {
+            let result = await FavoritesService.shared.addFavorite(userId: userId, placeId: placeId)
+            
+            await MainActor.run {
+                switch result {
+                case .success:
+                    // Success - optimistic update was correct
+                    print("✅ [ProfileViewModel] Favorite added successfully: \(place.name)")
+                    self.detailPlaceViewModel.calculateAnnotationPlaces()
+                    
+                case .maxLimit:
+                    // Server says max limit - revert and show alert
+                    print("⚠️ [ProfileViewModel] Server rejected: max favorites reached")
+                    self.revertFavoriteAdd(placeId: placeId, userId: userId)
+                    self.showMaxFavoritesAlert = true
+                    
+                case .duplicate:
+                    // Already favorited on server - keep local state as is
+                    print("ℹ️ [ProfileViewModel] Server says already favorited: \(placeId)")
+                    
+                case .error(let error):
+                    // Error - revert optimistic update
+                    print("❌ [ProfileViewModel] Error adding favorite: \(error)")
+                    self.revertFavoriteAdd(placeId: placeId, userId: userId)
                 }
             }
         }
-        
-        // Add current user as saver so favorite places appear on map with profile picture
-        if detailPlaceViewModel.placeSavers[place.id.uuidString] == nil {
-            detailPlaceViewModel.placeSavers[place.id.uuidString] = [userId]
-        } else if !detailPlaceViewModel.placeSavers[place.id.uuidString]!.contains(userId) {
-            detailPlaceViewModel.placeSavers[place.id.uuidString]!.append(userId)
-        }
-        
-        // Recalculate map annotations to include the new favorite place
-        detailPlaceViewModel.calculateAnnotationPlaces()
     }
     
+    /// Reverts an optimistic favorite add
+    private func revertFavoriteAdd(placeId: String, userId: String) {
+        lightweightFavorites.removeAll { $0.place_id == placeId }
+        userFavorites.removeAll { $0 == placeId }
+        updatePlaceSavers(placeId: placeId, userId: userId, isAdding: false)
+    }
+    
+    /// Updates placeSavers dictionary for map display
+    private func updatePlaceSavers(placeId: String, userId: String, isAdding: Bool) {
+        if isAdding {
+            if detailPlaceViewModel.placeSavers[placeId] == nil {
+                detailPlaceViewModel.placeSavers[placeId] = [userId]
+            } else if !detailPlaceViewModel.placeSavers[placeId]!.contains(userId) {
+                detailPlaceViewModel.placeSavers[placeId]!.append(userId)
+            }
+        } else {
+            detailPlaceViewModel.placeSavers[placeId]?.removeAll { $0 == userId }
+            if detailPlaceViewModel.placeSavers[placeId]?.isEmpty == true {
+                detailPlaceViewModel.placeSavers.removeValue(forKey: placeId)
+            }
+        }
+    }
+    
+    /// Removes a place from favorites.
     func removeFavoritePlace(place: DetailPlace) {
-        guard let userId = userSession.currentUserId else { return }
+        guard let userId = userSession.currentUserId else {
+            print("⚠️ [ProfileViewModel] Cannot remove favorite: no user ID")
+            return
+        }
         
-        // Optimistic UI update - remove immediately from lightweightFavorites
-        let removedFavorite = lightweightFavorites.first { $0.place_id == place.id.uuidString }
-        lightweightFavorites.removeAll { $0.place_id == place.id.uuidString }
+        let placeId = place.id.uuidString
         
-        // Also remove from legacy userFavorites array
-        userFavorites.removeAll { $0 == place.id.uuidString }
+        // Store for potential revert
+        let removedFavorite = lightweightFavorites.first { $0.place_id == placeId }
         
-        // Persist to Supabase favorites table
-        placeService.removeFavorite(userId: userId, placeId: place.id.uuidString) { [weak self] error in
-            if let error = error {
-                print("❌ Error removing profile favorite: \(error)")
+        // Optimistic UI update - remove immediately
+        lightweightFavorites.removeAll { $0.place_id == placeId }
+        userFavorites.removeAll { $0 == placeId }
+        
+        // Persist using FavoritesService
+        Task {
+            do {
+                try await FavoritesService.shared.removeFavorite(userId: userId, placeId: placeId)
+                print("✅ [ProfileViewModel] Favorite removed successfully: \(place.name)")
+            } catch {
                 // Revert optimistic update on failure
-                DispatchQueue.main.async {
+                print("❌ [ProfileViewModel] Error removing favorite: \(error)")
+                await MainActor.run {
                     if let favorite = removedFavorite {
-                        self?.lightweightFavorites.append(favorite)
+                        self.lightweightFavorites.append(favorite)
                     }
-                    if let self = self, !self.userFavorites.contains(place.id.uuidString) {
-                        self.userFavorites.append(place.id.uuidString)
+                    if !self.userFavorites.contains(placeId) {
+                        self.userFavorites.append(placeId)
                     }
                 }
             }
         }
     }
     
+    /// Checks if a place is in the user's favorites.
     func isPlaceFavorite(placeId: String) -> Bool {
         return lightweightFavorites.contains(where: { $0.place_id == placeId }) || userFavorites.contains(placeId)
     }

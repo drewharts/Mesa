@@ -447,6 +447,9 @@ class SelectedPlaceViewModel: ObservableObject {
                             
                             // Remove from liked posts set if it was there
                             self.likedPosts.remove(postId)
+                            
+                            // Notify observers that posts have changed
+                            self.postsUpdateCounter += 1
                         }
                     }
                     completion(.success(()))
