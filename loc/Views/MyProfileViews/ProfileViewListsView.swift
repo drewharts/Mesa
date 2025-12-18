@@ -112,8 +112,14 @@ struct ProfileViewListsView: View {
     
     // MARK: - List View
     
+    // 2-column grid for displaying lists side by side
+    private let listColumns = [
+        GridItem(.flexible(), spacing: 12),
+        GridItem(.flexible(), spacing: 12)
+    ]
+    
     private var listView: some View {
-        LazyVStack(spacing: 16) {
+        LazyVGrid(columns: listColumns, spacing: 16) {
             ForEach(Array(profile.filteredPlaceLists.enumerated()), id: \.element.id) { index, list in
                 LightweightProfileListSection(
                     list: list,
@@ -132,6 +138,7 @@ struct ProfileViewListsView: View {
                 paginationLoadingView
             }
         }
+        .padding(.horizontal, 16)
     }
     
     // MARK: - Empty State View

@@ -26,14 +26,15 @@ struct LightweightProfileListSection: View {
     }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // List header with title and place count
+        VStack(alignment: .leading, spacing: 8) {
+            // List header with title and place count - compact version
             HStack {
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: 2) {
                     Text(list.name)
-                        .font(.headline)
+                        .font(.subheadline)
                         .fontWeight(.semibold)
                         .foregroundColor(.primary)
+                        .lineLimit(1)
                     
                     // Show owner name if this is a shared list (collaborator view)
                     if list.isSharedWithMe, let ownerName = list.owner_name {
@@ -54,72 +55,65 @@ struct LightweightProfileListSection: View {
                 
                 Spacer()
             }
-            .padding(.horizontal, 20)
             
-            // Card with places grid
+            // Card with places grid - compact 2x2 layout
             Button(action: {
                 showingListPopup = true
             }) {
                 VStack(spacing: 0) {
                     if !places.isEmpty {
-                        // Places grid (first 6 places in 2x3 layout)
-                        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
-                            ForEach(Array(places.prefix(6).enumerated()), id: \.element.id) { index, place in
+                        // Places grid (first 4 places in 2x2 layout for compact view)
+                        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: 2), spacing: 4) {
+                            ForEach(Array(places.prefix(4).enumerated()), id: \.element.id) { index, place in
                                 LightweightPlacePreviewCard(
                                     place: place,
-                                    placeColors: $placeColors
+                                    placeColors: $placeColors,
+                                    height: 60
                                 )
                             }
                             
-                            // Fill remaining slots if less than 6 places
-                            if places.count < 6 {
-                                ForEach(0..<(6 - places.count), id: \.self) { _ in
+                            // Fill remaining slots if less than 4 places
+                            if places.count < 4 {
+                                ForEach(0..<(4 - places.count), id: \.self) { _ in
                                     Rectangle()
                                         .fill(Color.gray.opacity(0.1))
-                                        .frame(height: 80)
-                                        .cornerRadius(8)
+                                        .frame(height: 60)
+                                        .cornerRadius(6)
                                         .overlay(
-                                            RoundedRectangle(cornerRadius: 8)
+                                            RoundedRectangle(cornerRadius: 6)
                                                 .stroke(Color.gray.opacity(0.2), lineWidth: 1)
                                         )
                                 }
                             }
                         }
-                        .padding(16)
+                        .padding(8)
                     } else {
-                        // Empty state
-                        VStack(spacing: 12) {
+                        // Empty state - compact
+                        VStack(spacing: 8) {
                             Image(systemName: "photo.on.rectangle.angled")
-                                .font(.system(size: 32))
+                                .font(.system(size: 24))
                                 .foregroundColor(.gray.opacity(0.5))
                             
                             Text("No places yet")
-                                .font(.subheadline)
-                                .foregroundColor(.gray)
-                            
-                            Text("Add places to this list to see them here")
                                 .font(.caption)
-                                .foregroundColor(.gray.opacity(0.7))
-                                .multilineTextAlignment(.center)
+                                .foregroundColor(.gray)
                         }
-                        .frame(height: 120)
+                        .frame(height: 100)
                         .frame(maxWidth: .infinity)
                     }
                 }
                 .background(
-                    RoundedRectangle(cornerRadius: 16)
+                    RoundedRectangle(cornerRadius: 12)
                         .fill(Color(.systemBackground))
-                        .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
+                        .shadow(color: .black.opacity(0.08), radius: 6, x: 0, y: 3)
                 )
                 .overlay(
-                    RoundedRectangle(cornerRadius: 16)
+                    RoundedRectangle(cornerRadius: 12)
                         .stroke(Color.gray.opacity(0.1), lineWidth: 1)
                 )
             }
             .buttonStyle(PlainButtonStyle())
-            .scaleEffect(1.0)
         }
-        .padding(.horizontal, 20)
         .sheet(isPresented: $showingListPopup) {
             // Use lightweight popup with swiping support between all lists
             LightweightListPopupView(
@@ -135,6 +129,7 @@ struct LightweightProfileListSection: View {
 struct LightweightPlacePreviewCard: View {
     let place: LightweightPlace
     @Binding var placeColors: [UUID: Color]
+    var height: CGFloat = 80  // Default height, can be customized for compact layouts
     
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @Environment(\.presentationMode) var presentationMode
@@ -147,12 +142,17 @@ struct LightweightPlacePreviewCard: View {
         return Color(hue: hue, saturation: 0.6, brightness: 0.8)
     }
     
+    // Smaller corner radius for compact views
+    private var cornerRadius: CGFloat {
+        height < 80 ? 6 : 8
+    }
+    
     var body: some View {
         ZStack(alignment: .bottom) {
             // Container to strictly enforce bounds
             Rectangle()
                 .fill(Color.clear)
-                .frame(height: 80)
+                .frame(height: height)
                 .overlay(
                     Group {
                         // Check for TikTok thumbnail first, then review photo, then colored rectangle
@@ -164,18 +164,18 @@ struct LightweightPlacePreviewCard: View {
                                     image
                                         .resizable()
                                         .aspectRatio(contentMode: .fill)
-                                        .frame(maxWidth: .infinity, maxHeight: 80)
+                                        .frame(maxWidth: .infinity, maxHeight: height)
                                         .clipped()
                                 case .failure:
                                     // Fallback to colored rectangle on failure
                                     Rectangle()
                                         .foregroundColor(placeColor)
-                                        .frame(maxWidth: .infinity, maxHeight: 80)
+                                        .frame(maxWidth: .infinity, maxHeight: height)
                                 case .empty:
                                     // Loading state
                                     Rectangle()
                                         .foregroundColor(.gray.opacity(0.3))
-                                        .frame(maxWidth: .infinity, maxHeight: 80)
+                                        .frame(maxWidth: .infinity, maxHeight: height)
                                         .onAppear {
                                             Task {
                                                 _ = await TikTokMetadataCache.shared.getMetadata(for: tiktokUrl)
@@ -184,7 +184,7 @@ struct LightweightPlacePreviewCard: View {
                                 @unknown default:
                                     Rectangle()
                                         .foregroundColor(placeColor)
-                                        .frame(maxWidth: .infinity, maxHeight: 80)
+                                        .frame(maxWidth: .infinity, maxHeight: height)
                                 }
                             }
                         } else if let photoUrl = place.latest_review_photo, let url = URL(string: photoUrl) {
@@ -194,28 +194,28 @@ struct LightweightPlacePreviewCard: View {
                                     image
                                         .resizable()
                                         .aspectRatio(contentMode: .fill)
-                                        .frame(maxWidth: .infinity, maxHeight: 80)
+                                        .frame(maxWidth: .infinity, maxHeight: height)
                                         .clipped()
                                 case .failure:
                                     // Fallback to colored rectangle on failure
                                     Rectangle()
                                         .foregroundColor(placeColor)
-                                        .frame(maxWidth: .infinity, maxHeight: 80)
+                                        .frame(maxWidth: .infinity, maxHeight: height)
                                 case .empty:
                                     // Loading state
                                     Rectangle()
                                         .foregroundColor(.gray.opacity(0.3))
-                                        .frame(maxWidth: .infinity, maxHeight: 80)
+                                        .frame(maxWidth: .infinity, maxHeight: height)
                                 @unknown default:
                                     Rectangle()
                                         .foregroundColor(placeColor)
-                                        .frame(maxWidth: .infinity, maxHeight: 80)
+                                        .frame(maxWidth: .infinity, maxHeight: height)
                                 }
                             }
                         } else {
                             Rectangle()
                                 .foregroundColor(placeColor)
-                                .frame(maxWidth: .infinity, maxHeight: 80)
+                                .frame(maxWidth: .infinity, maxHeight: height)
                                 .onAppear {
                                     if let tiktokUrl = place.tiktok_url {
                                         Task {
@@ -239,26 +239,26 @@ struct LightweightPlacePreviewCard: View {
                 startPoint: .top,
                 endPoint: .bottom
             )
-            .frame(height: 80)
+            .frame(height: height)
             
             // Text overlay
             VStack(alignment: .leading, spacing: 2) {
                 Text(place.name)
-                    .font(.caption)
+                    .font(.caption2)
                     .fontWeight(.semibold)
                     .foregroundColor(.white)
                     .lineLimit(1)
                     .multilineTextAlignment(.leading)
             }
-            .padding(.horizontal, 8)
-            .padding(.bottom, 8)
+            .padding(.horizontal, 6)
+            .padding(.bottom, 6)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .frame(height: 80)
+        .frame(height: height)
         .clipped()
-        .cornerRadius(8)
+        .cornerRadius(cornerRadius)
         .overlay(
-            RoundedRectangle(cornerRadius: 8)
+            RoundedRectangle(cornerRadius: cornerRadius)
                 .stroke(Color.gray.opacity(0.2), lineWidth: 1)
         )
         // Individual places are NOT tappable - only the whole list button is tappable
