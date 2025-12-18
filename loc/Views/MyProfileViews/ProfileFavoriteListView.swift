@@ -44,7 +44,7 @@ struct ProfileFavoriteListView: View {
     
     private var favoritesHeader: some View {
         HStack {
-            Text("FAVORITES")
+            Text("Favorites")
                 .font(.headline)
                 .fontWeight(.semibold)
                 .foregroundColor(.primary)

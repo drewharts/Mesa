@@ -36,7 +36,7 @@ struct ProfileTikToksView: View {
     
     private var headerRow: some View {
         HStack {
-            Text("TIKTOKS")
+            Text("Tiktoks")
                 .font(.headline)
                 .fontWeight(.semibold)
                 .foregroundColor(.primary)

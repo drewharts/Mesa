@@ -29,7 +29,7 @@ struct ListHeaderView: View {
     var body: some View {
         HStack {
             // LISTS label on left (matches FAVORITES/TIKTOKS style)
-            Text("LISTS")
+            Text("Lists")
                 .font(.headline)
                 .fontWeight(.semibold)
                 .foregroundColor(.primary)
