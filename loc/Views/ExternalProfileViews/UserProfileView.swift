@@ -159,8 +159,6 @@ struct UserProfileView: View {
             showPageIndicators = true
             startFadeOutTimer()
         }
-        .toolbarBackground(Color(.systemGray6), for: .navigationBar)
-        .toolbarBackground(.visible, for: .navigationBar)
         .navigationBarTitleDisplayMode(.inline)
         .alert("Follow Error", isPresented: $UserProfileVM.showFollowError) {
             Button("OK") {
