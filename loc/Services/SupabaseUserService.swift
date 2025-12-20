@@ -374,6 +374,16 @@ class SupabaseUserService: ObservableObject {
         return count
     }
     
+    /// Get external places (TikTok) count - FAST! (count query only, no place data)
+    func getNumberExternalPlaces(forUserId userId: String) async throws -> Int {
+        let response: Int = try await supabase.client
+            .rpc("get_user_external_places_count", params: ["p_user_id": userId])
+            .execute()
+            .value
+        
+        return response
+    }
+    
     /// Get total list count for a user - FAST! (count query only)
     func getTotalListCount(forUserId userId: String) async throws -> Int {
         struct UserStats: Codable {
