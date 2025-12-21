@@ -2446,6 +2446,30 @@ class ProfileViewModel: ObservableObject {
         }
     }
     
+    /// Set places for a list with deduplication (for initial load)
+    /// Single Responsibility: ViewModel owns state management including deduplication
+    /// - Parameters:
+    ///   - listId: The list to set places for
+    ///   - places: Places fetched from the service
+    func setPlacesForList(listId: String, places: [LightweightPlace]) {
+        // Deduplicate by place_id (keep first occurrence)
+        var seenIds = Set<String>()
+        let uniquePlaces = places.filter { place in
+            if seenIds.contains(place.place_id) {
+                return false
+            }
+            seenIds.insert(place.place_id)
+            return true
+        }
+        
+        let duplicateCount = places.count - uniquePlaces.count
+        if duplicateCount > 0 {
+            print("⚠️ [ProfileViewModel] Filtered \(duplicateCount) duplicate places for list \(listId)")
+        }
+        
+        lightweightPlaceListPlaces[listId] = uniquePlaces
+    }
+    
     /// Smart image preloading for visible places (simplified)
     func preloadImagesForVisiblePlaces(listId: UUID) {
         let displayedPlaceIds = getDisplayedPlaceIds(for: listId)

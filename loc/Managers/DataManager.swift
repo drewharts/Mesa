@@ -1033,7 +1033,9 @@ class DataManager: ObservableObject {
             let places = try await userService.fetchPlacesForPlaceList(listId: listId, page: 1, pageSize: 6)
             
             await MainActor.run {
-                profileViewModel.lightweightPlaceListPlaces[listId] = places
+                // Delegate state management to ViewModel (Single Responsibility Principle)
+                // ViewModel handles deduplication
+                profileViewModel.setPlacesForList(listId: listId, places: places)
                 
                 // Update placeSavers for the current user so "Saved By" feature works
                 guard let currentUserId = self.userSession.currentUserId else { return }
@@ -1089,7 +1091,9 @@ class DataManager: ObservableObject {
             guard let currentUserId = self.userSession.currentUserId else { return }
             
             for (listId, places) in allPlaces {
-                profileViewModel.lightweightPlaceListPlaces[listId] = places
+                // Delegate state management to ViewModel (Single Responsibility Principle)
+                // ViewModel handles deduplication
+                profileViewModel.setPlacesForList(listId: listId, places: places)
                 
                 // Update placeSavers for each place in the list
                 for place in places {
