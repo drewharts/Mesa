@@ -50,7 +50,7 @@ struct ProfileFavoritesTikToksView: View {
                     selectedTab = .favorites 
                 }
             }) {
-                Text("FAVORITES")
+                Text("Favorites")
                     .font(.headline)
                     .fontWeight(selectedTab == .favorites ? .semibold : .regular)
                     .foregroundColor(selectedTab == .favorites ? .primary : .gray)
@@ -64,7 +64,7 @@ struct ProfileFavoritesTikToksView: View {
                 }
             }) {
                 HStack(spacing: 4) {
-                    Text("TIKTOKS")
+                    Text("TikToks")
                         .font(.headline)
                         .fontWeight(selectedTab == .tiktoks ? .semibold : .regular)
                         .foregroundColor(selectedTab == .tiktoks ? .primary : .gray)
@@ -150,18 +150,19 @@ struct ProfileFavoritesTikToksView: View {
     // MARK: - TikToks Content
     
     private var tiktoksContent: some View {
-        Button(action: { showingTikToksPopup = true }) {
-            Group {
-                if profile.isLoadingTikTokPlaces {
-                    loadingTikToksState
-                } else if profile.lightweightExternalPlaces.isEmpty {
-                    emptyTikToksState
-                } else {
-                    tiktoksGrid
-                }
+        Group {
+            if profile.isLoadingTikTokPlaces {
+                loadingTikToksState
+            } else if profile.lightweightExternalPlaces.isEmpty {
+                emptyTikToksState
+            } else {
+                tiktoksGrid
             }
         }
-        .buttonStyle(PlainButtonStyle())
+        .contentShape(Rectangle())
+        .onTapGesture {
+            showingTikToksPopup = true
+        }
     }
     
     private var loadingTikToksState: some View {
