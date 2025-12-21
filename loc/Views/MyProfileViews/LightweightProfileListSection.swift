@@ -27,68 +27,21 @@ struct LightweightProfileListSection: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            // List header with title and place count - compact version
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(list.name)
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.primary)
-                        .lineLimit(1)
-                    
-                    // Show owner name if this is a shared list (collaborator view)
-                    if list.isSharedWithMe, let ownerName = list.owner_name {
-                        SharedByIndicator(
-                            ownerName: ownerName,
-                            ownerPhotoUrl: list.owner_photo_url,
-                            collaboratorPhotos: list.collaborator_photos
-                        )
-                    } else {
-                        // Owner view - show place count and collaborators if shared
-                        SharedWithIndicator(
-                            collaboratorPhotos: list.collaborator_photos,
-                            collaboratorCount: list.collaborator_count ?? 0,
-                            placeCount: totalPlaceCount
-                        )
-                    }
-                }
-                
-                Spacer()
-            }
-            
-            // Card with places grid - compact 2x2 layout
+            // Photo collage - square aspect ratio
             Button(action: {
                 showingListPopup = true
             }) {
-                VStack(spacing: 0) {
+                GeometryReader { geometry in
                     if !places.isEmpty {
-                        // Places grid (first 4 places in 2x2 layout for compact view)
-                        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: 2), spacing: 4) {
-                            ForEach(Array(places.prefix(4).enumerated()), id: \.element.id) { index, place in
-                                LightweightPlacePreviewCard(
-                                    place: place,
-                                    placeColors: $placeColors,
-                                    height: 60
-                                )
-                            }
-                            
-                            // Fill remaining slots if less than 4 places
-                            if places.count < 4 {
-                                ForEach(0..<(4 - places.count), id: \.self) { _ in
-                                    Rectangle()
-                                        .fill(Color.gray.opacity(0.1))
-                                        .frame(height: 60)
-                                        .cornerRadius(6)
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: 6)
-                                                .stroke(Color.gray.opacity(0.2), lineWidth: 1)
-                                        )
-                                }
-                            }
-                        }
-                        .padding(8)
+                        // Photo collage fills the square card
+                        ListPhotoCollage(
+                            places: Array(places.prefix(3)),
+                            placeColors: $placeColors,
+                            totalHeight: geometry.size.width
+                        )
+                        .shadow(color: .black.opacity(0.08), radius: 6, x: 0, y: 3)
                     } else {
-                        // Empty state - compact
+                        // Empty state
                         VStack(spacing: 8) {
                             Image(systemName: "photo.on.rectangle.angled")
                                 .font(.system(size: 24))
@@ -98,21 +51,46 @@ struct LightweightProfileListSection: View {
                                 .font(.caption)
                                 .foregroundColor(.gray)
                         }
-                        .frame(height: 100)
-                        .frame(maxWidth: .infinity)
+                        .frame(width: geometry.size.width, height: geometry.size.width)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(Color(.systemBackground))
+                                .shadow(color: .black.opacity(0.08), radius: 6, x: 0, y: 3)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color.gray.opacity(0.1), lineWidth: 1)
+                        )
                     }
                 }
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color(.systemBackground))
-                        .shadow(color: .black.opacity(0.08), radius: 6, x: 0, y: 3)
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color.gray.opacity(0.1), lineWidth: 1)
-                )
+                .aspectRatio(1, contentMode: .fit)
             }
             .buttonStyle(PlainButtonStyle())
+            
+            // List info below the photo
+            VStack(alignment: .leading, spacing: 2) {
+                Text(list.name)
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.primary)
+                    .lineLimit(1)
+                
+                // Show owner name if this is a shared list (collaborator view)
+                if list.isSharedWithMe, let ownerName = list.owner_name {
+                    SharedByIndicator(
+                        ownerName: ownerName,
+                        ownerPhotoUrl: list.owner_photo_url,
+                        collaboratorPhotos: list.collaborator_photos
+                    )
+                } else {
+                    // Owner view - show place count and collaborators if shared
+                    SharedWithIndicator(
+                        collaboratorPhotos: list.collaborator_photos,
+                        collaboratorCount: list.collaborator_count ?? 0,
+                        placeCount: totalPlaceCount
+                    )
+                }
+            }
         }
         .sheet(isPresented: $showingListPopup) {
             // Use lightweight popup with swiping support between all lists
@@ -262,6 +240,146 @@ struct LightweightPlacePreviewCard: View {
                 .stroke(Color.gray.opacity(0.2), lineWidth: 1)
         )
         // Individual places are NOT tappable - only the whole list button is tappable
+    }
+}
+
+/// Photo collage component showing up to 3 photos edge-to-edge
+/// - 1 photo: Full width/height
+/// - 2 photos: Two equal columns
+/// - 3 photos: 2 stacked on left, 1 tall on right
+struct ListPhotoCollage: View {
+    let places: [LightweightPlace]
+    @Binding var placeColors: [UUID: Color]
+    var totalHeight: CGFloat = 150
+    
+    private var halfHeight: CGFloat { totalHeight / 2 }
+    
+    var body: some View {
+        Group {
+            switch places.count {
+            case 0:
+                // Empty state placeholder
+                Rectangle()
+                    .fill(Color.gray.opacity(0.1))
+                    .frame(height: totalHeight)
+                
+            case 1:
+                // Single photo fills entire space
+                CollagePhotoView(place: places[0], placeColors: $placeColors, height: totalHeight)
+                
+            case 2:
+                // Two photos side by side
+                HStack(spacing: 0) {
+                    CollagePhotoView(place: places[0], placeColors: $placeColors, height: totalHeight)
+                    CollagePhotoView(place: places[1], placeColors: $placeColors, height: totalHeight)
+                }
+                
+            default:
+                // 3+ photos: 2 stacked left, 1 tall right
+                HStack(spacing: 0) {
+                    VStack(spacing: 0) {
+                        CollagePhotoView(place: places[0], placeColors: $placeColors, height: halfHeight)
+                        CollagePhotoView(place: places[1], placeColors: $placeColors, height: halfHeight)
+                    }
+                    CollagePhotoView(place: places[2], placeColors: $placeColors, height: totalHeight)
+                }
+            }
+        }
+        .frame(height: totalHeight)
+        .clipped()
+        .cornerRadius(8)
+    }
+}
+
+/// Individual photo view for the collage - displays photo edge-to-edge
+struct CollagePhotoView: View {
+    let place: LightweightPlace
+    @Binding var placeColors: [UUID: Color]
+    var height: CGFloat
+    
+    // Generate a consistent color for this place based on its ID
+    private var placeColor: Color {
+        let hash = place.place_id.hashValue
+        let hue = Double(abs(hash) % 360) / 360.0
+        return Color(hue: hue, saturation: 0.6, brightness: 0.8)
+    }
+    
+    var body: some View {
+        Rectangle()
+            .fill(Color.clear)
+            .frame(maxWidth: .infinity)
+            .frame(height: height)
+            .overlay(
+                Group {
+                    // Check for TikTok thumbnail first, then review photo, then colored rectangle
+                    if let tiktokUrl = place.tiktok_url,
+                       let thumbnailURL = TikTokMetadataCache.shared.getCachedThumbnailUrl(for: tiktokUrl) {
+                        AsyncImage(url: URL(string: thumbnailURL)) { phase in
+                            switch phase {
+                            case .success(let image):
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .frame(maxWidth: .infinity, maxHeight: height)
+                                    .clipped()
+                            case .failure:
+                                Rectangle()
+                                    .foregroundColor(placeColor)
+                                    .frame(maxWidth: .infinity, maxHeight: height)
+                            case .empty:
+                                Rectangle()
+                                    .foregroundColor(.gray.opacity(0.3))
+                                    .frame(maxWidth: .infinity, maxHeight: height)
+                                    .onAppear {
+                                        Task {
+                                            _ = await TikTokMetadataCache.shared.getMetadata(for: tiktokUrl)
+                                        }
+                                    }
+                            @unknown default:
+                                Rectangle()
+                                    .foregroundColor(placeColor)
+                                    .frame(maxWidth: .infinity, maxHeight: height)
+                            }
+                        }
+                    } else if let photoUrl = place.latest_review_photo, let url = URL(string: photoUrl) {
+                        AsyncImage(url: url) { phase in
+                            switch phase {
+                            case .success(let image):
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .frame(maxWidth: .infinity, maxHeight: height)
+                                    .clipped()
+                            case .failure:
+                                Rectangle()
+                                    .foregroundColor(placeColor)
+                                    .frame(maxWidth: .infinity, maxHeight: height)
+                            case .empty:
+                                Rectangle()
+                                    .foregroundColor(.gray.opacity(0.3))
+                                    .frame(maxWidth: .infinity, maxHeight: height)
+                            @unknown default:
+                                Rectangle()
+                                    .foregroundColor(placeColor)
+                                    .frame(maxWidth: .infinity, maxHeight: height)
+                            }
+                        }
+                    } else {
+                        Rectangle()
+                            .foregroundColor(placeColor)
+                            .frame(maxWidth: .infinity, maxHeight: height)
+                            .onAppear {
+                                if let tiktokUrl = place.tiktok_url {
+                                    Task {
+                                        _ = await TikTokMetadataCache.shared.getMetadata(for: tiktokUrl)
+                                    }
+                                }
+                            }
+                    }
+                }
+                .clipped()
+            )
+            .clipped()
     }
 }
 

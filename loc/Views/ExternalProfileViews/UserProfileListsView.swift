@@ -154,57 +154,21 @@ struct UserProfileLightweightListSection: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            // List header with title and place count - compact version
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(list.name)
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.primary)
-                        .lineLimit(1)
-                    
-                    Text("\(totalPlaceCount) place\(totalPlaceCount == 1 ? "" : "s")")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                }
-                
-                Spacer()
-            }
-            
-            // Card with places grid - compact 2x2 layout
+            // Photo collage - square aspect ratio
             Button(action: {
                 showingListPopup = true
             }) {
-                VStack(spacing: 0) {
+                GeometryReader { geometry in
                     if !places.isEmpty {
-                        // Places grid (first 4 places in 2x2 layout for compact view)
-                        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: 2), spacing: 4) {
-                            ForEach(Array(places.prefix(4).enumerated()), id: \.element.id) { index, place in
-                                UserProfileLightweightPlacePreviewCard(
-                                    place: place,
-                                    placeColors: $placeColors,
-                                    height: 60
-                                )
-                                .environmentObject(viewModel)
-                            }
-                            
-                            // Fill remaining slots if less than 4 places
-                            if places.count < 4 {
-                                ForEach(0..<(4 - places.count), id: \.self) { _ in
-                                    Rectangle()
-                                        .fill(Color.gray.opacity(0.1))
-                                        .frame(height: 60)
-                                        .cornerRadius(6)
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: 6)
-                                                .stroke(Color.gray.opacity(0.2), lineWidth: 1)
-                                        )
-                                }
-                            }
-                        }
-                        .padding(8)
+                        // Photo collage fills the square card
+                        ListPhotoCollage(
+                            places: Array(places.prefix(3)),
+                            placeColors: $placeColors,
+                            totalHeight: geometry.size.width
+                        )
+                        .shadow(color: .black.opacity(0.08), radius: 6, x: 0, y: 3)
                     } else {
-                        // Empty state - compact
+                        // Empty state
                         VStack(spacing: 8) {
                             Image(systemName: "photo.on.rectangle.angled")
                                 .font(.system(size: 24))
@@ -214,21 +178,34 @@ struct UserProfileLightweightListSection: View {
                                 .font(.caption)
                                 .foregroundColor(.gray)
                         }
-                        .frame(height: 100)
-                        .frame(maxWidth: .infinity)
+                        .frame(width: geometry.size.width, height: geometry.size.width)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(Color(.systemBackground))
+                                .shadow(color: .black.opacity(0.08), radius: 6, x: 0, y: 3)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color.gray.opacity(0.1), lineWidth: 1)
+                        )
                     }
                 }
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color(.systemBackground))
-                        .shadow(color: .black.opacity(0.08), radius: 6, x: 0, y: 3)
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color.gray.opacity(0.1), lineWidth: 1)
-                )
+                .aspectRatio(1, contentMode: .fit)
             }
             .buttonStyle(PlainButtonStyle())
+            
+            // List info below the photo
+            VStack(alignment: .leading, spacing: 2) {
+                Text(list.name)
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.primary)
+                    .lineLimit(1)
+                
+                Text("\(totalPlaceCount) place\(totalPlaceCount == 1 ? "" : "s")")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
         }
         .sheet(isPresented: $showingListPopup) {
             // Use the same lightweight popup as MyProfile - need to pass profile data

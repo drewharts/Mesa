@@ -34,8 +34,6 @@ struct SharedWithIndicator: View {
             placeCountLabel
             
             if hasCollaborators {
-                separator
-                sharedWithLabel
                 collaboratorAvatars
             }
         }
@@ -45,18 +43,6 @@ struct SharedWithIndicator: View {
     
     private var placeCountLabel: some View {
         Text("\(placeCount) place\(placeCount == 1 ? "" : "s")")
-            .font(.caption)
-            .foregroundColor(.secondary)
-    }
-    
-    private var separator: some View {
-        Text("•")
-            .font(.caption)
-            .foregroundColor(.secondary.opacity(0.5))
-    }
-    
-    private var sharedWithLabel: some View {
-        Text("Shared with")
             .font(.caption)
             .foregroundColor(.secondary)
     }
