@@ -1008,13 +1008,9 @@ class DataManager: ObservableObject {
         let places = try await userService.fetchPlacesForPlaceList(listId: listId, page: page, pageSize: pageSize)
         
         await MainActor.run {
-            // Append to existing places
-            if var existingPlaces = profileViewModel.lightweightPlaceListPlaces[listId] {
-                existingPlaces.append(contentsOf: places)
-                profileViewModel.lightweightPlaceListPlaces[listId] = existingPlaces
-            } else {
-                profileViewModel.lightweightPlaceListPlaces[listId] = places
-            }
+            // Delegate state management to ViewModel (Single Responsibility Principle)
+            // ViewModel handles deduplication and state updates
+            profileViewModel.appendPlacesForList(listId: listId, newPlaces: places)
             
             // Update placeSavers for the current user so "Saved By" feature works
             guard let currentUserId = self.userSession.currentUserId else { return }

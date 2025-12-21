@@ -2416,6 +2416,36 @@ class ProfileViewModel: ObservableObject {
         hasMorePlaceLists = newLists.count >= pageSize
     }
     
+    // MARK: - Place List Places State Management
+    
+    /// Append new places to a list with deduplication
+    /// Single Responsibility: ViewModel owns state management including deduplication
+    /// - Parameters:
+    ///   - listId: The list to append places to
+    ///   - newPlaces: Places fetched from the service
+    func appendPlacesForList(listId: String, newPlaces: [LightweightPlace]) {
+        guard !newPlaces.isEmpty else { return }
+        
+        // Get existing places or empty array
+        let existingPlaces = lightweightPlaceListPlaces[listId] ?? []
+        
+        // Deduplication - ViewModel owns this logic because it owns the state
+        let existingIds = Set(existingPlaces.map { $0.place_id })
+        let uniqueNewPlaces = newPlaces.filter { !existingIds.contains($0.place_id) }
+        
+        // Log duplicates for debugging
+        let duplicateCount = newPlaces.count - uniqueNewPlaces.count
+        if duplicateCount > 0 {
+            print("⚠️ [ProfileViewModel] Filtered \(duplicateCount) duplicate places for list \(listId)")
+        }
+        
+        // Update state with unique places
+        if !uniqueNewPlaces.isEmpty {
+            lightweightPlaceListPlaces[listId] = existingPlaces + uniqueNewPlaces
+            print("✅ [ProfileViewModel] Appended \(uniqueNewPlaces.count) unique places to list \(listId) (total: \(existingPlaces.count + uniqueNewPlaces.count))")
+        }
+    }
+    
     /// Smart image preloading for visible places (simplified)
     func preloadImagesForVisiblePlaces(listId: UUID) {
         let displayedPlaceIds = getDisplayedPlaceIds(for: listId)
