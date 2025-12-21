@@ -923,23 +923,9 @@ class DataManager: ObservableObject {
             )
             
             await MainActor.run {
-                // Update pagination state
-                // If we got fewer than pageSize items, we've reached the end
-                profileViewModel.hasMorePlaceLists = moreLists.count >= pageSize
-                
-                // Append new lists if any
-                if !moreLists.isEmpty {
-                    profileViewModel.lightweightPlaceLists.append(contentsOf: moreLists)
-                    profileViewModel.placeListsCurrentPage = nextPage
-                    
-                    for list in moreLists {
-                        if profileViewModel.lightweightPlaceListCounts[list.list_id] == nil {
-                            profileViewModel.lightweightPlaceListCounts[list.list_id] = list.place_count
-                        }
-                    }
-                } else {
-                    profileViewModel.hasMorePlaceLists = false
-                }
+                // Delegate state management to ViewModel (Single Responsibility Principle)
+                // ViewModel handles deduplication and state updates
+                profileViewModel.appendPlaceLists(moreLists, nextPage: nextPage, pageSize: pageSize)
             }
             
             if !moreLists.isEmpty {

@@ -134,6 +134,7 @@ struct UserProfileListsView: View {
 }
 
 /// Lightweight list section for external user profiles - similar to LightweightProfileListSection but for external users
+/// Staff Engineer Refactor: Removed GeometryReader anti-pattern for stable LazyVGrid rendering
 struct UserProfileLightweightListSection: View {
     @ObservedObject var viewModel: UserProfileViewModel
     let list: LightweightPlaceList
@@ -147,54 +148,21 @@ struct UserProfileLightweightListSection: View {
     
     @State private var showingListPopup = false
     
-    // Get total place count from the list (from SQL function)
     private var totalPlaceCount: Int {
         return list.place_count
     }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            // Photo collage - square aspect ratio
+            // Photo collage button
             Button(action: {
                 showingListPopup = true
             }) {
-                GeometryReader { geometry in
-                    if !places.isEmpty {
-                        // Photo collage fills the square card
-                        ListPhotoCollage(
-                            places: Array(places.prefix(3)),
-                            placeColors: $placeColors,
-                            totalHeight: geometry.size.width
-                        )
-                        .shadow(color: .black.opacity(0.08), radius: 6, x: 0, y: 3)
-                    } else {
-                        // Empty state
-                        VStack(spacing: 8) {
-                            Image(systemName: "photo.on.rectangle.angled")
-                                .font(.system(size: 24))
-                                .foregroundColor(.gray.opacity(0.5))
-                            
-                            Text("No places yet")
-                                .font(.caption)
-                                .foregroundColor(.gray)
-                        }
-                        .frame(width: geometry.size.width, height: geometry.size.width)
-                        .background(
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(Color(.systemBackground))
-                                .shadow(color: .black.opacity(0.08), radius: 6, x: 0, y: 3)
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(Color.gray.opacity(0.1), lineWidth: 1)
-                        )
-                    }
-                }
-                .aspectRatio(1, contentMode: .fit)
+                ExternalUserListCardImage(places: places, placeColors: $placeColors)
             }
             .buttonStyle(PlainButtonStyle())
             
-            // List info below the photo
+            // List info
             VStack(alignment: .leading, spacing: 2) {
                 Text(list.name)
                     .font(.subheadline)
@@ -208,7 +176,6 @@ struct UserProfileLightweightListSection: View {
             }
         }
         .sheet(isPresented: $showingListPopup) {
-            // Use the same lightweight popup as MyProfile - need to pass profile data
             ExternalUserLightweightListPopupView(
                 viewModel: viewModel,
                 lists: allLists,
@@ -217,6 +184,50 @@ struct UserProfileLightweightListSection: View {
             )
             .environmentObject(selectedPlaceVM)
         }
+    }
+}
+
+// MARK: - External User List Card Image
+/// Square image card for external user list preview - NO GeometryReader needed!
+private struct ExternalUserListCardImage: View {
+    let places: [LightweightPlace]
+    @Binding var placeColors: [UUID: Color]
+    
+    var body: some View {
+        Group {
+            if !places.isEmpty {
+                ListPhotoCollage(
+                    places: Array(places.prefix(3)),
+                    placeColors: $placeColors
+                )
+            } else {
+                ExternalUserEmptyListCard()
+            }
+        }
+        .aspectRatio(1, contentMode: .fit) // Square sizing - no measurement needed!
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .shadow(color: .black.opacity(0.08), radius: 6, x: 0, y: 3)
+    }
+}
+
+// MARK: - External User Empty List Card
+private struct ExternalUserEmptyListCard: View {
+    var body: some View {
+        VStack(spacing: 8) {
+            Image(systemName: "photo.on.rectangle.angled")
+                .font(.system(size: 24))
+                .foregroundColor(.gray.opacity(0.5))
+            
+            Text("No places yet")
+                .font(.caption)
+                .foregroundColor(.gray)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(.systemBackground))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.gray.opacity(0.1), lineWidth: 1)
+        )
     }
 }
 

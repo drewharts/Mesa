@@ -2372,6 +2372,50 @@ class ProfileViewModel: ObservableObject {
         return currentIndex >= threshold
     }
     
+    /// Append new place lists with deduplication
+    /// Single Responsibility: ViewModel owns state management including deduplication
+    /// - Parameters:
+    ///   - newLists: Lists fetched from the service
+    ///   - nextPage: The page number these lists came from
+    ///   - pageSize: Number of items per page (for determining if more exist)
+    func appendPlaceLists(_ newLists: [LightweightPlaceList], nextPage: Int, pageSize: Int) {
+        // Guard: Nothing to append
+        guard !newLists.isEmpty else {
+            hasMorePlaceLists = false
+            return
+        }
+        
+        // Deduplication - ViewModel owns this logic because it owns the state
+        let existingIds = Set(lightweightPlaceLists.map { $0.list_id })
+        let uniqueNewLists = newLists.filter { !existingIds.contains($0.list_id) }
+        
+        // Log duplicates for debugging
+        let duplicateCount = newLists.count - uniqueNewLists.count
+        if duplicateCount > 0 {
+            print("⚠️ [ProfileViewModel] Filtered \(duplicateCount) duplicate place lists")
+        }
+        
+        // Update state with unique lists
+        if !uniqueNewLists.isEmpty {
+            lightweightPlaceLists.append(contentsOf: uniqueNewLists)
+            placeListsCurrentPage = nextPage
+            
+            // Update counts for new lists
+            for list in uniqueNewLists {
+                if lightweightPlaceListCounts[list.list_id] == nil {
+                    lightweightPlaceListCounts[list.list_id] = list.place_count
+                }
+            }
+            
+            print("✅ [ProfileViewModel] Appended \(uniqueNewLists.count) unique lists (total: \(lightweightPlaceLists.count))")
+        } else {
+            print("⚠️ [ProfileViewModel] All \(newLists.count) lists were duplicates - potential pagination issue")
+        }
+        
+        // Update pagination flag based on fetched count (not unique count)
+        hasMorePlaceLists = newLists.count >= pageSize
+    }
+    
     /// Smart image preloading for visible places (simplified)
     func preloadImagesForVisiblePlaces(listId: UUID) {
         let displayedPlaceIds = getDisplayedPlaceIds(for: listId)
