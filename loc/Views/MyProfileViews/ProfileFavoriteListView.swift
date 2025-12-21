@@ -58,7 +58,7 @@ struct ProfileFavoriteListView: View {
         Button(action: {
             // Could open a favorites popup or navigate to favorites view
         }) {
-            VStack(spacing: 0) {
+            Group {
                 if profile.lightweightFavorites.isEmpty {
                     // Empty state
                     VStack(spacing: 12) {
@@ -78,7 +78,7 @@ struct ProfileFavoriteListView: View {
                     .frame(height: 120)
                     .frame(maxWidth: .infinity)
                 } else {
-                    // Favorites grid (2x3 layout like list previews)
+                    // Favorites grid (2x3 layout) - no outer card, aligned with lists below
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
                         ForEach(Array(profile.lightweightFavorites.prefix(6).enumerated()), id: \.element.id) { index, favoritePlace in
                             LightweightFavoritePlaceCard(favoritePlace: favoritePlace, isPriorityTile: index < 6)
@@ -89,7 +89,7 @@ struct ProfileFavoriteListView: View {
                             ForEach(0..<(6 - profile.lightweightFavorites.count), id: \.self) { _ in
                                 Rectangle()
                                     .fill(Color.gray.opacity(0.1))
-                                    .frame(height: 80)
+                                    .frame(height: 90)
                                     .cornerRadius(8)
                                     .overlay(
                                         RoundedRectangle(cornerRadius: 8)
@@ -98,21 +98,11 @@ struct ProfileFavoriteListView: View {
                             }
                         }
                     }
-                    .padding(16)
                 }
             }
-            .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(Color(.systemBackground))
-                    .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 16)
-                    .stroke(Color.gray.opacity(0.1), lineWidth: 1)
-            )
         }
         .buttonStyle(PlainButtonStyle())
-        .padding(.horizontal, 20)
+        .padding(.horizontal, 16) // Match list padding for edge alignment
     }
     
     // Preload images for the first 6 priority favorite tiles
@@ -135,7 +125,7 @@ struct LightweightFavoritePlaceCard: View {
             // Container to strictly enforce bounds
             Rectangle()
                 .fill(Color.clear)
-                .frame(height: 80)
+                .frame(height: 90)
                 .overlay(
                     Group {
                         if let photoUrl = favoritePlace.latest_review_photo, let url = URL(string: photoUrl) {
@@ -143,17 +133,17 @@ struct LightweightFavoritePlaceCard: View {
                                 image
                                     .resizable()
                                     .aspectRatio(contentMode: .fill)
-                                    .frame(maxWidth: .infinity, maxHeight: 80)
+                                    .frame(maxWidth: .infinity, maxHeight: 90)
                                     .clipped()
                             } placeholder: {
                                 Rectangle()
                                     .foregroundColor(.gray.opacity(0.3))
-                                    .frame(maxWidth: .infinity, maxHeight: 80)
+                                    .frame(maxWidth: .infinity, maxHeight: 90)
                             }
                         } else {
                             Rectangle()
                                 .foregroundColor(places.colorForPlace(placeId: favoritePlace.place_id))
-                                .frame(maxWidth: .infinity, maxHeight: 80)
+                                .frame(maxWidth: .infinity, maxHeight: 90)
                         }
                     }
                     .clipped()
@@ -170,7 +160,7 @@ struct LightweightFavoritePlaceCard: View {
                 startPoint: .top,
                 endPoint: .bottom
             )
-            .frame(height: 80)
+            .frame(height: 90)
             
             // Text overlay
             VStack(alignment: .leading, spacing: 2) {
@@ -185,7 +175,7 @@ struct LightweightFavoritePlaceCard: View {
             .padding(.bottom, 8)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .frame(height: 80)
+        .frame(height: 90)
         .clipped()
         .cornerRadius(8)
         .overlay(
@@ -236,7 +226,7 @@ struct FavoritePlaceCard: View {
             // Container to strictly enforce bounds
             Rectangle()
                 .fill(Color.clear)
-                .frame(height: 80)
+                .frame(height: 90)
                 .overlay(
                     Group {
                         // Image loading matching new card styling
@@ -245,12 +235,12 @@ struct FavoritePlaceCard: View {
                                 image
                                     .resizable()
                                     .aspectRatio(contentMode: .fill)
-                                    .frame(maxWidth: .infinity, maxHeight: 80)
+                                    .frame(maxWidth: .infinity, maxHeight: 90)
                                     .clipped()
                             } placeholder: {
                                 Rectangle()
                                     .foregroundColor(.gray.opacity(0.3))
-                                    .frame(maxWidth: .infinity, maxHeight: 80)
+                                    .frame(maxWidth: .infinity, maxHeight: 90)
                             }
                         } else if let detailPlace = detailPlace,
                                   let photoUrls = detailPlace.photoUrls,
@@ -262,25 +252,25 @@ struct FavoritePlaceCard: View {
                                 image
                                     .resizable()
                                     .aspectRatio(contentMode: .fill)
-                                    .frame(maxWidth: .infinity, maxHeight: 80)
+                                    .frame(maxWidth: .infinity, maxHeight: 90)
                                     .clipped()
                             } placeholder: {
                                 Rectangle()
                                     .foregroundColor(.gray.opacity(0.3))
-                                    .frame(maxWidth: .infinity, maxHeight: 80)
+                                    .frame(maxWidth: .infinity, maxHeight: 90)
                             }
                         } else if let image = places.placeImages[place] {
                             // Show place review image (already loaded)
                             Image(uiImage: image)
                                 .resizable()
                                 .aspectRatio(contentMode: .fill)
-                                .frame(maxWidth: .infinity, maxHeight: 80)
+                                .frame(maxWidth: .infinity, maxHeight: 90)
                                 .clipped()
                         } else {
                             // Show colored rectangle fallback
                             Rectangle()
                                 .foregroundColor(places.colorForPlace(placeId: place))
-                                .frame(maxWidth: .infinity, maxHeight: 80)
+                                .frame(maxWidth: .infinity, maxHeight: 90)
                         }
                     }
                     .clipped()
@@ -297,7 +287,7 @@ struct FavoritePlaceCard: View {
                 startPoint: .top,
                 endPoint: .bottom
             )
-            .frame(height: 80)
+            .frame(height: 90)
             
             // Text overlay
             VStack(alignment: .leading, spacing: 2) {
@@ -320,7 +310,7 @@ struct FavoritePlaceCard: View {
             .padding(.bottom, 8)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .frame(height: 80)
+        .frame(height: 90)
         .clipped()
         .cornerRadius(8)
         .clipped()
