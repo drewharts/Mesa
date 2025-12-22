@@ -70,7 +70,12 @@ struct ProfilePictureView: View {
             }
             .onTapGesture {
                 if !profile.isUploadingProfilePhoto {
-                    showingFullScreen = true
+                    // If user has no profile picture, prompt them to add one
+                    if profile.userPicture == nil {
+                        showingImagePicker = true
+                    } else {
+                        showingFullScreen = true
+                    }
                 }
             }
             .contextMenu {

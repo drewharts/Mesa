@@ -91,6 +91,21 @@ class DetailPlaceViewModel: ObservableObject {
             NotificationCenter.default.removeObserver(observer)
         }
     }
+    
+    // MARK: - Logout Cleanup
+    /// Clears all user-related cached data - MUST be called on logout to prevent data leakage
+    func clearAllUserData() {
+        print("🗑️ [DetailPlaceViewModel] Clearing all user data for security")
+        places.removeAll()
+        placeImages.removeAll()
+        placeSavers.removeAll()
+        placeAnnotations.removeAll()
+        placeTypes.removeAll()
+        placeImageLoadingStates.removeAll()
+        userProfilePicture.removeAll()
+        placeColors.removeAll()
+        print("✅ [DetailPlaceViewModel] All user data cleared")
+    }
 
     // Calculate and store restaurant type
     func calculateRestaurantType(for place: DetailPlace) {

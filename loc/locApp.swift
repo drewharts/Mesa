@@ -55,6 +55,12 @@ struct locApp: App {
             detailPlaceViewModel: detailVM
         )
         
+        // Configure SessionCleanupService with non-singleton dependencies (SECURITY: for logout cache clearing)
+        SessionCleanupService.shared.configure(
+            detailPlaceViewModel: detailVM,
+            selectedPlaceViewModel: selectedPlaceVM
+        )
+        
         let deepLinkMgr = DeepLinkManager(
             placeService: services.placeService,
             userService: services.userService,
