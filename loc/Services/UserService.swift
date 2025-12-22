@@ -439,6 +439,11 @@ class UserService: ObservableObject {
     }
     
     // COUNT ONLY - Super fast! (~20-50ms)
+    func getNumberExternalPlaces(forUserId userId: String) async throws -> Int {
+        return try await supabase.getNumberExternalPlaces(forUserId: userId)
+    }
+    
+    // COUNT ONLY - Super fast! (~20-50ms)
     func getTotalListCount(forUserId userId: String) async throws -> Int {
         return try await supabase.getTotalListCount(forUserId: userId)
     }

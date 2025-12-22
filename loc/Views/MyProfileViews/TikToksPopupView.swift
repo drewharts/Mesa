@@ -51,7 +51,7 @@ struct TikToksPopupView: View {
                     .fontWeight(.bold)
                     .foregroundColor(.black)
                 
-                Text("\(profile.lightweightExternalPlaces.count) place\(profile.lightweightExternalPlaces.count == 1 ? "" : "s")")
+                Text("\(profile.totalExternalPlacesCount) place\(profile.totalExternalPlacesCount == 1 ? "" : "s")")
                     .font(.caption)
                     .foregroundColor(.gray)
             }

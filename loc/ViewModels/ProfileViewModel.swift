@@ -49,6 +49,7 @@ class ProfileViewModel: ObservableObject {
     @Published var isLoadingMoreMyPlaces: Bool = false
     @Published var hasMoreMyPlaces: Bool = true
     @Published var lightweightExternalPlaces: [LightweightPlace] = [] // Lightweight external/TikTok places for tiles
+    @Published var totalExternalPlacesCount: Int = 0 // Total TikTok count from database (not just loaded count)
     @Published var isLoadingMoreExternalPlaces: Bool = false
     @Published var hasMoreExternalPlaces: Bool = true
     @Published var isLoadingMorePlaceLists: Bool = false
@@ -166,6 +167,7 @@ class ProfileViewModel: ObservableObject {
     @Published var isLoadingMoreReviews: Bool = false
     @Published var hasMoreReviews: Bool = true
     @Published var lightweightReviewedPlaces: [LightweightPlace] = [] // Lightweight reviewed places for tiles
+    private var hasAttemptedInitialReviewsLoad: Bool = false // Prevents infinite reload when user has no reviews
     private let reviewsPerPage: Int = 8
     
     // Pagination for TikTok places
@@ -1025,9 +1027,9 @@ class ProfileViewModel: ObservableObject {
             return
         }
         
-        // Don't reload if already loading or if we have data
-        guard !isLoadingReviewedPlaces && lightweightReviewedPlaces.isEmpty else {
-            print("ℹ️ [ProfileViewModel] Skipping initial reviews load - already loading or data exists")
+        // Don't reload if already loading, if we have data, or if we already attempted (prevents infinite loop with no reviews)
+        guard !isLoadingReviewedPlaces && lightweightReviewedPlaces.isEmpty && !hasAttemptedInitialReviewsLoad else {
+            print("ℹ️ [ProfileViewModel] Skipping initial reviews load - already loading, data exists, or already attempted")
             return
         }
         
@@ -1044,6 +1046,7 @@ class ProfileViewModel: ObservableObject {
         }
         
         isLoadingReviewedPlaces = true
+        hasAttemptedInitialReviewsLoad = true // Mark that we've attempted the initial load
         
         defer {
             isLoadingReviewedPlaces = false
@@ -1056,6 +1059,8 @@ class ProfileViewModel: ObservableObject {
             // Update state: replace existing places and update hasMore flag
             lightweightReviewedPlaces = lightweightPlaces
             hasMoreReviews = !lightweightPlaces.isEmpty && lightweightPlaces.count >= reviewsPerPage
+            
+            print("✅ [ProfileViewModel] Loaded \(lightweightPlaces.count) reviewed places")
             
             // Load full place details for display
             await loadPlaceDetailsForReviews(lightweightPlaces, userId: userId)
@@ -1296,8 +1301,12 @@ class ProfileViewModel: ObservableObject {
         }
         
         do {
-            // Fetch first page of lightweight external places
-            let lightweightPlaces = try await userService.fetchUserExternalPlaces(userId: userId, limit: 8, offset: 0)
+            // Fetch first page of lightweight external places and total count in parallel
+            async let placesTask = userService.fetchUserExternalPlaces(userId: userId, limit: 8, offset: 0)
+            async let countTask = userService.getNumberExternalPlaces(forUserId: userId)
+            
+            let lightweightPlaces = try await placesTask
+            let totalCount = (try? await countTask) ?? 0
             
             // Prefetch TikTok metadata for all TikTok URLs
             let tiktokUrls = lightweightPlaces.compactMap { $0.tiktok_url }.filter { !$0.isEmpty }
@@ -1307,11 +1316,12 @@ class ProfileViewModel: ObservableObject {
             
             await MainActor.run {
                 lightweightExternalPlaces = lightweightPlaces
+                totalExternalPlacesCount = totalCount
                 hasMoreExternalPlaces = !lightweightPlaces.isEmpty && lightweightPlaces.count >= 8
                 isLoadingTikTokPlaces = false
             }
             
-            print("✅ [ProfileViewModel] Reloaded \(lightweightPlaces.count) lightweight external places")
+            print("✅ [ProfileViewModel] Reloaded \(lightweightPlaces.count) lightweight external places (total: \(totalCount))")
         } catch {
             print("❌ [ProfileViewModel] Error reloading lightweight external places: \(error.localizedDescription)")
             await MainActor.run {
@@ -1346,8 +1356,12 @@ class ProfileViewModel: ObservableObject {
         }
         
         do {
-            // Fetch first page of lightweight external places
-            let lightweightPlaces = try await userService.fetchUserExternalPlaces(userId: userId, limit: 8, offset: 0)
+            // Fetch first page of lightweight external places and total count in parallel
+            async let placesTask = userService.fetchUserExternalPlaces(userId: userId, limit: 8, offset: 0)
+            async let countTask = userService.getNumberExternalPlaces(forUserId: userId)
+            
+            let lightweightPlaces = try await placesTask
+            let totalCount = (try? await countTask) ?? 0
             
             // Prefetch TikTok metadata for all TikTok URLs (non-blocking)
             let tiktokUrls = lightweightPlaces.compactMap { $0.tiktok_url }.filter { !$0.isEmpty }
@@ -1360,9 +1374,10 @@ class ProfileViewModel: ObservableObject {
             
             // Update state: replace existing places and update hasMore flag
             lightweightExternalPlaces = lightweightPlaces
+            totalExternalPlacesCount = totalCount
             hasMoreExternalPlaces = !lightweightPlaces.isEmpty && lightweightPlaces.count >= 8
             
-            print("✅ [ProfileViewModel] Loaded \(lightweightPlaces.count) lightweight external places (hasMore: \(hasMoreExternalPlaces))")
+            print("✅ [ProfileViewModel] Loaded \(lightweightPlaces.count) lightweight external places (total: \(totalCount), hasMore: \(hasMoreExternalPlaces))")
         } catch {
             print("❌ [ProfileViewModel] Error loading initial external places: \(error.localizedDescription)")
             // Set hasMore to false on error to prevent infinite retry loops

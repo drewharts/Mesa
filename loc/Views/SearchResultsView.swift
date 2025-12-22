@@ -19,6 +19,8 @@ struct SearchResultsView: View {
     let isSearching: Bool
     let onSelectPlace: (MesaPlaceSuggestion) -> Void
     let onSelectUser: (ProfileData) -> Void
+    
+    @State private var isUsersCollapsed: Bool = false
 
     var body: some View {
         GeometryReader { geometry in
@@ -30,6 +32,7 @@ struct SearchResultsView: View {
                         UserResultsView(
                             userResults: userResults,
                             userPhotos: userPhotos,
+                            isCollapsed: $isUsersCollapsed,
                             onSelectUser: onSelectUser
                         )
                         PlaceResultsView(
@@ -42,8 +45,20 @@ struct SearchResultsView: View {
                 }
             }
             .scrollDismissesKeyboard(.interactively)
-            .frame(height: isSearching ? 100 : CGFloat((userResults.count + placeResults.count) * 120 + (showNoPlaceFound ? 120 : 0)))
+            .frame(height: calculateFrameHeight())
         }
+    }
+    
+    private func calculateFrameHeight() -> CGFloat {
+        if isSearching {
+            return 100
+        }
+        
+        let userHeight: CGFloat = userResults.isEmpty ? 0 : (isUsersCollapsed ? 40 : CGFloat(userResults.count * 80 + 40))
+        let placeHeight: CGFloat = CGFloat(placeResults.count * 120)
+        let noPlaceHeight: CGFloat = showNoPlaceFound ? 120 : 0
+        
+        return userHeight + placeHeight + noPlaceHeight + 20
     }
     
     private var loadingView: some View {
@@ -137,39 +152,64 @@ struct PlaceResultsView: View {
     }
 }
 
-/// DUMB Component: Displays user search results
+/// DUMB Component: Displays user search results with collapsible functionality
 struct UserResultsView: View {
     let userResults: [ProfileData]
     let userPhotos: [String: UIImage]  // Profile photos passed as data
+    @Binding var isCollapsed: Bool
     let onSelectUser: (ProfileData) -> Void
 
     var body: some View {
         if !userResults.isEmpty {
             VStack(alignment: .leading, spacing: 5) {
-                Text("Users")
-                    .font(.headline)
-                    .foregroundColor(.gray)
+                // Tappable header to collapse/expand
+                Button(action: {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        isCollapsed.toggle()
+                    }
+                }) {
+                    HStack {
+                        Text("Users")
+                            .font(.headline)
+                            .foregroundColor(.gray)
+                        
+                        Text("(\(userResults.count))")
+                            .font(.subheadline)
+                            .foregroundColor(.gray.opacity(0.7))
+                        
+                        Spacer()
+                        
+                        Image(systemName: isCollapsed ? "chevron.down" : "chevron.up")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                    }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 20)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(PlainButtonStyle())
                 
-                ForEach(userResults) { user in
-                    Button(action: { onSelectUser(user) }) {
-                        HStack {
-                            profilePhotoView(for: user)
-                            
-                            VStack(alignment: .leading) {
-                                Text(user.fullName)
-                                    .foregroundColor(.black)
+                // User results - only show when not collapsed
+                if !isCollapsed {
+                    ForEach(userResults) { user in
+                        Button(action: { onSelectUser(user) }) {
+                            HStack {
+                                profilePhotoView(for: user)
+                                
+                                VStack(alignment: .leading) {
+                                    Text(user.fullName)
+                                        .foregroundColor(.black)
+                                }
+                                
+                                Spacer()
                             }
-                            
-                            Spacer()
+                            .padding()
+                            .background(Color.white)
+                            .cornerRadius(10)
+                            .shadow(color: .black.opacity(0.1), radius: 3, x: 0, y: 2)
                         }
-                        .padding()
-                        .background(Color.white)
-                        .cornerRadius(10)
-                        .shadow(color: .black.opacity(0.1), radius: 3, x: 0, y: 2)
+                        .padding(.horizontal, 20)
                     }
-                    .padding(.horizontal, 20)
                 }
             }
         }

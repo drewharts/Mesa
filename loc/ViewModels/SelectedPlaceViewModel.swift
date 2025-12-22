@@ -602,4 +602,33 @@ class SelectedPlaceViewModel: ObservableObject {
             self.isDetailSheetPresented = true
         }
     }
+    
+    // MARK: - Logout Cleanup
+    
+    /// Clears all user-related cached data - MUST be called on logout to prevent data leakage
+    /// Single Responsibility: Only clears this ViewModel's cached state
+    func clearAllUserData() {
+        print("🗑️ [SelectedPlaceViewModel] Clearing all user data for security")
+        
+        // Clear selected place state
+        selectedPlace = nil
+        isDetailSheetPresented = false
+        isCurrentPlaceFullyLoaded = false
+        
+        // Clear all cached data
+        placePosts.removeAll()
+        placeTikToks.removeAll()
+        restaurantTypes.removeAll()
+        postLoadingStates.removeAll()
+        likedPosts.removeAll()
+        
+        // Reset UI state
+        placeRating = 0
+        isRestaurantOpen = false
+        allowAutoPresent = true
+        shouldAnimateMapToPlace = false
+        postsUpdateCounter = 0
+        
+        print("✅ [SelectedPlaceViewModel] All user data cleared")
+    }
 }
