@@ -2387,6 +2387,104 @@ class ProfileViewModel: ObservableObject {
         return currentIndex >= threshold
     }
     
+    /// Append new place lists with deduplication
+    /// Single Responsibility: ViewModel owns state management including deduplication
+    /// - Parameters:
+    ///   - newLists: Lists fetched from the service
+    ///   - nextPage: The page number these lists came from
+    ///   - pageSize: Number of items per page (for determining if more exist)
+    func appendPlaceLists(_ newLists: [LightweightPlaceList], nextPage: Int, pageSize: Int) {
+        // Guard: Nothing to append
+        guard !newLists.isEmpty else {
+            hasMorePlaceLists = false
+            return
+        }
+        
+        // Deduplication - ViewModel owns this logic because it owns the state
+        let existingIds = Set(lightweightPlaceLists.map { $0.list_id })
+        let uniqueNewLists = newLists.filter { !existingIds.contains($0.list_id) }
+        
+        // Log duplicates for debugging
+        let duplicateCount = newLists.count - uniqueNewLists.count
+        if duplicateCount > 0 {
+            print("⚠️ [ProfileViewModel] Filtered \(duplicateCount) duplicate place lists")
+        }
+        
+        // Update state with unique lists
+        if !uniqueNewLists.isEmpty {
+            lightweightPlaceLists.append(contentsOf: uniqueNewLists)
+            placeListsCurrentPage = nextPage
+            
+            // Update counts for new lists
+            for list in uniqueNewLists {
+                if lightweightPlaceListCounts[list.list_id] == nil {
+                    lightweightPlaceListCounts[list.list_id] = list.place_count
+                }
+            }
+            
+            print("✅ [ProfileViewModel] Appended \(uniqueNewLists.count) unique lists (total: \(lightweightPlaceLists.count))")
+        } else {
+            print("⚠️ [ProfileViewModel] All \(newLists.count) lists were duplicates - potential pagination issue")
+        }
+        
+        // Update pagination flag based on fetched count (not unique count)
+        hasMorePlaceLists = newLists.count >= pageSize
+    }
+    
+    // MARK: - Place List Places State Management
+    
+    /// Append new places to a list with deduplication
+    /// Single Responsibility: ViewModel owns state management including deduplication
+    /// - Parameters:
+    ///   - listId: The list to append places to
+    ///   - newPlaces: Places fetched from the service
+    func appendPlacesForList(listId: String, newPlaces: [LightweightPlace]) {
+        guard !newPlaces.isEmpty else { return }
+        
+        // Get existing places or empty array
+        let existingPlaces = lightweightPlaceListPlaces[listId] ?? []
+        
+        // Deduplication - ViewModel owns this logic because it owns the state
+        let existingIds = Set(existingPlaces.map { $0.place_id })
+        let uniqueNewPlaces = newPlaces.filter { !existingIds.contains($0.place_id) }
+        
+        // Log duplicates for debugging
+        let duplicateCount = newPlaces.count - uniqueNewPlaces.count
+        if duplicateCount > 0 {
+            print("⚠️ [ProfileViewModel] Filtered \(duplicateCount) duplicate places for list \(listId)")
+        }
+        
+        // Update state with unique places
+        if !uniqueNewPlaces.isEmpty {
+            lightweightPlaceListPlaces[listId] = existingPlaces + uniqueNewPlaces
+            print("✅ [ProfileViewModel] Appended \(uniqueNewPlaces.count) unique places to list \(listId) (total: \(existingPlaces.count + uniqueNewPlaces.count))")
+        }
+    }
+    
+    /// Set places for a list with deduplication (for initial load)
+    /// Single Responsibility: ViewModel owns state management including deduplication
+    /// - Parameters:
+    ///   - listId: The list to set places for
+    ///   - places: Places fetched from the service
+    func setPlacesForList(listId: String, places: [LightweightPlace]) {
+        // Deduplicate by place_id (keep first occurrence)
+        var seenIds = Set<String>()
+        let uniquePlaces = places.filter { place in
+            if seenIds.contains(place.place_id) {
+                return false
+            }
+            seenIds.insert(place.place_id)
+            return true
+        }
+        
+        let duplicateCount = places.count - uniquePlaces.count
+        if duplicateCount > 0 {
+            print("⚠️ [ProfileViewModel] Filtered \(duplicateCount) duplicate places for list \(listId)")
+        }
+        
+        lightweightPlaceListPlaces[listId] = uniquePlaces
+    }
+    
     /// Smart image preloading for visible places (simplified)
     func preloadImagesForVisiblePlaces(listId: UUID) {
         let displayedPlaceIds = getDisplayedPlaceIds(for: listId)

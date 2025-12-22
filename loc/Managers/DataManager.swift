@@ -923,23 +923,9 @@ class DataManager: ObservableObject {
             )
             
             await MainActor.run {
-                // Update pagination state
-                // If we got fewer than pageSize items, we've reached the end
-                profileViewModel.hasMorePlaceLists = moreLists.count >= pageSize
-                
-                // Append new lists if any
-                if !moreLists.isEmpty {
-                    profileViewModel.lightweightPlaceLists.append(contentsOf: moreLists)
-                    profileViewModel.placeListsCurrentPage = nextPage
-                    
-                    for list in moreLists {
-                        if profileViewModel.lightweightPlaceListCounts[list.list_id] == nil {
-                            profileViewModel.lightweightPlaceListCounts[list.list_id] = list.place_count
-                        }
-                    }
-                } else {
-                    profileViewModel.hasMorePlaceLists = false
-                }
+                // Delegate state management to ViewModel (Single Responsibility Principle)
+                // ViewModel handles deduplication and state updates
+                profileViewModel.appendPlaceLists(moreLists, nextPage: nextPage, pageSize: pageSize)
             }
             
             if !moreLists.isEmpty {
@@ -1022,13 +1008,9 @@ class DataManager: ObservableObject {
         let places = try await userService.fetchPlacesForPlaceList(listId: listId, page: page, pageSize: pageSize)
         
         await MainActor.run {
-            // Append to existing places
-            if var existingPlaces = profileViewModel.lightweightPlaceListPlaces[listId] {
-                existingPlaces.append(contentsOf: places)
-                profileViewModel.lightweightPlaceListPlaces[listId] = existingPlaces
-            } else {
-                profileViewModel.lightweightPlaceListPlaces[listId] = places
-            }
+            // Delegate state management to ViewModel (Single Responsibility Principle)
+            // ViewModel handles deduplication and state updates
+            profileViewModel.appendPlacesForList(listId: listId, newPlaces: places)
             
             // Update placeSavers for the current user so "Saved By" feature works
             guard let currentUserId = self.userSession.currentUserId else { return }
@@ -1051,7 +1033,9 @@ class DataManager: ObservableObject {
             let places = try await userService.fetchPlacesForPlaceList(listId: listId, page: 1, pageSize: 6)
             
             await MainActor.run {
-                profileViewModel.lightweightPlaceListPlaces[listId] = places
+                // Delegate state management to ViewModel (Single Responsibility Principle)
+                // ViewModel handles deduplication
+                profileViewModel.setPlacesForList(listId: listId, places: places)
                 
                 // Update placeSavers for the current user so "Saved By" feature works
                 guard let currentUserId = self.userSession.currentUserId else { return }
@@ -1107,7 +1091,9 @@ class DataManager: ObservableObject {
             guard let currentUserId = self.userSession.currentUserId else { return }
             
             for (listId, places) in allPlaces {
-                profileViewModel.lightweightPlaceListPlaces[listId] = places
+                // Delegate state management to ViewModel (Single Responsibility Principle)
+                // ViewModel handles deduplication
+                profileViewModel.setPlacesForList(listId: listId, places: places)
                 
                 // Update placeSavers for each place in the list
                 for place in places {
