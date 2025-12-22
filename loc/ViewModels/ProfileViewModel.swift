@@ -167,6 +167,7 @@ class ProfileViewModel: ObservableObject {
     @Published var isLoadingMoreReviews: Bool = false
     @Published var hasMoreReviews: Bool = true
     @Published var lightweightReviewedPlaces: [LightweightPlace] = [] // Lightweight reviewed places for tiles
+    private var hasAttemptedInitialReviewsLoad: Bool = false // Prevents infinite reload when user has no reviews
     private let reviewsPerPage: Int = 8
     
     // Pagination for TikTok places
@@ -1026,9 +1027,9 @@ class ProfileViewModel: ObservableObject {
             return
         }
         
-        // Don't reload if already loading or if we have data
-        guard !isLoadingReviewedPlaces && lightweightReviewedPlaces.isEmpty else {
-            print("ℹ️ [ProfileViewModel] Skipping initial reviews load - already loading or data exists")
+        // Don't reload if already loading, if we have data, or if we already attempted (prevents infinite loop with no reviews)
+        guard !isLoadingReviewedPlaces && lightweightReviewedPlaces.isEmpty && !hasAttemptedInitialReviewsLoad else {
+            print("ℹ️ [ProfileViewModel] Skipping initial reviews load - already loading, data exists, or already attempted")
             return
         }
         
@@ -1045,6 +1046,7 @@ class ProfileViewModel: ObservableObject {
         }
         
         isLoadingReviewedPlaces = true
+        hasAttemptedInitialReviewsLoad = true // Mark that we've attempted the initial load
         
         defer {
             isLoadingReviewedPlaces = false
@@ -1057,6 +1059,8 @@ class ProfileViewModel: ObservableObject {
             // Update state: replace existing places and update hasMore flag
             lightweightReviewedPlaces = lightweightPlaces
             hasMoreReviews = !lightweightPlaces.isEmpty && lightweightPlaces.count >= reviewsPerPage
+            
+            print("✅ [ProfileViewModel] Loaded \(lightweightPlaces.count) reviewed places")
             
             // Load full place details for display
             await loadPlaceDetailsForReviews(lightweightPlaces, userId: userId)
