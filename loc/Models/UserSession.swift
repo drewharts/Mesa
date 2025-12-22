@@ -62,6 +62,10 @@ class UserSession: ObservableObject {
             do {
                 try await authService.signOut()
                 GIDSignIn.sharedInstance.signOut()
+                
+                // SECURITY: Delegate cache clearing to dedicated service (SRP)
+                SessionCleanupService.shared.clearAllSessionData()
+                
                 isUserLoggedIn = false
                 profileViewModel = nil
                 currentUserId = nil
