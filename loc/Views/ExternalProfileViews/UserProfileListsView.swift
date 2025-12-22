@@ -32,12 +32,12 @@ struct UserProfileListsView: View {
     // MARK: - View Components
     
     private var sectionHeader: some View {
-        Text("LISTS")
-            .font(.subheadline)
-            .fontWeight(.medium)
+        Text("Lists")
+            .font(.headline)
+            .fontWeight(.semibold)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.leading, 20)
-            .foregroundStyle(.black)
+            .padding(.leading, 16)
+            .foregroundColor(.primary)
     }
     
     @ViewBuilder
