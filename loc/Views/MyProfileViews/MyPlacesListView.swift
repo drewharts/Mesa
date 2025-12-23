@@ -295,30 +295,50 @@ struct LightweightPlaceGridCell: View {
     }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            // Photo tile - square with consistent size (matching ProfileView lists)
-            Rectangle()
-                .fill(placeColor)
-                .aspectRatio(1, contentMode: .fit)
-                .overlay(photoContent)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-                .shadow(color: Color.black.opacity(0.08), radius: 6, x: 0, y: 3)
-            
-            // Place name below the tile (matching ListCardInfo structure)
-            Text(place.name)
-                .font(.subheadline)
-                .fontWeight(.semibold)
-                .foregroundColor(.primary)
-                .lineLimit(1)
-        }
-        .onTapGesture {
-            Task {
-                await loadPlaceAndNavigate()
+        // Base Rectangle provides consistent size
+        Rectangle()
+            .fill(placeColor)
+            .aspectRatio(1, contentMode: .fit)
+            .overlay(
+                ZStack(alignment: .bottom) {
+                    // Photo content overlays the background
+                    photoContent
+                        .clipped()
+                    
+                    // Gradient overlay for text readability (matches favorites/tiktoks)
+                    LinearGradient(
+                        gradient: Gradient(colors: [
+                            Color.black.opacity(0.0),
+                            Color.black.opacity(0.1),
+                            Color.black.opacity(0.2),
+                            Color.black.opacity(1.0)
+                        ]),
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    
+                    // Place name overlay (matches favorites/tiktoks style)
+                    Text(place.name)
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.white)
+                        .lineLimit(1)
+                        .multilineTextAlignment(.leading)
+                        .padding(.horizontal, 8)
+                        .padding(.bottom, 8)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .shadow(color: Color.black.opacity(0.08), radius: 6, x: 0, y: 3)
+            .onTapGesture {
+                Task {
+                    await loadPlaceAndNavigate()
+                }
             }
-        }
-        .onLongPressGesture {
-            onLongPress?()
-        }
+            .onLongPressGesture {
+                onLongPress?()
+            }
     }
     
     // MARK: - Photo Content
