@@ -295,118 +295,121 @@ struct LightweightPlaceGridCell: View {
     }
     
     var body: some View {
-        // Base Rectangle provides consistent size
-        Rectangle()
-            .fill(placeColor)
-            .aspectRatio(1, contentMode: .fit)
-            .overlay(
-                ZStack(alignment: .bottom) {
-                    // Photo content overlays the background
-                    photoContent
-                        .clipped()
-                    
-                    // Gradient overlay for text readability (matches favorites/tiktoks)
-                    LinearGradient(
-                        gradient: Gradient(colors: [
-                            Color.black.opacity(0.0),
-                            Color.black.opacity(0.1),
-                            Color.black.opacity(0.2),
-                            Color.black.opacity(1.0)
-                        ]),
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                    
-                    // Place name overlay (matches favorites/tiktoks style)
-                    Text(place.name)
-                        .font(.caption)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.white)
-                        .lineLimit(1)
-                        .multilineTextAlignment(.leading)
-                        .padding(.horizontal, 8)
-                        .padding(.bottom, 8)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 8))
+        // Use GeometryReader to get dynamic size for square aspect ratio
+        GeometryReader { geometry in
+            let size = geometry.size.width // Square, so use width for both dimensions
+            
+            ZStack(alignment: .bottom) {
+                // Background color layer
+                Rectangle()
+                    .fill(placeColor)
+                    .frame(width: size, height: size)
+                
+                // Photo content layer
+                photoContentView(size: size)
+                
+                // Gradient overlay for text readability (matches favorites/tiktoks)
+                LinearGradient(
+                    gradient: Gradient(colors: [
+                        Color.black.opacity(0.0),
+                        Color.black.opacity(0.1),
+                        Color.black.opacity(0.2),
+                        Color.black.opacity(1.0)
+                    ]),
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(width: size, height: size)
+                
+                // Place name overlay (matches favorites/tiktoks style)
+                Text(place.name)
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.white)
+                    .lineLimit(1)
+                    .multilineTextAlignment(.leading)
+                    .padding(.horizontal, 8)
+                    .padding(.bottom, 8)
+                    .frame(width: size, alignment: .leading)
+            }
+            .frame(width: size, height: size)
+            .clipped()
+            .cornerRadius(8)
             .shadow(color: Color.black.opacity(0.08), radius: 6, x: 0, y: 3)
-            .onTapGesture {
-                Task {
-                    await loadPlaceAndNavigate()
-                }
+        }
+        .aspectRatio(1, contentMode: .fit)
+        .onTapGesture {
+            Task {
+                await loadPlaceAndNavigate()
             }
-            .onLongPressGesture {
-                onLongPress?()
-            }
-    }
-    
-    // MARK: - Photo Content
-    @ViewBuilder
-    private var photoContent: some View {
-        if let tiktokUrl = place.tiktok_url,
-           let thumbnailURL = TikTokMetadataCache.shared.getCachedThumbnailUrl(for: tiktokUrl) {
-            tiktokThumbnailView(thumbnailURL: thumbnailURL, tiktokUrl: tiktokUrl)
-        } else if let photoUrl = place.latest_review_photo, let url = URL(string: photoUrl) {
-            reviewPhotoView(url: url)
-        } else {
-            placeholderView
+        }
+        .onLongPressGesture {
+            onLongPress?()
         }
     }
     
+    // MARK: - Photo Content with explicit size
     @ViewBuilder
-    private func tiktokThumbnailView(thumbnailURL: String, tiktokUrl: String) -> some View {
-        AsyncImage(url: URL(string: thumbnailURL)) { phase in
-            switch phase {
-            case .success(let image):
-                image
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-            case .failure:
-                Color.clear // Falls back to background placeColor
-            case .empty:
-                loadingPlaceholder
+    private func photoContentView(size: CGFloat) -> some View {
+        Group {
+            if let tiktokUrl = place.tiktok_url,
+               let thumbnailURL = TikTokMetadataCache.shared.getCachedThumbnailUrl(for: tiktokUrl) {
+                AsyncImage(url: URL(string: thumbnailURL)) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(width: size, height: size)
+                            .clipped()
+                    case .failure:
+                        Color.clear
+                    case .empty:
+                        loadingPlaceholder
+                            .frame(width: size, height: size)
+                            .onAppear {
+                                Task {
+                                    _ = await TikTokMetadataCache.shared.getMetadata(for: tiktokUrl)
+                                }
+                            }
+                    @unknown default:
+                        Color.clear
+                    }
+                }
+            } else if let photoUrl = place.latest_review_photo, let url = URL(string: photoUrl) {
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(width: size, height: size)
+                            .clipped()
+                    case .failure:
+                        Color.clear
+                    case .empty:
+                        loadingPlaceholder
+                            .frame(width: size, height: size)
+                    @unknown default:
+                        Color.clear
+                    }
+                }
+            } else {
+                // No photo - trigger TikTok metadata fetch if URL exists
+                Color.clear
+                    .frame(width: size, height: size)
                     .onAppear {
-                        Task {
-                            _ = await TikTokMetadataCache.shared.getMetadata(for: tiktokUrl)
+                        if let tiktokUrl = place.tiktok_url {
+                            Task {
+                                _ = await TikTokMetadataCache.shared.getMetadata(for: tiktokUrl)
+                            }
                         }
                     }
-            @unknown default:
-                Color.clear
             }
         }
     }
     
-    @ViewBuilder
-    private func reviewPhotoView(url: URL) -> some View {
-        AsyncImage(url: url) { phase in
-            switch phase {
-            case .success(let image):
-                image
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-            case .failure:
-                Color.clear // Falls back to background placeColor
-            case .empty:
-                loadingPlaceholder
-            @unknown default:
-                Color.clear
-            }
-        }
-    }
-    
-    private var placeholderView: some View {
-        Color.clear
-            .onAppear {
-                // Prefetch TikTok metadata if URL exists but no cached thumbnail
-                if let tiktokUrl = place.tiktok_url {
-                    Task {
-                        _ = await TikTokMetadataCache.shared.getMetadata(for: tiktokUrl)
-                    }
-                }
-            }
-    }
-    
+    // MARK: - Loading Placeholder
     private var loadingPlaceholder: some View {
         Color.gray.opacity(0.3)
             .overlay(
