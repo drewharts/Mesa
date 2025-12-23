@@ -295,40 +295,44 @@ struct LightweightPlaceGridCell: View {
     }
     
     var body: some View {
-        ZStack(alignment: .bottom) {
-            // Photo content - fills available space
-            photoContent
-            
-            // Gradient overlay for text readability
-            LinearGradient(
-                gradient: Gradient(colors: [.clear, .black.opacity(0.7)]),
-                startPoint: .top,
-                endPoint: .bottom
+        // Base Rectangle provides consistent size - aspectRatio works on Rectangle's intrinsic size
+        Rectangle()
+            .fill(placeColor)
+            .aspectRatio(1, contentMode: .fit)
+            .overlay(
+                ZStack(alignment: .bottom) {
+                    // Photo content overlays the background
+                    photoContent
+                    
+                    // Gradient overlay for text readability
+                    LinearGradient(
+                        gradient: Gradient(colors: [.clear, .black.opacity(0.7)]),
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .frame(maxHeight: 60)
+                    
+                    // Place name overlay
+                    Text(place.name)
+                        .font(.headline)
+                        .foregroundColor(.white)
+                        .lineLimit(1)
+                        .multilineTextAlignment(.leading)
+                        .padding(.horizontal, 12)
+                        .padding(.bottom, 8)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
             )
-            .frame(maxHeight: 60)
-            
-            // Place name overlay
-            Text(place.name)
-                .font(.headline)
-                .foregroundColor(.white)
-                .lineLimit(1)
-                .multilineTextAlignment(.leading)
-                .padding(.horizontal, 12)
-                .padding(.bottom, 8)
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .aspectRatio(1, contentMode: .fit) // Square that fills grid column (consistent with ProfileView)
-        .background(placeColor)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-        .shadow(color: Color.black.opacity(0.08), radius: 6, x: 0, y: 3)
-        .onTapGesture {
-            Task {
-                await loadPlaceAndNavigate()
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .shadow(color: Color.black.opacity(0.08), radius: 6, x: 0, y: 3)
+            .onTapGesture {
+                Task {
+                    await loadPlaceAndNavigate()
+                }
             }
-        }
-        .onLongPressGesture {
-            onLongPress?()
-        }
+            .onLongPressGesture {
+                onLongPress?()
+            }
     }
     
     // MARK: - Photo Content
