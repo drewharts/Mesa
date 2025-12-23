@@ -93,24 +93,33 @@ struct PlaceResultsView: View {
                 
                 ForEach(placeResults, id: \.id) { prediction in
                     Button(action: { onSelectPlace(prediction) }) {
-                        VStack(alignment: .center) {
-                            Text(prediction.name)
-                                .font(.headline)
-                                .foregroundColor(.black)
-                                .frame(maxWidth: .infinity, alignment: .center)
-
-                            if let secondaryText = prediction.address {
-                                Text(secondaryText)
-                                    .font(.subheadline)
-                                    .foregroundColor(.gray)
-                                    .frame(maxWidth: .infinity, alignment: .center)
+                        HStack(spacing: 12) {
+                            Image(systemName: "mappin.circle.fill")
+                                .font(.system(size: 24))
+                                .foregroundColor(.red.opacity(0.8))
+                            
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(prediction.name)
+                                    .font(.body)
+                                    .foregroundColor(.black)
+                                    .lineLimit(1)
+                                
+                                if let address = prediction.address, !address.isEmpty {
+                                    Text(address)
+                                        .font(.caption)
+                                        .foregroundColor(.gray)
+                                        .lineLimit(1)
+                                }
                             }
+                            
+                            Spacer()
                         }
                         .padding()
                         .background(Color.white)
                         .cornerRadius(10)
                         .shadow(color: .black.opacity(0.1), radius: 3, x: 0, y: 2)
                     }
+                    .buttonStyle(PlainButtonStyle())
                     .padding(.horizontal, 20)
                 }
             } else if showNoPlaceFound {
@@ -190,12 +199,14 @@ struct UserResultsView: View {
                 if !isCollapsed {
                     ForEach(userResults) { user in
                         Button(action: { onSelectUser(user) }) {
-                            HStack {
+                            HStack(spacing: 12) {
                                 profilePhotoView(for: user)
                                 
-                                VStack(alignment: .leading) {
+                                VStack(alignment: .leading, spacing: 2) {
                                     Text(user.fullName)
+                                        .font(.body)
                                         .foregroundColor(.black)
+                                        .lineLimit(1)
                                 }
                                 
                                 Spacer()
@@ -205,6 +216,7 @@ struct UserResultsView: View {
                             .cornerRadius(10)
                             .shadow(color: .black.opacity(0.1), radius: 3, x: 0, y: 2)
                         }
+                        .buttonStyle(PlainButtonStyle())
                         .padding(.horizontal, 20)
                     }
                 }
@@ -218,12 +230,11 @@ struct UserResultsView: View {
             Image(uiImage: profilePhoto)
                 .resizable()
                 .scaledToFill()
-                .frame(width: 40, height: 40)
+                .frame(width: 28, height: 28)
                 .clipShape(Circle())
         } else {
-            Image(systemName: "person.crop.circle.fill")
-                .resizable()
-                .frame(width: 40, height: 40)
+            Image(systemName: "person.circle.fill")
+                .font(.system(size: 24))
                 .foregroundColor(.gray)
         }
     }
@@ -242,10 +253,14 @@ struct RecentSearchesView: View {
     let onClearAll: () -> Void
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            headerView
-            selectionsList
+        ScrollView {
+            VStack(alignment: .leading, spacing: 8) {
+                headerView
+                selectionsList
+            }
         }
+        .scrollDismissesKeyboard(.immediately)
+        .fixedSize(horizontal: false, vertical: true)
     }
     
     // MARK: - Header
@@ -261,7 +276,7 @@ struct RecentSearchesView: View {
             Button(action: onClearAll) {
                 Text("Clear")
                     .font(.subheadline)
-                    .foregroundColor(.blue)
+                    .foregroundColor(.gray)
             }
         }
         .padding(.horizontal, 20)

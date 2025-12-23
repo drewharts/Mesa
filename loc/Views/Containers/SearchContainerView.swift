@@ -73,17 +73,29 @@ struct SearchContainerView: View {
     }
     
     private var searchBar: some View {
-        TextField("Search here...", text: $searchViewModel.searchText)
-            .padding()
-            .background(Color.white)
-            .cornerRadius(20)
-            .shadow(color: .black.opacity(0.2), radius: 5, x: 0, y: 3)
-            .foregroundStyle(Color.gray)
-            .focused($searchIsFocused)
-            .padding(.horizontal, 20)
-            .padding(.top, 20)
-            // ✅ Removed .onTapGesture - TextField handles taps natively
-            // This prevents gesture conflicts that cause "System gesture gate timed out"
+        HStack(spacing: 8) {
+            TextField("Search here...", text: $searchViewModel.searchText)
+                .foregroundStyle(Color.gray)
+                .focused($searchIsFocused)
+            
+            // Cancel button - dismisses search and keyboard
+            Button(action: {
+                dismissKeyboard()
+                withAnimation {
+                    isSearchExpanded = false
+                }
+            }) {
+                Text("Cancel")
+                    .font(.subheadline)
+                    .foregroundColor(.gray)
+            }
+        }
+        .padding()
+        .background(Color.white)
+        .cornerRadius(20)
+        .shadow(color: .black.opacity(0.2), radius: 5, x: 0, y: 3)
+        .padding(.horizontal, 20)
+        .padding(.top, 20)
     }
     
     private var searchResults: some View {
@@ -192,10 +204,9 @@ struct SearchContainerView: View {
                     isSearchExpanded = false
                 }
             }
-        )
-        .frame(maxWidth: .infinity)
-        .padding(.horizontal, 20)
-        .padding(.top, 10)
-        .padding(.bottom, 50)
-    }
+    )
+    .frame(maxWidth: .infinity)
+    .padding(.top, 10)
+    .padding(.bottom, 50)
+}
 }
