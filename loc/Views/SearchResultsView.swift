@@ -144,6 +144,7 @@ struct PlaceResultsView: View {
                     .multilineTextAlignment(.center)
             }
         }
+        .frame(maxWidth: .infinity)
         .padding()
         .background(Color.white)
         .cornerRadius(10)
@@ -172,10 +173,6 @@ struct UserResultsView: View {
                         Text("Users")
                             .font(.headline)
                             .foregroundColor(.gray)
-                        
-                        Text("(\(userResults.count))")
-                            .font(.subheadline)
-                            .foregroundColor(.gray.opacity(0.7))
                         
                         Spacer()
                         
@@ -228,6 +225,133 @@ struct UserResultsView: View {
                 .resizable()
                 .frame(width: 40, height: 40)
                 .foregroundColor(.gray)
+        }
+    }
+}
+
+// MARK: - Recent Selections View
+
+/// DUMB Component: Displays recently selected places & users
+/// Single Responsibility: Render recent selections with tap/clear actions
+/// Receives data and callbacks only - no ViewModel dependencies
+struct RecentSearchesView: View {
+    let selections: [RecentSelection]
+    let userPhotos: [String: UIImage]
+    let onSelectPlace: (String) -> Void   // Place ID
+    let onSelectUser: (String) -> Void    // User ID
+    let onClearAll: () -> Void
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            headerView
+            selectionsList
+        }
+    }
+    
+    // MARK: - Header
+    
+    private var headerView: some View {
+        HStack {
+            Text("Recent")
+                .font(.headline)
+                .foregroundColor(.gray)
+            
+            Spacer()
+            
+            Button(action: onClearAll) {
+                Text("Clear")
+                    .font(.subheadline)
+                    .foregroundColor(.blue)
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 10)
+    }
+    
+    // MARK: - Selections List
+    
+    private var selectionsList: some View {
+        ForEach(selections) { selection in
+            Button(action: { handleSelection(selection) }) {
+                HStack(spacing: 12) {
+                    selectionIcon(for: selection)
+                    
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(selection.displayName)
+                            .font(.body)
+                            .foregroundColor(.black)
+                            .lineLimit(1)
+                        
+                        if let subtitle = selection.subtitle, !subtitle.isEmpty {
+                            Text(subtitle)
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                                .lineLimit(1)
+                        }
+                    }
+                    
+                    Spacer()
+                }
+                .padding()
+                .background(Color.white)
+                .cornerRadius(10)
+                .shadow(color: .black.opacity(0.1), radius: 3, x: 0, y: 2)
+            }
+            .buttonStyle(PlainButtonStyle())
+            .padding(.horizontal, 20)
+        }
+    }
+    
+    // MARK: - Helpers
+    
+    @ViewBuilder
+    private func selectionIcon(for selection: RecentSelection) -> some View {
+        switch selection {
+        case .place:
+            Image(systemName: "mappin.circle.fill")
+                .font(.system(size: 24))
+                .foregroundColor(.red.opacity(0.8))
+        case .user(let id, _, let photoURLString):
+            // Try cached photo first, then fall back to AsyncImage
+            if let photo = userPhotos[id] {
+                Image(uiImage: photo)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 28, height: 28)
+                    .clipShape(Circle())
+            } else if let urlString = photoURLString, let url = URL(string: urlString) {
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 28, height: 28)
+                            .clipShape(Circle())
+                    case .failure, .empty:
+                        Image(systemName: "person.circle.fill")
+                            .font(.system(size: 24))
+                            .foregroundColor(.gray)
+                    @unknown default:
+                        Image(systemName: "person.circle.fill")
+                            .font(.system(size: 24))
+                            .foregroundColor(.gray)
+                    }
+                }
+            } else {
+                Image(systemName: "person.circle.fill")
+                    .font(.system(size: 24))
+                    .foregroundColor(.gray)
+            }
+        }
+    }
+    
+    private func handleSelection(_ selection: RecentSelection) {
+        switch selection {
+        case .place(let id, _, _):
+            onSelectPlace(id)
+        case .user(let id, _, _):
+            onSelectUser(id)
         }
     }
 }
