@@ -58,13 +58,13 @@ struct LightweightListPopupView: View {
         return lists[currentListIndex]
     }
     
-    // Same layout as original popup
-    private let cardWidth: CGFloat = UIScreen.main.bounds.width / 2 - 35
+    // Same layout as ProfileView lists
+    private let cardWidth: CGFloat = UIScreen.main.bounds.width / 2 - 28
     private let cardHeight: CGFloat = 180
     
     private let columns = [
-        GridItem(.flexible(), spacing: 15),
-        GridItem(.flexible(), spacing: 15)
+        GridItem(.flexible(), spacing: 12),
+        GridItem(.flexible(), spacing: 12)
     ]
     
     // Get all places for the current list (from profile state)
@@ -309,13 +309,13 @@ struct ListContentView: View {
     
     @EnvironmentObject var profile: ProfileViewModel
     
-    // Same layout as original popup
-    private let cardWidth: CGFloat = UIScreen.main.bounds.width / 2 - 35
+    // Same layout as ProfileView lists
+    private let cardWidth: CGFloat = UIScreen.main.bounds.width / 2 - 28
     private let cardHeight: CGFloat = 180
     
     private let columns = [
-        GridItem(.flexible(), spacing: 15),
-        GridItem(.flexible(), spacing: 15)
+        GridItem(.flexible(), spacing: 12),
+        GridItem(.flexible(), spacing: 12)
     ]
     
     // Get all places for this list (from profile state)
@@ -336,7 +336,7 @@ struct ListContentView: View {
     var body: some View {
         if !filteredPlaces.isEmpty {
             ScrollView {
-                LazyVGrid(columns: columns, spacing: 15) {
+                LazyVGrid(columns: columns, spacing: 16) {
                     ForEach(Array(filteredPlaces.enumerated()), id: \.element.id) { index, place in
                         LightweightPlaceGridCell(
                             place: place,
@@ -351,7 +351,7 @@ struct ListContentView: View {
                         }
                     }
                 }
-                .padding(.horizontal, 20)
+                .padding(.horizontal, 16)
                 .padding(.vertical, 10)
                 
                 // Loading indicator at bottom

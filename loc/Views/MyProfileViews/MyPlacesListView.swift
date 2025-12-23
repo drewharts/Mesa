@@ -453,8 +453,8 @@ struct LightweightPlaceGridCell: View {
         }
         .frame(width: cardWidth, height: cardHeight)
         .background(Color.white)
-        .cornerRadius(20)
-        .shadow(color: Color.black.opacity(0.2), radius: 5, x: 0, y: 2)
+        .cornerRadius(8)
+        .shadow(color: Color.black.opacity(0.08), radius: 6, x: 0, y: 3)
         .onTapGesture {
             // Load full place details when tapped
             Task {
@@ -642,8 +642,8 @@ struct PlaceGridCell: View {
         }
         .frame(width: cardWidth, height: cardHeight)
         .background(Color.white)
-        .cornerRadius(20)
-        .shadow(color: Color.black.opacity(0.2), radius: 5, x: 0, y: 2)
+        .cornerRadius(8)
+        .shadow(color: Color.black.opacity(0.08), radius: 6, x: 0, y: 3)
         .onTapGesture {
             selectedPlaceVM.selectPlaceAndFetchDetails(place)
             selectedPlaceVM.isDetailSheetPresented = true
