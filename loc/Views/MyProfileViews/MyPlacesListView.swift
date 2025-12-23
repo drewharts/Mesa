@@ -304,12 +304,14 @@ struct LightweightPlaceGridCell: View {
                 .clipShape(RoundedRectangle(cornerRadius: 8))
                 .shadow(color: Color.black.opacity(0.08), radius: 6, x: 0, y: 3)
             
-            // Place name below the tile (like ProfileView lists)
-            Text(place.name)
-                .font(.subheadline)
-                .fontWeight(.semibold)
-                .foregroundColor(.primary)
-                .lineLimit(1)
+            // Place info below the tile (matching ListCardInfo structure)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(place.name)
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.primary)
+                    .lineLimit(1)
+            }
         }
         .onTapGesture {
             Task {
