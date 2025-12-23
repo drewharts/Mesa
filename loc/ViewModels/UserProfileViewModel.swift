@@ -43,17 +43,13 @@ class UserProfileViewModel: ObservableObject {
     @Published var showFollowError: Bool = false
     @Published var followErrorMessage: String = ""
     
-    // Reviewed places loading state
+    // MARK: - Reviewed Places State (LightweightPlace for consistent image loading)
+    @Published var lightweightReviewedPlaces: [LightweightPlace] = []
     @Published var isLoadingReviewedPlaces: Bool = false
-    private var hasAttemptedLoadReviewedPlaces: [String: Bool] = [:]
-    
-    // Pagination properties for user reviews
     @Published var isLoadingMoreReviews: Bool = false
-    private var hasMoreReviews: [String: Bool] = [:] // userId -> hasMoreReviews
-    private var currentReviewPage: [String: Int] = [:] // userId -> page number
+    private var hasAttemptedLoadReviewedPlaces: [String: Bool] = [:]
+    private var hasMoreReviewsForUser: [String: Bool] = [:] // userId -> hasMoreReviews
     private let reviewsPerPage: Int = 8
-    private var allReviewedPlaceIds: [String: [String]] = [:] // userId -> [placeIds]
-    private var loadedReviewedPlaceIds: [String: [String]] = [:] // userId -> [loaded placeIds]
     
     private let placeService: PlaceService
     private let userService: UserService
@@ -559,145 +555,91 @@ class UserProfileViewModel: ObservableObject {
     }
     
     private func resetPaginationState() {
-        currentReviewPage.removeAll()
-        allReviewedPlaceIds.removeAll()
-        loadedReviewedPlaceIds.removeAll()
-        hasMoreReviews.removeAll()
+        lightweightReviewedPlaces = []
+        hasMoreReviewsForUser.removeAll()
         isLoadingMoreReviews = false
     }
     
+    /// Load initial reviewed places using server-side pagination (LightweightPlace)
+    /// Uses get_user_reviewed_places SQL function which includes latest_review_photo
     private func loadUserReviewedPlacesPaginated(userId: String) async {
-        // If this is the first load, get all review place IDs
-        if allReviewedPlaceIds[userId] == nil {
+        await MainActor.run {
+            isLoadingReviewedPlaces = true
+        }
+        
+        defer {
+            Task { @MainActor in
+                isLoadingReviewedPlaces = false
+            }
+        }
+        
+        do {
+            // Fetch first page using server-side pagination (includes latest_review_photo!)
+            let places = try await userService.fetchUserReviewedPlaces(userId: userId, limit: reviewsPerPage, offset: 0)
+            
             await MainActor.run {
-                isLoadingReviewedPlaces = true
+                lightweightReviewedPlaces = places
+                hasMoreReviewsForUser[userId] = !places.isEmpty && places.count >= reviewsPerPage
             }
             
-            do {
-                let allPosts = try await postService.fetchUserPosts(userId: userId)
-                
-                // Sort posts by timestamp (most recent first) and get unique place IDs while preserving order
-                let sortedPosts = allPosts.sorted { $0.timestamp > $1.timestamp }
-
-                // Get unique place IDs while preserving the order of most recently posted places
-                var seenPlaceIds = Set<String>()
-                let uniquePlaceIds: [String] = sortedPosts.compactMap { post in
-                    if seenPlaceIds.contains(post.placeId) {
-                        return nil
-                    }
-                    seenPlaceIds.insert(post.placeId)
-                    return post.placeId
+            print("✅ [UserProfileVM] Loaded \(places.count) reviewed places for user \(userId)")
+            
+            // Prefetch TikTok metadata for places with TikTok URLs
+            let tiktokUrls = places.compactMap { $0.tiktok_url }.filter { !$0.isEmpty }
+            if !tiktokUrls.isEmpty {
+                Task {
+                    await TikTokMetadataCache.shared.prefetchMetadata(for: tiktokUrls)
                 }
-
-                await MainActor.run {
-                    allReviewedPlaceIds[userId] = uniquePlaceIds
-                    // Initialize hasMoreReviews for this user
-                    hasMoreReviews[userId] = !allReviewedPlaceIds[userId]!.isEmpty
-                }
-            } catch {
-                print("Error fetching user posts for pagination: \(error.localizedDescription)")
-                await MainActor.run {
-                    isLoadingReviewedPlaces = false
-                }
-                return
             }
-        }
-        
-        // If there are no reviews at all, ensure loading state is reset
-        if allReviewedPlaceIds[userId]?.isEmpty == true {
+        } catch {
+            print("❌ [UserProfileVM] Error loading reviewed places: \(error.localizedDescription)")
             await MainActor.run {
-                isLoadingReviewedPlaces = false
+                hasMoreReviewsForUser[userId] = false
             }
-            return
         }
-        
-        // Load the next batch of reviews
-        await loadNextBatchOfReviews(userId: userId)
     }
     
+    /// Load more reviewed places (pagination)
     private func loadNextBatchOfReviews(userId: String) async {
-        guard !isLoadingMoreReviews && hasMoreReviews[userId] != false else { 
-            // Safety check: if we can't load more, ensure initial loading is complete
-            await MainActor.run {
-                isLoadingReviewedPlaces = false
-            }
-            return 
-        }
+        guard !isLoadingMoreReviews, hasMoreReviewsForUser[userId] != false else { return }
         
         await MainActor.run {
             isLoadingMoreReviews = true
         }
         
-        let startIndex = currentReviewPage[userId] ?? 0
-        let endIndex = min(startIndex + reviewsPerPage, allReviewedPlaceIds[userId]?.count ?? 0)
-        
-        guard startIndex < (allReviewedPlaceIds[userId]?.count ?? 0) else {
-            await MainActor.run {
-                hasMoreReviews[userId] = false
+        defer {
+            Task { @MainActor in
                 isLoadingMoreReviews = false
-                isLoadingReviewedPlaces = false
             }
-            return
         }
         
-        let placeIdsToLoad = Array(allReviewedPlaceIds[userId]![startIndex..<endIndex])
+        let offset = lightweightReviewedPlaces.count
         
-        // Load places and their details
-        var successfullyLoadedPlaceIds: [String] = []
-        
-        for placeId in placeIdsToLoad {
-            // Add userId to placeSavers if not already present
-            if detailPlaceViewModel.placeSavers[placeId] == nil {
-                detailPlaceViewModel.placeSavers[placeId] = [userId]
-            } else if !detailPlaceViewModel.placeSavers[placeId]!.contains(userId) {
-                detailPlaceViewModel.placeSavers[placeId]!.append(userId)
+        do {
+            let places = try await userService.fetchUserReviewedPlaces(userId: userId, limit: reviewsPerPage, offset: offset)
+            
+            await MainActor.run {
+                // Deduplicate to prevent SwiftUI rendering issues
+                let existingIds = Set(lightweightReviewedPlaces.map { $0.id })
+                let newUniquePlaces = places.filter { !existingIds.contains($0.id) }
+                lightweightReviewedPlaces.append(contentsOf: newUniquePlaces)
+                hasMoreReviewsForUser[userId] = !places.isEmpty && places.count >= reviewsPerPage
             }
             
-            // Fetch and store the place if not already present
-            if detailPlaceViewModel.places[placeId] == nil {
-                // Retry logic for failed place loads
-                var retryCount = 0
-                let maxRetries = 2
-
-                while retryCount <= maxRetries {
-                    do {
-                        let detailPlace = try await placeService.fetchPlace(withId: placeId)
-                        await MainActor.run {
-                            detailPlaceViewModel.places[placeId] = detailPlace
-                            detailPlaceViewModel.fetchPlaceImage(for: placeId)
-                            // Only add to successfully loaded places if we got the data
-                            successfullyLoadedPlaceIds.append(placeId)
-                        }
-                        break // Success, exit retry loop
-                    } catch {
-                        retryCount += 1
-                        if retryCount <= maxRetries {
-                            print("⚠️ [UserProfileViewModel] Failed to load place \(placeId), retrying (\(retryCount)/\(maxRetries)): \(error.localizedDescription)")
-                            try? await Task.sleep(nanoseconds: 500_000_000 * UInt64(retryCount)) // Exponential backoff
-                        } else {
-                            print("❌ [UserProfileViewModel] Failed to load place \(placeId) after \(maxRetries) retries: \(error.localizedDescription)")
-                        }
-                    }
+            print("✅ [UserProfileVM] Loaded \(places.count) more reviewed places (total: \(lightweightReviewedPlaces.count))")
+            
+            // Prefetch TikTok metadata for new places
+            let tiktokUrls = places.compactMap { $0.tiktok_url }.filter { !$0.isEmpty }
+            if !tiktokUrls.isEmpty {
+                Task {
+                    await TikTokMetadataCache.shared.prefetchMetadata(for: tiktokUrls)
                 }
-            } else {
-                // Place already exists, add to successfully loaded
-                successfullyLoadedPlaceIds.append(placeId)
             }
-        }
-        
-        await MainActor.run {
-            if loadedReviewedPlaceIds[userId] == nil {
-                loadedReviewedPlaceIds[userId] = []
+        } catch {
+            print("❌ [UserProfileVM] Error loading more reviewed places: \(error.localizedDescription)")
+            await MainActor.run {
+                hasMoreReviewsForUser[userId] = false
             }
-            // Only add place IDs that aren't already in the list
-            let newPlaceIds = successfullyLoadedPlaceIds.filter { placeId in
-                !loadedReviewedPlaceIds[userId]!.contains(placeId)
-            }
-            loadedReviewedPlaceIds[userId]?.append(contentsOf: newPlaceIds)
-            currentReviewPage[userId] = (currentReviewPage[userId] ?? 0) + 1
-            hasMoreReviews[userId] = endIndex < (allReviewedPlaceIds[userId]?.count ?? 0)
-            isLoadingMoreReviews = false
-            isLoadingReviewedPlaces = false
         }
     }
     
@@ -708,33 +650,17 @@ class UserProfileViewModel: ObservableObject {
         }
     }
     
-    // Get places that this user has reviewed (with pagination)
-    func getReviewedPlaces() -> [DetailPlace] {
-        guard let userId = selectedUser?.id else { return [] }
-        
-        // Return only the loaded places for pagination
-        return loadedReviewedPlaceIds[userId]?.compactMap { detailPlaceViewModel.places[$0] } ?? []
+    /// Get reviewed places as LightweightPlace (includes latest_review_photo for consistent image loading)
+    func getReviewedPlaces() -> [LightweightPlace] {
+        return lightweightReviewedPlaces
     }
     
-    // Get all reviewed places (for backward compatibility)
-    func getAllReviewedPlaces() -> [DetailPlace] {
-        guard let userId = selectedUser?.id else { return [] }
-        
-        // Find all places where this user is in the placeSavers array
-        let reviewedPlaceIds = detailPlaceViewModel.placeSavers.compactMap { (placeId, userIds) -> String? in
-            return userIds.contains(userId) ? placeId : nil
-        }
-        
-        // Get the actual DetailPlace objects for those IDs
-        return reviewedPlaceIds.compactMap { detailPlaceViewModel.places[$0] }
-    }
-    
-    // Get hasMoreReviews for a specific user
+    /// Get hasMoreReviews for a specific user
     func hasMoreReviews(for userId: String) -> Bool {
-        return hasMoreReviews[userId] ?? true
+        return hasMoreReviewsForUser[userId] ?? true
     }
     
-    // Check if we've attempted to load reviews for a specific user
+    /// Check if we've attempted to load reviews for a specific user
     func hasAttemptedLoadReviews(for userId: String) -> Bool {
         return hasAttemptedLoadReviewedPlaces[userId] ?? false
     }

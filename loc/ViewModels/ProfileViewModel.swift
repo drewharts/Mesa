@@ -1233,11 +1233,13 @@ class ProfileViewModel: ObservableObject {
     }
 
     /// Reset reviewed places pagination state (server-side pagination)
+    /// Single source of truth for all reviewed places state - ensures clean reload
     func resetMyReviewedPlacesPagination() {
         isLoadingReviewedPlaces = false
         isLoadingMoreReviews = false
         hasMoreReviews = true
         lightweightReviewedPlaces = []
+        hasAttemptedInitialReviewsLoad = false  // Critical: allow fresh reload on next view appear
     }
 
     /// Get the total count of reviewed places (server-side pagination)

@@ -362,11 +362,11 @@ class DataManager: ObservableObject {
     }
     
     /// Refresh Reviewed Places data (for when user clicks on My Places)
+    /// Delegates state reset to ViewModel (single responsibility principle)
     func refreshReviewedPlaces(userId: String) async {
-        // Clear existing data and reload (server-side pagination)
-        profileViewModel.lightweightReviewedPlaces.removeAll()
-        profileViewModel.hasMoreReviews = true
-        // Reload will happen automatically when view appears
+        // Delegate state reset to ViewModel - it owns all its pagination state
+        profileViewModel.resetMyReviewedPlacesPagination()
+        // Reload will happen automatically when view appears via onAppear
     }
     
     // Load's current user's profile data and profile picture

@@ -15,7 +15,6 @@ struct LightweightListPopupView: View {
     
     let lists: [LightweightPlaceList]
     let initialListIndex: Int
-    @Binding var placeColors: [UUID: Color]
     
     @State private var currentListIndex: Int
     @State private var showOnlyUnvisited: Bool = false
@@ -25,18 +24,16 @@ struct LightweightListPopupView: View {
     @State private var showCollaboratorsSheet: Bool = false
     
     // Convenience initializer for single list (backward compatibility)
-    init(list: LightweightPlaceList, places: [LightweightPlace], placeColors: Binding<[UUID: Color]>) {
+    init(list: LightweightPlaceList, places: [LightweightPlace] = []) {
         self.lists = [list]
         self.initialListIndex = 0
-        self._placeColors = placeColors
         self._currentListIndex = State(initialValue: 0)
     }
     
-    // New initializer for multiple lists with swiping
-    init(lists: [LightweightPlaceList], initialListIndex: Int, placeColors: Binding<[UUID: Color]>) {
+    // Initializer for multiple lists with swiping
+    init(lists: [LightweightPlaceList], initialListIndex: Int) {
         self.lists = lists
         self.initialListIndex = initialListIndex
-        self._placeColors = placeColors
         self._currentListIndex = State(initialValue: initialListIndex)
     }
     
@@ -58,28 +55,9 @@ struct LightweightListPopupView: View {
         return lists[currentListIndex]
     }
     
-    // Same layout as original popup
-    private let cardWidth: CGFloat = UIScreen.main.bounds.width / 2 - 35
-    private let cardHeight: CGFloat = 180
-    
-    private let columns = [
-        GridItem(.flexible(), spacing: 15),
-        GridItem(.flexible(), spacing: 15)
-    ]
-    
-    // Get all places for the current list (from profile state)
+    // Get all places for the current list (from profile state) - used for filtering logic
     var allPlaces: [LightweightPlace] {
         return profile.lightweightPlaceListPlaces[currentList.list_id] ?? []
-    }
-    
-    // Filtered places based on visited status (uses ViewModel's database-verified reviewed IDs)
-    var filteredPlaces: [LightweightPlace] {
-        guard showOnlyUnvisited else { return allPlaces }
-        
-        // Filter out places that the current user has reviewed (checked against ViewModel)
-        return allPlaces.filter { place in
-            !profile.hasVerifiedReviewedPlace(placeId: place.place_id)
-        }
     }
     
     var body: some View {
@@ -170,7 +148,6 @@ struct LightweightListPopupView: View {
                         ForEach(lists.indices, id: \.self) { index in
                             ListContentView(
                                 list: lists[index],
-                                placeColors: $placeColors,
                                 showOnlyUnvisited: $showOnlyUnvisited,
                                 isLoadingMore: $isLoadingMore,
                                 hasMorePlaces: $hasMorePlaces,
@@ -200,7 +177,6 @@ struct LightweightListPopupView: View {
                     // Single list - no swiping needed
                     ListContentView(
                         list: currentList,
-                        placeColors: $placeColors,
                         showOnlyUnvisited: $showOnlyUnvisited,
                         isLoadingMore: $isLoadingMore,
                         hasMorePlaces: $hasMorePlaces,
@@ -295,12 +271,10 @@ struct LightweightListPopupView: View {
 }
 
 // MARK: - List Content View
-// DUMB Component: Displays list places in grid, delegates actions via closures
-// Uses ProfileViewModel for reviewed place filtering (no local business logic)
-
+/// DUMB Component: Displays list places in grid, delegates actions via closures
+/// Single Responsibility: Render place grid with pagination, delegate loading
 struct ListContentView: View {
     let list: LightweightPlaceList
-    @Binding var placeColors: [UUID: Color]
     @Binding var showOnlyUnvisited: Bool
     @Binding var isLoadingMore: Bool
     @Binding var hasMorePlaces: Bool
@@ -309,13 +283,10 @@ struct ListContentView: View {
     
     @EnvironmentObject var profile: ProfileViewModel
     
-    // Same layout as original popup
-    private let cardWidth: CGFloat = UIScreen.main.bounds.width / 2 - 35
-    private let cardHeight: CGFloat = 180
-    
+    // Grid layout matching ProfileView lists (consistent spacing)
     private let columns = [
-        GridItem(.flexible(), spacing: 15),
-        GridItem(.flexible(), spacing: 15)
+        GridItem(.flexible(), spacing: 12),
+        GridItem(.flexible(), spacing: 12)
     ]
     
     // Get all places for this list (from profile state)
@@ -336,22 +307,18 @@ struct ListContentView: View {
     var body: some View {
         if !filteredPlaces.isEmpty {
             ScrollView {
-                LazyVGrid(columns: columns, spacing: 15) {
+                LazyVGrid(columns: columns, spacing: 16) {
                     ForEach(Array(filteredPlaces.enumerated()), id: \.element.id) { index, place in
-                        LightweightPlaceGridCell(
-                            place: place,
-                            cardWidth: cardWidth,
-                            cardHeight: cardHeight
-                        )
-                        .onAppear {
-                            // Load more when user scrolls to 3rd-to-last item
-                            if index == allPlaces.count - 3 {
-                                onLoadMore()
+                        LightweightPlaceGridCell(place: place)
+                            .onAppear {
+                                // Load more when user scrolls to 3rd-to-last item
+                                if index == allPlaces.count - 3 {
+                                    onLoadMore()
+                                }
                             }
-                        }
                     }
                 }
-                .padding(.horizontal, 20)
+                .padding(.horizontal, 16)
                 .padding(.vertical, 10)
                 
                 // Loading indicator at bottom
@@ -479,24 +446,7 @@ struct LightweightListPopupView_Previews: PreviewProvider {
                 distance_meters: 100.0,
                 place_count: 5,
                 city: "Test City"
-            ),
-            places: [
-                LightweightPlace(
-                    place_id: "place-1",
-                    name: "Test Place 1",
-                    latest_review_photo: nil,
-                    external_place_id: nil,
-                    tiktok_url: nil
-                ),
-                LightweightPlace(
-                    place_id: "place-2",
-                    name: "Test Place 2",
-                    latest_review_photo: nil,
-                    external_place_id: nil,
-                    tiktok_url: nil
-                )
-            ],
-            placeColors: .constant([:])
+            )
         )
     }
 }

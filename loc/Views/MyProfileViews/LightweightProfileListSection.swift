@@ -50,8 +50,7 @@ struct LightweightProfileListSection: View {
         .sheet(isPresented: $showingListPopup) {
             LightweightListPopupView(
                 lists: allLists,
-                initialListIndex: currentIndex,
-                placeColors: $placeColors
+                initialListIndex: currentIndex
             )
         }
     }
