@@ -10,16 +10,12 @@ import SwiftUI
 struct UserProfileActivityView: View {
     @ObservedObject var UserProfileVM: UserProfileViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
-    @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
     @Environment(\.presentationMode) var presentationMode
     
-    // Grid configuration
-    private let cardWidth: CGFloat = UIScreen.main.bounds.width / 2 - 35
-    private let cardHeight: CGFloat = 180
-    
+    // Grid layout matching ProfileView lists (consistent spacing)
     private let columns = [
-        GridItem(.flexible(), spacing: 15),
-        GridItem(.flexible(), spacing: 15)
+        GridItem(.flexible(), spacing: 12),
+        GridItem(.flexible(), spacing: 12)
     ]
     
     // MARK: - Computed Properties
@@ -29,7 +25,7 @@ struct UserProfileActivityView: View {
         return UserProfileVM.hasMoreReviews(for: userId)
     }
     
-    private var reviewedPlaces: [DetailPlace] {
+    private var reviewedPlaces: [LightweightPlace] {
         UserProfileVM.getReviewedPlaces()
     }
     
@@ -98,16 +94,14 @@ struct UserProfileActivityView: View {
     
     private var gridView: some View {
         ScrollView {
-            LazyVGrid(columns: columns, spacing: 15) {
+            LazyVGrid(columns: columns, spacing: 16) {
                 ForEach(Array(reviewedPlaces.enumerated()), id: \.element.id) { index, place in
-                    UserReviewedPlaceGridCell(
-                        place: place,
-                        cardWidth: cardWidth,
-                        cardHeight: cardHeight
-                    )
-                    .onAppear {
-                        handlePlaceAppear(index: index)
-                    }
+                    // Use LightweightPlaceGridCell for consistent image loading
+                    // Uses latest_review_photo which includes external review photos
+                    LightweightPlaceGridCell(place: place)
+                        .onAppear {
+                            handlePlaceAppear(index: index)
+                        }
                 }
                 
                 // Pagination loading indicator
@@ -115,7 +109,8 @@ struct UserProfileActivityView: View {
                     paginationLoadingView
                 }
             }
-            .padding(.horizontal, 20)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
         }
     }
     
