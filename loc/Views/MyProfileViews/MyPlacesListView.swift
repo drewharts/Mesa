@@ -5,38 +5,13 @@ struct MyPlacesListView: View {
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @Environment(\.presentationMode) var presentationMode
-    @State private var placeColors: [UUID: Color] = [:]
     @State private var selectedTab = 0
     @State private var showPageIndicators = true
     @State private var fadeOutTimer: Timer?
     
-    private let columns = [
-        GridItem(.flexible(), spacing: 15),
-        GridItem(.flexible(), spacing: 15)
-    ]
-    
-    private let cardWidth: CGFloat = UIScreen.main.bounds.width / 2 - 35
-    private let cardHeight: CGFloat = 180
-    
     // Use lightweight places for Created tab (no Firebase needed!)
     var lightweightCreatedPlaces: [LightweightPlace] {
         return profile.lightweightMyPlaces
-    }
-    
-    // Get places that the current user has reviewed (similar to external user profile)
-    var reviewedPlaces: [DetailPlace] {
-        guard let currentUserId = profile.user?.id else { return [] }
-        
-        // Find all places where this user is in the placeSavers array
-        let reviewedPlaceIds = profile.detailPlaceViewModel.placeSavers.compactMap { (placeId, userIds) -> String? in
-            return userIds.contains(currentUserId) ? placeId : nil
-        }
-        
-        // Get the actual DetailPlace objects for those IDs, excluding created places
-        return reviewedPlaceIds.compactMap { placeId in
-            guard !profile.myPlaces.contains(placeId) else { return nil } // Exclude created places
-            return profile.detailPlaceViewModel.places[placeId]
-        }
     }
     
     var body: some View {
@@ -93,10 +68,7 @@ struct MyPlacesListView: View {
                         // Created Places (lightweight - no Firebase!)
                         LightweightCreatedPlacesView(
                             lightweightPlaces: lightweightCreatedPlaces,
-                            isLoading: profile.isMyPlacesLoading,
-                            columns: columns,
-                            cardWidth: cardWidth,
-                            cardHeight: cardHeight
+                            isLoading: profile.isMyPlacesLoading
                         )
                         .transition(.asymmetric(
                             insertion: .move(edge: .leading).combined(with: .opacity),
@@ -104,16 +76,11 @@ struct MyPlacesListView: View {
                         ))
                     } else {
                         // Reviewed Places (with pagination)
-                        PaginatedReviewedPlacesView(
-                            columns: columns,
-                            cardWidth: cardWidth,
-                            cardHeight: cardHeight,
-                            colorForPlace: colorForPlace
-                        )
-                        .transition(.asymmetric(
-                            insertion: .move(edge: .trailing).combined(with: .opacity),
-                            removal: .move(edge: .leading).combined(with: .opacity)
-                        ))
+                        PaginatedReviewedPlacesView()
+                            .transition(.asymmetric(
+                                insertion: .move(edge: .trailing).combined(with: .opacity),
+                                removal: .move(edge: .leading).combined(with: .opacity)
+                            ))
                     }
                 }
                 .gesture(
@@ -186,12 +153,6 @@ struct MyPlacesListView: View {
                 }
             }
             
-            // Generate colors for reviewed places (created and TikTok use place ID hash)
-            for place in reviewedPlaces {
-                if placeColors[place.id] == nil {
-                    placeColors[place.id] = randomColor()
-                }
-            }
         }
     }
     
@@ -204,34 +165,27 @@ struct MyPlacesListView: View {
             }
         }
     }
-    
-    private func randomColor() -> Color {
-        Color(
-            red: Double.random(in: 0...1),
-            green: Double.random(in: 0...1),
-            blue: Double.random(in: 0...1)
-        )
-    }
-    
-    private func colorForPlace(_ place: DetailPlace) -> Color {
-        placeColors[place.id] ?? .gray
-    }
 }
 
 // MARK: - Lightweight Created Places View (No Firebase!)
+/// DUMB Component: Displays created places grid with pagination
+/// Single Responsibility: Render place grid, delegate actions to ViewModel
 struct LightweightCreatedPlacesView: View {
     let lightweightPlaces: [LightweightPlace]
     let isLoading: Bool
-    let columns: [GridItem]
-    let cardWidth: CGFloat
-    let cardHeight: CGFloat
     
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var dataManager: DataManager
     @Environment(\.presentationMode) var presentationMode
     
-    @State private var placeToDelete: String? // Store place ID
+    @State private var placeToDelete: String?
+    
+    // Grid layout matching ProfileView lists (consistent spacing)
+    private let columns = [
+        GridItem(.flexible(), spacing: 12),
+        GridItem(.flexible(), spacing: 12)
+    ]
     
     var body: some View {
         if isLoading {
@@ -257,12 +211,10 @@ struct LightweightCreatedPlacesView: View {
             }
         } else {
             ScrollView {
-                LazyVGrid(columns: columns, spacing: 15) {
+                LazyVGrid(columns: columns, spacing: 16) {
                     ForEach(Array(lightweightPlaces.enumerated()), id: \.element.id) { index, place in
                         LightweightPlaceGridCell(
                             place: place,
-                            cardWidth: cardWidth,
-                            cardHeight: cardHeight,
                             onLongPress: {
                                 placeToDelete = place.place_id
                             }
@@ -293,7 +245,7 @@ struct LightweightCreatedPlacesView: View {
                         .gridCellColumns(2)
                     }
                 }
-                .padding(.horizontal, 20)
+                .padding(.horizontal, 16)
                 .padding(.vertical, 10)
             }
             .alert(item: Binding(
@@ -326,10 +278,10 @@ struct AlertIdentifier: Identifiable {
 }
 
 // MARK: - Lightweight Place Grid Cell
+/// Square grid cell for place display - uses aspectRatio for flexible sizing (like ProfileView lists)
+/// Single Responsibility: Display place thumbnail with name overlay, handle tap/long-press
 struct LightweightPlaceGridCell: View {
     let place: LightweightPlace
-    let cardWidth: CGFloat
-    let cardHeight: CGFloat
     var onLongPress: (() -> Void)? = nil
     
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
@@ -343,120 +295,33 @@ struct LightweightPlaceGridCell: View {
     }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            ZStack(alignment: .bottom) {
-                // Check for TikTok thumbnail first, then review photo, then colored rectangle
-                if let tiktokUrl = place.tiktok_url,
-                   let thumbnailURL = TikTokMetadataCache.shared.getCachedThumbnailUrl(for: tiktokUrl) {
-                    // Show TikTok thumbnail with proper phase handling
-                    AsyncImage(url: URL(string: thumbnailURL)) { phase in
-                        switch phase {
-                        case .success(let image):
-                            image
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
-                                .frame(width: cardWidth, height: cardHeight)
-                                .clipped()
-                        case .failure:
-                            // Fallback to colored rectangle on failure
-                            Rectangle()
-                                .foregroundColor(placeColor)
-                                .frame(width: cardWidth, height: cardHeight)
-                        case .empty:
-                            // Loading state with progress indicator
-                            Rectangle()
-                                .foregroundColor(placeColor)
-                                .frame(width: cardWidth, height: cardHeight)
-                                .overlay(
-                                    ProgressView()
-                                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                        .scaleEffect(0.8)
-                                )
-                                .onAppear {
-                                    // Prefetch TikTok metadata if not cached
-                                    Task {
-                                        _ = await TikTokMetadataCache.shared.getMetadata(for: tiktokUrl)
-                                    }
-                                }
-                        @unknown default:
-                            Rectangle()
-                                .foregroundColor(placeColor)
-                                .frame(width: cardWidth, height: cardHeight)
-                        }
-                    }
-                } else if let photoUrl = place.latest_review_photo, let url = URL(string: photoUrl) {
-                    // Show review photo with proper phase handling
-                    AsyncImage(url: url) { phase in
-                        switch phase {
-                        case .success(let image):
-                            image
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
-                                .frame(width: cardWidth, height: cardHeight)
-                                .clipped()
-                        case .failure:
-                            // Fallback to colored rectangle on failure
-                            Rectangle()
-                                .foregroundColor(placeColor)
-                                .frame(width: cardWidth, height: cardHeight)
-                        case .empty:
-                            // Loading state with progress indicator
-                            Rectangle()
-                                .foregroundColor(placeColor)
-                                .frame(width: cardWidth, height: cardHeight)
-                                .overlay(
-                                    ProgressView()
-                                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                        .scaleEffect(0.8)
-                                )
-                        @unknown default:
-                            Rectangle()
-                                .foregroundColor(placeColor)
-                                .frame(width: cardWidth, height: cardHeight)
-                        }
-                    }
-                } else {
-                    // No photo - show colored background
-                    Rectangle()
-                        .foregroundColor(placeColor)
-                        .frame(width: cardWidth, height: cardHeight)
-                        .onAppear {
-                            // If we have a TikTok URL but no cached thumbnail, prefetch it
-                            if let tiktokUrl = place.tiktok_url {
-                                Task {
-                                    _ = await TikTokMetadataCache.shared.getMetadata(for: tiktokUrl)
-                                }
-                            }
-                        }
-                }
-                
-                // Gradient overlay
-                LinearGradient(
-                    gradient: Gradient(colors: [.clear, .black.opacity(0.7)]),
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .frame(height: 60)
-                
-                // Place name
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(place.name)
-                        .font(.headline)
-                        .foregroundColor(.white)
-                        .lineLimit(1)
-                        .multilineTextAlignment(.leading)
-                }
+        ZStack(alignment: .bottom) {
+            // Photo content - fills available space
+            photoContent
+            
+            // Gradient overlay for text readability
+            LinearGradient(
+                gradient: Gradient(colors: [.clear, .black.opacity(0.7)]),
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(maxHeight: 60)
+            
+            // Place name overlay
+            Text(place.name)
+                .font(.headline)
+                .foregroundColor(.white)
+                .lineLimit(1)
+                .multilineTextAlignment(.leading)
                 .padding(.horizontal, 12)
                 .padding(.bottom, 8)
                 .frame(maxWidth: .infinity, alignment: .leading)
-            }
         }
-        .frame(width: cardWidth, height: cardHeight)
-        .background(Color.white)
-        .cornerRadius(8)
+        .aspectRatio(1, contentMode: .fit) // Square that fills grid column (consistent with ProfileView)
+        .background(placeColor)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
         .shadow(color: Color.black.opacity(0.08), radius: 6, x: 0, y: 3)
         .onTapGesture {
-            // Load full place details when tapped
             Task {
                 await loadPlaceAndNavigate()
             }
@@ -464,6 +329,81 @@ struct LightweightPlaceGridCell: View {
         .onLongPressGesture {
             onLongPress?()
         }
+    }
+    
+    // MARK: - Photo Content
+    @ViewBuilder
+    private var photoContent: some View {
+        if let tiktokUrl = place.tiktok_url,
+           let thumbnailURL = TikTokMetadataCache.shared.getCachedThumbnailUrl(for: tiktokUrl) {
+            tiktokThumbnailView(thumbnailURL: thumbnailURL, tiktokUrl: tiktokUrl)
+        } else if let photoUrl = place.latest_review_photo, let url = URL(string: photoUrl) {
+            reviewPhotoView(url: url)
+        } else {
+            placeholderView
+        }
+    }
+    
+    @ViewBuilder
+    private func tiktokThumbnailView(thumbnailURL: String, tiktokUrl: String) -> some View {
+        AsyncImage(url: URL(string: thumbnailURL)) { phase in
+            switch phase {
+            case .success(let image):
+                image
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+            case .failure:
+                Color.clear // Falls back to background placeColor
+            case .empty:
+                loadingPlaceholder
+                    .onAppear {
+                        Task {
+                            _ = await TikTokMetadataCache.shared.getMetadata(for: tiktokUrl)
+                        }
+                    }
+            @unknown default:
+                Color.clear
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private func reviewPhotoView(url: URL) -> some View {
+        AsyncImage(url: url) { phase in
+            switch phase {
+            case .success(let image):
+                image
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+            case .failure:
+                Color.clear // Falls back to background placeColor
+            case .empty:
+                loadingPlaceholder
+            @unknown default:
+                Color.clear
+            }
+        }
+    }
+    
+    private var placeholderView: some View {
+        Color.clear
+            .onAppear {
+                // Prefetch TikTok metadata if URL exists but no cached thumbnail
+                if let tiktokUrl = place.tiktok_url {
+                    Task {
+                        _ = await TikTokMetadataCache.shared.getMetadata(for: tiktokUrl)
+                    }
+                }
+            }
+    }
+    
+    private var loadingPlaceholder: some View {
+        Color.gray.opacity(0.3)
+            .overlay(
+                ProgressView()
+                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                    .scaleEffect(0.8)
+            )
     }
     
     private func loadPlaceAndNavigate() async {
@@ -486,15 +426,18 @@ struct LightweightPlaceGridCell: View {
 
 
 // MARK: - Reviewed Places View
+/// DUMB Component: Displays reviewed places grid with pagination
+/// Single Responsibility: Render reviewed places, delegate loading to ViewModel
 struct PaginatedReviewedPlacesView: View {
-    let columns: [GridItem]
-    let cardWidth: CGFloat
-    let cardHeight: CGFloat
-    let colorForPlace: (DetailPlace) -> Color  // Keep for backward compatibility, but unused
-    
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @Environment(\.presentationMode) var presentationMode
+    
+    // Grid layout matching ProfileView lists (consistent spacing)
+    private let columns = [
+        GridItem(.flexible(), spacing: 12),
+        GridItem(.flexible(), spacing: 12)
+    ]
     
     var body: some View {
         if profile.isLoadingReviewedPlaces {
@@ -525,24 +468,20 @@ struct PaginatedReviewedPlacesView: View {
             }
         } else {
             ScrollView {
-                LazyVGrid(columns: columns, spacing: 15) {
+                LazyVGrid(columns: columns, spacing: 16) {
                     ForEach(Array(profile.lightweightReviewedPlaces.enumerated()), id: \.element.id) { index, place in
-                        LightweightPlaceGridCell(
-                            place: place,
-                            cardWidth: cardWidth,
-                            cardHeight: cardHeight
-                        )
-                        .onAppear {
-                            let lastIndex = profile.lightweightReviewedPlaces.count - 1
-                            if index == lastIndex && profile.hasMoreReviews && !profile.isLoadingMoreReviews {
-                                Task {
-                                    await profile.loadMoreMyReviews()
+                        LightweightPlaceGridCell(place: place)
+                            .onAppear {
+                                let lastIndex = profile.lightweightReviewedPlaces.count - 1
+                                if index == lastIndex && profile.hasMoreReviews && !profile.isLoadingMoreReviews {
+                                    Task {
+                                        await profile.loadMoreMyReviews()
+                                    }
                                 }
                             }
-                        }
                     }
                     
-                    // Loading indicator at bottom of content (enterprise-quality)
+                    // Loading indicator at bottom of content
                     if profile.isLoadingMoreReviews {
                         HStack {
                             Spacer()
@@ -559,7 +498,7 @@ struct PaginatedReviewedPlacesView: View {
                         .gridCellColumns(2)
                     }
                 }
-                .padding(.horizontal, 20)
+                .padding(.horizontal, 16)
                 .padding(.vertical, 10)
             }
             .onAppear {
