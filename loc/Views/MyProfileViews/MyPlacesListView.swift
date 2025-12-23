@@ -296,7 +296,7 @@ struct LightweightPlaceGridCell: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            // Photo tile - square with consistent size
+            // Photo tile - square with consistent size (matching ProfileView lists)
             Rectangle()
                 .fill(placeColor)
                 .aspectRatio(1, contentMode: .fit)
@@ -304,14 +304,12 @@ struct LightweightPlaceGridCell: View {
                 .clipShape(RoundedRectangle(cornerRadius: 8))
                 .shadow(color: Color.black.opacity(0.08), radius: 6, x: 0, y: 3)
             
-            // Place info below the tile (matching ListCardInfo structure)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(place.name)
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.primary)
-                    .lineLimit(1)
-            }
+            // Place name below the tile (matching ListCardInfo structure)
+            Text(place.name)
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .foregroundColor(.primary)
+                .lineLimit(1)
         }
         .onTapGesture {
             Task {
