@@ -188,66 +188,7 @@ struct LightweightCreatedPlacesView: View {
     ]
     
     var body: some View {
-        if isLoading {
-            VStack {
-                Spacer()
-                ProgressView()
-                Spacer()
-            }
-        } else if lightweightPlaces.isEmpty {
-            VStack(spacing: 16) {
-                Spacer()
-                Text("No Places Created Yet")
-                    .font(.title3)
-                    .fontWeight(.medium)
-                    .foregroundColor(.gray)
-                
-                Text("When you create a place, it'll appear here.")
-                    .font(.body)
-                    .foregroundColor(.gray)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal)
-                Spacer()
-            }
-        } else {
-            ScrollView {
-                LazyVGrid(columns: columns, spacing: 16) {
-                    ForEach(Array(lightweightPlaces.enumerated()), id: \.element.id) { index, place in
-                        LightweightPlaceGridCell(
-                            place: place,
-                            onLongPress: {
-                                placeToDelete = place.place_id
-                            }
-                        )
-                        .onAppear {
-                            // Trigger pagination when reaching the last item
-                            if index == lightweightPlaces.count - 1 && profile.hasMoreMyPlaces {
-                                if let userId = profile.user?.id {
-                                    Task {
-                                        await dataManager.loadMoreMyPlaces(userId: userId)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    
-                    // Loading indicator for pagination
-                    if profile.isLoadingMoreMyPlaces {
-                        HStack {
-                            ProgressView()
-                                .scaleEffect(0.8)
-                            Text("Loading more...")
-                                .font(.caption)
-                                .foregroundColor(.gray)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 20)
-                        .gridCellColumns(2)
-                    }
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-            }
+        content
             .alert(item: Binding(
                 get: { placeToDelete.map { AlertIdentifier(id: $0) } },
                 set: { placeToDelete = $0?.id }
@@ -256,7 +197,6 @@ struct LightweightCreatedPlacesView: View {
                     title: Text("Delete Place"),
                     message: Text("Are you sure you want to delete this place?"),
                     primaryButton: .destructive(Text("Delete")) {
-                        // Find the DetailPlace to delete
                         if let detailPlace = profile.detailPlaceViewModel.places[alertId.id] {
                             profile.deleteMyPlace(detailPlace) { success in
                                 if !success {
@@ -268,6 +208,99 @@ struct LightweightCreatedPlacesView: View {
                     secondaryButton: .cancel()
                 )
             }
+    }
+    
+    // MARK: - Content
+    
+    @ViewBuilder
+    private var content: some View {
+        if isLoading {
+            initialLoadingView
+        } else if lightweightPlaces.isEmpty {
+            emptyStateView
+        } else {
+            gridView
+        }
+    }
+    
+    // MARK: - Initial Loading View
+    
+    private var initialLoadingView: some View {
+        VStack {
+            Spacer()
+            ProgressView()
+            Spacer()
+        }
+    }
+    
+    // MARK: - Empty State View
+    
+    private var emptyStateView: some View {
+        VStack(spacing: 16) {
+            Spacer()
+            Text("No Places Created Yet")
+                .font(.title3)
+                .fontWeight(.medium)
+                .foregroundColor(.gray)
+            
+            Text("When you create a place, it'll appear here.")
+                .font(.body)
+                .foregroundColor(.gray)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal)
+            Spacer()
+        }
+    }
+    
+    // MARK: - Grid View
+    
+    private var gridView: some View {
+        ScrollView {
+            LazyVGrid(columns: columns, spacing: 16) {
+                ForEach(Array(lightweightPlaces.enumerated()), id: \.element.id) { index, place in
+                    LightweightPlaceGridCell(
+                        place: place,
+                        onLongPress: {
+                            placeToDelete = place.place_id
+                        }
+                    )
+                    .onAppear {
+                        handlePlaceAppear(index: index)
+                    }
+                }
+                
+                // Pagination loading indicator
+                if profile.isLoadingMoreMyPlaces {
+                    paginationLoadingView
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+        }
+    }
+    
+    // MARK: - Pagination Loading View
+    
+    private var paginationLoadingView: some View {
+        HStack {
+            Spacer()
+            ProgressView()
+                .padding()
+            Spacer()
+        }
+    }
+    
+    // MARK: - Actions
+    
+    private func handlePlaceAppear(index: Int) {
+        // Trigger pagination when within 3 items of the end (smoother infinite scroll)
+        let threshold = max(0, lightweightPlaces.count - 3)
+        guard index >= threshold,
+              profile.hasMoreMyPlaces,
+              let userId = profile.user?.id else { return }
+        
+        Task {
+            await dataManager.loadMoreMyPlaces(userId: userId)
         }
     }
 }
@@ -295,121 +328,121 @@ struct LightweightPlaceGridCell: View {
     }
     
     var body: some View {
-        // Use GeometryReader to get dynamic size for square aspect ratio
-        GeometryReader { geometry in
-            let size = geometry.size.width // Square, so use width for both dimensions
-            
-            ZStack(alignment: .bottom) {
-                // Background color layer
-                Rectangle()
-                    .fill(placeColor)
-                    .frame(width: size, height: size)
-                
-                // Photo content layer
-                photoContentView(size: size)
-                
-                // Gradient overlay for text readability (matches favorites/tiktoks)
-                LinearGradient(
-                    gradient: Gradient(colors: [
-                        Color.black.opacity(0.0),
-                        Color.black.opacity(0.1),
-                        Color.black.opacity(0.2),
-                        Color.black.opacity(1.0)
-                    ]),
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .frame(width: size, height: size)
-                
-                // Place name overlay (matches favorites/tiktoks style)
-                Text(place.name)
-                    .font(.caption)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.white)
-                    .lineLimit(1)
-                    .multilineTextAlignment(.leading)
-                    .padding(.horizontal, 8)
-                    .padding(.bottom, 8)
-                    .frame(width: size, alignment: .leading)
-            }
-            .frame(width: size, height: size)
-            .clipped()
-            .cornerRadius(8)
+        // Base Rectangle provides consistent size - aspectRatio works on Rectangle's intrinsic size
+        Rectangle()
+            .fill(placeColor)
+            .aspectRatio(1, contentMode: .fit)
+            .overlay(
+                GeometryReader { geometry in
+                    ZStack(alignment: .bottom) {
+                        // Photo content overlays the background (bottom layer)
+                        photoContent(size: geometry.size)
+                        
+                        // Gradient overlay for text readability (middle layer)
+                        LinearGradient(
+                            gradient: Gradient(colors: [.clear, .black.opacity(0.7)]),
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                        .frame(height: 60)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                        
+                        // Place name overlay (top layer)
+                        Text(place.name)
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .lineLimit(1)
+                            .multilineTextAlignment(.leading)
+                            .padding(.horizontal, 12)
+                            .padding(.bottom, 8)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 8))
             .shadow(color: Color.black.opacity(0.08), radius: 6, x: 0, y: 3)
-        }
-        .aspectRatio(1, contentMode: .fit)
-        .onTapGesture {
-            Task {
-                await loadPlaceAndNavigate()
+            .onTapGesture {
+                Task {
+                    await loadPlaceAndNavigate()
+                }
             }
-        }
-        .onLongPressGesture {
-            onLongPress?()
+            .onLongPressGesture {
+                onLongPress?()
+            }
+    }
+    
+    // MARK: - Photo Content
+    @ViewBuilder
+    private func photoContent(size: CGSize) -> some View {
+        if let tiktokUrl = place.tiktok_url,
+           let thumbnailURL = TikTokMetadataCache.shared.getCachedThumbnailUrl(for: tiktokUrl) {
+            tiktokThumbnailView(thumbnailURL: thumbnailURL, tiktokUrl: tiktokUrl, size: size)
+        } else if let photoUrl = place.latest_review_photo, let url = URL(string: photoUrl) {
+            reviewPhotoView(url: url, size: size)
+        } else {
+            placeholderView
         }
     }
     
-    // MARK: - Photo Content with explicit size
     @ViewBuilder
-    private func photoContentView(size: CGFloat) -> some View {
-        Group {
-            if let tiktokUrl = place.tiktok_url,
-               let thumbnailURL = TikTokMetadataCache.shared.getCachedThumbnailUrl(for: tiktokUrl) {
-                AsyncImage(url: URL(string: thumbnailURL)) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .frame(width: size, height: size)
-                            .clipped()
-                    case .failure:
-                        Color.clear
-                    case .empty:
-                        loadingPlaceholder
-                            .frame(width: size, height: size)
-                            .onAppear {
-                                Task {
-                                    _ = await TikTokMetadataCache.shared.getMetadata(for: tiktokUrl)
-                                }
-                            }
-                    @unknown default:
-                        Color.clear
-                    }
-                }
-            } else if let photoUrl = place.latest_review_photo, let url = URL(string: photoUrl) {
-                AsyncImage(url: url) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .frame(width: size, height: size)
-                            .clipped()
-                    case .failure:
-                        Color.clear
-                    case .empty:
-                        loadingPlaceholder
-                            .frame(width: size, height: size)
-                    @unknown default:
-                        Color.clear
-                    }
-                }
-            } else {
-                // No photo - trigger TikTok metadata fetch if URL exists
-                Color.clear
-                    .frame(width: size, height: size)
+    private func tiktokThumbnailView(thumbnailURL: String, tiktokUrl: String, size: CGSize) -> some View {
+        AsyncImage(url: URL(string: thumbnailURL)) { phase in
+            switch phase {
+            case .success(let image):
+                image
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: size.width, height: size.height)
+                    .clipped()
+            case .failure:
+                Color.clear // Falls back to background placeColor
+            case .empty:
+                loadingPlaceholder
+                    .frame(width: size.width, height: size.height)
                     .onAppear {
-                        if let tiktokUrl = place.tiktok_url {
-                            Task {
-                                _ = await TikTokMetadataCache.shared.getMetadata(for: tiktokUrl)
-                            }
+                        Task {
+                            _ = await TikTokMetadataCache.shared.getMetadata(for: tiktokUrl)
                         }
                     }
+            @unknown default:
+                Color.clear
             }
         }
     }
     
-    // MARK: - Loading Placeholder
+    @ViewBuilder
+    private func reviewPhotoView(url: URL, size: CGSize) -> some View {
+        AsyncImage(url: url) { phase in
+            switch phase {
+            case .success(let image):
+                image
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: size.width, height: size.height)
+                    .clipped()
+            case .failure:
+                Color.clear // Falls back to background placeColor
+            case .empty:
+                loadingPlaceholder
+                    .frame(width: size.width, height: size.height)
+            @unknown default:
+                Color.clear
+            }
+        }
+    }
+    
+    private var placeholderView: some View {
+        Color.clear
+            .onAppear {
+                // Prefetch TikTok metadata if URL exists but no cached thumbnail
+                if let tiktokUrl = place.tiktok_url {
+                    Task {
+                        _ = await TikTokMetadataCache.shared.getMetadata(for: tiktokUrl)
+                    }
+                }
+            }
+    }
+    
     private var loadingPlaceholder: some View {
         Color.gray.opacity(0.3)
             .overlay(
@@ -453,70 +486,97 @@ struct PaginatedReviewedPlacesView: View {
     ]
     
     var body: some View {
+        content
+            .onAppear {
+                profile.loadMyReviewedPlacesWithPagination()
+            }
+    }
+    
+    // MARK: - Content
+    
+    @ViewBuilder
+    private var content: some View {
         if profile.isLoadingReviewedPlaces {
-            VStack {
-                Spacer()
-                ProgressView()
-                Spacer()
-            }
-            .onAppear {
-                profile.loadMyReviewedPlacesWithPagination()
-            }
+            initialLoadingView
         } else if profile.lightweightReviewedPlaces.isEmpty {
-            VStack(spacing: 16) {
-                Spacer()
-                Text("No Places Reviewed Yet")
-                    .font(.title3)
-                    .fontWeight(.medium)
-                    .foregroundColor(.gray)
-                Text("When you review a place, it'll appear here.")
-                    .font(.body)
-                    .foregroundColor(.gray)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal)
-                Spacer()
-            }
-            .onAppear {
-                profile.loadMyReviewedPlacesWithPagination()
-            }
+            emptyStateView
         } else {
-            ScrollView {
-                LazyVGrid(columns: columns, spacing: 16) {
-                    ForEach(Array(profile.lightweightReviewedPlaces.enumerated()), id: \.element.id) { index, place in
-                        LightweightPlaceGridCell(place: place)
-                            .onAppear {
-                                let lastIndex = profile.lightweightReviewedPlaces.count - 1
-                                if index == lastIndex && profile.hasMoreReviews && !profile.isLoadingMoreReviews {
-                                    Task {
-                                        await profile.loadMoreMyReviews()
-                                    }
-                                }
-                            }
-                    }
-                    
-                    // Loading indicator at bottom of content
-                    if profile.isLoadingMoreReviews {
-                        HStack {
-                            Spacer()
-                            VStack(spacing: 12) {
-                                ProgressView()
-                                    .scaleEffect(1.0)
-                                Text("Loading...")
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
-                            }
-                            .padding(.vertical, 30)
-                            Spacer()
+            gridView
+        }
+    }
+    
+    // MARK: - Initial Loading View
+    
+    private var initialLoadingView: some View {
+        VStack {
+            Spacer()
+            ProgressView()
+            Spacer()
+        }
+    }
+    
+    // MARK: - Empty State View
+    
+    private var emptyStateView: some View {
+        VStack(spacing: 16) {
+            Spacer()
+            Text("No Places Reviewed Yet")
+                .font(.title3)
+                .fontWeight(.medium)
+                .foregroundColor(.gray)
+            Text("When you review a place, it'll appear here.")
+                .font(.body)
+                .foregroundColor(.gray)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal)
+            Spacer()
+        }
+    }
+    
+    // MARK: - Grid View
+    
+    private var gridView: some View {
+        ScrollView {
+            LazyVGrid(columns: columns, spacing: 16) {
+                ForEach(Array(profile.lightweightReviewedPlaces.enumerated()), id: \.element.id) { index, place in
+                    LightweightPlaceGridCell(place: place)
+                        .onAppear {
+                            handlePlaceAppear(index: index)
                         }
-                        .gridCellColumns(2)
-                    }
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
+                
+                // Pagination loading indicator
+                if profile.isLoadingMoreReviews {
+                    paginationLoadingView
+                }
             }
-            .onAppear {
-                profile.loadMyReviewedPlacesWithPagination()
-            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+        }
+    }
+    
+    // MARK: - Pagination Loading View
+    
+    private var paginationLoadingView: some View {
+        HStack {
+            Spacer()
+            ProgressView()
+                .padding()
+            Spacer()
+        }
+    }
+    
+    // MARK: - Actions
+    
+    private func handlePlaceAppear(index: Int) {
+        // Trigger pagination when within 3 items of the end (smoother infinite scroll)
+        let threshold = max(0, profile.lightweightReviewedPlaces.count - 3)
+        guard index >= threshold,
+              profile.hasMoreReviews,
+              !profile.isLoadingMoreReviews else { return }
+        
+        Task {
+            await profile.loadMoreMyReviews()
         }
     }
 }
