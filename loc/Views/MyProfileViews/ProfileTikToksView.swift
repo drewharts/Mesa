@@ -55,7 +55,7 @@ struct ProfileTikToksView: View {
     
     private var tiktoksCard: some View {
         Button(action: { showingTikToksPopup = true }) {
-            VStack(spacing: 0) {
+            Group {
                 if profile.isLoadingTikTokPlaces {
                     loadingState
                 } else if profile.lightweightExternalPlaces.isEmpty {
@@ -64,18 +64,9 @@ struct ProfileTikToksView: View {
                     tiktoksGrid
                 }
             }
-            .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(Color(.systemBackground))
-                    .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 16)
-                    .stroke(Color.gray.opacity(0.1), lineWidth: 1)
-            )
         }
         .buttonStyle(PlainButtonStyle())
-        .padding(.horizontal, 20)
+        .padding(.horizontal, 16) // Match list padding for edge alignment
     }
     
     private var loadingState: some View {
@@ -118,7 +109,7 @@ struct ProfileTikToksView: View {
             ForEach(0..<max(0, 6 - profile.lightweightExternalPlaces.count), id: \.self) { _ in
                 Rectangle()
                     .fill(Color.gray.opacity(0.1))
-                    .frame(height: 80)
+                    .frame(height: 90)
                     .cornerRadius(8)
                     .overlay(
                         RoundedRectangle(cornerRadius: 8)
@@ -126,7 +117,6 @@ struct ProfileTikToksView: View {
                     )
             }
         }
-        .padding(16)
     }
 }
 

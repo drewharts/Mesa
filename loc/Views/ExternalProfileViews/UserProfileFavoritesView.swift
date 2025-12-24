@@ -25,27 +25,21 @@ struct UserProfileFavoritesView: View {
     
     private var favoritesHeader: some View {
         HStack {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("FAVORITES")
-                    .font(.headline)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.primary)
-                
-                Text("\(userFavorites.count) place\(userFavorites.count == 1 ? "" : "s")")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
+            Text("Favorites")
+                .font(.headline)
+                .fontWeight(.semibold)
+                .foregroundColor(.primary)
             
             Spacer()
         }
-        .padding(.horizontal, 20)
+        .padding(.horizontal, 16)
     }
     
     private var favoritesCard: some View {
         Button(action: {
             // Could open a favorites popup or navigate to favorites view
         }) {
-            VStack(spacing: 0) {
+            Group {
                 if userFavorites.isEmpty {
                     // Empty state
                     VStack(spacing: 12) {
@@ -65,7 +59,7 @@ struct UserProfileFavoritesView: View {
                     .frame(height: 120)
                     .frame(maxWidth: .infinity)
                 } else {
-                    // Favorites grid (2x3 layout like list previews)
+                    // Favorites grid (2x3 layout) - no outer card, aligned with lists below
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
                         ForEach(Array(userFavorites.prefix(6)), id: \.id) { favoritePlace in
                             ExternalFavoritePlaceCard(favoritePlace: favoritePlace)
@@ -76,7 +70,7 @@ struct UserProfileFavoritesView: View {
                             ForEach(0..<(6 - userFavorites.count), id: \.self) { _ in
                                 Rectangle()
                                     .fill(Color.gray.opacity(0.1))
-                                    .frame(height: 80)
+                                    .frame(height: 90)
                                     .cornerRadius(8)
                                     .overlay(
                                         RoundedRectangle(cornerRadius: 8)
@@ -85,21 +79,11 @@ struct UserProfileFavoritesView: View {
                             }
                         }
                     }
-                    .padding(16)
                 }
             }
-            .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(Color(.systemBackground))
-                    .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 16)
-                    .stroke(Color.gray.opacity(0.1), lineWidth: 1)
-            )
         }
         .buttonStyle(PlainButtonStyle())
-        .padding(.horizontal, 20)
+        .padding(.horizontal, 16)
     }
 }
 
@@ -122,7 +106,7 @@ struct ExternalFavoritePlaceCard: View {
             // Container to strictly enforce bounds
             Rectangle()
                 .fill(Color.clear)
-                .frame(height: 80)
+                .frame(height: 90)
                 .overlay(
                     Group {
                         // Image loading matching lightweight card styling
@@ -131,17 +115,17 @@ struct ExternalFavoritePlaceCard: View {
                                 image
                                     .resizable()
                                     .aspectRatio(contentMode: .fill)
-                                    .frame(maxWidth: .infinity, maxHeight: 80)
+                                    .frame(maxWidth: .infinity, maxHeight: 90)
                                     .clipped()
                             } placeholder: {
                                 Rectangle()
                                     .foregroundColor(.gray.opacity(0.3))
-                                    .frame(maxWidth: .infinity, maxHeight: 80)
+                                    .frame(maxWidth: .infinity, maxHeight: 90)
                             }
                         } else {
                             Rectangle()
                                 .foregroundColor(placeColor)
-                                .frame(maxWidth: .infinity, maxHeight: 80)
+                                .frame(maxWidth: .infinity, maxHeight: 90)
                         }
                     }
                     .clipped()
@@ -158,7 +142,7 @@ struct ExternalFavoritePlaceCard: View {
                 startPoint: .top,
                 endPoint: .bottom
             )
-            .frame(height: 80)
+            .frame(height: 90)
             
             // Text overlay
             VStack(alignment: .leading, spacing: 2) {
@@ -173,15 +157,13 @@ struct ExternalFavoritePlaceCard: View {
             .padding(.bottom, 8)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .frame(height: 80)
+        .frame(height: 90)
         .clipped()
         .cornerRadius(8)
-        .clipped()
         .overlay(
             RoundedRectangle(cornerRadius: 8)
-                .stroke(Color.gray.opacity(0.1), lineWidth: 0.5)
+                .stroke(Color.gray.opacity(0.2), lineWidth: 1)
         )
-        .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
         .contentShape(Rectangle())
         .highPriorityGesture(
             TapGesture().onEnded {

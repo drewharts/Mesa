@@ -20,7 +20,7 @@ struct TikTokPlaceCard: View {
             gradientOverlay
             placeNameOverlay
         }
-        .frame(height: 80)
+        .frame(height: 90)
         .clipped()
         .cornerRadius(8)
         .overlay(
@@ -34,14 +34,14 @@ struct TikTokPlaceCard: View {
     private var thumbnailImage: some View {
         Rectangle()
             .fill(Color.clear)
-            .frame(height: 80)
+            .frame(height: 90)
             .overlay(
                 Group {
                     if let thumbnailURL = thumbnailURL {
                         AsyncImage(url: thumbnailURL) { image in
                             image.resizable()
                                 .aspectRatio(contentMode: .fill)
-                                .frame(maxWidth: .infinity, maxHeight: 80)
+                                .frame(maxWidth: .infinity, maxHeight: 90)
                                 .clipped()
                         } placeholder: {
                             coloredPlaceholder
@@ -50,7 +50,7 @@ struct TikTokPlaceCard: View {
                         AsyncImage(url: photoURL) { image in
                             image.resizable()
                                 .aspectRatio(contentMode: .fill)
-                                .frame(maxWidth: .infinity, maxHeight: 80)
+                                .frame(maxWidth: .infinity, maxHeight: 90)
                                 .clipped()
                         } placeholder: {
                             coloredPlaceholder
@@ -66,7 +66,7 @@ struct TikTokPlaceCard: View {
     private var coloredPlaceholder: some View {
         Rectangle()
             .foregroundColor(placeColor)
-            .frame(maxWidth: .infinity, maxHeight: 80)
+            .frame(maxWidth: .infinity, maxHeight: 90)
     }
     
     private var gradientOverlay: some View {
@@ -75,7 +75,7 @@ struct TikTokPlaceCard: View {
             startPoint: .top,
             endPoint: .bottom
         )
-        .frame(height: 80)
+        .frame(height: 90)
     }
     
     private var placeNameOverlay: some View {

@@ -16,7 +16,7 @@
             endingColumnNumber = "9223372036854775807"
             startingLineNumber = "103"
             endingLineNumber = "103"
-            landmarkName = "performSearch(query:)"
+            landmarkName = "clearResults()"
             landmarkType = "7">
          </BreakpointContent>
       </BreakpointProxy>
@@ -158,7 +158,7 @@
             endingColumnNumber = "9223372036854775807"
             startingLineNumber = "106"
             endingLineNumber = "106"
-            landmarkName = "performSearch(query:)"
+            landmarkName = "clearResults()"
             landmarkType = "7">
          </BreakpointContent>
       </BreakpointProxy>
@@ -190,7 +190,7 @@
             endingColumnNumber = "9223372036854775807"
             startingLineNumber = "107"
             endingLineNumber = "107"
-            landmarkName = "performSearch(query:)"
+            landmarkName = "clearResults()"
             landmarkType = "7">
          </BreakpointContent>
       </BreakpointProxy>

@@ -32,6 +32,14 @@ class SearchViewModel: ObservableObject {
     private let locationManager: LocationManager
     private let searchService = PlaceSearchService()
     private let photoCache = ProfilePhotoCache.shared
+    private let recentSearchesService = RecentSearchesService.shared
+    
+    // MARK: - Computed Properties
+    
+    /// Recent selections (places & users) - delegated to service (no local state duplication)
+    var recentSelections: [RecentSelection] {
+        recentSearchesService.getRecentSelections()
+    }
     
     // MARK: - Private State
     private var searchCache: [String: [MesaPlaceSuggestion]] = [:]
@@ -230,10 +238,45 @@ class SearchViewModel: ObservableObject {
     
     /// Handle selection of a place suggestion
     func selectSuggestion(_ suggestion: MesaPlaceSuggestion) {
+        // Save place to recent selections
+        recentSearchesService.savePlace(
+            id: suggestion.id,
+            name: suggestion.name,
+            address: suggestion.address
+        )
+        
         searchService.selectSuggestion(suggestion) { [weak self] result in
-            // Use callback instead of direct ViewModel access
             self?.onPlaceSelected?(result)
         }
+    }
+    
+    /// Save a user selection to recent history
+    func saveUserSelection(_ user: ProfileData) {
+        recentSearchesService.saveUser(
+            id: user.id,
+            name: user.fullName,
+            profilePhotoURL: user.profilePhotoURL?.absoluteString
+        )
+    }
+    
+    /// Handle selection of a recent place (fetch full details and navigate)
+    func selectRecentPlace(id: String) {
+        Task {
+            do {
+                let fullPlace = try await PlaceService.shared.fetchPlace(withId: id)
+                await MainActor.run {
+                    onPlaceSelected?(fullPlace)
+                }
+            } catch {
+                print("⚠️ [SearchViewModel] Failed to fetch recent place: \(error.localizedDescription)")
+            }
+        }
+    }
+    
+    /// Clear recent selection history
+    func clearRecentSearches() {
+        recentSearchesService.clearAll()
+        objectWillChange.send()  // Notify views to refresh
     }
     
     // MARK: - Cache Management

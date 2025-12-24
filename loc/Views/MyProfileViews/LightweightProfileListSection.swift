@@ -2,11 +2,18 @@
 //  LightweightProfileListSection.swift
 //  loc
 //
+//  Staff Engineer Refactor: Removed GeometryReader anti-pattern that caused
+//  lists to disappear/reappear during scrolling in LazyVGrid.
+//
+//  Key insight: Use aspectRatio(1, contentMode: .fit) for square sizing
+//  instead of runtime geometry measurement.
+//
 //  Created by Claude on 1/20/25.
 //
 
 import SwiftUI
 
+// MARK: - Main List Section Component
 struct LightweightProfileListSection: View {
     let list: LightweightPlaceList
     let places: [LightweightPlace]
@@ -20,213 +27,245 @@ struct LightweightProfileListSection: View {
     
     @State private var showingListPopup = false
     
-    // Get total place count from the list (from SQL function)
     private var totalPlaceCount: Int {
         return list.place_count
     }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // List header with title and place count
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(list.name)
-                        .font(.headline)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.primary)
-                    
-                    // Show owner name if this is a shared list (collaborator view)
-                    if list.isSharedWithMe, let ownerName = list.owner_name {
-                        SharedByIndicator(
-                            ownerName: ownerName,
-                            ownerPhotoUrl: list.owner_photo_url,
-                            collaboratorPhotos: list.collaborator_photos
-                        )
-                    } else {
-                        // Owner view - show place count and collaborators if shared
-                        SharedWithIndicator(
-                            collaboratorPhotos: list.collaborator_photos,
-                            collaboratorCount: list.collaborator_count ?? 0,
-                            placeCount: totalPlaceCount
-                        )
-                    }
-                }
-                
-                Spacer()
-            }
-            .padding(.horizontal, 20)
-            
-            // Card with places grid
+        VStack(alignment: .leading, spacing: 8) {
+            // Photo collage button
             Button(action: {
                 showingListPopup = true
             }) {
-                VStack(spacing: 0) {
-                    if !places.isEmpty {
-                        // Places grid (first 6 places in 2x3 layout)
-                        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
-                            ForEach(Array(places.prefix(6).enumerated()), id: \.element.id) { index, place in
-                                LightweightPlacePreviewCard(
-                                    place: place,
-                                    placeColors: $placeColors
-                                )
-                            }
-                            
-                            // Fill remaining slots if less than 6 places
-                            if places.count < 6 {
-                                ForEach(0..<(6 - places.count), id: \.self) { _ in
-                                    Rectangle()
-                                        .fill(Color.gray.opacity(0.1))
-                                        .frame(height: 80)
-                                        .cornerRadius(8)
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: 8)
-                                                .stroke(Color.gray.opacity(0.2), lineWidth: 1)
-                                        )
-                                }
-                            }
-                        }
-                        .padding(16)
-                    } else {
-                        // Empty state
-                        VStack(spacing: 12) {
-                            Image(systemName: "photo.on.rectangle.angled")
-                                .font(.system(size: 32))
-                                .foregroundColor(.gray.opacity(0.5))
-                            
-                            Text("No places yet")
-                                .font(.subheadline)
-                                .foregroundColor(.gray)
-                            
-                            Text("Add places to this list to see them here")
-                                .font(.caption)
-                                .foregroundColor(.gray.opacity(0.7))
-                                .multilineTextAlignment(.center)
-                        }
-                        .frame(height: 120)
-                        .frame(maxWidth: .infinity)
-                    }
-                }
-                .background(
-                    RoundedRectangle(cornerRadius: 16)
-                        .fill(Color(.systemBackground))
-                        .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16)
-                        .stroke(Color.gray.opacity(0.1), lineWidth: 1)
-                )
+                ListCardImage(places: places, placeColors: $placeColors)
             }
             .buttonStyle(PlainButtonStyle())
-            .scaleEffect(1.0)
+            
+            // List info
+            ListCardInfo(
+                list: list,
+                totalPlaceCount: totalPlaceCount
+            )
         }
-        .padding(.horizontal, 20)
         .sheet(isPresented: $showingListPopup) {
-            // Use lightweight popup with swiping support between all lists
             LightweightListPopupView(
                 lists: allLists,
-                initialListIndex: currentIndex,
-                placeColors: $placeColors
+                initialListIndex: currentIndex
             )
         }
     }
 }
 
-/// Lightweight place preview card - displays place without needing full DetailPlace object
-struct LightweightPlacePreviewCard: View {
+// MARK: - List Card Image
+/// Square image card for list preview - NO GeometryReader needed!
+/// Uses aspectRatio(1, ...) for stable sizing in LazyVGrid.
+private struct ListCardImage: View {
+    let places: [LightweightPlace]
+    @Binding var placeColors: [UUID: Color]
+    
+    var body: some View {
+        Group {
+            if !places.isEmpty {
+                ListPhotoCollage(
+                    places: Array(places.prefix(3)),
+                    placeColors: $placeColors
+                )
+            } else {
+                EmptyListCard()
+            }
+        }
+        .aspectRatio(1, contentMode: .fit) // This makes it square - no measurement needed!
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .shadow(color: .black.opacity(0.08), radius: 6, x: 0, y: 3)
+    }
+}
+
+// MARK: - Empty List Card
+private struct EmptyListCard: View {
+    var body: some View {
+        VStack(spacing: 8) {
+            Image(systemName: "photo.on.rectangle.angled")
+                .font(.system(size: 24))
+                .foregroundColor(.gray.opacity(0.5))
+            
+            Text("No places yet")
+                .font(.caption)
+                .foregroundColor(.gray)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(.systemBackground))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.gray.opacity(0.1), lineWidth: 1)
+        )
+    }
+}
+
+// MARK: - List Card Info
+private struct ListCardInfo: View {
+    let list: LightweightPlaceList
+    let totalPlaceCount: Int
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(list.name)
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .foregroundColor(.primary)
+                .lineLimit(1)
+            
+            if list.isSharedWithMe, let ownerName = list.owner_name {
+                SharedByIndicator(
+                    ownerName: ownerName,
+                    ownerPhotoUrl: list.owner_photo_url,
+                    collaboratorPhotos: list.collaborator_photos
+                )
+            } else {
+                SharedWithIndicator(
+                    collaboratorPhotos: list.collaborator_photos,
+                    collaboratorCount: list.collaborator_count ?? 0,
+                    placeCount: totalPlaceCount
+                )
+            }
+        }
+    }
+}
+
+// MARK: - Photo Collage
+/// Shows up to 3 photos in a collage layout.
+/// Uses flexible layout - fills available space without explicit dimensions.
+struct ListPhotoCollage: View {
+    let places: [LightweightPlace]
+    @Binding var placeColors: [UUID: Color]
+    
+    var body: some View {
+        Group {
+            switch places.count {
+            case 0:
+                Color.gray.opacity(0.1)
+                
+            case 1:
+                CollagePhotoView(place: places[0], placeColors: $placeColors)
+                
+            case 2:
+                HStack(spacing: 0) {
+                    CollagePhotoView(place: places[0], placeColors: $placeColors)
+                    CollagePhotoView(place: places[1], placeColors: $placeColors)
+                }
+                
+            default:
+                // 3+ photos: 2 stacked left, 1 tall right
+                HStack(spacing: 0) {
+                    VStack(spacing: 0) {
+                        CollagePhotoView(place: places[0], placeColors: $placeColors)
+                        CollagePhotoView(place: places[1], placeColors: $placeColors)
+                    }
+                    CollagePhotoView(place: places[2], placeColors: $placeColors)
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Collage Photo View
+/// Individual photo in the collage - fills available space.
+struct CollagePhotoView: View {
     let place: LightweightPlace
     @Binding var placeColors: [UUID: Color]
     
-    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
-    @Environment(\.presentationMode) var presentationMode
-    
-    // Generate a consistent color for this place based on its ID
     private var placeColor: Color {
-        // Use the place_id string to generate a consistent color
         let hash = place.place_id.hashValue
         let hue = Double(abs(hash) % 360) / 360.0
         return Color(hue: hue, saturation: 0.6, brightness: 0.8)
     }
     
     var body: some View {
-        ZStack(alignment: .bottom) {
-            // Container to strictly enforce bounds
-            Rectangle()
-                .fill(Color.clear)
-                .frame(height: 80)
-                .overlay(
-                    Group {
-                        // Check for TikTok thumbnail first, then review photo, then colored rectangle
-                        if let tiktokUrl = place.tiktok_url,
-                           let thumbnailURL = TikTokMetadataCache.shared.getCachedThumbnailUrl(for: tiktokUrl) {
-                            AsyncImage(url: URL(string: thumbnailURL)) { phase in
-                                switch phase {
-                                case .success(let image):
-                                    image
-                                        .resizable()
-                                        .aspectRatio(contentMode: .fill)
-                                        .frame(maxWidth: .infinity, maxHeight: 80)
-                                        .clipped()
-                                case .failure:
-                                    // Fallback to colored rectangle on failure
-                                    Rectangle()
-                                        .foregroundColor(placeColor)
-                                        .frame(maxWidth: .infinity, maxHeight: 80)
-                                case .empty:
-                                    // Loading state
-                                    Rectangle()
-                                        .foregroundColor(.gray.opacity(0.3))
-                                        .frame(maxWidth: .infinity, maxHeight: 80)
-                                        .onAppear {
-                                            Task {
-                                                _ = await TikTokMetadataCache.shared.getMetadata(for: tiktokUrl)
-                                            }
-                                        }
-                                @unknown default:
-                                    Rectangle()
-                                        .foregroundColor(placeColor)
-                                        .frame(maxWidth: .infinity, maxHeight: 80)
-                                }
+        // Base color that fills available space
+        Rectangle()
+            .fill(placeColor)
+            .overlay(photoOverlay)
+            .clipped()
+    }
+    
+    @ViewBuilder
+    private var photoOverlay: some View {
+        if let tiktokUrl = place.tiktok_url,
+           let thumbnailURL = TikTokMetadataCache.shared.getCachedThumbnailUrl(for: tiktokUrl) {
+            AsyncImage(url: URL(string: thumbnailURL)) { phase in
+                switch phase {
+                case .success(let image):
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                case .failure:
+                    EmptyView() // Falls back to placeColor
+                case .empty:
+                    Color.gray.opacity(0.3)
+                        .onAppear {
+                            Task {
+                                _ = await TikTokMetadataCache.shared.getMetadata(for: tiktokUrl)
                             }
-                        } else if let photoUrl = place.latest_review_photo, let url = URL(string: photoUrl) {
-                            AsyncImage(url: url) { phase in
-                                switch phase {
-                                case .success(let image):
-                                    image
-                                        .resizable()
-                                        .aspectRatio(contentMode: .fill)
-                                        .frame(maxWidth: .infinity, maxHeight: 80)
-                                        .clipped()
-                                case .failure:
-                                    // Fallback to colored rectangle on failure
-                                    Rectangle()
-                                        .foregroundColor(placeColor)
-                                        .frame(maxWidth: .infinity, maxHeight: 80)
-                                case .empty:
-                                    // Loading state
-                                    Rectangle()
-                                        .foregroundColor(.gray.opacity(0.3))
-                                        .frame(maxWidth: .infinity, maxHeight: 80)
-                                @unknown default:
-                                    Rectangle()
-                                        .foregroundColor(placeColor)
-                                        .frame(maxWidth: .infinity, maxHeight: 80)
-                                }
-                            }
-                        } else {
-                            Rectangle()
-                                .foregroundColor(placeColor)
-                                .frame(maxWidth: .infinity, maxHeight: 80)
-                                .onAppear {
-                                    if let tiktokUrl = place.tiktok_url {
-                                        Task {
-                                            _ = await TikTokMetadataCache.shared.getMetadata(for: tiktokUrl)
-                                        }
-                                    }
-                                }
                         }
+                @unknown default:
+                    EmptyView()
+                }
+            }
+        } else if let photoUrl = place.latest_review_photo, let url = URL(string: photoUrl) {
+            AsyncImage(url: url) { phase in
+                switch phase {
+                case .success(let image):
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                case .failure:
+                    EmptyView() // Falls back to placeColor
+                case .empty:
+                    Color.gray.opacity(0.3)
+                @unknown default:
+                    EmptyView()
+                }
+            }
+        } else if let tiktokUrl = place.tiktok_url {
+            // No cached thumbnail yet - trigger fetch
+            Color.clear
+                .onAppear {
+                    Task {
+                        _ = await TikTokMetadataCache.shared.getMetadata(for: tiktokUrl)
                     }
-                    .clipped()
-                )
+                }
+        }
+    }
+}
+
+// MARK: - Lightweight Place Preview Card
+/// Displays a place preview with photo and name overlay.
+/// Used in list detail views (not in the main grid).
+struct LightweightPlacePreviewCard: View {
+    let place: LightweightPlace
+    @Binding var placeColors: [UUID: Color]
+    var height: CGFloat = 80
+    
+    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
+    @Environment(\.presentationMode) var presentationMode
+    
+    private var placeColor: Color {
+        let hash = place.place_id.hashValue
+        let hue = Double(abs(hash) % 360) / 360.0
+        return Color(hue: hue, saturation: 0.6, brightness: 0.8)
+    }
+    
+    private var cornerRadius: CGFloat {
+        height < 80 ? 6 : 8
+    }
+    
+    var body: some View {
+        ZStack(alignment: .bottom) {
+            // Background with photo
+            Rectangle()
+                .fill(placeColor)
+                .frame(height: height)
+                .overlay(photoContent)
+                .clipped()
             
             // Gradient overlay for text readability
             LinearGradient(
@@ -239,29 +278,79 @@ struct LightweightPlacePreviewCard: View {
                 startPoint: .top,
                 endPoint: .bottom
             )
-            .frame(height: 80)
+            .frame(height: height)
             
             // Text overlay
             VStack(alignment: .leading, spacing: 2) {
                 Text(place.name)
-                    .font(.caption)
+                    .font(.caption2)
                     .fontWeight(.semibold)
                     .foregroundColor(.white)
                     .lineLimit(1)
                     .multilineTextAlignment(.leading)
             }
-            .padding(.horizontal, 8)
-            .padding(.bottom, 8)
+            .padding(.horizontal, 6)
+            .padding(.bottom, 6)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .frame(height: 80)
+        .frame(height: height)
         .clipped()
-        .cornerRadius(8)
+        .cornerRadius(cornerRadius)
         .overlay(
-            RoundedRectangle(cornerRadius: 8)
+            RoundedRectangle(cornerRadius: cornerRadius)
                 .stroke(Color.gray.opacity(0.2), lineWidth: 1)
         )
-        // Individual places are NOT tappable - only the whole list button is tappable
+    }
+    
+    @ViewBuilder
+    private var photoContent: some View {
+        if let tiktokUrl = place.tiktok_url,
+           let thumbnailURL = TikTokMetadataCache.shared.getCachedThumbnailUrl(for: tiktokUrl) {
+            AsyncImage(url: URL(string: thumbnailURL)) { phase in
+                switch phase {
+                case .success(let image):
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(maxWidth: .infinity, maxHeight: height)
+                        .clipped()
+                case .failure:
+                    EmptyView()
+                case .empty:
+                    Color.gray.opacity(0.3)
+                        .onAppear {
+                            Task {
+                                _ = await TikTokMetadataCache.shared.getMetadata(for: tiktokUrl)
+                            }
+                        }
+                @unknown default:
+                    EmptyView()
+                }
+            }
+        } else if let photoUrl = place.latest_review_photo, let url = URL(string: photoUrl) {
+            AsyncImage(url: url) { phase in
+                switch phase {
+                case .success(let image):
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(maxWidth: .infinity, maxHeight: height)
+                        .clipped()
+                case .failure:
+                    EmptyView()
+                case .empty:
+                    Color.gray.opacity(0.3)
+                @unknown default:
+                    EmptyView()
+                }
+            }
+        } else if let tiktokUrl = place.tiktok_url {
+            Color.clear
+                .onAppear {
+                    Task {
+                        _ = await TikTokMetadataCache.shared.getMetadata(for: tiktokUrl)
+                    }
+                }
+        }
     }
 }
-

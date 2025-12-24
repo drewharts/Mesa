@@ -57,8 +57,8 @@ struct UserProfileView: View {
                                 .fontWeight(.light)
                         }
                     }
-                    .padding(.top, 20)
-                    .padding(.bottom, 20)
+                    .padding(.top, 8)
+                    .padding(.bottom, 16)
                     
                     Divider()
                         .padding(.horizontal, 20)

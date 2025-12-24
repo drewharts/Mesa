@@ -22,23 +22,37 @@ struct SearchOverlayView: View {
     // MARK: - Callbacks for state updates
     let onSheetHeightChange: (CGFloat) -> Void
     
+    // MARK: - Animation Configuration
+    // Staff Engineer: Extract animation config for consistency and maintainability
+    // Duration matches iOS keyboard animation (~0.25s) for synchronized feel
+    private let expansionAnimation: Animation = .easeInOut(duration: 0.25)
+    
+    // MARK: - Body
+    
     var body: some View {
         VStack {
-            // Staff Engineer: Conditionally render SearchContainerView instead of hiding with opacity
-            // This prevents SwiftUI's NavigationStack from restoring focus to a hidden TextField
-            // when navigating back, which would cause the keyboard to reappear
-            if isSearchExpanded {
-                SearchContainerView(
-                    searchViewModel: searchViewModel,
-                    isSearchExpanded: $isSearchExpanded,
-                    onPlaceSelected: handlePlaceSelection,
-                    onUserSelected: searchCoordinator.handleUserSelection
-                )
-                .id("SearchContainer")  // Stable identity
-                .transition(.opacity)
-            }
-            
+            searchContent
             Spacer()
+        }
+        // Staff Engineer: Explicit animation tied to state value ensures smooth transitions
+        // synchronized with keyboard dismiss animation
+        .animation(expansionAnimation, value: isSearchExpanded)
+    }
+    
+    // MARK: - Search Content
+    // Single Responsibility: Render search container with appropriate transition
+    
+    @ViewBuilder
+    private var searchContent: some View {
+        if isSearchExpanded {
+            SearchContainerView(
+                searchViewModel: searchViewModel,
+                isSearchExpanded: $isSearchExpanded,
+                onPlaceSelected: handlePlaceSelection,
+                onUserSelected: searchCoordinator.handleUserSelection
+            )
+            .id("SearchContainer")  // Stable identity prevents recreation
+            .transition(.opacity)
         }
     }
     

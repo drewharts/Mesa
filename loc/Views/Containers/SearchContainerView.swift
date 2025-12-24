@@ -73,59 +73,140 @@ struct SearchContainerView: View {
     }
     
     private var searchBar: some View {
-        TextField("Search here...", text: $searchViewModel.searchText)
-            .padding()
-            .background(Color.white)
-            .cornerRadius(20)
-            .shadow(color: .black.opacity(0.2), radius: 5, x: 0, y: 3)
-            .foregroundStyle(Color.gray)
-            .focused($searchIsFocused)
-            .padding(.horizontal, 20)
-            .padding(.top, 20)
-            // ✅ Removed .onTapGesture - TextField handles taps natively
-            // This prevents gesture conflicts that cause "System gesture gate timed out"
+        HStack(spacing: 8) {
+            TextField("Search here...", text: $searchViewModel.searchText)
+                .foregroundStyle(Color.gray)
+                .focused($searchIsFocused)
+            
+            // Cancel button - dismisses search and keyboard
+            Button(action: {
+                dismissKeyboard()
+                withAnimation {
+                    isSearchExpanded = false
+                }
+            }) {
+                Text("Cancel")
+                    .font(.subheadline)
+                    .foregroundColor(.gray)
+            }
+        }
+        .padding()
+        .background(Color.white)
+        .cornerRadius(20)
+        .shadow(color: .black.opacity(0.2), radius: 5, x: 0, y: 3)
+        .padding(.horizontal, 20)
+        .padding(.top, 20)
     }
     
     private var searchResults: some View {
         Group {
-            if !searchViewModel.searchResults.isEmpty || 
-               !searchViewModel.userResults.isEmpty || 
-               searchViewModel.showNoPlaceFound || 
-               searchViewModel.isSearching {
-                SearchResultsView(
-                    placeResults: searchViewModel.searchResults,
-                    userResults: searchViewModel.userResults,
-                    userPhotos: searchViewModel.userPhotosSnapshot,  // ✅ Use snapshot (not reactive)
-                    showNoPlaceFound: searchViewModel.showNoPlaceFound,
-                    searchText: searchViewModel.searchText,
-                    isSearching: searchViewModel.isSearching,
-                    onSelectPlace: { suggestion in
-                        // CRITICAL: Dismiss keyboard BEFORE network call to prevent keyboard from affecting sheet height
-                        dismissKeyboard()
-                        
-                        searchViewModel.selectSuggestion(suggestion)
-                        
-                        // Collapse search UI after keyboard is dismissed
-                        withAnimation {
-                            isSearchExpanded = false
-                        }
-                    },
-                    onSelectUser: { user in
-                        // Dismiss keyboard immediately to prevent UI conflicts
-                        dismissKeyboard()
-                        
-                        onUserSelected(user)
-                        
-                        withAnimation {
-                            isSearchExpanded = false
-                        }
-                    }
-                )
-                .frame(maxWidth: .infinity)
-                .padding(.horizontal, 20)
-                .padding(.top, 10)
-                .padding(.bottom, 50)
+            if shouldShowRecentSearches {
+                recentSearchesSection
+            } else if shouldShowSearchResults {
+                searchResultsSection
             }
         }
     }
+    
+    // MARK: - View State Helpers
+    
+    private var shouldShowRecentSearches: Bool {
+        searchViewModel.searchText.isEmpty &&
+        !searchViewModel.recentSelections.isEmpty &&
+        !searchViewModel.isSearching
+    }
+    
+    private var shouldShowSearchResults: Bool {
+        !searchViewModel.searchResults.isEmpty ||
+        !searchViewModel.userResults.isEmpty ||
+        searchViewModel.showNoPlaceFound ||
+        searchViewModel.isSearching
+    }
+    
+    // MARK: - Recent Selections Section
+    
+    private var recentSearchesSection: some View {
+        RecentSearchesView(
+            selections: searchViewModel.recentSelections,
+            userPhotos: searchViewModel.userPhotosSnapshot,
+            onSelectPlace: { placeId in
+                dismissKeyboard()
+                searchViewModel.selectRecentPlace(id: placeId)
+                withAnimation {
+                    isSearchExpanded = false
+                }
+            },
+            onSelectUser: { userId in
+                dismissKeyboard()
+                // Reconstruct minimal ProfileData from recent selection for navigation
+                if let selection = searchViewModel.recentSelections.first(where: {
+                    if case .user(let id, _, _) = $0 { return id == userId }
+                    return false
+                }), case .user(let id, let name, let photoURLString) = selection {
+                    let nameParts = name.components(separatedBy: " ")
+                    let user = ProfileData(
+                        id: id,
+                        firstName: nameParts.first ?? name,
+                        lastName: nameParts.dropFirst().joined(separator: " "),
+                        email: "",
+                        profilePhotoURL: photoURLString.flatMap { URL(string: $0) },
+                        phoneNumber: "",
+                        fullNameLower: name.lowercased(),
+                        fullName: name,
+                        fcmToken: nil,
+                        firebaseUid: nil,
+                        supabaseUid: nil
+                    )
+                    onUserSelected(user)
+                }
+                withAnimation {
+                    isSearchExpanded = false
+                }
+            },
+            onClearAll: {
+                searchViewModel.clearRecentSearches()
+            }
+        )
+        .padding(.top, 10)
+    }
+    
+    // MARK: - Search Results Section
+    
+    private var searchResultsSection: some View {
+        SearchResultsView(
+            placeResults: searchViewModel.searchResults,
+            userResults: searchViewModel.userResults,
+            userPhotos: searchViewModel.userPhotosSnapshot,
+            showNoPlaceFound: searchViewModel.showNoPlaceFound,
+            searchText: searchViewModel.searchText,
+            isSearching: searchViewModel.isSearching,
+            onSelectPlace: { suggestion in
+                // CRITICAL: Dismiss keyboard BEFORE network call to prevent keyboard from affecting sheet height
+                dismissKeyboard()
+                
+                searchViewModel.selectSuggestion(suggestion)
+                
+                // Collapse search UI after keyboard is dismissed
+                withAnimation {
+                    isSearchExpanded = false
+                }
+            },
+            onSelectUser: { user in
+                // Dismiss keyboard immediately to prevent UI conflicts
+                dismissKeyboard()
+                
+                // Save user to recent selections
+                searchViewModel.saveUserSelection(user)
+                
+                onUserSelected(user)
+                
+                withAnimation {
+                    isSearchExpanded = false
+                }
+            }
+    )
+    .frame(maxWidth: .infinity)
+    .padding(.top, 10)
+    .padding(.bottom, 50)
+}
 }
