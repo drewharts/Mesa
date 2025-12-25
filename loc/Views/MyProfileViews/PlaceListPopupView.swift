@@ -141,10 +141,7 @@ struct PlaceListPopupView<CardView: View>: View {
                 ForEach(Array(places.enumerated()), id: \.element.id) { index, place in
                     cardBuilder(place)
                         .onAppear {
-                            // Trigger pagination when near the end
-                            if index == places.count - 3 && hasMore && !isLoadingMore {
-                                Task { await loadMore() }
-                            }
+                            triggerPaginationIfNeeded(index: index)
                         }
                 }
             }
@@ -161,6 +158,21 @@ struct PlaceListPopupView<CardView: View>: View {
                 }
             }
         }
+        .onChange(of: places.count) {
+            // Re-check pagination when places count changes (after load completes)
+            // This handles the case where user is already at the bottom
+            if places.count > 0 {
+                triggerPaginationIfNeeded(index: places.count - 1)
+            }
+        }
+    }
+    
+    // MARK: - Pagination Helper
+    
+    private func triggerPaginationIfNeeded(index: Int) {
+        // Trigger when within 3 items of the end
+        guard index >= places.count - 3 && hasMore && !isLoadingMore else { return }
+        Task { await loadMore() }
     }
 }
 
