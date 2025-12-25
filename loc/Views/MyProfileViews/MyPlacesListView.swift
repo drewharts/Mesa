@@ -5,132 +5,44 @@ struct MyPlacesListView: View {
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @Environment(\.presentationMode) var presentationMode
-    @State private var selectedTab = 0
-    @State private var showPageIndicators = true
-    @State private var fadeOutTimer: Timer?
     
-    // Use lightweight places for Created tab (no Firebase needed!)
+    // Use lightweight places (no Firebase needed!)
     var lightweightCreatedPlaces: [LightweightPlace] {
         return profile.lightweightMyPlaces
     }
     
     var body: some View {
         NavigationView {
-            ZStack {
-                VStack(spacing: 0) {
-                    // Tab buttons
-                    HStack(spacing: 30) {
-                        Button(action: { 
-                            withAnimation(.easeInOut(duration: 0.3)) {
-                                selectedTab = 0
-                                displayPageIndicators()
-                            }
-                        }) {
-                            VStack(spacing: 4) {
-                                Text("Created")
-                                    .font(.subheadline)
-                                    .fontWeight(selectedTab == 0 ? .semibold : .regular)
-                                    .foregroundColor(selectedTab == 0 ? .black : .gray)
-                                    .frame(minHeight: 20)
-                                
-                                Rectangle()
-                                    .fill(selectedTab == 0 ? Color.black : Color.clear)
-                                    .frame(width: 50, height: 2)
-                                    .animation(.easeInOut(duration: 0.3), value: selectedTab)
-                            }
-                        }
-                        
-                        Button(action: { 
-                            withAnimation(.easeInOut(duration: 0.3)) {
-                                selectedTab = 1
-                                displayPageIndicators()
-                            }
-                        }) {
-                            VStack(spacing: 4) {
-                                Text("Reviewed")
-                                    .font(.subheadline)
-                                    .fontWeight(selectedTab == 1 ? .semibold : .regular)
-                                    .foregroundColor(selectedTab == 1 ? .black : .gray)
-                                    .frame(minHeight: 20)
-                                
-                                Rectangle()
-                                    .fill(selectedTab == 1 ? Color.black : Color.clear)
-                                    .frame(width: 50, height: 2)
-                                    .animation(.easeInOut(duration: 0.3), value: selectedTab)
-                            }
-                        }
-                    }
-                    .padding(.top, 20)
-                    .padding(.bottom, 10)
+            VStack(spacing: 0) {
+                // Header
+                VStack(spacing: 4) {
+                    Text("My Places")
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .foregroundColor(.black)
                     
-                    // Content based on selected tab
-                    if selectedTab == 0 {
-                        // Created Places (lightweight - no Firebase!)
-                        LightweightCreatedPlacesView(
-                            lightweightPlaces: lightweightCreatedPlaces,
-                            isLoading: profile.isMyPlacesLoading
-                        )
-                        .transition(.asymmetric(
-                            insertion: .move(edge: .leading).combined(with: .opacity),
-                            removal: .move(edge: .trailing).combined(with: .opacity)
-                        ))
-                    } else {
-                        // Reviewed Places (with pagination)
-                        PaginatedReviewedPlacesView()
-                            .transition(.asymmetric(
-                                insertion: .move(edge: .trailing).combined(with: .opacity),
-                                removal: .move(edge: .leading).combined(with: .opacity)
-                            ))
-                    }
-                }
-                .gesture(
-                    DragGesture()
-                        .onEnded { gesture in
-                            let horizontalMovement = gesture.translation.width
-                            let verticalMovement = abs(gesture.translation.height)
-                            
-                            // Only respond to primarily horizontal swipes
-                            if abs(horizontalMovement) > 50 && abs(horizontalMovement) > verticalMovement {
-                                withAnimation(.easeInOut(duration: 0.3)) {
-                                    if horizontalMovement > 0 && selectedTab == 1 {
-                                        // Swipe right: go to previous tab
-                                        selectedTab = 0 // Reviewed -> Created
-                                        displayPageIndicators()
-                                    } else if horizontalMovement < 0 && selectedTab == 0 {
-                                        // Swipe left: go to next tab
-                                        selectedTab = 1 // Created -> Reviewed
-                                        displayPageIndicators()
-                                    }
-                                }
-                            }
-                        }
-                )
-                
-                // Page indicator dots at the bottom
-                VStack {
-                    Spacer()
-                    HStack(spacing: 8) {
-                        ForEach(0..<2, id: \.self) { index in
-                            Circle()
-                                .fill(selectedTab == index ? Color.gray : Color.gray.opacity(0.3))
-                                .frame(width: 8, height: 8)
-                        }
-                    }
-                    .opacity(showPageIndicators ? 1.0 : 0.0)
-                    .animation(.easeInOut(duration: 0.3), value: showPageIndicators)
-                    .padding(.bottom, 10)
-                }
-            }
-        }
-        .navigationTitle("My Places")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
-                Button(action: {
-                    presentationMode.wrappedValue.dismiss()
-                }) {
-                    Image(systemName: "xmark")
+                    Text("\(lightweightCreatedPlaces.count) place\(lightweightCreatedPlaces.count == 1 ? "" : "s")")
+                        .font(.caption)
                         .foregroundColor(.gray)
+                }
+                .padding(.top, 10)
+                .padding(.bottom, 10)
+                
+                // Created Places (lightweight - no Firebase!)
+                LightweightCreatedPlacesView(
+                    lightweightPlaces: lightweightCreatedPlaces,
+                    isLoading: profile.isMyPlacesLoading
+                )
+            }
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button(action: {
+                        presentationMode.wrappedValue.dismiss()
+                    }) {
+                        Image(systemName: "xmark")
+                            .foregroundColor(.gray)
+                    }
                 }
             }
         }
@@ -142,26 +54,7 @@ struct MyPlacesListView: View {
                     if profile.lightweightMyPlaces.isEmpty {
                         await profile.detailPlaceViewModel.dataManager?.loadUserMyPlaces(userId: userId)
                     }
-                    
-                    // Load reviewed places
-                    await profile.detailPlaceViewModel.dataManager?.refreshReviewedPlaces(userId: userId)
-                    
-                    // Preload images for reviewed (created and TikTok use AsyncImage directly!)
-                    await MainActor.run {
-                        profile.loadPriorityImagesForPlaces(profile.getMyReviewedPlaces(), priorityCount: 8)
-                    }
                 }
-            }
-            
-        }
-    }
-    
-    private func displayPageIndicators() {
-        showPageIndicators = true
-        fadeOutTimer?.invalidate()
-        fadeOutTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: false) { _ in
-            withAnimation(.easeInOut(duration: 0.3)) {
-                showPageIndicators = false
             }
         }
     }
@@ -494,117 +387,6 @@ struct LightweightPlaceGridCell: View {
     }
 }
 
-
-// MARK: - Reviewed Places View
-/// DUMB Component: Displays reviewed places grid with pagination
-/// Single Responsibility: Render reviewed places, delegate loading to ViewModel
-struct PaginatedReviewedPlacesView: View {
-    @EnvironmentObject var profile: ProfileViewModel
-    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
-    @Environment(\.presentationMode) var presentationMode
-    
-    // Grid layout matching ProfileView lists (consistent spacing)
-    private let columns = [
-        GridItem(.flexible(), spacing: 12),
-        GridItem(.flexible(), spacing: 12)
-    ]
-    
-    var body: some View {
-        content
-            .onAppear {
-                profile.loadMyReviewedPlacesWithPagination()
-            }
-    }
-    
-    // MARK: - Content
-    
-    @ViewBuilder
-    private var content: some View {
-        if profile.isLoadingReviewedPlaces {
-            initialLoadingView
-        } else if profile.lightweightReviewedPlaces.isEmpty {
-            emptyStateView
-        } else {
-            gridView
-        }
-    }
-    
-    // MARK: - Initial Loading View
-    
-    private var initialLoadingView: some View {
-        VStack {
-            Spacer()
-            ProgressView()
-            Spacer()
-        }
-    }
-    
-    // MARK: - Empty State View
-    
-    private var emptyStateView: some View {
-        VStack(spacing: 16) {
-            Spacer()
-            Text("No Places Reviewed Yet")
-                .font(.title3)
-                .fontWeight(.medium)
-                .foregroundColor(.gray)
-            Text("When you review a place, it'll appear here.")
-                .font(.body)
-                .foregroundColor(.gray)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal)
-            Spacer()
-        }
-    }
-    
-    // MARK: - Grid View
-    
-    private var gridView: some View {
-        ScrollView {
-            LazyVGrid(columns: columns, spacing: 16) {
-                ForEach(Array(profile.lightweightReviewedPlaces.enumerated()), id: \.element.id) { index, place in
-                    LightweightPlaceGridCell(place: place)
-                        .onAppear {
-                            handlePlaceAppear(index: index)
-                        }
-                }
-                
-                // Pagination loading indicator
-                if profile.isLoadingMoreReviews {
-                    paginationLoadingView
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-        }
-    }
-    
-    // MARK: - Pagination Loading View
-    
-    private var paginationLoadingView: some View {
-        HStack {
-            Spacer()
-            ProgressView()
-                .padding()
-            Spacer()
-        }
-    }
-    
-    // MARK: - Actions
-    
-    private func handlePlaceAppear(index: Int) {
-        // Trigger pagination when within 3 items of the end (smoother infinite scroll)
-        let threshold = max(0, profile.lightweightReviewedPlaces.count - 3)
-        guard index >= threshold,
-              profile.hasMoreReviews,
-              !profile.isLoadingMoreReviews else { return }
-        
-        Task {
-            await profile.loadMoreMyReviews()
-        }
-    }
-}
-
 // MARK: - Shared Place Grid Cell
 struct PlaceGridCell: View {
     let place: DetailPlace
@@ -687,61 +469,6 @@ struct PlaceGridCell: View {
         }
         .onLongPressGesture {
             onLongPress?()
-        }
-    }
-}
-
-// MARK: - User Reviews View
-struct UserReviewsView: View {
-    @EnvironmentObject var profile: ProfileViewModel
-    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
-    @Environment(\.presentationMode) var presentationMode
-    
-    var body: some View {
-        if profile.isLoadingUserPosts {
-            VStack {
-                Spacer()
-                ProgressView()
-                Text("Loading reviews...")
-                    .font(.caption)
-                    .foregroundColor(.gray)
-                    .padding(.top, 8)
-                Spacer()
-            }
-            .onAppear {
-                Task {
-                    await profile.loadUserPosts()
-                }
-            }
-        } else if profile.userPosts.isEmpty {
-            VStack(spacing: 16) {
-                Spacer()
-                Text("No Posts Yet")
-                    .font(.title3)
-                    .fontWeight(.medium)
-                    .foregroundColor(.gray)
-                Text("When you post about a place, it'll appear here.")
-                    .font(.body)
-                    .foregroundColor(.gray)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal)
-                Spacer()
-            }
-        } else {
-            ScrollView {
-                LazyVStack(spacing: 12) {
-                    ForEach(profile.userPosts, id: \.id) { post in
-                        PostCard(post: post)
-                    }
-                }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 10)
-            }
-            .onAppear {
-                Task {
-                    await profile.loadUserPosts()
-                }
-            }
         }
     }
 }

@@ -8,6 +8,7 @@ import SwiftUI
 enum FavoritesTikToksTab: String, CaseIterable {
     case favorites = "FAVORITES"
     case tiktoks = "TIKTOKS"
+    case reviews = "REVIEWS"
 }
 
 struct ProfileFavoritesTikToksView: View {
@@ -17,6 +18,7 @@ struct ProfileFavoritesTikToksView: View {
     
     @State private var selectedTab: FavoritesTikToksTab = .favorites
     @State private var showingTikToksPopup = false
+    @State private var showingReviewsPopup = false
     @State private var showingHelpSheet = false
     
     var body: some View {
@@ -31,9 +33,16 @@ struct ProfileFavoritesTikToksView: View {
             if profile.lightweightExternalPlaces.isEmpty && !profile.isLoadingTikTokPlaces {
                 Task { await profile.loadInitialExternalPlaces() }
             }
+            // Load reviewed places data if needed
+            if profile.lightweightReviewedPlaces.isEmpty && !profile.isLoadingReviewedPlaces {
+                profile.loadMyReviewedPlacesWithPagination()
+            }
         }
         .sheet(isPresented: $showingTikToksPopup) {
             TikToksPopupView()
+        }
+        .sheet(isPresented: $showingReviewsPopup) {
+            ReviewsListPopupView()
         }
         .sheet(isPresented: $showingHelpSheet) {
             TikTokImportHelpView()
@@ -82,6 +91,19 @@ struct ProfileFavoritesTikToksView: View {
             }
             .buttonStyle(.plain)
             
+            // Reviews tab
+            Button(action: { 
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    selectedTab = .reviews 
+                }
+            }) {
+                Text("Reviews")
+                    .font(.headline)
+                    .fontWeight(selectedTab == .reviews ? .semibold : .regular)
+                    .foregroundColor(selectedTab == .reviews ? .primary : .gray)
+            }
+            .buttonStyle(.plain)
+            
             Spacer()
         }
         .padding(.horizontal, 16)
@@ -96,6 +118,8 @@ struct ProfileFavoritesTikToksView: View {
                 favoritesContent
             case .tiktoks:
                 tiktoksContent
+            case .reviews:
+                reviewsContent
             }
         }
         .padding(.horizontal, 16)
@@ -203,6 +227,67 @@ struct ProfileFavoritesTikToksView: View {
             
             // Fill remaining slots
             ForEach(0..<max(0, 6 - profile.lightweightExternalPlaces.count), id: \.self) { _ in
+                emptySlot
+            }
+        }
+    }
+    
+    // MARK: - Reviews Content
+    
+    private var reviewsContent: some View {
+        Group {
+            if profile.isLoadingReviewedPlaces {
+                loadingReviewsState
+            } else if profile.lightweightReviewedPlaces.isEmpty {
+                emptyReviewsState
+            } else {
+                reviewsGrid
+            }
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            showingReviewsPopup = true
+        }
+    }
+    
+    private var loadingReviewsState: some View {
+        VStack(spacing: 12) {
+            ProgressView()
+            Text("Loading Reviews...")
+                .font(.caption)
+                .foregroundColor(.gray)
+        }
+        .frame(height: 120)
+        .frame(maxWidth: .infinity)
+    }
+    
+    private var emptyReviewsState: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "star.bubble")
+                .font(.system(size: 32))
+                .foregroundColor(.gray.opacity(0.5))
+            
+            Text("No reviews yet")
+                .font(.subheadline)
+                .foregroundColor(.gray)
+            
+            Text("Places you've reviewed will appear here")
+                .font(.caption)
+                .foregroundColor(.gray.opacity(0.7))
+                .multilineTextAlignment(.center)
+        }
+        .frame(height: 120)
+        .frame(maxWidth: .infinity)
+    }
+    
+    private var reviewsGrid: some View {
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
+            ForEach(profile.lightweightReviewedPlaces.prefix(6)) { place in
+                ReviewsPlaceCard(place: place)
+            }
+            
+            // Fill remaining slots
+            ForEach(0..<max(0, 6 - profile.lightweightReviewedPlaces.count), id: \.self) { _ in
                 emptySlot
             }
         }
