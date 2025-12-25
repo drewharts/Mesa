@@ -497,6 +497,11 @@ class UserService: ObservableObject {
     func getNumberReviewedPlaces(forUserId userId: String) async throws -> Int {
         return try await supabase.getNumberReviewedPlaces(forUserId: userId)
     }
+    
+    /// Get user's created places count (my places)
+    func getNumberCreatedPlaces(forUserId userId: String) async throws -> Int {
+        return try await supabase.getNumberCreatedPlaces(forUserId: userId)
+    }
 
     /// ✅ NEW: Fetch following user IDs only (not full profiles) - SUPER FAST!
     func fetchFollowingUserIds(userId: String) async throws -> [String] {

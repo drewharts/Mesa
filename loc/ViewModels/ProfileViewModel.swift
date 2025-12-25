@@ -46,6 +46,7 @@ class ProfileViewModel: ObservableObject {
     @Published var lightweightPlaceListPlaces: [String: [LightweightPlace]] = [:] // [listId: places]
     @Published var lightweightPlaceListCounts: [String: Int] = [:] // [listId: placeCount]
     @Published var lightweightMyPlaces: [LightweightPlace] = [] // Lightweight my places for tiles
+    @Published var totalMyPlacesCount: Int = 0 // Total My Places count from database (not just loaded count)
     @Published var isLoadingMoreMyPlaces: Bool = false
     @Published var hasMoreMyPlaces: Bool = true
     @Published var lightweightExternalPlaces: [LightweightPlace] = [] // Lightweight external/TikTok places for tiles
@@ -1465,6 +1466,131 @@ class ProfileViewModel: ObservableObject {
             print("❌ [ProfileViewModel] Error loading more external places: \(error.localizedDescription)")
             // Set hasMore to false on error to prevent infinite retry loops
             hasMoreExternalPlaces = false
+        }
+    }
+    
+    // MARK: - My Places Pagination (MVVM Architecture)
+    
+    /// Load initial my places (created places) - lightweight with pagination
+    /// This method handles the first page load when the My Places popup appears
+    func loadInitialMyPlaces() async {
+        guard let userId = user?.id else {
+            print("⚠️ [ProfileViewModel] Cannot load initial my places: no user ID")
+            return
+        }
+        
+        // Don't reload if already loading or if we have data
+        guard !isMyPlacesLoading && lightweightMyPlaces.isEmpty else {
+            print("ℹ️ [ProfileViewModel] Skipping initial my places load - already loading or data exists")
+            return
+        }
+        
+        print("🔄 [ProfileViewModel] Starting initial load of my places")
+        isMyPlacesLoading = true
+        
+        defer {
+            isMyPlacesLoading = false
+            print("✅ [ProfileViewModel] Completed initial load of my places")
+        }
+        
+        do {
+            // Fetch first page of lightweight places and total count in parallel
+            async let placesTask = userService.fetchUserCreatedPlaces(userId: userId, limit: 8, offset: 0)
+            async let countTask = userService.getNumberCreatedPlaces(forUserId: userId)
+            
+            let lightweightPlaces = try await placesTask
+            let totalCount = (try? await countTask) ?? 0
+            
+            // Update state: replace existing places and update hasMore flag
+            lightweightMyPlaces = lightweightPlaces
+            myPlaces = lightweightPlaces.map { $0.place_id }
+            totalMyPlacesCount = totalCount
+            hasMoreMyPlaces = !lightweightPlaces.isEmpty && lightweightPlaces.count >= 8
+            
+            // Add the current user as a saver for their own places (for map display)
+            for place in lightweightPlaces {
+                let placeId = place.place_id
+                if detailPlaceViewModel.placeSavers[placeId] == nil {
+                    detailPlaceViewModel.placeSavers[placeId] = [userId]
+                } else if !detailPlaceViewModel.placeSavers[placeId]!.contains(userId) {
+                    detailPlaceViewModel.placeSavers[placeId]!.append(userId)
+                }
+            }
+            
+            print("✅ [ProfileViewModel] Loaded \(lightweightPlaces.count) my places (total: \(totalCount), hasMore: \(hasMoreMyPlaces))")
+        } catch {
+            print("❌ [ProfileViewModel] Error loading initial my places: \(error.localizedDescription)")
+            hasMoreMyPlaces = false
+        }
+    }
+    
+    /// Load more my places (pagination) - MVVM architecture
+    /// This method handles loading additional pages when user scrolls to the end
+    func loadMoreMyPlaces() async {
+        guard let userId = user?.id else {
+            print("⚠️ [ProfileViewModel] Cannot load more my places: no user ID")
+            return
+        }
+        
+        // Guard: prevent multiple simultaneous loads and check if more data is available
+        guard !isLoadingMoreMyPlaces && hasMoreMyPlaces else {
+            if isLoadingMoreMyPlaces {
+                print("ℹ️ [ProfileViewModel] Skipping loadMoreMyPlaces - already loading")
+            } else {
+                print("ℹ️ [ProfileViewModel] Skipping loadMoreMyPlaces - no more data available")
+            }
+            return
+        }
+        
+        // Calculate offset based on current count
+        let offset = lightweightMyPlaces.count
+        print("🔄 [ProfileViewModel] Loading more my places (offset: \(offset), current count: \(lightweightMyPlaces.count))")
+        
+        isLoadingMoreMyPlaces = true
+        
+        defer {
+            isLoadingMoreMyPlaces = false
+            print("✅ [ProfileViewModel] Completed loading more my places")
+        }
+        
+        do {
+            // Fetch next page of lightweight places
+            let lightweightPlaces = try await userService.fetchUserCreatedPlaces(userId: userId, limit: 8, offset: offset)
+            
+            // Update state: append new places and update hasMore flag
+            // ⚠️ CRITICAL: Deduplicate to prevent SwiftUI rendering issues
+            let existingIds = Set(lightweightMyPlaces.map { $0.id })
+            let newUniquePlaces = lightweightPlaces.filter { !existingIds.contains($0.id) }
+            
+            if !newUniquePlaces.isEmpty {
+                lightweightMyPlaces.append(contentsOf: newUniquePlaces)
+                myPlaces.append(contentsOf: newUniquePlaces.map { $0.place_id })
+                
+                // Add the current user as a saver for their own places (for map display)
+                for place in newUniquePlaces {
+                    let placeId = place.place_id
+                    if detailPlaceViewModel.placeSavers[placeId] == nil {
+                        detailPlaceViewModel.placeSavers[placeId] = [userId]
+                    } else if !detailPlaceViewModel.placeSavers[placeId]!.contains(userId) {
+                        detailPlaceViewModel.placeSavers[placeId]!.append(userId)
+                    }
+                }
+                
+                let duplicateCount = lightweightPlaces.count - newUniquePlaces.count
+                if duplicateCount > 0 {
+                    print("⚠️ [ProfileViewModel] Filtered \(duplicateCount) duplicate places")
+                }
+            } else if !lightweightPlaces.isEmpty {
+                print("⚠️ [ProfileViewModel] All \(lightweightPlaces.count) places were duplicates - potential pagination issue")
+            }
+            
+            // Update hasMore flag: false if empty or if we got less than a full page
+            hasMoreMyPlaces = !lightweightPlaces.isEmpty && lightweightPlaces.count >= 8
+            
+            print("✅ [ProfileViewModel] Loaded \(newUniquePlaces.count) unique my places (total: \(lightweightMyPlaces.count), hasMore: \(hasMoreMyPlaces))")
+        } catch {
+            print("❌ [ProfileViewModel] Error loading more my places: \(error.localizedDescription)")
+            hasMoreMyPlaces = false
         }
     }
     
@@ -3103,6 +3229,70 @@ class ProfileViewModel: ObservableObject {
                     
                     completion(false)
                 }
+            }
+        }
+    }
+    
+    /// Delete a place created by the user (LightweightPlace version for PopupPlaceCard)
+    /// Handles optimistic updates and backend deletion
+    func deleteMyPlace(_ place: LightweightPlace) {
+        guard let userId = user?.id else { return }
+        
+        let placeId = place.place_id
+        
+        // Optimistic update: Remove from all local collections immediately
+        removeFromLocalMyPlacesState(placeId: placeId, userId: userId)
+        
+        // Recalculate map annotations
+        detailPlaceViewModel.calculateAnnotationPlaces()
+        
+        // Send notification to refresh map annotations
+        NotificationCenter.default.post(name: NSNotification.Name("RefreshMapAnnotations"), object: nil)
+        
+        // Persist deletion to backend
+        Task {
+            // Delete from my_places
+            placeService.deletePlaceFromMyPlaces(userId: userId, placeId: placeId) { error in
+                if let error = error {
+                    print("❌ [ProfileViewModel] Error deleting place from my_places: \(error.localizedDescription)")
+                } else {
+                    print("✅ [ProfileViewModel] Successfully deleted my place: \(place.name)")
+                }
+            }
+            
+            // Delete from all_places (only for custom places)
+            placeService.deletePlaceFromAllPlaces(placeId: placeId) { error in
+                if let error = error {
+                    print("❌ [ProfileViewModel] Error deleting place from all_places: \(error.localizedDescription)")
+                }
+            }
+        }
+    }
+    
+    /// Helper: Remove my place from all local state collections
+    /// Single Responsibility: Local state cleanup only
+    private func removeFromLocalMyPlacesState(placeId: String, userId: String) {
+        // Remove from lightweight places array
+        lightweightMyPlaces.removeAll { $0.place_id == placeId }
+        
+        // Remove from ID tracking collection
+        myPlaces.removeAll { $0 == placeId }
+        
+        // Update total count
+        if totalMyPlacesCount > 0 {
+            totalMyPlacesCount -= 1
+        }
+        
+        // Remove from map annotations
+        detailPlaceViewModel.places.removeValue(forKey: placeId)
+        
+        // Remove from placeSavers (so it doesn't appear on map)
+        if var savers = detailPlaceViewModel.placeSavers[placeId] {
+            savers.removeAll { $0 == userId }
+            if savers.isEmpty {
+                detailPlaceViewModel.placeSavers.removeValue(forKey: placeId)
+            } else {
+                detailPlaceViewModel.placeSavers[placeId] = savers
             }
         }
     }
