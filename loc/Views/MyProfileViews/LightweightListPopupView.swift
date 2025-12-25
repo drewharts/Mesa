@@ -309,13 +309,16 @@ struct ListContentView: View {
             ScrollView {
                 LazyVGrid(columns: columns, spacing: 16) {
                     ForEach(Array(filteredPlaces.enumerated()), id: \.element.id) { index, place in
-                        LightweightPlaceGridCell(place: place)
-                            .onAppear {
-                                // Load more when user scrolls to 3rd-to-last item
-                                if index == allPlaces.count - 3 {
-                                    onLoadMore()
-                                }
+                        LightweightPlaceGridCell(
+                            place: place,
+                            isCollaborativeList: list.isCollaborative
+                        )
+                        .onAppear {
+                            // Load more when user scrolls to 3rd-to-last item
+                            if index == allPlaces.count - 3 {
+                                onLoadMore()
                             }
+                        }
                     }
                 }
                 .padding(.horizontal, 16)

@@ -987,9 +987,13 @@ class DataManager: ObservableObject {
     
     // MARK: - Place List Management
     
-    /// Add a place to a list
-    func addPlaceToList(listId: String, placeId: String) async throws {
-        try await userService.addPlaceToList(listId: listId, placeId: placeId)
+    /// Add a place to a list with tracking of who added it
+    /// - Parameters:
+    ///   - listId: The list to add the place to
+    ///   - placeId: The place to add
+    ///   - addedBy: The user ID of who is adding the place (for collaborative list attribution)
+    func addPlaceToList(listId: String, placeId: String, addedBy: String) async throws {
+        try await userService.addPlaceToList(listId: listId, placeId: placeId, addedBy: addedBy)
     }
     
     /// Remove a place from a list

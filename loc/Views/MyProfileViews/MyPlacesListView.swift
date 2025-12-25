@@ -313,8 +313,10 @@ struct AlertIdentifier: Identifiable {
 // MARK: - Lightweight Place Grid Cell
 /// Square grid cell for place display - uses aspectRatio for flexible sizing (like ProfileView lists)
 /// Single Responsibility: Display place thumbnail with name overlay, handle tap/long-press
+/// For collaborative lists, shows "Added by [name]" indicator
 struct LightweightPlaceGridCell: View {
     let place: LightweightPlace
+    var isCollaborativeList: Bool = false  // Only show "Added by" for collaborative lists
     var onLongPress: (() -> Void)? = nil
     
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
@@ -325,6 +327,12 @@ struct LightweightPlaceGridCell: View {
         let hash = place.place_id.hashValue
         let hue = Double(abs(hash) % 360) / 360.0
         return Color(hue: hue, saturation: 0.6, brightness: 0.8)
+    }
+    
+    /// Should show the "Added by" indicator?
+    /// Only for collaborative lists AND when added_by info is available
+    private var shouldShowAddedBy: Bool {
+        isCollaborativeList && place.added_by_name != nil
     }
     
     var body: some View {
@@ -344,18 +352,11 @@ struct LightweightPlaceGridCell: View {
                             startPoint: .top,
                             endPoint: .bottom
                         )
-                        .frame(height: 60)
+                        .frame(height: shouldShowAddedBy ? 80 : 60)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
                         
-                        // Place name overlay (top layer)
-                        Text(place.name)
-                            .font(.headline)
-                            .foregroundColor(.white)
-                            .lineLimit(1)
-                            .multilineTextAlignment(.leading)
-                            .padding(.horizontal, 12)
-                            .padding(.bottom, 8)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                        // Place info overlay (top layer)
+                        placeInfoOverlay
                     }
                 }
             )
@@ -369,6 +370,29 @@ struct LightweightPlaceGridCell: View {
             .onLongPressGesture {
                 onLongPress?()
             }
+    }
+    
+    // MARK: - Place Info Overlay
+    
+    private var placeInfoOverlay: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(place.name)
+                .font(.headline)
+                .foregroundColor(.white)
+                .lineLimit(1)
+                .multilineTextAlignment(.leading)
+            
+            // Show "Added by" for collaborative lists
+            if shouldShowAddedBy, let addedByName = place.added_by_name {
+                AddedByIndicator(
+                    name: addedByName,
+                    photoUrl: place.added_by_photo_url
+                )
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.bottom, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
     
     // MARK: - Photo Content

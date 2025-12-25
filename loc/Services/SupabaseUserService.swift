@@ -930,8 +930,12 @@ struct FavoritePlace: Codable, Identifiable {
 // MARK: - Place List Management
 
 extension SupabaseUserService {
-    /// Add a place to a list
-    func addPlaceToList(listId: String, placeId: String) async throws {
+    /// Add a place to a list with tracking of who added it
+    /// - Parameters:
+    ///   - listId: The list to add the place to
+    ///   - placeId: The place to add
+    ///   - addedBy: The user ID of who is adding the place (for collaborative list attribution)
+    func addPlaceToList(listId: String, placeId: String, addedBy: String) async throws {
         // First, get the current max sort_order for this list
         let maxOrderResponse = try await supabase.client
             .from("place_list_items")
@@ -944,17 +948,19 @@ extension SupabaseUserService {
         let maxOrder = (try? JSONDecoder().decode([SortOrder].self, from: maxOrderResponse.data).first?.sort_order) ?? -1
         let nextOrder = maxOrder + 1
         
-        // Create insert struct
+        // Create insert struct with added_by for attribution
         struct PlaceListItem: Encodable {
             let list_id: String
             let place_id: String
             let sort_order: Int
+            let added_by: String
         }
         
         let newItem = PlaceListItem(
             list_id: listId,
             place_id: placeId,
-            sort_order: nextOrder
+            sort_order: nextOrder,
+            added_by: addedBy
         )
         
         // Insert the new item
@@ -963,7 +969,7 @@ extension SupabaseUserService {
             .insert(newItem)
             .execute()
         
-        print("✅ [Supabase] Added place \(placeId) to list \(listId) at position \(nextOrder)")
+        print("✅ [Supabase] Added place \(placeId) to list \(listId) by user \(addedBy) at position \(nextOrder)")
     }
     
     /// Remove a place from a list
