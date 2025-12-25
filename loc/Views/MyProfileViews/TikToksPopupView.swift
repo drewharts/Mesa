@@ -2,6 +2,9 @@
 //  TikToksPopupView.swift
 //  loc
 //
+//  Single Responsibility: Display paginated TikTok places in a popup grid
+//  MVVM: Delegates data loading and state to ProfileViewModel
+//  DUMB Component: Pure display, no business logic - just renders data from ViewModel
 
 import SwiftUI
 
