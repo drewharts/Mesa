@@ -470,13 +470,16 @@ class ProfileViewModel: ObservableObject {
         
         let placeId = place.id.uuidString
         
-        // Create lightweight place object
+        // Create lightweight place object with added_by info for collaborative lists
         let lightweightPlace = LightweightPlace(
             place_id: placeId,
             name: place.name,
             latest_review_photo: place.photoUrls?.first,
             external_place_id: nil, // Not a TikTok external place
-            tiktok_url: nil
+            tiktok_url: nil,
+            added_by_user_id: userId,
+            added_by_name: user?.fullName,
+            added_by_photo_url: user?.profilePhotoURL?.absoluteString
         )
         
         var didInsert = false
@@ -519,10 +522,14 @@ class ProfileViewModel: ObservableObject {
         // Recalculate map annotations to include the new place
         detailPlaceViewModel.calculateAnnotationPlaces()
         
-        // Persist to Supabase
+        // Persist to Supabase with added_by for collaborative list attribution
         Task {
             do {
-                try await SupabaseUserService.shared.addPlaceToList(listId: listId, placeId: placeId)
+                try await SupabaseUserService.shared.addPlaceToList(
+                    listId: listId,
+                    placeId: placeId,
+                    addedBy: userId
+                )
             } catch {
                 print("❌ [ProfileViewModel] Failed to add place to list: \(error)")
             }

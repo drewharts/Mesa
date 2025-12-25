@@ -636,8 +636,8 @@ class UserService: ObservableObject {
     
     // MARK: - Place List Management
     
-    func addPlaceToList(listId: String, placeId: String) async throws {
-        try await supabase.addPlaceToList(listId: listId, placeId: placeId)
+    func addPlaceToList(listId: String, placeId: String, addedBy: String) async throws {
+        try await supabase.addPlaceToList(listId: listId, placeId: placeId, addedBy: addedBy)
     }
     
     func removePlaceFromList(listId: String, placeId: String) async throws {

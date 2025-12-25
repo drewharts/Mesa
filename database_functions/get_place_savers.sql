@@ -3,7 +3,7 @@
 -- ============================================================================
 -- Returns all users who have "saved" a specific place through any method:
 -- 1. Favorites (added to favorites)
--- 2. Place Lists (added to any list)
+-- 2. Place Lists (added to any list - uses added_by for proper attribution)
 -- 3. External Places (saved a TikTok for this place)
 -- 4. Reviews (reviewed the place)
 --
@@ -34,8 +34,8 @@ BEGIN
         
         UNION
         
-        -- 2. Users who added this place to any list
-        SELECT pl.user_id
+        -- 2. Users who added this place to any list (use added_by for proper attribution)
+        SELECT COALESCE(pli.added_by, pl.user_id) AS user_id
         FROM place_list_items pli
         INNER JOIN place_lists pl ON pli.list_id = pl.id
         WHERE pli.place_id = p_place_id
@@ -86,4 +86,5 @@ $function$;
 -- Add comment for documentation
 COMMENT ON FUNCTION public.get_place_savers(TEXT, TEXT) IS 
 'Returns users who saved a place via favorites, lists, TikToks, or reviews. 
+For place lists, uses added_by column to properly attribute who added each place.
 Optionally filters to only show users the requesting user follows (+ self).';
