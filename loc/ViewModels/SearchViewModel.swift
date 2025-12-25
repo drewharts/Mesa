@@ -265,7 +265,11 @@ class SearchViewModel: ObservableObject {
         searchService.retrievePlaceById(placeId: id) { [weak self] result in
             DispatchQueue.main.async {
                 switch result {
-                case .success(let fullPlace):
+                case .success(let place):
+                    guard let fullPlace = place as? DetailPlace else {
+                        print("⚠️ [SearchViewModel] Failed to cast place result to DetailPlace")
+                        return
+                    }
                     self?.onPlaceSelected?(fullPlace)
                 case .failure(let error):
                     print("⚠️ [SearchViewModel] Failed to fetch recent place: \(error.localizedDescription)")
