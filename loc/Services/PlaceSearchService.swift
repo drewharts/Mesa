@@ -86,7 +86,8 @@ class PlaceSearchService {
         placeId: String,
         completion: @escaping DetailResultCallback
     ) {
-        mesaBackendService.fetchPlaceDetails(placeId: placeId, source: "") { result in
+        // Default to Google as the source for recent place lookups
+        mesaBackendService.fetchPlaceDetails(placeId: placeId, source: "google") { result in
             switch result {
             case .success(let details):
                 completion(.success(details))
