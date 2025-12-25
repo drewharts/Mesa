@@ -384,6 +384,17 @@ class SupabaseUserService: ObservableObject {
         return response
     }
     
+    /// Get reviewed places count - FAST! (count query only, no place data)
+    /// Returns count of distinct places reviewed by user (not total review count)
+    func getNumberReviewedPlaces(forUserId userId: String) async throws -> Int {
+        let response: Int = try await supabase.client
+            .rpc("get_user_reviewed_places_count", params: ["p_user_id": userId])
+            .execute()
+            .value
+        
+        return response
+    }
+    
     /// Get total list count for a user - FAST! (count query only)
     func getTotalListCount(forUserId userId: String) async throws -> Int {
         struct UserStats: Codable {

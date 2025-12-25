@@ -15,7 +15,7 @@ struct ReviewsListPopupView: View {
     var body: some View {
         PlaceListPopupView(
             title: "Reviews",
-            count: profile.lightweightReviewedPlaces.count,
+            count: profile.totalReviewedPlacesCount,
             isLoading: profile.isLoadingReviewedPlaces,
             isLoadingMore: profile.isLoadingMoreReviews,
             places: profile.lightweightReviewedPlaces,

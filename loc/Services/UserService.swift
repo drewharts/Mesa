@@ -492,6 +492,11 @@ class UserService: ObservableObject {
     func fetchUserReviewedPlaces(userId: String, limit: Int = 8, offset: Int = 0) async throws -> [LightweightPlace] {
         return try await supabase.fetchUserReviewedPlaces(userId: userId, limit: limit, offset: offset)
     }
+    
+    /// Get user's reviewed places count (distinct places, not total reviews)
+    func getNumberReviewedPlaces(forUserId userId: String) async throws -> Int {
+        return try await supabase.getNumberReviewedPlaces(forUserId: userId)
+    }
 
     /// ✅ NEW: Fetch following user IDs only (not full profiles) - SUPER FAST!
     func fetchFollowingUserIds(userId: String) async throws -> [String] {

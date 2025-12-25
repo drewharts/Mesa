@@ -167,6 +167,7 @@ class ProfileViewModel: ObservableObject {
     @Published var isLoadingMoreReviews: Bool = false
     @Published var hasMoreReviews: Bool = true
     @Published var lightweightReviewedPlaces: [LightweightPlace] = [] // Lightweight reviewed places for tiles
+    @Published var totalReviewedPlacesCount: Int = 0 // Total reviewed places count from database (not just loaded count)
     private var hasAttemptedInitialReviewsLoad: Bool = false // Prevents infinite reload when user has no reviews
     private let reviewsPerPage: Int = 8
     
@@ -1060,14 +1061,19 @@ class ProfileViewModel: ObservableObject {
         }
         
         do {
-            // Fetch first page of lightweight reviewed places
-            let lightweightPlaces = try await userService.fetchUserReviewedPlaces(userId: userId, limit: reviewsPerPage, offset: 0)
+            // Fetch first page of lightweight reviewed places and total count in parallel
+            async let placesTask = userService.fetchUserReviewedPlaces(userId: userId, limit: reviewsPerPage, offset: 0)
+            async let countTask = userService.getNumberReviewedPlaces(forUserId: userId)
+            
+            let lightweightPlaces = try await placesTask
+            let totalCount = (try? await countTask) ?? 0
             
             // Update state: replace existing places and update hasMore flag
             lightweightReviewedPlaces = lightweightPlaces
+            totalReviewedPlacesCount = totalCount
             hasMoreReviews = !lightweightPlaces.isEmpty && lightweightPlaces.count >= reviewsPerPage
             
-            print("✅ [ProfileViewModel] Loaded \(lightweightPlaces.count) reviewed places")
+            print("✅ [ProfileViewModel] Loaded \(lightweightPlaces.count) reviewed places (total: \(totalCount))")
             
             // Load full place details for display
             await loadPlaceDetailsForReviews(lightweightPlaces, userId: userId)
