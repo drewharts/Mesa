@@ -2,6 +2,9 @@
 //  TikToksPopupView.swift
 //  loc
 //
+//  Single Responsibility: Display paginated TikTok places in a popup grid
+//  MVVM: Delegates data loading and state to ProfileViewModel
+//  DUMB Component: Pure display, no business logic - just renders data from ViewModel
 
 import SwiftUI
 
@@ -10,13 +13,11 @@ struct TikToksPopupView: View {
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     
+    // Grid layout matching ProfileView lists (consistent spacing)
     private let columns = [
-        GridItem(.flexible(), spacing: 15),
-        GridItem(.flexible(), spacing: 15)
+        GridItem(.flexible(), spacing: 12),
+        GridItem(.flexible(), spacing: 12)
     ]
-    
-    private let cardWidth: CGFloat = UIScreen.main.bounds.width / 2 - 35
-    private let cardHeight: CGFloat = 180
     
     var body: some View {
         NavigationView {
@@ -90,9 +91,9 @@ struct TikToksPopupView: View {
             }
         } else {
             ScrollView {
-                LazyVGrid(columns: columns, spacing: 15) {
+                LazyVGrid(columns: columns, spacing: 16) {
                     ForEach(Array(profile.lightweightExternalPlaces.enumerated()), id: \.element.id) { index, place in
-                        TikTokPopupPlaceCard(place: place, cardWidth: cardWidth, cardHeight: cardHeight)
+                        TikTokPopupPlaceCard(place: place)
                             .onAppear {
                                 if index == profile.lightweightExternalPlaces.count - 3
                                     && profile.hasMoreExternalPlaces
@@ -102,7 +103,7 @@ struct TikToksPopupView: View {
                             }
                     }
                 }
-                .padding(.horizontal, 20)
+                .padding(.horizontal, 16)
                 .padding(.vertical, 10)
                 
                 if profile.isLoadingMoreExternalPlaces {
