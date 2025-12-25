@@ -18,8 +18,7 @@ struct UserProfileFavoritesView: View {
         VStack(alignment: .leading, spacing: 12) {
             favoritesHeader
             favoritesCard
-            Divider()
-                .padding(.horizontal, 20)
+            // Note: Divider removed - now handled by parent view (UserProfileFavoritesReviewsView)
         }
     }
     
