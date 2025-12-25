@@ -1,18 +1,31 @@
 //
-//  TikTokPopupPlaceCard.swift
+//  PopupPlaceCard.swift
 //  loc
 //
-//  Single Responsibility: Display a TikTok place card with tap/long-press interactions
-//  MVVM: All business logic delegated to ViewModels
-//  Structure: Matches LightweightPlaceGridCell for consistent styling
+//  Reusable Component: Generic place card for popup grids
+//  Used by: TikToksPopupView, ReviewsListPopupView, and future popup views
+//  DUMB Component: Pure display with configurable behavior
+//
+//  Configuration Options:
+//  - preferTikTokThumbnail: Whether to prioritize TikTok thumbnail over review photo (default: true)
+//  - allowDelete: Whether to show delete option on long press (default: false)
+//  - deleteTitle: Title for delete confirmation alert
+//  - deleteMessage: Message for delete confirmation alert
+//  - onDelete: Callback when delete is confirmed
 
 import SwiftUI
 
-struct TikTokPopupPlaceCard: View {
+struct PopupPlaceCard: View {
     let place: LightweightPlace
     
+    // Configuration
+    var preferTikTokThumbnail: Bool = true
+    var allowDelete: Bool = false
+    var deleteTitle: String = "Delete Place"
+    var deleteMessage: String? = nil
+    var onDelete: (() -> Void)? = nil
+    
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
-    @EnvironmentObject var profile: ProfileViewModel
     @Environment(\.presentationMode) var presentationMode
     
     @State private var showDeleteConfirmation = false
@@ -25,10 +38,13 @@ struct TikTokPopupPlaceCard: View {
         return Color(hue: hue, saturation: 0.6, brightness: 0.8)
     }
     
+    private var computedDeleteMessage: String {
+        deleteMessage ?? "Are you sure you want to delete \"\(place.name)\"? This action cannot be undone."
+    }
+    
     // MARK: - Body
     
     var body: some View {
-        // Base Rectangle provides consistent size - aspectRatio works on Rectangle's intrinsic size
         Rectangle()
             .fill(placeColor)
             .aspectRatio(1, contentMode: .fit)
@@ -55,19 +71,21 @@ struct TikTokPopupPlaceCard: View {
             .clipShape(RoundedRectangle(cornerRadius: 8))
             .shadow(color: Color.black.opacity(0.08), radius: 6, x: 0, y: 3)
             .onTapGesture {
-                // Navigate via ViewModel (business logic in ViewModel)
                 selectedPlaceVM.navigateToPlace(placeId: place.place_id) {
                     presentationMode.wrappedValue.dismiss()
                 }
             }
-            .onLongPressGesture { showDeleteConfirmation = true }
-            .alert("Delete TikTok Place", isPresented: $showDeleteConfirmation) {
+            .modifier(DeleteGestureModifier(
+                allowDelete: allowDelete,
+                showDeleteConfirmation: $showDeleteConfirmation
+            ))
+            .alert(deleteTitle, isPresented: $showDeleteConfirmation) {
                 Button("Cancel", role: .cancel) { }
                 Button("Delete", role: .destructive) {
-                    profile.deleteTikTokPlace(place)
+                    onDelete?()
                 }
             } message: {
-                Text("Are you sure you want to delete \"\(place.name)\"? This action cannot be undone.")
+                Text(computedDeleteMessage)
             }
     }
     
@@ -90,18 +108,31 @@ struct TikTokPopupPlaceCard: View {
     
     @ViewBuilder
     private func photoContent(size: CGSize) -> some View {
-        if let tiktokUrl = place.tiktok_url,
-           let thumbnailURL = TikTokMetadataCache.shared.getCachedThumbnailUrl(for: tiktokUrl) {
-            tiktokThumbnailView(thumbnailURL: thumbnailURL, tiktokUrl: tiktokUrl, size: size)
-        } else if let photoUrl = place.latest_review_photo, let url = URL(string: photoUrl) {
-            reviewPhotoView(url: url, size: size)
+        if preferTikTokThumbnail {
+            // TikTok-style: prioritize TikTok thumbnail
+            if let tiktokUrl = place.tiktok_url,
+               let thumbnailURL = TikTokMetadataCache.shared.getCachedThumbnailUrl(for: tiktokUrl) {
+                tiktokThumbnailView(thumbnailURL: thumbnailURL, tiktokUrl: tiktokUrl, size: size)
+            } else if let photoUrl = place.latest_review_photo, let url = URL(string: photoUrl) {
+                reviewPhotoView(url: url, size: size)
+            } else {
+                placeholderView
+            }
         } else {
-            placeholderView
+            // Reviews-style: prioritize review photo
+            if let photoUrl = place.latest_review_photo, let url = URL(string: photoUrl) {
+                reviewPhotoView(url: url, size: size)
+            } else if let tiktokUrl = place.tiktok_url,
+                      let thumbnailURL = TikTokMetadataCache.shared.getCachedThumbnailUrl(for: tiktokUrl) {
+                tiktokThumbnailView(thumbnailURL: thumbnailURL, tiktokUrl: nil, size: size)
+            } else {
+                placeholderView
+            }
         }
     }
     
     @ViewBuilder
-    private func tiktokThumbnailView(thumbnailURL: String, tiktokUrl: String, size: CGSize) -> some View {
+    private func tiktokThumbnailView(thumbnailURL: String, tiktokUrl: String?, size: CGSize) -> some View {
         AsyncImage(url: URL(string: thumbnailURL)) { phase in
             switch phase {
             case .success(let image):
@@ -111,13 +142,16 @@ struct TikTokPopupPlaceCard: View {
                     .frame(width: size.width, height: size.height)
                     .clipped()
             case .failure:
-                Color.clear // Falls back to background placeColor
+                Color.clear
             case .empty:
                 loadingPlaceholder
                     .frame(width: size.width, height: size.height)
                     .onAppear {
-                        Task {
-                            _ = await TikTokMetadataCache.shared.getMetadata(for: tiktokUrl)
+                        // Prefetch metadata if tiktokUrl is provided
+                        if let tiktokUrl = tiktokUrl {
+                            Task {
+                                _ = await TikTokMetadataCache.shared.getMetadata(for: tiktokUrl)
+                            }
                         }
                     }
             @unknown default:
@@ -137,7 +171,7 @@ struct TikTokPopupPlaceCard: View {
                     .frame(width: size.width, height: size.height)
                     .clipped()
             case .failure:
-                Color.clear // Falls back to background placeColor
+                Color.clear
             case .empty:
                 loadingPlaceholder
                     .frame(width: size.width, height: size.height)
@@ -151,7 +185,7 @@ struct TikTokPopupPlaceCard: View {
         Color.clear
             .onAppear {
                 // Prefetch TikTok metadata if URL exists but no cached thumbnail
-                if let tiktokUrl = place.tiktok_url {
+                if preferTikTokThumbnail, let tiktokUrl = place.tiktok_url {
                     Task {
                         _ = await TikTokMetadataCache.shared.getMetadata(for: tiktokUrl)
                     }
@@ -168,3 +202,22 @@ struct TikTokPopupPlaceCard: View {
             )
     }
 }
+
+// MARK: - Delete Gesture Modifier
+
+/// Conditional long press gesture modifier for delete functionality
+private struct DeleteGestureModifier: ViewModifier {
+    let allowDelete: Bool
+    @Binding var showDeleteConfirmation: Bool
+    
+    func body(content: Content) -> some View {
+        if allowDelete {
+            content.onLongPressGesture {
+                showDeleteConfirmation = true
+            }
+        } else {
+            content
+        }
+    }
+}
+
