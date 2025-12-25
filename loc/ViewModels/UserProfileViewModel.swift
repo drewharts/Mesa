@@ -463,6 +463,39 @@ class UserProfileViewModel: ObservableObject {
         }
     }
     
+    /// Load more places for a specific list (pagination)
+    /// Used by ExternalUserListContentView for infinite scroll
+    func loadMorePlacesForList(_ list: LightweightPlaceList, page: Int, completion: @escaping ([LightweightPlace]) -> Void) {
+        Task {
+            do {
+                let morePlaces = try await userService.fetchPlacesForPlaceList(
+                    listId: list.list_id,
+                    page: page,
+                    pageSize: 6
+                )
+                
+                await MainActor.run {
+                    // Append new places to existing ones
+                    var existingPlaces = self.placeListPlaces[list.list_id] ?? []
+                    
+                    // Deduplicate
+                    let existingIds = Set(existingPlaces.map { $0.id })
+                    let newUniquePlaces = morePlaces.filter { !existingIds.contains($0.id) }
+                    
+                    existingPlaces.append(contentsOf: newUniquePlaces)
+                    self.placeListPlaces[list.list_id] = existingPlaces
+                    
+                    completion(morePlaces)
+                }
+            } catch {
+                print("❌ [UserProfileViewModel] Error loading more places for list \(list.list_id): \(error)")
+                await MainActor.run {
+                    completion([])
+                }
+            }
+        }
+    }
+    
     /// Load more lists when user scrolls (lazy loading)
     /// Preloads places for lists that are becoming visible but haven't loaded their places yet
     /// This is called as user scrolls to lazy-load place data for each list
