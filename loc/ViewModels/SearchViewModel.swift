@@ -260,15 +260,16 @@ class SearchViewModel: ObservableObject {
     }
     
     /// Handle selection of a recent place (fetch full details and navigate)
+    /// Uses PlaceSearchService to resolve external IDs (Google/Mapbox) via Mesa backend
     func selectRecentPlace(id: String) {
-        Task {
-            do {
-                let fullPlace = try await PlaceService.shared.fetchPlace(withId: id)
-                await MainActor.run {
-                    onPlaceSelected?(fullPlace)
+        searchService.retrievePlaceById(placeId: id) { [weak self] result in
+            DispatchQueue.main.async {
+                switch result {
+                case .success(let fullPlace):
+                    self?.onPlaceSelected?(fullPlace)
+                case .failure(let error):
+                    print("⚠️ [SearchViewModel] Failed to fetch recent place: \(error.localizedDescription)")
                 }
-            } catch {
-                print("⚠️ [SearchViewModel] Failed to fetch recent place: \(error.localizedDescription)")
             }
         }
     }
