@@ -707,6 +707,7 @@ class ProfileViewModel: ObservableObject {
                     
                 case .duplicate:
                     // Already favorited on server - keep local state as is
+                    break
                     
                 case .error(let error):
                     // Error - revert optimistic update
