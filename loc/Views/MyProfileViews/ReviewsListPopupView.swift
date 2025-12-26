@@ -34,7 +34,9 @@ struct ReviewsListPopupView: View {
         )
         .onAppear {
             if profile.lightweightReviewedPlaces.isEmpty {
-                profile.loadMyReviewedPlacesWithPagination()
+                Task {
+                    await profile.loadMyReviewedPlacesWithPagination()
+                }
             }
         }
     }

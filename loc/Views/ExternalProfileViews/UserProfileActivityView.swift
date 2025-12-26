@@ -37,11 +37,15 @@ struct UserProfileActivityView: View {
         }
         .padding(.bottom, 20)
         .onAppear {
-            UserProfileVM.loadUserReviewedPlacesWithPagination()
+            Task {
+                await UserProfileVM.loadUserReviewedPlacesWithPagination()
+            }
         }
         .onChange(of: UserProfileVM.selectedUser?.id) {
             UserProfileVM.resetReviewedPlacesLoadingState()
-            UserProfileVM.loadUserReviewedPlacesWithPagination()
+            Task {
+                await UserProfileVM.loadUserReviewedPlacesWithPagination()
+            }
         }
     }
     

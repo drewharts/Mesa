@@ -31,7 +31,9 @@ struct UserProfileFavoritesReviewsView: View {
         .onAppear {
             // Load reviewed places data if needed
             if userProfileVM.lightweightReviewedPlaces.isEmpty && !userProfileVM.isLoadingReviewedPlaces {
-                userProfileVM.loadUserReviewedPlacesWithPagination()
+                Task {
+                    await userProfileVM.loadUserReviewedPlacesWithPagination()
+                }
             }
         }
         .sheet(isPresented: $showingReviewsPopup) {

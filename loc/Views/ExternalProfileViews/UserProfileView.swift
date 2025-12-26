@@ -17,66 +17,66 @@ struct UserProfileView: View {
     @Environment(\.presentationMode) var presentationMode
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 0) {
+            ScrollView {
+                VStack(spacing: 0) {
                 // Profile Picture, Name, Followers
-                VStack(spacing: 20) {
-                    // Profile Picture
-                    UserProfileProfilePictureView(
-                        profilePhotoURL: UserProfileVM.selectedUser?.profilePhotoURL,
-                        isFollowing: UserProfileVM.isFollowing,
-                        onToggleFollow: {
-                            // Single responsibility: Only UserProfileViewModel makes the API call
-                            UserProfileVM.toggleFollowUser(currentUserId: userId) { success, newFollowingState in
-                                if success {
-                                    // Update ProfileViewModel's local state WITHOUT making another API call
-                                    profileVM.updateFollowingState(
-                                        userId: UserProfileVM.selectedUser!.id, 
-                                        isFollowing: newFollowingState
-                                    )
+                    VStack(spacing: 20) {
+                        // Profile Picture
+                        UserProfileProfilePictureView(
+                            profilePhotoURL: UserProfileVM.selectedUser?.profilePhotoURL,
+                            isFollowing: UserProfileVM.isFollowing,
+                            onToggleFollow: {
+                                // Single responsibility: Only UserProfileViewModel makes the API call
+                                UserProfileVM.toggleFollowUser(currentUserId: userId) { success, newFollowingState in
+                                    if success {
+                                        // Update ProfileViewModel's local state WITHOUT making another API call
+                                        profileVM.updateFollowingState(
+                                            userId: UserProfileVM.selectedUser!.id, 
+                                            isFollowing: newFollowingState
+                                        )
+                                    }
                                 }
-                            }
-                        },
-                        totalPlacesCount: UserProfileVM.totalPlacesCount,
-                        userName: UserProfileVM.selectedUser?.firstName ?? UserProfileVM.selectedUser?.fullName ?? ""
-                    )
+                            },
+                            totalPlacesCount: UserProfileVM.totalPlacesCount,
+                            userName: UserProfileVM.selectedUser?.firstName ?? UserProfileVM.selectedUser?.fullName ?? ""
+                        )
 
-                    // Name
-                    Text(UserProfileVM.selectedUser!.fullName)
-                        .font(.title)
-                        .fontWeight(.bold)
-                        .foregroundColor(.black)
-                    
-                    VStack {
-                        Text("\(UserProfileVM.followers)")
-                            .foregroundStyle(.black)
-                        Text("Followers")
-                            .foregroundStyle(.black)
-                            .font(.footnote)
-                            .fontWeight(.light)
+                        // Name
+                        Text(UserProfileVM.selectedUser!.fullName)
+                            .font(.title)
+                            .fontWeight(.bold)
+                            .foregroundColor(.black)
+                        
+                        VStack {
+                            Text("\(UserProfileVM.followers)")
+                                .foregroundStyle(.black)
+                            Text("Followers")
+                                .foregroundStyle(.black)
+                                .font(.footnote)
+                                .fontWeight(.light)
+                        }
                     }
-                }
-                .padding(.top, 8)
-                .padding(.bottom, 16)
-                
-                Divider()
-                    .padding(.horizontal, 20)
-                
+                    .padding(.top, 8)
+                    .padding(.bottom, 16)
+                    
+                    Divider()
+                        .padding(.horizontal, 20)
+                    
                 // Content section
-                VStack(spacing: 20) {
+                            VStack(spacing: 20) {
                     // Favorites & Reviews (with tabs like ProfileFavoritesTikToksView)
                     // Note: Divider is included inside UserProfileFavoritesReviewsView
                     UserProfileFavoritesReviewsView(userProfileVM: UserProfileVM)
                         .padding(.top, 16)
-                    
+                                
                     // Place Lists
-                    UserProfileListsView(viewModel: UserProfileVM, placeLists: UserProfileVM.userLists)
+                                UserProfileListsView(viewModel: UserProfileVM, placeLists: UserProfileVM.userLists)
 
-                    Spacer(minLength: 50)
+                                Spacer(minLength: 50)
+                            }
                 }
             }
-        }
-        .environmentObject(UserProfileVM)
+            .environmentObject(UserProfileVM)
         .onAppear {
             UserProfileVM.checkIfFollowing(currentUserId: userId)
         }

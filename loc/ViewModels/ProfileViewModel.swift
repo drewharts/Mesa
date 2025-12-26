@@ -1030,7 +1030,7 @@ class ProfileViewModel: ObservableObject {
     }
 
     /// Load initial reviewed places (server-side pagination like TikToks)
-    func loadMyReviewedPlacesWithPagination() {
+    func loadMyReviewedPlacesWithPagination() async {
         guard let userId = user?.id else {
             print("⚠️ [ProfileViewModel] Cannot load reviewed places: no user ID")
             return
@@ -1042,9 +1042,7 @@ class ProfileViewModel: ObservableObject {
             return
         }
         
-        Task {
-            await loadInitialReviewedPlaces()
-        }
+        await loadInitialReviewedPlaces()
     }
     
     /// Load initial reviewed places from database (server-side pagination)

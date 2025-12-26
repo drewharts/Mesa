@@ -16,7 +16,7 @@ struct ExternalReviewsListPopupView: View {
     var body: some View {
         PlaceListPopupView(
             title: "Reviews",
-            count: userProfileVM.lightweightReviewedPlaces.count,
+            count: userProfileVM.totalReviewedPlacesCount,
             isLoading: userProfileVM.isLoadingReviewedPlaces,
             isLoadingMore: userProfileVM.isLoadingMoreReviews,
             places: userProfileVM.lightweightReviewedPlaces,
@@ -35,7 +35,9 @@ struct ExternalReviewsListPopupView: View {
         )
         .onAppear {
             if userProfileVM.lightweightReviewedPlaces.isEmpty {
-                userProfileVM.loadUserReviewedPlacesWithPagination()
+                Task {
+                    await userProfileVM.loadUserReviewedPlacesWithPagination()
+                }
             }
         }
     }

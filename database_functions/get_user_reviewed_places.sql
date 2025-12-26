@@ -24,7 +24,7 @@ BEGIN
     RETURN QUERY
     WITH distinct_places AS (
         -- First, get distinct place_ids ordered by most recent review
-        SELECT DISTINCT ON (r.place_id)
+    SELECT DISTINCT ON (r.place_id)
             r.place_id,
             r.timestamp
         FROM reviews r

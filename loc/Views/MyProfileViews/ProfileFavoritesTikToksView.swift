@@ -35,7 +35,9 @@ struct ProfileFavoritesTikToksView: View {
             }
             // Load reviewed places data if needed
             if profile.lightweightReviewedPlaces.isEmpty && !profile.isLoadingReviewedPlaces {
-                profile.loadMyReviewedPlacesWithPagination()
+                Task {
+                    await profile.loadMyReviewedPlacesWithPagination()
+                }
             }
         }
         .sheet(isPresented: $showingTikToksPopup) {

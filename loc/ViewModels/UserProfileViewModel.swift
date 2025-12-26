@@ -48,6 +48,7 @@ class UserProfileViewModel: ObservableObject {
     @Published var isLoadingReviewedPlaces: Bool = false
     @Published var isLoadingMoreReviews: Bool = false
     @Published var hasMoreReviews: Bool = true  // @Published to trigger SwiftUI updates
+    @Published var totalReviewedPlacesCount: Int = 0 // Total count of reviewed places
     private var hasAttemptedLoadReviewedPlaces: [String: Bool] = [:]
     private var hasMoreReviewsForUser: [String: Bool] = [:] // userId -> hasMoreReviews (for reference)
     private let reviewsPerPage: Int = 8
@@ -574,7 +575,7 @@ class UserProfileViewModel: ObservableObject {
     
     // MARK: - Pagination for User Reviews
     
-    func loadUserReviewedPlacesWithPagination() {
+    func loadUserReviewedPlacesWithPagination() async {
         guard let userId = selectedUser?.id else { return }
         
         // Reset pagination state for new user
@@ -583,14 +584,13 @@ class UserProfileViewModel: ObservableObject {
             hasAttemptedLoadReviewedPlaces[userId] = true
         }
         
-        Task {
-            await loadUserReviewedPlacesPaginated(userId: userId)
-        }
+        await loadUserReviewedPlacesPaginated(userId: userId)
     }
     
     private func resetPaginationState() {
         lightweightReviewedPlaces = []
         hasMoreReviews = true
+        totalReviewedPlacesCount = 0
         hasMoreReviewsForUser.removeAll()
         isLoadingMoreReviews = false
     }
@@ -607,13 +607,18 @@ class UserProfileViewModel: ObservableObject {
         
         do {
             // Fetch first page using server-side pagination (includes latest_review_photo!)
-            let places = try await userService.fetchUserReviewedPlaces(userId: userId, limit: reviewsPerPage, offset: 0)
+            // Also fetch total count in parallel
+            async let placesTask = userService.fetchUserReviewedPlaces(userId: userId, limit: reviewsPerPage, offset: 0)
+            async let countTask = userService.getNumberReviewedPlaces(forUserId: userId)
+            
+            let (places, totalCount) = try await (placesTask, countTask)
             
             lightweightReviewedPlaces = places
+            totalReviewedPlacesCount = totalCount
             hasMoreReviews = !places.isEmpty && places.count >= reviewsPerPage
             hasMoreReviewsForUser[userId] = hasMoreReviews
             
-            print("✅ [UserProfileVM] Loaded \(places.count) reviewed places for user \(userId)")
+            print("✅ [UserProfileVM] Loaded \(places.count) reviewed places (total: \(totalCount)) for user \(userId)")
             
             // Prefetch TikTok metadata for places with TikTok URLs
             let tiktokUrls = places.compactMap { $0.tiktok_url }.filter { !$0.isEmpty }
