@@ -90,35 +90,30 @@ class UserService: ObservableObject {
     }
 
     func fetchUser(userId: String, completion: @escaping (User?, Error?) -> Void) {
-        // ⚠️ NOW FETCHING FROM SUPABASE, NOT FIRESTORE
         Task { @MainActor in
             await supabase.fetchUser(userId: userId, completion: completion)
         }
     }
 
     func fetchFriends(userId: String, completion: @escaping ([String]?, Error?) -> Void) {
-        // ⚠️ NOW FETCHING FROM SUPABASE, NOT FIRESTORE
         Task { @MainActor in
             await supabase.fetchFriends(userId: userId, completion: completion)
             }
     }
 
     func fetchProfiles(for userIds: [String], completion: @escaping ([User]?, Error?) -> Void) {
-        // ⚠️ NOW FETCHING FROM SUPABASE, NOT FIRESTORE
         Task { @MainActor in
             await supabase.fetchProfiles(for: userIds, completion: completion)
         }
     }
 
     func fetchFollowingProfiles(for userId: String, completion: @escaping ([User]?, Error?) -> Void) {
-        // ⚠️ NOW FETCHING FROM SUPABASE, NOT FIRESTORE
         Task { @MainActor in
             await supabase.fetchFollowingProfiles(for: userId, completion: completion)
         }
     }
     
     func updateFCMToken(userId: String, token: String, completion: @escaping (Error?) -> Void) {
-        // ⚠️ NOW UPDATING IN SUPABASE, NOT FIRESTORE
         Task { @MainActor in
             await supabase.updateFCMToken(userId: userId, token: token, completion: completion)
         }

@@ -1190,7 +1190,7 @@ class ProfileViewModel: ObservableObject {
     
     /// Load image directly from URL and add to placeImages
     private func loadImageFromURL(imageUrl: String, placeId: String) async {
-        // ✅ COMPLETE Firebase elimination - block ALL Firebase URLs, only use Supabase
+        // Block Firebase Storage URLs (migrated to Supabase)
         if imageUrl.contains("firebasestorage.googleapis.com") {
             return
         }

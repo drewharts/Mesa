@@ -13,27 +13,22 @@ class PlaceService: ObservableObject {
 
     // Async version of fetchAllPlaces
     func fetchAllPlaces() async throws -> [DetailPlace] {
-        // ⚠️ NOW FETCHING FROM SUPABASE, NOT FIRESTORE
         return try await supabase.fetchAllPlaces()
     }
 
-    // Fetch all places from Supabase (was Firestore)
     func fetchAllPlaces(completion: @escaping ([DetailPlace]?, Error?) -> Void) {
-        // ⚠️ NOW FETCHING FROM SUPABASE, NOT FIRESTORE
         Task { @MainActor in
             await supabase.fetchAllPlaces(completion: completion)
         }
     }
 
     func findPlace(mapboxId: String, completion: @escaping (DetailPlace?, Error?) -> Void) {
-        // ⚠️ NOW FETCHING FROM SUPABASE, NOT FIRESTORE
         Task { @MainActor in
             await supabase.findPlace(mapboxId: mapboxId, completion: completion)
         }
     }
     
     func fetchPlace(withId placeId: String, completion: @escaping (Result<DetailPlace, Error>) -> Void) {
-        // ⚠️ NOW FETCHING FROM SUPABASE, NOT FIRESTORE
         Task { @MainActor in
             await supabase.fetchPlace(withId: placeId, completion: completion)
         }

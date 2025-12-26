@@ -503,7 +503,7 @@ class PlacePhotosViewModel: ObservableObject {
     
     /// Load image directly from URL
     private func loadImageFromURL(imageUrl: String) async -> UIImage? {
-        // ✅ COMPLETE Firebase elimination - block ALL Firebase URLs, only use Supabase
+        // Block Firebase Storage URLs (migrated to Supabase)
         if imageUrl.contains("firebasestorage.googleapis.com") {
             return nil
         }
