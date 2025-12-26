@@ -966,11 +966,19 @@ class ProfileViewModel: ObservableObject {
          return uniqueUsers
      }
     
-     func isPlaceInAnyList(placeId: String) -> Bool {
-         // Check if current user is in placeSavers for this place
-         // placeSavers is consistently updated when places are added/removed from lists
+     /// Check if a place is in any of the user's lists (uses SQL function)
+     func isPlaceInAnyList(placeId: String) async -> Bool {
          guard let userId = userSession.currentUserId else { return false }
-         return detailPlaceViewModel.placeSavers[placeId]?.contains(userId) ?? false
+         
+         do {
+             return try await PlaceListService.shared.isPlaceInAnyUserList(
+                 userId: userId,
+                 placeId: placeId
+             )
+         } catch {
+             print("❌ [ProfileViewModel] Error checking place list membership: \(error)")
+             return false
+         }
      }
 
     /// Returns the count of places in the PlaceList with the given id, or 0 if not found

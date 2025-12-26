@@ -150,6 +150,7 @@ struct PlaceRowView: View {
     let onBookmarkTapped: () -> Void
     let onPlaceTapped: () -> Void
     @EnvironmentObject var profile: ProfileViewModel
+    @State private var isInList: Bool = false
 
     var body: some View {
         HStack(spacing: 12) {
@@ -205,7 +206,7 @@ struct PlaceRowView: View {
 
             // Bookmark Button - shows filled if place is in any list
             Button(action: onBookmarkTapped) {
-                Image(systemName: profile.isPlaceInAnyList(placeId: place.id.uuidString) ? "bookmark.fill" : "bookmark")
+                Image(systemName: isInList ? "bookmark.fill" : "bookmark")
                     .font(.title2)
                     .foregroundColor(.blue)
             }
@@ -218,6 +219,9 @@ struct PlaceRowView: View {
         .contentShape(Rectangle()) // Make the entire row tappable
         .onTapGesture {
             onPlaceTapped()
+        }
+        .task {
+            isInList = await profile.isPlaceInAnyList(placeId: place.id.uuidString)
         }
     }
 } 
