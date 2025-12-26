@@ -177,8 +177,8 @@ struct PlaceListPopupView<CardView: View>: View {
     // MARK: - Pagination Helper
     
     private func triggerPaginationIfNeeded(index: Int) {
-        // Trigger when within 3 items of the end
-        guard index >= places.count - 3 && hasMore && !isLoadingMore else { return }
+        // Trigger when within 6 items of the end (aggressive prefetch for smooth infinite scroll)
+        guard index >= places.count - 6 && hasMore && !isLoadingMore else { return }
         Task { await loadMore() }
     }
 }
