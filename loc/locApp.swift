@@ -314,8 +314,8 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     
     // Called when APNs token is received
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
-        // TODO: Implement push notifications
-        // You can use this token for APNs directly or another push service
+        // Delegate to PushNotificationService (SRP: AppDelegate only coordinates, service handles logic)
+        PushNotificationService.shared.handleDeviceTokenReceived(deviceToken)
     }
     
     // Called when registration for remote notifications fails
