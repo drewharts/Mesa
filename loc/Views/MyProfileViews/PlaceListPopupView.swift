@@ -165,6 +165,13 @@ struct PlaceListPopupView<CardView: View>: View {
                 triggerPaginationIfNeeded(index: places.count - 1)
             }
         }
+        .onChange(of: isLoadingMore) { newValue in
+            // When loading finishes (newValue is false), if we are still at the end
+            // and more data exists, trigger the next load immediately.
+            if !newValue && hasMore && !places.isEmpty {
+                triggerPaginationIfNeeded(index: places.count - 1)
+            }
+        }
     }
     
     // MARK: - Pagination Helper
