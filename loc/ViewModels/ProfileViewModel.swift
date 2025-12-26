@@ -240,8 +240,6 @@ class ProfileViewModel: ObservableObject {
     }
     
      func changeProfilePhoto(_ newImage: UIImage) async {
-        print("🔄 [ProfileViewModel] changeProfilePhoto called")
-        
         // Set loading state and update UI immediately on main thread
         await MainActor.run {
             self.isUploadingProfilePhoto = true
@@ -257,22 +255,14 @@ class ProfileViewModel: ObservableObject {
             return 
         }
         
-        print("🔍 [ProfileViewModel] User ID: \(userId)")
-        print("🔍 [ProfileViewModel] User object: \(String(describing: user))")
-        
         let croppedImage = cropToSquare(newImage)
-        print("🔍 [ProfileViewModel] Image cropped, size: \(croppedImage.size)")
         
         do {
-            print("🚀 [ProfileViewModel] Starting profile photo upload...")
             let url = try await imageService.updateProfilePhoto(userId: userId, image: croppedImage)
-            print("✅ [ProfileViewModel] Upload successful, URL: \(url)")
             
             // Update the users table with the new profile photo URL
             do {
-                print("🔄 [ProfileViewModel] Updating users table with new profile photo URL...")
                 try await updateProfilePhotoInDatabase(userId: userId, photoURL: url)
-                print("✅ [ProfileViewModel] Database updated successfully")
             } catch {
                 print("⚠️ [ProfileViewModel] Failed to update database, but upload succeeded: \(error)")
             }
@@ -282,7 +272,6 @@ class ProfileViewModel: ObservableObject {
                 self.user?.profilePhotoURL = url
                 self.userPicture = croppedImage
                 self.isUploadingProfilePhoto = false
-                print("✅ [ProfileViewModel] Local state updated successfully")
             }
         } catch {
             print("❌ [ProfileViewModel] Failed to upload profile photo: \(error)")
@@ -309,7 +298,6 @@ class ProfileViewModel: ObservableObject {
             .eq("id", value: userId)
             .execute()
         
-        print("✅ [ProfileViewModel] Updated users table with new profile photo URL: \(photoURL)")
     }
     
      private func cropToSquare(_ image: UIImage) -> UIImage {
@@ -658,8 +646,6 @@ class ProfileViewModel: ObservableObject {
          placeService.removePlaceFromList(userId: userId, listId: list.id.uuidString, placeId: placeForList.id.uuidString) { error in
              if let error = error {
                  print("❌ Error removing place from list: \(error)")
-             } else {
-                 print("✅ Successfully removed place from list")
              }
          }
          
@@ -684,7 +670,6 @@ class ProfileViewModel: ObservableObject {
         
         // Quick client-side check (server will also validate)
         if lightweightFavorites.contains(where: { $0.place_id == placeId }) {
-            print("ℹ️ [ProfileViewModel] Place already favorited locally: \(placeId)")
             return
         }
         
@@ -712,7 +697,6 @@ class ProfileViewModel: ObservableObject {
                 switch result {
                 case .success:
                     // Success - optimistic update was correct
-                    print("✅ [ProfileViewModel] Favorite added successfully: \(place.name)")
                     self.detailPlaceViewModel.calculateAnnotationPlaces()
                     
                 case .maxLimit:
@@ -723,7 +707,6 @@ class ProfileViewModel: ObservableObject {
                     
                 case .duplicate:
                     // Already favorited on server - keep local state as is
-                    print("ℹ️ [ProfileViewModel] Server says already favorited: \(placeId)")
                     
                 case .error(let error):
                     // Error - revert optimistic update
@@ -777,7 +760,6 @@ class ProfileViewModel: ObservableObject {
         Task {
             do {
                 try await FavoritesService.shared.removeFavorite(userId: userId, placeId: placeId)
-                print("✅ [ProfileViewModel] Favorite removed successfully: \(place.name)")
             } catch {
                 // Revert optimistic update on failure
                 print("❌ [ProfileViewModel] Error removing favorite: \(error)")
@@ -1038,7 +1020,6 @@ class ProfileViewModel: ObservableObject {
         
         // Don't reload if already loading, if we have data, or if we already attempted (prevents infinite loop with no reviews)
         guard !isLoadingReviewedPlaces && lightweightReviewedPlaces.isEmpty && !hasAttemptedInitialReviewsLoad else {
-            print("ℹ️ [ProfileViewModel] Skipping initial reviews load - already loading, data exists, or already attempted")
             return
         }
         
@@ -1052,13 +1033,11 @@ class ProfileViewModel: ObservableObject {
             return
         }
         
-        print("🔄 [ProfileViewModel] Starting initial load of reviewed places")
         isLoadingReviewedPlaces = true
         hasAttemptedInitialReviewsLoad = true // Mark that we've attempted the initial load
         
         defer {
             isLoadingReviewedPlaces = false
-            print("✅ [ProfileViewModel] Completed initial load of reviewed places")
         }
         
         do {
@@ -1073,8 +1052,6 @@ class ProfileViewModel: ObservableObject {
             lightweightReviewedPlaces = lightweightPlaces
             totalReviewedPlacesCount = totalCount
             hasMoreReviews = !lightweightPlaces.isEmpty && lightweightPlaces.count >= 8
-            
-            print("✅ [ProfileViewModel] Loaded \(lightweightPlaces.count) reviewed places (total: \(totalCount), hasMore: \(hasMoreReviews))")
             
             // Load full place details for display (non-blocking like TikTok prefetch)
             Task {
@@ -1096,23 +1073,16 @@ class ProfileViewModel: ObservableObject {
         
         // Guard: prevent multiple simultaneous loads and check if more data is available
         guard !isLoadingMoreReviews && hasMoreReviews else {
-            if isLoadingMoreReviews {
-                print("ℹ️ [ProfileViewModel] Skipping loadMoreMyReviews - already loading")
-            } else {
-                print("ℹ️ [ProfileViewModel] Skipping loadMoreMyReviews - no more data available")
-            }
             return
         }
         
         // Calculate offset based on current count
         let offset = lightweightReviewedPlaces.count
-        print("🔄 [ProfileViewModel] Loading more reviewed places (offset: \(offset), current count: \(lightweightReviewedPlaces.count))")
         
         isLoadingMoreReviews = true
         
         defer {
             isLoadingMoreReviews = false
-            print("✅ [ProfileViewModel] Completed loading more reviewed places")
         }
         
         do {
@@ -1136,8 +1106,6 @@ class ProfileViewModel: ObservableObject {
             
             // Update hasMore flag: false if empty or if we got less than a full page
             hasMoreReviews = !lightweightPlaces.isEmpty && lightweightPlaces.count >= 8
-            
-            print("✅ [ProfileViewModel] Loaded \(newUniquePlaces.count) unique reviewed places (total: \(lightweightReviewedPlaces.count), hasMore: \(hasMoreReviews))")
             
             // Load full place details for display (non-blocking like TikTok prefetch)
             Task {
@@ -1224,7 +1192,6 @@ class ProfileViewModel: ObservableObject {
     private func loadImageFromURL(imageUrl: String, placeId: String) async {
         // ✅ COMPLETE Firebase elimination - block ALL Firebase URLs, only use Supabase
         if imageUrl.contains("firebasestorage.googleapis.com") {
-            print("🚫 [ProfileViewModel] BLOCKING Firebase Storage URL - Firebase migration complete, use Supabase only: \(imageUrl)")
             return
         }
         
@@ -1305,8 +1272,6 @@ class ProfileViewModel: ObservableObject {
     
     /// Refresh TikTok places list after a successful import
     func refreshTikTokPlacesAfterImport() {
-        print("🔄 [ProfileViewModel] Refreshing TikTok places after import...")
-        
         // Reload lightweight external places to show new TikTok place in tiles
         Task {
             await reloadLightweightExternalPlaces()
@@ -1344,8 +1309,6 @@ class ProfileViewModel: ObservableObject {
                 hasMoreExternalPlaces = !lightweightPlaces.isEmpty && lightweightPlaces.count >= 8
                 isLoadingTikTokPlaces = false
             }
-            
-            print("✅ [ProfileViewModel] Reloaded \(lightweightPlaces.count) lightweight external places (total: \(totalCount))")
         } catch {
             print("❌ [ProfileViewModel] Error reloading lightweight external places: \(error.localizedDescription)")
             await MainActor.run {
@@ -1367,16 +1330,13 @@ class ProfileViewModel: ObservableObject {
         
         // Don't reload if already loading or if we have data
         guard !isLoadingTikTokPlaces && lightweightExternalPlaces.isEmpty else {
-            print("ℹ️ [ProfileViewModel] Skipping initial load - already loading or data exists")
             return
         }
         
-        print("🔄 [ProfileViewModel] Starting initial load of external places")
         isLoadingTikTokPlaces = true
         
         defer {
             isLoadingTikTokPlaces = false
-            print("✅ [ProfileViewModel] Completed initial load of external places")
         }
         
         do {
@@ -1392,7 +1352,6 @@ class ProfileViewModel: ObservableObject {
             if !tiktokUrls.isEmpty {
                 Task {
                     await TikTokMetadataCache.shared.prefetchMetadata(for: tiktokUrls)
-                    print("✅ [ProfileViewModel] Prefetched TikTok metadata for \(tiktokUrls.count) URLs")
                 }
             }
             
@@ -1400,8 +1359,6 @@ class ProfileViewModel: ObservableObject {
             lightweightExternalPlaces = lightweightPlaces
             totalExternalPlacesCount = totalCount
             hasMoreExternalPlaces = !lightweightPlaces.isEmpty && lightweightPlaces.count >= 8
-            
-            print("✅ [ProfileViewModel] Loaded \(lightweightPlaces.count) lightweight external places (total: \(totalCount), hasMore: \(hasMoreExternalPlaces))")
         } catch {
             print("❌ [ProfileViewModel] Error loading initial external places: \(error.localizedDescription)")
             // Set hasMore to false on error to prevent infinite retry loops
@@ -1419,23 +1376,16 @@ class ProfileViewModel: ObservableObject {
         
         // Guard: prevent multiple simultaneous loads and check if more data is available
         guard !isLoadingMoreExternalPlaces && hasMoreExternalPlaces else {
-            if isLoadingMoreExternalPlaces {
-                print("ℹ️ [ProfileViewModel] Skipping loadMoreExternalPlaces - already loading")
-            } else {
-                print("ℹ️ [ProfileViewModel] Skipping loadMoreExternalPlaces - no more data available")
-            }
             return
         }
         
         // Calculate offset based on current count
         let offset = lightweightExternalPlaces.count
-        print("🔄 [ProfileViewModel] Loading more external places (offset: \(offset), current count: \(lightweightExternalPlaces.count))")
         
         isLoadingMoreExternalPlaces = true
         
         defer {
             isLoadingMoreExternalPlaces = false
-            print("✅ [ProfileViewModel] Completed loading more external places")
         }
         
         do {
@@ -1447,7 +1397,6 @@ class ProfileViewModel: ObservableObject {
             if !tiktokUrls.isEmpty {
                 Task {
                     await TikTokMetadataCache.shared.prefetchMetadata(for: tiktokUrls)
-                    print("✅ [ProfileViewModel] Prefetched TikTok metadata for \(tiktokUrls.count) URLs")
                 }
             }
             
@@ -1468,8 +1417,6 @@ class ProfileViewModel: ObservableObject {
             
             // Update hasMore flag: false if empty or if we got less than a full page
             hasMoreExternalPlaces = !lightweightPlaces.isEmpty && lightweightPlaces.count >= 8
-            
-            print("✅ [ProfileViewModel] Loaded \(newUniquePlaces.count) unique external places (total: \(lightweightExternalPlaces.count), hasMore: \(hasMoreExternalPlaces))")
         } catch {
             print("❌ [ProfileViewModel] Error loading more external places: \(error.localizedDescription)")
             // Set hasMore to false on error to prevent infinite retry loops
@@ -1489,16 +1436,13 @@ class ProfileViewModel: ObservableObject {
         
         // Don't reload if already loading or if we have data
         guard !isMyPlacesLoading && lightweightMyPlaces.isEmpty else {
-            print("ℹ️ [ProfileViewModel] Skipping initial my places load - already loading or data exists")
             return
         }
         
-        print("🔄 [ProfileViewModel] Starting initial load of my places")
         isMyPlacesLoading = true
         
         defer {
             isMyPlacesLoading = false
-            print("✅ [ProfileViewModel] Completed initial load of my places")
         }
         
         do {
@@ -1524,8 +1468,6 @@ class ProfileViewModel: ObservableObject {
                     detailPlaceViewModel.placeSavers[placeId]!.append(userId)
                 }
             }
-            
-            print("✅ [ProfileViewModel] Loaded \(lightweightPlaces.count) my places (total: \(totalCount), hasMore: \(hasMoreMyPlaces))")
         } catch {
             print("❌ [ProfileViewModel] Error loading initial my places: \(error.localizedDescription)")
             hasMoreMyPlaces = false
@@ -1542,23 +1484,16 @@ class ProfileViewModel: ObservableObject {
         
         // Guard: prevent multiple simultaneous loads and check if more data is available
         guard !isLoadingMoreMyPlaces && hasMoreMyPlaces else {
-            if isLoadingMoreMyPlaces {
-                print("ℹ️ [ProfileViewModel] Skipping loadMoreMyPlaces - already loading")
-            } else {
-                print("ℹ️ [ProfileViewModel] Skipping loadMoreMyPlaces - no more data available")
-            }
             return
         }
         
         // Calculate offset based on current count
         let offset = lightweightMyPlaces.count
-        print("🔄 [ProfileViewModel] Loading more my places (offset: \(offset), current count: \(lightweightMyPlaces.count))")
         
         isLoadingMoreMyPlaces = true
         
         defer {
             isLoadingMoreMyPlaces = false
-            print("✅ [ProfileViewModel] Completed loading more my places")
         }
         
         do {
@@ -1594,8 +1529,6 @@ class ProfileViewModel: ObservableObject {
             
             // Update hasMore flag: false if empty or if we got less than a full page
             hasMoreMyPlaces = !lightweightPlaces.isEmpty && lightweightPlaces.count >= 8
-            
-            print("✅ [ProfileViewModel] Loaded \(newUniquePlaces.count) unique my places (total: \(lightweightMyPlaces.count), hasMore: \(hasMoreMyPlaces))")
         } catch {
             print("❌ [ProfileViewModel] Error loading more my places: \(error.localizedDescription)")
             hasMoreMyPlaces = false
@@ -1646,7 +1579,6 @@ class ProfileViewModel: ObservableObject {
                     print("❌ [ProfileViewModel] Error deleting TikTok place: \(error.localizedDescription)")
                     completion(false)
                 } else {
-                    print("✅ [ProfileViewModel] Successfully deleted TikTok place: \(place.name)")
                     completion(true)
                 }
             }
@@ -1668,8 +1600,6 @@ class ProfileViewModel: ObservableObject {
             if let error = error {
                 print("❌ [ProfileViewModel] Error deleting TikTok place: \(error.localizedDescription)")
                 // Note: Could add revert logic here if needed
-            } else {
-                print("✅ [ProfileViewModel] Successfully deleted TikTok place: \(place.name)")
             }
         }
     }
@@ -1889,7 +1819,6 @@ class ProfileViewModel: ObservableObject {
     /// Now uses pre-calculated average coordinates for much faster sorting
     func sortListsByDistance() {
         guard locationManager.currentLocation != nil else { 
-            print("📍 [ProfileViewModel] sortListsByDistance: No location available, skipping sort")
             return 
         }
         
@@ -1966,8 +1895,6 @@ class ProfileViewModel: ObservableObject {
         
         switch result {
         case .success(let detailPlaces):
-            print("✅ [ProfileViewModel] Successfully processed TikTok URL, received \(detailPlaces.count) place(s)")
-            
             // Clear any previous errors
             tikTokImportError = nil
             
@@ -2009,7 +1936,6 @@ class ProfileViewModel: ObservableObject {
                     // Validate all places have names
                     let validPlaces = detailPlaces.filter { !$0.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
                     
-                    print("🔍 [ProfileViewModel] Valid places after filtering: \(validPlaces.count)")
                     for place in validPlaces {
                         print("   ✓ \(place.name)")
                     }
@@ -2095,7 +2021,6 @@ class ProfileViewModel: ObservableObject {
         isWaitingForPlaceDetail = false
         deepLinkManager?.isProcessingDeepLink = false
         deepLinkViewModel?.isProcessingDeepLink = false  // Direct update to ensure sync
-        print("✅ [ProfileViewModel] clearNoPlacesFound: Cleared all processing states")
     }
     
     func placeSelectionViewAppeared() {
@@ -2107,7 +2032,6 @@ class ProfileViewModel: ObservableObject {
     
     func ensureListsLoaded() {
         guard let userId = user?.id else { 
-            print("🔍 [ProfileViewModel] ensureListsLoaded: No user ID")
             return 
         }
         
@@ -2118,14 +2042,12 @@ class ProfileViewModel: ObservableObject {
         }
         
         if !needsPlaceLoading {
-            print("🔍 [ProfileViewModel] ensureListsLoaded: First 3 lists already have places loaded")
             DispatchQueue.main.async {
                 self.isLoading = false
             }
             return
         }
         
-        print("🔍 [ProfileViewModel] ensureListsLoaded: Loading places for first 3 lists")
         
         // Indicate loading state so UI can show a spinner
         DispatchQueue.main.async {
@@ -2136,17 +2058,13 @@ class ProfileViewModel: ObservableObject {
             do {
                 // Use the existing lists (already loaded by DataManager)
                 let lists = self.userLists
-                print("🔍 [ProfileViewModel] ensureListsLoaded: Using existing \(lists.count) lists")
                 
                 // Load places and counts for the first 3 visible lists
                 let firstThreeListIds = Array(lists.prefix(3).map { $0.id.uuidString })
-                print("🔍 [ProfileViewModel] First 3 list IDs: \(firstThreeListIds)")
                 
                 if !firstThreeListIds.isEmpty {
-                    print("🔍 [ProfileViewModel] Fetching places for first 3 lists...")
                     // Fetch places for first 3 lists (6 places each)
                     let placesForLists = try await placeService.fetchPlacesForLists(listIds: firstThreeListIds, maxPlacesPerList: 6)
-                    print("🔍 [ProfileViewModel] Received places for \(placesForLists.count) lists")
                     
                     // Fetch place counts for all lists
                     let placeCounts = try await placeService.getPlaceCountsForLists(listIds: lists.map { $0.id.uuidString })
@@ -2180,8 +2098,6 @@ class ProfileViewModel: ObservableObject {
                             }
                         }
                         
-                        print("🔍 [ProfileViewModel] ensureListsLoaded: Updated userListsPlaces with \(self.userListsPlaces.count) entries")
-                        print("🔍 [ProfileViewModel] ensureListsLoaded: Loaded places for first \(placesForLists.count) lists")
                         
                         self.isLoading = false
                     }
@@ -2203,16 +2119,13 @@ class ProfileViewModel: ObservableObject {
     /// Bulk calculates average coordinates for all lists that don't have them
     /// This is much faster than calculating them one by one
     private func bulkCalculateAverageCoordinates() {
-        print("🚀 [ProfileViewModel] Bulk calculating average coordinates for all lists")
         
         // Group lists by whether they need calculation
         let listsNeedingCalculation = userLists.filter { $0.averageCoordinate == nil }
         let listsWithCoordinates = userLists.filter { $0.averageCoordinate != nil }
         
-        print("🚀 [ProfileViewModel] \(listsWithCoordinates.count) lists already have coordinates, \(listsNeedingCalculation.count) need calculation")
         
         if listsNeedingCalculation.isEmpty {
-            print("🚀 [ProfileViewModel] All lists already have average coordinates - fast sorting ready!")
             return
         }
         
@@ -2221,19 +2134,16 @@ class ProfileViewModel: ObservableObject {
             recalculateAverageCoordinates(for: list.id)
         }
         
-        print("🚀 [ProfileViewModel] Bulk calculation complete - all lists now have average coordinates")
     }
     
     func loadListDataIfNeeded(listId: UUID) {
         guard !loadedListIds.contains(listId) && !loadingListIds.contains(listId),
               let userId = user?.id else {
-            print("🔍 [ProfileViewModel] loadListDataIfNeeded: List \(listId) already loaded or loading")
             return
         }
 
         // Check if we're at the concurrency limit
         if activeListLoadTasks.count >= maxConcurrentListLoads {
-            print("🔍 [ProfileViewModel] loadListDataIfNeeded: At concurrency limit (\(maxConcurrentListLoads)), queuing list \(listId)")
             // Queue the task for later execution
             let task = Task {
                 // Wait for a slot to become available
@@ -2255,7 +2165,6 @@ class ProfileViewModel: ObservableObject {
     }
 
     private func performListLoad(listId: UUID, userId: String) async {
-        print("🔍 [ProfileViewModel] performListLoad: Loading data for list \(listId)")
         
         // Check if places are already loaded (e.g., from preloading)
         let alreadyLoaded = await MainActor.run {
@@ -2268,7 +2177,6 @@ class ProfileViewModel: ObservableObject {
         }
         
         if alreadyLoaded {
-            print("✅ [ProfileViewModel] performListLoad: Places already loaded for list \(listId), skipping")
             await MainActor.run {
                 self.loadedListIds.insert(listId)
                 self.initializeListPagination(listId: listId)
@@ -2308,8 +2216,6 @@ class ProfileViewModel: ObservableObject {
 
                     // Initialize pagination for this list
                     self.initializeListPagination(listId: listId)
-
-                    print("✅ [ProfileViewModel] performListLoad: Successfully loaded \(places.count) places for list \(listId)")
                 }
             }
         } catch {
@@ -2366,7 +2272,6 @@ class ProfileViewModel: ObservableObject {
                         }
                     }
                     
-                    print("🔍 [ProfileViewModel] loadMoreListsIfNeeded: Loaded \(placesForLists.count) more lists")
                 }
             } catch {
                 print("❌ [ProfileViewModel] loadMoreListsIfNeeded: Error loading more lists: \(error)")
@@ -2385,7 +2290,6 @@ class ProfileViewModel: ObservableObject {
     private func initializeListPagination(listId: UUID) {
         let listIdString = listId.uuidString
         guard let allPlaceIds = userListsPlaces[listIdString], !allPlaceIds.isEmpty else {
-            print("🔍 [ProfileViewModel] initializeListPagination: No places found for list \(listId)")
             return
         }
         
@@ -2399,7 +2303,6 @@ class ProfileViewModel: ObservableObject {
         
         // Load first page
         loadNextPageForList(listId: listId)
-        print("🔍 [ProfileViewModel] initializeListPagination: Initialized pagination for list \(listId) with \(allPlaceIds.count) total places")
         
         // Trigger image preloading for initial places
         preloadImagesForVisiblePlaces(listId: listId)
@@ -2409,14 +2312,11 @@ class ProfileViewModel: ObservableObject {
     func initializeListPaginationIfNeeded(listId: UUID) {
         let listIdString = listId.uuidString
         let allPlaceIds = userListsPlaces[listIdString] ?? []
-        print("🔍 [ProfileViewModel] initializeListPaginationIfNeeded: List \(listId) has \(allPlaceIds.count) places")
         
         // Only initialize if not already initialized
         if listPlacePagination[listIdString] == nil {
-            print("🔍 [ProfileViewModel] initializeListPaginationIfNeeded: Initializing pagination for list \(listId)")
             initializeListPagination(listId: listId)
         } else {
-            print("🔍 [ProfileViewModel] initializeListPaginationIfNeeded: Pagination already exists for list \(listId)")
         }
     }
     
@@ -2426,7 +2326,6 @@ class ProfileViewModel: ObservableObject {
         guard var pagination = listPlacePagination[listIdString],
               !pagination.isLoadingMore,
               pagination.hasMorePlaces else {
-            print("🔍 [ProfileViewModel] loadNextPageForList: Cannot load more places for list \(listId)")
             return
         }
         
@@ -2444,7 +2343,6 @@ class ProfileViewModel: ObservableObject {
         }
         
         let placeIdsToLoad = Array(pagination.allPlaceIds[startIndex..<endIndex])
-        print("🔍 [ProfileViewModel] loadNextPageForList: Loading places \(startIndex) to \(endIndex-1) for list \(listId)")
         
         Task {
             // Load place details for the new place IDs
@@ -2469,8 +2367,6 @@ class ProfileViewModel: ObservableObject {
                     updatedPagination.hasMorePlaces = endIndex < updatedPagination.allPlaceIds.count
                     
                     self.listPlacePagination[listIdString] = updatedPagination
-                    
-                    print("✅ [ProfileViewModel] loadNextPageForList: Loaded \(placeIdsToLoad.count) more places for list \(listId). Total loaded: \(updatedPagination.loadedCount)/\(updatedPagination.totalPlaces)")
                     
                     // Trigger image preloading for newly loaded places
                     self.preloadImagesForVisiblePlaces(listId: listId)
@@ -2571,7 +2467,6 @@ class ProfileViewModel: ObservableObject {
                 }
             }
             
-            print("✅ [ProfileViewModel] Appended \(uniqueNewLists.count) unique lists (total: \(lightweightPlaceLists.count))")
         } else {
             print("⚠️ [ProfileViewModel] All \(newLists.count) lists were duplicates - potential pagination issue")
         }
@@ -2606,7 +2501,6 @@ class ProfileViewModel: ObservableObject {
         // Update state with unique places
         if !uniqueNewPlaces.isEmpty {
             lightweightPlaceListPlaces[listId] = existingPlaces + uniqueNewPlaces
-            print("✅ [ProfileViewModel] Appended \(uniqueNewPlaces.count) unique places to list \(listId) (total: \(existingPlaces.count + uniqueNewPlaces.count))")
         }
     }
     
@@ -2787,7 +2681,6 @@ class ProfileViewModel: ObservableObject {
             )
             
             let distance = targetLocation.distance(from: listLocation)
-            print("🚀 [ProfileViewModel] FAST: List '\(list.name)' using pre-calculated average coordinates, distance: \(String(format: "%.1f km", distance/1000))")
             return distance
         }
         
@@ -2821,7 +2714,6 @@ class ProfileViewModel: ObservableObject {
                 totalDistance += distance
                 validPlaceCount += 1
                 
-                print("🔍 [ProfileViewModel] List place '\(detailPlace.name)' distance: \(String(format: "%.1f km", distance/1000))")
             } else {
                 print("⚠️ [ProfileViewModel] Could not find place with ID \(placeId) or it has no coordinate")
             }
@@ -2895,11 +2787,8 @@ class ProfileViewModel: ObservableObject {
             return 
         }
         
-        print("🔍 [ProfileViewModel] Starting fetchUserExternalPlaces for user: \(userId)")
-        
         do {
             let externalPlaces = try await userService.fetchAllUserExternalPlaces(userId: userId)
-            print("✅ [ProfileViewModel] Successfully fetched \(externalPlaces.count) external places")
             
             // Convert array to dictionary (note: if multiple external places exist for same placeId,
             // only the last one will be stored - this is okay for quick lookups)
@@ -2908,11 +2797,9 @@ class ProfileViewModel: ObservableObject {
             // Update on main thread
             await MainActor.run {
                 self.userExternalPlaces = externalPlacesDict
-                print("📚 [ProfileViewModel] Updated userExternalPlaces dictionary with \(externalPlacesDict.count) entries")
             }
             
             // Prefetch TikTok metadata for external places
-            print("🖼️ [ProfileViewModel] Starting to prefetch TikTok metadata...")
             let urls = externalPlaces.compactMap { $0.url }.filter { !$0.isEmpty }
             await TikTokMetadataCache.shared.prefetchMetadata(for: urls)
             
@@ -2930,7 +2817,6 @@ class ProfileViewModel: ObservableObject {
                     }
                 }
             }
-            print("✅ [ProfileViewModel] TikTok metadata prefetch complete")
         } catch {
             print("❌ [ProfileViewModel] Error fetching external places: \(error.localizedDescription)")
         }
@@ -3214,7 +3100,6 @@ class ProfileViewModel: ObservableObject {
             // On success, call completion on main thread
             await MainActor.run {
                 if myPlacesDeleteSuccess {
-                    print("✅ [ProfileViewModel] Successfully deleted custom place: \(place.name)")
                     completion(true)
                 } else {
                     // If deletion fails, revert the optimistic updates
@@ -3263,8 +3148,6 @@ class ProfileViewModel: ObservableObject {
             placeService.deletePlaceFromMyPlaces(userId: userId, placeId: placeId) { error in
                 if let error = error {
                     print("❌ [ProfileViewModel] Error deleting place from my_places: \(error.localizedDescription)")
-                } else {
-                    print("✅ [ProfileViewModel] Successfully deleted my place: \(place.name)")
                 }
             }
             
@@ -3356,8 +3239,6 @@ class ProfileViewModel: ObservableObject {
             return
         }
         
-        print("🗑️ [ProfileViewModel] Starting account deletion for user: \(userId)")
-        
         // Delete user data from Firestore
         userService.deleteUserAccount(userId: userId) { [weak self] error in
             DispatchQueue.main.async {
@@ -3365,13 +3246,10 @@ class ProfileViewModel: ObservableObject {
                     print("❌ [ProfileViewModel] Error deleting account: \(error.localizedDescription)")
                     completion(false, error.localizedDescription)
                 } else {
-                    print("✅ [ProfileViewModel] Successfully deleted user data from Supabase")
-                    
                     // Delete Supabase Auth user
                     Task { @MainActor in
                         do {
                             try await SupabaseAuthService.shared.deleteAccount()
-                            print("✅ [ProfileViewModel] Successfully deleted Supabase Auth user")
                             
                             // Log out the user
                             self?.userSession.logout()
