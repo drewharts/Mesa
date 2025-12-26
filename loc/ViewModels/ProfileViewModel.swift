@@ -110,7 +110,6 @@ class ProfileViewModel: ObservableObject {
      @Published var showMaxFavoritesAlert: Bool = false
      @Published var isLoading: Bool = true
      @Published var isUploadingProfilePhoto: Bool = false
-     private var loadingTasks: Int = 0
      @Published var followersCount: Int = 0
      @Published var followingCount: Int = 0
      @Published var totalListCount: Int = 0
@@ -612,21 +611,6 @@ class ProfileViewModel: ObservableObject {
         }
     }
     
-    /// Merge TikTok data from an ExternalPlace into a DetailPlace (async)
-    func mergeTikTokData(into detailPlace: DetailPlace, from externalPlace: ExternalPlace) async -> DetailPlace {
-        // Create a copy of the DetailPlace with TikTok data merged in
-        var mergedPlace = detailPlace
-
-        // If the external place has a TikTok URL, fetch metadata from cache
-        if let url = externalPlace.url, !url.isEmpty {
-            if let tikTokVideo = await TikTokMetadataCache.shared.getMetadata(for: url) {
-                mergedPlace.tikTokVideos = [tikTokVideo]
-            }
-        }
-
-        return mergedPlace
-    }
-
      func removePlaceFromList(listId: UUID, place: DetailPlace) {
          let listIdString = listId.uuidString
          guard
@@ -989,15 +973,6 @@ class ProfileViewModel: ObservableObject {
          return detailPlaceViewModel.placeSavers[placeId]?.contains(userId) ?? false
      }
 
-    /// Returns a dictionary mapping each PlaceList's id to the count of places in that list
-    func placeCountsForAllLists() -> [UUID: Int] {
-        var counts: [UUID: Int] = [:]
-        for list in userLists {
-            counts[list.id] = list.places.count
-        }
-        return counts
-    }
-
     /// Returns the count of places in the PlaceList with the given id, or 0 if not found
     func placeCount(forListId listId: UUID) -> Int {
         return userLists.first(where: { $0.id == listId })?.places.count ?? 0
@@ -1235,38 +1210,6 @@ class ProfileViewModel: ObservableObject {
     /// Get the total count of reviewed places (server-side pagination)
     var reviewedPlacesCount: Int {
         return lightweightReviewedPlaces.count
-    }
-    
-    // User posts for display in My Places
-    @Published var userPosts: [PlacePost] = []
-    @Published var isLoadingUserPosts: Bool = false
-    
-    /// Load the last 8 posts made by the user
-    func loadUserPosts() async {
-        guard let userId = user?.id else { return }
-        
-        await MainActor.run {
-            isLoadingUserPosts = true
-        }
-        
-        do {
-            // Fetch all posts for the user
-            let allPosts = try await postService.fetchUserPosts(userId: userId)
-            
-            // Sort by timestamp (most recent first) and take the last 8
-            let sortedPosts = allPosts.sorted { $0.timestamp > $1.timestamp }
-            let last8Posts = Array(sortedPosts.prefix(8))
-            
-            await MainActor.run {
-                userPosts = last8Posts
-                isLoadingUserPosts = false
-            }
-        } catch {
-            print("❌ [ProfileViewModel] Error loading user posts: \(error.localizedDescription)")
-            await MainActor.run {
-                isLoadingUserPosts = false
-            }
-        }
     }
     
     // MARK: - TikTok Places Refresh After Import
@@ -1633,40 +1576,6 @@ class ProfileViewModel: ObservableObject {
         detailPlaceViewModel.calculateAnnotationPlaces()
     }
     
-    private func revertTikTokPlaceDeletion(_ place: DetailPlace) {
-        let placeId = place.id.uuidString
-        
-        // Re-add to local state
-        if !allTikTokPlaceIds.contains(placeId) {
-            allTikTokPlaceIds.append(placeId)
-            allTikTokPlaceIds.sort { placeId1, placeId2 in
-                // Sort by date (most recent first)
-                let place1 = userExternalPlaces[placeId1]
-                let place2 = userExternalPlaces[placeId2]
-                return (place1?.addedAt ?? Date.distantPast) > (place2?.addedAt ?? Date.distantPast)
-            }
-        }
-        
-        if !loadedTikTokPlaceIds.contains(placeId) {
-            loadedTikTokPlaceIds.append(placeId)
-        }
-        
-        // Re-add to placeSavers
-        if let userId = user?.id {
-            if detailPlaceViewModel.placeSavers[placeId] == nil {
-                detailPlaceViewModel.placeSavers[placeId] = [userId]
-            } else if !detailPlaceViewModel.placeSavers[placeId]!.contains(userId) {
-                detailPlaceViewModel.placeSavers[placeId]!.append(userId)
-            }
-        }
-        
-        // Re-add to places dictionary
-        detailPlaceViewModel.places[placeId] = place
-        
-        // Recalculate map annotations
-        detailPlaceViewModel.calculateAnnotationPlaces()
-    }
-    
     // MARK: - Reviewed Places Access
     
     /// Cached set of place IDs the user has reviewed (for unvisited filtering)
@@ -1846,16 +1755,6 @@ class ProfileViewModel: ObservableObject {
         }
         
         hasPerformedInitialSort = true
-    }
-
-    /// Public method for manual refresh (if needed) - should only be called by user actions like pull-to-refresh
-    func refreshListSorting() {
-        sortListsByDistance()
-    }
-    
-    /// Returns whether the initial sort has been performed
-    var hasCompletedInitialSort: Bool {
-        hasPerformedInitialSort
     }
     
     // MARK: - TikTok Processing
@@ -2115,26 +2014,6 @@ class ProfileViewModel: ObservableObject {
                 }
             }
         }
-    }
-    
-    /// Bulk calculates average coordinates for all lists that don't have them
-    /// This is much faster than calculating them one by one
-    private func bulkCalculateAverageCoordinates() {
-        
-        // Group lists by whether they need calculation
-        let listsNeedingCalculation = userLists.filter { $0.averageCoordinate == nil }
-        let listsWithCoordinates = userLists.filter { $0.averageCoordinate != nil }
-        
-        
-        if listsNeedingCalculation.isEmpty {
-            return
-        }
-        
-        // Calculate for all lists that need it
-        for list in listsNeedingCalculation {
-            recalculateAverageCoordinates(for: list.id)
-        }
-        
     }
     
     func loadListDataIfNeeded(listId: UUID) {
@@ -2755,92 +2634,6 @@ class ProfileViewModel: ObservableObject {
         }
     }
     
-    /// Returns the formatted average distance for a list
-    func getAverageDistanceForList(_ list: PlaceList) -> String {
-        let distance = calculateDistanceToList(list)
-        return formatDistance(distance)
-    }
-
-    /// Returns true if location is available for distance calculations
-    var isLocationAvailable: Bool {
-        return locationManager.currentLocation != nil
-    }
-    
-    // MARK: - Place-Specific List Sorting
-    
-    /// Calculates the average distance of all places in a list from a specific place
-    /// FAST VERSION: Uses pre-calculated average coordinates when available
-    func calculateAverageDistanceForListFromPlace(_ list: PlaceList, place: DetailPlace) -> Double {
-        guard let placeCoordinate = place.coordinate else { 
-            print("⚠️ [ProfileViewModel] Place '\(place.name)' has no coordinate, returning infinity")
-            return Double.infinity 
-        }
-        
-        // FAST PATH: Use pre-calculated average coordinates if available (much faster!)
-        if let averageCoordinate = list.averageCoordinate {
-            let targetLocation = CLLocation(
-                latitude: placeCoordinate.latitude,
-                longitude: placeCoordinate.longitude
-            )
-            let listLocation = CLLocation(
-                latitude: averageCoordinate.latitude,
-                longitude: averageCoordinate.longitude
-            )
-            
-            let distance = targetLocation.distance(from: listLocation)
-            return distance
-        }
-        
-        // SLOW PATH: Fallback to calculating from individual places (only if no average coordinate)
-        let listPlaceIds = userListsPlaces[list.id.uuidString] ?? []
-        guard !listPlaceIds.isEmpty else { 
-            print("⚠️ [ProfileViewModel] List '\(list.name)' has no places, returning infinity")
-            return Double.infinity 
-        }
-        
-        print("🐌 [ProfileViewModel] SLOW: Calculating distance for list '\(list.name)' with \(listPlaceIds.count) places (no average coordinate)")
-        
-        let targetLocation = CLLocation(
-            latitude: placeCoordinate.latitude,
-            longitude: placeCoordinate.longitude
-        )
-        
-        var totalDistance: Double = 0
-        var validPlaceCount: Int = 0
-        
-        for placeId in listPlaceIds {
-            if let detailPlace = detailPlaceViewModel.places[placeId],
-               let listPlaceCoordinate = detailPlace.coordinate {
-                
-                let listPlaceLocation = CLLocation(
-                    latitude: listPlaceCoordinate.latitude,
-                    longitude: listPlaceCoordinate.longitude
-                )
-                
-                let distance = targetLocation.distance(from: listPlaceLocation)
-                totalDistance += distance
-                validPlaceCount += 1
-                
-            } else {
-                print("⚠️ [ProfileViewModel] Could not find place with ID \(placeId) or it has no coordinate")
-            }
-        }
-        
-        let averageDistance = validPlaceCount > 0 ? totalDistance / Double(validPlaceCount) : Double.infinity
-        print("🐌 [ProfileViewModel] SLOW: List '\(list.name)' average distance: \(averageDistance == Double.infinity ? "infinity" : String(format: "%.1f km", averageDistance/1000)) (valid places: \(validPlaceCount)/\(listPlaceIds.count))")
-        
-        return averageDistance
-    }
-    
-    /// Sorts lists by their proximity to a specific place (closest first)
-    func sortListsByDistanceFromPlace(_ place: DetailPlace) -> [PlaceList] {
-        return userLists.sorted { list1, list2 in
-            let distance1 = calculateAverageDistanceForListFromPlace(list1, place: place)
-            let distance2 = calculateAverageDistanceForListFromPlace(list2, place: place)
-            return distance1 < distance2
-        }
-    }
-    
     /// Helper to check if a list is "recently" created (within last 60 seconds)
     func isListRecentlyCreated(_ listId: UUID) -> Bool {
         guard let createdId = recentlyCreatedListId,
@@ -2863,24 +2656,6 @@ class ProfileViewModel: ObservableObject {
     func clearRecentlyCreatedList() {
         recentlyCreatedListId = nil
         listCreationTime = nil
-    }
-    
-    /// Sorts lists with recently created list at the top, then by proximity to a specific place
-    func sortListsWithRecentFirstFromPlace(_ place: DetailPlace) -> [PlaceList] {
-        return userLists.sorted { list1, list2 in
-            // If one of the lists is recently created (and still within time window), prioritize it
-            if isListRecentlyCreated(list1.id) {
-                return true
-            }
-            if isListRecentlyCreated(list2.id) {
-                return false
-            }
-            
-            // Otherwise, sort by distance
-            let distance1 = calculateAverageDistanceForListFromPlace(list1, place: place)
-            let distance2 = calculateAverageDistanceForListFromPlace(list2, place: place)
-            return distance1 < distance2
-        }
     }
     
     // MARK: - External Places (TikTok-sourced places) - OLD CODE, KEEP FOR TikTok deletion
@@ -3078,26 +2853,6 @@ class ProfileViewModel: ObservableObject {
             return nil
         }
         return TikTokMetadataCache.shared.getCachedThumbnailUrl(for: url)
-    }
-
-    func loadPlaceImageWithFallback(for place: DetailPlace) {
-        let placeId = place.id.uuidString
-        
-        // If image already exists, no need to do anything
-        if detailPlaceViewModel.placeImages[placeId] != nil {
-            return
-        }
-        
-        // If there's no review image, try to load a TikTok thumbnail
-        Task {
-            if let externalPlace = getExternalPlace(for: placeId),
-               let url = externalPlace.url,
-               let thumbnailURL = await TikTokMetadataCache.shared.getThumbnailUrl(for: url) {
-                
-                // Load TikTok thumbnail directly
-                await loadTikTokThumbnailAsPlaceImage(placeId: placeId, thumbnailURL: thumbnailURL)
-            }
-        }
     }
     
     /// Load TikTok thumbnail as place image for external places
