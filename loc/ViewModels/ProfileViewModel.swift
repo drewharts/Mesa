@@ -2606,6 +2606,112 @@ class ProfileViewModel: ObservableObject {
         userSession.logout()
     }
     
+    // MARK: - Logout Cleanup
+    
+    /// Clears all user-related cached data - MUST be called on logout to prevent data leakage
+    /// Single Responsibility: Only clears this ViewModel's cached state
+    func clearAllUserData() {
+        print("🗑️ [ProfileViewModel] Clearing all user data for security")
+        
+        // Clear user profile data
+        user = nil
+        userPicture = nil
+        
+        // Clear TikTok/external places data
+        lightweightExternalPlaces.removeAll()
+        totalExternalPlacesCount = 0
+        userExternalPlaces.removeAll()
+        allTikTokPlaceIds.removeAll()
+        loadedTikTokPlaceIds.removeAll()
+        currentTikTokPage = 0
+        recentlyProcessedURLs.removeAll()
+        _hasMoreTikTokPlaces = true
+        
+        // Clear reviewed places data
+        lightweightReviewedPlaces.removeAll()
+        totalReviewedPlacesCount = 0
+        hasAttemptedInitialReviewsLoad = false
+        
+        // Clear user lists and places
+        userLists.removeAll()
+        userListsPlaces.removeAll()
+        lightweightPlaceLists.removeAll()
+        lightweightPlaceListPlaces.removeAll()
+        lightweightPlaceListCounts.removeAll()
+        placeListCounts.removeAll()
+        listPlacePagination.removeAll()
+        loadedListIds.removeAll()
+        loadingListIds.removeAll()
+        activeListLoadTasks.values.forEach { $0.cancel() }
+        activeListLoadTasks.removeAll()
+        placeListsCurrentPage = 1
+        
+        // Clear favorites
+        userFavorites.removeAll()
+        lightweightFavorites.removeAll()
+        lightweightMyPlaces.removeAll()
+        myPlaces.removeAll()
+        totalMyPlacesCount = 0
+        
+        // Clear social data
+        userFollowing.removeAll()
+        userFollowers.removeAll()
+        followersCount = 0
+        followingCount = 0
+        
+        // Clear place notes and flags
+        placeNotes.removeAll()
+        tikTokPlaceFlags.removeAll()
+        
+        // Clear TikTok processing state
+        importedPlaces.removeAll()
+        currentProcessingTikTokUrl = nil
+        noPlacesFoundTikTokUrl = ""
+        
+        // Reset loading states
+        isLoadingReviewedPlaces = false
+        isLoadingMoreReviews = false
+        hasMoreReviews = true
+        isLoadingTikTokPlaces = false
+        isLoadingMoreExternalPlaces = false
+        hasMoreExternalPlaces = true
+        isLoadingMoreMyPlaces = false
+        hasMoreMyPlaces = true
+        isLoadingInitialLists = false
+        isLoadingMorePlaceLists = false
+        hasMorePlaceLists = true
+        isLoadingMoreTikTokPlaces = false
+        isMyPlacesLoading = true
+        isFollowersLoading = true
+        isFollowingLoading = true
+        isFollowersListLoading = false
+        isFollowingListLoading = false
+        hasMoreFollowers = true
+        hasMoreFollowing = true
+        
+        // Clear other state
+        preloadedImages.removeAll()
+        recentlyCreatedListId = nil
+        listCreationTime = nil
+        totalListCount = 0
+        totalUniquePlacesCount = 0
+        showOnlySharedLists = false
+        hasPerformedInitialSort = false
+        
+        // Clear UI state flags
+        isProcessingTikTok = false
+        isWaitingForPlaceDetail = false
+        isShowingPlaceSelection = false
+        isShowingNoPlacesFound = false
+        tikTokImportError = nil
+        showMaxFavoritesAlert = false
+        isUploadingProfilePhoto = false
+        showFollowError = false
+        followErrorMessage = ""
+        
+        print("✅ [ProfileViewModel] All user data cleared")
+    }
+    
     func handleTikTokNotification(url: String, 
                                  tikTokService: TikTokService,
                                  selectedPlaceVM: SelectedPlaceViewModel,

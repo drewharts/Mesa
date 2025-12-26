@@ -30,6 +30,8 @@ final class SessionCleanupService {
     // Weak references to avoid retain cycles - ViewModels are owned by app lifecycle
     private weak var detailPlaceViewModel: DetailPlaceViewModel?
     private weak var selectedPlaceViewModel: SelectedPlaceViewModel?
+    private weak var profileViewModel: ProfileViewModel?
+    private weak var userProfileViewModel: UserProfileViewModel?
     
     private init() {}
     
@@ -39,10 +41,14 @@ final class SessionCleanupService {
     /// Call this during app initialization
     func configure(
         detailPlaceViewModel: DetailPlaceViewModel,
-        selectedPlaceViewModel: SelectedPlaceViewModel
+        selectedPlaceViewModel: SelectedPlaceViewModel,
+        profileViewModel: ProfileViewModel,
+        userProfileViewModel: UserProfileViewModel
     ) {
         self.detailPlaceViewModel = detailPlaceViewModel
         self.selectedPlaceViewModel = selectedPlaceViewModel
+        self.profileViewModel = profileViewModel
+        self.userProfileViewModel = userProfileViewModel
     }
     
     // MARK: - Public API
@@ -62,6 +68,12 @@ final class SessionCleanupService {
     // MARK: - Private Methods
     
     private func clearViewModelCaches() {
+        // Clear ProfileViewModel's user-specific data (profile picture, TikToks, reviewed places, etc.)
+        profileViewModel?.clearAllUserData()
+        
+        // Clear UserProfileViewModel's cached user data
+        userProfileViewModel?.clearAllUserData()
+        
         // Clear DetailPlaceViewModel's user-specific data (profile pictures, places, annotations)
         detailPlaceViewModel?.clearAllUserData()
         

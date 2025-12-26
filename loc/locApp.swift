@@ -55,12 +55,6 @@ struct locApp: App {
             detailPlaceViewModel: detailVM
         )
         
-        // Configure SessionCleanupService with non-singleton dependencies (SECURITY: for logout cache clearing)
-        SessionCleanupService.shared.configure(
-            detailPlaceViewModel: detailVM,
-            selectedPlaceViewModel: selectedPlaceVM
-        )
-        
         let deepLinkMgr = DeepLinkManager(
             placeService: services.placeService,
             userService: services.userService,
@@ -118,6 +112,15 @@ struct locApp: App {
         
         // Set UserSession reference in DeepLinkManager for accessing current user ID
         deepLinkMgr.setUserSession(userSess)
+        
+        // Configure SessionCleanupService with non-singleton dependencies (SECURITY: for logout cache clearing)
+        // Must be called after all ViewModels are created
+        SessionCleanupService.shared.configure(
+            detailPlaceViewModel: detailVM,
+            selectedPlaceViewModel: selectedPlaceVM,
+            profileViewModel: profileVM,
+            userProfileViewModel: userProfileVM
+        )
         
         // ✅ Create SearchViewModel ONCE at app level (staff engineer: no recreation overhead)
         let searchVM = SearchViewModel(
