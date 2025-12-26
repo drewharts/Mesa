@@ -205,6 +205,9 @@ class ProfileViewModel: ObservableObject {
         // Observe location changes using Combine
         setupLocationObserver()
         
+        // Setup reactive data loading (MVVM + SRP)
+        setupDataLoadingObserver()
+        
         // Observe TikTok multiple places notifications
         NotificationCenter.default.addObserver(
             forName: NSNotification.Name("TikTokMultiplePlacesFound"),
@@ -233,6 +236,30 @@ class ProfileViewModel: ObservableObject {
                     Task { @MainActor in
                         self?.sortListsByDistance()
                     }
+                }
+            }
+            .store(in: &cancellables)
+    }
+    
+    /// Observe user state and automatically load dependent data when user becomes available
+    /// This ensures data loads after login without view intervention (MVVM + SRP)
+    private func setupDataLoadingObserver() {
+        $user
+            .compactMap { $0?.id } // Only proceed when user has an ID
+            .removeDuplicates() // Prevent redundant loads on same user
+            .sink { [weak self] userId in
+                guard let self = self else { return }
+                
+                print("👤 [ProfileViewModel] User set (\(userId)) - auto-loading TikToks and reviews")
+                
+                // Automatically load TikToks and reviews when user becomes available
+                // This happens after login, ensuring data is ready for views
+                Task {
+                    async let tikToksLoad: () = self.loadInitialExternalPlaces()
+                    async let reviewsLoad: () = self.loadMyReviewedPlacesWithPagination()
+                    
+                    // Run in parallel for efficiency
+                    _ = await (tikToksLoad, reviewsLoad)
                 }
             }
             .store(in: &cancellables)

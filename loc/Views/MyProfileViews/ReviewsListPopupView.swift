@@ -32,12 +32,7 @@ struct ReviewsListPopupView: View {
                 )
             }
         )
-        .onAppear {
-            if profile.lightweightReviewedPlaces.isEmpty {
-                Task {
-                    await profile.loadMyReviewedPlacesWithPagination()
-                }
-            }
-        }
+        // ✅ MVVM + SRP: ViewModel automatically loads data when user is set
+        // No manual loading needed - reactive observer handles it
     }
 }

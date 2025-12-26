@@ -19,11 +19,8 @@ struct ProfileTikToksView: View {
             Divider()
                 .padding(.horizontal, 20)
         }
-        .onAppear {
-            if profile.lightweightExternalPlaces.isEmpty && !profile.isLoadingTikTokPlaces {
-                Task { await profile.loadInitialExternalPlaces() }
-            }
-        }
+        // ✅ MVVM + SRP: ViewModel automatically loads data when user is set
+        // No manual loading needed - reactive observer handles it
         .sheet(isPresented: $showingTikToksPopup) {
             TikToksPopupView()
         }
