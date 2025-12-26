@@ -21,8 +21,7 @@ struct UserProfileActivityView: View {
     // MARK: - Computed Properties
     
     private var hasMoreReviews: Bool {
-        guard let userId = UserProfileVM.selectedUser?.id else { return false }
-        return UserProfileVM.hasMoreReviews(for: userId)
+        UserProfileVM.hasMoreReviews
     }
     
     private var reviewedPlaces: [LightweightPlace] {

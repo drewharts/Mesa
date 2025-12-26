@@ -47,8 +47,9 @@ class UserProfileViewModel: ObservableObject {
     @Published var lightweightReviewedPlaces: [LightweightPlace] = []
     @Published var isLoadingReviewedPlaces: Bool = false
     @Published var isLoadingMoreReviews: Bool = false
+    @Published var hasMoreReviews: Bool = true  // @Published to trigger SwiftUI updates
     private var hasAttemptedLoadReviewedPlaces: [String: Bool] = [:]
-    private var hasMoreReviewsForUser: [String: Bool] = [:] // userId -> hasMoreReviews
+    private var hasMoreReviewsForUser: [String: Bool] = [:] // userId -> hasMoreReviews (for reference)
     private let reviewsPerPage: Int = 8
     
     private let placeService: PlaceService
@@ -589,6 +590,7 @@ class UserProfileViewModel: ObservableObject {
     
     private func resetPaginationState() {
         lightweightReviewedPlaces = []
+        hasMoreReviews = true
         hasMoreReviewsForUser.removeAll()
         isLoadingMoreReviews = false
     }
@@ -608,7 +610,8 @@ class UserProfileViewModel: ObservableObject {
             let places = try await userService.fetchUserReviewedPlaces(userId: userId, limit: reviewsPerPage, offset: 0)
             
             lightweightReviewedPlaces = places
-            hasMoreReviewsForUser[userId] = !places.isEmpty && places.count >= reviewsPerPage
+            hasMoreReviews = !places.isEmpty && places.count >= reviewsPerPage
+            hasMoreReviewsForUser[userId] = hasMoreReviews
             
             print("✅ [UserProfileVM] Loaded \(places.count) reviewed places for user \(userId)")
             
@@ -621,6 +624,7 @@ class UserProfileViewModel: ObservableObject {
             }
         } catch {
             print("❌ [UserProfileVM] Error loading reviewed places: \(error.localizedDescription)")
+            hasMoreReviews = false
             hasMoreReviewsForUser[userId] = false
         }
     }
@@ -628,7 +632,7 @@ class UserProfileViewModel: ObservableObject {
     /// Load more reviewed places (pagination)
     /// Note: Class is @MainActor so no need for MainActor.run wrappers
     private func loadNextBatchOfReviews(userId: String) async {
-        guard !isLoadingMoreReviews, hasMoreReviewsForUser[userId] != false else { return }
+        guard !isLoadingMoreReviews, hasMoreReviews else { return }
         
         isLoadingMoreReviews = true
         
@@ -645,7 +649,8 @@ class UserProfileViewModel: ObservableObject {
             let existingIds = Set(lightweightReviewedPlaces.map { $0.id })
             let newUniquePlaces = places.filter { !existingIds.contains($0.id) }
             lightweightReviewedPlaces.append(contentsOf: newUniquePlaces)
-            hasMoreReviewsForUser[userId] = !places.isEmpty && places.count >= reviewsPerPage
+            hasMoreReviews = !places.isEmpty && places.count >= reviewsPerPage
+            hasMoreReviewsForUser[userId] = hasMoreReviews
             
             print("✅ [UserProfileVM] Loaded \(places.count) more reviewed places (total: \(lightweightReviewedPlaces.count))")
             
@@ -658,6 +663,7 @@ class UserProfileViewModel: ObservableObject {
             }
         } catch {
             print("❌ [UserProfileVM] Error loading more reviewed places: \(error.localizedDescription)")
+            hasMoreReviews = false
             hasMoreReviewsForUser[userId] = false
         }
     }

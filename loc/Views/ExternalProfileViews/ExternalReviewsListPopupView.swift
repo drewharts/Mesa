@@ -13,14 +13,6 @@ struct ExternalReviewsListPopupView: View {
     @ObservedObject var userProfileVM: UserProfileViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     
-    private var userId: String {
-        userProfileVM.selectedUser?.id ?? ""
-    }
-    
-    private var hasMore: Bool {
-        userProfileVM.hasMoreReviews(for: userId)
-    }
-    
     var body: some View {
         PlaceListPopupView(
             title: "Reviews",
@@ -28,7 +20,7 @@ struct ExternalReviewsListPopupView: View {
             isLoading: userProfileVM.isLoadingReviewedPlaces,
             isLoadingMore: userProfileVM.isLoadingMoreReviews,
             places: userProfileVM.lightweightReviewedPlaces,
-            hasMore: hasMore,
+            hasMore: userProfileVM.hasMoreReviews,
             emptyIcon: "star.bubble",
             emptyTitle: "No Reviews Yet",
             emptyMessage: "This user hasn't reviewed any places yet",
