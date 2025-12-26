@@ -38,7 +38,7 @@ BEGIN
         get_latest_review_photo(dp.place_id::text) AS latest_review_photo
     FROM distinct_places dp
     JOIN places p ON dp.place_id = p.id
-    ORDER BY dp.timestamp DESC  -- Stable chronological ordering for pagination
+    ORDER BY dp.timestamp DESC, dp.place_id ASC  -- Added place_id tiebreaker for truly stable pagination
     LIMIT p_limit
     OFFSET p_offset;
 END;
