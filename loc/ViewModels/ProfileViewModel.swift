@@ -1052,16 +1052,18 @@ class ProfileViewModel: ObservableObject {
             return
         }
         
+        print("🔄 [ProfileViewModel] Starting initial load of reviewed places")
         isLoadingReviewedPlaces = true
         hasAttemptedInitialReviewsLoad = true // Mark that we've attempted the initial load
         
         defer {
             isLoadingReviewedPlaces = false
+            print("✅ [ProfileViewModel] Completed initial load of reviewed places")
         }
         
         do {
             // Fetch first page of lightweight reviewed places and total count in parallel
-            async let placesTask = userService.fetchUserReviewedPlaces(userId: userId, limit: reviewsPerPage, offset: 0)
+            async let placesTask = userService.fetchUserReviewedPlaces(userId: userId, limit: 8, offset: 0)
             async let countTask = userService.getNumberReviewedPlaces(forUserId: userId)
             
             let lightweightPlaces = try await placesTask
@@ -1070,12 +1072,14 @@ class ProfileViewModel: ObservableObject {
             // Update state: replace existing places and update hasMore flag
             lightweightReviewedPlaces = lightweightPlaces
             totalReviewedPlacesCount = totalCount
-            hasMoreReviews = !lightweightPlaces.isEmpty && lightweightPlaces.count >= reviewsPerPage
+            hasMoreReviews = !lightweightPlaces.isEmpty && lightweightPlaces.count >= 8
             
-            print("✅ [ProfileViewModel] Loaded \(lightweightPlaces.count) reviewed places (total: \(totalCount))")
+            print("✅ [ProfileViewModel] Loaded \(lightweightPlaces.count) reviewed places (total: \(totalCount), hasMore: \(hasMoreReviews))")
             
-            // Load full place details for display
-            await loadPlaceDetailsForReviews(lightweightPlaces, userId: userId)
+            // Load full place details for display (non-blocking like TikTok prefetch)
+            Task {
+                await loadPlaceDetailsForReviews(lightweightPlaces, userId: userId)
+            }
         } catch {
             print("❌ [ProfileViewModel] Error loading initial reviewed places: \(error.localizedDescription)")
             // Set hasMore to false on error to prevent infinite retry loops
@@ -1102,16 +1106,18 @@ class ProfileViewModel: ObservableObject {
         
         // Calculate offset based on current count
         let offset = lightweightReviewedPlaces.count
+        print("🔄 [ProfileViewModel] Loading more reviewed places (offset: \(offset), current count: \(lightweightReviewedPlaces.count))")
         
         isLoadingMoreReviews = true
         
         defer {
             isLoadingMoreReviews = false
+            print("✅ [ProfileViewModel] Completed loading more reviewed places")
         }
         
         do {
             // Fetch next page of lightweight reviewed places
-            let lightweightPlaces = try await userService.fetchUserReviewedPlaces(userId: userId, limit: reviewsPerPage, offset: offset)
+            let lightweightPlaces = try await userService.fetchUserReviewedPlaces(userId: userId, limit: 8, offset: offset)
             
             // Update state: append new places and update hasMore flag
             // ⚠️ CRITICAL: Deduplicate to prevent SwiftUI rendering issues
@@ -1129,10 +1135,14 @@ class ProfileViewModel: ObservableObject {
             }
             
             // Update hasMore flag: false if empty or if we got less than a full page
-            hasMoreReviews = !lightweightPlaces.isEmpty && lightweightPlaces.count >= reviewsPerPage
+            hasMoreReviews = !lightweightPlaces.isEmpty && lightweightPlaces.count >= 8
             
-            // Load full place details for display
-            await loadPlaceDetailsForReviews(newUniquePlaces, userId: userId)
+            print("✅ [ProfileViewModel] Loaded \(newUniquePlaces.count) unique reviewed places (total: \(lightweightReviewedPlaces.count), hasMore: \(hasMoreReviews))")
+            
+            // Load full place details for display (non-blocking like TikTok prefetch)
+            Task {
+                await loadPlaceDetailsForReviews(newUniquePlaces, userId: userId)
+            }
         } catch {
             print("❌ [ProfileViewModel] Error loading more reviewed places: \(error.localizedDescription)")
             // Set hasMore to false on error to prevent infinite retry loops
