@@ -250,7 +250,6 @@ class ProfileViewModel: ObservableObject {
             .sink { [weak self] userId in
                 guard let self = self else { return }
                 
-                print("👤 [ProfileViewModel] User set (\(userId)) - auto-loading TikToks and reviews")
                 
                 // Automatically load TikToks and reviews when user becomes available
                 // This happens after login, ensuring data is ready for views

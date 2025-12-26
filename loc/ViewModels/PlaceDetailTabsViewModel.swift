@@ -206,6 +206,7 @@ class PlaceDetailTabsViewModel: ObservableObject {
             .store(in: &cancellables)
         
         // Check place list membership when place changes (database source of truth)
+        // SQL function only checks place_list_items, not external_places (TikToks)
         selectedPlaceVM.$selectedPlace
             .sink { [weak self] place in
                 guard let self = self else { return }
@@ -214,20 +215,10 @@ class PlaceDetailTabsViewModel: ObservableObject {
                 }
             }
             .store(in: &cancellables)
-        
-        // Optimistic updates: also observe placeSavers for immediate UI feedback
-        // This fires when user adds/removes place from list without waiting for DB
-        detailPlaceViewModel.$placeSavers
-            .sink { [weak self] savers in
-                guard let self = self,
-                      let place = self.selectedPlaceVM.selectedPlace,
-                      let userId = self.userSession.currentUserId else { return }
-                self.isPlaceInList = savers[place.id.uuidString]?.contains(userId) ?? false
-            }
-            .store(in: &cancellables)
     }
     
     /// Check if the current place is saved in any of the user's lists (database call)
+    /// Only checks place_list_items table, NOT external_places (TikToks)
     private func checkPlaceListMembership(place: DetailPlace?) async {
         guard let place = place, let userId = userSession.currentUserId else {
             isPlaceInList = false
@@ -242,8 +233,8 @@ class PlaceDetailTabsViewModel: ObservableObject {
             isPlaceInList = isSaved
         } catch {
             print("❌ [PlaceDetailTabsVM] Error checking place list membership: \(error)")
-            // Fall back to local check on error
-            isPlaceInList = detailPlaceViewModel.placeSavers[place.id.uuidString]?.contains(userId) ?? false
+            // On error, default to false (don't show bookmark as filled)
+            isPlaceInList = false
         }
     }
     

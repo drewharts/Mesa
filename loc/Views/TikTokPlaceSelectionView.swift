@@ -205,7 +205,13 @@ struct PlaceRowView: View {
             Spacer()
 
             // Bookmark Button - shows filled if place is in any list
-            Button(action: onBookmarkTapped) {
+            Button(action: {
+                onBookmarkTapped()
+                // Refresh state after bookmark action (optimistic update)
+                Task {
+                    isInList = await profile.isPlaceInAnyList(placeId: place.id.uuidString)
+                }
+            }) {
                 Image(systemName: isInList ? "bookmark.fill" : "bookmark")
                     .font(.title2)
                     .foregroundColor(.blue)
@@ -222,6 +228,13 @@ struct PlaceRowView: View {
         }
         .task {
             isInList = await profile.isPlaceInAnyList(placeId: place.id.uuidString)
+        }
+        // ✅ SRP: View observes ViewModel's published state (proper MVVM)
+        // Update when list membership changes (reactive to ViewModel state)
+        .onChange(of: profile.lightweightPlaceListPlaces) { _ in
+            Task {
+                isInList = await profile.isPlaceInAnyList(placeId: place.id.uuidString)
+            }
         }
     }
 } 
