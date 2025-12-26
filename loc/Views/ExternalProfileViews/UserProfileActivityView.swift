@@ -135,6 +135,8 @@ struct UserProfileActivityView: View {
               hasMoreReviews,
               !UserProfileVM.isLoadingMoreReviews else { return }
         
-        UserProfileVM.loadMoreReviews()
+        Task {
+            await UserProfileVM.loadMoreReviews()
+        }
     }
 }

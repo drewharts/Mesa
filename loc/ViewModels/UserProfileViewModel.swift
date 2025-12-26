@@ -676,11 +676,9 @@ class UserProfileViewModel: ObservableObject {
         }
     }
     
-    func loadMoreReviews() {
+    func loadMoreReviews() async {
         guard let userId = selectedUser?.id else { return }
-        Task {
-            await loadNextBatchOfReviews(userId: userId)
-        }
+        await loadNextBatchOfReviews(userId: userId)
     }
     
     /// Get reviewed places as LightweightPlace (includes latest_review_photo for consistent image loading)

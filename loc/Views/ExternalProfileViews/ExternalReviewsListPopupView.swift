@@ -32,7 +32,7 @@ struct ExternalReviewsListPopupView: View {
             emptyIcon: "star.bubble",
             emptyTitle: "No Reviews Yet",
             emptyMessage: "This user hasn't reviewed any places yet",
-            loadMore: { userProfileVM.loadMoreReviews() },
+            loadMore: { await userProfileVM.loadMoreReviews() },
             cardBuilder: { place in
                 PopupPlaceCard(
                     place: place,
