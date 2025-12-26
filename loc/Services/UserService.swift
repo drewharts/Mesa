@@ -90,35 +90,30 @@ class UserService: ObservableObject {
     }
 
     func fetchUser(userId: String, completion: @escaping (User?, Error?) -> Void) {
-        // ⚠️ NOW FETCHING FROM SUPABASE, NOT FIRESTORE
         Task { @MainActor in
             await supabase.fetchUser(userId: userId, completion: completion)
         }
     }
 
     func fetchFriends(userId: String, completion: @escaping ([String]?, Error?) -> Void) {
-        // ⚠️ NOW FETCHING FROM SUPABASE, NOT FIRESTORE
         Task { @MainActor in
             await supabase.fetchFriends(userId: userId, completion: completion)
             }
     }
 
     func fetchProfiles(for userIds: [String], completion: @escaping ([User]?, Error?) -> Void) {
-        // ⚠️ NOW FETCHING FROM SUPABASE, NOT FIRESTORE
         Task { @MainActor in
             await supabase.fetchProfiles(for: userIds, completion: completion)
         }
     }
 
     func fetchFollowingProfiles(for userId: String, completion: @escaping ([User]?, Error?) -> Void) {
-        // ⚠️ NOW FETCHING FROM SUPABASE, NOT FIRESTORE
         Task { @MainActor in
             await supabase.fetchFollowingProfiles(for: userId, completion: completion)
         }
     }
     
     func updateFCMToken(userId: String, token: String, completion: @escaping (Error?) -> Void) {
-        // ⚠️ NOW UPDATING IN SUPABASE, NOT FIRESTORE
         Task { @MainActor in
             await supabase.updateFCMToken(userId: userId, token: token, completion: completion)
         }
@@ -492,6 +487,11 @@ class UserService: ObservableObject {
     func fetchUserReviewedPlaces(userId: String, limit: Int = 8, offset: Int = 0) async throws -> [LightweightPlace] {
         return try await supabase.fetchUserReviewedPlaces(userId: userId, limit: limit, offset: offset)
     }
+    
+    /// Get user's created places count (my places)
+    func getNumberCreatedPlaces(forUserId userId: String) async throws -> Int {
+        return try await supabase.getNumberCreatedPlaces(forUserId: userId)
+    }
 
     /// ✅ NEW: Fetch following user IDs only (not full profiles) - SUPER FAST!
     func fetchFollowingUserIds(userId: String) async throws -> [String] {
@@ -636,8 +636,8 @@ class UserService: ObservableObject {
     
     // MARK: - Place List Management
     
-    func addPlaceToList(listId: String, placeId: String) async throws {
-        try await supabase.addPlaceToList(listId: listId, placeId: placeId)
+    func addPlaceToList(listId: String, placeId: String, addedBy: String) async throws {
+        try await supabase.addPlaceToList(listId: listId, placeId: placeId, addedBy: addedBy)
     }
     
     func removePlaceFromList(listId: String, placeId: String) async throws {

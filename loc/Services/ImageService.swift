@@ -129,9 +129,9 @@ class ImageService {
     
     /// Load image directly from URL (same approach as ProfileViewModel)
     private func loadImageFromURL(imageUrl: String) async -> UIImage? {
-        // ✅ COMPLETE Firebase elimination - block ALL Firebase URLs, only use Supabase
+        // Block Firebase Storage URLs (migrated to Supabase)
         if imageUrl.contains("firebasestorage.googleapis.com") {
-            print("🚫 [ImageService] BLOCKING Firebase Storage URL - Firebase migration complete, use Supabase only: \(imageUrl)")
+            print("🚫 [ImageService] Blocking Firebase Storage URL (migrated to Supabase): \(imageUrl)")
             return nil
         }
         
@@ -250,7 +250,7 @@ class ImageService {
 
     func fetchPhotosFromStorage(placeId: String, returnFirstImageOnly: Bool = false, completion: @escaping ([UIImage]?, Error?) -> Void) {
         // TODO: Implement with Supabase Storage
-        print("🚫 [ImageService] fetchPhotosFromStorage(placeId:) - Firebase completely removed, use Supabase only")
+        print("⚠️ [ImageService] fetchPhotosFromStorage(placeId:) - Not yet implemented")
         completion([], nil)
     }
 
@@ -337,8 +337,8 @@ class ImageService {
     // Function to upload an image and update the PlaceList's image field
     func uploadImageAndUpdatePlaceList(userId: String, placeList: PlaceList, image: UIImage, completion: @escaping (Error?) -> Void) {
         // TODO: Implement with Supabase Storage
-        print("🚫 [ImageService] uploadImageAndUpdatePlaceList - Firebase completely removed, use Supabase only")
-        let error = NSError(domain: "ImageService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Firebase completely removed - use Supabase only"])
+        print("⚠️ [ImageService] uploadImageAndUpdatePlaceList - Not yet implemented")
+        let error = NSError(domain: "ImageService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Not yet implemented"])
         completion(error)
     }
 

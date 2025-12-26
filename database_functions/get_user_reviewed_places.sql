@@ -1,8 +1,10 @@
 -- ============================================================================
 -- Function: get_user_reviewed_places
 -- ============================================================================
--- Returns paginated list of places reviewed by a user
--- Uses server-side pagination like external_places for better performance
+-- Returns paginated list of distinct places reviewed by a user
+-- Uses GROUP BY for clean deduplication (simpler than DISTINCT ON)
+-- Orders by most recent review timestamp for each place
+-- Note: user_id column is TEXT (not UUID) - do not cast
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION public.get_user_reviewed_places(
@@ -20,17 +22,17 @@ LANGUAGE plpgsql
 AS $function$
 BEGIN
     RETURN QUERY
-    SELECT DISTINCT ON (r.place_id)
+    SELECT 
         r.place_id::text,
         p.name,
         p.location AS coordinate,
         get_latest_review_photo(r.place_id::text) AS latest_review_photo
     FROM reviews r
     JOIN places p ON r.place_id = p.id
-    WHERE r.user_id = p_user_id::uuid
-    ORDER BY r.place_id, r.timestamp DESC, r.id DESC
+    WHERE r.user_id = p_user_id
+    GROUP BY r.place_id, p.name, p.location
+    ORDER BY MAX(r.timestamp) DESC, r.place_id ASC
     LIMIT p_limit
     OFFSET p_offset;
 END;
 $function$;
-

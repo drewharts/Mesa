@@ -1,0 +1,43 @@
+//
+//  ReviewsListPopupView.swift
+//  loc
+//
+//  Single Responsibility: Display paginated reviewed places in a popup grid
+//  MVVM: Delegates data loading and state to ProfileViewModel
+//  DUMB Component: Uses PlaceListPopupView for consistent popup behavior
+
+import SwiftUI
+
+struct ReviewsListPopupView: View {
+    @EnvironmentObject var profile: ProfileViewModel
+    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
+    
+    var body: some View {
+        PlaceListPopupView(
+            title: "Reviews",
+            count: profile.totalReviewedPlacesCount,
+            isLoading: profile.isLoadingReviewedPlaces,
+            isLoadingMore: profile.isLoadingMoreReviews,
+            places: profile.lightweightReviewedPlaces,
+            hasMore: profile.hasMoreReviews,
+            emptyIcon: "star.bubble",
+            emptyTitle: "No Reviews Yet",
+            emptyMessage: "Places you've reviewed will appear here",
+            loadMore: { await profile.loadMoreMyReviews() },
+            cardBuilder: { place in
+                PopupPlaceCard(
+                    place: place,
+                    preferTikTokThumbnail: false,  // Reviews prioritize review photos
+                    allowDelete: false
+                )
+            }
+        )
+        .onAppear {
+            if profile.lightweightReviewedPlaces.isEmpty {
+                Task {
+                    await profile.loadMyReviewedPlacesWithPagination()
+                }
+            }
+        }
+    }
+}

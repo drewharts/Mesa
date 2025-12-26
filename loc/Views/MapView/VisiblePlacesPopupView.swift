@@ -17,7 +17,6 @@ struct VisiblePlacesPopupView: View {
     @EnvironmentObject var mapViewModel: MapViewModel
     @EnvironmentObject var profile: ProfileViewModel
     
-    @State private var placeColors: [String: Color] = [:]
     @State private var loadedImageCount = 0
     @State private var isLoadingImages = false
     
@@ -43,13 +42,10 @@ struct VisiblePlacesPopupView: View {
         }
     }
     
-    // Card dimensions matching the list popup format
-    private let cardWidth: CGFloat = UIScreen.main.bounds.width / 2 - 35
-    private let cardHeight: CGFloat = 180
-    
+    // Grid layout matching ProfileView lists (consistent spacing)
     private let columns = [
-        GridItem(.flexible(), spacing: 15),
-        GridItem(.flexible(), spacing: 15)
+        GridItem(.flexible(), spacing: 12),
+        GridItem(.flexible(), spacing: 12)
     ]
     
     var body: some View {
@@ -76,13 +72,10 @@ struct VisiblePlacesPopupView: View {
                 // Content
                 if !visiblePlaces.isEmpty {
                     ScrollView {
-                        LazyVGrid(columns: columns, spacing: 15) {
+                        LazyVGrid(columns: columns, spacing: 16) {
                             ForEach(Array(visiblePlaces.enumerated()), id: \.element.id) { index, annotation in
                                 VisiblePlaceGridCell(
                                     annotation: annotation,
-                                    cardWidth: cardWidth,
-                                    cardHeight: cardHeight,
-                                    placeColors: $placeColors,
                                     onDismiss: { dismiss() }
                                 )
                                 .onAppear {
@@ -91,7 +84,7 @@ struct VisiblePlacesPopupView: View {
                                 }
                             }
                         }
-                        .padding(.horizontal, 20)
+                        .padding(.horizontal, 16)
                         .padding(.vertical, 10)
                     }
                 } else {
@@ -117,22 +110,8 @@ struct VisiblePlacesPopupView: View {
             .navigationBarHidden(true)
         }
         .onAppear {
-            // Generate colors for all visible places
-            generateColorsForPlaces()
             // Load first batch of images
             loadNextBatch()
-        }
-    }
-    
-    private func generateColorsForPlaces() {
-        for annotation in visiblePlaces {
-            if placeColors[annotation.id] == nil {
-                placeColors[annotation.id] = Color(
-                    red: Double.random(in: 0.3...0.9),
-                    green: Double.random(in: 0.3...0.9),
-                    blue: Double.random(in: 0.3...0.9)
-                )
-            }
         }
     }
     
@@ -209,14 +188,18 @@ struct VisiblePlacesPopupView: View {
 
 struct VisiblePlaceGridCell: View {
     let annotation: PlaceAnnotation
-    let cardWidth: CGFloat
-    let cardHeight: CGFloat
-    @Binding var placeColors: [String: Color]
     let onDismiss: () -> Void
     
     @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var profile: ProfileViewModel
+    
+    // Generate a consistent color for this place based on its ID
+    private var placeColor: Color {
+        let hash = annotation.id.hashValue
+        let hue = Double(abs(hash) % 360) / 360.0
+        return Color(hue: hue, saturation: 0.6, brightness: 0.8)
+    }
     
     private var firstTikTokThumbnail: String? {
         if let place = detailPlaceViewModel.places[annotation.id],
@@ -224,90 +207,115 @@ struct VisiblePlaceGridCell: View {
            let firstVideo = videos.first {
             return firstVideo.thumbnailURL
         }
-        
         return profile.getFirstTikTokThumbnailURL(for: annotation.id)
     }
     
-    // Generate a consistent color for this place based on its ID
-    private var placeColor: Color {
-        if let color = placeColors[annotation.id] {
-            return color
-        }
-        let hash = annotation.id.hashValue
-        let hue = Double(abs(hash) % 360) / 360.0
-        return Color(hue: hue, saturation: 0.6, brightness: 0.8)
-    }
-    
     var body: some View {
-        Button(action: {
-            // Fetch full place details and navigate
-            Task {
-                await loadPlaceAndNavigate()
-            }
-        }) {
-            VStack(alignment: .leading, spacing: 0) {
-                ZStack(alignment: .bottom) {
-                    if let thumbnailURL = firstTikTokThumbnail,
-                       let url = URL(string: thumbnailURL) {
-                        AsyncImage(url: url) { image in
-                            image
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
-                                .frame(width: cardWidth, height: cardHeight)
-                                .clipped()
-                        } placeholder: {
-                            Rectangle()
-                                .foregroundColor(placeColor)
-                                .frame(width: cardWidth, height: cardHeight)
-                        }
-                    } else if let image = detailPlaceViewModel.placeImages[annotation.id] {
-                        Image(uiImage: image)
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .frame(width: cardWidth, height: cardHeight)
-                            .clipped()
-                    } else {
-                        // Show colored rectangle fallback while batch loading
-                        Rectangle()
-                            .foregroundColor(placeColor)
-                            .frame(width: cardWidth, height: cardHeight)
-                            .onAppear {
-                                profile.ensureTikTokThumbnailCached(for: annotation.id)
-                            }
+        // Base Rectangle provides consistent size - aspectRatio works on Rectangle's intrinsic size
+        Rectangle()
+            .fill(placeColor)
+            .aspectRatio(1, contentMode: .fit)
+            .overlay(
+                GeometryReader { geometry in
+                    ZStack(alignment: .bottom) {
+                        // Photo content overlays the background (bottom layer)
+                        photoContent(size: geometry.size)
+                        
+                        // Gradient overlay for text readability (middle layer)
+                        LinearGradient(
+                            gradient: Gradient(colors: [.clear, .black.opacity(0.7)]),
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                        .frame(height: 60)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                        
+                        // Place info overlay (top layer)
+                        placeInfoOverlay
                     }
-                    
-                    // Gradient overlay
-                    LinearGradient(
-                        gradient: Gradient(colors: [
-                            Color.black.opacity(0.0),
-                            Color.black.opacity(0.1),
-                            Color.black.opacity(0.2),
-                            Color.black.opacity(1.0)
-                        ]),
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                    .frame(width: cardWidth, height: cardHeight)
-                    
-                    // Place name
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(annotation.name)
-                            .font(.headline)
-                            .foregroundColor(.white)
-                            .lineLimit(1)
-                            .multilineTextAlignment(.leading)
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.bottom, 12)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .shadow(color: Color.black.opacity(0.08), radius: 6, x: 0, y: 3)
+            .onTapGesture {
+                Task {
+                    await loadPlaceAndNavigate()
                 }
             }
-            .frame(width: cardWidth, height: cardHeight)
-            .background(Color.white)
-            .clipShape(RoundedRectangle(cornerRadius: 20))
-            .shadow(color: Color.black.opacity(0.2), radius: 5, x: 0, y: 2)
+    }
+    
+    // MARK: - Place Info Overlay
+    
+    private var placeInfoOverlay: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(annotation.name)
+                .font(.headline)
+                .foregroundColor(.white)
+                .lineLimit(1)
+                .multilineTextAlignment(.leading)
         }
-        .buttonStyle(PlainButtonStyle())
+        .padding(.horizontal, 12)
+        .padding(.bottom, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+    
+    // MARK: - Photo Content
+    
+    @ViewBuilder
+    private func photoContent(size: CGSize) -> some View {
+        if let thumbnailURL = firstTikTokThumbnail {
+            tiktokThumbnailView(thumbnailURL: thumbnailURL, size: size)
+        } else if let image = detailPlaceViewModel.placeImages[annotation.id] {
+            cachedImageView(image: image, size: size)
+        } else {
+            placeholderView
+        }
+    }
+    
+    @ViewBuilder
+    private func tiktokThumbnailView(thumbnailURL: String, size: CGSize) -> some View {
+        AsyncImage(url: URL(string: thumbnailURL)) { phase in
+            switch phase {
+            case .success(let image):
+                image
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: size.width, height: size.height)
+                    .clipped()
+            case .failure:
+                Color.clear // Falls back to background placeColor
+            case .empty:
+                loadingPlaceholder
+                    .frame(width: size.width, height: size.height)
+            @unknown default:
+                Color.clear
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private func cachedImageView(image: UIImage, size: CGSize) -> some View {
+        Image(uiImage: image)
+            .resizable()
+            .aspectRatio(contentMode: .fill)
+            .frame(width: size.width, height: size.height)
+            .clipped()
+    }
+    
+    private var placeholderView: some View {
+        Color.clear
+            .onAppear {
+                profile.ensureTikTokThumbnailCached(for: annotation.id)
+            }
+    }
+    
+    private var loadingPlaceholder: some View {
+        Color.gray.opacity(0.3)
+            .overlay(
+                ProgressView()
+                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                    .scaleEffect(0.8)
+            )
     }
     
     private func loadPlaceAndNavigate() async {
