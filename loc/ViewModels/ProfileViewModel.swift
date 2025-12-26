@@ -1043,7 +1043,7 @@ class ProfileViewModel: ObservableObject {
         do {
             // Fetch first page of lightweight reviewed places and total count in parallel
             async let placesTask = userService.fetchUserReviewedPlaces(userId: userId, limit: 8, offset: 0)
-            async let countTask = userService.getNumberReviewedPlaces(forUserId: userId)
+            async let countTask = SupabaseUserService.shared.getNumberReviewedPlaces(forUserId: userId)
             
             let lightweightPlaces = try await placesTask
             let totalCount = (try? await countTask) ?? 0

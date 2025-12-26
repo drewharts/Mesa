@@ -493,11 +493,6 @@ class UserService: ObservableObject {
         return try await supabase.fetchUserReviewedPlaces(userId: userId, limit: limit, offset: offset)
     }
     
-    /// Get user's reviewed places count (distinct places, not total reviews)
-    func getNumberReviewedPlaces(forUserId userId: String) async throws -> Int {
-        return try await supabase.getNumberReviewedPlaces(forUserId: userId)
-    }
-    
     /// Get user's created places count (my places)
     func getNumberCreatedPlaces(forUserId userId: String) async throws -> Int {
         return try await supabase.getNumberCreatedPlaces(forUserId: userId)

@@ -609,7 +609,7 @@ class UserProfileViewModel: ObservableObject {
             // Fetch first page using server-side pagination (includes latest_review_photo!)
             // Also fetch total count in parallel
             async let placesTask = userService.fetchUserReviewedPlaces(userId: userId, limit: reviewsPerPage, offset: 0)
-            async let countTask = userService.getNumberReviewedPlaces(forUserId: userId)
+            async let countTask = SupabaseUserService.shared.getNumberReviewedPlaces(forUserId: userId)
             
             let (places, totalCount) = try await (placesTask, countTask)
             
