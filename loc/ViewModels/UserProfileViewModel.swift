@@ -595,25 +595,20 @@ class UserProfileViewModel: ObservableObject {
     
     /// Load initial reviewed places using server-side pagination (LightweightPlace)
     /// Uses get_user_reviewed_places SQL function which includes latest_review_photo
+    /// Note: Class is @MainActor so no need for MainActor.run wrappers
     private func loadUserReviewedPlacesPaginated(userId: String) async {
-        await MainActor.run {
-            isLoadingReviewedPlaces = true
-        }
+        isLoadingReviewedPlaces = true
         
         defer {
-            Task { @MainActor in
-                isLoadingReviewedPlaces = false
-            }
+            isLoadingReviewedPlaces = false
         }
         
         do {
             // Fetch first page using server-side pagination (includes latest_review_photo!)
             let places = try await userService.fetchUserReviewedPlaces(userId: userId, limit: reviewsPerPage, offset: 0)
             
-            await MainActor.run {
-                lightweightReviewedPlaces = places
-                hasMoreReviewsForUser[userId] = !places.isEmpty && places.count >= reviewsPerPage
-            }
+            lightweightReviewedPlaces = places
+            hasMoreReviewsForUser[userId] = !places.isEmpty && places.count >= reviewsPerPage
             
             print("✅ [UserProfileVM] Loaded \(places.count) reviewed places for user \(userId)")
             
@@ -626,24 +621,19 @@ class UserProfileViewModel: ObservableObject {
             }
         } catch {
             print("❌ [UserProfileVM] Error loading reviewed places: \(error.localizedDescription)")
-            await MainActor.run {
-                hasMoreReviewsForUser[userId] = false
-            }
+            hasMoreReviewsForUser[userId] = false
         }
     }
     
     /// Load more reviewed places (pagination)
+    /// Note: Class is @MainActor so no need for MainActor.run wrappers
     private func loadNextBatchOfReviews(userId: String) async {
         guard !isLoadingMoreReviews, hasMoreReviewsForUser[userId] != false else { return }
         
-        await MainActor.run {
-            isLoadingMoreReviews = true
-        }
+        isLoadingMoreReviews = true
         
         defer {
-            Task { @MainActor in
-                isLoadingMoreReviews = false
-            }
+            isLoadingMoreReviews = false
         }
         
         let offset = lightweightReviewedPlaces.count
@@ -651,13 +641,11 @@ class UserProfileViewModel: ObservableObject {
         do {
             let places = try await userService.fetchUserReviewedPlaces(userId: userId, limit: reviewsPerPage, offset: offset)
             
-            await MainActor.run {
-                // Deduplicate to prevent SwiftUI rendering issues
-                let existingIds = Set(lightweightReviewedPlaces.map { $0.id })
-                let newUniquePlaces = places.filter { !existingIds.contains($0.id) }
-                lightweightReviewedPlaces.append(contentsOf: newUniquePlaces)
-                hasMoreReviewsForUser[userId] = !places.isEmpty && places.count >= reviewsPerPage
-            }
+            // Deduplicate to prevent SwiftUI rendering issues
+            let existingIds = Set(lightweightReviewedPlaces.map { $0.id })
+            let newUniquePlaces = places.filter { !existingIds.contains($0.id) }
+            lightweightReviewedPlaces.append(contentsOf: newUniquePlaces)
+            hasMoreReviewsForUser[userId] = !places.isEmpty && places.count >= reviewsPerPage
             
             print("✅ [UserProfileVM] Loaded \(places.count) more reviewed places (total: \(lightweightReviewedPlaces.count))")
             
@@ -670,9 +658,7 @@ class UserProfileViewModel: ObservableObject {
             }
         } catch {
             print("❌ [UserProfileVM] Error loading more reviewed places: \(error.localizedDescription)")
-            await MainActor.run {
-                hasMoreReviewsForUser[userId] = false
-            }
+            hasMoreReviewsForUser[userId] = false
         }
     }
     
