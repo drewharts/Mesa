@@ -21,8 +21,7 @@ struct UserProfileActivityView: View {
     // MARK: - Computed Properties
     
     private var hasMoreReviews: Bool {
-        guard let userId = UserProfileVM.selectedUser?.id else { return false }
-        return UserProfileVM.hasMoreReviews(for: userId)
+        UserProfileVM.hasMoreReviews
     }
     
     private var reviewedPlaces: [LightweightPlace] {
@@ -38,11 +37,15 @@ struct UserProfileActivityView: View {
         }
         .padding(.bottom, 20)
         .onAppear {
-            UserProfileVM.loadUserReviewedPlacesWithPagination()
+            Task {
+                await UserProfileVM.loadUserReviewedPlacesWithPagination()
+            }
         }
         .onChange(of: UserProfileVM.selectedUser?.id) {
             UserProfileVM.resetReviewedPlacesLoadingState()
-            UserProfileVM.loadUserReviewedPlacesWithPagination()
+            Task {
+                await UserProfileVM.loadUserReviewedPlacesWithPagination()
+            }
         }
     }
     
@@ -135,6 +138,8 @@ struct UserProfileActivityView: View {
               hasMoreReviews,
               !UserProfileVM.isLoadingMoreReviews else { return }
         
-        UserProfileVM.loadMoreReviews()
+        Task {
+            await UserProfileVM.loadMoreReviews()
+        }
     }
 }
