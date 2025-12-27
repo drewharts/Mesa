@@ -816,8 +816,9 @@ class SupabasePlaceService: ObservableObject {
     // MARK: - Community Places (places saved by users outside your network)
     
     /// Fetch community places in viewport - places saved by users you don't follow
-    /// These are displayed as small white dots on the map
-    func fetchCommunityPlacesInViewport(northLat: Double, southLat: Double, eastLng: Double, westLng: Double, userId: String, limit: Int = 500) async throws -> [CommunityPlaceMarker] {
+    /// These are displayed as small emoji markers on the map
+    /// Uses grid-based clustering for O(n) performance (same as Google Maps/Mapbox)
+    func fetchCommunityPlacesInViewport(northLat: Double, southLat: Double, eastLng: Double, westLng: Double, userId: String) async throws -> [CommunityPlaceMarker] {
         do {
             struct CommunityViewportParams: Encodable {
                 let p_user_id: String
@@ -825,7 +826,6 @@ class SupabasePlaceService: ObservableObject {
                 let p_min_lat: Double
                 let p_max_lon: Double
                 let p_max_lat: Double
-                let p_limit: Int
             }
             
             let params = CommunityViewportParams(
@@ -833,8 +833,7 @@ class SupabasePlaceService: ObservableObject {
                 p_min_lon: westLng,
                 p_min_lat: southLat,
                 p_max_lon: eastLng,
-                p_max_lat: northLat,
-                p_limit: limit
+                p_max_lat: northLat
             )
             
             let response: [CommunityPlaceMarker] = try await supabase.client

@@ -240,8 +240,8 @@ class PlaceService: ObservableObject {
     }
     
     /// Fetch community places in viewport - places saved by users outside your network
-    /// Returns lightweight markers for display as small white dots on the map
-    func fetchCommunityPlacesInViewport(northLat: Double, southLat: Double, eastLng: Double, westLng: Double, limit: Int = 500) async throws -> [CommunityPlaceMarker] {
+    /// Returns lightweight emoji markers using grid-based clustering for O(n) performance
+    func fetchCommunityPlacesInViewport(northLat: Double, southLat: Double, eastLng: Double, westLng: Double) async throws -> [CommunityPlaceMarker] {
         guard let authUserId = await SupabaseAuthService.shared.currentUserId else {
             return []
         }
@@ -261,8 +261,7 @@ class PlaceService: ObservableObject {
             southLat: southLat,
             eastLng: eastLng,
             westLng: westLng,
-            userId: profileUserId,
-            limit: limit
+            userId: profileUserId
         )
     }
     
