@@ -609,6 +609,18 @@ class SupabasePlaceService: ObservableObject {
         return imageMap
     }
     
+    // MARK: - Save Count
+    
+    /// Fetch total save count for a place (all users, all save sources)
+    /// Returns the number of unique users who have saved this place
+    func fetchTotalSaveCount(for placeId: String) async throws -> Int {
+        let count: Int = try await supabase.client
+            .rpc("get_place_total_save_count", params: ["p_place_id": placeId])
+            .execute()
+            .value
+        return count
+    }
+    
     // MARK: - Place Creation
     
     /// Test method to verify Supabase connection
