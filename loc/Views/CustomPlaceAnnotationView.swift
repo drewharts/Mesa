@@ -18,7 +18,7 @@ struct CustomPlaceAnnotationView: View {
                 Image(uiImage: annotationImage)
                     .resizable()
                     .scaledToFit()
-                    .frame(width: 80, height: 40)
+                    .frame(width: 60, height: 30)
                     .shadow(
                         color: isSelected ? Color.blue.opacity(0.8) : Color.clear,
                         radius: isSelected ? 16 : 0,

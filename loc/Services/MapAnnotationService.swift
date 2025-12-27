@@ -116,14 +116,14 @@ class MapAnnotationService: ObservableObject {
 
     private func combinedCircularImage(image1: UIImage?, image2: UIImage? = nil, image3: UIImage? = nil) -> UIImage {
         // Exact copy of the method from ProfileViewModel
-        let totalSize = CGSize(width: 80, height: 40)
-        let singleCircleSize = CGSize(width: 40, height: 40)
+        let totalSize = CGSize(width: 60, height: 30)
+        let singleCircleSize = CGSize(width: 30, height: 30)
         let renderer = UIGraphicsImageRenderer(size: totalSize)
 
         return renderer.image { context in
             let firstRect = CGRect(x: 0, y: 0, width: singleCircleSize.width, height: singleCircleSize.height)
-            let secondRect = CGRect(x: 15, y: 0, width: singleCircleSize.width, height: singleCircleSize.height)
-            let thirdRect = CGRect(x: 30, y: 0, width: singleCircleSize.width, height: singleCircleSize.height)
+            let secondRect = CGRect(x: 11, y: 0, width: singleCircleSize.width, height: singleCircleSize.height)
+            let thirdRect = CGRect(x: 22, y: 0, width: singleCircleSize.width, height: singleCircleSize.height)
 
             func drawCircularImage(_ image: UIImage?, in rect: CGRect) {
                 guard let image = image else { return }
