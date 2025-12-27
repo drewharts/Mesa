@@ -208,7 +208,7 @@ class DetailPlaceViewModel: ObservableObject {
         // If no place photoUrls, try to get images from reviews (for reviewed places)
         // Get the current user ID
         Task { @MainActor in
-            guard let currentUserId = await SupabaseAuthService.shared.currentUserId else {
+            guard let currentUserId = SupabaseAuthService.shared.currentUserId else {
                 print("Error: Current user ID is not available")
                 self.placeImages[placeId] = UIImage()
                 self.placeImageLoadingStates[placeId] = false

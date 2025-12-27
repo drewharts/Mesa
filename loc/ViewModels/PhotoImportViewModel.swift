@@ -210,7 +210,7 @@ class PhotoImportViewModel: ObservableObject {
     }
     
     private func saveSelectedPlaceToFirestore(_ nearbyPlace: NearbyPlaceFeature) async {
-        guard let currentUserId = await SupabaseAuthService.shared.currentUserId else {
+        guard let currentUserId = SupabaseAuthService.shared.currentUserId else {
             print("❌ No authenticated user found")
             return
         }

@@ -53,7 +53,7 @@ struct VisiblePlacesPopupView: View {
             .navigationBarHidden(true)
         }
         .onAppear(perform: configureViewModel)
-        .onChange(of: viewModel.selectedFilter) { _ in
+        .onChange(of: viewModel.selectedFilter) {
             viewModel.resetImageLoading()
         }
     }
@@ -75,15 +75,15 @@ struct VisiblePlacesPopupView: View {
     // MARK: - Header Section
     
     private var headerSection: some View {
-        HStack {
-            Spacer()
-            Text("Places in View")
-                .font(.headline)
-                .fontWeight(.semibold)
-                .frame(maxWidth: .infinity, alignment: .center)
-            Spacer()
-        }
-        .padding(.horizontal, 20)
+                HStack {
+                    Spacer()
+                    Text("Places in View")
+                        .font(.headline)
+                        .fontWeight(.semibold)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                    Spacer()
+                }
+                .padding(.horizontal, 20)
         .padding(.top, 24)
     }
     
@@ -190,9 +190,9 @@ struct VisiblePlacesPopupView: View {
             do {
                 let fullPlace = try await viewModel.loadPlaceDetails(for: item)
                 
-                await MainActor.run {
-                    selectedPlaceVM.selectPlaceAndFetchDetails(fullPlace, shouldAnimateMap: true)
-                    selectedPlaceVM.isDetailSheetPresented = true
+            await MainActor.run {
+                selectedPlaceVM.selectPlaceAndFetchDetails(fullPlace, shouldAnimateMap: true)
+                selectedPlaceVM.isDetailSheetPresented = true
                     dismiss()
                 }
             } catch {

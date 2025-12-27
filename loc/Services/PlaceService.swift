@@ -162,7 +162,7 @@ class PlaceService: ObservableObject {
     
     func fetchPlacesInViewport(viewport: (minLat: Double, maxLat: Double, minLng: Double, maxLng: Double), completion: @escaping ([PlaceAnnotation]?, Error?) -> Void) {
         Task { @MainActor in
-            guard let authUserId = await SupabaseAuthService.shared.currentUserId else {
+            guard let authUserId = SupabaseAuthService.shared.currentUserId else {
                 print("⚠️ [PlaceService] No auth userId available for viewport query")
                 completion([], nil)
                 return
