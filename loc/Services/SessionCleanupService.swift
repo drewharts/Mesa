@@ -61,6 +61,7 @@ final class SessionCleanupService {
         clearViewModelCaches()
         clearImageCaches()
         clearMetadataCaches()
+        clearUserActivityCaches()
         
         print("✅ [SessionCleanupService] All session data cleared")
     }
@@ -90,6 +91,11 @@ final class SessionCleanupService {
     private func clearMetadataCaches() {
         // Clear TikTok metadata cache
         TikTokMetadataCache.shared.clearCache()
+    }
+    
+    private func clearUserActivityCaches() {
+        // Clear recent search history (persisted in UserDefaults)
+        RecentSearchesService.shared.clearAll()
     }
 }
 
