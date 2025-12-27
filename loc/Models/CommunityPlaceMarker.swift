@@ -39,23 +39,41 @@ struct PlaceTypeEmoji {
     static func emoji(for placeType: String) -> String {
         let type = placeType.lowercased()
         
-        // Food & Dining
-        if type.contains("restaurant") || type.contains("food") { return "🍽️" }
-        if type.contains("coffee") || type.contains("cafe") { return "☕" }
-        if type.contains("tea") { return "🍵" }
-        if type.contains("bar") || type.contains("pub") || type.contains("brewery") { return "🍺" }
+        // Food & Dining - specific types first (order matters!)
         if type.contains("pizza") { return "🍕" }
         if type.contains("burger") { return "🍔" }
-        if type.contains("sushi") || type.contains("japanese") { return "🍣" }
-        if type.contains("mexican") || type.contains("taco") { return "🌮" }
-        if type.contains("chinese") || type.contains("asian") { return "🥡" }
-        if type.contains("italian") || type.contains("pasta") { return "🍝" }
-        if type.contains("indian") { return "🍛" }
+        if type.contains("sushi") { return "🍣" }
+        if type.contains("ramen") || type.contains("noodle") { return "🍜" }
+        if type.contains("poke") { return "🐟" }
+        if type.contains("taco") || type.contains("mexican") || type.contains("burrito") { return "🌮" }
+        if type.contains("dim sum") || type.contains("dumpling") { return "🥟" }
+        if type.contains("korean") { return "🍖" }
+        if type.contains("chinese") { return "🥡" }
+        if type.contains("japanese") { return "🍣" }
         if type.contains("thai") || type.contains("vietnamese") { return "🍜" }
-        if type.contains("bakery") || type.contains("dessert") { return "🧁" }
-        if type.contains("ice cream") { return "🍦" }
+        if type.contains("indian") || type.contains("curry") { return "🍛" }
+        if type.contains("italian") || type.contains("pasta") { return "🍝" }
+        if type.contains("mediterranean") || type.contains("greek") { return "🥙" }
         if type.contains("steakhouse") || type.contains("bbq") || type.contains("barbecue") { return "🥩" }
-        if type.contains("seafood") { return "🦞" }
+        if type.contains("seafood") || type.contains("fish") || type.contains("oyster") { return "🦞" }
+        if type.contains("wing") || type.contains("chicken") { return "🍗" }
+        if type.contains("sandwich") || type.contains("deli") || type.contains("sub") { return "🥪" }
+        if type.contains("salad") || type.contains("acai") { return "🥗" }
+        if type.contains("soup") || type.contains("pho") { return "🍲" }
+        if type.contains("hot dog") { return "🌭" }
+        if type.contains("donut") || type.contains("doughnut") { return "🍩" }
+        if type.contains("brunch") || type.contains("breakfast") || type.contains("pancake") || type.contains("waffle") { return "🥞" }
+        if type.contains("bakery") || type.contains("pastry") { return "🧁" }
+        if type.contains("dessert") || type.contains("sweet") { return "🍰" }
+        if type.contains("ice cream") || type.contains("gelato") || type.contains("frozen yogurt") { return "🍦" }
+        if type.contains("juice") || type.contains("smoothie") { return "🧃" }
+        if type.contains("coffee") || type.contains("cafe") { return "☕" }
+        if type.contains("tea") { return "🍵" }
+        if type.contains("wine") || type.contains("winery") { return "🍷" }
+        if type.contains("cocktail") { return "🍸" }
+        if type.contains("bar") || type.contains("pub") || type.contains("brewery") || type.contains("beer") { return "🍺" }
+        if type.contains("asian") { return "🥢" }
+        if type.contains("restaurant") || type.contains("food") || type.contains("dining") { return "🍽️" }
         
         // Parks & Nature
         if type.contains("park") || type.contains("garden") { return "🌳" }
