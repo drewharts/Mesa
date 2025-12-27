@@ -101,8 +101,6 @@ class DataManager: ObservableObject {
     
     /// ✅ NEW: Load only places in the current viewport (much faster!)
     private func loadViewportPlacesOnly(userId: String) async {
-        let startTime = Date()
-        
         // Get the current map region from LocationManager
         guard let userLocation = locationManager.currentLocation?.coordinate else {
             print("⚠️ [DataManager] No location available, skipping viewport loading")
@@ -120,7 +118,8 @@ class DataManager: ObservableObject {
             let bounds = getViewportBounds(from: viewportRegion)
             
             // Load places in viewport (much faster than all places!)
-            let viewportPlaces = try await placeService.fetchPlacesInViewportWithUserId(
+            // Result is used to update internal caches, then calculateMapAnnotations() reads from cache
+            _ = try await placeService.fetchPlacesInViewportWithUserId(
                 northLat: bounds.northLat,
                 southLat: bounds.southLat,
                 eastLng: bounds.eastLng,
