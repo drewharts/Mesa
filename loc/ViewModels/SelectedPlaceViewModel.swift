@@ -595,10 +595,8 @@ class SelectedPlaceViewModel: ObservableObject {
         self.selectPlaceAndFetchDetails(place, shouldAnimateMap: true)
         self.isDetailSheetPresented = true
         
-        // Then dismiss the profile - place detail will appear smoothly as profile animates away
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            dismissNavigation()
-        }
+        // Dismiss immediately - place detail is already set up and will appear as profile animates away
+        dismissNavigation()
     }
     
     // MARK: - Logout Cleanup
