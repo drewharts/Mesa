@@ -559,6 +559,56 @@ class SupabasePlaceService: ObservableObject {
         return imageMap
     }
     
+    /// Batch fetch place images with fallback to place's own thumbnail/photo_urls
+    /// Useful for community places that may not have review photos
+    func fetchPlaceImagesWithFallback(for placeIds: [String]) async throws -> [String: String] {
+        guard !placeIds.isEmpty else {
+            return [:]
+        }
+        
+        // First try review photos
+        var imageMap = try await fetchPlaceImages(for: placeIds)
+        
+        // Find places that still need images
+        let missingPlaceIds = placeIds.filter { imageMap[$0] == nil }
+        
+        if !missingPlaceIds.isEmpty {
+            // Fetch place records to get thumbnail_url or photo_urls
+            let fallbackImages = try await fetchPlaceThumbnails(for: missingPlaceIds)
+            imageMap.merge(fallbackImages) { existing, _ in existing }
+        }
+        
+        return imageMap
+    }
+    
+    /// Fetch thumbnail_url or first photo_url for places
+    private func fetchPlaceThumbnails(for placeIds: [String]) async throws -> [String: String] {
+        struct PlaceImageData: Decodable {
+            let id: String
+            let thumbnail_url: String?
+            let photo_urls: [String]?
+        }
+        
+        let records: [PlaceImageData] = try await supabase.client
+            .from("places")
+            .select("id, thumbnail_url, photo_urls")
+            .in("id", values: placeIds)
+            .execute()
+            .value
+        
+        var imageMap: [String: String] = [:]
+        for record in records {
+            // Prefer thumbnail_url, fallback to first photo_url
+            if let thumbnail = record.thumbnail_url, !thumbnail.isEmpty {
+                imageMap[record.id] = thumbnail
+            } else if let photos = record.photo_urls, let firstPhoto = photos.first, !firstPhoto.isEmpty {
+                imageMap[record.id] = firstPhoto
+            }
+        }
+        
+        return imageMap
+    }
+    
     // MARK: - Place Creation
     
     /// Test method to verify Supabase connection

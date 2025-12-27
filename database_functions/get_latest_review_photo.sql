@@ -51,6 +51,7 @@ END;
 $function$;
 
 -- Overload 2: Array of place_ids
+-- Fixed: Renamed internal column aliases to avoid ambiguity with RETURN TABLE columns
 CREATE OR REPLACE FUNCTION public.get_latest_review_photo(p_place_ids text[])
 RETURNS TABLE(place_id text, image_url text)
 LANGUAGE plpgsql
@@ -60,8 +61,8 @@ BEGIN
   WITH review_photos AS (
     -- Get the latest review photo for each place_id from reviews table
     SELECT 
-      r.place_id, 
-      image_elem AS image_url, 
+      r.place_id AS pid, 
+      image_elem AS img_url, 
       r.timestamp AS photo_timestamp
     FROM reviews r
     CROSS JOIN LATERAL unnest(r.images) AS image_elem
@@ -73,8 +74,8 @@ BEGIN
   external_review_photos AS (
     -- Get images from external_reviews.media JSONB array
     SELECT 
-      er.place_id,
-      (media_item->>'imageUrl')::text AS image_url,
+      er.place_id AS pid,
+      (media_item->>'imageUrl')::text AS img_url,
       er.review_iso_date AS photo_timestamp
     FROM external_reviews er
     CROSS JOIN LATERAL jsonb_array_elements(er.media) AS media_item
@@ -88,19 +89,19 @@ BEGIN
   ),
   all_photos AS (
     -- Combine both sources, preferring review photos (they come first in UNION)
-    SELECT rp.place_id, rp.image_url, rp.photo_timestamp FROM review_photos rp
+    SELECT rp.pid, rp.img_url, rp.photo_timestamp FROM review_photos rp
     UNION ALL
-    SELECT erp.place_id, erp.image_url, erp.photo_timestamp FROM external_review_photos erp
+    SELECT erp.pid, erp.img_url, erp.photo_timestamp FROM external_review_photos erp
   ),
   latest_photo AS (
     -- Select the most recent image per place_id (preferring review photos when timestamps are equal)
-    SELECT DISTINCT ON (ap.place_id) ap.place_id, ap.image_url
+    SELECT DISTINCT ON (ap.pid) ap.pid, ap.img_url
     FROM all_photos ap
-    ORDER BY ap.place_id, ap.photo_timestamp DESC
+    ORDER BY ap.pid, ap.photo_timestamp DESC
   )
   -- Return results for all input place_ids, including NULL for those with no images
-  SELECT p.place_id, lp.image_url
-  FROM unnest(p_place_ids) AS p(place_id)
-  LEFT JOIN latest_photo lp ON p.place_id = lp.place_id;
+  SELECT input_pid AS place_id, lp.img_url AS image_url
+  FROM unnest(p_place_ids) AS input_pid
+  LEFT JOIN latest_photo lp ON input_pid = lp.pid;
 END;
 $function$;

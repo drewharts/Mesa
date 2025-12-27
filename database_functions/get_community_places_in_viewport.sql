@@ -8,6 +8,10 @@
 -- Counts saves from ALL sources: favorites, place_list_items, my_places, 
 -- external_places (TikTok), and reviews
 -- 
+-- FIX: Use FIRST category (most specific) instead of LAST
+-- Google Places API often puts "establishment" and "point_of_interest" at the end
+-- The first category is typically the most specific/useful
+-- 
 -- Uses enterprise-grade grid-based clustering (same as Google Maps/Mapbox)
 -- for O(n) performance instead of O(n²) distance-based filtering
 -- ============================================================================
@@ -105,8 +109,18 @@ BEGIN
             ST_Y(p.location::geometry) AS lat,
             ST_X(p.location::geometry) AS lon,
             cs.save_count AS saves,
-            -- Use LAST category (most specific) - Google orders general → specific
-            COALESCE(p.categories[array_length(p.categories, 1)], 'Place') AS ptype,
+            -- Use FIRST category (most specific) - Google puts generic types last
+            -- If first category is generic, fall back through the array
+            COALESCE(
+                -- Try first non-generic category
+                (SELECT cat FROM unnest(p.categories) AS cat
+                 WHERE LOWER(cat) NOT IN ('establishment', 'point_of_interest', 'food', 'store', 'place', 'health')
+                 LIMIT 1),
+                -- Fallback to first category if all are generic
+                p.categories[1],
+                -- Ultimate fallback
+                'Place'
+            ) AS ptype,
             -- Snap to grid for clustering (O(n) operation)
             ST_SnapToGrid(p.location::geometry, v_grid_size_lon, v_grid_size_lat) AS grid_cell
         FROM community_saves cs

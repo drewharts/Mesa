@@ -221,7 +221,7 @@ struct PlaceTypeEmoji {
         if type.contains("hvac") || type.contains("air condition") || type.contains("heating") { return "❄️" }
         
         // Transport & Travel
-        if type.contains("hotel") || type.contains("motel") || type.contains("inn") { return "🏨" }
+        if type.contains("hotel") || type.contains("motel") || type.contains("inn") || type.contains("lodging") { return "🏨" }
         if type.contains("resort") { return "🏝️" }
         if type.contains("hostel") { return "🛏️" }
         if type.contains("airbnb") || type.contains("vacation rental") { return "🏠" }
