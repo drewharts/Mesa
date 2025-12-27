@@ -284,7 +284,22 @@ class MapViewModel: ObservableObject {
                 }
                 
                 self.viewportAnnotations = annotations
-                self.communityMarkers = community
+                
+                // Filter out community markers that overlap with friends annotations
+                // This prevents duplicate markers on the map (O(n+m) with Set lookup)
+                let friendsPlaceIds = Set(annotations.map { $0.id })
+                let filteredCommunity = community.filter { !friendsPlaceIds.contains($0.id) }
+                
+                // Debug: Log any duplicates that were filtered
+                let duplicateCount = community.count - filteredCommunity.count
+                if duplicateCount > 0 {
+                    let duplicateIds = community.filter { friendsPlaceIds.contains($0.id) }.map { $0.id }
+                    print("🔍 [MapViewModel] Filtered \(duplicateCount) duplicate community markers: \(duplicateIds)")
+                }
+                print("🔍 [MapViewModel] Friends: \(annotations.count), Community before: \(community.count), after: \(filteredCommunity.count)")
+                
+                self.communityMarkers = filteredCommunity
+                
                 self.lastLoadedRegion = region
                 
                 // Generate annotation images for new annotations

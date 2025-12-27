@@ -59,18 +59,12 @@ struct CommunityPlaceGridCell: View {
             startPoint: .top,
             endPoint: .bottom
         )
-        .frame(height: 70)
+        .frame(height: 60)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
     }
     
     private var placeInfoOverlay: some View {
         VStack(alignment: .leading, spacing: 4) {
-            // Emoji badge for place type
-            if let emoji = item.emoji {
-                Text(emoji)
-                    .font(.system(size: 20))
-            }
-            
             // Place name
             Text(item.name)
                 .font(.headline)
