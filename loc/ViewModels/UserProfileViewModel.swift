@@ -78,8 +78,9 @@ class UserProfileViewModel: ObservableObject {
         self.selectedUser = user
         self.isUserDetailPresented = true
         
-        // Reset all state for new user
+        // Reset ALL state for new user (Single Responsibility: one place for all resets)
         resetListPaginationState()
+        resetReviewedPlacesLoadingState()
         totalPlacesCount = 0
         
         self.checkIfFollowing(currentUserId: currentUserId)
