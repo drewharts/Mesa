@@ -14,57 +14,51 @@ struct PlaceInfoSection: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Stats Row: Rating + Save Count
-            HStack(spacing: 16) {
-                // External Rating (Google/Mapbox)
-                if let rating = place.rating, rating > 0 {
-                    HStack(spacing: 8) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "star.fill")
-                                .font(.subheadline)
-                                .foregroundColor(.yellow)
-                            
-                            Text(String(format: "%.1f", rating))
-                                .font(.subheadline)
-                                .fontWeight(.semibold)
-                                .foregroundColor(.black)
-                            
-                            if let count = place.userRatingsTotal, count > 0 {
-                                Text("(\(count.formatted()) reviews)")
-                                    .font(.subheadline)
-                                    .foregroundColor(.gray)
-                            }
-                        }
+            // Rating Row (Google/Mapbox)
+            if let rating = place.rating, rating > 0 {
+                HStack(spacing: 8) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "star.fill")
+                            .font(.subheadline)
+                            .foregroundColor(.yellow)
                         
-                        // Google logo
-                        Image("GoogleLogo")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(height: 16)
+                        Text(String(format: "%.1f", rating))
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.black)
+                        
+                        if let count = place.userRatingsTotal, count > 0 {
+                            Text("(\(count.formatted()) reviews)")
+                                .font(.subheadline)
+                                .foregroundColor(.gray)
+                        }
                     }
+                    
+                    // Google logo
+                    Image("GoogleLogo")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(height: 16)
                 }
-                
-                // Divider if we have both rating and saves
-                if place.rating != nil && place.rating! > 0 && totalSaveCount > 0 {
-                    Text("·")
+                .padding(.bottom, 4)
+            }
+            
+            // Save Count Row (below rating)
+            if totalSaveCount > 0 {
+                HStack(spacing: 4) {
+                    Image(systemName: "bookmark.fill")
+                        .font(.subheadline)
+                        .foregroundColor(.gray)
+                    
+                    Text("\(totalSaveCount) save\(totalSaveCount == 1 ? "" : "s")")
                         .font(.subheadline)
                         .foregroundColor(.gray)
                 }
-                
-                // Save Count
-                if totalSaveCount > 0 {
-                    HStack(spacing: 4) {
-                        Image(systemName: "bookmark.fill")
-                            .font(.subheadline)
-                            .foregroundColor(.blue)
-                        
-                        Text("\(totalSaveCount) save\(totalSaveCount == 1 ? "" : "s")")
-                            .font(.subheadline)
-                            .foregroundColor(.gray)
-                    }
-                }
+                .padding(.bottom, 8)
+            } else if place.rating != nil && place.rating! > 0 {
+                // Add spacing if we had rating but no saves
+                Spacer().frame(height: 4)
             }
-            .padding(.bottom, 8)
             
             Text(place.description ?? "No description available")
                 .font(.footnote)
