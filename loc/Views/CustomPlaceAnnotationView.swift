@@ -19,26 +19,39 @@ struct CustomPlaceAnnotationView: View {
                     .resizable()
                     .scaledToFit()
                     .frame(width: 60, height: 30)
-                    .shadow(
-                        color: isSelected ? Color.blue.opacity(0.8) : Color.clear,
-                        radius: isSelected ? 16 : 0,
-                        x: 0,
-                        y: 0
+                    .background(
+                        // Pulsing ring effect when selected
+                        Circle()
+                            .stroke(Color.blue, lineWidth: isSelected ? 3 : 0)
+                            .frame(width: isSelected ? 80 : 0, height: isSelected ? 80 : 0)
+                            .opacity(isSelected ? 0.6 : 0)
                     )
-                    .scaleEffect(isSelected ? 1.15 : 1.0)
+                    .shadow(
+                        color: isSelected ? Color.blue.opacity(0.9) : Color.black.opacity(0.3),
+                        radius: isSelected ? 20 : 4,
+                        x: 0,
+                        y: isSelected ? 0 : 2
+                    )
+                    .scaleEffect(isSelected ? 1.5 : 1.0)
+                    .zIndex(isSelected ? 100 : 0)
                     .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isSelected)
             } else {
                 // Fallback to pin icon if no image
                 Image(systemName: "mappin.circle.fill")
-                    .font(.title)
+                    .font(.system(size: isSelected ? 44 : 28))
                     .foregroundColor(isSelected ? .blue : .red)
-                    .shadow(
-                        color: isSelected ? Color.blue.opacity(0.8) : Color.clear,
-                        radius: isSelected ? 16 : 0,
-                        x: 0,
-                        y: 0
+                    .background(
+                        Circle()
+                            .stroke(Color.blue, lineWidth: isSelected ? 3 : 0)
+                            .frame(width: isSelected ? 60 : 0, height: isSelected ? 60 : 0)
+                            .opacity(isSelected ? 0.6 : 0)
                     )
-                    .scaleEffect(isSelected ? 1.2 : 1.0)
+                    .shadow(
+                        color: isSelected ? Color.blue.opacity(0.9) : Color.black.opacity(0.3),
+                        radius: isSelected ? 16 : 4,
+                        x: 0,
+                        y: isSelected ? 0 : 2
+                    )
                     .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isSelected)
             }
         }

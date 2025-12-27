@@ -105,9 +105,18 @@ struct MapView: View {
         }()
         
         return Text(marker.emoji)
-            .font(.system(size: fontSize))
+            .font(.system(size: isSelected ? fontSize * 1.8 : fontSize))
+            .padding(isSelected ? 8 : 0)
+            .background(
+                Circle()
+                    .fill(Color.white.opacity(isSelected ? 0.95 : 0))
+                    .shadow(
+                        color: isSelected ? Color.blue.opacity(0.8) : Color.clear,
+                        radius: isSelected ? 12 : 0
+                    )
+            )
             .shadow(color: .black.opacity(0.3), radius: 2, x: 0, y: 1)
-            .scaleEffect(isSelected ? 1.3 : 1.0)
+            .zIndex(isSelected ? 100 : 0)
             .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isSelected)
             .onTapGesture {
                 handleCommunityMarkerTap(marker)
