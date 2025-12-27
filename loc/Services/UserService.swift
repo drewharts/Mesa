@@ -91,37 +91,37 @@ class UserService: ObservableObject {
 
     func fetchUser(userId: String, completion: @escaping (User?, Error?) -> Void) {
         Task { @MainActor in
-            await supabase.fetchUser(userId: userId, completion: completion)
+            supabase.fetchUser(userId: userId, completion: completion)
         }
     }
 
     func fetchFriends(userId: String, completion: @escaping ([String]?, Error?) -> Void) {
         Task { @MainActor in
-            await supabase.fetchFriends(userId: userId, completion: completion)
+            supabase.fetchFriends(userId: userId, completion: completion)
             }
     }
 
     func fetchProfiles(for userIds: [String], completion: @escaping ([User]?, Error?) -> Void) {
         Task { @MainActor in
-            await supabase.fetchProfiles(for: userIds, completion: completion)
+            supabase.fetchProfiles(for: userIds, completion: completion)
         }
     }
 
     func fetchFollowingProfiles(for userId: String, completion: @escaping ([User]?, Error?) -> Void) {
         Task { @MainActor in
-            await supabase.fetchFollowingProfiles(for: userId, completion: completion)
+            supabase.fetchFollowingProfiles(for: userId, completion: completion)
         }
     }
     
     func updateFCMToken(userId: String, token: String, completion: @escaping (Error?) -> Void) {
         Task { @MainActor in
-            await supabase.updateFCMToken(userId: userId, token: token, completion: completion)
+            supabase.updateFCMToken(userId: userId, token: token, completion: completion)
         }
     }
     
     func deleteAccount(userId: String, completion: @escaping (Error?) -> Void) {
         Task { @MainActor in
-            await supabase.deleteAccount(userId: userId, completion: completion)
+            supabase.deleteAccount(userId: userId, completion: completion)
         }
     }
     
@@ -573,7 +573,7 @@ class UserService: ObservableObject {
     
     func searchUsers(query: String, completion: @escaping ([User]?, Error?) -> Void) {
         Task { @MainActor in
-            await supabase.searchUsers(query: query, completion: completion)
+            supabase.searchUsers(query: query, completion: completion)
         }
     }
     
