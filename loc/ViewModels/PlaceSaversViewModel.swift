@@ -114,16 +114,6 @@ class PlaceSaversViewModel: ObservableObject {
         displayableSaverCount > 0
     }
     
-    /// Whether there are savers OTHER than just the current user
-    /// Used to determine if we should show total saves fallback
-    /// Returns false if current user is the only saver (no social proof to show)
-    /// Requires at least 2 saves to be meaningful social proof
-    var hasOtherSavers: Bool {
-        // Only show if there are at least 2 saves - "1 save" is not useful social proof
-        // (either it's just you, or one stranger which isn't compelling)
-        return totalGlobalSaveCount > 1
-    }
-    
     /// Get first N saver IDs for profile circle display (excluding current user)
     func saverIdsForDisplay(limit: Int = 3) -> [String] {
         return Array(displayableSavers.prefix(limit).map { $0.id })

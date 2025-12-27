@@ -162,20 +162,10 @@ struct PlaceDetailTabsView: View {
             
             TravelTimeSelector(viewModel: viewModel.travelTimeViewModel)
             
-            // Show friend savers OR total saves fallback (never show if only you saved)
             if viewModel.showSaversIndicator {
-                // Friends have saved this place - show their faces + total count
                 SavedByIndicator(
                     savers: viewModel.placeSaversViewModel.saversForDisplay(limit: 3),
                     additionalCount: viewModel.placeSaversViewModel.additionalSaverCount,
-                    totalSaves: viewModel.placeSaversViewModel.totalGlobalSaveCount,
-                    onTap: { showingSaversSheet = true }
-                )
-            } else if viewModel.placeSaversViewModel.hasOtherSavers {
-                // No friends saved, but others have - show total saves as social proof
-                // (Don't show if you're the only saver - no social proof value)
-                TotalSavesIndicator(
-                    count: viewModel.placeSaversViewModel.totalGlobalSaveCount,
                     onTap: { showingSaversSheet = true }
                 )
             }
@@ -331,12 +321,11 @@ private struct SavedByIndicator: View {
     // MARK: - Pure Data Parameters (No ViewModel!)
     let savers: [ProfileData]
     let additionalCount: Int
-    let totalSaves: Int
     let onTap: () -> Void
     
     var body: some View {
         Button(action: onTap) {
-            HStack(spacing: 6) {
+            HStack(spacing: 4) {
                 // Overlapping profile circles in their own container
                 HStack(spacing: -8) {
                     ForEach(savers, id: \.id) { saver in
@@ -365,10 +354,10 @@ private struct SavedByIndicator: View {
                     }
                 }
                 
-                // Show total saves count only if > 1 (1 save is not useful social proof)
-                if totalSaves > 1 {
-                    Text("\(totalSaves)")
-                        .font(.caption)
+                // +X indicator outside the overlapping circles
+                if additionalCount > 0 {
+                    Text("+\(additionalCount)")
+                        .font(.caption2)
                         .fontWeight(.medium)
                         .foregroundColor(.gray)
                 }
@@ -389,29 +378,6 @@ private struct SavedByIndicator: View {
             .overlay(
                 Circle().stroke(Color.white, lineWidth: 2)
             )
-    }
-}
-
-// MARK: - Total Saves Indicator (Fallback when no friends saved)
-
-private struct TotalSavesIndicator: View {
-    let count: Int
-    let onTap: () -> Void
-    
-    var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: 4) {
-                Image(systemName: "bookmark.fill")
-                    .font(.caption)
-                    .foregroundColor(.gray)
-                
-                Text("\(count)")
-                    .font(.caption)
-                    .fontWeight(.medium)
-                    .foregroundColor(.gray)
-            }
-        }
-        .buttonStyle(.plain)
     }
 }
 
