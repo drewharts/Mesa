@@ -42,6 +42,7 @@ struct PlaceTypeEmoji {
         // Food & Dining
         if type.contains("restaurant") || type.contains("food") { return "🍽️" }
         if type.contains("coffee") || type.contains("cafe") { return "☕" }
+        if type.contains("tea") { return "🍵" }
         if type.contains("bar") || type.contains("pub") || type.contains("brewery") { return "🍺" }
         if type.contains("pizza") { return "🍕" }
         if type.contains("burger") { return "🍔" }
