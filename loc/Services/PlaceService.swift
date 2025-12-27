@@ -24,7 +24,7 @@ class PlaceService: ObservableObject {
 
     func findPlace(mapboxId: String, completion: @escaping (DetailPlace?, Error?) -> Void) {
         Task { @MainActor in
-            await supabase.findPlace(mapboxId: mapboxId, completion: completion)
+            supabase.findPlace(mapboxId: mapboxId, completion: completion)
         }
     }
     
