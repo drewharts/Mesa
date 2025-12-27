@@ -680,7 +680,10 @@ class SupabasePlaceService: ObservableObject {
             
             return response
         } catch {
-            print("❌ [Supabase] Error fetching place annotations: \(error)")
+            // Don't log cancellation errors - they're expected when user pans/zooms quickly
+            if !Task.isCancelled && !(error is CancellationError) && (error as NSError).code != NSURLErrorCancelled {
+                print("❌ [Supabase] Error fetching place annotations: \(error)")
+            }
             throw error
         }
     }
