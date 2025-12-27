@@ -22,7 +22,7 @@ CREATE OR REPLACE FUNCTION public.get_community_places_in_viewport(
     p_min_lat double precision, 
     p_max_lon double precision, 
     p_max_lat double precision,
-    p_grid_cells_across integer DEFAULT 30  -- More cells = more markers for community places
+    p_grid_cells_across integer DEFAULT 20  -- Reduced from 30 for less density
 )
 RETURNS TABLE(id text, name text, latitude double precision, longitude double precision, save_count bigint, place_type text)
 LANGUAGE plpgsql
@@ -148,6 +148,6 @@ BEGIN
         ptype AS place_type
     FROM clustered
     ORDER BY saves DESC
-    LIMIT 900;  -- Max possible with 30x30 grid
+    LIMIT 400;  -- Max possible with 20x20 grid
 END;
 $function$;
