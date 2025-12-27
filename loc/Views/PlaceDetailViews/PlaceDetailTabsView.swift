@@ -162,7 +162,7 @@ struct PlaceDetailTabsView: View {
             
             TravelTimeSelector(viewModel: viewModel.travelTimeViewModel)
             
-            // Show friend savers OR total saves fallback
+            // Show friend savers OR total saves fallback (never show if only you saved)
             if viewModel.showSaversIndicator {
                 // Friends have saved this place - show their faces + total count
                 SavedByIndicator(
@@ -171,8 +171,9 @@ struct PlaceDetailTabsView: View {
                     totalSaves: viewModel.placeSaversViewModel.totalGlobalSaveCount,
                     onTap: { showingSaversSheet = true }
                 )
-            } else if viewModel.placeSaversViewModel.totalGlobalSaveCount > 0 {
+            } else if viewModel.placeSaversViewModel.hasOtherSavers {
                 // No friends saved, but others have - show total saves as social proof
+                // (Don't show if you're the only saver - no social proof value)
                 TotalSavesIndicator(
                     count: viewModel.placeSaversViewModel.totalGlobalSaveCount,
                     onTap: { showingSaversSheet = true }
