@@ -365,8 +365,8 @@ private struct SavedByIndicator: View {
                     }
                 }
                 
-                // Show total saves count (includes non-friends)
-                if totalSaves > 0 {
+                // Show total saves count only if > 1 (1 save is not useful social proof)
+                if totalSaves > 1 {
                     Text("\(totalSaves)")
                         .font(.caption)
                         .fontWeight(.medium)
