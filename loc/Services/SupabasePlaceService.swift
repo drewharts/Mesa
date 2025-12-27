@@ -810,6 +810,45 @@ class SupabasePlaceService: ObservableObject {
         }
     }
     
+    // MARK: - Community Places (places saved by users outside your network)
+    
+    /// Fetch community places in viewport - places saved by users you don't follow
+    /// These are displayed as small white dots on the map
+    func fetchCommunityPlacesInViewport(northLat: Double, southLat: Double, eastLng: Double, westLng: Double, userId: String, limit: Int = 500) async throws -> [CommunityPlaceMarker] {
+        do {
+            struct CommunityViewportParams: Encodable {
+                let p_user_id: String
+                let p_min_lon: Double
+                let p_min_lat: Double
+                let p_max_lon: Double
+                let p_max_lat: Double
+                let p_limit: Int
+            }
+            
+            let params = CommunityViewportParams(
+                p_user_id: userId,
+                p_min_lon: westLng,
+                p_min_lat: southLat,
+                p_max_lon: eastLng,
+                p_max_lat: northLat,
+                p_limit: limit
+            )
+            
+            let response: [CommunityPlaceMarker] = try await supabase.client
+                .rpc("get_community_places_in_viewport", params: params)
+                .execute()
+                .value
+            
+            return response
+        } catch {
+            // Don't log cancellation errors - they're expected when user pans/zooms quickly
+            if !Task.isCancelled && !(error is CancellationError) && (error as NSError).code != NSURLErrorCancelled {
+                print("❌ [Supabase] Error fetching community places: \(error)")
+            }
+            throw error
+        }
+    }
+    
     // MARK: - User Photos for Annotations
     
     /// Fetch profile photos for all followed users (for custom annotation views)

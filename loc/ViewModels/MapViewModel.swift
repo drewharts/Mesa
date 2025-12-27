@@ -12,6 +12,7 @@ import SwiftUI
 @MainActor
 class MapViewModel: ObservableObject {
     @Published var viewportAnnotations: [PlaceAnnotation] = [] // Place annotations in current viewport
+    @Published var communityMarkers: [CommunityPlaceMarker] = [] // Community places (from users you don't follow)
     @Published var isLoadingViewportPlaces: Bool = false
     @Published var followedUsersPhotos: [FollowedUserPhoto] = [] // Profile photos for custom annotations
     @Published var annotationImages: [String: UIImage] = [:] // Combined profile images for annotations
@@ -181,6 +182,28 @@ class MapViewModel: ObservableObject {
         }
     }
     
+    /// Load full place details for a community marker (when user taps a white dot)
+    func loadPlaceDetails(for marker: CommunityPlaceMarker) async -> DetailPlace? {
+        let placeId = marker.id
+        
+        // Check cache first
+        if let cached = placeDetailsCache[placeId] {
+            return cached
+        }
+        
+        // Load from database
+        do {
+            let details = try await placeService.fetchPlaceDetails(placeId: placeId)
+            if let details = details {
+                placeDetailsCache[placeId] = details
+            }
+            return details
+        } catch {
+            print("❌ [MapViewModel] Error loading community place details: \(error)")
+            return nil
+        }
+    }
+    
     /// Call this when the map camera has settled (using native iOS 17+ callback)
     /// Apple handles debouncing automatically, so we don't need manual timers
     func onMapCameraSettled(_ newRegion: MKCoordinateRegion) async {
@@ -237,13 +260,22 @@ class MapViewModel: ObservableObject {
                     return
                 }
                 
-                // Use the optimized PostgreSQL function
-                let annotations = try await placeService.fetchPlacesInViewport(
+                // Fetch network annotations and community places in parallel
+                async let networkAnnotationsTask = placeService.fetchPlacesInViewport(
                     northLat: bounds.northLat,
                     southLat: bounds.southLat,
                     eastLng: bounds.eastLng,
                     westLng: bounds.westLng
                 )
+                
+                async let communityMarkersTask = placeService.fetchCommunityPlacesInViewport(
+                    northLat: bounds.northLat,
+                    southLat: bounds.southLat,
+                    eastLng: bounds.eastLng,
+                    westLng: bounds.westLng
+                )
+                
+                let (annotations, community) = try await (networkAnnotationsTask, communityMarkersTask)
                 
                 // Check if cancelled after network call
                 guard !Task.isCancelled else {
@@ -252,13 +284,16 @@ class MapViewModel: ObservableObject {
                 }
                 
                 self.viewportAnnotations = annotations
+                self.communityMarkers = community
                 self.lastLoadedRegion = region
                 
                 // Generate annotation images for new annotations
                 generateAnnotationImages()
                 
             } catch {
-                if !Task.isCancelled {
+                // Don't log cancellation errors - they're expected when user pans/zooms quickly
+                let isCancelled = Task.isCancelled || error is CancellationError || (error as NSError).code == NSURLErrorCancelled
+                if !isCancelled {
                     print("❌ [MapViewModel] Error loading viewport annotations: \(error.localizedDescription)")
                 }
             }
