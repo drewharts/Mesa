@@ -27,7 +27,7 @@ class SupabaseAuthService: ObservableObject {
     
     func setupAuthListener() async {
         // Listen for auth state changes
-        for await state in await supabase.auth.authStateChanges {
+        for await state in supabase.auth.authStateChanges {
             switch state.event {
             case .signedIn:
                 if let session = state.session {

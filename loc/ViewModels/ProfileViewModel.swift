@@ -2226,7 +2226,6 @@ class ProfileViewModel: ObservableObject {
     /// Public method to initialize pagination if needed (called from views)
     func initializeListPaginationIfNeeded(listId: UUID) {
         let listIdString = listId.uuidString
-        let allPlaceIds = userListsPlaces[listIdString] ?? []
         
         // Only initialize if not already initialized
         if listPlacePagination[listIdString] == nil {
