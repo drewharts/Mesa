@@ -31,7 +31,7 @@ class DeepLinkManager: ObservableObject {
     private weak var userSession: UserSession?
     
     // MARK: - TikTok Processing State
-    private static var recentlyProcessedURLs: Set<String> = []
+    nonisolated(unsafe) private static var recentlyProcessedURLs: Set<String> = []
     private static var urlProcessingQueue = DispatchQueue(label: "url-processing", qos: .userInitiated)
     private var currentProcessingTikTokUrl: String?
     
