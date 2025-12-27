@@ -352,7 +352,7 @@ class SelectedPlaceViewModel: ObservableObject {
         
         // Use Task to handle async call to get current user ID
         Task { @MainActor in
-            guard let currentUserId = await SupabaseAuthService.shared.currentUserId else {
+            guard let currentUserId = SupabaseAuthService.shared.currentUserId else {
                 print("Error: Current user ID is not available")
                 self.postLoadingStates[placeId] = .error(NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "User not logged in"]))
                 self.placePosts[placeId] = []

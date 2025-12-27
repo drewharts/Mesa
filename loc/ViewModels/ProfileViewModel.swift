@@ -315,7 +315,7 @@ class ProfileViewModel: ObservableObject {
     
      /// Update the users table with the new profile photo URL
      private func updateProfilePhotoInDatabase(userId: String, photoURL: URL) async throws {
-        let supabase = await SupabaseManager.shared
+        let supabase = SupabaseManager.shared
         
         // Update the users table with the new profile_photo_url
         try await supabase.client
@@ -2099,7 +2099,7 @@ class ProfileViewModel: ObservableObject {
             return
         }
         
-        await MainActor.run {
+        _ = await MainActor.run {
             self.loadingListIds.insert(listId)
         }
 

@@ -174,7 +174,7 @@ class TikTokVideoViewModel: ObservableObject {
         isRefreshing = true
         hasAttemptedRefresh = true
 
-        let userId = await SupabaseAuthService.shared.currentUserId
+        let userId = SupabaseAuthService.shared.currentUserId
         
         // 🔍 Log what external_place_id we have before calling refresh
         debugLog("🎬 [TikTokVideoViewModel] Calling refreshThumbnail")
