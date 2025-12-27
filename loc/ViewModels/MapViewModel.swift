@@ -283,12 +283,6 @@ class MapViewModel: ObservableObject {
                     return
                 }
                 
-                // Debug: Log community markers and their save counts
-                print("📍 [MapViewModel] Loaded \(community.count) community markers")
-                for marker in community.prefix(10) {
-                    print("   - \(marker.name): \(marker.saveCount) saves")
-                }
-                
                 self.viewportAnnotations = annotations
                 self.communityMarkers = community
                 self.lastLoadedRegion = region
