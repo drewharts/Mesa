@@ -245,8 +245,9 @@ class ProfileViewModel: ObservableObject {
     /// This ensures data loads after login without view intervention (MVVM + SRP)
     private func setupDataLoadingObserver() {
         $user
-            .compactMap { $0?.id } // Only proceed when user has an ID
-            .removeDuplicates() // Prevent redundant loads on same user
+            .map { $0?.id }         // Map to Optional<String> first
+            .removeDuplicates()     // Compare optionals: nil → "abc" is NOT a duplicate
+            .compactMap { $0 }      // Filter out nil AFTER deduplication
             .sink { [weak self] userId in
                 guard let self = self else { return }
                 
