@@ -67,7 +67,7 @@ struct PlaceTypeEmoji {
         if type.contains("dessert") || type.contains("sweet") { return "🍰" }
         if type.contains("ice cream") || type.contains("gelato") || type.contains("frozen yogurt") { return "🍦" }
         if type.contains("juice") || type.contains("smoothie") { return "🧃" }
-        if type.contains("coffee") || type.contains("cafe") { return "☕" }
+        if type.contains("coffee") || type.contains("cafe") || type.contains("espresso") { return "☕" }
         if type.contains("tea") { return "🍵" }
         if type.contains("wine") || type.contains("winery") { return "🍷" }
         if type.contains("cocktail") { return "🍸" }
