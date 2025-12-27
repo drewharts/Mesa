@@ -213,119 +213,13 @@ class PlaceDetailViewModel: ObservableObject {
     }
 
     func getRestaurantType(for place: DetailPlace) -> String? {
-        // Add safety guards to prevent crashes
-        guard let placeTypes = place.categories,
-              !placeTypes.isEmpty else { 
-            return PlaceTypes.defaultType 
+        // Simply take the last category - it's always the most specific
+        // Google Places orders categories from general → specific
+        // e.g., ["Restaurant", "Indian Restaurant", "Indian"] → "Indian"
+        guard let categories = place.categories, !categories.isEmpty else {
+            return PlaceTypes.defaultType
         }
-        
-        // Make a defensive copy to avoid potential race conditions
-        let placeTypesCopy = Array(placeTypes)
-        let recognizedTypesCopy = Array(PlaceTypes.recognizedTypes)
-        
-        // First pass: Look for specific cuisine types (prioritize over generic terms)
-        // Skip generic terms in first pass - these will be checked in second pass only
-        let genericTerms = [
-            "Restaurant", "Cafe", "Bar", "Place",
-            "Point of Interest", "Point Of Interest", "Point_of_Interest", 
-            "POI", "Establishment", "Store", "Business", "Location",
-            "Venue", "Site", "Spot", "Destination"
-        ]
-        for recognizedType in recognizedTypesCopy {
-            // Skip generic terms in first pass (normalize for comparison)
-            let normalizedRecognizedType = recognizedType.lowercased()
-                .replacingOccurrences(of: "_", with: " ")
-                .replacingOccurrences(of: "-", with: " ")
-                .replacingOccurrences(of: ".", with: " ")
-            
-            let isGenericTerm = genericTerms.contains { genericTerm in
-                let normalizedGenericTerm = genericTerm.lowercased()
-                    .replacingOccurrences(of: "_", with: " ")
-                    .replacingOccurrences(of: "-", with: " ")
-                    .replacingOccurrences(of: ".", with: " ")
-                return normalizedRecognizedType == normalizedGenericTerm
-            }
-            
-            if isGenericTerm { continue }
-            
-            guard !recognizedType.isEmpty else { continue }
-            
-            if placeTypesCopy.contains(where: { placeType in
-                guard !placeType.isEmpty else { return false }
-                
-                // Normalize both strings for better matching
-                let normalizedPlaceType = placeType.lowercased()
-                    .replacingOccurrences(of: "_", with: " ")
-                    .replacingOccurrences(of: "-", with: " ")
-                    .replacingOccurrences(of: ".", with: " ")
-                
-                let normalizedRecognizedType = recognizedType.lowercased()
-                    .replacingOccurrences(of: "_", with: " ")
-                    .replacingOccurrences(of: "-", with: " ")
-                    .replacingOccurrences(of: ".", with: " ")
-                
-                guard !normalizedPlaceType.isEmpty && !normalizedRecognizedType.isEmpty else {
-                    return false
-                }
-                
-                // Check if the place type contains the cuisine type
-                // e.g., "indian restaurant" contains "indian"
-                return normalizedPlaceType.contains(normalizedRecognizedType)
-            }) {
-                return recognizedType
-            }
-        }
-        
-        // Second pass: Look for generic terms if no specific type found
-        // Check both our generic terms and any generic terms from the recognized types
-        var allGenericTermsToCheck = genericTerms
-        
-        // Add any generic terms from recognized types that we skipped in first pass
-        for recognizedType in recognizedTypesCopy {
-            let normalizedRecognizedType = recognizedType.lowercased()
-                .replacingOccurrences(of: "_", with: " ")
-                .replacingOccurrences(of: "-", with: " ")
-                .replacingOccurrences(of: ".", with: " ")
-            
-            let isGenericTerm = genericTerms.contains { genericTerm in
-                let normalizedGenericTerm = genericTerm.lowercased()
-                    .replacingOccurrences(of: "_", with: " ")
-                    .replacingOccurrences(of: "-", with: " ")
-                    .replacingOccurrences(of: ".", with: " ")
-                return normalizedRecognizedType == normalizedGenericTerm
-            }
-            
-            if isGenericTerm && !allGenericTermsToCheck.contains(recognizedType) {
-                allGenericTermsToCheck.append(recognizedType)
-            }
-        }
-        
-        for genericTerm in allGenericTermsToCheck {
-            if placeTypesCopy.contains(where: { placeType in
-                guard !placeType.isEmpty else { return false }
-                
-                let normalizedPlaceType = placeType.lowercased()
-                    .replacingOccurrences(of: "_", with: " ")
-                    .replacingOccurrences(of: "-", with: " ")
-                    .replacingOccurrences(of: ".", with: " ")
-                
-                let normalizedGenericTerm = genericTerm.lowercased()
-                    .replacingOccurrences(of: "_", with: " ")
-                    .replacingOccurrences(of: "-", with: " ")
-                    .replacingOccurrences(of: ".", with: " ")
-                
-                guard !normalizedPlaceType.isEmpty && !normalizedGenericTerm.isEmpty else {
-                    return false
-                }
-                
-                return normalizedPlaceType.contains(normalizedGenericTerm)
-            }) {
-                // Return the original generic term from our list if found, not the recognized type variant
-                return genericTerm
-            }
-        }
-        
-        return PlaceTypes.defaultType
+        return categories.last ?? PlaceTypes.defaultType
     }
 
     func openInGoogleMaps(latitude: Double, longitude: Double) {

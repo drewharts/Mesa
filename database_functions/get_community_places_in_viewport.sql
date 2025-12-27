@@ -105,7 +105,8 @@ BEGIN
             ST_Y(p.location::geometry) AS lat,
             ST_X(p.location::geometry) AS lon,
             cs.save_count AS saves,
-            COALESCE(p.categories[1], 'Place') AS ptype,
+            -- Use LAST category (most specific) - Google orders general → specific
+            COALESCE(p.categories[array_length(p.categories, 1)], 'Place') AS ptype,
             -- Snap to grid for clustering (O(n) operation)
             ST_SnapToGrid(p.location::geometry, v_grid_size_lon, v_grid_size_lat) AS grid_cell
         FROM community_saves cs
