@@ -17,7 +17,6 @@ struct AboutTabContent: View {
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var userSession: UserSession
     
-    let totalSaveCount: Int
     let onPhotoTapped: ([UIImage], Int) -> Void
     
     // MARK: - View-Owned Presentation State
@@ -29,7 +28,7 @@ struct AboutTabContent: View {
             
             // 1. DUMB COMPONENT: Pure display of place info
             if let place = viewModel.place {
-                PlaceInfoSection(place: place, totalSaveCount: totalSaveCount)
+                PlaceInfoSection(place: place)
             }
             
             // 2. User's private note (only shown if note exists)
@@ -140,7 +139,6 @@ struct AboutTabContent: View {
     
     return AboutTabContent(
         viewModel: aboutVM,
-        totalSaveCount: 42,
         onPhotoTapped: { photos, index in
             print("Tapped photo at index: \(index)")
         }

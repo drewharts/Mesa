@@ -10,7 +10,6 @@ import SwiftUI
 
 struct PlaceInfoSection: View {
     let place: DetailPlace
-    let totalSaveCount: Int
     
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -40,24 +39,7 @@ struct PlaceInfoSection: View {
                         .scaledToFit()
                         .frame(height: 16)
                 }
-                .padding(.bottom, 4)
-            }
-            
-            // Save Count Row (below rating)
-            if totalSaveCount > 0 {
-                HStack(spacing: 4) {
-                    Image(systemName: "bookmark.fill")
-                        .font(.subheadline)
-                        .foregroundColor(.gray)
-                    
-                    Text("\(totalSaveCount) save\(totalSaveCount == 1 ? "" : "s")")
-                        .font(.subheadline)
-                        .foregroundColor(.gray)
-                }
                 .padding(.bottom, 8)
-            } else if place.rating != nil && place.rating! > 0 {
-                // Add spacing if we had rating but no saves
-                Spacer().frame(height: 4)
             }
             
             Text(place.description ?? "No description available")
@@ -77,7 +59,7 @@ struct PlaceInfoSection: View {
     mockPlace.rating = 4.5
     mockPlace.userRatingsTotal = 234
     
-    return PlaceInfoSection(place: mockPlace, totalSaveCount: 42)
+    return PlaceInfoSection(place: mockPlace)
         .padding()
 }
 
