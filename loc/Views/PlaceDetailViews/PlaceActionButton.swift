@@ -19,6 +19,7 @@ struct PlaceActionButton: View {
     @State private var isExpanded = false
     @State private var dragOffset: CGFloat = 0
     @State private var selectedAction: ActionType?
+    @State private var isInList: Bool = false
     
     private let buttonSize: CGFloat = 40
     private let expandedSize: CGFloat = 200
@@ -110,7 +111,7 @@ struct PlaceActionButton: View {
                                             collapseMenu()
                                         },
                                         isFavorited: action == .favorite ? profile.isPlaceFavorite(placeId: place.id.uuidString) : false,
-                                        isInList: action == .addToList ? profile.isPlaceInAnyList(placeId: place.id.uuidString) : false
+                                        isInList: action == .addToList ? isInList : false
                                     )
                                 }
                             }
@@ -171,6 +172,16 @@ struct PlaceActionButton: View {
         }
         .animation(.easeInOut(duration: animationDuration), value: isExpanded)
         .environment(\.allowChildDrag, isExpanded)
+        .task {
+            isInList = await profile.isPlaceInAnyList(placeId: place.id.uuidString)
+        }
+        // ✅ SRP: View observes ViewModel's published state (proper MVVM)
+        // Update when list membership changes (reactive to ViewModel state)
+        .onChange(of: profile.lightweightPlaceListPlaces) { _ in
+            Task {
+                isInList = await profile.isPlaceInAnyList(placeId: place.id.uuidString)
+            }
+        }
     }
     
     // MARK: - Helper Methods

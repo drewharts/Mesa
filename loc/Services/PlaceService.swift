@@ -18,26 +18,26 @@ class PlaceService: ObservableObject {
 
     func fetchAllPlaces(completion: @escaping ([DetailPlace]?, Error?) -> Void) {
         Task { @MainActor in
-            await supabase.fetchAllPlaces(completion: completion)
+            supabase.fetchAllPlaces(completion: completion)
         }
     }
 
     func findPlace(mapboxId: String, completion: @escaping (DetailPlace?, Error?) -> Void) {
         Task { @MainActor in
-            await supabase.findPlace(mapboxId: mapboxId, completion: completion)
+            supabase.findPlace(mapboxId: mapboxId, completion: completion)
         }
     }
     
     func fetchPlace(withId placeId: String, completion: @escaping (Result<DetailPlace, Error>) -> Void) {
         Task { @MainActor in
-            await supabase.fetchPlace(withId: placeId, completion: completion)
+            supabase.fetchPlace(withId: placeId, completion: completion)
         }
     }
     
     func fetchPlace(withId placeId: String) async throws -> DetailPlace {
         return try await withCheckedThrowingContinuation { continuation in
             Task { @MainActor in
-                await supabase.fetchPlace(withId: placeId) { result in
+                supabase.fetchPlace(withId: placeId) { result in
                     continuation.resume(with: result)
                 }
             }
@@ -51,19 +51,19 @@ class PlaceService: ObservableObject {
     
     func addFavorite(userId: String, placeId: String, completion: @escaping (Error?) -> Void) {
         Task { @MainActor in
-            await supabase.addFavorite(userId: userId, placeId: placeId, completion: completion)
+            supabase.addFavorite(userId: userId, placeId: placeId, completion: completion)
         }
     }
     
     func removeFavorite(userId: String, placeId: String, completion: @escaping (Error?) -> Void) {
         Task { @MainActor in
-            await supabase.removeFavorite(userId: userId, placeId: placeId, completion: completion)
+            supabase.removeFavorite(userId: userId, placeId: placeId, completion: completion)
         }
     }
     
     func fetchFavorites(userId: String, completion: @escaping ([DetailPlace]?, Error?) -> Void) {
         Task { @MainActor in
-            await supabase.fetchFavorites(userId: userId, completion: completion)
+            supabase.fetchFavorites(userId: userId, completion: completion)
         }
     }
     
@@ -87,7 +87,7 @@ class PlaceService: ObservableObject {
     
     func fetchMyPlaces(userId: String, completion: @escaping (Result<[DetailPlace], Error>) -> Void) {
         Task { @MainActor in
-            await supabase.fetchMyPlaces(userId: userId) { places, error in
+            supabase.fetchMyPlaces(userId: userId) { places, error in
                 if let error = error {
                     completion(.failure(error))
                 } else {
@@ -103,7 +103,7 @@ class PlaceService: ObservableObject {
     
     func fetchProfileFavorites(userId: String, completion: @escaping ([DetailPlace], Error?) -> Void) {
         Task { @MainActor in
-            await supabase.fetchProfileFavorites(userId: userId) { places, error in
+            supabase.fetchProfileFavorites(userId: userId) { places, error in
                 completion(places ?? [], error)
             }
         }
@@ -115,7 +115,7 @@ class PlaceService: ObservableObject {
     
     func fetchLists(userId: String, completion: @escaping ([PlaceList]) -> Void) {
         Task { @MainActor in
-            await supabase.fetchLists(userId: userId, completion: completion)
+            supabase.fetchLists(userId: userId, completion: completion)
         }
     }
 
@@ -141,7 +141,7 @@ class PlaceService: ObservableObject {
     /// Fetches place lists sorted by proximity to user's current location
     func fetchListsByProximity(userId: String, userLocation: CLLocationCoordinate2D?, completion: @escaping ([PlaceList]) -> Void) {
         Task { @MainActor in
-            await supabase.fetchListsByProximity(userId: userId, userLocation: userLocation, completion: completion)
+            supabase.fetchListsByProximity(userId: userId, userLocation: userLocation, completion: completion)
         }
     }
     
@@ -162,7 +162,7 @@ class PlaceService: ObservableObject {
     
     func fetchPlacesInViewport(viewport: (minLat: Double, maxLat: Double, minLng: Double, maxLng: Double), completion: @escaping ([PlaceAnnotation]?, Error?) -> Void) {
         Task { @MainActor in
-            guard let authUserId = await SupabaseAuthService.shared.currentUserId else {
+            guard let authUserId = SupabaseAuthService.shared.currentUserId else {
                 print("⚠️ [PlaceService] No auth userId available for viewport query")
                 completion([], nil)
                 return
@@ -178,7 +178,7 @@ class PlaceService: ObservableObject {
                 profileUserId = authUserId
             }
             
-            await supabase.fetchPlacesInViewport(
+            supabase.fetchPlacesInViewport(
                 northLat: viewport.maxLat,
                 southLat: viewport.minLat,
                 eastLng: viewport.maxLng,
@@ -236,6 +236,32 @@ class PlaceService: ObservableObject {
             eastLng: eastLng,
             westLng: westLng,
             userId: userId
+        )
+    }
+    
+    /// Fetch community places in viewport - places saved by users outside your network
+    /// Returns lightweight emoji markers using grid-based clustering for O(n) performance
+    func fetchCommunityPlacesInViewport(northLat: Double, southLat: Double, eastLng: Double, westLng: Double) async throws -> [CommunityPlaceMarker] {
+        guard let authUserId = await SupabaseAuthService.shared.currentUserId else {
+            return []
+        }
+        
+        // Get the profile user ID (not auth UID)
+        let profileUserId: String
+        do {
+            let profile = try await UserService.shared.fetchUserById(userId: authUserId)
+            profileUserId = profile.id
+        } catch {
+            print("⚠️ [PlaceService] Could not fetch profile, using auth UID as fallback: \(authUserId)")
+            profileUserId = authUserId
+        }
+        
+        return try await supabase.fetchCommunityPlacesInViewport(
+            northLat: northLat,
+            southLat: southLat,
+            eastLng: eastLng,
+            westLng: westLng,
+            userId: profileUserId
         )
     }
     

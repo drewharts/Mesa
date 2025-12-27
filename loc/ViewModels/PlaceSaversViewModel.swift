@@ -23,7 +23,8 @@ class PlaceSaversViewModel: ObservableObject {
     @Published private(set) var isLoading: Bool = false
     @Published private(set) var error: Error?
     @Published private(set) var currentUserSaved: Bool = false
-    @Published private(set) var totalSaverCount: Int = 0
+    @Published private(set) var totalSaverCount: Int = 0  // Count of visible savers (profiles you can see)
+    @Published private(set) var totalGlobalSaveCount: Int = 0  // Total saves from ALL users (for display)
     
     // MARK: - Dependencies (Services, not other ViewModels)
     private let userService: UserService
@@ -137,10 +138,14 @@ class PlaceSaversViewModel: ObservableObject {
             do {
                 let requestingUserId = self.userSession.currentUserId
                 
-                let saverProfiles = try await self.userService.fetchPlaceSavers(
+                // Fetch savers and total count in parallel
+                async let saverProfilesTask = self.userService.fetchPlaceSavers(
                     placeId: placeId,
                     requestingUserId: requestingUserId
                 )
+                async let totalCountTask = SupabasePlaceService.shared.fetchTotalSaveCount(for: placeId)
+                
+                let (saverProfiles, globalCount) = try await (saverProfilesTask, totalCountTask)
                 
                 // Check if task was cancelled
                 guard !Task.isCancelled else { return }
@@ -148,6 +153,7 @@ class PlaceSaversViewModel: ObservableObject {
                 // Update state
                 self.savers = saverProfiles.map { $0.toProfileData() }
                 self.totalSaverCount = saverProfiles.count
+                self.totalGlobalSaveCount = globalCount
                 
                 // Check if current user is in the savers list
                 if let currentUserId = requestingUserId {
@@ -165,7 +171,7 @@ class PlaceSaversViewModel: ObservableObject {
                 self.error = nil
                 self.isLoading = false
                 
-                print("✅ [PlaceSavers] Fetched \(saverProfiles.count) savers for place \(placeId.prefix(8))...")
+                print("✅ [PlaceSavers] Fetched \(saverProfiles.count) visible savers, \(globalCount) total saves for place \(placeId.prefix(8))...")
                 
             } catch {
                 guard !Task.isCancelled else { return }
@@ -174,6 +180,7 @@ class PlaceSaversViewModel: ObservableObject {
                 self.error = error
                 self.isLoading = false
                 self.totalSaverCount = 0
+                self.totalGlobalSaveCount = 0
                 self.savers = []
             }
         }
@@ -185,6 +192,7 @@ class PlaceSaversViewModel: ObservableObject {
         error = nil
         currentUserSaved = false
         totalSaverCount = 0
+        totalGlobalSaveCount = 0
     }
 }
 

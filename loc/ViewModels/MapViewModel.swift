@@ -12,6 +12,7 @@ import SwiftUI
 @MainActor
 class MapViewModel: ObservableObject {
     @Published var viewportAnnotations: [PlaceAnnotation] = [] // Place annotations in current viewport
+    @Published var communityMarkers: [CommunityPlaceMarker] = [] // Community places (from users you don't follow)
     @Published var isLoadingViewportPlaces: Bool = false
     @Published var followedUsersPhotos: [FollowedUserPhoto] = [] // Profile photos for custom annotations
     @Published var annotationImages: [String: UIImage] = [:] // Combined profile images for annotations
@@ -132,14 +133,14 @@ class MapViewModel: ObservableObject {
     
     /// Create combined circular image from profile pictures (matching existing implementation)
     private func combinedCircularImage(image1: UIImage?, image2: UIImage? = nil, image3: UIImage? = nil) -> UIImage {
-        let totalSize = CGSize(width: 80, height: 40)
-        let singleCircleSize = CGSize(width: 40, height: 40)
+        let totalSize = CGSize(width: 60, height: 30)
+        let singleCircleSize = CGSize(width: 30, height: 30)
         let renderer = UIGraphicsImageRenderer(size: totalSize)
        
         return renderer.image { context in
             let firstRect = CGRect(x: 0, y: 0, width: singleCircleSize.width, height: singleCircleSize.height)
-            let secondRect = CGRect(x: 15, y: 0, width: singleCircleSize.width, height: singleCircleSize.height)
-            let thirdRect = CGRect(x: 30, y: 0, width: singleCircleSize.width, height: singleCircleSize.height)
+            let secondRect = CGRect(x: 11, y: 0, width: singleCircleSize.width, height: singleCircleSize.height)
+            let thirdRect = CGRect(x: 22, y: 0, width: singleCircleSize.width, height: singleCircleSize.height)
            
             func drawCircularImage(_ image: UIImage?, in rect: CGRect) {
                 guard let image = image else { return }
@@ -177,6 +178,28 @@ class MapViewModel: ObservableObject {
             return details
         } catch {
             print("❌ [MapViewModel] Error loading place details: \(error)")
+            return nil
+        }
+    }
+    
+    /// Load full place details for a community marker (when user taps a white dot)
+    func loadPlaceDetails(for marker: CommunityPlaceMarker) async -> DetailPlace? {
+        let placeId = marker.id
+        
+        // Check cache first
+        if let cached = placeDetailsCache[placeId] {
+            return cached
+        }
+        
+        // Load from database
+        do {
+            let details = try await placeService.fetchPlaceDetails(placeId: placeId)
+            if let details = details {
+                placeDetailsCache[placeId] = details
+            }
+            return details
+        } catch {
+            print("❌ [MapViewModel] Error loading community place details: \(error)")
             return nil
         }
     }
@@ -237,13 +260,22 @@ class MapViewModel: ObservableObject {
                     return
                 }
                 
-                // Use the optimized PostgreSQL function
-                let annotations = try await placeService.fetchPlacesInViewport(
+                // Fetch network annotations and community places in parallel
+                async let networkAnnotationsTask = placeService.fetchPlacesInViewport(
                     northLat: bounds.northLat,
                     southLat: bounds.southLat,
                     eastLng: bounds.eastLng,
                     westLng: bounds.westLng
                 )
+                
+                async let communityMarkersTask = placeService.fetchCommunityPlacesInViewport(
+                    northLat: bounds.northLat,
+                    southLat: bounds.southLat,
+                    eastLng: bounds.eastLng,
+                    westLng: bounds.westLng
+                )
+                
+                let (annotations, community) = try await (networkAnnotationsTask, communityMarkersTask)
                 
                 // Check if cancelled after network call
                 guard !Task.isCancelled else {
@@ -252,13 +284,31 @@ class MapViewModel: ObservableObject {
                 }
                 
                 self.viewportAnnotations = annotations
+                
+                // Filter out community markers that overlap with friends annotations
+                // This prevents duplicate markers on the map (O(n+m) with Set lookup)
+                let friendsPlaceIds = Set(annotations.map { $0.id })
+                let filteredCommunity = community.filter { !friendsPlaceIds.contains($0.id) }
+                
+                // Debug: Log any duplicates that were filtered
+                let duplicateCount = community.count - filteredCommunity.count
+                if duplicateCount > 0 {
+                    let duplicateIds = community.filter { friendsPlaceIds.contains($0.id) }.map { $0.id }
+                    print("🔍 [MapViewModel] Filtered \(duplicateCount) duplicate community markers: \(duplicateIds)")
+                }
+                print("🔍 [MapViewModel] Friends: \(annotations.count), Community before: \(community.count), after: \(filteredCommunity.count)")
+                
+                self.communityMarkers = filteredCommunity
+                
                 self.lastLoadedRegion = region
                 
                 // Generate annotation images for new annotations
                 generateAnnotationImages()
                 
             } catch {
-                if !Task.isCancelled {
+                // Don't log cancellation errors - they're expected when user pans/zooms quickly
+                let isCancelled = Task.isCancelled || error is CancellationError || (error as NSError).code == NSURLErrorCancelled
+                if !isCancelled {
                     print("❌ [MapViewModel] Error loading viewport annotations: \(error.localizedDescription)")
                 }
             }

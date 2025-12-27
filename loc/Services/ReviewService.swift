@@ -13,7 +13,7 @@ class ReviewService: ObservableObject {
     
     func likeReview(userId: String, placeId: String, reviewId: String, completion: @escaping (Result<Void, Error>) -> Void) {
         Task { @MainActor in
-            await supabasePostService.likePost(postId: reviewId, userId: userId) { error in
+            supabasePostService.likePost(postId: reviewId, userId: userId) { error in
                 if let error = error {
                     completion(.failure(error))
                 } else {
@@ -25,7 +25,7 @@ class ReviewService: ObservableObject {
 
     func unlikeReview(userId: String, placeId: String, reviewId: String, completion: @escaping (Result<Void, Error>) -> Void) {
         Task { @MainActor in
-            await supabasePostService.unlikePost(postId: reviewId, userId: userId) { error in
+            supabasePostService.unlikePost(postId: reviewId, userId: userId) { error in
                 if let error = error {
                     completion(.failure(error))
                 } else {
@@ -65,7 +65,7 @@ class ReviewService: ObservableObject {
     
     func deleteReview(reviewId: String, completion: @escaping (Result<Void, Error>) -> Void) {
         Task { @MainActor in
-            await supabasePostService.deletePost(postId: reviewId) { error in
+            supabasePostService.deletePost(postId: reviewId) { error in
                 if let error = error {
                     completion(.failure(error))
                 } else {

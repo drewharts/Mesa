@@ -90,4 +90,46 @@ class ImageCacheService {
             print("Error clearing image cache directory: \(error)")
         }
     }
+    
+    // MARK: - Batch Loading (Parallel with Caching)
+    
+    /// Batch load images in parallel with caching
+    /// Returns a dictionary mapping URL strings to loaded images
+    /// Uses TaskGroup for concurrent downloads - significantly faster than sequential loading
+    func loadImages(from urlStrings: [String]) async -> [String: UIImage] {
+        var results: [String: UIImage] = [:]
+        
+        await withTaskGroup(of: (String, UIImage?).self) { group in
+            for urlString in urlStrings {
+                guard let url = URL(string: urlString) else { continue }
+                
+                group.addTask {
+                    // Check cache first (instant if cached)
+                    if let cached = self.getImage(for: url) {
+                        return (urlString, cached)
+                    }
+                    
+                    // Download if not cached
+                    do {
+                        let (data, _) = try await URLSession.shared.data(from: url)
+                        if let image = UIImage(data: data) {
+                            self.storeImage(image, for: url)
+                            return (urlString, image)
+                        }
+                    } catch {
+                        // Silent fail - expected for some URLs
+                    }
+                    return (urlString, nil)
+                }
+            }
+            
+            for await (urlString, image) in group {
+                if let image = image {
+                    results[urlString] = image
+                }
+            }
+        }
+        
+        return results
+    }
 } 

@@ -260,9 +260,7 @@ class PlaceTypeFilterViewModel: ObservableObject {
     /// Get all places to display (combines viewport annotations with cached place details)
     private func getAllDisplayPlaces() -> [DetailPlace] {
         // If we have a MapViewModel, get annotations and load details for them
-        if let mapVM = mapViewModel {
-            let annotations = mapVM.getAllDisplayAnnotations()
-            
+        if let mapVM = mapViewModel {            
             // For now, return empty array since we're using on-demand loading
             // The map will handle displaying annotations directly
             return []

@@ -208,7 +208,7 @@ class DetailPlaceViewModel: ObservableObject {
         // If no place photoUrls, try to get images from reviews (for reviewed places)
         // Get the current user ID
         Task { @MainActor in
-            guard let currentUserId = await SupabaseAuthService.shared.currentUserId else {
+            guard let currentUserId = SupabaseAuthService.shared.currentUserId else {
                 print("Error: Current user ID is not available")
                 self.placeImages[placeId] = UIImage()
                 self.placeImageLoadingStates[placeId] = false
@@ -352,14 +352,14 @@ class DetailPlaceViewModel: ObservableObject {
     // Removed MapboxSearch searchResultToDetailPlace method - now using Google Places API
     
     private func combinedCircularImage(image1: UIImage?, image2: UIImage? = nil, image3: UIImage? = nil) -> UIImage {
-        let totalSize = CGSize(width: 80, height: 40)
-        let singleCircleSize = CGSize(width: 40, height: 40)
+        let totalSize = CGSize(width: 60, height: 30)
+        let singleCircleSize = CGSize(width: 30, height: 30)
         let renderer = UIGraphicsImageRenderer(size: totalSize)
        
         return renderer.image { context in
             let firstRect = CGRect(x: 0, y: 0, width: singleCircleSize.width, height: singleCircleSize.height)
-            let secondRect = CGRect(x: 15, y: 0, width: singleCircleSize.width, height: singleCircleSize.height)
-            let thirdRect = CGRect(x: 30, y: 0, width: singleCircleSize.width, height: singleCircleSize.height)
+            let secondRect = CGRect(x: 11, y: 0, width: singleCircleSize.width, height: singleCircleSize.height)
+            let thirdRect = CGRect(x: 22, y: 0, width: singleCircleSize.width, height: singleCircleSize.height)
            
             func drawCircularImage(_ image: UIImage?, in rect: CGRect) {
                 guard let image = image else { return }

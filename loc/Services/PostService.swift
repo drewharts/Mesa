@@ -38,7 +38,7 @@ class PostService: ObservableObject {
                 try await placeService.ensurePlaceExists(place: place)
                 
                 // Now save the post
-                await supabase.savePost(post: post) { error in
+                supabase.savePost(post: post) { error in
                     if let error = error {
                         completion(.failure(error))
                     } else {
@@ -55,7 +55,7 @@ class PostService: ObservableObject {
     @available(*, deprecated, message: "Use savePost(_:forPlace:) to ensure place exists")
     func savePost(_ post: PlacePost, completion: @escaping (Result<Void, Error>) -> Void) {
         Task { @MainActor in
-            await supabase.savePost(post: post) { error in
+            supabase.savePost(post: post) { error in
                 if let error = error {
                     completion(.failure(error))
                 } else {
@@ -69,7 +69,7 @@ class PostService: ObservableObject {
     
     func deletePost(postId: String, completion: @escaping (Result<Void, Error>) -> Void) {
         Task { @MainActor in
-            await supabase.deletePost(postId: postId) { error in
+            supabase.deletePost(postId: postId) { error in
                 if let error = error {
                     completion(.failure(error))
                 } else {
@@ -83,7 +83,7 @@ class PostService: ObservableObject {
     
     func likePost(userId: String, placeId: String, postId: String, completion: @escaping (Result<Void, Error>) -> Void) {
         Task { @MainActor in
-            await supabase.likePost(postId: postId, userId: userId) { error in
+            supabase.likePost(postId: postId, userId: userId) { error in
                 if let error = error {
                     completion(.failure(error))
                 } else {
@@ -95,7 +95,7 @@ class PostService: ObservableObject {
     
     func unlikePost(userId: String, placeId: String, postId: String, completion: @escaping (Result<Void, Error>) -> Void) {
         Task { @MainActor in
-            await supabase.unlikePost(postId: postId, userId: userId) { error in
+            supabase.unlikePost(postId: postId, userId: userId) { error in
                 if let error = error {
                     completion(.failure(error))
                 } else {

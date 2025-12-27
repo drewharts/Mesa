@@ -78,8 +78,9 @@ class UserProfileViewModel: ObservableObject {
         self.selectedUser = user
         self.isUserDetailPresented = true
         
-        // Reset all state for new user
+        // Reset ALL state for new user (Single Responsibility: one place for all resets)
         resetListPaginationState()
+        resetReviewedPlacesLoadingState()
         totalPlacesCount = 0
         
         self.checkIfFollowing(currentUserId: currentUserId)
@@ -691,6 +692,57 @@ class UserProfileViewModel: ObservableObject {
     /// Check if we've attempted to load reviews for a specific user
     func hasAttemptedLoadReviews(for userId: String) -> Bool {
         return hasAttemptedLoadReviewedPlaces[userId] ?? false
+    }
+    
+    // MARK: - Logout Cleanup
+    
+    /// Clears all user-related cached data - MUST be called on logout to prevent data leakage
+    /// Single Responsibility: Only clears this ViewModel's cached state
+    func clearAllUserData() {
+        print("🗑️ [UserProfileViewModel] Clearing all user data for security")
+        
+        // Clear profile navigation state
+        selectedUser = nil
+        isUserDetailPresented = false
+        
+        // Clear external profile data
+        userFavorites.removeAll()
+        userLists.removeAll()
+        placeListPlaces.removeAll()
+        
+        // Clear reviewed places data
+        lightweightReviewedPlaces.removeAll()
+        totalReviewedPlacesCount = 0
+        hasAttemptedLoadReviewedPlaces.removeAll()
+        hasMoreReviewsForUser.removeAll()
+        
+        // Clear social state
+        isFollowing = false
+        followers = 0
+        totalPlacesCount = 0
+        
+        // Reset pagination state
+        currentListPage = 1
+        hasMoreLists = true
+        loadedListIds.removeAll()
+        loadingListIds.removeAll()
+        
+        // Reset loading states
+        isLoadingReviewedPlaces = false
+        isLoadingMoreReviews = false
+        hasMoreReviews = true
+        isLoadingMoreLists = false
+        
+        // Clear popup state
+        shouldShowListPopup = false
+        pendingListIndex = nil
+        pendingListIdToOpen = nil
+        
+        // Clear error state
+        showFollowError = false
+        followErrorMessage = ""
+        
+        print("✅ [UserProfileViewModel] All user data cleared")
     }
     
     // MARK: - Navigation

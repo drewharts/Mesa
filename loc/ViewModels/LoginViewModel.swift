@@ -417,6 +417,7 @@ class LoginViewModel: ObservableObject {
                     Task { @MainActor in
                         // For new users, the profile ID is the same as supabaseUserId
                         userSession.setUserLoggedIn(uid: supabaseUserId)
+                        await self.dataManager.initializeProfileData(userId: supabaseUserId)
                     }
                 }
                 continuation.resume()

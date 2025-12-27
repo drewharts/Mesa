@@ -13,7 +13,7 @@ struct PlaceInfoSection: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // External Rating (Google/Mapbox)
+            // Rating Row (Google/Mapbox)
             if let rating = place.rating, rating > 0 {
                 HStack(spacing: 8) {
                     HStack(spacing: 4) {
