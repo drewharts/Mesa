@@ -220,7 +220,7 @@ class SupabaseUserService: ObservableObject {
                 profile_photo_url,
                 full_name
             """)
-            .ilike("full_name_lower", value: likePattern)
+            .ilike("full_name_lower", pattern: likePattern)
             .limit(limit)
             .execute()
             .value
@@ -239,7 +239,7 @@ class SupabaseUserService: ObservableObject {
                     profile_photo_url,
                     full_name
                 """)
-                .ilike("email", value: emailPattern)
+                .ilike("email", pattern: emailPattern)
                 .limit(limit)
                 .execute()
                 .value
@@ -265,7 +265,7 @@ class SupabaseUserService: ObservableObject {
                         profile_photo_url,
                         full_name
                     """)
-                    .ilike("full_name_lower", value: tokenPattern)
+                    .ilike("full_name_lower", pattern: tokenPattern)
                     .limit(limit)
                     .execute()
                     .value
