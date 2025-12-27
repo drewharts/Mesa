@@ -29,7 +29,10 @@ struct ExternalReviewsListPopupView: View {
                 PopupPlaceCard(
                     place: place,
                     preferTikTokThumbnail: false, // Reviews prioritize review photos
-                    allowDelete: false // Can't delete other user's reviews
+                    allowDelete: false, // Can't delete other user's reviews
+                    onNavigate: { placeId in
+                        navigateToPlace(placeId: placeId)
+                    }
                 )
             }
         )
@@ -38,6 +41,16 @@ struct ExternalReviewsListPopupView: View {
                 Task {
                     await userProfileVM.loadUserReviewedPlacesWithPagination()
                 }
+            }
+        }
+    }
+    
+    /// Navigate to place from external profile - dismisses entire profile sheet first
+    private func navigateToPlace(placeId: String) {
+        Task {
+            guard let detailPlace = try? await PlaceService.shared.fetchPlace(withId: placeId) else { return }
+            await MainActor.run {
+                userProfileVM.navigateToPlaceFromProfile(detailPlace, selectedPlaceVM: selectedPlaceVM)
             }
         }
     }

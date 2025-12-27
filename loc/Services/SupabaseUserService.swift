@@ -314,10 +314,12 @@ class SupabaseUserService: ObservableObject {
     func updateFCMToken(userId: String, token: String, completion: @escaping (Error?) -> Void) {
         Task {
             do {
+                // Try to update by id OR supabase_uid since we might receive either
+                // (id is the legacy Firebase ID, supabase_uid is the Supabase auth ID)
                 try await supabase.client
                     .from("users")
                     .update(["fcm_token": token])
-                    .eq("id", value: userId)
+                    .or("id.eq.\(userId),supabase_uid.eq.\(userId)")
                     .execute()
                 
                 print("✅ [Supabase] FCM token updated for user \(userId)")

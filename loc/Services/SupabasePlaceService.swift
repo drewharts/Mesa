@@ -559,6 +559,68 @@ class SupabasePlaceService: ObservableObject {
         return imageMap
     }
     
+    /// Batch fetch place images with fallback to place's own thumbnail/photo_urls
+    /// Useful for community places that may not have review photos
+    func fetchPlaceImagesWithFallback(for placeIds: [String]) async throws -> [String: String] {
+        guard !placeIds.isEmpty else {
+            return [:]
+        }
+        
+        // First try review photos
+        var imageMap = try await fetchPlaceImages(for: placeIds)
+        
+        // Find places that still need images
+        let missingPlaceIds = placeIds.filter { imageMap[$0] == nil }
+        
+        if !missingPlaceIds.isEmpty {
+            // Fetch place records to get thumbnail_url or photo_urls
+            let fallbackImages = try await fetchPlaceThumbnails(for: missingPlaceIds)
+            imageMap.merge(fallbackImages) { existing, _ in existing }
+        }
+        
+        return imageMap
+    }
+    
+    /// Fetch thumbnail_url or first photo_url for places
+    private func fetchPlaceThumbnails(for placeIds: [String]) async throws -> [String: String] {
+        struct PlaceImageData: Decodable {
+            let id: String
+            let thumbnail_url: String?
+            let photo_urls: [String]?
+        }
+        
+        let records: [PlaceImageData] = try await supabase.client
+            .from("places")
+            .select("id, thumbnail_url, photo_urls")
+            .in("id", values: placeIds)
+            .execute()
+            .value
+        
+        var imageMap: [String: String] = [:]
+        for record in records {
+            // Prefer thumbnail_url, fallback to first photo_url
+            if let thumbnail = record.thumbnail_url, !thumbnail.isEmpty {
+                imageMap[record.id] = thumbnail
+            } else if let photos = record.photo_urls, let firstPhoto = photos.first, !firstPhoto.isEmpty {
+                imageMap[record.id] = firstPhoto
+            }
+        }
+        
+        return imageMap
+    }
+    
+    // MARK: - Save Count
+    
+    /// Fetch total save count for a place (all users, all save sources)
+    /// Returns the number of unique users who have saved this place
+    func fetchTotalSaveCount(for placeId: String) async throws -> Int {
+        let count: Int = try await supabase.client
+            .rpc("get_place_total_save_count", params: ["p_place_id": placeId])
+            .execute()
+            .value
+        return count
+    }
+    
     // MARK: - Place Creation
     
     /// Test method to verify Supabase connection
@@ -680,7 +742,10 @@ class SupabasePlaceService: ObservableObject {
             
             return response
         } catch {
-            print("❌ [Supabase] Error fetching place annotations: \(error)")
+            // Don't log cancellation errors - they're expected when user pans/zooms quickly
+            if !Task.isCancelled && !(error is CancellationError) && (error as NSError).code != NSURLErrorCancelled {
+                print("❌ [Supabase] Error fetching place annotations: \(error)")
+            }
             throw error
         }
     }
@@ -807,6 +872,44 @@ class SupabasePlaceService: ObservableObject {
                 print("❌ [Supabase] Error fetching viewport places: \(error)")
                 completion(nil, error)
             }
+        }
+    }
+    
+    // MARK: - Community Places (places saved by users outside your network)
+    
+    /// Fetch community places in viewport - places saved by users you don't follow
+    /// These are displayed as small emoji markers on the map
+    /// Uses grid-based clustering for O(n) performance (same as Google Maps/Mapbox)
+    func fetchCommunityPlacesInViewport(northLat: Double, southLat: Double, eastLng: Double, westLng: Double, userId: String) async throws -> [CommunityPlaceMarker] {
+        do {
+            struct CommunityViewportParams: Encodable {
+                let p_user_id: String
+                let p_min_lon: Double
+                let p_min_lat: Double
+                let p_max_lon: Double
+                let p_max_lat: Double
+            }
+            
+            let params = CommunityViewportParams(
+                p_user_id: userId,
+                p_min_lon: westLng,
+                p_min_lat: southLat,
+                p_max_lon: eastLng,
+                p_max_lat: northLat
+            )
+            
+            let response: [CommunityPlaceMarker] = try await supabase.client
+                .rpc("get_community_places_in_viewport", params: params)
+                .execute()
+                .value
+            
+            return response
+        } catch {
+            // Don't log cancellation errors - they're expected when user pans/zooms quickly
+            if !Task.isCancelled && !(error is CancellationError) && (error as NSError).code != NSURLErrorCancelled {
+                print("❌ [Supabase] Error fetching community places: \(error)")
+            }
+            throw error
         }
     }
     

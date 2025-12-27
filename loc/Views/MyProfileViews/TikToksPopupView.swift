@@ -34,10 +34,7 @@ struct TikToksPopupView: View {
                 )
             }
         )
-        .onAppear {
-            if profile.lightweightExternalPlaces.isEmpty {
-                Task { await profile.loadInitialExternalPlaces() }
-            }
-        }
+        // ✅ MVVM + SRP: ViewModel automatically loads data when user is set
+        // No manual loading needed - reactive observer handles it
     }
 }

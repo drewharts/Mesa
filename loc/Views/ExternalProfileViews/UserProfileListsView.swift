@@ -520,6 +520,8 @@ struct ExternalUserListContentView: View {
     @Binding var currentPage: Int
     let onLoadMore: () -> Void
     
+    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
+    
     // Grid layout matching ProfileView lists (consistent spacing)
     private let columns = [
         GridItem(.flexible(), spacing: 12),
@@ -538,7 +540,10 @@ struct ExternalUserListContentView: View {
                         // Use same LightweightPlaceGridCell as internal popup
                         LightweightPlaceGridCell(
                             place: place,
-                            isCollaborativeList: list.isCollaborative
+                            isCollaborativeList: list.isCollaborative,
+                            onNavigate: { placeId in
+                                navigateToPlace(placeId: placeId)
+                            }
                         )
                         .onAppear {
                             // Load more when user scrolls to 3rd-to-last item
@@ -569,6 +574,16 @@ struct ExternalUserListContentView: View {
                 Spacer()
             }
             .padding(.vertical, 30)
+        }
+    }
+    
+    /// Navigate to place from external profile - dismisses entire profile sheet first
+    private func navigateToPlace(placeId: String) {
+        Task {
+            guard let detailPlace = try? await PlaceService.shared.fetchPlace(withId: placeId) else { return }
+            await MainActor.run {
+                viewModel.navigateToPlaceFromProfile(detailPlace, selectedPlaceVM: selectedPlaceVM)
+            }
         }
     }
 }

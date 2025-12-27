@@ -239,6 +239,32 @@ class PlaceService: ObservableObject {
         )
     }
     
+    /// Fetch community places in viewport - places saved by users outside your network
+    /// Returns lightweight emoji markers using grid-based clustering for O(n) performance
+    func fetchCommunityPlacesInViewport(northLat: Double, southLat: Double, eastLng: Double, westLng: Double) async throws -> [CommunityPlaceMarker] {
+        guard let authUserId = await SupabaseAuthService.shared.currentUserId else {
+            return []
+        }
+        
+        // Get the profile user ID (not auth UID)
+        let profileUserId: String
+        do {
+            let profile = try await UserService.shared.fetchUserById(userId: authUserId)
+            profileUserId = profile.id
+        } catch {
+            print("⚠️ [PlaceService] Could not fetch profile, using auth UID as fallback: \(authUserId)")
+            profileUserId = authUserId
+        }
+        
+        return try await supabase.fetchCommunityPlacesInViewport(
+            northLat: northLat,
+            southLat: southLat,
+            eastLng: eastLng,
+            westLng: westLng,
+            userId: profileUserId
+        )
+    }
+    
     // fetchFriendsPlacesInViewport methods removed - the main get_visible_annotations_with_users function
     // now handles both user and friends' places in a single optimized query
     

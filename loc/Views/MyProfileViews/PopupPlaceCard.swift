@@ -12,6 +12,7 @@
 //  - deleteTitle: Title for delete confirmation alert
 //  - deleteMessage: Message for delete confirmation alert
 //  - onDelete: Callback when delete is confirmed
+//  - onNavigate: Custom navigation callback (for external profile views that need to dismiss the profile)
 
 import SwiftUI
 
@@ -24,6 +25,9 @@ struct PopupPlaceCard: View {
     var deleteTitle: String = "Delete Place"
     var deleteMessage: String? = nil
     var onDelete: (() -> Void)? = nil
+    /// Custom navigation callback - when provided, bypasses default navigation
+    /// Use this for external profile views that need to dismiss the profile sheet first
+    var onNavigate: ((String) -> Void)? = nil
     
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @Environment(\.presentationMode) var presentationMode
@@ -71,8 +75,14 @@ struct PopupPlaceCard: View {
             .clipShape(RoundedRectangle(cornerRadius: 8))
             .shadow(color: Color.black.opacity(0.08), radius: 6, x: 0, y: 3)
             .onTapGesture {
-                selectedPlaceVM.navigateToPlace(placeId: place.place_id) {
-                    presentationMode.wrappedValue.dismiss()
+                if let customNavigate = onNavigate {
+                    // Use custom navigation (e.g., for external profile views)
+                    customNavigate(place.place_id)
+                } else {
+                    // Default navigation - just dismiss popup and show place
+                    selectedPlaceVM.navigateToPlace(placeId: place.place_id) {
+                        presentationMode.wrappedValue.dismiss()
+                    }
                 }
             }
             .modifier(DeleteGestureModifier(

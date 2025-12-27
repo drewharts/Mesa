@@ -214,6 +214,7 @@ struct PlaceDetailTabsView: View {
         case .about:
             AboutTabContent(
                 viewModel: viewModel.aboutTabViewModel,
+                totalSaveCount: viewModel.placeSaversViewModel.totalGlobalSaveCount,
                 onPhotoTapped: onPhotoTapped
             )
             .environmentObject(profile)

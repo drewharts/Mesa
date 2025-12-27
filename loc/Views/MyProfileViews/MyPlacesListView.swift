@@ -58,6 +58,9 @@ struct LightweightPlaceGridCell: View {
     let place: LightweightPlace
     var isCollaborativeList: Bool = false  // Only show "Added by" for collaborative lists
     var onLongPress: (() -> Void)? = nil
+    /// Custom navigation callback - when provided, bypasses default navigation
+    /// Use this for external profile views that need to dismiss the profile sheet first
+    var onNavigate: ((String) -> Void)? = nil
     
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @Environment(\.presentationMode) var presentationMode
@@ -103,8 +106,14 @@ struct LightweightPlaceGridCell: View {
             .clipShape(RoundedRectangle(cornerRadius: 8))
             .shadow(color: Color.black.opacity(0.08), radius: 6, x: 0, y: 3)
             .onTapGesture {
-                Task {
-                    await loadPlaceAndNavigate()
+                if let customNavigate = onNavigate {
+                    // Use custom navigation (e.g., for external profile views)
+                    customNavigate(place.place_id)
+                } else {
+                    // Default navigation - just dismiss popup and show place
+                    Task {
+                        await loadPlaceAndNavigate()
+                    }
                 }
             }
             .onLongPressGesture {

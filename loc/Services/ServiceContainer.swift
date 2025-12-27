@@ -26,6 +26,7 @@ class ServiceContainer: ObservableObject {
     // MARK: - Managers
     lazy var locationManager = LocationManager()
     lazy var notificationManager = NotificationManager.shared
+    lazy var pushNotificationService = PushNotificationService.shared
     lazy var deepLinkManager: DeepLinkManager = {
         let dummyLocationManager = LocationManager()
         let dummySelectedPlaceVM = SelectedPlaceViewModel(

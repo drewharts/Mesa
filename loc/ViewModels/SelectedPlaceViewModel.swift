@@ -589,18 +589,14 @@ class SelectedPlaceViewModel: ObservableObject {
     }
     
     /// Navigate to map and select a place (for use when navigating from profile views)
-    /// This method handles dismissing navigation and then selecting the place with map animation
+    /// This method sets up the place detail FIRST, then dismisses the profile for a smooth transition
     func navigateToMapAndSelectPlace(_ place: DetailPlace, dismissNavigation: @escaping () -> Void) {
-        // First dismiss any navigation
-        dismissNavigation()
+        // Set up place selection FIRST (so it's ready when profile dismisses)
+        self.selectPlaceAndFetchDetails(place, shouldAnimateMap: true)
+        self.isDetailSheetPresented = true
         
-        // Small delay to ensure navigation is dismissed before selecting place
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
-            guard let self = self else { return }
-            // Select place with map animation
-            self.selectPlaceAndFetchDetails(place, shouldAnimateMap: true)
-            self.isDetailSheetPresented = true
-        }
+        // Dismiss immediately - place detail is already set up and will appear as profile animates away
+        dismissNavigation()
     }
     
     // MARK: - Logout Cleanup

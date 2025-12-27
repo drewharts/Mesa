@@ -40,6 +40,18 @@ struct MapView: View {
     // Map content extracted to help Swift type checker
     private var mapContentView: some View {
         Map(position: $mapPosition) {
+            // Community places as small white dots (shown behind network places)
+            ForEach(mapViewModel.communityMarkers) { marker in
+                Annotation(
+                    "",
+                    coordinate: marker.coordinate,
+                    anchor: .center
+                ) {
+                    communityMarkerView(for: marker)
+                }
+            }
+            
+            // Network places (user + followed users) as main annotations
             ForEach(annotationsToDisplay) { annotation in
                 Annotation(
                     annotation.name,
@@ -49,6 +61,7 @@ struct MapView: View {
                     annotationMarkerView(for: annotation)
                 }
             }
+            
             // Current location dot
             if let userLocation = locationManager.currentLocation?.coordinate {
                 Annotation(
@@ -74,6 +87,43 @@ struct MapView: View {
         )
         .onTapGesture {
             handleAnnotationTap(annotation)
+        }
+    }
+    
+    // Community marker view - small emoji markers for places saved by users you don't follow
+    private func communityMarkerView(for marker: CommunityPlaceMarker) -> some View {
+        let isSelected = selectedPlaceVM.isDetailSheetPresented && 
+                        selectedPlaceVM.selectedPlace?.id.uuidString == marker.id
+        
+        // Scale size based on popularity (save count)
+        let fontSize: CGFloat = {
+            switch marker.saveCount {
+            case 1...5: return 16
+            case 6...20: return 20
+            default: return 24
+            }
+        }()
+        
+        return Text(marker.emoji)
+            .font(.system(size: fontSize))
+            .shadow(color: .black.opacity(0.3), radius: 2, x: 0, y: 1)
+            .scaleEffect(isSelected ? 1.3 : 1.0)
+            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isSelected)
+            .onTapGesture {
+                handleCommunityMarkerTap(marker)
+            }
+    }
+    
+    // Handle community marker tap
+    private func handleCommunityMarkerTap(_ marker: CommunityPlaceMarker) {
+        Task {
+            if let place = await mapViewModel.loadPlaceDetails(for: marker) {
+                await MainActor.run {
+                    // Don't animate map when tapping marker - user is already looking at it
+                    selectedPlaceVM.selectPlaceAndFetchDetails(place, shouldAnimateMap: false)
+                    selectedPlaceVM.isDetailSheetPresented = true
+                }
+            }
         }
     }
     

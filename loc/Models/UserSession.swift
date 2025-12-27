@@ -79,6 +79,11 @@ class UserSession: ObservableObject {
     func setUserLoggedIn(uid: String) {
         self.isUserLoggedIn = true
         self.currentUserId = uid
+        
+        // Process any pending push notification token (SRP: delegate to service)
+        Task { @MainActor in
+            await PushNotificationService.shared.processPendingToken(for: uid)
+        }
     }
     
     // MARK: - Push Notifications

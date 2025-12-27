@@ -9,6 +9,7 @@ FUNCTIONS=(
     "extract_video_url"
     "get_all_user_places"
     "get_bounding_box"
+    "get_community_places_in_viewport"
     "get_external_places_annotations"
     "get_favorites_annotations"
     "get_followed_users"
