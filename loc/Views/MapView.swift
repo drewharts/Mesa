@@ -29,6 +29,7 @@ struct MapView: View {
     @State private var showVisiblePlacesPopup = false
     @State private var currentMapRegion: MKCoordinateRegion?
     @State private var hasLoadedInitialViewport = false
+    @State private var hasCenteredOnUserLocation = false
     
     var onMapTap: (() -> Void)?
     
@@ -163,8 +164,6 @@ struct MapView: View {
     }
     
     var body: some View {
-        let currentCoords = locationManager.currentLocation?.coordinate ?? defaultCenter
-        
         ZStack {
             MapReader { mapProxy in
                 mapContentView
@@ -201,16 +200,6 @@ struct MapView: View {
                         }
                 )
             }
-            .onChange(of: selectedPlaceVM.selectedPlace) { oldValue, newValue in
-                guard newValue != nil else {
-                    // Reset to default if no place is selected
-                    withAnimation(.easeOut) {
-                        mapPosition = .camera(MapCamera(centerCoordinate: defaultCenter, distance: 100))
-                    }
-                    return
-                }
-                // No zoom animation when selecting a place - just show the detail view
-            }
             .onChange(of: recenterMap) { oldValue, newValue in
                 if newValue {
                     let coords = locationManager.currentLocation?.coordinate ?? defaultCenter
@@ -218,6 +207,30 @@ struct MapView: View {
                         mapPosition = .camera(MapCamera(centerCoordinate: coords, distance: 1000))
                     }
                     recenterMap = false
+                }
+            }
+            .onChange(of: locationManager.currentLocation) { oldValue, newValue in
+                // Center map on user's actual location when it first becomes available
+                // This fixes the "Kansas problem" where new users start at the US center
+                if !hasCenteredOnUserLocation,
+                   let userLocation = newValue?.coordinate,
+                   selectedPlaceVM.selectedPlace == nil {
+                    hasCenteredOnUserLocation = true
+                    withAnimation(.easeInOut(duration: 0.5)) {
+                        mapPosition = .camera(MapCamera(centerCoordinate: userLocation, distance: 1500))
+                    }
+                    
+                    // Also load viewport places for this new location
+                    if !hasLoadedInitialViewport {
+                        let region = MKCoordinateRegion(
+                            center: userLocation,
+                            span: MKCoordinateSpan(latitudeDelta: 0.015, longitudeDelta: 0.015)
+                        )
+                        hasLoadedInitialViewport = true
+                        Task.detached(priority: .background) {
+                            await mapViewModel.onMapCameraSettled(region)
+                        }
+                    }
                 }
             }
             .onChange(of: showCreatePlacePopup) { oldValue, newValue in
@@ -284,11 +297,15 @@ struct MapView: View {
                 let newCenter = CLLocationCoordinate2D(latitude: geoPoint.latitude, longitude: geoPoint.longitude)
                 let camera = MapCamera(centerCoordinate: newCenter, distance: 500)
                 mapPosition = .camera(camera)
-            } else {
-                // Default to current location or center of US
-                let coords = locationManager.currentLocation?.coordinate ?? defaultCenter
-                mapPosition = .camera(MapCamera(centerCoordinate: coords, distance: 1500))
+                hasCenteredOnUserLocation = true // Don't override with user location later
+            } else if let userLocation = locationManager.currentLocation?.coordinate {
+                // User location is available - center on it
+                mapPosition = .camera(MapCamera(centerCoordinate: userLocation, distance: 1500))
+                hasCenteredOnUserLocation = true
             }
+            // Note: If neither place nor location is available, mapPosition stays at .automatic
+            // and the onChange(of: locationManager.currentLocation) will handle centering
+            // when the user's location becomes available
 
             // Setup notification observers
             setupNotificationObservers()
@@ -320,16 +337,17 @@ struct MapView: View {
                 if let region = currentMapRegion {
                     await mapViewModel.onMapCameraSettled(region)
                     hasLoadedInitialViewport = true
-                } else {
-                    // Create a region from the current map position
-                    let coords = locationManager.currentLocation?.coordinate ?? defaultCenter
+                } else if let userLocation = locationManager.currentLocation?.coordinate {
+                    // Create a region from the user's current location
                     let region = MKCoordinateRegion(
-                        center: coords,
+                        center: userLocation,
                         span: MKCoordinateSpan(latitudeDelta: 0.015, longitudeDelta: 0.015)
                     )
                     await mapViewModel.onMapCameraSettled(region)
                     hasLoadedInitialViewport = true
                 }
+                // Note: If no location yet, we'll load viewport when location becomes available
+                // via the onChange handler
             }
             
             // ✅ Load profile photos on first appearance (critical for login flow)
