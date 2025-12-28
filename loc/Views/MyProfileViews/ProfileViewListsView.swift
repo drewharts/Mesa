@@ -43,9 +43,11 @@ struct ProfileViewListsView: View {
             ImagePicker(images: $inputImage, selectionLimit: 1)
         }
         .sheet(isPresented: $showingNewListSheet) {
-            NewListView(isPresented: $showingNewListSheet, onSave: { listName in
+            NewListSheetView(onSave: { listName in
                 let _ = await profile.addNewPlaceList(named: listName, city: "", emoji: "", image: "")
             })
+            .presentationDetents([.height(200)])
+            .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: .constant(deepLinkManager.hasPendingList()), onDismiss: {
             deepLinkManager.clearPendingList()

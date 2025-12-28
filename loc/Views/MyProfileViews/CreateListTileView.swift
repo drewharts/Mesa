@@ -39,14 +39,13 @@ struct CreateListTileView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .aspectRatio(1, contentMode: .fit)
-        .background(Color(.systemBackground))
+        .background(Color(.systemGray6))
         .overlay(
             RoundedRectangle(cornerRadius: 8)
-                .stroke(style: StrokeStyle(lineWidth: 1.5, dash: [8, 4]))
-                .foregroundColor(.gray.opacity(0.3))
+                .stroke(Color.gray.opacity(0.2), lineWidth: 1)
         )
         .clipShape(RoundedRectangle(cornerRadius: 8))
-        .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 2)
+        .shadow(color: .black.opacity(0.08), radius: 6, x: 0, y: 3)
     }
     
     // MARK: - Tile Label
