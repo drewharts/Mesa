@@ -178,16 +178,16 @@ struct UserResultsView: View {
                         isCollapsed.toggle()
                     }
                 }) {
-                    HStack {
+                    HStack(spacing: 6) {
                         Text("Users")
                             .font(.headline)
                             .foregroundColor(.gray)
                         
-                        Spacer()
-                        
                         Image(systemName: isCollapsed ? "chevron.down" : "chevron.up")
                             .font(.system(size: 12, weight: .semibold))
                             .foregroundColor(.gray.opacity(0.8))
+                        
+                        Spacer()
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 20)
