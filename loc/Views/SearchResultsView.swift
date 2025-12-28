@@ -186,8 +186,8 @@ struct UserResultsView: View {
                         Spacer()
                         
                         Image(systemName: isCollapsed ? "chevron.down" : "chevron.up")
-                            .font(.caption)
-                            .foregroundColor(.gray)
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(.gray.opacity(0.8))
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 20)
