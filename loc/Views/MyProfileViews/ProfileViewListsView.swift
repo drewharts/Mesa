@@ -31,7 +31,6 @@ struct ProfileViewListsView: View {
     @State private var selectedList: PlaceListViewModel?
     @State private var showingNewListSheet = false
     @State private var placeColors: [UUID: Color] = [:]
-    @FocusState private var isSearchFocused: Bool
     
     // MARK: - Body
     
@@ -39,29 +38,15 @@ struct ProfileViewListsView: View {
         VStack(alignment: .leading, spacing: 8) {
             headerView
             
-            ScrollViewReader { proxy in
-                VStack(alignment: .leading, spacing: 8) {
-                    if profile.isSearchingLists {
-                        searchBar
-                            .id("searchBar")
-                    }
-                    
-                    listContent
-                }
-                .onChange(of: isSearchFocused) { focused in
-                    if focused {
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            proxy.scrollTo("searchBar", anchor: .top)
-                        }
-                    }
-                }
+            // Simple inline search bar
+            if profile.isSearchingLists {
+                searchBar
             }
+            
+            listContent
         }
         .onChange(of: profile.isSearchingLists) { isSearching in
-            if isSearching {
-                isSearchFocused = true
-            } else {
-                isSearchFocused = false
+            if !isSearching {
                 profile.listSearchText = ""
                 Task {
                     await profile.reloadListsAfterSearch()
@@ -120,7 +105,7 @@ struct ProfileViewListsView: View {
     
     // MARK: - Search Bar
     
-    /// Inline search bar with keyboard focus tracking for automatic scrolling
+    /// Simple inline search bar for filtering lists
     private var searchBar: some View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
@@ -132,7 +117,6 @@ struct ProfileViewListsView: View {
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
                 .submitLabel(.search)
-                .focused($isSearchFocused)
             
             if !profile.listSearchText.isEmpty {
                 Button {
@@ -149,6 +133,7 @@ struct ProfileViewListsView: View {
         .background(Color(.systemGray6))
         .cornerRadius(10)
         .padding(.horizontal, 20)
+        .padding(.bottom, 4)
     }
     
     // MARK: - List Content (State-based rendering)

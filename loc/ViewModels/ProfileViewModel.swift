@@ -2381,23 +2381,30 @@ class ProfileViewModel: ObservableObject {
         }
     }
     
-    /// Loads places for search result lists to display photos in collages
+    /// Loads places for search result lists in parallel to display photos in collages
     private func loadPlacesForSearchResults() async {
-        // Load places for first 6 lists (for collage photos)
-        let listsToLoad = Array(lightweightPlaceLists.prefix(6))
-        
-        for list in listsToLoad {
-            do {
-                let places = try await userService.fetchPlacesForPlaceList(
-                    listId: list.list_id,
-                    page: 1,
-                    pageSize: 6
-                )
-                
-                // Update places for this list (delegates to existing state management)
-                setPlacesForList(listId: list.list_id, places: places)
-            } catch {
-                // Continue loading other lists on error
+        // Load places for all search results in parallel for better performance
+        await withTaskGroup(of: (String, [LightweightPlace]?).self) { group in
+            for list in lightweightPlaceLists {
+                group.addTask {
+                    do {
+                        let places = try await self.userService.fetchPlacesForPlaceList(
+                            listId: list.list_id,
+                            page: 1,
+                            pageSize: 6
+                        )
+                        return (list.list_id, places)
+                    } catch {
+                        return (list.list_id, nil)
+                    }
+                }
+            }
+            
+            // Collect all results and update in a single batch
+            for await (listId, places) in group {
+                if let places = places {
+                    setPlacesForList(listId: listId, places: places)
+                }
             }
         }
     }
