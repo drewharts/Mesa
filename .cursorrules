@@ -1,5 +1,58 @@
 # Cursor Rules for SwiftUI Project
 
+## ⚠️ CORE PRINCIPLES (ALWAYS FOLLOW)
+
+### Architecture Standards
+- **STRICT MVVM ARCHITECTURE**: All code MUST follow Model-View-ViewModel architecture without exception
+  - **Model**: Data structures and business entities only
+  - **View**: Purely declarative UI with zero business logic
+  - **ViewModel**: All business logic, state management, and data coordination
+  - Never bypass MVVM for "quick fixes" or "simple cases"
+
+### Single Responsibility Principle (SRP)
+- **ONE REASON TO CHANGE**: Every class, struct, and function should have exactly one reason to change
+- **FOCUSED COMPONENTS**: Each component does one thing and does it well
+- **CLEAR BOUNDARIES**: If a component has multiple responsibilities, split it immediately
+- **NO GOD OBJECTS**: Avoid classes/structs that know or do too much
+
+### Code Quality Standards
+- **STAFF ENGINEER LEVEL**: All code must meet staff engineer quality standards:
+  - Clean, readable, and self-documenting code
+  - Proper error handling and edge case coverage
+  - Thoughtful API design and abstractions
+  - Performance-conscious implementations
+  - Maintainable and extensible architecture
+  - No shortcuts or technical debt without explicit documentation
+
+## Documentation Standards
+
+### Function Comments
+- **ONE COMMENT PER FUNCTION**: Every function MUST have exactly one comment directly above it
+- **DESCRIBE THE BEHAVIOR**: The comment must clearly describe what the function does, not how
+- **KEEP COMMENTS UPDATED**: When a function's behavior changes, the comment MUST be updated immediately
+- **NO STALE COMMENTS**: A wrong comment is worse than no comment - always verify accuracy
+
+### Comment Format
+```swift
+/// Fetches user places from the database and updates the local cache.
+func fetchUserPlaces() async throws { ... }
+
+/// Calculates the distance between two coordinates in meters.
+func calculateDistance(from: CLLocationCoordinate2D, to: CLLocationCoordinate2D) -> Double { ... }
+
+/// Validates the input form and returns any validation errors found.
+func validateForm() -> [ValidationError] { ... }
+```
+
+### Comment Rules
+- Use `///` for documentation comments (Swift standard)
+- Start with a verb (Fetches, Calculates, Validates, Returns, etc.)
+- Be specific but concise (one sentence is ideal)
+- Include parameter context only if not obvious from names
+- Update comment FIRST when modifying function behavior
+
+---
+
 ## File Organization Rules
 
 ### View Structure
@@ -59,6 +112,11 @@ ViewModels/
 4. **Network calls or async operations in Views**
 5. **Complex data manipulation in Views**
 6. **Functions longer than 30 lines**
+7. **MVVM violations**: Any code that bypasses the MVVM architecture
+8. **SRP violations**: Components with multiple responsibilities
+9. **Missing function comments**: Functions without a describing comment
+10. **Stale comments**: Comments that don't match the function's current behavior
+11. **Sub-standard code quality**: Code that doesn't meet staff engineer standards
 
 ### Acceptable in Views
 - `var body: some View { ... }`

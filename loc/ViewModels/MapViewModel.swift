@@ -8,7 +8,6 @@
 import Foundation
 import MapKit
 import SwiftUI
-import Combine
 
 @MainActor
 class MapViewModel: ObservableObject {
@@ -23,22 +22,12 @@ class MapViewModel: ObservableObject {
     private let placeService: PlaceService
     private let detailPlaceVM: DetailPlaceViewModel
     private var lastLoadedRegion: MKCoordinateRegion?
-    private var pendingViewportRegion: MKCoordinateRegion? // Region waiting for profile to be ready
     private var placeDetailsCache: [String: DetailPlace] = [:] // Cache for full place details
     private var currentLoadTask: Task<Void, Never>? // Track current loading task for cancellation
-    private var cancellables = Set<AnyCancellable>() // Combine subscriptions
-    
-    /// ProfileViewModel reference - when set, automatically observes user profile changes
-    /// and triggers photo loading when user becomes available
-    weak var profileViewModel: ProfileViewModel? {
-        didSet {
-            setupProfileObserver()
-        }
-    }
     
     // Photo loading state (for de-duplication)
     private var isLoadingPhotos = false
-    private var hasLoadedPhotos = false
+    private(set) var hasLoadedPhotos = false // Exposed for View to check
     
     // Minimum movement threshold to trigger reload (in degrees)
     private let minMovementThreshold: Double = 0.01 // ~1km at equator
@@ -48,72 +37,26 @@ class MapViewModel: ObservableObject {
         self.detailPlaceVM = detailPlaceVM
     }
     
-    // MARK: - Profile Observer (Reactive MVVM Pattern)
-    
-    /// Sets up Combine subscription to observe ProfileViewModel.user changes.
-    /// Automatically triggers photo and viewport loading when user profile becomes available.
-    /// This ensures data loads regardless of initialization order (race condition fix).
-    private func setupProfileObserver() {
-        // Cancel existing subscriptions when profileViewModel changes
-        cancellables.removeAll()
-        
-        guard let profileVM = profileViewModel else { return }
-        
-        // Observe user profile changes reactively
-        profileVM.$user
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] user in
-                guard let self = self, user != nil else { return }
-                
-                Task { @MainActor in
-                    // When user becomes available, trigger pending operations
-                    
-                    // 1. Load photos if not already loaded
-                    if !self.hasLoadedPhotos {
-                        print("✅ [MapViewModel] User profile available, triggering photo load")
-                        await self.loadFollowedUsersPhotos()
-                    }
-                    
-                    // 2. Load pending viewport if one was waiting for profile
-                    if let pendingRegion = self.pendingViewportRegion {
-                        print("✅ [MapViewModel] User profile available, loading pending viewport")
-                        self.pendingViewportRegion = nil
-                        await self.loadPlacesForViewport(pendingRegion)
-                    }
-                }
-            }
-            .store(in: &cancellables)
-    }
+    // MARK: - Photo Loading (Called by View when profile is available)
     
     /// Load profile photos for followed users (for custom annotation views)
-    /// Note: This is automatically triggered reactively when ProfileViewModel.user becomes available.
-    /// Manual calls are only needed for refresh scenarios (e.g., app returning to foreground).
-    func loadFollowedUsersPhotos() async {
+    /// Called by View when user profile becomes available - View coordinates, ViewModel executes
+    /// - Parameters:
+    ///   - userId: The current user's profile ID
+    ///   - currentUserPhotoUrl: Optional URL for current user's profile photo
+    func loadFollowedUsersPhotos(userId: String, currentUserPhotoUrl: URL?) async {
         // Prevent duplicate/concurrent loads
-        guard !isLoadingPhotos else {
-            return // Silent skip - this is expected during reactive + manual overlap
-        }
-        
-        // Use cached profile data - should be available due to reactive subscription
-        guard let currentUser = profileViewModel?.user else {
-            // This is now unexpected after reactive subscription is set up
-            // Only happens if called manually before profile loads (legacy code paths)
-            print("⏳ [MapViewModel] Waiting for user profile (reactive subscription will trigger load)")
-            return
-        }
+        guard !isLoadingPhotos else { return }
         
         isLoadingPhotos = true
         defer { isLoadingPhotos = false }
         
-        let profileUserId = currentUser.id
-        let currentUserPhotoUrl = currentUser.profilePhotoURL
-        
         do {
-            var photos = try await placeService.fetchFollowedUsersPhotos(userId: profileUserId)
+            var photos = try await placeService.fetchFollowedUsersPhotos(userId: userId)
             
-            // Add current user's photo to the list (using cached data)
+            // Add current user's photo to the list
             if let photoUrl = currentUserPhotoUrl {
-                let currentUserPhoto = FollowedUserPhoto(userId: profileUserId, profilePhotoUrl: photoUrl.absoluteString)
+                let currentUserPhoto = FollowedUserPhoto(userId: userId, profilePhotoUrl: photoUrl.absoluteString)
                 photos.append(currentUserPhoto)
             }
             
@@ -254,57 +197,36 @@ class MapViewModel: ObservableObject {
         }
     }
     
+    // MARK: - Viewport Loading (Called by View with userId)
+    
     /// Call this when the map camera has settled (using native iOS 17+ callback)
     /// Apple handles debouncing automatically, so we don't need manual timers
-    func onMapCameraSettled(_ newRegion: MKCoordinateRegion) async {
+    /// - Parameters:
+    ///   - newRegion: The map region to load places for
+    ///   - userId: The current user's profile ID (passed by View from ProfileViewModel)
+    func onMapCameraSettled(_ newRegion: MKCoordinateRegion, userId: String) async {
         // Check if the region change is significant enough to warrant a reload
         if let lastRegion = lastLoadedRegion, !shouldReloadForRegion(newRegion, lastRegion: lastRegion) {
             return
         }
         
-        // Load places for the new viewport with low priority
-        await loadPlacesForViewport(newRegion)
-    }
-    
-    /// Legacy method for compatibility (deprecated - use onMapCameraSettled instead)
-    func onMapRegionChange(_ newRegion: MKCoordinateRegion) {
-        // Check if the region change is significant enough to warrant a reload
-        if let lastRegion = lastLoadedRegion, !shouldReloadForRegion(newRegion, lastRegion: lastRegion) {
-            return
-        }
-        
-        // Debounce to avoid excessive queries while user is actively panning
-        debounceTimer?.invalidate()
-        
-        debounceTimer = Timer.scheduledTimer(
-            withTimeInterval: 1.2,  // 1.2s for better debouncing
-            repeats: false
-        ) { [weak self] _ in
-            Task(priority: .background) { @MainActor in
-                await self?.loadPlacesForViewport(newRegion)
-            }
-        }
+        // Load places for the new viewport
+        await loadPlacesForViewport(newRegion, userId: userId)
     }
     
     /// Main method to load place annotations for a given viewport
     /// Uses the optimized PostgreSQL function for ultra-fast loading
     /// Implements task cancellation to avoid redundant loads
-    private func loadPlacesForViewport(_ region: MKCoordinateRegion) async {
+    /// - Parameters:
+    ///   - region: The map region to load places for
+    ///   - userId: The current user's profile ID
+    private func loadPlacesForViewport(_ region: MKCoordinateRegion, userId: String) async {
         // Cancel any previous loading task
         currentLoadTask?.cancel()
         
         let task = Task { @MainActor in
             // Check if cancelled before starting
             guard !Task.isCancelled else {
-                return
-            }
-            
-            // Use cached profile ID from ProfileViewModel (avoids redundant DB lookups)
-            guard let profileUserId = profileViewModel?.user?.id else {
-                // Store region for when profile becomes available (reactive pattern)
-                self.pendingViewportRegion = region
-                print("⏳ [MapViewModel] Waiting for user profile before loading viewport")
-                isLoadingViewportPlaces = false
                 return
             }
             
@@ -320,13 +242,12 @@ class MapViewModel: ObservableObject {
                 }
                 
                 // Fetch network annotations and community places in parallel
-                // Using explicit userId methods to avoid redundant profile lookups
                 async let networkAnnotationsTask = placeService.fetchPlacesInViewportWithUserId(
                     northLat: bounds.northLat,
                     southLat: bounds.southLat,
                     eastLng: bounds.eastLng,
                     westLng: bounds.westLng,
-                    userId: profileUserId
+                    userId: userId
                 )
                 
                 async let communityMarkersTask = placeService.fetchCommunityPlacesInViewportWithUserId(
@@ -334,7 +255,7 @@ class MapViewModel: ObservableObject {
                     southLat: bounds.southLat,
                     eastLng: bounds.eastLng,
                     westLng: bounds.westLng,
-                    userId: profileUserId
+                    userId: userId
                 )
                 
                 let (annotations, community) = try await (networkAnnotationsTask, communityMarkersTask)
@@ -444,7 +365,6 @@ class MapViewModel: ObservableObject {
     
     deinit {
         debounceTimer?.invalidate()
-        cancellables.removeAll()
     }
 }
 

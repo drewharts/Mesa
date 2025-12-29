@@ -63,6 +63,33 @@ class PlaceListService {
         }
     }
     
+    /// Search user's place lists by name with server-side filtering
+    /// Returns all matching lists regardless of pagination for comprehensive search results
+    func searchListsByName(
+        userId: String,
+        searchTerm: String,
+        limit: Int = 50
+    ) async throws -> [LightweightPlaceList] {
+        struct Params: Encodable {
+            let p_user_id: String
+            let p_search_term: String
+            let p_limit: Int
+        }
+        
+        let params = Params(
+            p_user_id: userId,
+            p_search_term: searchTerm,
+            p_limit: limit
+        )
+        
+        let lists: [LightweightPlaceList] = try await supabase.client
+            .rpc("search_user_place_lists", params: params)
+            .execute()
+            .value
+        
+        return lists
+    }
+    
     // MARK: - Fetch Places in List
     
     /// Fetch places within a specific place list with pagination
