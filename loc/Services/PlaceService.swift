@@ -241,6 +241,7 @@ class PlaceService: ObservableObject {
     
     /// Fetch community places in viewport - places saved by users outside your network
     /// Returns lightweight emoji markers using grid-based clustering for O(n) performance
+    /// Note: Prefer `fetchCommunityPlacesInViewportWithUserId` when caller already has user ID
     func fetchCommunityPlacesInViewport(northLat: Double, southLat: Double, eastLng: Double, westLng: Double) async throws -> [CommunityPlaceMarker] {
         guard let authUserId = await SupabaseAuthService.shared.currentUserId else {
             return []
@@ -262,6 +263,18 @@ class PlaceService: ObservableObject {
             eastLng: eastLng,
             westLng: westLng,
             userId: profileUserId
+        )
+    }
+    
+    /// ✅ Fetch community places with explicit user ID (avoids redundant profile lookups)
+    /// Use this when caller already has the profile user ID from ProfileViewModel
+    func fetchCommunityPlacesInViewportWithUserId(northLat: Double, southLat: Double, eastLng: Double, westLng: Double, userId: String) async throws -> [CommunityPlaceMarker] {
+        return try await supabase.fetchCommunityPlacesInViewport(
+            northLat: northLat,
+            southLat: southLat,
+            eastLng: eastLng,
+            westLng: westLng,
+            userId: userId
         )
     }
     

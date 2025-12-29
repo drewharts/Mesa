@@ -23,6 +23,7 @@ class MapViewModel: ObservableObject {
     private let placeService: PlaceService
     private let detailPlaceVM: DetailPlaceViewModel
     private var lastLoadedRegion: MKCoordinateRegion?
+    private var pendingViewportRegion: MKCoordinateRegion? // Region waiting for profile to be ready
     private var placeDetailsCache: [String: DetailPlace] = [:] // Cache for full place details
     private var currentLoadTask: Task<Void, Never>? // Track current loading task for cancellation
     private var cancellables = Set<AnyCancellable>() // Combine subscriptions
@@ -50,8 +51,8 @@ class MapViewModel: ObservableObject {
     // MARK: - Profile Observer (Reactive MVVM Pattern)
     
     /// Sets up Combine subscription to observe ProfileViewModel.user changes.
-    /// Automatically triggers photo loading when user profile becomes available.
-    /// This ensures photos load regardless of initialization order (race condition fix).
+    /// Automatically triggers photo and viewport loading when user profile becomes available.
+    /// This ensures data loads regardless of initialization order (race condition fix).
     private func setupProfileObserver() {
         // Cancel existing subscriptions when profileViewModel changes
         cancellables.removeAll()
@@ -62,13 +63,22 @@ class MapViewModel: ObservableObject {
         profileVM.$user
             .receive(on: DispatchQueue.main)
             .sink { [weak self] user in
-                guard let self = self else { return }
+                guard let self = self, user != nil else { return }
                 
-                // When user becomes available and photos haven't loaded, trigger loading
-                if user != nil && !self.hasLoadedPhotos {
-                    print("✅ [MapViewModel] User profile available, triggering photo load")
-                    Task { @MainActor in
+                Task { @MainActor in
+                    // When user becomes available, trigger pending operations
+                    
+                    // 1. Load photos if not already loaded
+                    if !self.hasLoadedPhotos {
+                        print("✅ [MapViewModel] User profile available, triggering photo load")
                         await self.loadFollowedUsersPhotos()
+                    }
+                    
+                    // 2. Load pending viewport if one was waiting for profile
+                    if let pendingRegion = self.pendingViewportRegion {
+                        print("✅ [MapViewModel] User profile available, loading pending viewport")
+                        self.pendingViewportRegion = nil
+                        await self.loadPlacesForViewport(pendingRegion)
                     }
                 }
             }
@@ -289,6 +299,15 @@ class MapViewModel: ObservableObject {
                 return
             }
             
+            // Use cached profile ID from ProfileViewModel (avoids redundant DB lookups)
+            guard let profileUserId = profileViewModel?.user?.id else {
+                // Store region for when profile becomes available (reactive pattern)
+                self.pendingViewportRegion = region
+                print("⏳ [MapViewModel] Waiting for user profile before loading viewport")
+                isLoadingViewportPlaces = false
+                return
+            }
+            
             isLoadingViewportPlaces = true
             
             let bounds = getViewportBounds(from: region)
@@ -301,18 +320,21 @@ class MapViewModel: ObservableObject {
                 }
                 
                 // Fetch network annotations and community places in parallel
-                async let networkAnnotationsTask = placeService.fetchPlacesInViewport(
+                // Using explicit userId methods to avoid redundant profile lookups
+                async let networkAnnotationsTask = placeService.fetchPlacesInViewportWithUserId(
                     northLat: bounds.northLat,
                     southLat: bounds.southLat,
                     eastLng: bounds.eastLng,
-                    westLng: bounds.westLng
+                    westLng: bounds.westLng,
+                    userId: profileUserId
                 )
                 
-                async let communityMarkersTask = placeService.fetchCommunityPlacesInViewport(
+                async let communityMarkersTask = placeService.fetchCommunityPlacesInViewportWithUserId(
                     northLat: bounds.northLat,
                     southLat: bounds.southLat,
                     eastLng: bounds.eastLng,
-                    westLng: bounds.westLng
+                    westLng: bounds.westLng,
+                    userId: profileUserId
                 )
                 
                 let (annotations, community) = try await (networkAnnotationsTask, communityMarkersTask)
