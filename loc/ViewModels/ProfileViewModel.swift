@@ -997,7 +997,7 @@ class ProfileViewModel: ObservableObject {
         }
     }
     
-    func removePlaceList(placeList: PlaceList) {
+     func removePlaceList(placeList: PlaceList) {
          if let index = userLists.firstIndex(where: { $0.id == placeList.id }) {
              userLists.remove(at: index)
              sortListsByDistance() // Sort lists by distance after removing list

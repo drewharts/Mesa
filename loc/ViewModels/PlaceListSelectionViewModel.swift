@@ -133,9 +133,9 @@ class PlaceListSelectionViewModel: ObservableObject {
         collaborativeOwnedLists: collaborativeOwnedLists,
         sharedLists: fetchedSharedLists
     )
-        lists = uniqueLists
-        hasMore = ownedLists.count >= pageSize
-        hasLoadedOnce = true
+    lists = uniqueLists
+    hasMore = ownedLists.count >= pageSize
+    hasLoadedOnce = true
         
         // Initialize filtered lists with all loaded lists
         filteredLists = applyLocalFilters(to: uniqueLists)
