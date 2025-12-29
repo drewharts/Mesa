@@ -2350,12 +2350,9 @@ class ProfileViewModel: ObservableObject {
     private func performListSearch() async {
         guard let userId = userSession.currentUserId else { return }
         
-        // If search is empty, restore normal paginated view
+        // If search is empty, do nothing (keep current lists)
+        // View layer will handle reloading when search mode is closed
         if listSearchText.trimmingCharacters(in: .whitespaces).isEmpty {
-            // Reload initial lists when exiting search
-            if isSearchingLists {
-                await dataManager.loadInitialPlaceLists(userId: userId)
-            }
             return
         }
         
