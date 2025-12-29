@@ -218,6 +218,17 @@ class PlaceListService {
         }
     }
     
+    // MARK: - Delete Place List
+    
+    /// Deletes a place list and all its associated items from the database
+    func deleteList(listId: String) async throws {
+        try await supabase.client
+            .from("place_lists")
+            .delete()
+            .eq("id", value: listId)
+            .execute()
+    }
+    
     // MARK: - Private Helpers
     
     private func convertToPlaceList(_ record: PlaceListRecord) -> PlaceList {

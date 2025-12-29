@@ -980,7 +980,24 @@ class ProfileViewModel: ObservableObject {
         }
     }
     
-     func removePlaceList(placeList: PlaceList) {
+    /// Deletes a lightweight place list from database and removes from local state
+    func deleteLightweightList(_ list: LightweightPlaceList) async -> Result<Void, Error> {
+        do {
+            // Delete from database
+            try await PlaceListService.shared.deleteList(listId: list.list_id)
+            
+            // Remove from local state
+            lightweightPlaceLists.removeAll { $0.list_id == list.list_id }
+            lightweightPlaceListPlaces.removeValue(forKey: list.list_id)
+            lightweightPlaceListCounts.removeValue(forKey: list.list_id)
+            
+            return .success(())
+        } catch {
+            return .failure(error)
+        }
+    }
+    
+    func removePlaceList(placeList: PlaceList) {
          if let index = userLists.firstIndex(where: { $0.id == placeList.id }) {
              userLists.remove(at: index)
              sortListsByDistance() // Sort lists by distance after removing list

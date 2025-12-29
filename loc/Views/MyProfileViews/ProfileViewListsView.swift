@@ -31,6 +31,8 @@ struct ProfileViewListsView: View {
     @State private var selectedList: PlaceListViewModel?
     @State private var showingNewListSheet = false
     @State private var placeColors: [UUID: Color] = [:]
+    @State private var listToDelete: LightweightPlaceList?
+    @State private var showDeleteConfirmation = false
     
     // MARK: - Body
     
@@ -77,6 +79,26 @@ struct ProfileViewListsView: View {
         .onChange(of: selectedPlaceVM.isDetailSheetPresented) {
             if selectedPlaceVM.isDetailSheetPresented == true {
                 presentationMode.wrappedValue.dismiss()
+            }
+        }
+        .alert("Delete List", isPresented: $showDeleteConfirmation) {
+            Button("Cancel", role: .cancel) {
+                listToDelete = nil
+            }
+            Button("Delete", role: .destructive) {
+                if let list = listToDelete {
+                    Task {
+                        let result = await profile.deleteLightweightList(list)
+                        if case .failure = result {
+                            // Could show error alert here if needed
+                        }
+                        listToDelete = nil
+                    }
+                }
+            }
+        } message: {
+            if let list = listToDelete {
+                Text("Are you sure you want to delete \"\(list.name)\"? This action cannot be undone.")
             }
         }
     }
@@ -183,6 +205,14 @@ struct ProfileViewListsView: View {
                     currentIndex: index,
                     placeColors: $placeColors
                 )
+                .contextMenu {
+                    Button(role: .destructive) {
+                        listToDelete = list
+                        showDeleteConfirmation = true
+                    } label: {
+                        Label("Delete List", systemImage: "trash")
+                    }
+                }
                 .onAppear {
                     handleListAppear(list: list)
                 }
