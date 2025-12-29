@@ -8,6 +8,7 @@
 import Foundation
 import MapKit
 import SwiftUI
+import Combine
 
 @MainActor
 class MapViewModel: ObservableObject {
@@ -24,7 +25,15 @@ class MapViewModel: ObservableObject {
     private var lastLoadedRegion: MKCoordinateRegion?
     private var placeDetailsCache: [String: DetailPlace] = [:] // Cache for full place details
     private var currentLoadTask: Task<Void, Never>? // Track current loading task for cancellation
-    weak var profileViewModel: ProfileViewModel? // To access current user's profile
+    private var cancellables = Set<AnyCancellable>() // Combine subscriptions
+    
+    /// ProfileViewModel reference - when set, automatically observes user profile changes
+    /// and triggers photo loading when user becomes available
+    weak var profileViewModel: ProfileViewModel? {
+        didSet {
+            setupProfileObserver()
+        }
+    }
     
     // Photo loading state (for de-duplication)
     private var isLoadingPhotos = false
@@ -38,17 +47,48 @@ class MapViewModel: ObservableObject {
         self.detailPlaceVM = detailPlaceVM
     }
     
+    // MARK: - Profile Observer (Reactive MVVM Pattern)
+    
+    /// Sets up Combine subscription to observe ProfileViewModel.user changes.
+    /// Automatically triggers photo loading when user profile becomes available.
+    /// This ensures photos load regardless of initialization order (race condition fix).
+    private func setupProfileObserver() {
+        // Cancel existing subscriptions when profileViewModel changes
+        cancellables.removeAll()
+        
+        guard let profileVM = profileViewModel else { return }
+        
+        // Observe user profile changes reactively
+        profileVM.$user
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] user in
+                guard let self = self else { return }
+                
+                // When user becomes available and photos haven't loaded, trigger loading
+                if user != nil && !self.hasLoadedPhotos {
+                    print("✅ [MapViewModel] User profile available, triggering photo load")
+                    Task { @MainActor in
+                        await self.loadFollowedUsersPhotos()
+                    }
+                }
+            }
+            .store(in: &cancellables)
+    }
+    
     /// Load profile photos for followed users (for custom annotation views)
+    /// Note: This is automatically triggered reactively when ProfileViewModel.user becomes available.
+    /// Manual calls are only needed for refresh scenarios (e.g., app returning to foreground).
     func loadFollowedUsersPhotos() async {
-        // Prevent duplicate loads
+        // Prevent duplicate/concurrent loads
         guard !isLoadingPhotos else {
-            print("⚠️ [MapViewModel] Already loading photos, skipping duplicate call")
-            return
+            return // Silent skip - this is expected during reactive + manual overlap
         }
         
-        // Use cached profile data instead of fetching again
+        // Use cached profile data - should be available due to reactive subscription
         guard let currentUser = profileViewModel?.user else {
-            print("⚠️ [MapViewModel] No user profile available for loading photos")
+            // This is now unexpected after reactive subscription is set up
+            // Only happens if called manually before profile loads (legacy code paths)
+            print("⏳ [MapViewModel] Waiting for user profile (reactive subscription will trigger load)")
             return
         }
         
@@ -382,6 +422,7 @@ class MapViewModel: ObservableObject {
     
     deinit {
         debounceTimer?.invalidate()
+        cancellables.removeAll()
     }
 }
 

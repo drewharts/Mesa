@@ -323,7 +323,9 @@ struct MapView: View {
              removeNotificationObservers()
          }
         .task(id: scenePhase) {
-            // Reload photos when app becomes active
+            // Refresh photos when app returns to foreground (e.g., user updated their profile photo)
+            // Note: Initial photo loading is handled reactively by MapViewModel's Combine subscription
+            // to ProfileViewModel.$user - this only handles re-activation refresh
             if scenePhase == .active {
                 await mapViewModel.loadFollowedUsersPhotos()
             }
@@ -350,13 +352,10 @@ struct MapView: View {
                 // via the onChange handler
             }
             
-            // ✅ Load profile photos on first appearance (critical for login flow)
-            // This ensures photos load whether user logs in OR app starts already logged in
-            await mapViewModel.loadFollowedUsersPhotos()
-            
-            // ✅ REMOVED: Duplicate operations already handled in DataManager
-            // profile.refreshUserPlaces() - Already done in DataManager.initializeProfileData()
-            // detailPlaceVM.calculateAnnotationPlaces() - Already done in DataManager.calculateMapAnnotations()
+            // ✅ Profile photos are loaded REACTIVELY via MapViewModel's Combine subscription
+            // to ProfileViewModel.$user. This ensures photos load when user profile is ready,
+            // eliminating race conditions where photos were requested before profile loaded.
+            // See: MapViewModel.setupProfileObserver()
         }
         .sheet(isPresented: $showVisiblePlacesPopup) {
             VisiblePlacesPopupView(mapRegion: currentMapRegion)
