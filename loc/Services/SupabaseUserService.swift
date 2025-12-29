@@ -190,6 +190,10 @@ class SupabaseUserService: ObservableObject {
         }
     }
     
+    /// Instagram-style user search with prefix/word-boundary matching
+    /// - "Jo" matches "John Smith" ✅ (name starts with query)
+    /// - "Sm" matches "John Smith" ✅ (word starts with query)
+    /// - "ohn" does NOT match "John Smith" ❌ (middle of word)
     func searchUsers(query: String, limit: Int = 20) async throws -> [User] {
         let trimmedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmedQuery.count >= 2 else {
@@ -206,11 +210,17 @@ class SupabaseUserService: ObservableObject {
             return []
         }
         
-        let likePattern = "%\(normalizedQuery)%"
+        // Instagram-style prefix patterns:
+        // 1. Name starts with query: "jo" matches "john smith"
+        let startsWithPattern = "\(normalizedQuery)%"
+        // 2. Any word starts with query: "sm" matches "john smith" (space before)
+        let wordBoundaryPattern = "% \(normalizedQuery)%"
         
-        var uniqueRecords: [String: UserRecord] = [:]
+        var prefixMatches: [String: UserRecord] = [:]
+        var wordBoundaryMatches: [String: UserRecord] = [:]
         
-        let fullNameMatches: [UserRecord] = try await supabase.client
+        // Priority 1: Names that START with the query (highest relevance)
+        let startsWithResults: [UserRecord] = try await supabase.client
             .from("users")
             .select("""
                 id,
@@ -220,16 +230,43 @@ class SupabaseUserService: ObservableObject {
                 profile_photo_url,
                 full_name
             """)
-            .ilike("full_name_lower", pattern: likePattern)
+            .ilike("full_name_lower", pattern: startsWithPattern)
             .limit(limit)
             .execute()
             .value
         
-        fullNameMatches.forEach { uniqueRecords[$0.id] = $0 }
+        startsWithResults.forEach { prefixMatches[$0.id] = $0 }
         
+        // Priority 2: Any word in name starts with query (if we need more results)
+        if prefixMatches.count < limit {
+            let wordBoundaryResults: [UserRecord] = try await supabase.client
+                .from("users")
+                .select("""
+                    id,
+                    first_name,
+                    last_name,
+                    email,
+                    profile_photo_url,
+                    full_name
+                """)
+                .ilike("full_name_lower", pattern: wordBoundaryPattern)
+                .limit(limit)
+                .execute()
+                .value
+            
+            // Only add if not already in prefix matches
+            wordBoundaryResults.forEach { record in
+                if prefixMatches[record.id] == nil {
+                    wordBoundaryMatches[record.id] = record
+                }
+            }
+        }
+        
+        // Email search (only if query contains @)
+        var emailMatches: [String: UserRecord] = [:]
         if trimmedQuery.contains("@") {
-            let emailPattern = "%\(trimmedQuery.lowercased())%"
-            let emailMatches: [UserRecord] = try await supabase.client
+            let emailPattern = "\(trimmedQuery.lowercased())%"
+            let emailResults: [UserRecord] = try await supabase.client
                 .from("users")
                 .select("""
                     id,
@@ -244,46 +281,29 @@ class SupabaseUserService: ObservableObject {
                 .execute()
                 .value
             
-            emailMatches.forEach { uniqueRecords[$0.id] = $0 }
-        }
-        
-        if uniqueRecords.isEmpty && normalizedQuery.contains(" ") {
-            let tokens = normalizedQuery
-                .split(separator: " ")
-                .map(String.init)
-                .filter { !$0.isEmpty }
-            
-            for token in tokens {
-                let tokenPattern = "%\(token)%"
-                let tokenMatches: [UserRecord] = try await supabase.client
-                    .from("users")
-                    .select("""
-                        id,
-                        first_name,
-                        last_name,
-                        email,
-                        profile_photo_url,
-                        full_name
-                    """)
-                    .ilike("full_name_lower", pattern: tokenPattern)
-                    .limit(limit)
-                    .execute()
-                    .value
-                
-                tokenMatches.forEach { uniqueRecords[$0.id] = $0 }
-                
-                if uniqueRecords.count >= limit {
-                    break
+            emailResults.forEach { record in
+                if prefixMatches[record.id] == nil && wordBoundaryMatches[record.id] == nil {
+                    emailMatches[record.id] = record
                 }
             }
         }
         
-        let sortedRecords = uniqueRecords
-            .values
+        // Combine results with priority ordering:
+        // 1. Prefix matches (name starts with query) - sorted alphabetically
+        // 2. Word boundary matches (word starts with query) - sorted alphabetically
+        // 3. Email matches - sorted alphabetically
+        let sortedPrefixMatches = prefixMatches.values
             .sorted { $0.full_name.localizedCaseInsensitiveCompare($1.full_name) == .orderedAscending }
-            .prefix(limit)
         
-        return sortedRecords.map { record in
+        let sortedWordBoundaryMatches = wordBoundaryMatches.values
+            .sorted { $0.full_name.localizedCaseInsensitiveCompare($1.full_name) == .orderedAscending }
+        
+        let sortedEmailMatches = emailMatches.values
+            .sorted { $0.full_name.localizedCaseInsensitiveCompare($1.full_name) == .orderedAscending }
+        
+        let combinedRecords = Array((sortedPrefixMatches + sortedWordBoundaryMatches + sortedEmailMatches).prefix(limit))
+        
+        return combinedRecords.map { record in
             User(
                 id: record.id,
                 firstName: record.first_name,

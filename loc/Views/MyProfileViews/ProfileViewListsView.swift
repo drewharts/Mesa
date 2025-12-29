@@ -43,9 +43,11 @@ struct ProfileViewListsView: View {
             ImagePicker(images: $inputImage, selectionLimit: 1)
         }
         .sheet(isPresented: $showingNewListSheet) {
-            NewListView(isPresented: $showingNewListSheet, onSave: { listName in
+            NewListSheetView(onSave: { listName in
                 let _ = await profile.addNewPlaceList(named: listName, city: "", emoji: "", image: "")
             })
+            .presentationDetents([.height(200)])
+            .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: .constant(deepLinkManager.hasPendingList()), onDismiss: {
             deepLinkManager.clearPendingList()
@@ -144,25 +146,39 @@ struct ProfileViewListsView: View {
     // MARK: - Empty State View
     
     private var emptyStateView: some View {
-        VStack(spacing: 12) {
+        Group {
             if profile.showOnlySharedLists {
-                Image(systemName: "person.2")
-                    .font(.system(size: 32))
-                    .foregroundColor(.gray.opacity(0.5))
-                Text("No shared lists")
-                    .font(.subheadline)
-                    .foregroundColor(.gray)
-                Text("Lists shared with you or that you've shared will appear here")
-                    .font(.caption)
-                    .foregroundColor(.gray.opacity(0.7))
-                    .multilineTextAlignment(.center)
+                noSharedListsView
             } else {
-                Text("No lists available")
-                    .foregroundColor(.gray)
+                createListTileGrid
             }
+        }
+    }
+    
+    private var noSharedListsView: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "person.2")
+                .font(.system(size: 32))
+                .foregroundColor(.gray.opacity(0.5))
+            Text("No shared lists")
+                .font(.subheadline)
+                .foregroundColor(.gray)
+            Text("Lists shared with you or that you've shared will appear here")
+                .font(.caption)
+                .foregroundColor(.gray.opacity(0.7))
+                .multilineTextAlignment(.center)
         }
         .padding(.horizontal)
         .padding(.vertical, 20)
+    }
+    
+    private var createListTileGrid: some View {
+        LazyVGrid(columns: listColumns, spacing: 16) {
+            CreateListTileView(onTap: {
+                showingNewListSheet = true
+            })
+        }
+        .padding(.horizontal, 16)
     }
     
     // MARK: - Pagination Loading View

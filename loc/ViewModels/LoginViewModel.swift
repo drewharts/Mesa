@@ -19,9 +19,46 @@ class LoginViewModel: ObservableObject {
     private let authService = SupabaseAuthService.shared
     private var currentNonce: String?
     
+    // MARK: - Apple Name Caching
+    // Apple only provides the user's name on the FIRST authorization ever.
+    // We must cache it immediately to handle network failures or retries.
+    private let appleNameCacheKey = "cachedAppleFullName"
+    
     init(userService: UserService, dataManager: DataManager) {
         self.userService = userService
         self.dataManager = dataManager
+    }
+    
+    private func cacheAppleName(_ fullName: PersonNameComponents?) {
+        guard let fullName = fullName,
+              let givenName = fullName.givenName, !givenName.isEmpty else {
+            return // Don't cache empty names
+        }
+        
+        let nameDict: [String: String] = [
+            "givenName": givenName,
+            "familyName": fullName.familyName ?? ""
+        ]
+        UserDefaults.standard.set(nameDict, forKey: appleNameCacheKey)
+        print("🍎 Cached Apple name: \(givenName) \(fullName.familyName ?? "")")
+    }
+    
+    private func getCachedAppleName() -> PersonNameComponents? {
+        guard let nameDict = UserDefaults.standard.dictionary(forKey: appleNameCacheKey) as? [String: String],
+              let givenName = nameDict["givenName"], !givenName.isEmpty else {
+            return nil
+        }
+        
+        var components = PersonNameComponents()
+        components.givenName = givenName
+        components.familyName = nameDict["familyName"]
+        print("🍎 Retrieved cached Apple name: \(givenName) \(components.familyName ?? "")")
+        return components
+    }
+    
+    private func clearCachedAppleName() {
+        UserDefaults.standard.removeObject(forKey: appleNameCacheKey)
+        print("🍎 Cleared cached Apple name")
     }
 
     // MARK: - Google Sign-In
@@ -252,6 +289,8 @@ class LoginViewModel: ObservableObject {
             }
 
             print("✅ User linking completed successfully")
+            // Clear any cached Apple name since existing user already has profile data
+            clearCachedAppleName()
             Task { @MainActor in
                 // For existing users, keep using the original UID as the session ID
                 // but they're now authenticated via Supabase
@@ -414,6 +453,8 @@ class LoginViewModel: ObservableObject {
                     }
                 } else {
                     print("✅ New profile created successfully")
+                    // Clear cached Apple name after successful profile creation
+                    self.clearCachedAppleName()
                     Task { @MainActor in
                         // For new users, the profile ID is the same as supabaseUserId
                         userSession.setUserLoggedIn(uid: supabaseUserId)
@@ -466,13 +507,28 @@ class LoginViewModel: ObservableObject {
                 return
             }
 
+            // 🍎 CRITICAL: Cache the name IMMEDIATELY before any network calls
+            // Apple only provides the name on the very first authorization
+            if let fullName = appleIDCredential.fullName, fullName.givenName != nil {
+                cacheAppleName(fullName)
+            }
+            
+            // Use cached name if credential doesn't have one (subsequent sign-ins)
+            let effectiveFullName: PersonNameComponents?
+            if appleIDCredential.fullName?.givenName != nil {
+                effectiveFullName = appleIDCredential.fullName
+            } else {
+                effectiveFullName = getCachedAppleName()
+            }
+            
             print("🍎 Got Apple identity token, signing in with Supabase...")
+            print("🍎 Effective name: \(effectiveFullName?.givenName ?? "nil") \(effectiveFullName?.familyName ?? "nil")")
             
             Task { @MainActor in
                 await authenticateWithSupabaseApple(
                     idToken: idTokenString,
                     nonce: nonce,
-                    fullName: appleIDCredential.fullName,
+                    fullName: effectiveFullName,
                     email: appleIDCredential.email,
                     userSession: userSession
                 )
