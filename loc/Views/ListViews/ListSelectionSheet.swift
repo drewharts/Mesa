@@ -391,7 +391,7 @@ struct ListSelectionSheet: View {
                             .background(Circle().fill(Color(.systemGray5)))
                 }
                 .sheet(isPresented: $showNewListSheet) {
-                    NewListView(isPresented: $showNewListSheet, onSave: { listName in
+                    NewListSheetView(onSave: { listName in
                         let result = await viewModel.addNewListToSelection(
                             named: listName, 
                             city: "", 
@@ -401,13 +401,15 @@ struct ListSelectionSheet: View {
                         
                         switch result {
                         case .success:
-                                break
+                            break
                         case .failure(let error):
                             errorMessage = error.localizedDescription
                             showError = true
                         }
                     })
-                    }
+                    .presentationDetents([.height(200)])
+                    .presentationDragIndicator(.visible)
+                }
                 }
             }
             .padding(.horizontal, 20)

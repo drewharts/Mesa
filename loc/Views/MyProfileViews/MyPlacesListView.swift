@@ -23,7 +23,7 @@ struct MyPlacesListView: View {
             hasMore: profile.hasMoreMyPlaces,
             emptyIcon: "mappin.and.ellipse",
             emptyTitle: "No Places Created Yet",
-            emptyMessage: "When you create a place, it'll appear here.",
+            emptyMessage: "Press and hold on the map to create a place at any location",
             loadMore: { await profile.loadMoreMyPlaces() },
             cardBuilder: { place in
                 PopupPlaceCard(
