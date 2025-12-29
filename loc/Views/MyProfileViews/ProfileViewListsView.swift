@@ -89,9 +89,9 @@ struct ProfileViewListsView: View {
                     profile.isSearchingLists.toggle()
                     if !profile.isSearchingLists {
                         profile.listSearchText = ""
-                        // Reload lists when exiting search to restore normal paginated view
+                        // Reload lists when exiting search (delegated to ViewModel)
                         Task {
-                            await dataManager.loadInitialPlaceLists(userId: userSession.currentUserId ?? "")
+                            await profile.reloadListsAfterSearch()
                         }
                     }
                 }

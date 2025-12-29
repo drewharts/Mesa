@@ -2345,8 +2345,7 @@ class ProfileViewModel: ObservableObject {
     
     // MARK: - Place List Pagination (for lists themselves, not places within lists)
     
-    /// Performs server-side search for user's place lists
-    /// Searches ALL lists in database regardless of pagination
+    /// Performs server-side search across ALL user lists in database regardless of pagination
     private func performListSearch() async {
         guard let userId = userSession.currentUserId else { return }
         
@@ -2377,6 +2376,42 @@ class ProfileViewModel: ObservableObject {
         } catch {
             // On error, keep current lists
         }
+    }
+    
+    /// Reloads place lists when exiting search mode to restore normal paginated view
+    func reloadListsAfterSearch() async {
+        guard let userId = userSession.currentUserId else { return }
+        
+        isLoadingInitialLists = true
+        
+        do {
+            let location = locationManager.currentLocation?.coordinate
+            let lists: [LightweightPlaceList]
+            
+            if let location = location {
+                lists = try await userService.fetchPlaceListsByProximity(
+                    userId: userId,
+                    userLatitude: location.latitude,
+                    userLongitude: location.longitude,
+                    page: 1,
+                    pageSize: 6
+                )
+            } else {
+                lists = try await userService.fetchPlaceListsWithoutLocation(
+                    userId: userId,
+                    page: 1,
+                    pageSize: 6
+                )
+            }
+            
+            lightweightPlaceLists = lists
+            placeListsCurrentPage = 1
+            hasMorePlaceLists = lists.count >= 6
+        } catch {
+            // Keep existing lists on error
+        }
+        
+        isLoadingInitialLists = false
     }
     
     /// Check if we should load more place lists based on current scroll position
