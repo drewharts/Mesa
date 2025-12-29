@@ -2373,8 +2373,32 @@ class ProfileViewModel: ObservableObject {
             
             // Reset pagination state during search
             hasMorePlaceLists = false
+            
+            // Load places for search results to display collage photos
+            await loadPlacesForSearchResults()
         } catch {
             // On error, keep current lists
+        }
+    }
+    
+    /// Loads places for search result lists to display photos in collages
+    private func loadPlacesForSearchResults() async {
+        // Load places for first 6 lists (for collage photos)
+        let listsToLoad = Array(lightweightPlaceLists.prefix(6))
+        
+        for list in listsToLoad {
+            do {
+                let places = try await userService.fetchPlacesForPlaceList(
+                    listId: list.list_id,
+                    page: 1,
+                    pageSize: 6
+                )
+                
+                // Update places for this list (delegates to existing state management)
+                setPlacesForList(listId: list.list_id, places: places)
+            } catch {
+                // Continue loading other lists on error
+            }
         }
     }
     
