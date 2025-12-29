@@ -31,22 +31,37 @@ struct ProfileViewListsView: View {
     @State private var selectedList: PlaceListViewModel?
     @State private var showingNewListSheet = false
     @State private var placeColors: [UUID: Color] = [:]
+    @FocusState private var isSearchFocused: Bool
     
     // MARK: - Body
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             headerView
-            listContent
+            
+            ScrollViewReader { proxy in
+                VStack(alignment: .leading, spacing: 8) {
+                    if profile.isSearchingLists {
+                        searchBar
+                            .id("searchBar")
+                    }
+                    
+                    listContent
+                }
+                .onChange(of: isSearchFocused) { focused in
+                    if focused {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            proxy.scrollTo("searchBar", anchor: .top)
+                        }
+                    }
+                }
+            }
         }
-        .searchable(
-            text: $profile.listSearchText,
-            isPresented: $profile.isSearchingLists,
-            placement: .navigationBarDrawer(displayMode: .always),
-            prompt: "Search lists..."
-        )
         .onChange(of: profile.isSearchingLists) { isSearching in
-            if !isSearching {
+            if isSearching {
+                isSearchFocused = true
+            } else {
+                isSearchFocused = false
                 profile.listSearchText = ""
                 Task {
                     await profile.reloadListsAfterSearch()
@@ -101,6 +116,39 @@ struct ProfileViewListsView: View {
                 showingNewListSheet = true
             }
         )
+    }
+    
+    // MARK: - Search Bar
+    
+    /// Inline search bar with keyboard focus tracking for automatic scrolling
+    private var searchBar: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .foregroundColor(.gray)
+                .font(.system(size: 14))
+            
+            TextField("Search lists...", text: $profile.listSearchText)
+                .font(.subheadline)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .submitLabel(.search)
+                .focused($isSearchFocused)
+            
+            if !profile.listSearchText.isEmpty {
+                Button {
+                    profile.listSearchText = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundColor(.gray)
+                        .font(.system(size: 14))
+                }
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(Color(.systemGray6))
+        .cornerRadius(10)
+        .padding(.horizontal, 20)
     }
     
     // MARK: - List Content (State-based rendering)
