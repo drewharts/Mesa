@@ -133,6 +133,15 @@ When finding violations:
 4. **Update Dependencies**: Ensure proper `@EnvironmentObject` setup
 5. **Refactor Long Functions**: Break functions longer than 30 lines into smaller, focused functions
 
+## Development Workflow
+
+### Git Commit Rules
+- **NEVER COMMIT WITHOUT USER TESTING**: All code changes MUST be tested by the user before committing
+- **WAIT FOR CONFIRMATION**: After implementing changes, wait for explicit user confirmation that the feature works
+- **NO PREMATURE COMMITS**: Do not commit based on assumptions or theoretical correctness
+- **TEST FIRST, COMMIT SECOND**: The workflow is always: implement → user tests → user confirms → then commit
+- **REVERT MISTAKES IMMEDIATELY**: If a commit causes issues, revert it immediately and fix properly
+
 ## Enforcement
 - Every Pull Request should be checked against these rules
 - Use these rules during code review
