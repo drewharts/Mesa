@@ -28,16 +28,28 @@ class PlaceListSelectionViewModel: ObservableObject {
     
     // MARK: - Filter State
     @Published var showOnlyShared: Bool = false
+    @Published var searchText: String = ""
     
     // MARK: - Computed Properties
     
-    /// Returns filtered lists based on current filter state
-    /// When filter is active, shows lists that are collaborative (shared with you OR you shared with others)
+    /// Returns filtered lists based on current filter and search text
+    /// Applies shared filter first, then search filter (client-side for instant results)
     var filteredLists: [LightweightPlaceList] {
+        var result = lists
+        
+        // Apply shared filter
         if showOnlyShared {
-            return lists.filter { $0.isCollaborative }
+            result = result.filter { $0.isCollaborative }
         }
-        return lists
+        
+        // Apply search filter (client-side for instant results)
+        if !searchText.isEmpty {
+            result = result.filter { list in
+                list.name.localizedCaseInsensitiveContains(searchText)
+            }
+        }
+        
+        return result
     }
     
     /// Count of collaborative lists (shared with you OR you shared with others)
