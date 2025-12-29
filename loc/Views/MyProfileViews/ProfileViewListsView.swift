@@ -37,13 +37,21 @@ struct ProfileViewListsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             headerView
-            
-            // Search bar (shown when searching)
-            if profile.isSearchingLists {
-                searchBar
-            }
-            
             listContent
+        }
+        .searchable(
+            text: $profile.listSearchText,
+            isPresented: $profile.isSearchingLists,
+            placement: .navigationBarDrawer(displayMode: .always),
+            prompt: "Search lists..."
+        )
+        .onChange(of: profile.isSearchingLists) { isSearching in
+            if !isSearching {
+                profile.listSearchText = ""
+                Task {
+                    await profile.reloadListsAfterSearch()
+                }
+            }
         }
         .sheet(isPresented: $showingImagePicker) {
             ImagePicker(images: $inputImage, selectionLimit: 1)
@@ -87,47 +95,12 @@ struct ProfileViewListsView: View {
             onToggleSearch: {
                 withAnimation {
                     profile.isSearchingLists.toggle()
-                    if !profile.isSearchingLists {
-                        profile.listSearchText = ""
-                        // Reload lists when exiting search (delegated to ViewModel)
-                        Task {
-                            await profile.reloadListsAfterSearch()
-                        }
-                    }
                 }
             },
             onAddList: {
                 showingNewListSheet = true
             }
         )
-    }
-    
-    // MARK: - Search Bar
-    
-    private var searchBar: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "magnifyingglass")
-                .foregroundColor(.gray)
-                .font(.system(size: 14))
-            
-            TextField("Search lists...", text: $profile.listSearchText)
-                .font(.subheadline)
-            
-            if !profile.listSearchText.isEmpty {
-                Button {
-                    profile.listSearchText = ""
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundColor(.gray)
-                        .font(.system(size: 14))
-                }
-            }
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .background(Color(.systemGray6))
-        .cornerRadius(10)
-        .padding(.horizontal, 20)
     }
     
     // MARK: - List Content (State-based rendering)
