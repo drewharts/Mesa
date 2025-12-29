@@ -37,6 +37,12 @@ struct ProfileViewListsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             headerView
+            
+            // Search bar (shown when searching)
+            if profile.isSearchingLists {
+                searchBar
+            }
+            
             listContent
         }
         .sheet(isPresented: $showingImagePicker) {
@@ -74,13 +80,50 @@ struct ProfileViewListsView: View {
             showOnlyShared: profile.showOnlySharedLists,
             hasSharedLists: profile.hasSharedLists,
             isFilterEnabled: profile.canInteractWithSharedFilter,
+            isSearching: profile.isSearchingLists,
             onToggleFilter: {
                 profile.showOnlySharedLists.toggle()
+            },
+            onToggleSearch: {
+                withAnimation {
+                    profile.isSearchingLists.toggle()
+                    if !profile.isSearchingLists {
+                        profile.listSearchText = ""
+                    }
+                }
             },
             onAddList: {
                 showingNewListSheet = true
             }
         )
+    }
+    
+    // MARK: - Search Bar
+    
+    private var searchBar: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .foregroundColor(.gray)
+                .font(.system(size: 14))
+            
+            TextField("Search lists...", text: $profile.listSearchText)
+                .font(.subheadline)
+            
+            if !profile.listSearchText.isEmpty {
+                Button {
+                    profile.listSearchText = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundColor(.gray)
+                        .font(.system(size: 14))
+                }
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(Color(.systemGray6))
+        .cornerRadius(10)
+        .padding(.horizontal, 20)
     }
     
     // MARK: - List Content (State-based rendering)
@@ -196,13 +239,13 @@ struct ProfileViewListsView: View {
     
     /// Handle list appearing - triggers pagination when approaching end
     private func handleListAppear(list: LightweightPlaceList) {
-        // Only paginate in unfiltered view (shared lists are fully loaded)
-        guard !profile.showOnlySharedLists else { return }
+        // Don't paginate during search or shared filter
+        guard !profile.showOnlySharedLists && !profile.isSearchingLists else { return }
         
         if profile.shouldLoadMorePlaceLists(
             currentItem: list,
             filteredLists: profile.filteredPlaceLists,
-            isSearching: false
+            isSearching: profile.isSearchingLists
         ) {
             Task {
                 await dataManager.loadMorePlaceLists(userId: userSession.currentUserId ?? "")

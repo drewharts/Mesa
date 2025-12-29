@@ -64,6 +64,11 @@ class ProfileViewModel: ObservableObject {
     // MARK: - List Filter State
     @Published var showOnlySharedLists: Bool = false
     
+    // MARK: - List Search State
+    @Published var isSearchingLists: Bool = false
+    @Published var listSearchText: String = ""
+    private var listSearchCancellable: AnyCancellable?
+    
     /// Returns filtered lists based on current filter state
     var filteredPlaceLists: [LightweightPlaceList] {
         if showOnlySharedLists {
@@ -208,6 +213,9 @@ class ProfileViewModel: ObservableObject {
         // Setup reactive data loading (MVVM + SRP)
         setupDataLoadingObserver()
         
+        // Setup list search observer with debouncing
+        setupListSearchObserver()
+        
         // Observe TikTok multiple places notifications
         NotificationCenter.default.addObserver(
             forName: NSNotification.Name("TikTokMultiplePlacesFound"),
@@ -239,6 +247,17 @@ class ProfileViewModel: ObservableObject {
                 }
             }
             .store(in: &cancellables)
+    }
+    
+    /// Sets up debounced observer for list search text changes
+    private func setupListSearchObserver() {
+        listSearchCancellable = $listSearchText
+            .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
+            .sink { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    await self?.performListSearch()
+                }
+            }
     }
     
     /// Observe user state and automatically load dependent data when user becomes available
@@ -2325,6 +2344,43 @@ class ProfileViewModel: ObservableObject {
     }
     
     // MARK: - Place List Pagination (for lists themselves, not places within lists)
+    
+    /// Performs server-side search for user's place lists
+    /// Searches ALL lists in database regardless of pagination
+    private func performListSearch() async {
+        guard let userId = userSession.currentUserId else { return }
+        
+        // If search is empty, restore normal paginated view
+        if listSearchText.trimmingCharacters(in: .whitespaces).isEmpty {
+            // Reload initial lists when exiting search
+            if isSearchingLists {
+                await dataManager.loadInitialPlaceLists(userId: userId)
+            }
+            return
+        }
+        
+        do {
+            let searchResults = try await PlaceListService.shared.searchListsByName(
+                userId: userId,
+                searchTerm: listSearchText
+            )
+            
+            // Update lists with search results
+            lightweightPlaceLists = searchResults
+            
+            // Update counts for search results
+            for list in searchResults {
+                if lightweightPlaceListCounts[list.list_id] == nil {
+                    lightweightPlaceListCounts[list.list_id] = list.place_count
+                }
+            }
+            
+            // Reset pagination state during search
+            hasMorePlaceLists = false
+        } catch {
+            // On error, keep current lists
+        }
+    }
     
     /// Check if we should load more place lists based on current scroll position
     func shouldLoadMorePlaceLists(currentItem: LightweightPlaceList, filteredLists: [LightweightPlaceList], isSearching: Bool) -> Bool {
