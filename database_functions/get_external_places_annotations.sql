@@ -1,22 +1,30 @@
 -- ============================================================================
 -- Function: get_external_places_annotations
 -- ============================================================================
--- This file contains the current state of the function in the database.
+-- Returns map annotations for external places (TikTok, etc.)
+-- Updated: Now includes place_type derived from categories
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION public.get_external_places_annotations(p_user_ids text[], p_bbox geometry)
- RETURNS SETOF place_annotation_with_users
- LANGUAGE sql
- STABLE SECURITY DEFINER
+RETURNS TABLE(id text, name text, coordinate geometry, user_ids text[], place_type text)
+LANGUAGE sql
+STABLE SECURITY DEFINER
 AS $function$
 SELECT
-    p.id                                       AS id,          -- canonical place id
-    p.name                                     AS name,
-    p.location                                 AS coordinate,
-    array_agg(DISTINCT ep.user_id ORDER BY ep.user_id) AS user_ids
+    p.id AS id,
+    p.name,
+    p.location AS coordinate,
+    array_agg(DISTINCT ep.user_id ORDER BY ep.user_id) AS user_ids,
+    COALESCE(
+        (SELECT cat FROM unnest(p.categories) AS cat
+         WHERE LOWER(cat) NOT IN ('establishment', 'point_of_interest', 'food', 'store', 'place', 'health')
+         LIMIT 1),
+        p.categories[1],
+        'Place'
+    ) AS place_type
 FROM external_places ep
 JOIN places p ON p.id = ep.place_id
 WHERE ep.user_id = ANY(p_user_ids)
   AND ST_Intersects(p.location, p_bbox)
-GROUP BY p.id, p.name, p.location;
-$function$
+GROUP BY p.id, p.name, p.location, p.categories;
+$function$;

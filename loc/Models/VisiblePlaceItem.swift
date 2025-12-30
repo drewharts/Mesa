@@ -39,7 +39,7 @@ struct VisiblePlaceItem: Identifiable {
         self.source = .friends
         self.userIds = annotation.userIds
         self.saveCount = nil
-        self.placeType = nil
+        self.placeType = annotation.placeType
         self.emoji = nil
     }
     

@@ -6,7 +6,7 @@
 //  Single Responsibility: Manage visible places state, filtering, and coordinate data loading.
 //
 //  Dependencies: Services only (not other ViewModels)
-//  - PlaceService for fetching place details
+//  - PlaceService for fetching place details and all places in viewport
 //  - ImageCacheService for cached parallel image loading
 //
 
@@ -21,10 +21,11 @@ class VisiblePlacesPopupViewModel: ObservableObject {
     
     @Published var selectedFilter: VisiblePlacesFilter = .friends
     @Published var isLoadingImages: Bool = false
+    @Published var isLoadingPlaces: Bool = false
     @Published private(set) var loadedImageCount: Int = 0
     @Published private(set) var placeImages: [String: UIImage] = [:]
     
-    // MARK: - Data Sources (set externally)
+    // MARK: - Data Sources (fetched directly from services)
     
     private(set) var friendsAnnotations: [PlaceAnnotation] = []
     private(set) var communityMarkers: [CommunityPlaceMarker] = []
@@ -51,18 +52,24 @@ class VisiblePlacesPopupViewModel: ObservableObject {
     
     // MARK: - Configuration (called by parent View)
     
-    /// Configure the ViewModel with data from parent's environment objects
-    /// This keeps the ViewModel decoupled from other ViewModels (SRP)
+    /// Configure the ViewModel with map region and existing images
+    /// Fetches all places directly from services (no density filtering)
     func configure(
-        friendsAnnotations: [PlaceAnnotation],
-        communityMarkers: [CommunityPlaceMarker],
         mapRegion: MKCoordinateRegion?,
+        userId: String?,
         existingPlaceImages: [String: UIImage]
     ) {
-        self.friendsAnnotations = friendsAnnotations
-        self.communityMarkers = communityMarkers
         self.mapRegion = mapRegion
         self.placeImages = existingPlaceImages
+        
+        guard let region = mapRegion, let userId = userId else {
+            print("⚠️ [VisiblePlacesPopupVM] Cannot fetch places: missing region or userId")
+            return
+        }
+        
+        Task {
+            await fetchAllPlacesInViewport(region: region, userId: userId)
+        }
     }
     
     // MARK: - Computed Properties
@@ -123,6 +130,77 @@ class VisiblePlacesPopupViewModel: ObservableObject {
     /// Load full place details for navigation
     func loadPlaceDetails(for item: VisiblePlaceItem) async throws -> DetailPlace {
         return try await placeService.fetchPlace(withId: item.id)
+    }
+    
+    // MARK: - Data Fetching (Private)
+    
+    /// Fetches all places in viewport without density filtering
+    /// Uses separate SQL functions for friends and community places
+    private func fetchAllPlacesInViewport(region: MKCoordinateRegion, userId: String) async {
+        guard !isLoadingPlaces else { return }
+        
+        isLoadingPlaces = true
+        defer { isLoadingPlaces = false }
+        
+        let bounds = getViewportBounds(from: region)
+        
+        do {
+            let (friends, community) = try await fetchPlacesInParallel(
+                bounds: bounds,
+                userId: userId
+            )
+            
+            self.friendsAnnotations = friends
+            self.communityMarkers = community
+            
+            loadNextImageBatch()
+        } catch {
+            print("❌ [VisiblePlacesPopupVM] Error fetching all places in viewport: \(error)")
+        }
+    }
+    
+    /// Fetches friends and community places in parallel
+    private func fetchPlacesInParallel(
+        bounds: (northLat: Double, southLat: Double, eastLng: Double, westLng: Double),
+        userId: String
+    ) async throws -> ([PlaceAnnotation], [CommunityPlaceMarker]) {
+        async let friendsTask = placeService.fetchAllFriendsPlacesInViewportWithUserId(
+            northLat: bounds.northLat,
+            southLat: bounds.southLat,
+            eastLng: bounds.eastLng,
+            westLng: bounds.westLng,
+            userId: userId
+        )
+        
+        async let communityTask = placeService.fetchAllCommunityPlacesInViewportWithUserId(
+            northLat: bounds.northLat,
+            southLat: bounds.southLat,
+            eastLng: bounds.eastLng,
+            westLng: bounds.westLng,
+            userId: userId
+        )
+        
+        return try await (friendsTask, communityTask)
+    }
+    
+    /// Convert map region to lat/lng bounds
+    private func getViewportBounds(from region: MKCoordinateRegion) -> (
+        northLat: Double,
+        southLat: Double,
+        eastLng: Double,
+        westLng: Double
+    ) {
+        let centerLat = region.center.latitude
+        let centerLng = region.center.longitude
+        let latDelta = region.span.latitudeDelta
+        let lngDelta = region.span.longitudeDelta
+        
+        return (
+            northLat: centerLat + (latDelta / 2),
+            southLat: centerLat - (latDelta / 2),
+            eastLng: centerLng + (lngDelta / 2),
+            westLng: centerLng - (lngDelta / 2)
+        )
     }
     
     // MARK: - Viewport Filtering (Private)

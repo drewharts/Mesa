@@ -102,7 +102,8 @@ struct locApp: App {
             detailPlaceViewModel: detailVM,
             placeService: services.placeService,
             userService: services.userService,
-            postService: services.postService
+            postService: services.postService,
+            userSession: userSess
         )
         
         profileVM.userProfileViewModel = userProfileVM
@@ -365,9 +366,14 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
     // Handle notification tap
     func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completionHandler: @escaping () -> Void) {
         let userInfo = response.notification.request.content.userInfo
+        let type = userInfo["type"] as? String
         
+        // Handle follow notifications
+        if type == "follow", let userId = userInfo["userId"] as? String {
+            NotificationManager.shared.handleFollowNotificationTap(userId: userId)
+        }
         // Handle review notifications
-        if let reviewId = userInfo["reviewId"] as? String,
+        else if let reviewId = userInfo["reviewId"] as? String,
            let placeId = userInfo["placeId"] as? String,
            let userId = userInfo["userId"] as? String {
             // Use NotificationManager to coordinate navigation
@@ -381,8 +387,8 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
         else if let commentId = userInfo["commentId"] as? String,
                 let reviewId = userInfo["reviewId"] as? String,
                 let placeId = userInfo["placeId"] as? String,
-                let type = userInfo["type"] as? String,
-                type == "comment" {
+                let notificationType = userInfo["type"] as? String,
+                notificationType == "comment" {
             // For comments, we still navigate to the review (which will show the comments)
             // The reviewAuthorId is the person who should receive the notification
             let reviewAuthorId = userInfo["reviewAuthorId"] as? String ?? "unknown"

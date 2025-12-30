@@ -70,6 +70,13 @@ struct FriendsPlaceGridCell: View {
                 .foregroundColor(.white)
                 .lineLimit(1)
                 .multilineTextAlignment(.leading)
+            
+            if let placeType = item.placeType {
+                Text(PlaceTypeTranslator.translate(placeType))
+                    .font(.caption)
+                    .foregroundColor(.white.opacity(0.8))
+                    .lineLimit(1)
+            }
         }
         .padding(.horizontal, 12)
         .padding(.bottom, 8)

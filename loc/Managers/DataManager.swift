@@ -798,72 +798,108 @@ class DataManager: ObservableObject {
         }
         
         // Load place lists in background - don't block UI
-        if let location = userLocation {
-            // Set loading state BEFORE spawning background task (SRP: DataManager coordinates state)
-            await MainActor.run {
-                self.profileViewModel.isLoadingInitialLists = true
+        // Set loading state BEFORE spawning background task (SRP: DataManager coordinates state)
+        await MainActor.run {
+            self.profileViewModel.isLoadingInitialLists = true
+        }
+        
+        Task.detached(priority: .userInitiated) { [weak self] in
+            guard let self = self else { return }
+            
+            // Guaranteed cleanup of loading state (staff engineer pattern)
+            defer {
+                Task { @MainActor in
+                    self.profileViewModel.isLoadingInitialLists = false
+                }
             }
             
-            Task.detached(priority: .userInitiated) { [weak self] in
-                guard let self = self else { return }
-                
-                // Guaranteed cleanup of loading state (staff engineer pattern)
-                defer {
-                    Task { @MainActor in
-                        self.profileViewModel.isLoadingInitialLists = false
-                    }
+            let pageSize = 6 // Consistent page size for initial load and pagination
+            
+            // Fetch owned lists - use proximity sorting if location available, otherwise use default
+            var ownedLists: [LightweightPlaceList] = []
+            
+            if let location = userLocation {
+                do {
+                    ownedLists = try await self.userService.fetchPlaceListsByProximity(
+                        userId: userId,
+                        userLatitude: location.latitude,
+                        userLongitude: location.longitude,
+                        page: 1,
+                        pageSize: pageSize
+                    )
+                } catch {
+                    print("❌ [DataManager] Error fetching owned lists with proximity: \(error)")
+                    // Try fallback without location
+                    ownedLists = await self.fetchListsWithoutLocation(userId: userId, pageSize: pageSize)
                 }
-                
-                let pageSize = 6 // Consistent page size for initial load and pagination
-                
-                // Fetch owned lists, shared lists, AND collaborative owned lists in parallel
-                // This ensures ALL collaborative lists are available for the Shared filter
-                async let ownedListsTask = self.userService.fetchPlaceListsByProximity(
-                    userId: userId,
-                    userLatitude: location.latitude,
-                    userLongitude: location.longitude,
-                    page: 1,
-                    pageSize: pageSize
-                )
-                async let sharedListsTask = CollaborationService.shared.fetchSharedLists(userId: userId)
-                async let collaborativeOwnedTask = CollaborationService.shared.fetchCollaborativeOwnedLists(userId: userId)
-                
-                let ownedLists = (try? await ownedListsTask) ?? []
-                let sharedLists = (try? await sharedListsTask) ?? []
-                let collaborativeOwnedLists = (try? await collaborativeOwnedTask) ?? []
-                
-                // Convert collaborative lists to LightweightPlaceList format
-                let sharedAsLightweight = sharedLists.map { $0.toLightweightPlaceList() }
-                let collaborativeOwnedAsLightweight = collaborativeOwnedLists.map { $0.toLightweightPlaceList() }
-                
-                // Get IDs of lists already in owned lists (to avoid duplicates)
-                let ownedListIds = Set(ownedLists.map { $0.list_id })
-                
-                // Filter out collaborative owned lists that are already in paginated owned lists
-                let additionalCollaborativeLists = collaborativeOwnedAsLightweight.filter { 
-                    !ownedListIds.contains($0.list_id) 
-                }
-                
-                // Merge: owned (paginated) + collaborative owned (not in page 1) + shared with me
-                let allLists = ownedLists + additionalCollaborativeLists + sharedAsLightweight
-                
-                print("📋 [DataManager] Loaded \(ownedLists.count) owned lists + \(additionalCollaborativeLists.count) additional collaborative owned + \(sharedLists.count) shared lists")
-                
-                // Update place lists on main thread
-                await MainActor.run {
-                    self.profileViewModel.lightweightPlaceLists = allLists
-                    self.profileViewModel.placeListsCurrentPage = 1
-                    // Set hasMore based on whether we got a full page of owned lists
-                    self.profileViewModel.hasMorePlaceLists = ownedLists.count >= pageSize
-                }
-                
-                // Load places for each list
-                if !allLists.isEmpty {
-                    await self.loadPlacesForLists(allLists)
-                }
+            } else {
+                print("⚠️ [DataManager] No user location available - loading lists without proximity sorting")
+                ownedLists = await self.fetchListsWithoutLocation(userId: userId, pageSize: pageSize)
             }
-        } else {
-            print("⚠️ [DataManager] No user location available for place list sorting")
+            
+            // Fetch shared and collaborative lists in parallel
+            var sharedLists: [SharedListInfo] = []
+            var collaborativeOwnedLists: [CollaborativeOwnedList] = []
+            
+            do {
+                sharedLists = try await CollaborationService.shared.fetchSharedLists(userId: userId)
+            } catch {
+                print("❌ [DataManager] Error fetching shared lists: \(error)")
+            }
+            
+            do {
+                collaborativeOwnedLists = try await CollaborationService.shared.fetchCollaborativeOwnedLists(userId: userId)
+            } catch {
+                print("❌ [DataManager] Error fetching collaborative owned lists: \(error)")
+            }
+            
+            // Convert collaborative lists to LightweightPlaceList format
+            let sharedAsLightweight = sharedLists.map { $0.toLightweightPlaceList() }
+            let collaborativeOwnedAsLightweight = collaborativeOwnedLists.map { $0.toLightweightPlaceList() }
+            
+            // Get IDs of lists already in owned lists (to avoid duplicates)
+            let ownedListIds = Set(ownedLists.map { $0.list_id })
+            
+            // Filter out collaborative owned lists that are already in paginated owned lists
+            let additionalCollaborativeLists = collaborativeOwnedAsLightweight.filter { 
+                !ownedListIds.contains($0.list_id) 
+            }
+            
+            // Merge: owned (paginated) + collaborative owned (not in page 1) + shared with me
+            let allLists = ownedLists + additionalCollaborativeLists + sharedAsLightweight
+            
+            print("📋 [DataManager] Loaded \(ownedLists.count) owned lists + \(additionalCollaborativeLists.count) additional collaborative owned + \(sharedLists.count) shared lists")
+            
+            // Update place lists on main thread
+            await MainActor.run {
+                self.profileViewModel.lightweightPlaceLists = allLists
+                self.profileViewModel.placeListsCurrentPage = 1
+                // Set hasMore based on whether we got a full page of owned lists
+                self.profileViewModel.hasMorePlaceLists = ownedLists.count >= pageSize
+            }
+            
+            // Load places for each list
+            if !allLists.isEmpty {
+                await self.loadPlacesForLists(allLists)
+            }
+        }
+    }
+    
+    /// Fallback: Fetch lists without location-based sorting
+    /// Used when user location is unavailable
+    private func fetchListsWithoutLocation(userId: String, pageSize: Int) async -> [LightweightPlaceList] {
+        do {
+            // Use dedicated method that returns lists with place counts
+            let lists = try await userService.fetchPlaceListsWithoutLocation(
+                userId: userId,
+                page: 1,
+                pageSize: pageSize
+            )
+            print("✅ [DataManager] Fetched \(lists.count) lists without proximity sorting")
+            return lists
+        } catch {
+            print("❌ [DataManager] Error fetching lists without location: \(error)")
+            return []
         }
     }
     

@@ -413,7 +413,39 @@ struct ListSelectionSheet: View {
                 }
             }
             .padding(.horizontal, 20)
+            
+            // Search bar
+            searchBar
         }
+    }
+    
+    // MARK: - Search Bar
+    
+    private var searchBar: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .foregroundColor(.gray)
+                .font(.system(size: 14))
+            
+            TextField("Search lists...", text: $viewModel.searchText)
+                .font(.subheadline)
+            
+            if !viewModel.searchText.isEmpty {
+                Button {
+                    viewModel.searchText = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundColor(.gray)
+                        .font(.system(size: 14))
+                }
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(Color(.systemGray6))
+        .cornerRadius(10)
+        .padding(.horizontal, 16)
+        .padding(.top, 12)
     }
     
     // MARK: - Shared Filter Button

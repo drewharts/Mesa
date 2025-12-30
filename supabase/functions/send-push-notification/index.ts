@@ -50,13 +50,13 @@ serve(async (req) => {
       )
     }
     
-    // Get the user's device token
+    // Get the user's device token - check both id and supabase_uid
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
     
     const { data: user, error: userError } = await supabase
       .from('users')
       .select('fcm_token')
-      .eq('id', record.user_id)
+      .or(`id.eq.${record.user_id},supabase_uid.eq.${record.user_id}`)
       .single()
     
     if (userError) {
@@ -74,6 +74,24 @@ serve(async (req) => {
         { status: 400, headers: { 'Content-Type': 'application/json' } }
       )
     }
+    
+    // Validate and clean device token
+    let deviceToken = user.fcm_token.trim().replace(/\s+/g, '')
+    
+    // Validate token format (should be 64 hex characters)
+    if (!/^[0-9a-fA-F]{64}$/.test(deviceToken)) {
+      console.error('❌ [Push] Invalid device token format:', deviceToken.substring(0, 8) + '...')
+      return new Response(
+        JSON.stringify({ error: 'Invalid device token format' }), 
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      )
+    }
+    
+    // Log masked token for debugging (first 8 and last 8 chars)
+    const maskedToken = deviceToken.length > 16 
+      ? `${deviceToken.substring(0, 8)}...${deviceToken.substring(deviceToken.length - 8)}`
+      : '***'
+    console.log('📱 [Push] Device token (masked):', maskedToken)
     
     // Build notification message based on type
     let title = ''
@@ -154,7 +172,7 @@ serve(async (req) => {
       ? 'api.push.apple.com' 
       : 'api.sandbox.push.apple.com'
     
-    const apnsUrl = `https://${apnsHost}/3/device/${user.fcm_token}`
+    const apnsUrl = `https://${apnsHost}/3/device/${deviceToken}`
     
     // Build APNs payload
     const apnsPayload = {
@@ -190,6 +208,7 @@ serve(async (req) => {
     if (!apnsResponse.ok) {
       const errorText = await apnsResponse.text()
       console.error('❌ [Push] APNs error:', apnsResponse.status, errorText)
+      
       return new Response(
         JSON.stringify({ 
           error: 'APNs request failed', 

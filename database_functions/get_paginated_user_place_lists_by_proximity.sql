@@ -47,7 +47,7 @@ BEGIN
     FROM (
         -- Lists WITH average_location (sorted by proximity)
     SELECT 
-        pl.id AS list_id,
+        pl.id::TEXT AS list_id,
         pl.name,
         pl.average_location,
         pl.is_public,
@@ -76,7 +76,7 @@ BEGIN
         
         -- Lists WITHOUT average_location (empty/new lists, sorted by created_at)
         SELECT 
-            pl.id AS list_id,
+            pl.id::TEXT AS list_id,
             pl.name,
             pl.average_location,
             pl.is_public,
@@ -104,7 +104,7 @@ BEGIN
     ORDER BY 
         combined.sort_order ASC,  -- Lists with location first
         CASE WHEN combined.sort_order = 0 THEN combined.distance_meters ELSE NULL END ASC,  -- Then by proximity
-        CASE WHEN combined.sort_order = 1 THEN combined.created_at ELSE NULL END DESC  -- Or by creation date for new lists
+        CASE WHEN combined.sort_order = 1 THEN combined.created_at ELSE NULL END DESC NULLS LAST  -- Or by creation date for new lists
     OFFSET (p_page - 1) * p_page_size
     LIMIT p_page_size;
 END;

@@ -64,12 +64,20 @@ struct CommunityPlaceGridCell: View {
     }
     
     private var placeInfoOverlay: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 2) {
             // Place name
             Text(item.name)
                 .font(.headline)
                 .foregroundColor(.white)
                 .lineLimit(1)
+            
+            // Place type
+            if let placeType = item.placeType {
+                Text(PlaceTypeTranslator.translate(placeType))
+                    .font(.caption)
+                    .foregroundColor(.white.opacity(0.8))
+                    .lineLimit(1)
+            }
             
             // Save count indicator
             if let saveCount = item.saveCount {

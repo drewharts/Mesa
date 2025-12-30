@@ -21,7 +21,9 @@ struct ListHeaderView: View {
     var showOnlyShared: Bool
     var hasSharedLists: Bool
     var isFilterEnabled: Bool = true  // Default enabled for backward compatibility
+    var isSearching: Bool = false
     var onToggleFilter: () -> Void
+    var onToggleSearch: () -> Void
     var onAddList: () -> Void
     
     // MARK: - Body
@@ -42,6 +44,9 @@ struct ListHeaderView: View {
                 if hasSharedLists || !isFilterEnabled {
                     sharedFilterButton
                 }
+                
+                // Search button
+                searchButton
                 
                 // Add list button (matches ListSelectionSheet style)
             Button(action: onAddList) {
@@ -88,6 +93,18 @@ struct ListHeaderView: View {
         .disabled(!isFilterEnabled)
     }
     
+    // MARK: - Search Button
+    
+    private var searchButton: some View {
+        Button(action: onToggleSearch) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(isSearching ? .white : .gray)
+                .frame(width: 32, height: 32)
+                .background(Circle().fill(isSearching ? Color.primary : Color(.systemGray5)))
+        }
+    }
+    
     // MARK: - Computed Colors (SRP: Visual state derived from parameters)
     
     private var buttonForegroundColor: Color {
@@ -114,7 +131,9 @@ struct ListHeaderView: View {
             showOnlyShared: false,
             hasSharedLists: true,
             isFilterEnabled: true,
+            isSearching: false,
             onToggleFilter: {},
+            onToggleSearch: {},
             onAddList: {}
         )
         
@@ -123,7 +142,20 @@ struct ListHeaderView: View {
             showOnlyShared: true,
             hasSharedLists: true,
             isFilterEnabled: true,
+            isSearching: false,
             onToggleFilter: {},
+            onToggleSearch: {},
+            onAddList: {}
+        )
+        
+        Text("Search active").font(.caption2).foregroundColor(.gray)
+        ListHeaderView(
+            showOnlyShared: false,
+            hasSharedLists: true,
+            isFilterEnabled: true,
+            isSearching: true,
+            onToggleFilter: {},
+            onToggleSearch: {},
             onAddList: {}
         )
         
@@ -132,7 +164,9 @@ struct ListHeaderView: View {
             showOnlyShared: false,
             hasSharedLists: false,
             isFilterEnabled: false,
+            isSearching: false,
             onToggleFilter: {},
+            onToggleSearch: {},
             onAddList: {}
         )
         
@@ -141,7 +175,9 @@ struct ListHeaderView: View {
             showOnlyShared: false,
             hasSharedLists: false,
             isFilterEnabled: true,
+            isSearching: false,
             onToggleFilter: {},
+            onToggleSearch: {},
             onAddList: {}
         )
     }
