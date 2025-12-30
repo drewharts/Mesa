@@ -75,6 +75,29 @@ serve(async (req) => {
       )
     }
     
+    // Validate and clean device token
+    let deviceToken = user.fcm_token.trim().replace(/\s+/g, '')
+    
+    // Validate token format (should be 64 hex characters)
+    if (!/^[0-9a-fA-F]{64}$/.test(deviceToken)) {
+      console.error('❌ [Push] Invalid device token format:', deviceToken.substring(0, 8) + '...')
+      // Clear invalid token from database
+      await supabase
+        .from('users')
+        .update({ fcm_token: null })
+        .or(`id.eq.${record.user_id},supabase_uid.eq.${record.user_id}`)
+      return new Response(
+        JSON.stringify({ error: 'Invalid device token format' }), 
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      )
+    }
+    
+    // Log masked token for debugging (first 8 and last 8 chars)
+    const maskedToken = deviceToken.length > 16 
+      ? `${deviceToken.substring(0, 8)}...${deviceToken.substring(deviceToken.length - 8)}`
+      : '***'
+    console.log('📱 [Push] Device token (masked):', maskedToken)
+    
     // Build notification message based on type
     let title = ''
     let body = ''
@@ -154,7 +177,7 @@ serve(async (req) => {
       ? 'api.push.apple.com' 
       : 'api.sandbox.push.apple.com'
     
-    const apnsUrl = `https://${apnsHost}/3/device/${user.fcm_token}`
+    const apnsUrl = `https://${apnsHost}/3/device/${deviceToken}`
     
     // Build APNs payload
     const apnsPayload = {
@@ -190,6 +213,16 @@ serve(async (req) => {
     if (!apnsResponse.ok) {
       const errorText = await apnsResponse.text()
       console.error('❌ [Push] APNs error:', apnsResponse.status, errorText)
+      
+      // If BadDeviceToken, clear the invalid token from database
+      if (apnsResponse.status === 400 && errorText.includes('BadDeviceToken')) {
+        console.log('🧹 [Push] Clearing invalid device token for user:', record.user_id)
+        await supabase
+          .from('users')
+          .update({ fcm_token: null })
+          .or(`id.eq.${record.user_id},supabase_uid.eq.${record.user_id}`)
+      }
+      
       return new Response(
         JSON.stringify({ 
           error: 'APNs request failed', 
