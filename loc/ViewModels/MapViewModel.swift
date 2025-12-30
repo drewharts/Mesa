@@ -24,11 +24,10 @@ class MapViewModel: ObservableObject {
     private var lastLoadedRegion: MKCoordinateRegion?
     private var placeDetailsCache: [String: DetailPlace] = [:] // Cache for full place details
     private var currentLoadTask: Task<Void, Never>? // Track current loading task for cancellation
-    weak var profileViewModel: ProfileViewModel? // To access current user's profile
     
     // Photo loading state (for de-duplication)
     private var isLoadingPhotos = false
-    private var hasLoadedPhotos = false
+    private(set) var hasLoadedPhotos = false // Exposed for View to check
     
     // Minimum movement threshold to trigger reload (in degrees)
     private let minMovementThreshold: Double = 0.01 // ~1km at equator
@@ -38,32 +37,26 @@ class MapViewModel: ObservableObject {
         self.detailPlaceVM = detailPlaceVM
     }
     
+    // MARK: - Photo Loading (Called by View when profile is available)
+    
     /// Load profile photos for followed users (for custom annotation views)
-    func loadFollowedUsersPhotos() async {
-        // Prevent duplicate loads
-        guard !isLoadingPhotos else {
-            print("⚠️ [MapViewModel] Already loading photos, skipping duplicate call")
-            return
-        }
-        
-        // Use cached profile data instead of fetching again
-        guard let currentUser = profileViewModel?.user else {
-            print("⚠️ [MapViewModel] No user profile available for loading photos")
-            return
-        }
+    /// Called by View when user profile becomes available - View coordinates, ViewModel executes
+    /// - Parameters:
+    ///   - userId: The current user's profile ID
+    ///   - currentUserPhotoUrl: Optional URL for current user's profile photo
+    func loadFollowedUsersPhotos(userId: String, currentUserPhotoUrl: URL?) async {
+        // Prevent duplicate/concurrent loads
+        guard !isLoadingPhotos else { return }
         
         isLoadingPhotos = true
         defer { isLoadingPhotos = false }
         
-        let profileUserId = currentUser.id
-        let currentUserPhotoUrl = currentUser.profilePhotoURL
-        
         do {
-            var photos = try await placeService.fetchFollowedUsersPhotos(userId: profileUserId)
+            var photos = try await placeService.fetchFollowedUsersPhotos(userId: userId)
             
-            // Add current user's photo to the list (using cached data)
+            // Add current user's photo to the list
             if let photoUrl = currentUserPhotoUrl {
-                let currentUserPhoto = FollowedUserPhoto(userId: profileUserId, profilePhotoUrl: photoUrl.absoluteString)
+                let currentUserPhoto = FollowedUserPhoto(userId: userId, profilePhotoUrl: photoUrl.absoluteString)
                 photos.append(currentUserPhoto)
             }
             
@@ -204,42 +197,30 @@ class MapViewModel: ObservableObject {
         }
     }
     
+    // MARK: - Viewport Loading (Called by View with userId)
+    
     /// Call this when the map camera has settled (using native iOS 17+ callback)
     /// Apple handles debouncing automatically, so we don't need manual timers
-    func onMapCameraSettled(_ newRegion: MKCoordinateRegion) async {
+    /// - Parameters:
+    ///   - newRegion: The map region to load places for
+    ///   - userId: The current user's profile ID (passed by View from ProfileViewModel)
+    func onMapCameraSettled(_ newRegion: MKCoordinateRegion, userId: String) async {
         // Check if the region change is significant enough to warrant a reload
         if let lastRegion = lastLoadedRegion, !shouldReloadForRegion(newRegion, lastRegion: lastRegion) {
             return
         }
         
-        // Load places for the new viewport with low priority
-        await loadPlacesForViewport(newRegion)
-    }
-    
-    /// Legacy method for compatibility (deprecated - use onMapCameraSettled instead)
-    func onMapRegionChange(_ newRegion: MKCoordinateRegion) {
-        // Check if the region change is significant enough to warrant a reload
-        if let lastRegion = lastLoadedRegion, !shouldReloadForRegion(newRegion, lastRegion: lastRegion) {
-            return
-        }
-        
-        // Debounce to avoid excessive queries while user is actively panning
-        debounceTimer?.invalidate()
-        
-        debounceTimer = Timer.scheduledTimer(
-            withTimeInterval: 1.2,  // 1.2s for better debouncing
-            repeats: false
-        ) { [weak self] _ in
-            Task(priority: .background) { @MainActor in
-                await self?.loadPlacesForViewport(newRegion)
-            }
-        }
+        // Load places for the new viewport
+        await loadPlacesForViewport(newRegion, userId: userId)
     }
     
     /// Main method to load place annotations for a given viewport
     /// Uses the optimized PostgreSQL function for ultra-fast loading
     /// Implements task cancellation to avoid redundant loads
-    private func loadPlacesForViewport(_ region: MKCoordinateRegion) async {
+    /// - Parameters:
+    ///   - region: The map region to load places for
+    ///   - userId: The current user's profile ID
+    private func loadPlacesForViewport(_ region: MKCoordinateRegion, userId: String) async {
         // Cancel any previous loading task
         currentLoadTask?.cancel()
         
@@ -261,18 +242,20 @@ class MapViewModel: ObservableObject {
                 }
                 
                 // Fetch network annotations and community places in parallel
-                async let networkAnnotationsTask = placeService.fetchPlacesInViewport(
+                async let networkAnnotationsTask = placeService.fetchPlacesInViewportWithUserId(
                     northLat: bounds.northLat,
                     southLat: bounds.southLat,
                     eastLng: bounds.eastLng,
-                    westLng: bounds.westLng
+                    westLng: bounds.westLng,
+                    userId: userId
                 )
                 
-                async let communityMarkersTask = placeService.fetchCommunityPlacesInViewport(
+                async let communityMarkersTask = placeService.fetchCommunityPlacesInViewportWithUserId(
                     northLat: bounds.northLat,
                     southLat: bounds.southLat,
                     eastLng: bounds.eastLng,
-                    westLng: bounds.westLng
+                    westLng: bounds.westLng,
+                    userId: userId
                 )
                 
                 let (annotations, community) = try await (networkAnnotationsTask, communityMarkersTask)

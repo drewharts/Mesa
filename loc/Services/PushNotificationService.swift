@@ -40,7 +40,7 @@ class PushNotificationService {
     
     /// Converts APNs device token Data to hex string format
     func convertDeviceToken(_ deviceToken: Data) -> String {
-        let tokenParts = deviceToken.map { data in String(format: "%02.2hhx", data) }
+        let tokenParts = deviceToken.map { String(format: "%02x", $0) }
         return tokenParts.joined()
     }
     

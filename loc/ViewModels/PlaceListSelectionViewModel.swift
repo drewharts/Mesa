@@ -16,6 +16,7 @@
 
 import Foundation
 import CoreLocation
+import Combine
 
 @MainActor
 class PlaceListSelectionViewModel: ObservableObject {
@@ -28,17 +29,11 @@ class PlaceListSelectionViewModel: ObservableObject {
     
     // MARK: - Filter State
     @Published var showOnlyShared: Bool = false
+    @Published var searchText: String = ""
     
-    // MARK: - Computed Properties
-    
-    /// Returns filtered lists based on current filter state
-    /// When filter is active, shows lists that are collaborative (shared with you OR you shared with others)
-    var filteredLists: [LightweightPlaceList] {
-        if showOnlyShared {
-            return lists.filter { $0.isCollaborative }
-        }
-        return lists
-    }
+    // MARK: - Search State
+    @Published var filteredLists: [LightweightPlaceList] = []
+    @Published var isSearching: Bool = false
     
     /// Count of collaborative lists (shared with you OR you shared with others)
     var collaborativeListCount: Int {
@@ -63,6 +58,8 @@ class PlaceListSelectionViewModel: ObservableObject {
     private var hasLoadedOnce: Bool = false
     private var currentPlace: DetailPlace?
     private var sharedLists: [LightweightPlaceList] = [] // Cached shared lists (don't paginate)
+    private var searchCancellable: AnyCancellable?
+    private var filterCancellable: AnyCancellable?
     
     // MARK: - Init
     init(profile: ProfileViewModel,
@@ -73,9 +70,28 @@ class PlaceListSelectionViewModel: ObservableObject {
         self.placeListService = placeListService
         self.collaborationService = collaborationService
         self.userSession = userSession
+        
+        // Set up search observer with debouncing to avoid excessive server calls
+        searchCancellable = $searchText
+            .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
+            .sink { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    await self?.performSearch()
+                }
+            }
+        
+        // Set up filter observer to re-apply filters when shared toggle changes
+        filterCancellable = $showOnlyShared
+            .sink { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    await self?.performSearch()
+                }
+            }
     }
     
     deinit {
+        searchCancellable?.cancel()
+        filterCancellable?.cancel()
     }
     
     // MARK: - Public API
@@ -120,6 +136,9 @@ class PlaceListSelectionViewModel: ObservableObject {
     lists = uniqueLists
     hasMore = ownedLists.count >= pageSize
     hasLoadedOnce = true
+        
+        // Initialize filtered lists with all loaded lists
+        filteredLists = applyLocalFilters(to: uniqueLists)
         
         print("📋 [PlaceListSelectionVM] Loaded \(uniqueLists.count) unique lists (from \(ownedLists.count) owned + \(collaborativeOwnedLists.count) collab + \(fetchedSharedLists.count) shared)")
         
@@ -172,6 +191,56 @@ class PlaceListSelectionViewModel: ObservableObject {
         }
     }
     
+    // MARK: - Search Methods
+    
+    /// Performs server-side search when search text is not empty
+    /// Searches ALL user lists in database regardless of pagination
+    private func performSearch() async {
+        guard let userId = userSession.currentUserId else { return }
+        
+        // If search is empty, use local filtering on loaded lists
+        if searchText.trimmingCharacters(in: .whitespaces).isEmpty {
+            filteredLists = applyLocalFilters(to: lists)
+            return
+        }
+        
+        // Perform server-side search
+        isSearching = true
+        
+        do {
+            let searchResults = try await placeListService.searchListsByName(
+                userId: userId,
+                searchTerm: searchText
+            )
+            
+            // Apply local filters (shared filter) on top of search results
+            filteredLists = applyLocalFilters(to: searchResults)
+            
+            // Load place membership for search results
+            if let placeId = currentPlace?.id.uuidString, !searchResults.isEmpty {
+                await loadPlaceMembershipForLists(searchResults, placeId: placeId)
+            }
+        } catch {
+            // Fallback to local filtering on error
+            filteredLists = applyLocalFilters(to: lists)
+        }
+        
+        isSearching = false
+    }
+    
+    /// Applies local filters (shared filter) to a list of lists
+    /// Single Responsibility: Filter application logic
+    private func applyLocalFilters(to sourceLists: [LightweightPlaceList]) -> [LightweightPlaceList] {
+        var result = sourceLists
+        
+        // Apply shared filter if enabled
+        if showOnlyShared {
+            result = result.filter { $0.isCollaborative }
+        }
+        
+        return result
+    }
+    
     func loadMoreListsIfNeeded(currentIndex: Int) async {
         // Guard: Already loading or no more to load
         guard !isLoadingMore,
@@ -210,6 +279,11 @@ class PlaceListSelectionViewModel: ObservableObject {
                     // Insert new owned lists BEFORE shared lists
                     let insertIndex = lists.count - sharedLists.count
                     lists.insert(contentsOf: newUniqueLists, at: insertIndex)
+                    
+                    // Update filtered lists if not actively searching
+                    if searchText.trimmingCharacters(in: .whitespaces).isEmpty {
+                        filteredLists = applyLocalFilters(to: lists)
+                    }
                     
                     // Load place membership data in BACKGROUND (non-blocking)
                     // Follows Single Responsibility: Pagination ≠ Data Enrichment
@@ -392,6 +466,16 @@ class PlaceListSelectionViewModel: ObservableObject {
             
             // Update our own paginated view (independent from ProfileViewModel's state)
             lists.insert(lightweightList, at: 0)
+            
+            // Update filtered lists to include the new list
+            if searchText.trimmingCharacters(in: .whitespaces).isEmpty {
+                filteredLists = applyLocalFilters(to: lists)
+            } else {
+                // If actively searching, re-run search to include new list if it matches
+                Task {
+                    await performSearch()
+                }
+            }
             
             return .success(())
             

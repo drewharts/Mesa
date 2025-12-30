@@ -31,13 +31,29 @@ struct ProfileViewListsView: View {
     @State private var selectedList: PlaceListViewModel?
     @State private var showingNewListSheet = false
     @State private var placeColors: [UUID: Color] = [:]
+    @State private var listToDelete: LightweightPlaceList?
+    @State private var showDeleteConfirmation = false
     
     // MARK: - Body
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             headerView
+            
+            // Simple inline search bar
+            if profile.isSearchingLists {
+                searchBar
+            }
+            
             listContent
+        }
+        .onChange(of: profile.isSearchingLists) { isSearching in
+            if !isSearching {
+                profile.listSearchText = ""
+                Task {
+                    await profile.reloadListsAfterSearch()
+                }
+            }
         }
         .sheet(isPresented: $showingImagePicker) {
             ImagePicker(images: $inputImage, selectionLimit: 1)
@@ -65,6 +81,26 @@ struct ProfileViewListsView: View {
                 presentationMode.wrappedValue.dismiss()
             }
         }
+        .alert("Delete List", isPresented: $showDeleteConfirmation) {
+            Button("Cancel", role: .cancel) {
+                listToDelete = nil
+            }
+            Button("Delete", role: .destructive) {
+                if let list = listToDelete {
+                    Task {
+                        let result = await profile.deleteLightweightList(list)
+                        if case .failure = result {
+                            // Could show error alert here if needed
+                        }
+                        listToDelete = nil
+                    }
+                }
+            }
+        } message: {
+            if let list = listToDelete {
+                Text("Are you sure you want to delete \"\(list.name)\"? This action cannot be undone.")
+            }
+        }
     }
     
     // MARK: - Header View
@@ -74,13 +110,52 @@ struct ProfileViewListsView: View {
             showOnlyShared: profile.showOnlySharedLists,
             hasSharedLists: profile.hasSharedLists,
             isFilterEnabled: profile.canInteractWithSharedFilter,
+            isSearching: profile.isSearchingLists,
             onToggleFilter: {
                 profile.showOnlySharedLists.toggle()
+            },
+            onToggleSearch: {
+                withAnimation {
+                    profile.isSearchingLists.toggle()
+                }
             },
             onAddList: {
                 showingNewListSheet = true
             }
         )
+    }
+    
+    // MARK: - Search Bar
+    
+    /// Simple inline search bar for filtering lists
+    private var searchBar: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .foregroundColor(.gray)
+                .font(.system(size: 14))
+            
+            TextField("Search lists...", text: $profile.listSearchText)
+                .font(.subheadline)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .submitLabel(.search)
+            
+            if !profile.listSearchText.isEmpty {
+                Button {
+                    profile.listSearchText = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundColor(.gray)
+                        .font(.system(size: 14))
+                }
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(Color(.systemGray6))
+        .cornerRadius(10)
+        .padding(.horizontal, 20)
+        .padding(.bottom, 4)
     }
     
     // MARK: - List Content (State-based rendering)
@@ -130,6 +205,14 @@ struct ProfileViewListsView: View {
                     currentIndex: index,
                     placeColors: $placeColors
                 )
+                .contextMenu {
+                    Button(role: .destructive) {
+                        listToDelete = list
+                        showDeleteConfirmation = true
+                    } label: {
+                        Label("Delete List", systemImage: "trash")
+                    }
+                }
                 .onAppear {
                     handleListAppear(list: list)
                 }
@@ -196,13 +279,13 @@ struct ProfileViewListsView: View {
     
     /// Handle list appearing - triggers pagination when approaching end
     private func handleListAppear(list: LightweightPlaceList) {
-        // Only paginate in unfiltered view (shared lists are fully loaded)
-        guard !profile.showOnlySharedLists else { return }
+        // Don't paginate during search or shared filter
+        guard !profile.showOnlySharedLists && !profile.isSearchingLists else { return }
         
         if profile.shouldLoadMorePlaceLists(
             currentItem: list,
             filteredLists: profile.filteredPlaceLists,
-            isSearching: false
+            isSearching: profile.isSearchingLists
         ) {
             Task {
                 await dataManager.loadMorePlaceLists(userId: userSession.currentUserId ?? "")
