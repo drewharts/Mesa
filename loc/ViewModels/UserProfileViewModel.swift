@@ -56,22 +56,51 @@ class UserProfileViewModel: ObservableObject {
     private let placeService: PlaceService
     private let userService: UserService
     private let postService: PostService
+    private let userSession: UserSession
     
     private let dataManager: DataManager
     private let detailPlaceViewModel: DetailPlaceViewModel
+    
+    private var notificationObserver: NSObjectProtocol?
     
     init(
         dataManager: DataManager, 
         detailPlaceViewModel: DetailPlaceViewModel,
         placeService: PlaceService,
         userService: UserService,
-        postService: PostService
+        postService: PostService,
+        userSession: UserSession
     ) {
         self.dataManager = dataManager
         self.detailPlaceViewModel = detailPlaceViewModel
         self.placeService = placeService
         self.userService = userService
         self.postService = postService
+        self.userSession = userSession
+        
+        setupNotificationObserver()
+    }
+    
+    deinit {
+        if let observer = notificationObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+    }
+    
+    /// Sets up observer for follow notification navigation
+    private func setupNotificationObserver() {
+        notificationObserver = NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("NavigateToUserProfileFromNotification"),
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let self = self,
+                  let userId = notification.userInfo?["userId"] as? String,
+                  let currentUserId = self.userSession.currentUserId else {
+                return
+            }
+            self.fetchAndSelectUser(userId: userId, currentUserId: currentUserId)
+        }
     }
     
     func selectUser(_ user: ProfileData, currentUserId: String) {
