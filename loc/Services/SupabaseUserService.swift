@@ -586,6 +586,54 @@ class SupabaseUserService: ObservableObject {
         }
     }
     
+    /// Fetch user's place lists without location sorting (fallback when location unavailable)
+    /// Returns lists ordered by creation date (newest first) with place counts
+    func fetchPlaceListsWithoutLocation(userId: String, page: Int = 1, pageSize: Int = 20) async throws -> [LightweightPlaceList] {
+        struct ListWithCount: Codable {
+            let id: String
+            let name: String
+            let is_public: Bool?
+            let image: String?
+            let created_at: String?
+            let updated_at: String?
+            let place_count: Int?
+        }
+        
+        // Use a subquery to get place count for each list
+        let response: [ListWithCount] = try await supabase.client
+            .from("place_lists")
+            .select("""
+                id,
+                name,
+                is_public,
+                image,
+                created_at,
+                updated_at,
+                place_list_items(count)
+            """)
+            .eq("user_id", value: userId)
+            .order("created_at", ascending: false)
+            .range(from: (page - 1) * pageSize, to: page * pageSize - 1)
+            .execute()
+            .value
+        
+        print("✅ [Supabase] Fetched \(response.count) lists without proximity sorting")
+        
+        return response.map { record in
+            LightweightPlaceList(
+                list_id: record.id,
+                name: record.name,
+                is_public: record.is_public ?? false,
+                image: record.image,
+                created_at: record.created_at,
+                updated_at: record.updated_at,
+                distance_meters: nil,
+                place_count: record.place_count ?? 0,
+                city: nil
+            )
+        }
+    }
+    
     /// Search place lists by name with pagination (server-side filtering)
     func searchPlaceLists(userId: String, query: String, page: Int = 1, pageSize: Int = 20) async throws -> [LightweightPlaceList] {
         struct SearchListRecord: Codable {

@@ -64,6 +64,11 @@ class ProfileViewModel: ObservableObject {
     // MARK: - List Filter State
     @Published var showOnlySharedLists: Bool = false
     
+    // MARK: - List Search State
+    @Published var isSearchingLists: Bool = false
+    @Published var listSearchText: String = ""
+    private var listSearchCancellable: AnyCancellable?
+    
     /// Returns filtered lists based on current filter state
     var filteredPlaceLists: [LightweightPlaceList] {
         if showOnlySharedLists {
@@ -208,6 +213,9 @@ class ProfileViewModel: ObservableObject {
         // Setup reactive data loading (MVVM + SRP)
         setupDataLoadingObserver()
         
+        // Setup list search observer with debouncing
+        setupListSearchObserver()
+        
         // Observe TikTok multiple places notifications
         NotificationCenter.default.addObserver(
             forName: NSNotification.Name("TikTokMultiplePlacesFound"),
@@ -239,6 +247,17 @@ class ProfileViewModel: ObservableObject {
                 }
             }
             .store(in: &cancellables)
+    }
+    
+    /// Sets up debounced observer for list search text changes
+    private func setupListSearchObserver() {
+        listSearchCancellable = $listSearchText
+            .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
+            .sink { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    await self?.performListSearch()
+                }
+            }
     }
     
     /// Observe user state and automatically load dependent data when user becomes available
@@ -956,6 +975,23 @@ class ProfileViewModel: ObservableObject {
             }
             
             return .success(createdList)
+        } catch {
+            return .failure(error)
+        }
+    }
+    
+    /// Deletes a lightweight place list from database and removes from local state
+    func deleteLightweightList(_ list: LightweightPlaceList) async -> Result<Void, Error> {
+        do {
+            // Delete from database
+            try await PlaceListService.shared.deleteList(listId: list.list_id)
+            
+            // Remove from local state
+            lightweightPlaceLists.removeAll { $0.list_id == list.list_id }
+            lightweightPlaceListPlaces.removeValue(forKey: list.list_id)
+            lightweightPlaceListCounts.removeValue(forKey: list.list_id)
+            
+            return .success(())
         } catch {
             return .failure(error)
         }
@@ -2325,6 +2361,106 @@ class ProfileViewModel: ObservableObject {
     }
     
     // MARK: - Place List Pagination (for lists themselves, not places within lists)
+    
+    /// Performs server-side search across ALL user lists in database regardless of pagination
+    private func performListSearch() async {
+        guard let userId = userSession.currentUserId else { return }
+        
+        // If search is empty, do nothing (keep current lists)
+        // View layer will handle reloading when search mode is closed
+        if listSearchText.trimmingCharacters(in: .whitespaces).isEmpty {
+            return
+        }
+        
+        do {
+            let searchResults = try await PlaceListService.shared.searchListsByName(
+                userId: userId,
+                searchTerm: listSearchText
+            )
+            
+            // Update lists with search results
+            lightweightPlaceLists = searchResults
+            
+            // Update counts for search results
+            for list in searchResults {
+                if lightweightPlaceListCounts[list.list_id] == nil {
+                    lightweightPlaceListCounts[list.list_id] = list.place_count
+                }
+            }
+            
+            // Reset pagination state during search
+            hasMorePlaceLists = false
+            
+            // Load places for search results to display collage photos
+            await loadPlacesForSearchResults()
+        } catch {
+            // On error, keep current lists
+        }
+    }
+    
+    /// Loads places for search result lists in parallel to display photos in collages
+    private func loadPlacesForSearchResults() async {
+        // Load places for all search results in parallel for better performance
+        await withTaskGroup(of: (String, [LightweightPlace]?).self) { group in
+            for list in lightweightPlaceLists {
+                group.addTask {
+                    do {
+                        let places = try await self.userService.fetchPlacesForPlaceList(
+                            listId: list.list_id,
+                            page: 1,
+                            pageSize: 6
+                        )
+                        return (list.list_id, places)
+                    } catch {
+                        return (list.list_id, nil)
+                    }
+                }
+            }
+            
+            // Collect all results and update in a single batch
+            for await (listId, places) in group {
+                if let places = places {
+                    setPlacesForList(listId: listId, places: places)
+                }
+            }
+        }
+    }
+    
+    /// Reloads place lists when exiting search mode to restore normal paginated view
+    func reloadListsAfterSearch() async {
+        guard let userId = userSession.currentUserId else { return }
+        
+        isLoadingInitialLists = true
+        
+        do {
+            let location = locationManager.currentLocation?.coordinate
+            let lists: [LightweightPlaceList]
+            
+            if let location = location {
+                lists = try await userService.fetchPlaceListsByProximity(
+                    userId: userId,
+                    userLatitude: location.latitude,
+                    userLongitude: location.longitude,
+                    page: 1,
+                    pageSize: 6
+                )
+            } else {
+                lists = try await userService.fetchPlaceListsWithoutLocation(
+                    userId: userId,
+                    page: 1,
+                    pageSize: 6
+                )
+            }
+            
+            lightweightPlaceLists = lists
+            placeListsCurrentPage = 1
+            hasMorePlaceLists = lists.count >= 6
+        } catch {
+            // Keep existing lists on error
+        }
+        
+        isLoadingInitialLists = false
+    }
     
     /// Check if we should load more place lists based on current scroll position
     func shouldLoadMorePlaceLists(currentItem: LightweightPlaceList, filteredLists: [LightweightPlaceList], isSearching: Bool) -> Bool {

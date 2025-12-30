@@ -168,10 +168,11 @@ struct ListPhotoCollage: View {
 }
 
 // MARK: - Collage Photo View
-/// Individual photo in the collage - fills available space.
+/// Individual photo in the collage with reactive TikTok thumbnail loading
 struct CollagePhotoView: View {
     let place: LightweightPlace
     @Binding var placeColors: [UUID: Color]
+    @ObservedObject var tikTokCache = TikTokMetadataCache.shared
     
     private var placeColor: Color {
         let hash = place.place_id.hashValue
@@ -226,8 +227,8 @@ struct CollagePhotoView: View {
                 }
             }
         } else if let tiktokUrl = place.tiktok_url {
-            // No cached thumbnail yet - trigger fetch
-            Color.clear
+            // No cached thumbnail yet - show placeholder while fetching
+            Color.gray.opacity(0.3)
                 .onAppear {
                     Task {
                         _ = await TikTokMetadataCache.shared.getMetadata(for: tiktokUrl)
@@ -238,8 +239,7 @@ struct CollagePhotoView: View {
 }
 
 // MARK: - Lightweight Place Preview Card
-/// Displays a place preview with photo and name overlay.
-/// Used in list detail views (not in the main grid).
+/// Displays a place preview with photo and name overlay with reactive TikTok thumbnail loading
 struct LightweightPlacePreviewCard: View {
     let place: LightweightPlace
     @Binding var placeColors: [UUID: Color]
@@ -247,6 +247,7 @@ struct LightweightPlacePreviewCard: View {
     
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @Environment(\.presentationMode) var presentationMode
+    @ObservedObject var tikTokCache = TikTokMetadataCache.shared
     
     private var placeColor: Color {
         let hash = place.place_id.hashValue
@@ -345,7 +346,8 @@ struct LightweightPlacePreviewCard: View {
                 }
             }
         } else if let tiktokUrl = place.tiktok_url {
-            Color.clear
+            // No cached thumbnail yet - show placeholder while fetching
+            Color.gray.opacity(0.3)
                 .onAppear {
                     Task {
                         _ = await TikTokMetadataCache.shared.getMetadata(for: tiktokUrl)

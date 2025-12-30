@@ -121,6 +121,7 @@ private struct PostPhotoSection: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
+            // Selected images
             if !viewModel.images.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 12) {
@@ -159,19 +160,26 @@ private struct PostPhotoSection: View {
     private func addPhotoButton(compact: Bool) -> some View {
         Button(action: { showingImagePicker = true }) {
             VStack(spacing: 8) {
-                Image(systemName: "camera.fill")
-                    .font(.title2)
+                Image(systemName: "plus")
+                    .font(.system(size: compact ? 20 : 24, weight: .medium))
+                    .foregroundColor(.secondary)
                 if !compact {
                     Text("Add Photos")
                         .font(.subheadline)
                         .fontWeight(.medium)
+                        .foregroundColor(.secondary)
                 }
             }
-            .foregroundColor(.gray)
             .frame(width: compact ? 100 : nil, height: 100)
             .frame(maxWidth: compact ? nil : .infinity)
-            .background(Color(.systemGray6))
-            .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+            .background(
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .fill(.ultraThinMaterial)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .strokeBorder(.quaternary, lineWidth: 0.5)
+            )
         }
     }
 }
@@ -375,3 +383,4 @@ private struct SentimentButton: View {
         }
     }
 }
+

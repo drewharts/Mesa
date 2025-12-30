@@ -177,8 +177,34 @@ struct PlaceDetailTabsView: View {
     
     private var tabBar: some View {
         HStack(spacing: 12) {
-            tabButton(title: "FEED", tab: DetailTab.reviews)
             tabButton(title: "ABOUT", tab: DetailTab.about)
+            tabButton(title: "FEED", tab: DetailTab.reviews)
+            
+            Spacer()
+            
+            // Favorite Button
+            Button(action: {
+                viewModel.postsViewModel.toggleFavorite()
+            }) {
+                Image(systemName: viewModel.postsViewModel.isFavorited ? "star.fill" : "star")
+                    .font(.body)
+                    .foregroundColor(viewModel.postsViewModel.isFavorited ? .yellow : .gray)
+                    .frame(width: 32, height: 32)
+                    .background(viewModel.postsViewModel.isFavorited ? Color.yellow.opacity(0.15) : Color.gray.opacity(0.1))
+                    .cornerRadius(16)
+            }
+            
+            // Private Note Button
+            Button(action: {
+                showingNoteSheet = true
+            }) {
+                Image(systemName: "note.text")
+                    .font(.body)
+                    .foregroundColor(.gray)
+                    .frame(width: 32, height: 32)
+                    .background(Color.gray.opacity(0.1))
+                    .cornerRadius(16)
+            }
         }
         .padding(.bottom, 10)
     }
@@ -222,8 +248,7 @@ struct PlaceDetailTabsView: View {
             PlacePostsView(
                 viewModel: viewModel.postsViewModel,
                 onPhotoTapped: onPhotoTapped,
-                onAddPost: onAddReview,
-                onAddNote: { showingNoteSheet = true }
+                onAddPost: onAddReview
             )
             .environmentObject(selectedPlaceVM)
             .environmentObject(userProfileViewModel)
@@ -438,7 +463,8 @@ private struct SavedByIndicator: View {
                 detailPlaceViewModel: detailPlaceVM,
                 placeService: services.placeService,
                 userService: services.userService,
-                postService: services.postService
+                postService: services.postService,
+                userSession: userSession
             )
             
             // Create a mock place and set it

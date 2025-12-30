@@ -45,13 +45,12 @@ struct MapContainerView: View {
         self.onMapTap = onMapTap
         
         // Create MapViewModel scoped to this container
+        // Note: MapViewModel no longer observes ProfileViewModel directly
+        // The View layer coordinates data flow between ViewModels (SRP pattern)
         let mapVM = MapViewModel(
             placeService: placeService,
             detailPlaceVM: detailPlaceViewModel
         )
-        
-        // Wire up ProfileViewModel to MapViewModel for viewport filtering and profile photos
-        mapVM.profileViewModel = profileViewModel
         
         self._mapViewModel = StateObject(wrappedValue: mapVM)
     }
