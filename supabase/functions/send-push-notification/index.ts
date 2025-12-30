@@ -50,13 +50,13 @@ serve(async (req) => {
       )
     }
     
-    // Get the user's device token
+    // Get the user's device token - check both id and supabase_uid
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
     
     const { data: user, error: userError } = await supabase
       .from('users')
       .select('fcm_token')
-      .eq('id', record.user_id)
+      .or(`id.eq.${record.user_id},supabase_uid.eq.${record.user_id}`)
       .single()
     
     if (userError) {
