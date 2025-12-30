@@ -81,11 +81,6 @@ serve(async (req) => {
     // Validate token format (should be 64 hex characters)
     if (!/^[0-9a-fA-F]{64}$/.test(deviceToken)) {
       console.error('❌ [Push] Invalid device token format:', deviceToken.substring(0, 8) + '...')
-      // Clear invalid token from database
-      await supabase
-        .from('users')
-        .update({ fcm_token: null })
-        .or(`id.eq.${record.user_id},supabase_uid.eq.${record.user_id}`)
       return new Response(
         JSON.stringify({ error: 'Invalid device token format' }), 
         { status: 400, headers: { 'Content-Type': 'application/json' } }
@@ -213,15 +208,6 @@ serve(async (req) => {
     if (!apnsResponse.ok) {
       const errorText = await apnsResponse.text()
       console.error('❌ [Push] APNs error:', apnsResponse.status, errorText)
-      
-      // If BadDeviceToken, clear the invalid token from database
-      if (apnsResponse.status === 400 && errorText.includes('BadDeviceToken')) {
-        console.log('🧹 [Push] Clearing invalid device token for user:', record.user_id)
-        await supabase
-          .from('users')
-          .update({ fcm_token: null })
-          .or(`id.eq.${record.user_id},supabase_uid.eq.${record.user_id}`)
-      }
       
       return new Response(
         JSON.stringify({ 
