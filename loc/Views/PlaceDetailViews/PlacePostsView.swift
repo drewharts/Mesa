@@ -68,20 +68,19 @@ struct PlacePostsView: View {
     
     private var postActionButtons: some View {
         HStack(spacing: 10) {
-            // Share Post Button
+            // Post Review Button
             Button(action: onAddPost) {
-                HStack(spacing: 4) {
-                    Image(systemName: "plus.circle.fill")
-                        .font(.caption)
-                    Text("Share Post")
-                        .font(.caption)
-                        .fontWeight(.medium)
+                HStack(spacing: 8) {
+                    Image(systemName: "star.fill")
+                        .font(.system(size: 16, weight: .semibold))
+                    Text("Post Review")
+                        .font(.system(size: 16, weight: .semibold))
                 }
                 .foregroundColor(.white)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 7)
-                .background(Color(white: 0.45))
-                .cornerRadius(16)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
+                .background(Color.blue)
+                .cornerRadius(12)
             }
             
             // Favorite Button
