@@ -278,6 +278,30 @@ class PlaceService: ObservableObject {
         )
     }
     
+    /// Fetch ALL friends places in viewport WITHOUT density filtering
+    /// Used for "Places in View" popup to show every place regardless of zoom level
+    func fetchAllFriendsPlacesInViewportWithUserId(northLat: Double, southLat: Double, eastLng: Double, westLng: Double, userId: String) async throws -> [PlaceAnnotation] {
+        return try await supabase.fetchAllFriendsPlacesInViewport(
+            northLat: northLat,
+            southLat: southLat,
+            eastLng: eastLng,
+            westLng: westLng,
+            userId: userId
+        )
+    }
+    
+    /// Fetch ALL community places in viewport WITHOUT density filtering
+    /// Used for "Places in View" popup to show every place regardless of zoom level
+    func fetchAllCommunityPlacesInViewportWithUserId(northLat: Double, southLat: Double, eastLng: Double, westLng: Double, userId: String) async throws -> [CommunityPlaceMarker] {
+        return try await supabase.fetchAllCommunityPlacesInViewport(
+            northLat: northLat,
+            southLat: southLat,
+            eastLng: eastLng,
+            westLng: westLng,
+            userId: userId
+        )
+    }
+    
     // fetchFriendsPlacesInViewport methods removed - the main get_visible_annotations_with_users function
     // now handles both user and friends' places in a single optimized query
     

@@ -64,9 +64,8 @@ struct VisiblePlacesPopupView: View {
     /// This keeps ViewModel decoupled from other ViewModels (SRP)
     private func configureViewModel() {
         viewModel.configure(
-            friendsAnnotations: mapViewModel.viewportAnnotations,
-            communityMarkers: mapViewModel.communityMarkers,
             mapRegion: mapRegion,
+            userId: profile.user?.id,
             existingPlaceImages: detailPlaceViewModel.placeImages
         )
         viewModel.onAppear()
