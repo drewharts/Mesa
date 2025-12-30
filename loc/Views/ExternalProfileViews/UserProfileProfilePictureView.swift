@@ -72,7 +72,7 @@ struct UserProfileProfilePictureView: View {
                     )
             }
         }
-        .padding(.top, 40)
+        .padding(.top, 0)
         .alert("Places Saved", isPresented: $showingPlacesCount) {
             Button("OK", role: .cancel) { }
         } message: {
