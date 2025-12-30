@@ -173,8 +173,11 @@ struct MapView: View {
                     // This fires only when camera stops moving - Apple handles debouncing!
                     currentMapRegion = context.region
                     
-                    Task.detached(priority: .background) {
-                        await mapViewModel.onMapCameraSettled(context.region)
+                    // Only load if user profile is available (View coordinates data flow)
+                    if let userId = profile.user?.id {
+                        Task.detached(priority: .background) {
+                            await mapViewModel.onMapCameraSettled(context.region, userId: userId)
+                        }
                     }
                 }
                 .gesture(
@@ -221,14 +224,14 @@ struct MapView: View {
                     }
                     
                     // Also load viewport places for this new location
-                    if !hasLoadedInitialViewport {
+                    if !hasLoadedInitialViewport, let userId = profile.user?.id {
                         let region = MKCoordinateRegion(
                             center: userLocation,
                             span: MKCoordinateSpan(latitudeDelta: 0.015, longitudeDelta: 0.015)
                         )
                         hasLoadedInitialViewport = true
                         Task.detached(priority: .background) {
-                            await mapViewModel.onMapCameraSettled(region)
+                            await mapViewModel.onMapCameraSettled(region, userId: userId)
                         }
                     }
                 }
@@ -310,10 +313,10 @@ struct MapView: View {
             // Setup notification observers
             setupNotificationObservers()
             
-            // 🚀 Load initial viewport places
-            if !hasLoadedInitialViewport, let region = currentMapRegion {
+            // 🚀 Load initial viewport places (only if profile is ready)
+            if !hasLoadedInitialViewport, let region = currentMapRegion, let userId = profile.user?.id {
                 Task.detached(priority: .background) {
-                    await mapViewModel.onMapCameraSettled(region)
+                    await mapViewModel.onMapCameraSettled(region, userId: userId)
                 }
                 hasLoadedInitialViewport = true
             }
@@ -323,19 +326,25 @@ struct MapView: View {
              removeNotificationObservers()
          }
         .task(id: scenePhase) {
-            // Reload photos when app becomes active
-            if scenePhase == .active {
-                await mapViewModel.loadFollowedUsersPhotos()
+            // Refresh photos when app returns to foreground (e.g., user updated their profile photo)
+            if scenePhase == .active, let userId = profile.user?.id {
+                await mapViewModel.loadFollowedUsersPhotos(
+                    userId: userId,
+                    currentUserPhotoUrl: profile.user?.profilePhotoURL
+                )
             }
         }
         .task {
             // 🚀 CRITICAL: Load viewport places FIRST (instant map rendering)
+            // Only proceed if user profile is available
+            guard let userId = profile.user?.id else { return }
+            
             if !hasLoadedInitialViewport {
                 // Give the map a moment to settle and provide a region
                 try? await Task.sleep(nanoseconds: 300_000_000) // 0.3 seconds
                 
                 if let region = currentMapRegion {
-                    await mapViewModel.onMapCameraSettled(region)
+                    await mapViewModel.onMapCameraSettled(region, userId: userId)
                     hasLoadedInitialViewport = true
                 } else if let userLocation = locationManager.currentLocation?.coordinate {
                     // Create a region from the user's current location
@@ -343,20 +352,47 @@ struct MapView: View {
                         center: userLocation,
                         span: MKCoordinateSpan(latitudeDelta: 0.015, longitudeDelta: 0.015)
                     )
-                    await mapViewModel.onMapCameraSettled(region)
+                    await mapViewModel.onMapCameraSettled(region, userId: userId)
                     hasLoadedInitialViewport = true
                 }
                 // Note: If no location yet, we'll load viewport when location becomes available
                 // via the onChange handler
             }
             
-            // ✅ Load profile photos on first appearance (critical for login flow)
-            // This ensures photos load whether user logs in OR app starts already logged in
-            await mapViewModel.loadFollowedUsersPhotos()
+            // ✅ Load profile photos for annotations
+            if !mapViewModel.hasLoadedPhotos {
+                await mapViewModel.loadFollowedUsersPhotos(
+                    userId: userId,
+                    currentUserPhotoUrl: profile.user?.profilePhotoURL
+                )
+            }
+        }
+        .onChange(of: profile.user?.id) { oldValue, newValue in
+            // When user profile becomes available (nil → value), trigger initial loads
+            guard let userId = newValue, oldValue == nil else { return }
             
-            // ✅ REMOVED: Duplicate operations already handled in DataManager
-            // profile.refreshUserPlaces() - Already done in DataManager.initializeProfileData()
-            // detailPlaceVM.calculateAnnotationPlaces() - Already done in DataManager.calculateMapAnnotations()
+            Task {
+                // Load photos
+                await mapViewModel.loadFollowedUsersPhotos(
+                    userId: userId,
+                    currentUserPhotoUrl: profile.user?.profilePhotoURL
+                )
+                
+                // Load viewport if we have a region
+                if !hasLoadedInitialViewport {
+                    if let region = currentMapRegion {
+                        await mapViewModel.onMapCameraSettled(region, userId: userId)
+                        hasLoadedInitialViewport = true
+                    } else if let userLocation = locationManager.currentLocation?.coordinate {
+                        let region = MKCoordinateRegion(
+                            center: userLocation,
+                            span: MKCoordinateSpan(latitudeDelta: 0.015, longitudeDelta: 0.015)
+                        )
+                        await mapViewModel.onMapCameraSettled(region, userId: userId)
+                        hasLoadedInitialViewport = true
+                    }
+                }
+            }
         }
         .sheet(isPresented: $showVisiblePlacesPopup) {
             VisiblePlacesPopupView(mapRegion: currentMapRegion)

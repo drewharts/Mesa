@@ -14,12 +14,14 @@ struct PlaceAnnotation: Identifiable, Codable {
     let name: String
     let coordinate: CLLocationCoordinate2D
     let userIds: [String] // Array of user IDs who saved this place
+    let placeType: String // Derived from first non-generic category
     
     enum CodingKeys: String, CodingKey {
         case id
         case name
         case coordinate
         case userIds = "user_ids"
+        case placeType = "place_type"
     }
     
     init(from decoder: Decoder) throws {
@@ -28,6 +30,7 @@ struct PlaceAnnotation: Identifiable, Codable {
         id = try container.decode(String.self, forKey: .id)
         name = try container.decode(String.self, forKey: .name)
         userIds = try container.decode([String].self, forKey: .userIds)
+        placeType = try container.decode(String.self, forKey: .placeType)
         
         // Parse coordinate from PostGIS GeoJSON format: {"type": "Point", "coordinates": [longitude, latitude]}
         let coordinateData = try container.decode(CoordinateData.self, forKey: .coordinate)

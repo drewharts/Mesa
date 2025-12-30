@@ -913,6 +913,74 @@ class SupabasePlaceService: ObservableObject {
         }
     }
     
+    /// Fetch ALL friends places in viewport WITHOUT density filtering
+    /// Used for "Places in View" popup to show every place regardless of zoom level
+    func fetchAllFriendsPlacesInViewport(northLat: Double, southLat: Double, eastLng: Double, westLng: Double, userId: String) async throws -> [PlaceAnnotation] {
+        do {
+            struct ViewportParams: Encodable {
+                let p_user_id: String
+                let p_min_lon: Double
+                let p_min_lat: Double
+                let p_max_lon: Double
+                let p_max_lat: Double
+            }
+            
+            let params = ViewportParams(
+                p_user_id: userId,
+                p_min_lon: westLng,
+                p_min_lat: southLat,
+                p_max_lon: eastLng,
+                p_max_lat: northLat
+            )
+            
+            let response: [PlaceAnnotation] = try await supabase.client
+                .rpc("get_all_friends_places_in_viewport", params: params)
+                .execute()
+                .value
+            
+            return response
+        } catch {
+            if !Task.isCancelled && !(error is CancellationError) && (error as NSError).code != NSURLErrorCancelled {
+                print("❌ [Supabase] Error fetching all friends places in viewport: \(error)")
+            }
+            throw error
+        }
+    }
+    
+    /// Fetch ALL community places in viewport WITHOUT density filtering
+    /// Used for "Places in View" popup to show every place regardless of zoom level
+    func fetchAllCommunityPlacesInViewport(northLat: Double, southLat: Double, eastLng: Double, westLng: Double, userId: String) async throws -> [CommunityPlaceMarker] {
+        do {
+            struct ViewportParams: Encodable {
+                let p_user_id: String
+                let p_min_lon: Double
+                let p_min_lat: Double
+                let p_max_lon: Double
+                let p_max_lat: Double
+            }
+            
+            let params = ViewportParams(
+                p_user_id: userId,
+                p_min_lon: westLng,
+                p_min_lat: southLat,
+                p_max_lon: eastLng,
+                p_max_lat: northLat
+            )
+            
+            let response: [CommunityPlaceMarker] = try await supabase.client
+                .rpc("get_all_community_places_in_viewport", params: params)
+                .execute()
+                .value
+            
+            return response
+        } catch {
+            if !Task.isCancelled && !(error is CancellationError) && (error as NSError).code != NSURLErrorCancelled {
+                print("❌ [Supabase] Error fetching all community places in viewport: \(error)")
+            }
+            throw error
+        }
+    }
+    
     // MARK: - User Photos for Annotations
     
     /// Fetch profile photos for all followed users (for custom annotation views)
