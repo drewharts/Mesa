@@ -20,7 +20,7 @@ struct UserProfileView: View {
             ScrollView {
                 VStack(spacing: 0) {
                 // Profile Picture, Name, Followers
-                    VStack(spacing: 20) {
+                    VStack(spacing: 16) {
                         // Profile Picture
                         UserProfileProfilePictureView(
                             profilePhotoURL: UserProfileVM.selectedUser?.profilePhotoURL,
@@ -56,7 +56,7 @@ struct UserProfileView: View {
                                 .fontWeight(.light)
                         }
                     }
-                    .padding(.top, 0)
+                    .padding(.top, -8)
                     .padding(.bottom, 16)
                     
                     Divider()
