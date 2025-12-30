@@ -27,7 +27,9 @@ BEGIN
         NOW(),
         false
     FROM users u
-    WHERE u.id = NEW.follower_id;
+    WHERE u.id = NEW.follower_id
+       OR u.supabase_uid = NEW.follower_id
+       OR u.firebase_uid = NEW.follower_id;
     
     RETURN NEW;
 END;
