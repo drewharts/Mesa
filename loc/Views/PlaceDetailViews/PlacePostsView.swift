@@ -11,7 +11,6 @@ struct PlacePostsView: View {
     @ObservedObject var viewModel: PlacePostsViewModel
     let onPhotoTapped: ([UIImage], Int) -> Void
     let onAddPost: () -> Void
-    let onAddNote: () -> Void
     
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var userProfileViewModel: UserProfileViewModel
@@ -67,43 +66,30 @@ struct PlacePostsView: View {
     // MARK: - Action Buttons
     
     private var postActionButtons: some View {
-        HStack(spacing: 10) {
-            // Post Review Button
-            Button(action: onAddPost) {
-                HStack(spacing: 8) {
-                    Image(systemName: "star.fill")
-                        .font(.system(size: 16, weight: .semibold))
-                    Text("Post Review")
-                        .font(.system(size: 16, weight: .semibold))
-                }
-                .foregroundColor(.white)
-                .padding(.horizontal, 20)
-                .padding(.vertical, 12)
-                .background(Color.blue)
-                .cornerRadius(12)
+        // Post Button - Modern, sleek, inviting style with Apple glass
+        Button(action: onAddPost) {
+            HStack(spacing: 12) {
+                Image(systemName: "plus")
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundColor(.secondary)
+                
+                Text("Share something...")
+                    .font(.system(size: 15, weight: .regular))
+                    .foregroundColor(.secondary)
+                
+                Spacer()
             }
-            
-            // Favorite Button
-            Button(action: viewModel.toggleFavorite) {
-                Image(systemName: viewModel.isFavorited ? "star.fill" : "star")
-                    .font(.body)
-                    .foregroundColor(viewModel.isFavorited ? .yellow : .gray)
-                    .frame(width: 32, height: 32)
-                    .background(viewModel.isFavorited ? Color.yellow.opacity(0.15) : Color.gray.opacity(0.1))
-                    .cornerRadius(16)
-            }
-            
-            // Private Note Button
-            Button(action: onAddNote) {
-                Image(systemName: "note.text")
-                    .font(.body)
-                    .foregroundColor(.gray)
-                    .frame(width: 32, height: 32)
-                    .background(Color.gray.opacity(0.1))
-                    .cornerRadius(16)
-            }
-            
-            Spacer()
+            .padding(.horizontal, 18)
+            .padding(.vertical, 14)
+            .frame(maxWidth: .infinity)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(.ultraThinMaterial)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .strokeBorder(.quaternary, lineWidth: 0.5)
+            )
         }
         .padding(.top, 8)
     }
