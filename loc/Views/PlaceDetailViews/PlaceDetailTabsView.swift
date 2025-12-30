@@ -438,7 +438,8 @@ private struct SavedByIndicator: View {
                 detailPlaceViewModel: detailPlaceVM,
                 placeService: services.placeService,
                 userService: services.userService,
-                postService: services.postService
+                postService: services.postService,
+                userSession: userSession
             )
             
             // Create a mock place and set it

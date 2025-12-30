@@ -32,6 +32,17 @@ class NotificationManager: ObservableObject {
     func setHighlightedReview(_ reviewId: String) {
         highlightedReviewId = reviewId
     }
+    
+    /// Handles follow notification tap by posting notification for UserProfileViewModel to observe
+    func handleFollowNotificationTap(userId: String) {
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(
+                name: NSNotification.Name("NavigateToUserProfileFromNotification"),
+                object: nil,
+                userInfo: ["userId": userId]
+            )
+        }
+    }
 }
 
 struct PendingNavigation {
