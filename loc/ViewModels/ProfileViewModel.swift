@@ -1288,6 +1288,7 @@ class ProfileViewModel: ObservableObject {
     /// Refresh TikTok places list after a successful import
     func refreshTikTokPlacesAfterImport() {
         // Reload lightweight external places to show new TikTok place in tiles
+        // Note: Actual refresh happens when place detail view appears (after backend creates entry)
         Task {
             await reloadLightweightExternalPlaces()
         }
@@ -1898,7 +1899,8 @@ class ProfileViewModel: ObservableObject {
                     deepLinkManager?.isProcessingDeepLink = false
                     currentProcessingTikTokUrl = nil
                     
-                    refreshTikTokPlacesAfterImport()
+                    // Note: TikTok places refresh happens in PlaceDetailView.onAppear
+                    // after backend creates the external_place entry
                 
                 } else if detailPlaces.count > 1 {
                     // Multiple places - show selection screen
@@ -1933,7 +1935,8 @@ class ProfileViewModel: ObservableObject {
                     isWaitingForPlaceDetail = false
                     deepLinkManager?.isProcessingDeepLink = false
                     
-                    refreshTikTokPlacesAfterImport()
+                    // Note: TikTok places refresh happens in PlaceDetailView.onAppear
+                    // after user selects a place and backend creates the external_place entry
                 } else {
                     // No places found - show flagging interface
                     print("❌ [ProfileViewModel] No places found: count = \(detailPlaces.count)")

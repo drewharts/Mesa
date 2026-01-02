@@ -140,6 +140,10 @@ struct PlaceDetailView: View {
                    let tabsVM = tabsViewModel {
                     tabsVM.travelTimeViewModel.updateTravelTime(for: place, from: currentLocation.coordinate)
                 }
+                
+                // Refresh TikTok places when place detail view appears
+                // Backend creates external_place entry when selectPlaceAndFetchDetails is called
+                profile.refreshTikTokPlacesAfterImport()
             }
             .onChange(of: selectedPlaceVM.selectedPlace) { _, newPlace in
                 if let place = newPlace,

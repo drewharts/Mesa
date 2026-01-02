@@ -34,7 +34,9 @@ struct TikToksPopupView: View {
                 )
             }
         )
-        // ✅ MVVM + SRP: ViewModel automatically loads data when user is set
-        // No manual loading needed - reactive observer handles it
+        .onAppear {
+            // Refresh TikTok places every time popup is opened to show latest data
+            profile.refreshTikTokPlacesAfterImport()
+        }
     }
 }
