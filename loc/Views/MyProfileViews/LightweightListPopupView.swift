@@ -62,129 +62,129 @@ struct LightweightListPopupView: View {
     
     var body: some View {
         NavigationView {
-            VStack(spacing: 0) {
-                // Header with list name and controls
-                VStack(spacing: 12) {
-                    // Top bar with close button, collaborators button, and share button
-                    HStack {
-                        Button(action: {
-                            presentationMode.wrappedValue.dismiss()
-                        }) {
-                            Image(systemName: "xmark")
-                                .foregroundColor(.primary)
-                        }
-                        
-                        Spacer()
-                        
-                        // Collaborators button with profile avatars + Share button
-                        if let userId = profile.user?.id {
-                            HStack(alignment: .center, spacing: 12) {
-                                // Collaborators button
-                                Button {
-                                    showCollaboratorsSheet = true
-                                } label: {
-                                    // Show profile picture avatars for collaborators (like map annotations)
-                                    if currentList.hasCollaborators || currentList.isSharedWithMe {
-                                        CollaboratorAvatarsButton(
-                                            isSharedWithMe: currentList.isSharedWithMe,
-                                            ownerPhotoUrl: currentList.owner_photo_url,
-                                            collaboratorPhotos: currentList.collaborator_photos
-                                        )
-                                    } else {
-                                        // Just show person.2 icon when no collaborators (for adding)
-                                        Image(systemName: "person.2")
-                                            .font(.system(size: 20, weight: .regular))
-                                            .foregroundColor(.primary)
+            ScrollView {
+                VStack(spacing: 0) {
+                    // Header with list name and controls - horizontally aligned
+                    VStack(spacing: 12) {
+                        // Top bar with list title on left, buttons on right
+                        HStack(alignment: .center) {
+                            // List name and place count on the left
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(currentList.name)
+                                    .font(.title2)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.black)
+                                
+                                Text("\(currentList.place_count) place\(currentList.place_count == 1 ? "" : "s")")
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+                            }
+                            
+                            Spacer()
+                            
+                            // Collaborators button with profile avatars + Share button
+                            if let userId = profile.user?.id {
+                                HStack(alignment: .center, spacing: 12) {
+                                    // Collaborators button
+                                    Button {
+                                        showCollaboratorsSheet = true
+                                    } label: {
+                                        // Show profile picture avatars for collaborators (like map annotations)
+                                        if currentList.hasCollaborators || currentList.isSharedWithMe {
+                                            CollaboratorAvatarsButton(
+                                                isSharedWithMe: currentList.isSharedWithMe,
+                                                ownerPhotoUrl: currentList.owner_photo_url,
+                                                collaboratorPhotos: currentList.collaborator_photos
+                                            )
+                                        } else {
+                                            // Just show person.2 icon when no collaborators (for adding)
+                                            Image(systemName: "person.2")
+                                                .font(.system(size: 20, weight: .regular))
+                                                .foregroundColor(.primary)
+                                        }
                                     }
+                                    .frame(minWidth: 44, minHeight: 44) // Tap target
+                                    
+                                    // Share button (Apple style - clean and simple)
+                                    LightweightListShareButton(lightweightList: currentList, userId: userId, style: .apple)
                                 }
-                                .frame(minWidth: 44, minHeight: 44) // Tap target
-                                
-                                // Share button (Apple style - clean and simple)
-                                LightweightListShareButton(lightweightList: currentList, userId: userId, style: .apple)
                             }
                         }
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.top, 20)
-                    
-                    // List name and place count
-                    VStack(spacing: 4) {
-                        Text(currentList.name)
-                            .font(.title2)
-                            .fontWeight(.bold)
-                            .foregroundColor(.black)
+                        .padding(.horizontal, 20)
+                        .padding(.top, 24)
                         
-                        Text("\(currentList.place_count) place\(currentList.place_count == 1 ? "" : "s")")
-                            .font(.caption)
-                            .foregroundColor(.gray)
+                        // Filter toggle
+                        HStack {
+                            Button(action: {
+                                showOnlyUnvisited.toggle()
+                            }) {
+                                HStack(spacing: 8) {
+                                    Image(systemName: showOnlyUnvisited ? "checkmark.circle.fill" : "circle")
+                                        .foregroundColor(showOnlyUnvisited ? .blue : .gray)
+                                    
+                                    Text("Show only unvisited")
+                                        .font(.subheadline)
+                                        .foregroundColor(.primary)
+                                }
+                            }
+                            
+                            Spacer()
+                        }
+                        .padding(.horizontal, 20)
                     }
-                    .padding(.horizontal, 20)
+                    .padding(.bottom, 10)
                     
-                    // Filter toggle
-                    HStack {
-                        Button(action: {
-                            showOnlyUnvisited.toggle()
-                        }) {
-                            HStack(spacing: 8) {
-                                Image(systemName: showOnlyUnvisited ? "checkmark.circle.fill" : "circle")
-                                    .foregroundColor(showOnlyUnvisited ? .blue : .gray)
-                                
-                                Text("Show only unvisited")
-                                    .font(.subheadline)
-                                    .foregroundColor(.primary)
+                    // Content with swiping support (uses passed lists for filtered support)
+                    if lists.count > 1 {
+                        // Multiple lists - use TabView for swiping
+                        TabView(selection: $currentListIndex) {
+                            ForEach(lists.indices, id: \.self) { index in
+                                ListContentView(
+                                    list: lists[index],
+                                    showOnlyUnvisited: $showOnlyUnvisited,
+                                    isLoadingMore: $isLoadingMore,
+                                    hasMorePlaces: $hasMorePlaces,
+                                    currentPage: $currentPage,
+                                    onLoadMore: loadMoreIfNeeded
+                                )
+                                .tag(index)
                             }
                         }
-                        
-                        Spacer()
-                    }
-                    .padding(.horizontal, 20)
-                }
-                .padding(.bottom, 10)
-                
-                // Content with swiping support (uses passed lists for filtered support)
-                if lists.count > 1 {
-                    // Multiple lists - use TabView for swiping
-                    TabView(selection: $currentListIndex) {
-                        ForEach(lists.indices, id: \.self) { index in
-                            ListContentView(
-                                list: lists[index],
-                                showOnlyUnvisited: $showOnlyUnvisited,
-                                isLoadingMore: $isLoadingMore,
-                                hasMorePlaces: $hasMorePlaces,
-                                currentPage: $currentPage,
-                                onLoadMore: loadMoreIfNeeded
-                            )
-                            .tag(index)
+                        .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
+                        .frame(height: calculateTabViewHeight())
+                        // Note: Native sheets handle gesture conflicts automatically
+                        // Horizontal swiping between lists works when sheet is at min height
+                        // Vertical scrolling works when sheet is at max height
+                        .onChange(of: currentListIndex) { _, newIndex in
+                            // Reset pagination state when switching lists
+                            isLoadingMore = false
+                            hasMorePlaces = true
+                            currentPage = 1
+                            
+                            // Reload reviewed IDs for new list's places via ViewModel
+                            loadReviewedPlaceIdsViaViewModel()
+                            
+                            // Load more lists when approaching the end (only if using full list, not filtered)
+                            // Note: When using filtered lists, we don't load more lists
+                            if newIndex >= lists.count - 3 && lists.count == profile.lightweightPlaceLists.count {
+                                loadMoreListsIfNeeded()
+                            }
                         }
+                    } else {
+                        // Single list - no swiping needed
+                        ListContentView(
+                            list: currentList,
+                            showOnlyUnvisited: $showOnlyUnvisited,
+                            isLoadingMore: $isLoadingMore,
+                            hasMorePlaces: $hasMorePlaces,
+                            currentPage: $currentPage,
+                            onLoadMore: loadMoreIfNeeded
+                        )
                     }
-                    .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
-                    .onChange(of: currentListIndex) { _, newIndex in
-                        // Reset pagination state when switching lists
-                        isLoadingMore = false
-                        hasMorePlaces = true
-                        currentPage = 1
-                        
-                        // Reload reviewed IDs for new list's places via ViewModel
-                        loadReviewedPlaceIdsViaViewModel()
-                        
-                        // Load more lists when approaching the end (only if using full list, not filtered)
-                        // Note: When using filtered lists, we don't load more lists
-                        if newIndex >= lists.count - 3 && lists.count == profile.lightweightPlaceLists.count {
-                            loadMoreListsIfNeeded()
-                        }
-                    }
-                } else {
-                    // Single list - no swiping needed
-                    ListContentView(
-                        list: currentList,
-                        showOnlyUnvisited: $showOnlyUnvisited,
-                        isLoadingMore: $isLoadingMore,
-                        hasMorePlaces: $hasMorePlaces,
-                        currentPage: $currentPage,
-                        onLoadMore: loadMoreIfNeeded
-                    )
                 }
             }
+            // Native sheets automatically handle scrolling based on detent state
+            // No need to manually disable/enable scrolling
             .navigationBarHidden(true)
         }
         .onAppear {
@@ -268,6 +268,23 @@ struct LightweightListPopupView: View {
             await profile.loadVerifiedReviewedPlaceIds(for: placeIds)
         }
     }
+    
+    /// Single Responsibility: Calculate TabView height based on actual content
+    /// MVVM: Pure function - calculates based on current list's place count
+    /// Staff Engineer: Uses actual filtered places count for accurate height calculation
+    private func calculateTabViewHeight() -> CGFloat {
+        // Calculate based on filtered places (respects showOnlyUnvisited filter)
+        let filteredCount = showOnlyUnvisited ? 
+            allPlaces.filter { !profile.hasVerifiedReviewedPlace(placeId: $0.place_id) }.count :
+            allPlaces.count
+        
+        // Each row has 2 places, approximate row height is 200
+        let rows = ceil(Double(filteredCount) / 2.0)
+        let estimatedHeight = rows * 200 + 100 // Row height + padding
+        
+        // Ensure minimum height for empty/loading states, cap at reasonable max
+        return max(300, min(estimatedHeight, 2000))
+    }
 }
 
 // MARK: - List Content View
@@ -306,32 +323,31 @@ struct ListContentView: View {
     
     var body: some View {
         if !filteredPlaces.isEmpty {
-            ScrollView {
-                LazyVGrid(columns: columns, spacing: 16) {
-                    ForEach(Array(filteredPlaces.enumerated()), id: \.element.id) { index, place in
-                        LightweightPlaceGridCell(
-                            place: place,
-                            isCollaborativeList: list.isCollaborative
-                        )
-                        .onAppear {
-                            // Load more when user scrolls to 3rd-to-last item
-                            if index == allPlaces.count - 3 {
-                                onLoadMore()
-                            }
+            // Removed ScrollView wrapper - parent now handles scrolling
+            LazyVGrid(columns: columns, spacing: 16) {
+                ForEach(Array(filteredPlaces.enumerated()), id: \.element.id) { index, place in
+                    LightweightPlaceGridCell(
+                        place: place,
+                        isCollaborativeList: list.isCollaborative
+                    )
+                    .onAppear {
+                        // Load more when user scrolls to 3rd-to-last item
+                        if index == allPlaces.count - 3 {
+                            onLoadMore()
                         }
                     }
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-                
-                // Loading indicator at bottom
-                if isLoadingMore {
-                    HStack {
-                        Spacer()
-                        ProgressView()
-                            .padding()
-                        Spacer()
-                    }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            
+            // Loading indicator at bottom
+            if isLoadingMore {
+                HStack {
+                    Spacer()
+                    ProgressView()
+                        .padding()
+                    Spacer()
                 }
             }
         } else {
@@ -434,6 +450,8 @@ private struct CollaboratorAvatarsButton: View {
             .overlay(Circle().stroke(Color.white, lineWidth: 2))
     }
 }
+
+// MARK: - Block Horizontal Swipe Modifier
 
 // Preview
 struct LightweightListPopupView_Previews: PreviewProvider {

@@ -22,6 +22,7 @@ struct MapContainerView: View {
     let selectedPlaceViewModel: SelectedPlaceViewModel
     let detailPlaceViewModel: DetailPlaceViewModel
     let profileViewModel: ProfileViewModel
+    let dataManager: DataManager
     let onMapTap: () -> Void
     
     init(
@@ -33,6 +34,7 @@ struct MapContainerView: View {
         detailPlaceViewModel: DetailPlaceViewModel,
         placeService: PlaceService,
         profileViewModel: ProfileViewModel,
+        dataManager: DataManager,
         onMapTap: @escaping () -> Void
     ) {
         self._mapPosition = mapPosition
@@ -42,6 +44,7 @@ struct MapContainerView: View {
         self.selectedPlaceViewModel = selectedPlaceViewModel
         self.detailPlaceViewModel = detailPlaceViewModel
         self.profileViewModel = profileViewModel
+        self.dataManager = dataManager
         self.onMapTap = onMapTap
         
         // Create MapViewModel scoped to this container
@@ -56,19 +59,97 @@ struct MapContainerView: View {
     }
     
     var body: some View {
-        MapView(
-            recenterMap: $recenterMap,
-            mapPosition: $mapPosition,
-            isSearchBarMinimized: !isSearchExpanded,
-            isCreatePlacePopupActive: $isCreatePlacePopupActive,
-            onMapTap: onMapTap
-        )
-        .environmentObject(mapViewModel)
-        .environmentObject(selectedPlaceViewModel)
-        .environmentObject(detailPlaceViewModel)
-        .environmentObject(profileViewModel)
+        ZStack {
+            MapView(
+                recenterMap: $recenterMap,
+                mapPosition: $mapPosition,
+                isSearchBarMinimized: !isSearchExpanded,
+                isCreatePlacePopupActive: $isCreatePlacePopupActive,
+                onMapTap: onMapTap
+            )
+            .environmentObject(mapViewModel)
+            .environmentObject(selectedPlaceViewModel)
+            .environmentObject(detailPlaceViewModel)
+            .environmentObject(profileViewModel)
+            .onChange(of: profileViewModel.selectedListIdForMap) { oldValue, newValue in
+                // Sync ProfileViewModel list selection with MapViewModel
+                if let listId = newValue {
+                    mapViewModel.selectList(listId)
+                    // Trigger reload if we have a current region
+                    if let userId = userSession.currentUserId {
+                        let currentRegion = getCurrentMapRegion()
+                        Task {
+                            if let region = currentRegion {
+                                await mapViewModel.onMapCameraSettled(region, userId: userId)
+                            }
+                        }
+                    }
+                } else {
+                    mapViewModel.clearListFilter()
+                    // Trigger reload to show all annotations
+                    if let userId = userSession.currentUserId {
+                        let currentRegion = getCurrentMapRegion()
+                        Task {
+                            if let region = currentRegion {
+                                await mapViewModel.onMapCameraSettled(region, userId: userId)
+                            }
+                        }
+                    }
+                }
+            }
+            
+        }
         .ignoresSafeArea()
         .edgesIgnoringSafeArea(.all)
+        // Native SwiftUI sheet for list popup (replaces custom BottomSheetView)
+        // Single Responsibility: Present list popup sheet using native iOS sheet behavior
+        // MVVM: Uses ViewModel state to control presentation
+        .sheet(isPresented: $mapViewModel.showingListPopup) {
+            if let listId = mapViewModel.selectedListId,
+               let list = profileViewModel.lightweightPlaceLists.first(where: { $0.id == listId }),
+               let listIndex = profileViewModel.lightweightPlaceLists.firstIndex(where: { $0.id == listId }) {
+                LightweightListPopupView(
+                    lists: profileViewModel.lightweightPlaceLists,
+                    initialListIndex: listIndex
+                )
+                .environmentObject(profileViewModel)
+                .environmentObject(selectedPlaceViewModel)
+                .environmentObject(dataManager)
+                .presentationDetents([.height(300), .height(800)])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Color.clear)
+                .presentationBackgroundInteraction(.enabled(upThrough: .height(800)))
+                .interactiveDismissDisabled(false)
+                .onDisappear {
+                    // Clear list filter when popup is dismissed
+                    mapViewModel.clearListFilter()
+                    profileViewModel.selectedListIdForMap = nil
+                }
+            }
+        }
+    }
+    
+    /// Helper to get current map region from location manager or default
+    private func getCurrentMapRegion() -> MKCoordinateRegion? {
+        // Use location manager's current location as the center
+        if let location = locationManager.currentLocation?.coordinate {
+            return MKCoordinateRegion(
+                center: location,
+                span: MKCoordinateSpan(
+                    latitudeDelta: 0.1,
+                    longitudeDelta: 0.1
+                )
+            )
+        }
+        // Fallback to default center if no location available
+        let defaultCenter = CLLocationCoordinate2D(latitude: 39.5, longitude: -98.0)
+        return MKCoordinateRegion(
+            center: defaultCenter,
+            span: MKCoordinateSpan(
+                latitudeDelta: 0.1,
+                longitudeDelta: 0.1
+            )
+        )
     }
 }
 
