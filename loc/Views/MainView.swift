@@ -81,6 +81,7 @@ struct MainView: View {
                     detailPlaceViewModel: detailPlaceViewModel,
                     placeService: serviceContainer.placeService,
                     profileViewModel: profileViewModel,
+                    dataManager: dataManager,
                     onMapTap: handleMapTap
                 )
                 
@@ -89,14 +90,18 @@ struct MainView: View {
                 
                 // Search Overlay (Isolated to prevent recreation)
                 // Staff Engineer: Separate layer prevents TextField destruction on MainView re-renders
-                SearchOverlayView(
-                    searchViewModel: searchViewModel,
-                    isSearchExpanded: $appCoordinator.isSearchExpanded,
-                    searchCoordinator: searchCoordinator,
-                    onSheetHeightChange: { newHeight in
-                        sheetHeight = newHeight
-                    }
-                )
+                // Single Responsibility: Only show search when list popup is not active
+                // MVVM: Uses ViewModel state to determine visibility
+                if shouldShowSearchOverlay {
+                    SearchOverlayView(
+                        searchViewModel: searchViewModel,
+                        isSearchExpanded: $appCoordinator.isSearchExpanded,
+                        searchCoordinator: searchCoordinator,
+                        onSheetHeightChange: { newHeight in
+                            sheetHeight = newHeight
+                        }
+                    )
+                }
                 
                 // Place Detail Sheet (Independent Z-Layer)
                 // Moved out of VStack to prevent keyboard/layout constraints from affecting sheet height
@@ -230,11 +235,11 @@ struct MainView: View {
     }
     
     // MARK: - Floating Action Buttons
+    /// Single Responsibility: Conditionally display floating action buttons based on UI state
+    /// MVVM: Uses ViewModel state to determine visibility (no business logic)
     private var floatingActionButtons: some View {
         Group {
-            if !appCoordinator.isSearchExpanded && 
-               !selectedPlaceVM.isDetailSheetPresented && 
-               !isCreatePlacePopupActive {
+            if shouldShowFloatingActionButtons {
                 FloatingActionButtons(
                     searchCoordinator: searchCoordinator,
                     isSearchBarMinimized: Binding(
@@ -247,6 +252,21 @@ struct MainView: View {
                 .environmentObject(profileViewModel)
             }
         }
+    }
+    
+    /// Single Responsibility: Determines if floating action buttons should be visible
+    /// MVVM: Pure function that checks ViewModel state - no side effects
+    private var shouldShowFloatingActionButtons: Bool {
+        !appCoordinator.isSearchExpanded &&
+        !selectedPlaceVM.isDetailSheetPresented &&
+        !isCreatePlacePopupActive &&
+        profileViewModel.selectedListIdForMap == nil // Hide when list popup is showing
+    }
+    
+    /// Single Responsibility: Determines if search overlay should be visible
+    /// MVVM: Pure function that checks ViewModel state - no side effects
+    private var shouldShowSearchOverlay: Bool {
+        profileViewModel.selectedListIdForMap == nil // Hide search bar when list popup is showing
     }
     
     // MARK: - Loading Overlay

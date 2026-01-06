@@ -16,7 +16,7 @@
 
 CREATE OR REPLACE FUNCTION public.get_list_annotations_with_users(
     p_user_id text, 
-    p_list_id uuid,
+    p_list_id text,
     p_min_lon double precision, 
     p_min_lat double precision, 
     p_max_lon double precision, 

@@ -51,6 +51,9 @@ class ProfileViewModel: ObservableObject {
     @Published var hasMoreMyPlaces: Bool = true
     @Published var lightweightExternalPlaces: [LightweightPlace] = [] // Lightweight external/TikTok places for tiles
     @Published var totalExternalPlacesCount: Int = 0 // Total TikTok count from database (not just loaded count)
+    
+    // List filtering for map
+    @Published var selectedListIdForMap: String? = nil // When set, triggers map to show only this list's annotations (String because LightweightPlaceList.id is String)
     @Published var isLoadingMoreExternalPlaces: Bool = false
     @Published var hasMoreExternalPlaces: Bool = true
     @Published var isLoadingMorePlaceLists: Bool = false

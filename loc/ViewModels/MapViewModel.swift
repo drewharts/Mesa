@@ -18,6 +18,10 @@ class MapViewModel: ObservableObject {
     @Published var annotationImages: [String: UIImage] = [:] // Combined profile images for annotations
     @Published var userProfilePictures: [String: UIImage] = [:] // Cache of user profile pictures
     
+    // List filtering state
+    @Published var selectedListId: String? = nil // When set, only show annotations from this list (String because LightweightPlaceList.id is String)
+    @Published var showingListPopup: Bool = false // Controls list popup sheet visibility
+    
     private var debounceTimer: Timer?
     private let placeService: PlaceService
     private let detailPlaceVM: DetailPlaceViewModel
@@ -35,6 +39,28 @@ class MapViewModel: ObservableObject {
     init(placeService: PlaceService, detailPlaceVM: DetailPlaceViewModel) {
         self.placeService = placeService
         self.detailPlaceVM = detailPlaceVM
+    }
+    
+    // MARK: - List Filtering
+    
+    /// Sets the selected list ID to filter map annotations
+    func selectList(_ listId: String) {
+        selectedListId = listId
+        showingListPopup = true
+        // Clear current annotations - they will be reloaded with list filter
+        viewportAnnotations = []
+        communityMarkers = []
+        // Reset last loaded region to force reload
+        lastLoadedRegion = nil
+    }
+    
+    /// Clears the list filter and restores all annotations
+    func clearListFilter() {
+        selectedListId = nil
+        showingListPopup = false
+        // Clear current annotations - they will be reloaded without filter
+        viewportAnnotations = []
+        communityMarkers = []
     }
     
     // MARK: - Photo Loading (Called by View when profile is available)
@@ -241,24 +267,43 @@ class MapViewModel: ObservableObject {
                     return
                 }
                 
-                // Fetch network annotations and community places in parallel
-                async let networkAnnotationsTask = placeService.fetchPlacesInViewportWithUserId(
-                    northLat: bounds.northLat,
-                    southLat: bounds.southLat,
-                    eastLng: bounds.eastLng,
-                    westLng: bounds.westLng,
-                    userId: userId
-                )
+                // If a list is selected, only fetch annotations from that list
+                let annotations: [PlaceAnnotation]
+                if let listId = selectedListId {
+                    // Fetch annotations for the selected list only
+                    annotations = try await placeService.fetchListAnnotationsInViewport(
+                        northLat: bounds.northLat,
+                        southLat: bounds.southLat,
+                        eastLng: bounds.eastLng,
+                        westLng: bounds.westLng,
+                        userId: userId,
+                        listId: listId
+                    )
+                } else {
+                    // Fetch all annotations (normal behavior)
+                    annotations = try await placeService.fetchPlacesInViewportWithUserId(
+                        northLat: bounds.northLat,
+                        southLat: bounds.southLat,
+                        eastLng: bounds.eastLng,
+                        westLng: bounds.westLng,
+                        userId: userId
+                    )
+                }
                 
-                async let communityMarkersTask = placeService.fetchCommunityPlacesInViewportWithUserId(
-                    northLat: bounds.northLat,
-                    southLat: bounds.southLat,
-                    eastLng: bounds.eastLng,
-                    westLng: bounds.westLng,
-                    userId: userId
-                )
-                
-                let (annotations, community) = try await (networkAnnotationsTask, communityMarkersTask)
+                // Only fetch community markers if no list is selected
+                let community: [CommunityPlaceMarker]
+                if selectedListId == nil {
+                    community = try await placeService.fetchCommunityPlacesInViewportWithUserId(
+                        northLat: bounds.northLat,
+                        southLat: bounds.southLat,
+                        eastLng: bounds.eastLng,
+                        westLng: bounds.westLng,
+                        userId: userId
+                    )
+                } else {
+                    // No community markers when filtering by list
+                    community = []
+                }
                 
                 // Check if cancelled after network call
                 guard !Task.isCancelled else {

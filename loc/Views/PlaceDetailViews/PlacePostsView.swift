@@ -67,7 +67,7 @@ struct PlacePostsView: View {
     
     private var postActionButtons: some View {
         // Post Button - Modern, sleek, inviting style with Apple glass
-        Button(action: onAddPost) {
+            Button(action: onAddPost) {
             HStack(spacing: 12) {
                 Image(systemName: "plus")
                     .font(.system(size: 18, weight: .medium))
