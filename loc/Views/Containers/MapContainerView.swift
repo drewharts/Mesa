@@ -73,8 +73,10 @@ struct MapContainerView: View {
             .environmentObject(profileViewModel)
             .onChange(of: profileViewModel.selectedListIdForMap) { oldValue, newValue in
                 // Sync ProfileViewModel list selection with MapViewModel
+                // MVVM: View coordinates data flow between ViewModels
                 if let listId = newValue {
-                    mapViewModel.selectList(listId)
+                    // Validate list exists before showing sheet (prevents competing views)
+                    mapViewModel.selectList(listId, availableLists: profileViewModel.lightweightPlaceLists)
                     // Trigger reload if we have a current region
                     if let userId = userSession.currentUserId {
                         let currentRegion = getCurrentMapRegion()
@@ -105,6 +107,8 @@ struct MapContainerView: View {
         // Single Responsibility: Present list popup sheet using native iOS sheet behavior
         // MVVM: Uses ViewModel state to control presentation
         .sheet(isPresented: $mapViewModel.showingListPopup) {
+            // Always provide content to prevent competing views issue
+            // MVVM: View is declarative - uses ViewModel state to determine content
             if let listId = mapViewModel.selectedListId,
                let list = profileViewModel.lightweightPlaceLists.first(where: { $0.id == listId }),
                let listIndex = profileViewModel.lightweightPlaceLists.firstIndex(where: { $0.id == listId }) {
@@ -122,6 +126,24 @@ struct MapContainerView: View {
                 .interactiveDismissDisabled(false)
                 .onDisappear {
                     // Clear list filter when popup is dismissed
+                    mapViewModel.clearListFilter()
+                    profileViewModel.selectedListIdForMap = nil
+                }
+            } else {
+                // Loading state while list is being validated
+                // Prevents empty sheet from appearing before content is ready
+                VStack {
+                    ProgressView()
+                        .padding()
+                    Text("Loading list...")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .presentationDetents([.height(300)])
+                .presentationDragIndicator(.visible)
+                .onDisappear {
+                    // Clear state if dismissed during loading
                     mapViewModel.clearListFilter()
                     profileViewModel.selectedListIdForMap = nil
                 }

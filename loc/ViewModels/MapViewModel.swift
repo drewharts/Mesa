@@ -43,8 +43,15 @@ class MapViewModel: ObservableObject {
     
     // MARK: - List Filtering
     
-    /// Sets the selected list ID to filter map annotations
-    func selectList(_ listId: String) {
+    /// Validates that a list exists and sets it as the selected list for filtering map annotations
+    /// MVVM: Business logic - validates list exists before updating state
+    func selectList(_ listId: String, availableLists: [LightweightPlaceList]) {
+        // Only set list and show popup if list exists in available lists
+        guard availableLists.contains(where: { $0.id == listId }) else {
+            // List not found - don't show popup
+            return
+        }
+        
         selectedListId = listId
         showingListPopup = true
         // Clear current annotations - they will be reloaded with list filter

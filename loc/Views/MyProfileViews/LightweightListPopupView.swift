@@ -22,6 +22,7 @@ struct LightweightListPopupView: View {
     @State private var hasMorePlaces: Bool = true
     @State private var currentPage: Int = 1
     @State private var showCollaboratorsSheet: Bool = false
+    @State private var cachedTabViewHeight: CGFloat = 300 // Cached height to prevent layout shift
     
     // Convenience initializer for single list (backward compatibility)
     init(list: LightweightPlaceList, places: [LightweightPlace] = []) {
@@ -57,7 +58,12 @@ struct LightweightListPopupView: View {
     
     // Get all places for the current list (from profile state) - used for filtering logic
     var allPlaces: [LightweightPlace] {
-        return profile.lightweightPlaceListPlaces[currentList.list_id] ?? []
+        let places = profile.lightweightPlaceListPlaces[currentList.list_id] ?? []
+        // Log when places are accessed (helps track when computed property is called)
+        if places.count > 0 {
+            print("📋 [LightweightListPopupView] allPlaces accessed - Count: \(places.count) for list: \(currentList.list_id)")
+        }
+        return places
     }
     
     var body: some View {
@@ -132,26 +138,34 @@ struct LightweightListPopupView: View {
                         }
                         .padding(.horizontal, 20)
                     }
-                    .padding(.bottom, 10)
+                    .padding(.bottom, 12)
                     
                     // Content with swiping support (uses passed lists for filtered support)
                     if lists.count > 1 {
                         // Multiple lists - use TabView for swiping
                         TabView(selection: $currentListIndex) {
                             ForEach(lists.indices, id: \.self) { index in
-                                ListContentView(
-                                    list: lists[index],
-                                    showOnlyUnvisited: $showOnlyUnvisited,
-                                    isLoadingMore: $isLoadingMore,
-                                    hasMorePlaces: $hasMorePlaces,
-                                    currentPage: $currentPage,
-                                    onLoadMore: loadMoreIfNeeded
-                                )
+                                VStack(alignment: .leading, spacing: 0) {
+                                    ListContentView(
+                                        list: lists[index],
+                                        showOnlyUnvisited: $showOnlyUnvisited,
+                                        isLoadingMore: $isLoadingMore,
+                                        hasMorePlaces: $hasMorePlaces,
+                                        currentPage: $currentPage,
+                                        onLoadMore: loadMoreIfNeeded
+                                    )
+                                }
+                                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                                 .tag(index)
                             }
                         }
                         .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
-                        .frame(height: calculateTabViewHeight())
+                        .frame(height: cachedTabViewHeight, alignment: .top)
+                        .clipped()
+                        .contentShape(Rectangle())
+                        .onChange(of: cachedTabViewHeight) { oldValue, newValue in
+                            print("📐 [LightweightListPopupView] TabView frame height changed: \(oldValue) -> \(newValue)")
+                        }
                         // Note: Native sheets handle gesture conflicts automatically
                         // Horizontal swiping between lists works when sheet is at min height
                         // Vertical scrolling works when sheet is at max height
@@ -164,6 +178,9 @@ struct LightweightListPopupView: View {
                             // Reload reviewed IDs for new list's places via ViewModel
                             loadReviewedPlaceIdsViaViewModel()
                             
+                            // Recalculate height for new list
+                            updateTabViewHeight()
+                            
                             // Load more lists when approaching the end (only if using full list, not filtered)
                             // Note: When using filtered lists, we don't load more lists
                             if newIndex >= lists.count - 3 && lists.count == profile.lightweightPlaceLists.count {
@@ -172,14 +189,17 @@ struct LightweightListPopupView: View {
                         }
                     } else {
                         // Single list - no swiping needed
-                        ListContentView(
-                            list: currentList,
-                            showOnlyUnvisited: $showOnlyUnvisited,
-                            isLoadingMore: $isLoadingMore,
-                            hasMorePlaces: $hasMorePlaces,
-                            currentPage: $currentPage,
-                            onLoadMore: loadMoreIfNeeded
-                        )
+                        VStack(alignment: .leading, spacing: 0) {
+                            ListContentView(
+                                list: currentList,
+                                showOnlyUnvisited: $showOnlyUnvisited,
+                                isLoadingMore: $isLoadingMore,
+                                hasMorePlaces: $hasMorePlaces,
+                                currentPage: $currentPage,
+                                onLoadMore: loadMoreIfNeeded
+                            )
+                        }
+                        .frame(maxWidth: .infinity, alignment: .top)
                     }
                 }
             }
@@ -188,14 +208,28 @@ struct LightweightListPopupView: View {
             .navigationBarHidden(true)
         }
         .onAppear {
+            print("👁️ [LightweightListPopupView] onAppear - Current list: \(currentList.list_id)")
+            print("   - All places count: \(allPlaces.count)")
             // Load places for the current list
             loadPlacesForCurrentList()
             // Load reviewed place IDs from database via ViewModel for accurate filtering
             loadReviewedPlaceIdsViaViewModel()
+            // Calculate initial TabView height
+            updateTabViewHeight()
         }
-        .onChange(of: allPlaces) { _, _ in
+        .onChange(of: allPlaces) { oldValue, newValue in
+            print("🔄 [LightweightListPopupView] allPlaces changed:")
+            print("   - Old count: \(oldValue.count)")
+            print("   - New count: \(newValue.count)")
             // Reload reviewed IDs when places change via ViewModel
             loadReviewedPlaceIdsViaViewModel()
+            // Recalculate height when places load (prevents layout shift)
+            updateTabViewHeight()
+        }
+        .onChange(of: showOnlyUnvisited) { oldValue, newValue in
+            print("🔄 [LightweightListPopupView] showOnlyUnvisited changed: \(oldValue) -> \(newValue)")
+            // Recalculate height when filter changes
+            updateTabViewHeight()
         }
         .sheet(isPresented: $showCollaboratorsSheet) {
             if let userId = profile.user?.id {
@@ -269,6 +303,22 @@ struct LightweightListPopupView: View {
         }
     }
     
+    /// Updates the cached TabView height to prevent layout shifts during async data loading
+    /// MVVM: Pure function - updates state based on current content
+    /// Staff Engineer: Caches height to prevent visual jumps when data loads asynchronously
+    private func updateTabViewHeight() {
+        let oldHeight = cachedTabViewHeight
+        let newHeight = calculateTabViewHeight()
+        cachedTabViewHeight = newHeight
+        
+        print("📏 [LightweightListPopupView] TabView height update:")
+        print("   - Old height: \(oldHeight)")
+        print("   - New height: \(newHeight)")
+        print("   - All places count: \(allPlaces.count)")
+        print("   - Show only unvisited: \(showOnlyUnvisited)")
+        print("   - Current list ID: \(currentList.list_id)")
+    }
+    
     /// Single Responsibility: Calculate TabView height based on actual content
     /// MVVM: Pure function - calculates based on current list's place count
     /// Staff Engineer: Uses actual filtered places count for accurate height calculation
@@ -339,7 +389,8 @@ struct ListContentView: View {
                 }
             }
             .padding(.horizontal, 16)
-            .padding(.vertical, 10)
+            .padding(.top, 0)
+            .padding(.bottom, 0)
             
             // Loading indicator at bottom
             if isLoadingMore {

@@ -93,14 +93,14 @@ struct MainView: View {
                 // Single Responsibility: Only show search when list popup is not active
                 // MVVM: Uses ViewModel state to determine visibility
                 if shouldShowSearchOverlay {
-                    SearchOverlayView(
-                        searchViewModel: searchViewModel,
-                        isSearchExpanded: $appCoordinator.isSearchExpanded,
-                        searchCoordinator: searchCoordinator,
-                        onSheetHeightChange: { newHeight in
-                            sheetHeight = newHeight
-                        }
-                    )
+                SearchOverlayView(
+                    searchViewModel: searchViewModel,
+                    isSearchExpanded: $appCoordinator.isSearchExpanded,
+                    searchCoordinator: searchCoordinator,
+                    onSheetHeightChange: { newHeight in
+                        sheetHeight = newHeight
+                    }
+                )
                 }
                 
                 // Place Detail Sheet (Independent Z-Layer)
