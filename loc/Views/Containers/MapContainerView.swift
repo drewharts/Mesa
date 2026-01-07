@@ -60,17 +60,17 @@ struct MapContainerView: View {
     
     var body: some View {
         ZStack {
-            MapView(
-                recenterMap: $recenterMap,
-                mapPosition: $mapPosition,
-                isSearchBarMinimized: !isSearchExpanded,
-                isCreatePlacePopupActive: $isCreatePlacePopupActive,
-                onMapTap: onMapTap
-            )
-            .environmentObject(mapViewModel)
-            .environmentObject(selectedPlaceViewModel)
-            .environmentObject(detailPlaceViewModel)
-            .environmentObject(profileViewModel)
+        MapView(
+            recenterMap: $recenterMap,
+            mapPosition: $mapPosition,
+            isSearchBarMinimized: !isSearchExpanded,
+            isCreatePlacePopupActive: $isCreatePlacePopupActive,
+            onMapTap: onMapTap
+        )
+        .environmentObject(mapViewModel)
+        .environmentObject(selectedPlaceViewModel)
+        .environmentObject(detailPlaceViewModel)
+        .environmentObject(profileViewModel)
             .onChange(of: profileViewModel.selectedListIdForMap) { oldValue, newValue in
                 // Sync ProfileViewModel list selection with MapViewModel
                 // MVVM: View coordinates data flow between ViewModels

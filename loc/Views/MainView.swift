@@ -103,10 +103,6 @@ struct MainView: View {
                 )
                 }
                 
-                // Place Detail Sheet (Independent Z-Layer)
-                // Moved out of VStack to prevent keyboard/layout constraints from affecting sheet height
-                placeDetailLayer
-                
                 loadingOverlay
             }
             .navigationBarHidden(true)
@@ -135,6 +131,26 @@ struct MainView: View {
                     .environmentObject(detailPlaceViewModel)
                     .presentationDragIndicator(.visible)
             }
+            // Native SwiftUI sheet for place detail (replaces custom BottomSheetView)
+            // Single Responsibility: Present place detail sheet using native iOS sheet behavior
+            // MVVM: Uses ViewModel state to control presentation
+            .sheet(isPresented: $selectedPlaceVM.isDetailSheetPresented) {
+                PlaceDetailView(minSheetHeight: searchCoordinator.minSheetHeight)
+                    .environmentObject(selectedPlaceVM)
+                    .environmentObject(locationManager)
+                    .environmentObject(userSession)
+                    .environmentObject(userProfileViewModel)
+                    .environmentObject(notificationManager)
+                    .environmentObject(profileViewModel)
+                    .environmentObject(detailPlaceViewModel)
+                    .environmentObject(serviceContainer)
+                    .environmentObject(dataManager)
+                    .presentationDetents([.height(searchCoordinator.minSheetHeight), .height(800)])
+                    .presentationDragIndicator(.visible)
+                    .presentationBackground(Color.clear)
+                    .presentationBackgroundInteraction(.enabled(upThrough: .height(800)))
+                    .interactiveDismissDisabled(false)
+            }
             .fullScreenCover(isPresented: $shouldNavigateToProfile) {
                 ProfileView()
                     .environmentObject(userProfileViewModel)
@@ -161,9 +177,6 @@ struct MainView: View {
             if newValue {
                 appCoordinator.isSearchExpanded = false
                 // Sheet opens at partial height, user can swipe up to expand
-            } else {
-                // Reset to partial height when dismissing so next open starts at bottom
-                sheetHeight = searchCoordinator.minSheetHeight
             }
         }
         .onChange(of: selectedPlaceVM.shouldAnimateMapToPlace) { _, newValue in
@@ -212,26 +225,6 @@ struct MainView: View {
             Spacer()
         }
         .overlay(floatingActionButtons)
-    }
-    
-    // MARK: - Place Detail Layer
-    // Isolated layer for the bottom sheet to ensure full-screen height availability
-    private var placeDetailLayer: some View {
-        VStack(spacing: 0) {
-            Spacer(minLength: 0)
-            PlaceDetailContainerView(
-                profileViewModel: profileViewModel,
-                detailPlaceViewModel: detailPlaceViewModel,
-                serviceContainer: serviceContainer,
-                dataManager: dataManager,
-                sheetHeight: $sheetHeight,
-                minSheetHeight: searchCoordinator.minSheetHeight,
-                maxSheetHeight: searchCoordinator.maxSheetHeight
-            )
-            .environmentObject(selectedPlaceVM)
-            .environmentObject(userProfileViewModel)
-            .environmentObject(notificationManager)
-        }
     }
     
     // MARK: - Floating Action Buttons

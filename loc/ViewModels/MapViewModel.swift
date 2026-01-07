@@ -289,24 +289,24 @@ class MapViewModel: ObservableObject {
                 } else {
                     // Fetch all annotations (normal behavior)
                     annotations = try await placeService.fetchPlacesInViewportWithUserId(
-                        northLat: bounds.northLat,
-                        southLat: bounds.southLat,
-                        eastLng: bounds.eastLng,
-                        westLng: bounds.westLng,
-                        userId: userId
-                    )
+                    northLat: bounds.northLat,
+                    southLat: bounds.southLat,
+                    eastLng: bounds.eastLng,
+                    westLng: bounds.westLng,
+                    userId: userId
+                )
                 }
                 
                 // Only fetch community markers if no list is selected
                 let community: [CommunityPlaceMarker]
                 if selectedListId == nil {
                     community = try await placeService.fetchCommunityPlacesInViewportWithUserId(
-                        northLat: bounds.northLat,
-                        southLat: bounds.southLat,
-                        eastLng: bounds.eastLng,
-                        westLng: bounds.westLng,
-                        userId: userId
-                    )
+                    northLat: bounds.northLat,
+                    southLat: bounds.southLat,
+                    eastLng: bounds.eastLng,
+                    westLng: bounds.westLng,
+                    userId: userId
+                )
                 } else {
                     // No community markers when filtering by list
                     community = []
