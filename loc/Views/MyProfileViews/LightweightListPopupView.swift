@@ -58,12 +58,7 @@ struct LightweightListPopupView: View {
     
     // Get all places for the current list (from profile state) - used for filtering logic
     var allPlaces: [LightweightPlace] {
-        let places = profile.lightweightPlaceListPlaces[currentList.list_id] ?? []
-        // Log when places are accessed (helps track when computed property is called)
-        if places.count > 0 {
-            print("📋 [LightweightListPopupView] allPlaces accessed - Count: \(places.count) for list: \(currentList.list_id)")
-        }
-        return places
+        return profile.lightweightPlaceListPlaces[currentList.list_id] ?? []
     }
     
     var body: some View {
@@ -163,9 +158,6 @@ struct LightweightListPopupView: View {
                         .frame(height: cachedTabViewHeight, alignment: .top)
                         .clipped()
                         .contentShape(Rectangle())
-                        .onChange(of: cachedTabViewHeight) { oldValue, newValue in
-                            print("📐 [LightweightListPopupView] TabView frame height changed: \(oldValue) -> \(newValue)")
-                        }
                         // Note: Native sheets handle gesture conflicts automatically
                         // Horizontal swiping between lists works when sheet is at min height
                         // Vertical scrolling works when sheet is at max height
@@ -208,8 +200,6 @@ struct LightweightListPopupView: View {
             .navigationBarHidden(true)
         }
         .onAppear {
-            print("👁️ [LightweightListPopupView] onAppear - Current list: \(currentList.list_id)")
-            print("   - All places count: \(allPlaces.count)")
             // Load places for the current list
             loadPlacesForCurrentList()
             // Load reviewed place IDs from database via ViewModel for accurate filtering
@@ -218,16 +208,12 @@ struct LightweightListPopupView: View {
             updateTabViewHeight()
         }
         .onChange(of: allPlaces) { oldValue, newValue in
-            print("🔄 [LightweightListPopupView] allPlaces changed:")
-            print("   - Old count: \(oldValue.count)")
-            print("   - New count: \(newValue.count)")
             // Reload reviewed IDs when places change via ViewModel
             loadReviewedPlaceIdsViaViewModel()
             // Recalculate height when places load (prevents layout shift)
             updateTabViewHeight()
         }
         .onChange(of: showOnlyUnvisited) { oldValue, newValue in
-            print("🔄 [LightweightListPopupView] showOnlyUnvisited changed: \(oldValue) -> \(newValue)")
             // Recalculate height when filter changes
             updateTabViewHeight()
         }
@@ -286,8 +272,6 @@ struct LightweightListPopupView: View {
         // Check if we have more lists to load and not currently loading
         guard profile.hasMorePlaceLists && !profile.isLoadingMorePlaceLists else { return }
         
-        print("📋 [LightweightListPopupView] Loading more lists (current: \(profile.lightweightPlaceLists.count), approaching end)")
-        
         Task {
             if let userId = profile.user?.id {
                 await dataManager.loadMorePlaceLists(userId: userId)
@@ -307,16 +291,7 @@ struct LightweightListPopupView: View {
     /// MVVM: Pure function - updates state based on current content
     /// Staff Engineer: Caches height to prevent visual jumps when data loads asynchronously
     private func updateTabViewHeight() {
-        let oldHeight = cachedTabViewHeight
-        let newHeight = calculateTabViewHeight()
-        cachedTabViewHeight = newHeight
-        
-        print("📏 [LightweightListPopupView] TabView height update:")
-        print("   - Old height: \(oldHeight)")
-        print("   - New height: \(newHeight)")
-        print("   - All places count: \(allPlaces.count)")
-        print("   - Show only unvisited: \(showOnlyUnvisited)")
-        print("   - Current list ID: \(currentList.list_id)")
+        cachedTabViewHeight = calculateTabViewHeight()
     }
     
     /// Single Responsibility: Calculate TabView height based on actual content
