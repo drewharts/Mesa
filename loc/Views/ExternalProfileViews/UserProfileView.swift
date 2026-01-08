@@ -17,9 +17,15 @@ struct UserProfileView: View {
     @Environment(\.presentationMode) var presentationMode
 
     var body: some View {
-            ScrollView {
-                VStack(spacing: 0) {
-                // Profile Picture, Name, Followers
+        ScrollView {
+            VStack(spacing: 0) {
+                // Show loading state if selectedUser is not yet set
+                if UserProfileVM.selectedUser == nil {
+                    ProgressView("Loading profile...")
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .padding()
+                } else {
+                    // Profile Picture, Name, Followers
                     VStack(spacing: 16) {
                         // Profile Picture
                         UserProfileProfilePictureView(
@@ -62,21 +68,22 @@ struct UserProfileView: View {
                     Divider()
                         .padding(.horizontal, 20)
                     
-                // Content section
-                            VStack(spacing: 20) {
-                    // Favorites & Reviews (with tabs like ProfileFavoritesTikToksView)
-                    // Note: Divider is included inside UserProfileFavoritesReviewsView
-                    UserProfileFavoritesReviewsView(userProfileVM: UserProfileVM)
-                        .padding(.top, 16)
-                                
-                    // Place Lists
-                                UserProfileListsView(viewModel: UserProfileVM, placeLists: UserProfileVM.userLists)
+                    // Content section
+                    VStack(spacing: 20) {
+                        // Favorites & Reviews (with tabs like ProfileFavoritesTikToksView)
+                        // Note: Divider is included inside UserProfileFavoritesReviewsView
+                        UserProfileFavoritesReviewsView(userProfileVM: UserProfileVM)
+                            .padding(.top, 16)
+                                    
+                        // Place Lists
+                        UserProfileListsView(viewModel: UserProfileVM, placeLists: UserProfileVM.userLists)
 
-                                Spacer(minLength: 50)
-                            }
+                        Spacer(minLength: 50)
+                    }
                 }
             }
-            .environmentObject(UserProfileVM)
+        }
+        .environmentObject(UserProfileVM)
         .onAppear {
             UserProfileVM.checkIfFollowing(currentUserId: userId)
         }
