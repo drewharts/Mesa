@@ -23,6 +23,9 @@ struct MapContainerView: View {
     let detailPlaceViewModel: DetailPlaceViewModel
     let profileViewModel: ProfileViewModel
     let dataManager: DataManager
+    let userProfileViewModel: UserProfileViewModel
+    let serviceContainer: ServiceContainer
+    let notificationManager: NotificationManager
     let onMapTap: () -> Void
     
     init(
@@ -35,6 +38,9 @@ struct MapContainerView: View {
         placeService: PlaceService,
         profileViewModel: ProfileViewModel,
         dataManager: DataManager,
+        userProfileViewModel: UserProfileViewModel,
+        serviceContainer: ServiceContainer,
+        notificationManager: NotificationManager,
         onMapTap: @escaping () -> Void
     ) {
         self._mapPosition = mapPosition
@@ -45,6 +51,9 @@ struct MapContainerView: View {
         self.detailPlaceViewModel = detailPlaceViewModel
         self.profileViewModel = profileViewModel
         self.dataManager = dataManager
+        self.userProfileViewModel = userProfileViewModel
+        self.serviceContainer = serviceContainer
+        self.notificationManager = notificationManager
         self.onMapTap = onMapTap
         
         // Create MapViewModel scoped to this container
@@ -106,6 +115,16 @@ struct MapContainerView: View {
         // Native SwiftUI sheet for list popup (replaces custom BottomSheetView)
         // Single Responsibility: Present list popup sheet using native iOS sheet behavior
         // MVVM: Uses ViewModel state to control presentation
+        .onChange(of: mapViewModel.showingListPopup) { oldValue, newValue in
+            print("🔴 [MapContainerView] showingListPopup changed: \(oldValue) -> \(newValue)")
+        }
+        .onChange(of: selectedPlaceViewModel.isDetailSheetPresented) { oldValue, newValue in
+            if newValue {
+                print("🔴 [MapContainerView] ⚠️ isDetailSheetPresented set to true!")
+                print("🔴 [MapContainerView] Current list popup state: \(mapViewModel.showingListPopup)")
+                print("🔴 [MapContainerView] This might be triggering place detail sheet from elsewhere")
+            }
+        }
         .sheet(isPresented: $mapViewModel.showingListPopup) {
             // Always provide content to prevent competing views issue
             // MVVM: View is declarative - uses ViewModel state to determine content
@@ -116,9 +135,16 @@ struct MapContainerView: View {
                     lists: profileViewModel.lightweightPlaceLists,
                     initialListIndex: listIndex
                 )
+                .id(listId) // Force recreation of view when sheet is presented - ensures fresh NavigationStack
                 .environmentObject(profileViewModel)
                 .environmentObject(selectedPlaceViewModel)
                 .environmentObject(dataManager)
+                .environmentObject(locationManager)
+                .environmentObject(userSession)
+                .environmentObject(detailPlaceViewModel)
+                .environmentObject(userProfileViewModel)
+                .environmentObject(serviceContainer)
+                .environmentObject(notificationManager)
                 .presentationDetents([.height(300), .height(800)])
                 .presentationDragIndicator(.visible)
                 .presentationBackground(Color.clear)
@@ -126,6 +152,7 @@ struct MapContainerView: View {
                 .interactiveDismissDisabled(false)
                 .onDisappear {
                     // Clear list filter when popup is dismissed
+                    print("🔴 [MapContainerView] List popup onDisappear - clearing filter")
                     mapViewModel.clearListFilter()
                     profileViewModel.selectedListIdForMap = nil
                 }

@@ -82,6 +82,9 @@ struct MainView: View {
                     placeService: serviceContainer.placeService,
                     profileViewModel: profileViewModel,
                     dataManager: dataManager,
+                    userProfileViewModel: userProfileViewModel,
+                    serviceContainer: serviceContainer,
+                    notificationManager: notificationManager,
                     onMapTap: handleMapTap
                 )
                 
