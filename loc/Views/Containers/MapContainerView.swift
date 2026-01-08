@@ -115,15 +115,8 @@ struct MapContainerView: View {
         // Native SwiftUI sheet for list popup (replaces custom BottomSheetView)
         // Single Responsibility: Present list popup sheet using native iOS sheet behavior
         // MVVM: Uses ViewModel state to control presentation
-        .onChange(of: mapViewModel.showingListPopup) { oldValue, newValue in
-            print("🔴 [MapContainerView] showingListPopup changed: \(oldValue) -> \(newValue)")
-        }
         .onChange(of: selectedPlaceViewModel.isDetailSheetPresented) { oldValue, newValue in
-            if newValue {
-                print("🔴 [MapContainerView] ⚠️ isDetailSheetPresented set to true!")
-                print("🔴 [MapContainerView] Current list popup state: \(mapViewModel.showingListPopup)")
-                print("🔴 [MapContainerView] This might be triggering place detail sheet from elsewhere")
-            }
+            // Monitor detail sheet presentation state for debugging if needed
         }
         .sheet(isPresented: $mapViewModel.showingListPopup) {
             // Always provide content to prevent competing views issue
@@ -151,10 +144,21 @@ struct MapContainerView: View {
                 .presentationBackgroundInteraction(.enabled(upThrough: .height(800)))
                 .interactiveDismissDisabled(false)
                 .onDisappear {
-                    // Clear list filter when popup is dismissed
-                    print("🔴 [MapContainerView] List popup onDisappear - clearing filter")
+                    // Clear list filter when popup is dismissed and reload all map annotations
+                    // MVVM: View coordinates state cleanup and data reload after sheet dismissal
                     mapViewModel.clearListFilter()
                     profileViewModel.selectedListIdForMap = nil
+                    
+                    // Trigger map annotation reload to show all annotations (not just filtered list)
+                    // MVVM: View coordinates reload after state change
+                    if let userId = userSession.currentUserId {
+                        let currentRegion = getCurrentMapRegion()
+                        Task {
+                            if let region = currentRegion {
+                                await mapViewModel.onMapCameraSettled(region, userId: userId)
+                            }
+                        }
+                    }
                 }
             } else {
                 // Loading state while list is being validated
@@ -170,9 +174,21 @@ struct MapContainerView: View {
                 .presentationDetents([.height(300)])
                 .presentationDragIndicator(.visible)
                 .onDisappear {
-                    // Clear state if dismissed during loading
+                    // Clear state if dismissed during loading and reload all map annotations
+                    // MVVM: View coordinates state cleanup and data reload after sheet dismissal
                     mapViewModel.clearListFilter()
                     profileViewModel.selectedListIdForMap = nil
+                    
+                    // Trigger map annotation reload to show all annotations (not just filtered list)
+                    // MVVM: View coordinates reload after state change
+                    if let userId = userSession.currentUserId {
+                        let currentRegion = getCurrentMapRegion()
+                        Task {
+                            if let region = currentRegion {
+                                await mapViewModel.onMapCameraSettled(region, userId: userId)
+                            }
+                        }
+                    }
                 }
             }
         }

@@ -74,24 +74,14 @@ struct LightweightListPopupView: View {
             .navigationDestination(for: String.self) { placeId in
                 // Navigate to place detail when place ID is pushed onto path
                 // Environment objects are inherited from parent hierarchy
-                print("🟡 [LightweightListPopupView] navigationDestination triggered for placeId: \(placeId)")
-                print("🟡 [LightweightListPopupView] Current navigation path count: \(navigationPath.count)")
-                return PlaceDetailViewInNavigation(placeId: placeId, minSheetHeight: 250)
+                PlaceDetailViewInNavigation(placeId: placeId, minSheetHeight: 250)
             }
         }
         .onAppear {
-            // Debug: Log when view appears
-            print("🔵 [LightweightListPopupView] onAppear - View ID: \(currentList.list_id)")
-            print("🔵 [LightweightListPopupView] Navigation path count: \(navigationPath.count)")
-            
             // Clear navigation path when sheet appears (ensures fresh state each time)
             // MVVM: View manages its own navigation state - reset on each presentation
             // Best Practice: Clear in onAppear rather than onDisappear for reliability
-            if navigationPath.count > 0 {
-                print("⚠️ [LightweightListPopupView] Clearing non-empty navigation path: \(navigationPath.count) items")
-            }
             navigationPath = NavigationPath()
-            print("🔵 [LightweightListPopupView] Navigation path cleared, new count: \(navigationPath.count)")
             
             // Load places for the current list
             loadPlacesForCurrentList()
@@ -221,9 +211,7 @@ struct LightweightListPopupView: View {
                         currentPage: $currentPage,
                         onLoadMore: loadMoreIfNeeded,
                         onNavigateToPlace: { placeId in
-                            print("🟢 [LightweightListPopupView] Appending placeId to navigation path (multiple lists): \(placeId)")
                             navigationPath.append(placeId)
-                            print("🟢 [LightweightListPopupView] Navigation path count after append: \(navigationPath.count)")
                         }
                     )
                 }
@@ -266,9 +254,7 @@ struct LightweightListPopupView: View {
                 currentPage: $currentPage,
                 onLoadMore: loadMoreIfNeeded,
                 onNavigateToPlace: { placeId in
-                    print("🟢 [LightweightListPopupView] Appending placeId to navigation path (single list): \(placeId)")
                     navigationPath.append(placeId)
-                    print("🟢 [LightweightListPopupView] Navigation path count after append: \(navigationPath.count)")
                 }
             )
         }

@@ -62,7 +62,6 @@ struct PlaceDetailViewInNavigation: View {
             // Restore allowAutoPresent when leaving this view
             // MVVM: Clean up state when view is dismissed
             selectedPlaceVM.allowAutoPresent = originalAllowAutoPresent
-            print("🔄 [PlaceDetailViewInNavigation] Restored allowAutoPresent to \(originalAllowAutoPresent)")
         }
     }
     
@@ -84,12 +83,11 @@ struct PlaceDetailViewInNavigation: View {
                 selectedPlaceVM.allowAutoPresent = false
                 
                 // Set up place (this will load data but won't auto-present sheet)
-                selectedPlaceVM.selectPlaceAndFetchDetails(fullPlace, shouldAnimateMap: false)
+                // Animate map to place location when navigating from list popup
+                selectedPlaceVM.selectPlaceAndFetchDetails(fullPlace, shouldAnimateMap: true)
                 
                 // Ensure sheet is NOT presented (we're using NavigationStack)
                 selectedPlaceVM.isDetailSheetPresented = false
-                
-                print("✅ [PlaceDetailViewInNavigation] Place loaded without triggering sheet (NavigationStack navigation)")
                 
                 isLoading = false
             }
