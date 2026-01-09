@@ -138,6 +138,7 @@ struct MapContainerView: View {
                 .environmentObject(userProfileViewModel)
                 .environmentObject(serviceContainer)
                 .environmentObject(notificationManager)
+                .environmentObject(mapViewModel) // Add MapViewModel for pending navigation
                 .presentationDetents([.height(300), .height(800)])
                 .presentationDragIndicator(.visible)
                 .presentationBackground(Color.clear)

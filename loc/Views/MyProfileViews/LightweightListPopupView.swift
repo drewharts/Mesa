@@ -12,6 +12,7 @@ struct LightweightListPopupView: View {
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var dataManager: DataManager
+    @EnvironmentObject var mapViewModel: MapViewModel // Add MapViewModel for pending navigation
     
     let lists: [LightweightPlaceList]
     let initialListIndex: Int
@@ -75,6 +76,16 @@ struct LightweightListPopupView: View {
                 // Navigate to place detail when place ID is pushed onto path
                 // Environment objects are inherited from parent hierarchy
                 PlaceDetailViewInNavigation(placeId: placeId, minSheetHeight: 250)
+            }
+        }
+        .onChange(of: mapViewModel.pendingPlaceNavigation) { oldValue, newValue in
+            // When map annotation is tapped while list sheet is open, navigate to that place
+            // MVVM: View coordinates navigation based on ViewModel state
+            // This makes annotation taps behave the same as clicking a place tile in the list sheet
+            if let placeId = newValue {
+                navigationPath.append(placeId)
+                // Clear the pending navigation after handling it
+                mapViewModel.pendingPlaceNavigation = nil
             }
         }
         .onAppear {

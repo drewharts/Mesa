@@ -21,6 +21,7 @@ class MapViewModel: ObservableObject {
     // List filtering state
     @Published var selectedListId: String? = nil // When set, only show annotations from this list (String because LightweightPlaceList.id is String)
     @Published var showingListPopup: Bool = false // Controls list popup sheet visibility
+    @Published var pendingPlaceNavigation: String? = nil // Place ID to navigate to when list sheet is open
     
     private var debounceTimer: Timer?
     private let placeService: PlaceService

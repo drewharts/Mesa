@@ -113,7 +113,7 @@ class UserProfileViewModel: ObservableObject {
     func selectUser(_ user: ProfileData, currentUserId: String, shouldPresent: Bool = true) {
         self.selectedUser = user
         if shouldPresent {
-            self.isUserDetailPresented = true
+        self.isUserDetailPresented = true
         }
         
         // Reset ALL state for new user (Single Responsibility: one place for all resets)
