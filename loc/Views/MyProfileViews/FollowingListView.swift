@@ -68,16 +68,20 @@ struct FollowingListView: View {
                     }
                 }
                 .listStyle(PlainListStyle())
+                .refreshable {
+                    // Pull-to-refresh: reload following data
+                    // MVVM: View coordinates refresh action, ViewModel manages data
+                    await dataManager.loadFollowing(userId: userSession.currentUserId ?? "", offset: 0)
+                }
             }
         }
         .navigationTitle("Following")
         .navigationBarTitleDisplayMode(.inline)
-        .onAppear {
-            // Always load following profiles when view appears
-            if !profile.isFollowingListLoading {
-                Task {
-                    await dataManager.loadFollowing(userId: userSession.currentUserId ?? "")
-                }
+        .task {
+            // Only load on initial appearance if list is empty (first-time users)
+            // Enterprise: Don't reload on every appearance - preserves scroll position and avoids unnecessary network calls
+            if profile.userFollowing.isEmpty && !profile.isFollowingListLoading {
+                await dataManager.loadFollowing(userId: userSession.currentUserId ?? "", offset: 0)
             }
         }
     }

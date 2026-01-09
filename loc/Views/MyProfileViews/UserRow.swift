@@ -22,6 +22,7 @@ struct UserRow: View {
             )
             .environmentObject(profile)
             .environmentObject(detailPlaceVM)
+            .environmentObject(userSession) // Add userSession for currentUserId
             .task {
                 // Set up user in ViewModel when profile view appears
                 // MVVM: ViewModel manages user data state

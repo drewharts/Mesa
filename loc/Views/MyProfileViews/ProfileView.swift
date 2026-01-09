@@ -52,6 +52,7 @@ struct ProfileView: View {
                     .environmentObject(profile)
                     .environmentObject(selectedPlaceVM)
                     .environmentObject(placeVM)
+                    .environmentObject(userSession) // Add userSession for currentUserId
                 }
                 .navigationDestination(for: FollowListDestination.self) { destination in
                     // Navigate to followers or following list
