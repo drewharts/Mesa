@@ -208,7 +208,7 @@ private struct PostOptionalSections: View {
         if viewModel.shouldShowCaptionButton || viewModel.shouldShowSentimentButton {
             HStack(spacing: 12) {
                 if viewModel.shouldShowCaptionButton {
-                    AddOptionButton(title: "Caption", icon: "text.bubble") {
+                    AddOptionButton(title: "What's it like?", icon: "text.bubble") {
                         withAnimation(.easeInOut(duration: 0.2)) {
                             viewModel.showCaption()
                         }
@@ -237,7 +237,7 @@ private struct PostCaptionSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("Caption")
+                Text("What's it like?")
                     .font(.subheadline)
                     .fontWeight(.medium)
                     .foregroundColor(.secondary)

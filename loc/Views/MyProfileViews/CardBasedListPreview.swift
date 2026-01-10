@@ -16,6 +16,7 @@ struct CardBasedListPreview: View {
     
     @State private var showingListPopup = false
     @EnvironmentObject var profile: ProfileViewModel
+    @Environment(\.presentationMode) var presentationMode
     
     // Get preview places (first 6 places for 2x3 grid)
     private var previewPlaces: [DetailPlace] {
@@ -59,7 +60,10 @@ struct CardBasedListPreview: View {
             
             // Card with places grid
             Button(action: {
-                showingListPopup = true
+                // Set list filter and navigate to map
+                profile.selectedListIdForMap = list.id.uuidString
+                // Dismiss profile view to show map
+                presentationMode.wrappedValue.dismiss()
             }) {
                 VStack(spacing: 0) {
                     if isLoading {
@@ -137,15 +141,6 @@ struct CardBasedListPreview: View {
         .onAppear {
             // Preload images for the first 6 priority tiles immediately
             preloadPriorityImages()
-        }
-        .sheet(isPresented: $showingListPopup) {
-            let lists = profile.userLists
-            let initialIndex = lists.firstIndex(where: { $0.id == list.id }) ?? 0
-            SwipeableListPopupView(
-                lists: lists,
-                initialListIndex: initialIndex,
-                placeColors: $placeColors
-            )
         }
     }
 }

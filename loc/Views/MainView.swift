@@ -81,6 +81,10 @@ struct MainView: View {
                     detailPlaceViewModel: detailPlaceViewModel,
                     placeService: serviceContainer.placeService,
                     profileViewModel: profileViewModel,
+                    dataManager: dataManager,
+                    userProfileViewModel: userProfileViewModel,
+                    serviceContainer: serviceContainer,
+                    notificationManager: notificationManager,
                     onMapTap: handleMapTap
                 )
                 
@@ -89,6 +93,9 @@ struct MainView: View {
                 
                 // Search Overlay (Isolated to prevent recreation)
                 // Staff Engineer: Separate layer prevents TextField destruction on MainView re-renders
+                // Single Responsibility: Only show search when list popup is not active
+                // MVVM: Uses ViewModel state to determine visibility
+                if shouldShowSearchOverlay {
                 SearchOverlayView(
                     searchViewModel: searchViewModel,
                     isSearchExpanded: $appCoordinator.isSearchExpanded,
@@ -97,10 +104,7 @@ struct MainView: View {
                         sheetHeight = newHeight
                     }
                 )
-                
-                // Place Detail Sheet (Independent Z-Layer)
-                // Moved out of VStack to prevent keyboard/layout constraints from affecting sheet height
-                placeDetailLayer
+                }
                 
                 loadingOverlay
             }
@@ -130,6 +134,26 @@ struct MainView: View {
                     .environmentObject(detailPlaceViewModel)
                     .presentationDragIndicator(.visible)
             }
+            // Native SwiftUI sheet for place detail (replaces custom BottomSheetView)
+            // Single Responsibility: Present place detail sheet using native iOS sheet behavior
+            // MVVM: Uses ViewModel state to control presentation
+            .sheet(isPresented: $selectedPlaceVM.isDetailSheetPresented) {
+                PlaceDetailView(minSheetHeight: searchCoordinator.minSheetHeight)
+                    .environmentObject(selectedPlaceVM)
+                    .environmentObject(locationManager)
+                    .environmentObject(userSession)
+                    .environmentObject(userProfileViewModel)
+                    .environmentObject(notificationManager)
+                    .environmentObject(profileViewModel)
+                    .environmentObject(detailPlaceViewModel)
+                    .environmentObject(serviceContainer)
+                    .environmentObject(dataManager)
+                    .presentationDetents([.height(searchCoordinator.minSheetHeight), .height(800)])
+                    .presentationDragIndicator(.visible)
+                    .presentationBackground(Color.clear)
+                    .presentationBackgroundInteraction(.enabled(upThrough: .height(800)))
+                    .interactiveDismissDisabled(false)
+            }
             .fullScreenCover(isPresented: $shouldNavigateToProfile) {
                 ProfileView()
                     .environmentObject(userProfileViewModel)
@@ -156,9 +180,6 @@ struct MainView: View {
             if newValue {
                 appCoordinator.isSearchExpanded = false
                 // Sheet opens at partial height, user can swipe up to expand
-            } else {
-                // Reset to partial height when dismissing so next open starts at bottom
-                sheetHeight = searchCoordinator.minSheetHeight
             }
         }
         .onChange(of: selectedPlaceVM.shouldAnimateMapToPlace) { _, newValue in
@@ -209,32 +230,12 @@ struct MainView: View {
         .overlay(floatingActionButtons)
     }
     
-    // MARK: - Place Detail Layer
-    // Isolated layer for the bottom sheet to ensure full-screen height availability
-    private var placeDetailLayer: some View {
-        VStack(spacing: 0) {
-            Spacer(minLength: 0)
-            PlaceDetailContainerView(
-                profileViewModel: profileViewModel,
-                detailPlaceViewModel: detailPlaceViewModel,
-                serviceContainer: serviceContainer,
-                dataManager: dataManager,
-                sheetHeight: $sheetHeight,
-                minSheetHeight: searchCoordinator.minSheetHeight,
-                maxSheetHeight: searchCoordinator.maxSheetHeight
-            )
-            .environmentObject(selectedPlaceVM)
-            .environmentObject(userProfileViewModel)
-            .environmentObject(notificationManager)
-        }
-    }
-    
     // MARK: - Floating Action Buttons
+    /// Single Responsibility: Conditionally display floating action buttons based on UI state
+    /// MVVM: Uses ViewModel state to determine visibility (no business logic)
     private var floatingActionButtons: some View {
         Group {
-            if !appCoordinator.isSearchExpanded && 
-               !selectedPlaceVM.isDetailSheetPresented && 
-               !isCreatePlacePopupActive {
+            if shouldShowFloatingActionButtons {
                 FloatingActionButtons(
                     searchCoordinator: searchCoordinator,
                     isSearchBarMinimized: Binding(
@@ -247,6 +248,21 @@ struct MainView: View {
                 .environmentObject(profileViewModel)
             }
         }
+    }
+    
+    /// Single Responsibility: Determines if floating action buttons should be visible
+    /// MVVM: Pure function that checks ViewModel state - no side effects
+    private var shouldShowFloatingActionButtons: Bool {
+        !appCoordinator.isSearchExpanded &&
+        !selectedPlaceVM.isDetailSheetPresented &&
+        !isCreatePlacePopupActive &&
+        profileViewModel.selectedListIdForMap == nil // Hide when list popup is showing
+    }
+    
+    /// Single Responsibility: Determines if search overlay should be visible
+    /// MVVM: Pure function that checks ViewModel state - no side effects
+    private var shouldShowSearchOverlay: Bool {
+        profileViewModel.selectedListIdForMap == nil // Hide search bar when list popup is showing
     }
     
     // MARK: - Loading Overlay

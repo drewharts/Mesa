@@ -51,6 +51,9 @@ class ProfileViewModel: ObservableObject {
     @Published var hasMoreMyPlaces: Bool = true
     @Published var lightweightExternalPlaces: [LightweightPlace] = [] // Lightweight external/TikTok places for tiles
     @Published var totalExternalPlacesCount: Int = 0 // Total TikTok count from database (not just loaded count)
+    
+    // List filtering for map
+    @Published var selectedListIdForMap: String? = nil // When set, triggers map to show only this list's annotations (String because LightweightPlaceList.id is String)
     @Published var isLoadingMoreExternalPlaces: Bool = false
     @Published var hasMoreExternalPlaces: Bool = true
     @Published var isLoadingMorePlaceLists: Bool = false
@@ -1288,6 +1291,7 @@ class ProfileViewModel: ObservableObject {
     /// Refresh TikTok places list after a successful import
     func refreshTikTokPlacesAfterImport() {
         // Reload lightweight external places to show new TikTok place in tiles
+        // Note: Actual refresh happens when place detail view appears (after backend creates entry)
         Task {
             await reloadLightweightExternalPlaces()
         }
@@ -1898,7 +1902,8 @@ class ProfileViewModel: ObservableObject {
                     deepLinkManager?.isProcessingDeepLink = false
                     currentProcessingTikTokUrl = nil
                     
-                    refreshTikTokPlacesAfterImport()
+                    // Note: TikTok places refresh happens in PlaceDetailView.onAppear
+                    // after backend creates the external_place entry
                 
                 } else if detailPlaces.count > 1 {
                     // Multiple places - show selection screen
@@ -1933,7 +1938,8 @@ class ProfileViewModel: ObservableObject {
                     isWaitingForPlaceDetail = false
                     deepLinkManager?.isProcessingDeepLink = false
                     
-                    refreshTikTokPlacesAfterImport()
+                    // Note: TikTok places refresh happens in PlaceDetailView.onAppear
+                    // after user selects a place and backend creates the external_place entry
                 } else {
                     // No places found - show flagging interface
                     print("❌ [ProfileViewModel] No places found: count = \(detailPlaces.count)")

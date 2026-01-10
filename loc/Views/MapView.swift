@@ -155,9 +155,17 @@ struct MapView: View {
         Task {
             if let place = await mapViewModel.loadPlaceDetails(for: annotation) {
                 await MainActor.run {
-                    // Don't animate map when tapping annotation - user is already looking at it
-                    selectedPlaceVM.selectPlaceAndFetchDetails(place, shouldAnimateMap: false)
-                    selectedPlaceVM.isDetailSheetPresented = true
+                    // Check if list sheet is open - if so, navigate within the sheet instead
+                    // MVVM: View coordinates navigation based on ViewModel state
+                    if mapViewModel.showingListPopup {
+                        // Set pending navigation - LightweightListPopupView will observe this and push to NavigationStack
+                        // This makes annotation taps behave the same as clicking a place tile in the list sheet
+                        mapViewModel.pendingPlaceNavigation = place.id.uuidString
+                    } else {
+                        // Normal behavior: show place detail sheet
+                        selectedPlaceVM.selectPlaceAndFetchDetails(place, shouldAnimateMap: false)
+                        selectedPlaceVM.isDetailSheetPresented = true
+                    }
                 }
             }
         }

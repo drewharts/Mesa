@@ -12,6 +12,7 @@ struct LightweightListPopupView: View {
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var dataManager: DataManager
+    @EnvironmentObject var mapViewModel: MapViewModel // Add MapViewModel for pending navigation
     
     let lists: [LightweightPlaceList]
     let initialListIndex: Int
@@ -22,6 +23,8 @@ struct LightweightListPopupView: View {
     @State private var hasMorePlaces: Bool = true
     @State private var currentPage: Int = 1
     @State private var showCollaboratorsSheet: Bool = false
+    @State private var cachedTabViewHeight: CGFloat = 300 // Cached height to prevent layout shift
+    @State private var navigationPath = NavigationPath() // Navigation path for place detail navigation
     
     // Convenience initializer for single list (backward compatibility)
     init(list: LightweightPlaceList, places: [LightweightPlace] = []) {
@@ -61,141 +64,52 @@ struct LightweightListPopupView: View {
     }
     
     var body: some View {
-        NavigationView {
-            VStack(spacing: 0) {
-                // Header with list name and controls
-                VStack(spacing: 12) {
-                    // Top bar with close button, collaborators button, and share button
-                    HStack {
-                        Button(action: {
-                            presentationMode.wrappedValue.dismiss()
-                        }) {
-                            Image(systemName: "xmark")
-                                .foregroundColor(.primary)
-                        }
-                        
-                        Spacer()
-                        
-                        // Collaborators button with profile avatars + Share button
-                        if let userId = profile.user?.id {
-                            HStack(alignment: .center, spacing: 12) {
-                                // Collaborators button
-                                Button {
-                                    showCollaboratorsSheet = true
-                                } label: {
-                                    // Show profile picture avatars for collaborators (like map annotations)
-                                    if currentList.hasCollaborators || currentList.isSharedWithMe {
-                                        CollaboratorAvatarsButton(
-                                            isSharedWithMe: currentList.isSharedWithMe,
-                                            ownerPhotoUrl: currentList.owner_photo_url,
-                                            collaboratorPhotos: currentList.collaborator_photos
-                                        )
-                                    } else {
-                                        // Just show person.2 icon when no collaborators (for adding)
-                                        Image(systemName: "person.2")
-                                            .font(.system(size: 20, weight: .regular))
-                                            .foregroundColor(.primary)
-                                    }
-                                }
-                                .frame(minWidth: 44, minHeight: 44) // Tap target
-                                
-                                // Share button (Apple style - clean and simple)
-                                LightweightListShareButton(lightweightList: currentList, userId: userId, style: .apple)
-                            }
-                        }
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.top, 20)
-                    
-                    // List name and place count
-                    VStack(spacing: 4) {
-                        Text(currentList.name)
-                            .font(.title2)
-                            .fontWeight(.bold)
-                            .foregroundColor(.black)
-                        
-                        Text("\(currentList.place_count) place\(currentList.place_count == 1 ? "" : "s")")
-                            .font(.caption)
-                            .foregroundColor(.gray)
-                    }
-                    .padding(.horizontal, 20)
-                    
-                    // Filter toggle
-                    HStack {
-                        Button(action: {
-                            showOnlyUnvisited.toggle()
-                        }) {
-                            HStack(spacing: 8) {
-                                Image(systemName: showOnlyUnvisited ? "checkmark.circle.fill" : "circle")
-                                    .foregroundColor(showOnlyUnvisited ? .blue : .gray)
-                                
-                                Text("Show only unvisited")
-                                    .font(.subheadline)
-                                    .foregroundColor(.primary)
-                            }
-                        }
-                        
-                        Spacer()
-                    }
-                    .padding(.horizontal, 20)
-                }
-                .padding(.bottom, 10)
-                
-                // Content with swiping support (uses passed lists for filtered support)
-                if lists.count > 1 {
-                    // Multiple lists - use TabView for swiping
-                    TabView(selection: $currentListIndex) {
-                        ForEach(lists.indices, id: \.self) { index in
-                            ListContentView(
-                                list: lists[index],
-                                showOnlyUnvisited: $showOnlyUnvisited,
-                                isLoadingMore: $isLoadingMore,
-                                hasMorePlaces: $hasMorePlaces,
-                                currentPage: $currentPage,
-                                onLoadMore: loadMoreIfNeeded
-                            )
-                            .tag(index)
-                        }
-                    }
-                    .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
-                    .onChange(of: currentListIndex) { _, newIndex in
-                        // Reset pagination state when switching lists
-                        isLoadingMore = false
-                        hasMorePlaces = true
-                        currentPage = 1
-                        
-                        // Reload reviewed IDs for new list's places via ViewModel
-                        loadReviewedPlaceIdsViaViewModel()
-                        
-                        // Load more lists when approaching the end (only if using full list, not filtered)
-                        // Note: When using filtered lists, we don't load more lists
-                        if newIndex >= lists.count - 3 && lists.count == profile.lightweightPlaceLists.count {
-                            loadMoreListsIfNeeded()
-                        }
-                    }
-                } else {
-                    // Single list - no swiping needed
-                    ListContentView(
-                        list: currentList,
-                        showOnlyUnvisited: $showOnlyUnvisited,
-                        isLoadingMore: $isLoadingMore,
-                        hasMorePlaces: $hasMorePlaces,
-                        currentPage: $currentPage,
-                        onLoadMore: loadMoreIfNeeded
-                    )
+        NavigationStack(path: $navigationPath) {
+            ScrollView {
+                VStack(spacing: 0) {
+                    headerSection
+                    contentSection
                 }
             }
             .navigationBarHidden(true)
+            .navigationDestination(for: String.self) { placeId in
+                // Navigate to place detail when place ID is pushed onto path
+                // Environment objects are inherited from parent hierarchy
+                PlaceDetailViewInNavigation(placeId: placeId, minSheetHeight: 250)
+            }
+        }
+        .onChange(of: mapViewModel.pendingPlaceNavigation) { oldValue, newValue in
+            // When map annotation is tapped while list sheet is open, navigate to that place
+            // MVVM: View coordinates navigation based on ViewModel state
+            // This makes annotation taps behave the same as clicking a place tile in the list sheet
+            if let placeId = newValue {
+                navigationPath.append(placeId)
+                // Clear the pending navigation after handling it
+                mapViewModel.pendingPlaceNavigation = nil
+            }
         }
         .onAppear {
+            // Clear navigation path when sheet appears (ensures fresh state each time)
+            // MVVM: View manages its own navigation state - reset on each presentation
+            // Best Practice: Clear in onAppear rather than onDisappear for reliability
+            navigationPath = NavigationPath()
+            
             // Load places for the current list
             loadPlacesForCurrentList()
             // Load reviewed place IDs from database via ViewModel for accurate filtering
             loadReviewedPlaceIdsViaViewModel()
+            // Calculate initial TabView height
+            updateTabViewHeight()
         }
-        .onChange(of: allPlaces) { _, _ in
+        .onChange(of: allPlaces) { oldValue, newValue in
             // Reload reviewed IDs when places change via ViewModel
             loadReviewedPlaceIdsViaViewModel()
+            // Recalculate height when places load (prevents layout shift)
+            updateTabViewHeight()
+        }
+        .onChange(of: showOnlyUnvisited) { oldValue, newValue in
+            // Recalculate height when filter changes
+            updateTabViewHeight()
         }
         .sheet(isPresented: $showCollaboratorsSheet) {
             if let userId = profile.user?.id {
@@ -205,6 +119,157 @@ struct LightweightListPopupView: View {
                 )
             }
         }
+    }
+    
+    // MARK: - View Components
+    
+    /// Header section with list name, controls, and filter toggle
+    /// Single Responsibility: Display list header UI
+    private var headerSection: some View {
+        VStack(spacing: 12) {
+            // Top bar with list title on left, buttons on right
+            HStack(alignment: .center) {
+                // List name and place count on the left
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(currentList.name)
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .foregroundColor(.black)
+                    
+                    Text("\(currentList.place_count) place\(currentList.place_count == 1 ? "" : "s")")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                }
+                
+                Spacer()
+                
+                // Collaborators button with profile avatars + Share button
+                if let userId = profile.user?.id {
+                    HStack(alignment: .center, spacing: 12) {
+                        // Collaborators button
+                        Button {
+                            showCollaboratorsSheet = true
+                        } label: {
+                            // Show profile picture avatars for collaborators (like map annotations)
+                            if currentList.hasCollaborators || currentList.isSharedWithMe {
+                                CollaboratorAvatarsButton(
+                                    isSharedWithMe: currentList.isSharedWithMe,
+                                    ownerPhotoUrl: currentList.owner_photo_url,
+                                    collaboratorPhotos: currentList.collaborator_photos
+                                )
+                            } else {
+                                // Just show person.2 icon when no collaborators (for adding)
+                                Image(systemName: "person.2")
+                                    .font(.system(size: 20, weight: .regular))
+                                    .foregroundColor(.primary)
+                            }
+                        }
+                        .frame(minWidth: 44, minHeight: 44) // Tap target
+                        
+                        // Share button (Apple style - clean and simple)
+                        LightweightListShareButton(lightweightList: currentList, userId: userId, style: .apple)
+                    }
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 24)
+            
+            // Filter toggle
+            HStack {
+                Button(action: {
+                    showOnlyUnvisited.toggle()
+                }) {
+                    HStack(spacing: 8) {
+                        Image(systemName: showOnlyUnvisited ? "checkmark.circle.fill" : "circle")
+                            .foregroundColor(showOnlyUnvisited ? .blue : .gray)
+                        
+                        Text("Show only unvisited")
+                            .font(.subheadline)
+                            .foregroundColor(.primary)
+                    }
+                }
+                
+                Spacer()
+            }
+            .padding(.horizontal, 20)
+        }
+        .padding(.bottom, 12)
+    }
+    
+    /// Content section with list places (TabView for multiple lists, single view for one list)
+    /// Single Responsibility: Display list content based on number of lists
+    private var contentSection: some View {
+        Group {
+            if lists.count > 1 {
+                multipleListsContent
+            } else {
+                singleListContent
+            }
+        }
+    }
+    
+    /// Multiple lists content with TabView
+    /// Single Responsibility: Display swipable TabView for multiple lists
+    private var multipleListsContent: some View {
+        TabView(selection: $currentListIndex) {
+            ForEach(lists.indices, id: \.self) { index in
+                VStack(alignment: .leading, spacing: 0) {
+                    ListContentView(
+                        list: lists[index],
+                        showOnlyUnvisited: $showOnlyUnvisited,
+                        isLoadingMore: $isLoadingMore,
+                        hasMorePlaces: $hasMorePlaces,
+                        currentPage: $currentPage,
+                        onLoadMore: loadMoreIfNeeded,
+                        onNavigateToPlace: { placeId in
+                            navigationPath.append(placeId)
+                        }
+                    )
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .tag(index)
+            }
+        }
+        .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
+        .frame(height: cachedTabViewHeight, alignment: .top)
+        .clipped()
+        .contentShape(Rectangle())
+        .onChange(of: currentListIndex) { _, newIndex in
+            // Reset pagination state when switching lists
+            isLoadingMore = false
+            hasMorePlaces = true
+            currentPage = 1
+            
+            // Reload reviewed IDs for new list's places via ViewModel
+            loadReviewedPlaceIdsViaViewModel()
+            
+            // Recalculate height for new list
+            updateTabViewHeight()
+            
+            // Load more lists when approaching the end (only if using full list, not filtered)
+            if newIndex >= lists.count - 3 && lists.count == profile.lightweightPlaceLists.count {
+                loadMoreListsIfNeeded()
+            }
+        }
+    }
+    
+    /// Single list content
+    /// Single Responsibility: Display single list without TabView
+    private var singleListContent: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ListContentView(
+                list: currentList,
+                showOnlyUnvisited: $showOnlyUnvisited,
+                isLoadingMore: $isLoadingMore,
+                hasMorePlaces: $hasMorePlaces,
+                currentPage: $currentPage,
+                onLoadMore: loadMoreIfNeeded,
+                onNavigateToPlace: { placeId in
+                    navigationPath.append(placeId)
+                }
+            )
+        }
+        .frame(maxWidth: .infinity, alignment: .top)
     }
     
     // MARK: - Helper Methods
@@ -252,8 +317,6 @@ struct LightweightListPopupView: View {
         // Check if we have more lists to load and not currently loading
         guard profile.hasMorePlaceLists && !profile.isLoadingMorePlaceLists else { return }
         
-        print("📋 [LightweightListPopupView] Loading more lists (current: \(profile.lightweightPlaceLists.count), approaching end)")
-        
         Task {
             if let userId = profile.user?.id {
                 await dataManager.loadMorePlaceLists(userId: userId)
@@ -268,6 +331,30 @@ struct LightweightListPopupView: View {
             await profile.loadVerifiedReviewedPlaceIds(for: placeIds)
         }
     }
+    
+    /// Updates the cached TabView height to prevent layout shifts during async data loading
+    /// MVVM: Pure function - updates state based on current content
+    /// Staff Engineer: Caches height to prevent visual jumps when data loads asynchronously
+    private func updateTabViewHeight() {
+        cachedTabViewHeight = calculateTabViewHeight()
+    }
+    
+    /// Single Responsibility: Calculate TabView height based on actual content
+    /// MVVM: Pure function - calculates based on current list's place count
+    /// Staff Engineer: Uses actual filtered places count for accurate height calculation
+    private func calculateTabViewHeight() -> CGFloat {
+        // Calculate based on filtered places (respects showOnlyUnvisited filter)
+        let filteredCount = showOnlyUnvisited ? 
+            allPlaces.filter { !profile.hasVerifiedReviewedPlace(placeId: $0.place_id) }.count :
+            allPlaces.count
+        
+        // Each row has 2 places, approximate row height is 200
+        let rows = ceil(Double(filteredCount) / 2.0)
+        let estimatedHeight = rows * 200 + 100 // Row height + padding
+        
+        // Ensure minimum height for empty/loading states, cap at reasonable max
+        return max(300, min(estimatedHeight, 2000))
+    }
 }
 
 // MARK: - List Content View
@@ -280,6 +367,7 @@ struct ListContentView: View {
     @Binding var hasMorePlaces: Bool
     @Binding var currentPage: Int
     let onLoadMore: () -> Void
+    let onNavigateToPlace: ((String) -> Void)? // Navigation callback for NavigationStack
     
     @EnvironmentObject var profile: ProfileViewModel
     
@@ -306,12 +394,13 @@ struct ListContentView: View {
     
     var body: some View {
         if !filteredPlaces.isEmpty {
-            ScrollView {
+            // Removed ScrollView wrapper - parent now handles scrolling
                 LazyVGrid(columns: columns, spacing: 16) {
                     ForEach(Array(filteredPlaces.enumerated()), id: \.element.id) { index, place in
                         LightweightPlaceGridCell(
                             place: place,
-                            isCollaborativeList: list.isCollaborative
+                            isCollaborativeList: list.isCollaborative,
+                            onNavigateToPlace: onNavigateToPlace
                         )
                         .onAppear {
                             // Load more when user scrolls to 3rd-to-last item
@@ -322,7 +411,8 @@ struct ListContentView: View {
                     }
                 }
                 .padding(.horizontal, 16)
-                .padding(.vertical, 10)
+            .padding(.top, 0)
+            .padding(.bottom, 0)
                 
                 // Loading indicator at bottom
                 if isLoadingMore {
@@ -331,7 +421,6 @@ struct ListContentView: View {
                         ProgressView()
                             .padding()
                         Spacer()
-                    }
                 }
             }
         } else {
@@ -434,6 +523,8 @@ private struct CollaboratorAvatarsButton: View {
             .overlay(Circle().stroke(Color.white, lineWidth: 2))
     }
 }
+
+// MARK: - Block Horizontal Swipe Modifier
 
 // Preview
 struct LightweightListPopupView_Previews: PreviewProvider {

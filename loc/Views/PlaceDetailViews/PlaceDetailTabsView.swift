@@ -21,7 +21,6 @@ struct PlaceDetailTabsView: View {
     @EnvironmentObject var userSession: UserSession
     @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
 
-    @Environment(\.isScrollingEnabled) var isScrollingEnabled
     @Binding var showNoPhoneNumberAlert: Bool
     let onPhotoTapped: ([UIImage], Int) -> Void
     
@@ -46,8 +45,8 @@ struct PlaceDetailTabsView: View {
                 tabContent
             }
             .padding(.horizontal, 24)
+            .padding(.top, 24)
         }
-        .scrollDisabled(!isScrollingEnabled)
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             viewModel.onAppear()
@@ -509,7 +508,6 @@ private struct SavedByIndicator: View {
             .environmentObject(userProfileVM)
             .environmentObject(userSession)
             .environmentObject(detailPlaceVM)
-            .environment(\.isScrollingEnabled, true)
             .padding()
         }
     }

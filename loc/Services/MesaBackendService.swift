@@ -152,7 +152,7 @@ class MesaBackendService {
     func fetchSuggestions(
         query: String,
         limit: Int = 5,
-        provider: String = "all",
+        provider: String = "google",
         latitude: Double? = nil,
         longitude: Double? = nil,
         completion: @escaping (Result<[MesaPlaceSuggestion], Error>) -> Void
