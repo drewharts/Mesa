@@ -403,8 +403,8 @@ struct ListContentView: View {
                             onNavigateToPlace: onNavigateToPlace
                         )
                         .onAppear {
-                            // Load more when user scrolls to 3rd-to-last item
-                            if index == allPlaces.count - 3 {
+                            // Load more when user scrolls to 3rd-to-last item in FILTERED results
+                            if index == filteredPlaces.count - 3 {
                                 onLoadMore()
                             }
                         }
