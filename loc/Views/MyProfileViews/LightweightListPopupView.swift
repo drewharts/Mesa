@@ -384,11 +384,16 @@ struct ListContentView: View {
     
     // Filtered places based on visited status (uses ViewModel's database-verified reviewed IDs)
     var filteredPlaces: [LightweightPlace] {
-        guard showOnlyUnvisited else { return allPlaces }
-        
-        // Filter out places that the current user has reviewed (checked against ViewModel)
-        return allPlaces.filter { place in
-            !profile.hasVerifiedReviewedPlace(placeId: place.place_id)
+        let toFilter = showOnlyUnvisited ?
+            allPlaces.filter { !profile.hasVerifiedReviewedPlace(placeId: $0.place_id) } :
+            allPlaces
+
+        // Secondary deduplication - eliminate any duplicates by place_id (defense in depth)
+        var seenIds = Set<String>()
+        return toFilter.filter { place in
+            guard !seenIds.contains(place.place_id) else { return false }
+            seenIds.insert(place.place_id)
+            return true
         }
     }
     
