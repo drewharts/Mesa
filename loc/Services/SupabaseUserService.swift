@@ -1027,17 +1027,18 @@ extension SupabaseUserService {
     ///   - placeId: The place to add
     ///   - addedBy: The user ID of who is adding the place (for collaborative list attribution)
     func addPlaceToList(listId: String, placeId: String, addedBy: String) async throws {
-        // First, get the current max sort_order for this list
-        let maxOrderResponse = try await supabase.client
+        // Get the current MIN sort_order so new places go at the TOP (most recent first)
+        // This ensures new places appear on page 1 immediately (query uses ORDER BY sort_order ASC)
+        let minOrderResponse = try await supabase.client
             .from("place_list_items")
             .select("sort_order")
             .eq("list_id", value: listId)
-            .order("sort_order", ascending: false)
+            .order("sort_order", ascending: true)
             .limit(1)
             .execute()
-        
-        let maxOrder = (try? JSONDecoder().decode([SortOrder].self, from: maxOrderResponse.data).first?.sort_order) ?? -1
-        let nextOrder = maxOrder + 1
+
+        let minOrder = (try? JSONDecoder().decode([SortOrder].self, from: minOrderResponse.data).first?.sort_order) ?? 1
+        let nextOrder = minOrder - 1  // New places get lowest sort_order (appear first)
         
         // Create insert struct with added_by for attribution
         struct PlaceListItem: Encodable {
