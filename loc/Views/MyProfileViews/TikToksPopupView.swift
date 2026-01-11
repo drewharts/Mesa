@@ -11,7 +11,7 @@ import SwiftUI
 struct TikToksPopupView: View {
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
-    
+
     var body: some View {
         PlaceListPopupView(
             title: "TikToks",
@@ -36,8 +36,11 @@ struct TikToksPopupView: View {
             }
         )
         .onAppear {
-            // Refresh TikTok places every time popup is opened to show latest data
-            profile.refreshTikTokPlacesAfterImport()
+            // Only load if not already loaded (same pattern as list sheets)
+            // This preserves scroll position on back navigation
+            if profile.lightweightExternalPlaces.isEmpty {
+                profile.refreshTikTokPlacesAfterImport()
+            }
         }
     }
 }

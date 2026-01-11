@@ -150,140 +150,65 @@ struct MapContainerView: View {
         .onChange(of: selectedPlaceViewModel.isDetailSheetPresented) { oldValue, newValue in
             // Monitor detail sheet presentation state for debugging if needed
         }
-        .sheet(isPresented: $mapViewModel.showingListPopup) {
-            // Always provide content to prevent competing views issue
-            // MVVM: View is declarative - uses ViewModel state to determine content
-            if let listId = mapViewModel.selectedListId,
-               let list = profileViewModel.lightweightPlaceLists.first(where: { $0.id == listId }),
-               let listIndex = profileViewModel.lightweightPlaceLists.firstIndex(where: { $0.id == listId }) {
-                LightweightListPopupView(
-                    lists: profileViewModel.lightweightPlaceLists,
-                    initialListIndex: listIndex
-                )
-                .id(listId) // Force recreation of view when sheet is presented - ensures fresh NavigationStack
-                .environmentObject(profileViewModel)
-                .environmentObject(selectedPlaceViewModel)
-                .environmentObject(dataManager)
-                .environmentObject(locationManager)
-                .environmentObject(userSession)
-                .environmentObject(detailPlaceViewModel)
-                .environmentObject(userProfileViewModel)
-                .environmentObject(serviceContainer)
-                .environmentObject(notificationManager)
-                .environmentObject(mapViewModel) // Add MapViewModel for pending navigation
-                .presentationDetents([.height(300), .height(800)])
-                .presentationDragIndicator(.visible)
-                .presentationBackground(Color.clear)
-                .presentationBackgroundInteraction(.enabled(upThrough: .height(800)))
-                .interactiveDismissDisabled(false)
-                .onDisappear {
-                    // Clear list filter when popup is dismissed and reload all map annotations
-                    // MVVM: View coordinates state cleanup and data reload after sheet dismissal
-                    mapViewModel.clearListFilter()
-                    profileViewModel.selectedListIdForMap = nil
-                    
-                    // Trigger map annotation reload to show all annotations (not just filtered list)
-                    // MVVM: View coordinates reload after state change
-                    if let userId = userSession.currentUserId {
-                        let currentRegion = getCurrentMapRegion()
-                        Task {
-                            if let region = currentRegion {
-                                await mapViewModel.onMapCameraSettled(region, userId: userId)
-                            }
+        // Single sheet using item binding - prevents "only presenting a single sheet" warning
+        .sheet(item: $mapViewModel.activeSheet) { sheetType in
+            Group {
+                switch sheetType {
+                case .list(let listId):
+                    if let listIndex = profileViewModel.lightweightPlaceLists.firstIndex(where: { $0.id == listId }) {
+                        LightweightListPopupView(
+                            lists: profileViewModel.lightweightPlaceLists,
+                            initialListIndex: listIndex
+                        )
+                        .id(listId)
+                    } else {
+                        // Loading state while list is being validated
+                        VStack {
+                            ProgressView()
+                                .padding()
+                            Text("Loading list...")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
                         }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
+
+                case .tiktoks:
+                    TikToksPopupView()
+
+                case .reviews:
+                    ReviewsListPopupView()
                 }
-            } else {
-                // Loading state while list is being validated
-                // Prevents empty sheet from appearing before content is ready
-                VStack {
-                    ProgressView()
-                        .padding()
-                    Text("Loading list...")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .presentationDetents([.height(300)])
-                .presentationDragIndicator(.visible)
-                .onDisappear {
-                    // Clear state if dismissed during loading and reload all map annotations
-                    // MVVM: View coordinates state cleanup and data reload after sheet dismissal
-                    mapViewModel.clearListFilter()
-                    profileViewModel.selectedListIdForMap = nil
-                    
-                    // Trigger map annotation reload to show all annotations (not just filtered list)
-                    // MVVM: View coordinates reload after state change
-                    if let userId = userSession.currentUserId {
-                        let currentRegion = getCurrentMapRegion()
-                        Task {
-                            if let region = currentRegion {
-                                await mapViewModel.onMapCameraSettled(region, userId: userId)
-                            }
+            }
+            .environmentObject(profileViewModel)
+            .environmentObject(selectedPlaceViewModel)
+            .environmentObject(detailPlaceViewModel)
+            .environmentObject(mapViewModel)
+            .environmentObject(dataManager)
+            .environmentObject(locationManager)
+            .environmentObject(userSession)
+            .environmentObject(userProfileViewModel)
+            .environmentObject(serviceContainer)
+            .environmentObject(notificationManager)
+            .presentationDetents([.height(300), .height(800)])
+            .presentationDragIndicator(.visible)
+            .presentationBackground(Color.clear)
+            .presentationBackgroundInteraction(.enabled(upThrough: .height(800)))
+            .onDisappear {
+                // Clear all filters when any sheet is dismissed
+                mapViewModel.clearAllFilters()
+                profileViewModel.selectedListIdForMap = nil
+
+                // Trigger map annotation reload to show all annotations
+                if let userId = userSession.currentUserId {
+                    let currentRegion = getCurrentMapRegion()
+                    Task {
+                        if let region = currentRegion {
+                            await mapViewModel.onMapCameraSettled(region, userId: userId)
                         }
                     }
                 }
             }
-        }
-        // TikToks popup sheet
-        .sheet(isPresented: $mapViewModel.showingTikToksPopup) {
-            TikToksPopupView()
-                .environmentObject(profileViewModel)
-                .environmentObject(selectedPlaceViewModel)
-                .environmentObject(detailPlaceViewModel)
-                .environmentObject(mapViewModel)
-                .environmentObject(dataManager)
-                .environmentObject(locationManager)
-                .environmentObject(userSession)
-                .environmentObject(userProfileViewModel)
-                .environmentObject(serviceContainer)
-                .environmentObject(notificationManager)
-                .presentationDetents([.height(300), .height(800)])
-                .presentationDragIndicator(.visible)
-                .presentationBackground(Color.clear)
-                .presentationBackgroundInteraction(.enabled(upThrough: .height(800)))
-                .onDisappear {
-                    mapViewModel.clearAllFilters()
-                    // Trigger reload for all annotations
-                    if let userId = userSession.currentUserId {
-                        let currentRegion = getCurrentMapRegion()
-                        Task {
-                            if let region = currentRegion {
-                                await mapViewModel.onMapCameraSettled(region, userId: userId)
-                            }
-                        }
-                    }
-                }
-        }
-        // Reviews popup sheet
-        .sheet(isPresented: $mapViewModel.showingReviewsPopup) {
-            ReviewsListPopupView()
-                .environmentObject(profileViewModel)
-                .environmentObject(selectedPlaceViewModel)
-                .environmentObject(detailPlaceViewModel)
-                .environmentObject(mapViewModel)
-                .environmentObject(dataManager)
-                .environmentObject(locationManager)
-                .environmentObject(userSession)
-                .environmentObject(userProfileViewModel)
-                .environmentObject(serviceContainer)
-                .environmentObject(notificationManager)
-                .presentationDetents([.height(300), .height(800)])
-                .presentationDragIndicator(.visible)
-                .presentationBackground(Color.clear)
-                .presentationBackgroundInteraction(.enabled(upThrough: .height(800)))
-                .onDisappear {
-                    mapViewModel.clearAllFilters()
-                    // Trigger reload for all annotations
-                    if let userId = userSession.currentUserId {
-                        let currentRegion = getCurrentMapRegion()
-                        Task {
-                            if let region = currentRegion {
-                                await mapViewModel.onMapCameraSettled(region, userId: userId)
-                            }
-                        }
-                    }
-                }
         }
     }
 

@@ -53,9 +53,23 @@ struct PlaceListPopupView<CardView: View>: View {
 
     var body: some View {
         NavigationStack(path: $navigationPath) {
-            VStack(spacing: 0) {
-                header
-                content
+            ScrollView {
+                VStack(spacing: 0) {
+                    header
+                    content
+                }
+            }
+            .onChange(of: places.count) {
+                // Re-check pagination when places count changes (after load completes)
+                if places.count > 0 {
+                    triggerPaginationIfNeeded(index: places.count - 1)
+                }
+            }
+            .onChange(of: isLoadingMore) { newValue in
+                // When loading finishes, if at end and more data exists, trigger next load
+                if !newValue && hasMore && !places.isEmpty {
+                    triggerPaginationIfNeeded(index: places.count - 1)
+                }
             }
             .navigationBarHidden(true)
             .navigationDestination(for: String.self) { placeId in
@@ -68,10 +82,6 @@ struct PlaceListPopupView<CardView: View>: View {
                 navigationPath.append(placeId)
                 mapViewModel.pendingPlaceNavigation = nil
             }
-        }
-        .onAppear {
-            // Clear navigation path when sheet appears (ensures fresh state)
-            navigationPath = NavigationPath()
         }
     }
     
@@ -104,7 +114,7 @@ struct PlaceListPopupView<CardView: View>: View {
     }
     
     // MARK: - Content
-    
+
     @ViewBuilder
     private var content: some View {
         if isLoading && places.isEmpty {
@@ -113,6 +123,16 @@ struct PlaceListPopupView<CardView: View>: View {
             emptyView
         } else {
             gridView
+
+            // Pagination loading indicator
+            if isLoadingMore {
+                HStack {
+                    Spacer()
+                    ProgressView()
+                        .padding()
+                    Spacer()
+                }
+            }
         }
     }
     
@@ -152,46 +172,22 @@ struct PlaceListPopupView<CardView: View>: View {
     }
     
     // MARK: - Grid View
-    
+    // Note: No ScrollView or VStack wrapper - allows LazyVGrid to load items lazily
+    // Parent body provides the ScrollView for scroll position preservation
+
     private var gridView: some View {
-        ScrollView {
-            LazyVGrid(columns: columns, spacing: 16) {
-                ForEach(Array(places.enumerated()), id: \.element.id) { index, place in
-                    cardBuilder(place, { placeId in
-                        navigationPath.append(placeId)
-                    })
-                        .onAppear {
-                            triggerPaginationIfNeeded(index: index)
-                        }
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-            
-            // Pagination loading indicator
-            if isLoadingMore {
-                HStack {
-                    Spacer()
-                    ProgressView()
-                        .padding()
-                    Spacer()
+        LazyVGrid(columns: columns, spacing: 16) {
+            ForEach(Array(places.enumerated()), id: \.element.id) { index, place in
+                cardBuilder(place, { placeId in
+                    navigationPath.append(placeId)
+                })
+                .onAppear {
+                    triggerPaginationIfNeeded(index: index)
                 }
             }
         }
-        .onChange(of: places.count) {
-            // Re-check pagination when places count changes (after load completes)
-            // This handles the case where user is already at the bottom
-            if places.count > 0 {
-                triggerPaginationIfNeeded(index: places.count - 1)
-            }
-        }
-        .onChange(of: isLoadingMore) { newValue in
-            // When loading finishes (newValue is false), if we are still at the end
-            // and more data exists, trigger the next load immediately.
-            if !newValue && hasMore && !places.isEmpty {
-                triggerPaginationIfNeeded(index: places.count - 1)
-            }
-        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
     }
     
     // MARK: - Pagination Helper

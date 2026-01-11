@@ -9,6 +9,23 @@ import Foundation
 import MapKit
 import SwiftUI
 
+// MARK: - Sheet Type Enum
+/// Identifies which sheet is currently being presented on the map
+/// Using an enum with Identifiable allows SwiftUI to use a single .sheet(item:) modifier
+enum MapSheetType: Identifiable, Equatable {
+    case list(String)  // listId
+    case tiktoks
+    case reviews
+
+    var id: String {
+        switch self {
+        case .list(let listId): return "list-\(listId)"
+        case .tiktoks: return "tiktoks"
+        case .reviews: return "reviews"
+        }
+    }
+}
+
 @MainActor
 class MapViewModel: ObservableObject {
     @Published var viewportAnnotations: [PlaceAnnotation] = [] // Place annotations in current viewport
@@ -19,13 +36,16 @@ class MapViewModel: ObservableObject {
     @Published var userProfilePictures: [String: UIImage] = [:] // Cache of user profile pictures
     
     // Map filtering state
-    @Published var selectedListId: String? = nil // When set, only show annotations from this list (String because LightweightPlaceList.id is String)
-    @Published var showingListPopup: Bool = false // Controls list popup sheet visibility
-    @Published var pendingPlaceNavigation: String? = nil // Place ID to navigate to when list sheet is open
+    @Published var selectedListId: String? = nil // When set, only show annotations from this list
+    @Published var activeSheet: MapSheetType? = nil // Single sheet control - prevents multiple sheet conflicts
+    @Published var pendingPlaceNavigation: String? = nil // Place ID to navigate to when sheet is open
     @Published var showingTikToksOnMap: Bool = false // When set, only show TikTok annotations
     @Published var showingReviewsOnMap: Bool = false // When set, only show reviewed place annotations
-    @Published var showingTikToksPopup: Bool = false // Controls TikToks popup sheet visibility
-    @Published var showingReviewsPopup: Bool = false // Controls Reviews popup sheet visibility
+
+    // Computed properties for backwards compatibility with existing code
+    var showingListPopup: Bool { if case .list = activeSheet { return true } else { return false } }
+    var showingTikToksPopup: Bool { activeSheet == .tiktoks }
+    var showingReviewsPopup: Bool { activeSheet == .reviews }
     
     private var debounceTimer: Timer?
     private let placeService: PlaceService
@@ -56,20 +76,22 @@ class MapViewModel: ObservableObject {
             // List not found - don't show popup
             return
         }
-        
+
         selectedListId = listId
-        showingListPopup = true
+        showingTikToksOnMap = false
+        showingReviewsOnMap = false
+        activeSheet = .list(listId)
         // Clear current annotations - they will be reloaded with list filter
         viewportAnnotations = []
         communityMarkers = []
         // Reset last loaded region to force reload
         lastLoadedRegion = nil
     }
-    
+
     /// Clears the list filter and restores all annotations
     func clearListFilter() {
         selectedListId = nil
-        showingListPopup = false
+        activeSheet = nil
         // Clear current annotations - they will be reloaded without filter
         viewportAnnotations = []
         communityMarkers = []
@@ -78,11 +100,9 @@ class MapViewModel: ObservableObject {
     /// Sets the map to show only TikTok places
     func selectTikToks() {
         showingTikToksOnMap = true
-        showingTikToksPopup = true
         showingReviewsOnMap = false
-        showingReviewsPopup = false
         selectedListId = nil
-        showingListPopup = false
+        activeSheet = .tiktoks
         // Clear current annotations - they will be reloaded with TikTok filter
         viewportAnnotations = []
         communityMarkers = []
@@ -92,11 +112,9 @@ class MapViewModel: ObservableObject {
     /// Sets the map to show only reviewed places
     func selectReviews() {
         showingReviewsOnMap = true
-        showingReviewsPopup = true
         showingTikToksOnMap = false
-        showingTikToksPopup = false
         selectedListId = nil
-        showingListPopup = false
+        activeSheet = .reviews
         // Clear current annotations - they will be reloaded with reviews filter
         viewportAnnotations = []
         communityMarkers = []
@@ -106,11 +124,9 @@ class MapViewModel: ObservableObject {
     /// Clears all special filters (list, TikToks, reviews)
     func clearAllFilters() {
         selectedListId = nil
-        showingListPopup = false
         showingTikToksOnMap = false
-        showingTikToksPopup = false
         showingReviewsOnMap = false
-        showingReviewsPopup = false
+        activeSheet = nil
         viewportAnnotations = []
         communityMarkers = []
         lastLoadedRegion = nil
