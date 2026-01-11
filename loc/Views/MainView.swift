@@ -154,6 +154,13 @@ struct MainView: View {
                     .presentationBackgroundInteraction(.enabled(upThrough: .height(800)))
                     .interactiveDismissDisabled(false)
             }
+            .onChange(of: userProfileViewModel.isUserDetailPresented) { _, isPresented in
+                // Dismiss PlaceDetailView sheet when navigating to user profile
+                // MVVM: View observes ViewModel state changes and coordinates sheet dismissal
+                if isPresented && selectedPlaceVM.isDetailSheetPresented {
+                    selectedPlaceVM.isDetailSheetPresented = false
+                }
+            }
             .fullScreenCover(isPresented: $shouldNavigateToProfile) {
                 ProfileView()
                     .environmentObject(userProfileViewModel)

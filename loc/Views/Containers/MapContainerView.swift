@@ -150,6 +150,13 @@ struct MapContainerView: View {
         .onChange(of: selectedPlaceViewModel.isDetailSheetPresented) { oldValue, newValue in
             // Monitor detail sheet presentation state for debugging if needed
         }
+        .onChange(of: userProfileViewModel.isUserDetailPresented) { _, isPresented in
+            // Dismiss popup sheets when navigating to user profile from within nested PlaceDetailView
+            // MVVM: View observes ViewModel state changes and coordinates sheet dismissal
+            if isPresented && mapViewModel.activeSheet != nil {
+                mapViewModel.activeSheet = nil
+            }
+        }
         // Single sheet using item binding - prevents "only presenting a single sheet" warning
         .sheet(item: $mapViewModel.activeSheet) { sheetType in
             Group {
