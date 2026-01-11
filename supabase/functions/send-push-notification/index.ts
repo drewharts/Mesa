@@ -144,7 +144,21 @@ serve(async (req) => {
         notificationData.placeId = record.place_id
         notificationData.userId = record.actor_id
         break
-        
+
+      case 'place_added_to_list': {
+        title = 'New Place Added'
+        const adderName = record.actor_first_name && record.actor_last_name
+          ? `${record.actor_first_name} ${record.actor_last_name}`
+          : 'Someone'
+        const addedPlaceName = record.place_name || 'a place'
+        const listName = record.list_name || 'your list'
+        body = `${adderName} added ${addedPlaceName} to ${listName}`
+        notificationData.placeId = record.place_id
+        notificationData.listId = record.list_id
+        notificationData.userId = record.actor_id
+        break
+      }
+
       default:
         console.log('⚠️ [Push] Unknown notification type:', record.type)
         return new Response(

@@ -505,9 +505,9 @@ class ProfileViewModel: ObservableObject {
     ///   - updatedCount: The new count after adding (caller owns state and does the math)
     func addPlaceToLightweightList(listId: String, place: DetailPlace, updatedCount: Int? = nil) {
         guard let userId = userSession.currentUserId else { return }
-        
+
         let placeId = place.id.uuidString
-        
+
         // Create lightweight place object with added_by info for collaborative lists
         let lightweightPlace = LightweightPlace(
             place_id: placeId,
@@ -523,9 +523,10 @@ class ProfileViewModel: ObservableObject {
         var didInsert = false
         
         // Update local lightweightPlaceListPlaces
+        // Insert at index 0 so new places appear first (matches DB sort_order behavior)
         if var existingPlaces = lightweightPlaceListPlaces[listId] {
             if !existingPlaces.contains(where: { $0.place_id == placeId }) {
-                existingPlaces.append(lightweightPlace)
+                existingPlaces.insert(lightweightPlace, at: 0)  // Prepend, not append
                 lightweightPlaceListPlaces[listId] = existingPlaces
                 didInsert = true
             }
@@ -2566,7 +2567,7 @@ class ProfileViewModel: ObservableObject {
     ///   - listId: The list to set places for
     ///   - places: Places fetched from the service
     func setPlacesForList(listId: String, places: [LightweightPlace]) {
-        // Deduplicate by place_id (keep first occurrence)
+        // Deduplicate places by place_id
         var seenIds = Set<String>()
         let uniquePlaces = places.filter { place in
             if seenIds.contains(place.place_id) {
@@ -2575,12 +2576,7 @@ class ProfileViewModel: ObservableObject {
             seenIds.insert(place.place_id)
             return true
         }
-        
-        let duplicateCount = places.count - uniquePlaces.count
-        if duplicateCount > 0 {
-            print("⚠️ [ProfileViewModel] Filtered \(duplicateCount) duplicate places for list \(listId)")
-        }
-        
+
         lightweightPlaceListPlaces[listId] = uniquePlaces
     }
     

@@ -20,6 +20,7 @@ struct LightweightListPopupView: View {
     @State private var currentListIndex: Int
     @State private var showOnlyUnvisited: Bool = false
     @State private var isLoadingMore: Bool = false
+    @State private var pendingLoadRequest: Bool = false  // Track if load was requested while already loading
     @State private var hasMorePlaces: Bool = true
     @State private var currentPage: Int = 1
     @State private var showCollaboratorsSheet: Bool = false
@@ -284,9 +285,16 @@ struct LightweightListPopupView: View {
     }
     
     private func loadMoreIfNeeded() {
-        guard !isLoadingMore && hasMorePlaces else { return }
-        
+        guard hasMorePlaces else { return }
+
+        // If already loading, mark that we have a pending request
+        if isLoadingMore {
+            pendingLoadRequest = true
+            return
+        }
+
         isLoadingMore = true
+        pendingLoadRequest = false  // Clear any pending request since we're now loading
         let nextPage = currentPage + 1
         
         Task {
@@ -303,6 +311,11 @@ struct LightweightListPopupView: View {
                     // Keep loading if we got 6 or more places, stop if we got fewer than 6
                     hasMorePlaces = morePlaces.count >= 6
                     isLoadingMore = false
+
+                    // If there was a pending request (user scrolled while loading), process it now
+                    if pendingLoadRequest && hasMorePlaces {
+                        loadMoreIfNeeded()
+                    }
                 }
             } catch {
                 await MainActor.run {
@@ -388,7 +401,7 @@ struct ListContentView: View {
             allPlaces.filter { !profile.hasVerifiedReviewedPlace(placeId: $0.place_id) } :
             allPlaces
 
-        // Secondary deduplication - eliminate any duplicates by place_id (defense in depth)
+        // Deduplicate by place_id
         var seenIds = Set<String>()
         return toFilter.filter { place in
             guard !seenIds.contains(place.place_id) else { return false }
