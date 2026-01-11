@@ -789,11 +789,77 @@ class SupabasePlaceService: ObservableObject {
             throw error
         }
     }
-    
+
+    /// Fetch TikTok/external place annotations in the viewport for a user
+    func fetchTikTokAnnotationsInViewport(northLat: Double, southLat: Double, eastLng: Double, westLng: Double, userId: String) async throws -> [PlaceAnnotation] {
+        do {
+            struct ViewportParams: Encodable {
+                let p_user_id: String
+                let p_min_lon: Double
+                let p_min_lat: Double
+                let p_max_lon: Double
+                let p_max_lat: Double
+            }
+
+            let params = ViewportParams(
+                p_user_id: userId,
+                p_min_lon: westLng,
+                p_min_lat: southLat,
+                p_max_lon: eastLng,
+                p_max_lat: northLat
+            )
+
+            let response: [PlaceAnnotation] = try await supabase.client
+                .rpc("get_tiktok_annotations_with_users", params: params)
+                .execute()
+                .value
+
+            return response
+        } catch {
+            if !Task.isCancelled && !(error is CancellationError) && (error as NSError).code != NSURLErrorCancelled {
+                print("❌ [Supabase] Error fetching TikTok annotations: \(error)")
+            }
+            throw error
+        }
+    }
+
+    /// Fetch reviewed place annotations in the viewport for a user
+    func fetchReviewAnnotationsInViewport(northLat: Double, southLat: Double, eastLng: Double, westLng: Double, userId: String) async throws -> [PlaceAnnotation] {
+        do {
+            struct ViewportParams: Encodable {
+                let p_user_id: String
+                let p_min_lon: Double
+                let p_min_lat: Double
+                let p_max_lon: Double
+                let p_max_lat: Double
+            }
+
+            let params = ViewportParams(
+                p_user_id: userId,
+                p_min_lon: westLng,
+                p_min_lat: southLat,
+                p_max_lon: eastLng,
+                p_max_lat: northLat
+            )
+
+            let response: [PlaceAnnotation] = try await supabase.client
+                .rpc("get_review_annotations_with_users", params: params)
+                .execute()
+                .value
+
+            return response
+        } catch {
+            if !Task.isCancelled && !(error is CancellationError) && (error as NSError).code != NSURLErrorCancelled {
+                print("❌ [Supabase] Error fetching review annotations: \(error)")
+            }
+            throw error
+        }
+    }
+
     // Fallback method removed - we now use the optimized PostgreSQL function exclusively
-    
+
     // fetchFriendsPlacesInViewport removed - the main function already includes friends' places
-    
+
     /// ✅ NEW: Fetch favorite place IDs only (not full place documents) - SUPER FAST!
     func fetchFavoritePlaceIds(userId: String) async throws -> [String] {
         let favoriteRecords: [FavoriteRecord] = try await supabase.client

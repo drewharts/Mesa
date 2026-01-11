@@ -108,7 +108,39 @@ struct MapContainerView: View {
                     }
                 }
             }
-            
+            .onChange(of: profileViewModel.showTikToksOnMap) { _, newValue in
+                // Navigate to map showing TikTok places
+                if newValue {
+                    mapViewModel.selectTikToks()
+                    profileViewModel.showTikToksOnMap = false // Reset trigger
+                    // Trigger reload with TikTok filter
+                    if let userId = userSession.currentUserId {
+                        let currentRegion = getCurrentMapRegion()
+                        Task {
+                            if let region = currentRegion {
+                                await mapViewModel.onMapCameraSettled(region, userId: userId)
+                            }
+                        }
+                    }
+                }
+            }
+            .onChange(of: profileViewModel.showReviewsOnMap) { _, newValue in
+                // Navigate to map showing reviewed places
+                if newValue {
+                    mapViewModel.selectReviews()
+                    profileViewModel.showReviewsOnMap = false // Reset trigger
+                    // Trigger reload with reviews filter
+                    if let userId = userSession.currentUserId {
+                        let currentRegion = getCurrentMapRegion()
+                        Task {
+                            if let region = currentRegion {
+                                await mapViewModel.onMapCameraSettled(region, userId: userId)
+                            }
+                        }
+                    }
+                }
+            }
+
         }
         .ignoresSafeArea()
         .edgesIgnoringSafeArea(.all)
@@ -193,8 +225,68 @@ struct MapContainerView: View {
                 }
             }
         }
+        // TikToks popup sheet
+        .sheet(isPresented: $mapViewModel.showingTikToksPopup) {
+            TikToksPopupView()
+                .environmentObject(profileViewModel)
+                .environmentObject(selectedPlaceViewModel)
+                .environmentObject(detailPlaceViewModel)
+                .environmentObject(mapViewModel)
+                .environmentObject(dataManager)
+                .environmentObject(locationManager)
+                .environmentObject(userSession)
+                .environmentObject(userProfileViewModel)
+                .environmentObject(serviceContainer)
+                .environmentObject(notificationManager)
+                .presentationDetents([.height(300), .height(800)])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Color.clear)
+                .presentationBackgroundInteraction(.enabled(upThrough: .height(800)))
+                .onDisappear {
+                    mapViewModel.clearAllFilters()
+                    // Trigger reload for all annotations
+                    if let userId = userSession.currentUserId {
+                        let currentRegion = getCurrentMapRegion()
+                        Task {
+                            if let region = currentRegion {
+                                await mapViewModel.onMapCameraSettled(region, userId: userId)
+                            }
+                        }
+                    }
+                }
+        }
+        // Reviews popup sheet
+        .sheet(isPresented: $mapViewModel.showingReviewsPopup) {
+            ReviewsListPopupView()
+                .environmentObject(profileViewModel)
+                .environmentObject(selectedPlaceViewModel)
+                .environmentObject(detailPlaceViewModel)
+                .environmentObject(mapViewModel)
+                .environmentObject(dataManager)
+                .environmentObject(locationManager)
+                .environmentObject(userSession)
+                .environmentObject(userProfileViewModel)
+                .environmentObject(serviceContainer)
+                .environmentObject(notificationManager)
+                .presentationDetents([.height(300), .height(800)])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Color.clear)
+                .presentationBackgroundInteraction(.enabled(upThrough: .height(800)))
+                .onDisappear {
+                    mapViewModel.clearAllFilters()
+                    // Trigger reload for all annotations
+                    if let userId = userSession.currentUserId {
+                        let currentRegion = getCurrentMapRegion()
+                        Task {
+                            if let region = currentRegion {
+                                await mapViewModel.onMapCameraSettled(region, userId: userId)
+                            }
+                        }
+                    }
+                }
+        }
     }
-    
+
     /// Helper to get current map region from location manager or default
     private func getCurrentMapRegion() -> MKCoordinateRegion? {
         // Use location manager's current location as the center

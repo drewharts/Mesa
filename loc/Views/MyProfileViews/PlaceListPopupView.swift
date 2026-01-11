@@ -18,7 +18,7 @@
 //      emptyTitle: "No TikToks Yet",
 //      emptyMessage: "Places you add from TikTok videos will appear here",
 //      loadMore: { await profile.loadMoreExternalPlaces() },
-//      cardBuilder: { place in PopupPlaceCard(place: place, ...) }
+//      cardBuilder: { place, navigate in PopupPlaceCard(place: place, onNavigate: navigate, ...) }
 //  )
 
 import SwiftUI
@@ -35,25 +35,43 @@ struct PlaceListPopupView<CardView: View>: View {
     let emptyTitle: String
     let emptyMessage: String
     let loadMore: () async -> Void
-    @ViewBuilder let cardBuilder: (LightweightPlace) -> CardView
-    
+    @ViewBuilder let cardBuilder: (LightweightPlace, @escaping (String) -> Void) -> CardView
+
     @Environment(\.presentationMode) var presentationMode
-    
+    @EnvironmentObject var mapViewModel: MapViewModel
+
+    // Navigation state for place detail navigation
+    @State private var navigationPath = NavigationPath()
+
     // Grid layout matching ProfileView lists (consistent spacing)
     private let columns = [
         GridItem(.flexible(), spacing: 12),
         GridItem(.flexible(), spacing: 12)
     ]
-    
+
     // MARK: - Body
-    
+
     var body: some View {
-        NavigationView {
+        NavigationStack(path: $navigationPath) {
             VStack(spacing: 0) {
                 header
                 content
             }
             .navigationBarHidden(true)
+            .navigationDestination(for: String.self) { placeId in
+                PlaceDetailViewInNavigation(placeId: placeId, minSheetHeight: 250)
+            }
+        }
+        .onChange(of: mapViewModel.pendingPlaceNavigation) { oldValue, newValue in
+            // When map annotation is tapped while popup is open, navigate to that place
+            if let placeId = newValue {
+                navigationPath.append(placeId)
+                mapViewModel.pendingPlaceNavigation = nil
+            }
+        }
+        .onAppear {
+            // Clear navigation path when sheet appears (ensures fresh state)
+            navigationPath = NavigationPath()
         }
     }
     
@@ -139,7 +157,9 @@ struct PlaceListPopupView<CardView: View>: View {
         ScrollView {
             LazyVGrid(columns: columns, spacing: 16) {
                 ForEach(Array(places.enumerated()), id: \.element.id) { index, place in
-                    cardBuilder(place)
+                    cardBuilder(place, { placeId in
+                        navigationPath.append(placeId)
+                    })
                         .onAppear {
                             triggerPaginationIfNeeded(index: index)
                         }

@@ -24,13 +24,14 @@ struct TikToksPopupView: View {
             emptyTitle: "No TikToks Yet",
             emptyMessage: "Places you add from TikTok videos will appear here",
             loadMore: { await profile.loadMoreExternalPlaces() },
-            cardBuilder: { place in
+            cardBuilder: { place, navigate in
                 PopupPlaceCard(
                     place: place,
                     preferTikTokThumbnail: true,
                     allowDelete: true,
                     deleteTitle: "Delete TikTok Place",
-                    onDelete: { profile.deleteTikTokPlace(place) }
+                    onDelete: { profile.deleteTikTokPlace(place) },
+                    onNavigate: navigate
                 )
             }
         )

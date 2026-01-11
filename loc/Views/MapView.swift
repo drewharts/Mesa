@@ -155,11 +155,13 @@ struct MapView: View {
         Task {
             if let place = await mapViewModel.loadPlaceDetails(for: annotation) {
                 await MainActor.run {
-                    // Check if list sheet is open - if so, navigate within the sheet instead
+                    // Check if any popup sheet is open - if so, navigate within the sheet instead
                     // MVVM: View coordinates navigation based on ViewModel state
-                    if mapViewModel.showingListPopup {
-                        // Set pending navigation - LightweightListPopupView will observe this and push to NavigationStack
-                        // This makes annotation taps behave the same as clicking a place tile in the list sheet
+                    if mapViewModel.showingListPopup ||
+                       mapViewModel.showingTikToksPopup ||
+                       mapViewModel.showingReviewsPopup {
+                        // Set pending navigation - popup view will observe this and push to NavigationStack
+                        // This makes annotation taps behave the same as clicking a place tile in the popup
                         mapViewModel.pendingPlaceNavigation = place.id.uuidString
                     } else {
                         // Normal behavior: show place detail sheet
