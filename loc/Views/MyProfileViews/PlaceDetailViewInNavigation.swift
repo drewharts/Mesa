@@ -1,15 +1,111 @@
 //
-//  RestaurantDetailView.swift (PlaceDetailView)
+//  PlaceDetailViewInNavigation.swift
 //  loc
 //
-//  Created by Andrew Hartsfield II on 11/8/24.
+//  Created by Assistant on navigation integration
 //
+//  Wrapper view for PlaceDetailView when used in NavigationStack
+//  Single Responsibility: Load place details and present PlaceDetailView without NavigationView wrapper
+//  MVVM: Coordinates between SelectedPlaceViewModel and PlaceDetailView
 
 import SwiftUI
 
-struct PlaceDetailView: View {
+struct PlaceDetailViewInNavigation: View {
+    let placeId: String
     let minSheetHeight: CGFloat
+    
+    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
+    @EnvironmentObject var profile: ProfileViewModel
+    @EnvironmentObject var locationManager: LocationManager
+    @EnvironmentObject var userProfileViewModel: UserProfileViewModel
+    @EnvironmentObject var userSession: UserSession
+    @EnvironmentObject var serviceContainer: ServiceContainer
+    @EnvironmentObject var dataManager: DataManager
+    @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
+    
+    @State private var isLoading = true
+    @State private var loadError: Error?
+    @State private var originalAllowAutoPresent: Bool = true // Store original value to restore later
+    
+    var body: some View {
+        Group {
+            if isLoading {
+                ProgressView("Loading place details...")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if let error = loadError {
+                VStack(spacing: 16) {
+                    Text("Error loading place")
+                        .font(.headline)
+                    Text(error.localizedDescription)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .padding()
+            } else {
+                // PlaceDetailView without NavigationView wrapper (we're already in NavigationStack)
+                PlaceDetailViewContent(minSheetHeight: minSheetHeight)
+                    .environmentObject(selectedPlaceVM)
+                    .environmentObject(profile)
+                    .environmentObject(locationManager)
+                    .environmentObject(userProfileViewModel)
+                    .environmentObject(userSession)
+                    .environmentObject(serviceContainer)
+                    .environmentObject(dataManager)
+                    .environmentObject(detailPlaceViewModel)
+            }
+        }
+        .navigationBarTitleDisplayMode(.inline)
+        .task {
+            await loadPlace()
+        }
+        .onDisappear {
+            // Restore allowAutoPresent when leaving this view
+            // MVVM: Clean up state when view is dismissed
+            selectedPlaceVM.allowAutoPresent = originalAllowAutoPresent
+        }
+    }
+    
+    /// Loads place details and sets up SelectedPlaceViewModel
+    /// MVVM: Business logic - coordinates place loading
+    /// Staff Engineer: Prevents auto-presentation of sheet when navigating within NavigationStack
+    private func loadPlace() async {
+        do {
+            // Fetch the full place details using PlaceService
+            let fullPlace = try await PlaceService.shared.fetchPlace(withId: placeId)
+            
+            // Set up place in SelectedPlaceViewModel WITHOUT triggering sheet presentation
+            // MVVM: We're in NavigationStack, so we don't want to trigger the sheet in MainView
+            await MainActor.run {
+                // Disable auto-present to prevent sheet from showing in MainView
+                // Keep it disabled - loadData() runs asynchronously and will check this
+                // We'll restore it in onDisappear when this view is dismissed
+                originalAllowAutoPresent = selectedPlaceVM.allowAutoPresent
+                selectedPlaceVM.allowAutoPresent = false
+                
+                // Set up place (this will load data but won't auto-present sheet)
+                // Animate map to place location when navigating from list popup
+                selectedPlaceVM.selectPlaceAndFetchDetails(fullPlace, shouldAnimateMap: true)
+                
+                // Ensure sheet is NOT presented (we're using NavigationStack)
+                selectedPlaceVM.isDetailSheetPresented = false
+                
+                isLoading = false
+            }
+        } catch {
+            await MainActor.run {
+                loadError = error
+                isLoading = false
+            }
+            print("❌ [PlaceDetailViewInNavigation] Error loading place details: \(error)")
+        }
+    }
+}
 
+/// Content view extracted from PlaceDetailView to work without NavigationView wrapper
+/// Single Responsibility: Display place detail content (reusable in both sheet and navigation contexts)
+struct PlaceDetailViewContent: View {
+    let minSheetHeight: CGFloat
+    
     @State private var selectedImageIndex: Int?
     @State private var showPhotoGallery = false
     @State private var galleryPhotos: [UIImage] = []
@@ -17,9 +113,8 @@ struct PlaceDetailView: View {
     @State private var showListSelection = false
     @State private var showCreatePost = false
     @State private var listSelectionViewModel: PlaceListSelectionViewModel?
-
+    
     @EnvironmentObject var profile: ProfileViewModel
-
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var locationManager: LocationManager
     @EnvironmentObject var userProfileViewModel: UserProfileViewModel
@@ -27,16 +122,10 @@ struct PlaceDetailView: View {
     @EnvironmentObject var serviceContainer: ServiceContainer
     @EnvironmentObject var dataManager: DataManager
     @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
-
-    // Removed PlaceDetailViewModel - travel time logic now in PlaceDetailTabsViewModel
+    
     @State private var tabsViewModel: PlaceDetailTabsViewModel?
-
-    init(minSheetHeight: CGFloat) {
-        self.minSheetHeight = minSheetHeight
-    }
-
+    
     var body: some View {
-        NavigationView {
         ZStack {
             VStack(spacing: 16) {
                 if selectedPlaceVM.selectedPlace == nil {
@@ -55,10 +144,10 @@ struct PlaceDetailView: View {
                     )
                     .environmentObject(userProfileViewModel)
                     .environmentObject(detailPlaceViewModel)
-                    }
                 }
+            }
             .frame(maxWidth: .infinity)
-                .ignoresSafeArea(edges: [.bottom, .horizontal])
+            .ignoresSafeArea(edges: [.bottom, .horizontal])
             .onAppear {
                 // Initialize the ViewModel when the view appears
                 if tabsViewModel == nil {
@@ -84,7 +173,6 @@ struct PlaceDetailView: View {
                     }
                 }
             }
-            // Alert for travel time removed - no longer needed
             .alert(isPresented: $showNoPhoneNumberAlert) {
                 Alert(
                     title: Text("Phone Number Not Available"),
@@ -137,10 +225,9 @@ struct PlaceDetailView: View {
                    let tabsVM = tabsViewModel {
                     tabsVM.travelTimeViewModel.updateTravelTime(for: place, from: currentLocation.coordinate)
                 }
-                    
-                    // Refresh TikTok places when place detail view appears
-                    // Backend creates external_place entry when selectPlaceAndFetchDetails is called
-                    profile.refreshTikTokPlacesAfterImport()
+                
+                // Refresh TikTok places when place detail view appears
+                profile.refreshTikTokPlacesAfterImport()
             }
             .onChange(of: selectedPlaceVM.selectedPlace) { _, newPlace in
                 if let place = newPlace,
@@ -149,9 +236,7 @@ struct PlaceDetailView: View {
                     tabsVM.travelTimeViewModel.updateTravelTime(for: place, from: currentLocation)
                 }
             }
-
-
-
+            
             // Photo Gallery Overlay (Pinterest-style) - fills entire sheet
             if showPhotoGallery, let selectedIndex = selectedImageIndex {
                 PinterestPhotoGalleryView(
@@ -163,8 +248,6 @@ struct PlaceDetailView: View {
                 .transition(.opacity)
                 .zIndex(100)
             }
-            }
-            .navigationBarHidden(true)
         }
     }
 }

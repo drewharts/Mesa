@@ -25,14 +25,12 @@ struct ExternalReviewsListPopupView: View {
             emptyTitle: "No Reviews Yet",
             emptyMessage: "This user hasn't reviewed any places yet",
             loadMore: { await userProfileVM.loadMoreReviews() },
-            cardBuilder: { place in
+            cardBuilder: { place, navigate in
                 PopupPlaceCard(
                     place: place,
                     preferTikTokThumbnail: false, // Reviews prioritize review photos
                     allowDelete: false, // Can't delete other user's reviews
-                    onNavigate: { placeId in
-                        navigateToPlace(placeId: placeId)
-                    }
+                    onNavigate: navigate
                 )
             }
         )

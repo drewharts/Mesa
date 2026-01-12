@@ -14,11 +14,18 @@ struct UserProfileView: View {
     let userId: String
     @ObservedObject var UserProfileVM: UserProfileViewModel
     @EnvironmentObject var profileVM: ProfileViewModel
+    @EnvironmentObject var userSession: UserSession // Add userSession to get current user ID
     @Environment(\.presentationMode) var presentationMode
 
     var body: some View {
             ScrollView {
                 VStack(spacing: 0) {
+                // Show loading state if selectedUser is not yet set
+                if UserProfileVM.selectedUser == nil {
+                    ProgressView("Loading profile...")
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .padding()
+                } else {
                 // Profile Picture, Name, Followers
                     VStack(spacing: 16) {
                         // Profile Picture
@@ -27,7 +34,9 @@ struct UserProfileView: View {
                             isFollowing: UserProfileVM.isFollowing,
                             onToggleFollow: {
                                 // Single responsibility: Only UserProfileViewModel makes the API call
-                                UserProfileVM.toggleFollowUser(currentUserId: userId) { success, newFollowingState in
+                                // Use currentUserId from userSession, not userId (which is the viewed profile)
+                                guard let currentUserId = userSession.currentUserId else { return }
+                                UserProfileVM.toggleFollowUser(currentUserId: currentUserId) { success, newFollowingState in
                                     if success {
                                         // Update ProfileViewModel's local state WITHOUT making another API call
                                         profileVM.updateFollowingState(
@@ -73,12 +82,19 @@ struct UserProfileView: View {
                                 UserProfileListsView(viewModel: UserProfileVM, placeLists: UserProfileVM.userLists)
 
                                 Spacer(minLength: 50)
+                    }
                             }
                 }
             }
             .environmentObject(UserProfileVM)
-        .onAppear {
-            UserProfileVM.checkIfFollowing(currentUserId: userId)
+        .task {
+            // Use .task instead of .onAppear to ensure it runs after selectUser sets selectedUser
+            // Use currentUserId from userSession, not userId (which is the viewed profile)
+            guard let currentUserId = userSession.currentUserId else { return }
+            // Only check if following if selectedUser is already set (from selectUser in UserRow)
+            if UserProfileVM.selectedUser != nil {
+                UserProfileVM.checkIfFollowing(currentUserId: currentUserId)
+            }
         }
         .navigationBarTitleDisplayMode(.inline)
         .alert("Follow Error", isPresented: $UserProfileVM.showFollowError) {

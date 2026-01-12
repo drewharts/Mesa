@@ -24,6 +24,7 @@ struct LightweightProfileListSection: View {
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @Environment(\.presentationMode) var presentationMode
+    @EnvironmentObject var appCoordinator: AppCoordinator
     
     @State private var showingListPopup = false
     
@@ -35,7 +36,10 @@ struct LightweightProfileListSection: View {
         VStack(alignment: .leading, spacing: 8) {
             // Photo collage button
             Button(action: {
-                showingListPopup = true
+                // Set list filter and navigate to map
+                profile.selectedListIdForMap = list.id
+                // Dismiss profile view to show map
+                presentationMode.wrappedValue.dismiss()
             }) {
                 ListCardImage(places: places, placeColors: $placeColors)
             }
@@ -45,12 +49,6 @@ struct LightweightProfileListSection: View {
             ListCardInfo(
                 list: list,
                 totalPlaceCount: totalPlaceCount
-            )
-        }
-        .sheet(isPresented: $showingListPopup) {
-            LightweightListPopupView(
-                lists: allLists,
-                initialListIndex: currentIndex
             )
         }
     }

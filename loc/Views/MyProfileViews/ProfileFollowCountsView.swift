@@ -15,28 +15,29 @@ struct ProfileFollowCountsView: View {
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var detailPlaceVM: DetailPlaceViewModel
     
+    @Binding var navigationPath: NavigationPath
+    @State private var refreshToggle = false
+    
+    // Keep sheet for My Places (not converting to navigation yet)
     enum SheetType: Identifiable {
-        case followers
-        case following
         case myPlaces
         
         var id: Int {
             switch self {
-            case .followers: return 0
-            case .following: return 1
             case .myPlaces: return 2
             }
         }
     }
     
     @State private var activeSheet: SheetType?
-    @State private var refreshToggle = false
     
     var body: some View {
         HStack(spacing: 24) {
             // Followers count
             Button(action: {
-                activeSheet = .followers
+                // Push followers destination onto navigation path
+                // MVVM: View coordinates navigation, ViewModel manages data
+                navigationPath.append(ProfileView.FollowListDestination.followers)
             }) {
                 VStack {
                     if profile.isFollowersLoading {
@@ -57,7 +58,9 @@ struct ProfileFollowCountsView: View {
             
             // Following count
             Button(action: {
-                activeSheet = .following
+                // Push following destination onto navigation path
+                // MVVM: View coordinates navigation, ViewModel manages data
+                navigationPath.append(ProfileView.FollowListDestination.following)
             }) {
                 VStack {
                     if profile.isFollowingLoading {
@@ -100,26 +103,6 @@ struct ProfileFollowCountsView: View {
         .padding(.vertical, 10)
         .sheet(item: $activeSheet) { sheetType in
             switch sheetType {
-            case .followers:
-                FollowersListView(onSelectUser: {
-                    // Dismiss sheet and trigger navigation
-                    activeSheet = nil
-                })
-                    .environmentObject(profile)
-                    .environmentObject(userProfileViewModel)
-                    .environmentObject(dataManager)
-                    .environmentObject(userSession)
-                    .environmentObject(detailPlaceVM)
-            case .following:
-                FollowingListView(onSelectUser: {
-                    // Dismiss sheet and trigger navigation
-                    activeSheet = nil
-                })
-                    .environmentObject(profile)
-                    .environmentObject(userProfileViewModel)
-                    .environmentObject(dataManager)
-                    .environmentObject(userSession)
-                    .environmentObject(detailPlaceVM)
             case .myPlaces:
                 MyPlacesListView()
                     .environmentObject(profile)

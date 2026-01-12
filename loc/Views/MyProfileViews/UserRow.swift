@@ -8,7 +8,6 @@ import SwiftUI
 
 struct UserRow: View {
     let user: ProfileData
-    let onSelectUser: () -> Void
     
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var detailPlaceVM: DetailPlaceViewModel
@@ -16,12 +15,22 @@ struct UserRow: View {
     @EnvironmentObject var userProfileVM: UserProfileViewModel
     
     var body: some View {
-        Button(action: {
-            guard let currentUserId = userSession.currentUserId else { return }
-            // Select the user first
-            userProfileVM.selectUser(user, currentUserId: currentUserId)
-            // Then call the closure to switch sheets
-            onSelectUser()
+        NavigationLink(destination: {
+            UserProfileView(
+                userId: user.id,
+                UserProfileVM: userProfileVM
+            )
+            .environmentObject(profile)
+            .environmentObject(detailPlaceVM)
+            .environmentObject(userSession) // Add userSession for currentUserId
+            .task {
+                // Set up user in ViewModel when profile view appears
+                // MVVM: ViewModel manages user data state
+                // Using .task instead of .onAppear ensures this runs before view renders
+                // NOTE: Pass shouldPresent: false to prevent double navigation since NavigationLink handles it
+                guard let currentUserId = userSession.currentUserId else { return }
+                userProfileVM.selectUser(user, currentUserId: currentUserId, shouldPresent: false)
+            }
         }) {
             HStack(spacing: 12) {
                 // User profile photo
@@ -53,12 +62,9 @@ struct UserRow: View {
                 
                 Spacer()
                 
-                Image(systemName: "chevron.right")
-                    .foregroundColor(.gray)
-                    .font(.footnote)
+                // Removed manual chevron - NavigationLink provides one automatically
             }
             .padding(.vertical, 8)
         }
-        .contentShape(Rectangle())
     }
 }

@@ -24,6 +24,9 @@ struct ProfileView: View {
     
     // Track if we've already done initial data refresh
     @State private var hasRefreshedPlaces = false
+    
+    // Navigation path for followers/following lists
+    @State private var navigationPath = NavigationPath()
 
     init() {
         // Configure navigation bar appearance to remove the bottom border
@@ -32,7 +35,7 @@ struct ProfileView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $navigationPath) {
             mainContent
                 .navigationBarBackButtonHidden(true)
                 .preferredColorScheme(.light)
@@ -49,6 +52,31 @@ struct ProfileView: View {
                     .environmentObject(profile)
                     .environmentObject(selectedPlaceVM)
                     .environmentObject(placeVM)
+                    .environmentObject(userSession) // Add userSession for currentUserId
+                }
+                .navigationDestination(for: FollowListDestination.self) { destination in
+                    // Navigate to followers or following list
+                    // MVVM: View coordinates navigation based on destination
+                    Group {
+                        switch destination {
+                        case .followers:
+                            FollowersListView()
+                                .environmentObject(profile)
+                                .environmentObject(userProfileViewModel)
+                                .environmentObject(dataManager)
+                                .environmentObject(userSession)
+                                .environmentObject(placeVM)
+                                .environmentObject(selectedPlaceVM)
+                        case .following:
+                            FollowingListView()
+                                .environmentObject(profile)
+                                .environmentObject(userProfileViewModel)
+                                .environmentObject(dataManager)
+                                .environmentObject(userSession)
+                                .environmentObject(placeVM)
+                                .environmentObject(selectedPlaceVM)
+                        }
+                    }
                 }
         }
             .modifier(SheetsModifier(
@@ -90,10 +118,17 @@ struct ProfileView: View {
             .modifier(AccountManagementModifier(profile: profile))
     }
     
+    /// Navigation destination enum for followers/following lists
+    /// Single Responsibility: Defines navigation destinations for follow lists
+    enum FollowListDestination: Hashable {
+        case followers
+        case following
+    }
+    
     private var mainContent: some View {
         ZStack {
             // Main Content
-            ProfileContentView(photoImportVM: photoImportVM)
+            ProfileContentView(photoImportVM: photoImportVM, navigationPath: $navigationPath)
             
             // TikTok Processing Overlay
             if profile.isProcessingTikTok || profile.isWaitingForPlaceDetail || deepLinkViewModel.isProcessingDeepLink {

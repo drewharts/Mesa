@@ -25,13 +25,14 @@ struct MyPlacesListView: View {
             emptyTitle: "No Places Created Yet",
             emptyMessage: "Press and hold on the map to create a place at any location",
             loadMore: { await profile.loadMoreMyPlaces() },
-            cardBuilder: { place in
+            cardBuilder: { place, navigate in
                 PopupPlaceCard(
                     place: place,
                     preferTikTokThumbnail: true,  // Prefer TikTok thumbnail for visual consistency
                     allowDelete: true,
                     deleteTitle: "Delete Place",
-                    onDelete: { profile.deleteMyPlace(place) }
+                    onDelete: { profile.deleteMyPlace(place) },
+                    onNavigate: navigate
                 )
             }
         )
@@ -61,6 +62,8 @@ struct LightweightPlaceGridCell: View {
     /// Custom navigation callback - when provided, bypasses default navigation
     /// Use this for external profile views that need to dismiss the profile sheet first
     var onNavigate: ((String) -> Void)? = nil
+    /// Navigation callback for NavigationStack - pushes place ID onto navigation path
+    var onNavigateToPlace: ((String) -> Void)? = nil
     
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @Environment(\.presentationMode) var presentationMode
@@ -106,7 +109,10 @@ struct LightweightPlaceGridCell: View {
             .clipShape(RoundedRectangle(cornerRadius: 8))
             .shadow(color: Color.black.opacity(0.08), radius: 6, x: 0, y: 3)
             .onTapGesture {
-                if let customNavigate = onNavigate {
+                if let navigateToPlace = onNavigateToPlace {
+                    // Use NavigationStack navigation (push onto path)
+                    navigateToPlace(place.place_id)
+                } else if let customNavigate = onNavigate {
                     // Use custom navigation (e.g., for external profile views)
                     customNavigate(place.place_id)
                 } else {

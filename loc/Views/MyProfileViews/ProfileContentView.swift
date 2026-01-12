@@ -11,6 +11,7 @@ import PhotosUI
 struct ProfileContentView: View {
     @EnvironmentObject var profile: ProfileViewModel
     @ObservedObject var photoImportVM: PhotoImportViewModel
+    @Binding var navigationPath: NavigationPath
     
     var body: some View {
         ZStack {
@@ -28,7 +29,7 @@ struct ProfileContentView: View {
                         .foregroundColor(.black)
                     
                     // Follow Counts
-                    ProfileFollowCountsView()
+                    ProfileFollowCountsView(navigationPath: $navigationPath)
 
                     Divider()
                         .padding(.top, 15)

@@ -103,9 +103,18 @@ class UserProfileViewModel: ObservableObject {
         }
     }
     
-    func selectUser(_ user: ProfileData, currentUserId: String) {
+    /// Sets up user data and optionally triggers programmatic navigation
+    /// MVVM: Business logic - manages user selection and data loading
+    /// - Parameters:
+    ///   - user: The user profile data to select
+    ///   - currentUserId: The current user's ID for following status checks
+    ///   - shouldPresent: If true, triggers programmatic navigation via isUserDetailPresented. 
+    ///     Set to false when NavigationLink is handling navigation to prevent double navigation.
+    func selectUser(_ user: ProfileData, currentUserId: String, shouldPresent: Bool = true) {
         self.selectedUser = user
+        if shouldPresent {
         self.isUserDetailPresented = true
+        }
         
         // Reset ALL state for new user (Single Responsibility: one place for all resets)
         resetListPaginationState()

@@ -136,12 +136,10 @@ class PlaceListSelectionViewModel: ObservableObject {
     lists = uniqueLists
     hasMore = ownedLists.count >= pageSize
     hasLoadedOnce = true
-        
+
         // Initialize filtered lists with all loaded lists
         filteredLists = applyLocalFilters(to: uniqueLists)
-        
-        print("📋 [PlaceListSelectionVM] Loaded \(uniqueLists.count) unique lists (from \(ownedLists.count) owned + \(collaborativeOwnedLists.count) collab + \(fetchedSharedLists.count) shared)")
-        
+
         // Load place membership data for all lists (so we can show checkmarks)
         if !uniqueLists.isEmpty {
             await loadPlaceMembershipForLists(uniqueLists, placeId: place.id.uuidString)
@@ -385,11 +383,13 @@ class PlaceListSelectionViewModel: ObservableObject {
     }
     
     func toggle(place: DetailPlace, in list: LightweightPlaceList) {
-        // CRITICAL FIX: Look up current state from our array (not the stale captured parameter)
+        // Look up current state from our array (not the stale captured parameter)
         // Since LightweightPlaceList is a struct (value type), the parameter may be a stale snapshot
         // from when the closure was created. Always read from the source of truth: lists array.
-        guard let currentList = lists.first(where: { $0.list_id == list.list_id }) else { return }
-        
+        guard let currentList = lists.first(where: { $0.list_id == list.list_id }) else {
+            return
+        }
+
         let wasInList = isPlace(place, in: currentList)
         
         if wasInList {

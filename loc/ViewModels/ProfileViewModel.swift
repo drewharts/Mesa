@@ -51,6 +51,11 @@ class ProfileViewModel: ObservableObject {
     @Published var hasMoreMyPlaces: Bool = true
     @Published var lightweightExternalPlaces: [LightweightPlace] = [] // Lightweight external/TikTok places for tiles
     @Published var totalExternalPlacesCount: Int = 0 // Total TikTok count from database (not just loaded count)
+    
+    // Map filtering triggers
+    @Published var selectedListIdForMap: String? = nil // When set, triggers map to show only this list's annotations (String because LightweightPlaceList.id is String)
+    @Published var showTikToksOnMap: Bool = false // When set, triggers map to show TikTok places
+    @Published var showReviewsOnMap: Bool = false // When set, triggers map to show reviewed places
     @Published var isLoadingMoreExternalPlaces: Bool = false
     @Published var hasMoreExternalPlaces: Bool = true
     @Published var isLoadingMorePlaceLists: Bool = false
@@ -502,9 +507,9 @@ class ProfileViewModel: ObservableObject {
     ///   - updatedCount: The new count after adding (caller owns state and does the math)
     func addPlaceToLightweightList(listId: String, place: DetailPlace, updatedCount: Int? = nil) {
         guard let userId = userSession.currentUserId else { return }
-        
+
         let placeId = place.id.uuidString
-        
+
         // Create lightweight place object with added_by info for collaborative lists
         let lightweightPlace = LightweightPlace(
             place_id: placeId,
@@ -520,9 +525,10 @@ class ProfileViewModel: ObservableObject {
         var didInsert = false
         
         // Update local lightweightPlaceListPlaces
+        // Insert at index 0 so new places appear first (matches DB sort_order behavior)
         if var existingPlaces = lightweightPlaceListPlaces[listId] {
             if !existingPlaces.contains(where: { $0.place_id == placeId }) {
-                existingPlaces.append(lightweightPlace)
+                existingPlaces.insert(lightweightPlace, at: 0)  // Prepend, not append
                 lightweightPlaceListPlaces[listId] = existingPlaces
                 didInsert = true
             }
@@ -1288,6 +1294,7 @@ class ProfileViewModel: ObservableObject {
     /// Refresh TikTok places list after a successful import
     func refreshTikTokPlacesAfterImport() {
         // Reload lightweight external places to show new TikTok place in tiles
+        // Note: Actual refresh happens when place detail view appears (after backend creates entry)
         Task {
             await reloadLightweightExternalPlaces()
         }
@@ -1898,7 +1905,8 @@ class ProfileViewModel: ObservableObject {
                     deepLinkManager?.isProcessingDeepLink = false
                     currentProcessingTikTokUrl = nil
                     
-                    refreshTikTokPlacesAfterImport()
+                    // Note: TikTok places refresh happens in PlaceDetailView.onAppear
+                    // after backend creates the external_place entry
                 
                 } else if detailPlaces.count > 1 {
                     // Multiple places - show selection screen
@@ -1933,7 +1941,8 @@ class ProfileViewModel: ObservableObject {
                     isWaitingForPlaceDetail = false
                     deepLinkManager?.isProcessingDeepLink = false
                     
-                    refreshTikTokPlacesAfterImport()
+                    // Note: TikTok places refresh happens in PlaceDetailView.onAppear
+                    // after user selects a place and backend creates the external_place entry
                 } else {
                     // No places found - show flagging interface
                     print("❌ [ProfileViewModel] No places found: count = \(detailPlaces.count)")
@@ -2560,7 +2569,7 @@ class ProfileViewModel: ObservableObject {
     ///   - listId: The list to set places for
     ///   - places: Places fetched from the service
     func setPlacesForList(listId: String, places: [LightweightPlace]) {
-        // Deduplicate by place_id (keep first occurrence)
+        // Deduplicate places by place_id
         var seenIds = Set<String>()
         let uniquePlaces = places.filter { place in
             if seenIds.contains(place.place_id) {
@@ -2569,12 +2578,7 @@ class ProfileViewModel: ObservableObject {
             seenIds.insert(place.place_id)
             return true
         }
-        
-        let duplicateCount = places.count - uniquePlaces.count
-        if duplicateCount > 0 {
-            print("⚠️ [ProfileViewModel] Filtered \(duplicateCount) duplicate places for list \(listId)")
-        }
-        
+
         lightweightPlaceListPlaces[listId] = uniquePlaces
     }
     

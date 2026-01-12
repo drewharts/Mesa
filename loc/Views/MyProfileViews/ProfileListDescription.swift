@@ -10,11 +10,15 @@ struct ProfileListDescription: View {
     @State var list: PlaceList
     @State private var showingPlacesPopup = false
     @EnvironmentObject var profile: ProfileViewModel
+    @Environment(\.presentationMode) var presentationMode
     @Binding var placeColors: [UUID: Color]
     
     var body: some View {
         Button(action: {
-            showingPlacesPopup = true
+            // Set list filter and navigate to map
+            profile.selectedListIdForMap = list.id.uuidString
+            // Dismiss profile view to show map
+            presentationMode.wrappedValue.dismiss()
         }) {
             HStack {
                 Text(list.name)
@@ -29,15 +33,6 @@ struct ProfileListDescription: View {
                 
                 Spacer()
             }
-        }
-        .sheet(isPresented: $showingPlacesPopup) {
-            let lists = profile.userLists
-            let initialIndex = lists.firstIndex(where: { $0.id == list.id }) ?? 0
-            SwipeableListPopupView(
-                lists: lists,
-                initialListIndex: initialIndex,
-                placeColors: $placeColors
-            )
         }
     }
 }
