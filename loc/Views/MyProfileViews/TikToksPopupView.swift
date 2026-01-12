@@ -11,7 +11,7 @@ import SwiftUI
 struct TikToksPopupView: View {
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
-    
+
     var body: some View {
         PlaceListPopupView(
             title: "TikToks",
@@ -24,19 +24,23 @@ struct TikToksPopupView: View {
             emptyTitle: "No TikToks Yet",
             emptyMessage: "Places you add from TikTok videos will appear here",
             loadMore: { await profile.loadMoreExternalPlaces() },
-            cardBuilder: { place in
+            cardBuilder: { place, navigate in
                 PopupPlaceCard(
                     place: place,
                     preferTikTokThumbnail: true,
                     allowDelete: true,
                     deleteTitle: "Delete TikTok Place",
-                    onDelete: { profile.deleteTikTokPlace(place) }
+                    onDelete: { profile.deleteTikTokPlace(place) },
+                    onNavigate: navigate
                 )
             }
         )
         .onAppear {
-            // Refresh TikTok places every time popup is opened to show latest data
-            profile.refreshTikTokPlacesAfterImport()
+            // Only load if not already loaded (same pattern as list sheets)
+            // This preserves scroll position on back navigation
+            if profile.lightweightExternalPlaces.isEmpty {
+                profile.refreshTikTokPlacesAfterImport()
+            }
         }
     }
 }

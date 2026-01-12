@@ -25,13 +25,14 @@ struct MyPlacesListView: View {
             emptyTitle: "No Places Created Yet",
             emptyMessage: "Press and hold on the map to create a place at any location",
             loadMore: { await profile.loadMoreMyPlaces() },
-            cardBuilder: { place in
+            cardBuilder: { place, navigate in
                 PopupPlaceCard(
                     place: place,
                     preferTikTokThumbnail: true,  // Prefer TikTok thumbnail for visual consistency
                     allowDelete: true,
                     deleteTitle: "Delete Place",
-                    onDelete: { profile.deleteMyPlace(place) }
+                    onDelete: { profile.deleteMyPlace(place) },
+                    onNavigate: navigate
                 )
             }
         )

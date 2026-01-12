@@ -15,7 +15,8 @@ struct ProfileFavoritesTikToksView: View {
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var places: DetailPlaceViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
-    
+    @Environment(\.presentationMode) var presentationMode
+
     @State private var selectedTab: FavoritesTikToksTab = .favorites
     @State private var showingTikToksPopup = false
     @State private var showingReviewsPopup = false
@@ -177,10 +178,12 @@ struct ProfileFavoritesTikToksView: View {
         }
         .contentShape(Rectangle())
         .onTapGesture {
-            showingTikToksPopup = true
+            // Navigate to map showing TikTok places
+            profile.showTikToksOnMap = true
+            presentationMode.wrappedValue.dismiss()
         }
     }
-    
+
     private var loadingTikToksState: some View {
         VStack(spacing: 12) {
             ProgressView()
@@ -238,10 +241,12 @@ struct ProfileFavoritesTikToksView: View {
         }
         .contentShape(Rectangle())
         .onTapGesture {
-            showingReviewsPopup = true
+            // Navigate to map showing reviewed places
+            profile.showReviewsOnMap = true
+            presentationMode.wrappedValue.dismiss()
         }
     }
-    
+
     private var loadingReviewsState: some View {
         VStack(spacing: 12) {
             ProgressView()

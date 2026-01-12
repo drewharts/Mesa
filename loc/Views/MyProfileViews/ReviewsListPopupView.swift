@@ -24,11 +24,12 @@ struct ReviewsListPopupView: View {
             emptyTitle: "No Reviews Yet",
             emptyMessage: "Places you've reviewed will appear here",
             loadMore: { await profile.loadMoreMyReviews() },
-            cardBuilder: { place in
+            cardBuilder: { place, navigate in
                 PopupPlaceCard(
                     place: place,
                     preferTikTokThumbnail: false,  // Reviews prioritize review photos
-                    allowDelete: false
+                    allowDelete: false,
+                    onNavigate: navigate
                 )
             }
         )
