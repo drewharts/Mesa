@@ -34,9 +34,13 @@ struct MapView: View {
     var onMapTap: (() -> Void)?
     
     // Helper computed property to simplify type checking
-    // Only filters out selected place when the dedicated annotation is showing
+    // Filters out selected place when beacon is showing (detail sheet or popups)
     private var annotationsToDisplay: [PlaceAnnotation] {
-        if selectedPlaceVM.isDetailSheetPresented,
+        let isShowingPlace = selectedPlaceVM.isDetailSheetPresented ||
+                             mapViewModel.showingListPopup ||
+                             mapViewModel.showingTikToksPopup ||
+                             mapViewModel.showingReviewsPopup
+        if isShowingPlace,
            let selectedId = selectedPlaceVM.selectedPlace?.id.uuidString {
             return mapViewModel.viewportAnnotations.filter { $0.id != selectedId }
         }
@@ -68,8 +72,11 @@ struct MapView: View {
                 }
             }
 
-            // Selected place annotation (shown when detail sheet is presented)
-            if selectedPlaceVM.isDetailSheetPresented,
+            // Selected place annotation (shown when detail sheet or popup is presenting a place)
+            if (selectedPlaceVM.isDetailSheetPresented ||
+                mapViewModel.showingListPopup ||
+                mapViewModel.showingTikToksPopup ||
+                mapViewModel.showingReviewsPopup),
                let selectedPlace = selectedPlaceVM.selectedPlace,
                let coordinate = selectedPlace.coordinate {
                 Annotation(
@@ -192,6 +199,10 @@ struct MapView: View {
     
     // Handle annotation tap
     private func handleAnnotationTap(_ annotation: PlaceAnnotation) {
+        // Skip if this place is already selected
+        if selectedPlaceVM.selectedPlace?.id.uuidString == annotation.id {
+            return
+        }
         Task {
             if let place = await mapViewModel.loadPlaceDetails(for: annotation) {
                 await MainActor.run {
