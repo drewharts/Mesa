@@ -34,7 +34,12 @@ struct MapView: View {
     var onMapTap: (() -> Void)?
     
     // Helper computed property to simplify type checking
+    // Only filters out selected place when the dedicated annotation is showing
     private var annotationsToDisplay: [PlaceAnnotation] {
+        if selectedPlaceVM.isDetailSheetPresented,
+           let selectedId = selectedPlaceVM.selectedPlace?.id.uuidString {
+            return mapViewModel.viewportAnnotations.filter { $0.id != selectedId }
+        }
         return mapViewModel.viewportAnnotations
     }
     
@@ -62,7 +67,23 @@ struct MapView: View {
                     annotationMarkerView(for: annotation)
                 }
             }
-            
+
+            // Selected place annotation (shown when detail sheet is presented)
+            if selectedPlaceVM.isDetailSheetPresented,
+               let selectedPlace = selectedPlaceVM.selectedPlace,
+               let coordinate = selectedPlace.coordinate {
+                Annotation(
+                    selectedPlace.name,
+                    coordinate: CLLocationCoordinate2D(
+                        latitude: coordinate.latitude,
+                        longitude: coordinate.longitude
+                    ),
+                    anchor: .bottom
+                ) {
+                    selectedPlaceAnnotationView(for: selectedPlace)
+                }
+            }
+
             // Current location dot
             if let userLocation = locationManager.currentLocation?.coordinate {
                 Annotation(
@@ -79,7 +100,7 @@ struct MapView: View {
     // Annotation marker view with user photos
     private func annotationMarkerView(for annotation: PlaceAnnotation) -> some View {
         // Only highlight annotation if detail sheet is presented AND this is the selected place
-        let isSelected = selectedPlaceVM.isDetailSheetPresented && 
+        let isSelected = selectedPlaceVM.isDetailSheetPresented &&
                         selectedPlaceVM.selectedPlace?.id.uuidString == annotation.id
         return CustomPlaceAnnotationView(
             annotation: annotation,
@@ -90,7 +111,15 @@ struct MapView: View {
             handleAnnotationTap(annotation)
         }
     }
-    
+
+    // Selected place annotation view - pulsing beacon for searched places
+    private func selectedPlaceAnnotationView(for place: DetailPlace) -> some View {
+        PulsingBeaconView()
+            .onTapGesture {
+                selectedPlaceVM.isDetailSheetPresented = true
+            }
+    }
+
     // Community marker view - small emoji markers for places saved by users you don't follow
     private func communityMarkerView(for marker: CommunityPlaceMarker) -> some View {
         let isSelected = selectedPlaceVM.isDetailSheetPresented && 
@@ -107,14 +136,25 @@ struct MapView: View {
         
         return Text(marker.emoji)
             .font(.system(size: isSelected ? fontSize * 1.8 : fontSize))
-            .padding(isSelected ? 8 : 0)
+            .padding(isSelected ? 12 : 0)
             .background(
-                Circle()
-                    .fill(Color.white.opacity(isSelected ? 0.95 : 0))
-                    .shadow(
-                        color: isSelected ? Color.blue.opacity(0.8) : Color.clear,
-                        radius: isSelected ? 12 : 0
-                    )
+                ZStack {
+                    // Outer glow layers for prominent halo effect
+                    if isSelected {
+                        Circle()
+                            .fill(Color.white)
+                            .shadow(color: Color.blue.opacity(0.6), radius: 20)
+                            .shadow(color: Color.blue.opacity(0.4), radius: 30)
+                            .shadow(color: Color.blue.opacity(0.2), radius: 40)
+
+                        // Crisp ring border
+                        Circle()
+                            .strokeBorder(Color.blue.opacity(0.8), lineWidth: 3)
+                    } else {
+                        Circle()
+                            .fill(Color.clear)
+                    }
+                }
             )
             .shadow(color: .black.opacity(0.3), radius: 2, x: 0, y: 1)
             .zIndex(isSelected ? 100 : 0)
