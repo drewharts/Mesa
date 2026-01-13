@@ -860,6 +860,39 @@ class SupabasePlaceService: ObservableObject {
 
     // fetchFriendsPlacesInViewport removed - the main function already includes friends' places
 
+    /// Fetch favorite annotations in viewport for a user (filtered to only favorites)
+    func fetchFavoriteAnnotationsInViewport(northLat: Double, southLat: Double, eastLng: Double, westLng: Double, userId: String) async throws -> [PlaceAnnotation] {
+        do {
+            struct ViewportParams: Encodable {
+                let p_user_id: String
+                let p_min_lon: Double
+                let p_min_lat: Double
+                let p_max_lon: Double
+                let p_max_lat: Double
+            }
+
+            let params = ViewportParams(
+                p_user_id: userId,
+                p_min_lon: westLng,
+                p_min_lat: southLat,
+                p_max_lon: eastLng,
+                p_max_lat: northLat
+            )
+
+            let response: [PlaceAnnotation] = try await supabase.client
+                .rpc("get_favorite_annotations_with_users", params: params)
+                .execute()
+                .value
+
+            return response
+        } catch {
+            if !Task.isCancelled && !(error is CancellationError) && (error as NSError).code != NSURLErrorCancelled {
+                print("❌ [Supabase] Error fetching favorite annotations: \(error)")
+            }
+            throw error
+        }
+    }
+
     /// ✅ NEW: Fetch favorite place IDs only (not full place documents) - SUPER FAST!
     func fetchFavoritePlaceIds(userId: String) async throws -> [String] {
         let favoriteRecords: [FavoriteRecord] = try await supabase.client
