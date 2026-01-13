@@ -196,11 +196,12 @@ class MapViewModel: ObservableObject {
         lastLoadedRegion = nil
     }
 
-    /// Clears all special filters (list, TikToks, reviews, external)
+    /// Clears all special filters (list, TikToks, reviews, favorites, external)
     func clearAllFilters() {
         selectedListId = nil
         showingTikToksOnMap = false
         showingReviewsOnMap = false
+        showingFavoritesOnMap = false
         // Clear external user state
         externalUserId = nil
         showingExternalReviewsOnMap = false
@@ -464,6 +465,15 @@ class MapViewModel: ObservableObject {
                         westLng: bounds.westLng,
                         userId: userId
                     )
+                } else if showingFavoritesOnMap {
+                    // Current user's favorite places
+                    annotations = try await placeService.fetchFavoriteAnnotationsInViewport(
+                        northLat: bounds.northLat,
+                        southLat: bounds.southLat,
+                        eastLng: bounds.eastLng,
+                        westLng: bounds.westLng,
+                        userId: userId
+                    )
                 } else {
                     // Fetch all annotations (normal behavior)
                     annotations = try await placeService.fetchPlacesInViewportWithUserId(
@@ -477,7 +487,7 @@ class MapViewModel: ObservableObject {
 
                 // Only fetch community markers if no filter is active
                 let community: [CommunityPlaceMarker]
-                let hasActiveFilter = selectedListId != nil || showingTikToksOnMap || showingReviewsOnMap || externalUserId != nil
+                let hasActiveFilter = selectedListId != nil || showingTikToksOnMap || showingReviewsOnMap || showingFavoritesOnMap || externalUserId != nil
                 if !hasActiveFilter {
                     community = try await placeService.fetchCommunityPlacesInViewportWithUserId(
                     northLat: bounds.northLat,

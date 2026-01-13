@@ -273,6 +273,17 @@ class PlaceService: ObservableObject {
         )
     }
 
+    /// Fetches map annotations for user's favorite places
+    func fetchFavoriteAnnotationsInViewport(northLat: Double, southLat: Double, eastLng: Double, westLng: Double, userId: String) async throws -> [PlaceAnnotation] {
+        return try await supabase.fetchFavoriteAnnotationsInViewport(
+            northLat: northLat,
+            southLat: southLat,
+            eastLng: eastLng,
+            westLng: westLng,
+            userId: userId
+        )
+    }
+
     /// Fetch community places in viewport - places saved by users outside your network
     /// Returns lightweight emoji markers using grid-based clustering for O(n) performance
     /// Note: Prefer `fetchCommunityPlacesInViewportWithUserId` when caller already has user ID
