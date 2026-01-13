@@ -183,7 +183,11 @@ struct PlaceDetailViewContent: View {
                     dismissButton: .default(Text("OK"))
                 )
             }
-            .sheet(isPresented: $showListSelection) {
+            .sheet(isPresented: $showListSelection, onDismiss: {
+                // Refresh list membership state after sheet closes
+                tabsViewModel?.refreshPlaceListMembership()
+                listSelectionViewModel = nil
+            }) {
                 if let selectedPlace = selectedPlaceVM.selectedPlace,
                    let viewModel = listSelectionViewModel {
                     ListSelectionSheet(
@@ -191,9 +195,6 @@ struct PlaceDetailViewContent: View {
                         place: selectedPlace,
                         isPresented: $showListSelection
                     )
-                    .onDisappear {
-                        listSelectionViewModel = nil
-                    }
                 } else {
                     Text("No place selected")
                 }

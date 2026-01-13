@@ -164,27 +164,5 @@ struct ExternalFavoritePlaceCard: View {
                 .stroke(Color.gray.opacity(0.2), lineWidth: 1)
         )
         .contentShape(Rectangle())
-        .highPriorityGesture(
-            TapGesture().onEnded {
-                // Load full place details and navigate
-                Task {
-                    await loadPlaceAndNavigate()
-            }
-        }
-        )
-    }
-    
-    private func loadPlaceAndNavigate() async {
-        do {
-            // Fetch the full place details
-            let place = try await PlaceService.shared.fetchPlace(withId: favoritePlace.place_id)
-            
-            // Use centralized navigation method from UserProfileViewModel
-            await MainActor.run {
-                userProfileViewModel.navigateToPlaceFromProfile(place, selectedPlaceVM: selectedPlaceVM)
-            }
-        } catch {
-            print("❌ Error loading place details: \(error)")
-        }
     }
 }

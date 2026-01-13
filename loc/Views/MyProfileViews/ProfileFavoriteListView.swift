@@ -117,9 +117,7 @@ struct LightweightFavoritePlaceCard: View {
     let favoritePlace: FavoritePlace
     let isPriorityTile: Bool
     @EnvironmentObject var places: DetailPlaceViewModel
-    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
-    @Environment(\.presentationMode) var presentationMode
-    
+
     var body: some View {
         ZStack(alignment: .bottom) {
             // Container to strictly enforce bounds
@@ -183,29 +181,6 @@ struct LightweightFavoritePlaceCard: View {
                 .stroke(Color.gray.opacity(0.2), lineWidth: 1)
         )
         .contentShape(Rectangle())
-        .onTapGesture {
-            // When tapped, load the full place details and navigate
-            Task {
-                await loadPlaceAndNavigate()
-            }
-        }
-    }
-    
-    private func loadPlaceAndNavigate() async {
-        do {
-            // Fetch the full place details using PlaceService
-            let place = try await PlaceService.shared.fetchPlace(withId: favoritePlace.place_id)
-            
-            // Navigate to the place detail view
-            await MainActor.run {
-                // Animate map to favorite place location when tapping from tile
-                selectedPlaceVM.selectPlaceAndFetchDetails(place, shouldAnimateMap: true)
-                selectedPlaceVM.isDetailSheetPresented = true
-                presentationMode.wrappedValue.dismiss()
-            }
-        } catch {
-            print("❌ Error loading place details: \(error)")
-        }
     }
 }
 

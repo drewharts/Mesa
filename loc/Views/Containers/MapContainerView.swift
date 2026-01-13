@@ -140,6 +140,22 @@ struct MapContainerView: View {
                     }
                 }
             }
+            .onChange(of: profileViewModel.showFavoritesOnMap) { _, newValue in
+                // Navigate to map showing favorite places
+                if newValue {
+                    mapViewModel.selectFavorites()
+                    profileViewModel.showFavoritesOnMap = false // Reset trigger
+                    // Trigger reload with favorites filter
+                    if let userId = userSession.currentUserId {
+                        let currentRegion = getCurrentMapRegion()
+                        Task {
+                            if let region = currentRegion {
+                                await mapViewModel.onMapCameraSettled(region, userId: userId)
+                            }
+                        }
+                    }
+                }
+            }
 
         }
         .ignoresSafeArea()
@@ -194,6 +210,22 @@ struct MapContainerView: View {
                 }
             }
         }
+        .onChange(of: userProfileViewModel.showExternalFavoritesOnMap) { _, shouldShow in
+            // Show external user's favorites on map with filtered annotations
+            if shouldShow, let userId = userProfileViewModel.selectedUser?.id {
+                mapViewModel.selectExternalFavorites(userId: userId)
+                userProfileViewModel.showExternalFavoritesOnMap = false  // Reset trigger
+                // Trigger reload to show external user's favorite places
+                if let currentUserId = userSession.currentUserId {
+                    let currentRegion = getCurrentMapRegion()
+                    Task {
+                        if let region = currentRegion {
+                            await mapViewModel.onMapCameraSettled(region, userId: currentUserId)
+                        }
+                    }
+                }
+            }
+        }
         // Single sheet using item binding - prevents "only presenting a single sheet" warning
         .sheet(item: $mapViewModel.activeSheet) { sheetType in
             Group {
@@ -223,6 +255,9 @@ struct MapContainerView: View {
                 case .reviews:
                     ReviewsListPopupView()
 
+                case .favorites:
+                    FavoritesPopupView()
+
                 case .externalReviews:
                     ExternalReviewsListPopupView(userProfileVM: userProfileViewModel)
 
@@ -245,6 +280,9 @@ struct MapContainerView: View {
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
+
+                case .externalFavorites:
+                    ExternalFavoritesListPopupView(userProfileVM: userProfileViewModel)
                 }
             }
             .environmentObject(profileViewModel)

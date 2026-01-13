@@ -96,6 +96,11 @@ struct UserProfileFavoritesReviewsView: View {
                 favoritesGrid
             }
         }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            // Dismiss profile and show favorites on map (matches reviews behavior)
+            userProfileVM.triggerExternalFavoritesOnMap()
+        }
     }
     
     private var emptyFavoritesState: some View {

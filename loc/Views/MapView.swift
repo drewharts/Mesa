@@ -40,8 +40,10 @@ struct MapView: View {
                              mapViewModel.showingListPopup ||
                              mapViewModel.showingTikToksPopup ||
                              mapViewModel.showingReviewsPopup ||
+                             mapViewModel.showingFavoritesPopup ||
                              mapViewModel.showingExternalListPopup ||
-                             mapViewModel.showingExternalReviewsPopup
+                             mapViewModel.showingExternalReviewsPopup ||
+                             mapViewModel.showingExternalFavoritesPopup
         if isShowingPlace,
            let selectedId = selectedPlaceVM.selectedPlace?.id.uuidString {
             return mapViewModel.viewportAnnotations.filter { $0.id != selectedId }
@@ -79,8 +81,10 @@ struct MapView: View {
                 mapViewModel.showingListPopup ||
                 mapViewModel.showingTikToksPopup ||
                 mapViewModel.showingReviewsPopup ||
+                mapViewModel.showingFavoritesPopup ||
                 mapViewModel.showingExternalListPopup ||
-                mapViewModel.showingExternalReviewsPopup),
+                mapViewModel.showingExternalReviewsPopup ||
+                mapViewModel.showingExternalFavoritesPopup),
                let selectedPlace = selectedPlaceVM.selectedPlace,
                let coordinate = selectedPlace.coordinate {
                 Annotation(
@@ -203,8 +207,10 @@ struct MapView: View {
     
     // Handle annotation tap
     private func handleAnnotationTap(_ annotation: PlaceAnnotation) {
-        // Skip if this place is already selected
-        if selectedPlaceVM.selectedPlace?.id.uuidString == annotation.id {
+        // Skip if this place is already selected AND detail sheet is visible
+        // Allow re-tap if sheet was swiped away (isDetailSheetPresented = false)
+        if selectedPlaceVM.selectedPlace?.id.uuidString == annotation.id &&
+           selectedPlaceVM.isDetailSheetPresented {
             return
         }
         Task {
@@ -215,8 +221,10 @@ struct MapView: View {
                     if mapViewModel.showingListPopup ||
                        mapViewModel.showingTikToksPopup ||
                        mapViewModel.showingReviewsPopup ||
+                       mapViewModel.showingFavoritesPopup ||
                        mapViewModel.showingExternalListPopup ||
-                       mapViewModel.showingExternalReviewsPopup {
+                       mapViewModel.showingExternalReviewsPopup ||
+                       mapViewModel.showingExternalFavoritesPopup {
                         // Set pending navigation - popup view will observe this and push to NavigationStack
                         // This makes annotation taps behave the same as clicking a place tile in the popup
                         mapViewModel.pendingPlaceNavigation = place.id.uuidString

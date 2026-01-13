@@ -26,7 +26,7 @@ import SwiftUI
 struct PlaceListPopupView<CardView: View>: View {
     // MARK: - Configuration
     let title: String
-    let count: Int
+    let count: Int?
     let isLoading: Bool
     let isLoadingMore: Bool
     let places: [LightweightPlace]
@@ -44,7 +44,7 @@ struct PlaceListPopupView<CardView: View>: View {
     // Default initializer with optional onBackToProfile
     init(
         title: String,
-        count: Int,
+        count: Int? = nil,
         isLoading: Bool,
         isLoadingMore: Bool,
         places: [LightweightPlace],
@@ -150,9 +150,11 @@ struct PlaceListPopupView<CardView: View>: View {
                     .fontWeight(.bold)
                     .foregroundColor(.black)
 
-                Text("\(count) place\(count == 1 ? "" : "s")")
-                    .font(.caption)
-                    .foregroundColor(.gray)
+                if let count = count {
+                    Text("\(count) place\(count == 1 ? "" : "s")")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                }
             }
         }
         .padding(.bottom, 10)

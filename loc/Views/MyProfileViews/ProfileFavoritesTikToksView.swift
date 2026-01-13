@@ -128,6 +128,12 @@ struct ProfileFavoritesTikToksView: View {
                 favoritesGrid
             }
         }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            // Navigate to map showing favorite places
+            profile.showFavoritesOnMap = true
+            presentationMode.wrappedValue.dismiss()
+        }
     }
     
     private var emptyFavoritesState: some View {

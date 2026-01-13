@@ -15,6 +15,7 @@ class UserProfileViewModel: ObservableObject {
     @Published var isUserDetailPresented = false
     @Published var showExternalReviewsOnMap = false  // Triggers map sheet for external reviews
     @Published var showExternalListOnMap: String? = nil  // List ID to show on map (triggers map sheet)
+    @Published var showExternalFavoritesOnMap = false  // Triggers map sheet for external favorites
     
     // MARK: - External Profile Data
     @Published var userFavorites: [FavoritePlace] = []
@@ -54,6 +55,23 @@ class UserProfileViewModel: ObservableObject {
     private var hasAttemptedLoadReviewedPlaces: [String: Bool] = [:]
     private var hasMoreReviewsForUser: [String: Bool] = [:] // userId -> hasMoreReviews (for reference)
     private let reviewsPerPage: Int = 8
+
+    // MARK: - Favorites as LightweightPlace (for popup display)
+    /// Converts userFavorites to LightweightPlace format for consistent popup display
+    var lightweightFavorites: [LightweightPlace] {
+        userFavorites.map { favorite in
+            LightweightPlace(
+                place_id: favorite.place_id,
+                name: favorite.name,
+                latest_review_photo: favorite.latest_review_photo,
+                external_place_id: nil,
+                tiktok_url: nil,
+                added_by_user_id: nil,
+                added_by_name: nil,
+                added_by_photo_url: nil
+            )
+        }
+    }
     
     private let placeService: PlaceService
     private let userService: UserService
@@ -810,6 +828,19 @@ class UserProfileViewModel: ObservableObject {
         // Show map sheet after profile has begun dismissing
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
             self?.showExternalListOnMap = listId
+        }
+    }
+
+    /// Shows external user's favorites on the map (dismisses profile, shows map sheet)
+    /// Matches the behavior of reviews and lists flow
+    /// Uses staggered timing for smooth transition
+    func triggerExternalFavoritesOnMap() {
+        // Dismiss profile first
+        isUserDetailPresented = false
+
+        // Show map sheet after profile has begun dismissing
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            self?.showExternalFavoritesOnMap = true
         }
     }
 

@@ -45,20 +45,8 @@ struct SearchResultsView: View {
                 }
             }
             .scrollDismissesKeyboard(.interactively)
-            .frame(height: calculateFrameHeight())
+            .fixedSize(horizontal: false, vertical: true)
         }
-    }
-    
-    private func calculateFrameHeight() -> CGFloat {
-        if isSearching {
-            return 100
-        }
-        
-        let userHeight: CGFloat = userResults.isEmpty ? 0 : (isUsersCollapsed ? 40 : CGFloat(userResults.count * 80 + 40))
-        let placeHeight: CGFloat = CGFloat(placeResults.count * 120)
-        let noPlaceHeight: CGFloat = showNoPlaceFound ? 120 : 0
-        
-        return userHeight + placeHeight + noPlaceHeight + 20
     }
     
     private var loadingView: some View {

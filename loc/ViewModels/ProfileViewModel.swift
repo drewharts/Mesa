@@ -42,6 +42,23 @@ class ProfileViewModel: ObservableObject {
     @Published var placeListCounts: [UUID: Int] = [:]
     @Published var userFavorites: [String] = [] // Legacy - full place IDs
     @Published var lightweightFavorites: [FavoritePlace] = [] // New - lightweight data for display
+
+    /// Converts lightweightFavorites to LightweightPlace format for consistent popup display
+    var favoritesAsLightweight: [LightweightPlace] {
+        lightweightFavorites.map { favorite in
+            LightweightPlace(
+                place_id: favorite.place_id,
+                name: favorite.name,
+                latest_review_photo: favorite.latest_review_photo,
+                external_place_id: nil,
+                tiktok_url: nil,
+                added_by_user_id: nil,
+                added_by_name: nil,
+                added_by_photo_url: nil
+            )
+        }
+    }
+
     @Published var lightweightPlaceLists: [LightweightPlaceList] = [] // New - lightweight place lists by proximity
     @Published var lightweightPlaceListPlaces: [String: [LightweightPlace]] = [:] // [listId: places]
     @Published var lightweightPlaceListCounts: [String: Int] = [:] // [listId: placeCount]
@@ -56,6 +73,7 @@ class ProfileViewModel: ObservableObject {
     @Published var selectedListIdForMap: String? = nil // When set, triggers map to show only this list's annotations (String because LightweightPlaceList.id is String)
     @Published var showTikToksOnMap: Bool = false // When set, triggers map to show TikTok places
     @Published var showReviewsOnMap: Bool = false // When set, triggers map to show reviewed places
+    @Published var showFavoritesOnMap: Bool = false // When set, triggers map to show favorite places
     @Published var isLoadingMoreExternalPlaces: Bool = false
     @Published var hasMoreExternalPlaces: Bool = true
     @Published var isLoadingMorePlaceLists: Bool = false
