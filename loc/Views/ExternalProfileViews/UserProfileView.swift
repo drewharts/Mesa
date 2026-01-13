@@ -39,10 +39,12 @@ struct UserProfileView: View {
                                 UserProfileVM.toggleFollowUser(currentUserId: currentUserId) { success, newFollowingState in
                                     if success {
                                         // Update ProfileViewModel's local state WITHOUT making another API call
-                                        profileVM.updateFollowingState(
-                                            userId: UserProfileVM.selectedUser!.id, 
-                                            isFollowing: newFollowingState
-                                        )
+                                        if let userId = UserProfileVM.selectedUser?.id {
+                                            profileVM.updateFollowingState(
+                                                userId: userId,
+                                                isFollowing: newFollowingState
+                                            )
+                                        }
                                     }
                                 }
                             },
@@ -51,7 +53,7 @@ struct UserProfileView: View {
                         )
 
                         // Name
-                        Text(UserProfileVM.selectedUser!.fullName)
+                        Text(UserProfileVM.selectedUser?.fullName ?? "")
                             .font(.title)
                             .fontWeight(.bold)
                             .foregroundColor(.black)

@@ -19,7 +19,6 @@ struct UserProfileFavoritesReviewsView: View {
     @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
     
     @State private var selectedTab: UserFavoritesReviewsTab = .favorites
-    @State private var showingReviewsPopup = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -35,9 +34,6 @@ struct UserProfileFavoritesReviewsView: View {
                     await userProfileVM.loadUserReviewedPlacesWithPagination()
                 }
             }
-        }
-        .sheet(isPresented: $showingReviewsPopup) {
-            ExternalReviewsListPopupView(userProfileVM: userProfileVM)
         }
     }
     
@@ -150,7 +146,8 @@ struct UserProfileFavoritesReviewsView: View {
         }
         .contentShape(Rectangle())
         .onTapGesture {
-            showingReviewsPopup = true
+            // Dismiss profile and show reviews on map (matches current user behavior)
+            userProfileVM.triggerExternalReviewsOnMap()
         }
     }
     

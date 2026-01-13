@@ -13,6 +13,8 @@ class UserProfileViewModel: ObservableObject {
     // MARK: - Profile Navigation State
     @Published var selectedUser: ProfileData?
     @Published var isUserDetailPresented = false
+    @Published var showExternalReviewsOnMap = false  // Triggers map sheet for external reviews
+    @Published var showExternalListOnMap: String? = nil  // List ID to show on map (triggers map sheet)
     
     // MARK: - External Profile Data
     @Published var userFavorites: [FavoritePlace] = []
@@ -784,7 +786,33 @@ class UserProfileViewModel: ObservableObject {
     }
     
     // MARK: - Navigation
-    
+
+    /// Shows external user's reviews on the map (dismisses profile, shows map sheet)
+    /// Matches the behavior of current user's reviews flow
+    /// Uses staggered timing for smooth transition
+    func triggerExternalReviewsOnMap() {
+        // Dismiss profile first
+        isUserDetailPresented = false
+
+        // Show map sheet after profile has begun dismissing
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            self?.showExternalReviewsOnMap = true
+        }
+    }
+
+    /// Shows external user's list on the map (dismisses profile, shows map sheet)
+    /// Matches the behavior of current user's list flow
+    /// Uses staggered timing for smooth transition
+    func triggerExternalListOnMap(listId: String) {
+        // Dismiss profile first
+        isUserDetailPresented = false
+
+        // Show map sheet after profile has begun dismissing
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            self?.showExternalListOnMap = listId
+        }
+    }
+
     /// Centralized navigation method for all external profile places (favorites, lists, reviews)
     /// Navigates back to the map, selects the place, and dismisses the user profile sheet
     func navigateToPlaceFromProfile(_ place: DetailPlace, selectedPlaceVM: SelectedPlaceViewModel) {

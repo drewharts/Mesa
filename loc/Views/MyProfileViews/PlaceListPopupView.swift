@@ -35,10 +35,40 @@ struct PlaceListPopupView<CardView: View>: View {
     let emptyTitle: String
     let emptyMessage: String
     let loadMore: () async -> Void
+    let onBackToProfile: (() -> Void)?  // Optional: Shows "Profile" button when provided
     @ViewBuilder let cardBuilder: (LightweightPlace, @escaping (String) -> Void) -> CardView
 
     @Environment(\.presentationMode) var presentationMode
     @EnvironmentObject var mapViewModel: MapViewModel
+
+    // Default initializer with optional onBackToProfile
+    init(
+        title: String,
+        count: Int,
+        isLoading: Bool,
+        isLoadingMore: Bool,
+        places: [LightweightPlace],
+        hasMore: Bool,
+        emptyIcon: String,
+        emptyTitle: String,
+        emptyMessage: String,
+        loadMore: @escaping () async -> Void,
+        onBackToProfile: (() -> Void)? = nil,
+        @ViewBuilder cardBuilder: @escaping (LightweightPlace, @escaping (String) -> Void) -> CardView
+    ) {
+        self.title = title
+        self.count = count
+        self.isLoading = isLoading
+        self.isLoadingMore = isLoadingMore
+        self.places = places
+        self.hasMore = hasMore
+        self.emptyIcon = emptyIcon
+        self.emptyTitle = emptyTitle
+        self.emptyMessage = emptyMessage
+        self.loadMore = loadMore
+        self.onBackToProfile = onBackToProfile
+        self.cardBuilder = cardBuilder
+    }
 
     // Navigation state for place detail navigation
     @State private var navigationPath = NavigationPath()
@@ -86,25 +116,40 @@ struct PlaceListPopupView<CardView: View>: View {
     }
     
     // MARK: - Header
-    
+
     private var header: some View {
         VStack(spacing: 12) {
             HStack {
-                Button(action: { presentationMode.wrappedValue.dismiss() }) {
-                    Image(systemName: "xmark")
+                // For external user popups: show "< Profile" back button
+                // For current user popups: show X close button
+                if let backAction = onBackToProfile {
+                    Button(action: {
+                        presentationMode.wrappedValue.dismiss()
+                        backAction()
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "chevron.left")
+                            Text("Profile")
+                        }
                         .foregroundColor(.primary)
+                    }
+                } else {
+                    Button(action: { presentationMode.wrappedValue.dismiss() }) {
+                        Image(systemName: "xmark")
+                            .foregroundColor(.primary)
+                    }
                 }
                 Spacer()
             }
             .padding(.horizontal, 20)
             .padding(.top, 20)
-            
+
             VStack(spacing: 4) {
                 Text(title)
                     .font(.title2)
                     .fontWeight(.bold)
                     .foregroundColor(.black)
-                
+
                 Text("\(count) place\(count == 1 ? "" : "s")")
                     .font(.caption)
                     .foregroundColor(.gray)

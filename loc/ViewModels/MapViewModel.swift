@@ -16,12 +16,16 @@ enum MapSheetType: Identifiable, Equatable {
     case list(String)  // listId
     case tiktoks
     case reviews
+    case externalReviews  // External user's reviews
+    case externalList(String)  // External user's list
 
     var id: String {
         switch self {
         case .list(let listId): return "list-\(listId)"
         case .tiktoks: return "tiktoks"
         case .reviews: return "reviews"
+        case .externalReviews: return "externalReviews"
+        case .externalList(let listId): return "externalList-\(listId)"
         }
     }
 }
@@ -42,10 +46,17 @@ class MapViewModel: ObservableObject {
     @Published var showingTikToksOnMap: Bool = false // When set, only show TikTok annotations
     @Published var showingReviewsOnMap: Bool = false // When set, only show reviewed place annotations
 
+    // External user filtering state
+    @Published var externalUserId: String? = nil // When set, filter by this external user's places
+    @Published var showingExternalReviewsOnMap: Bool = false // When set, show external user's reviewed places
+    @Published var externalListId: String? = nil // When set, show external user's list places
+
     // Computed properties for backwards compatibility with existing code
     var showingListPopup: Bool { if case .list = activeSheet { return true } else { return false } }
     var showingTikToksPopup: Bool { activeSheet == .tiktoks }
     var showingReviewsPopup: Bool { activeSheet == .reviews }
+    var showingExternalReviewsPopup: Bool { activeSheet == .externalReviews }
+    var showingExternalListPopup: Bool { if case .externalList = activeSheet { return true } else { return false } }
     
     private var debounceTimer: Timer?
     private let placeService: PlaceService
@@ -121,11 +132,43 @@ class MapViewModel: ObservableObject {
         lastLoadedRegion = nil
     }
 
-    /// Clears all special filters (list, TikToks, reviews)
+    /// Shows external user's reviews on the map with filtered annotations
+    func selectExternalReviews(userId: String) {
+        externalUserId = userId
+        showingExternalReviewsOnMap = true
+        showingReviewsOnMap = false
+        showingTikToksOnMap = false
+        selectedListId = nil
+        externalListId = nil
+        activeSheet = .externalReviews
+        viewportAnnotations = []
+        communityMarkers = []
+        lastLoadedRegion = nil
+    }
+
+    /// Shows external user's list on the map with filtered annotations
+    func selectExternalList(listId: String, userId: String) {
+        externalUserId = userId
+        externalListId = listId
+        showingExternalReviewsOnMap = false
+        showingReviewsOnMap = false
+        showingTikToksOnMap = false
+        selectedListId = nil
+        activeSheet = .externalList(listId)
+        viewportAnnotations = []
+        communityMarkers = []
+        lastLoadedRegion = nil
+    }
+
+    /// Clears all special filters (list, TikToks, reviews, external)
     func clearAllFilters() {
         selectedListId = nil
         showingTikToksOnMap = false
         showingReviewsOnMap = false
+        // Clear external user state
+        externalUserId = nil
+        showingExternalReviewsOnMap = false
+        externalListId = nil
         activeSheet = nil
         viewportAnnotations = []
         communityMarkers = []
@@ -336,10 +379,29 @@ class MapViewModel: ObservableObject {
                     return
                 }
                 
-                // Fetch annotations based on current filter (list, TikToks, reviews, or all)
+                // Fetch annotations based on current filter (external user, list, TikToks, reviews, or all)
                 let annotations: [PlaceAnnotation]
-                if let listId = selectedListId {
-                    // Fetch annotations for the selected list only
+                if let extListId = externalListId, let extUserId = externalUserId {
+                    // External user's list - filter by their list
+                    annotations = try await placeService.fetchListAnnotationsInViewport(
+                        northLat: bounds.northLat,
+                        southLat: bounds.southLat,
+                        eastLng: bounds.eastLng,
+                        westLng: bounds.westLng,
+                        userId: extUserId,
+                        listId: extListId
+                    )
+                } else if showingExternalReviewsOnMap, let extUserId = externalUserId {
+                    // External user's reviews - filter by their reviewed places
+                    annotations = try await placeService.fetchReviewAnnotationsInViewport(
+                        northLat: bounds.northLat,
+                        southLat: bounds.southLat,
+                        eastLng: bounds.eastLng,
+                        westLng: bounds.westLng,
+                        userId: extUserId
+                    )
+                } else if let listId = selectedListId {
+                    // Current user's list - filter by list
                     annotations = try await placeService.fetchListAnnotationsInViewport(
                         northLat: bounds.northLat,
                         southLat: bounds.southLat,
@@ -358,7 +420,7 @@ class MapViewModel: ObservableObject {
                         userId: userId
                     )
                 } else if showingReviewsOnMap {
-                    // Fetch annotations for reviewed places only
+                    // Current user's reviewed places
                     annotations = try await placeService.fetchReviewAnnotationsInViewport(
                         northLat: bounds.northLat,
                         southLat: bounds.southLat,
@@ -379,7 +441,7 @@ class MapViewModel: ObservableObject {
 
                 // Only fetch community markers if no filter is active
                 let community: [CommunityPlaceMarker]
-                let hasActiveFilter = selectedListId != nil || showingTikToksOnMap || showingReviewsOnMap
+                let hasActiveFilter = selectedListId != nil || showingTikToksOnMap || showingReviewsOnMap || externalUserId != nil
                 if !hasActiveFilter {
                     community = try await placeService.fetchCommunityPlacesInViewportWithUserId(
                     northLat: bounds.northLat,

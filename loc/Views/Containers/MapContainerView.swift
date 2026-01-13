@@ -153,8 +153,45 @@ struct MapContainerView: View {
         .onChange(of: userProfileViewModel.isUserDetailPresented) { _, isPresented in
             // Dismiss popup sheets when navigating to user profile from within nested PlaceDetailView
             // MVVM: View observes ViewModel state changes and coordinates sheet dismissal
-            if isPresented && mapViewModel.activeSheet != nil {
-                mapViewModel.activeSheet = nil
+            if isPresented {
+                // Clear selected place to reset beacon when navigating to external profile
+                // Prevents stale beacon from previous context showing on map
+                selectedPlaceViewModel.selectedPlace = nil
+                if mapViewModel.activeSheet != nil {
+                    mapViewModel.activeSheet = nil
+                }
+            }
+        }
+        .onChange(of: userProfileViewModel.showExternalReviewsOnMap) { _, shouldShow in
+            // Show external user's reviews on map with filtered annotations
+            if shouldShow, let userId = userProfileViewModel.selectedUser?.id {
+                mapViewModel.selectExternalReviews(userId: userId)
+                userProfileViewModel.showExternalReviewsOnMap = false  // Reset trigger
+                // Trigger reload to show external user's reviewed places
+                if let currentUserId = userSession.currentUserId {
+                    let currentRegion = getCurrentMapRegion()
+                    Task {
+                        if let region = currentRegion {
+                            await mapViewModel.onMapCameraSettled(region, userId: currentUserId)
+                        }
+                    }
+                }
+            }
+        }
+        .onChange(of: userProfileViewModel.showExternalListOnMap) { _, listId in
+            // Show external user's list on map with filtered annotations
+            if let listId = listId, let userId = userProfileViewModel.selectedUser?.id {
+                mapViewModel.selectExternalList(listId: listId, userId: userId)
+                userProfileViewModel.showExternalListOnMap = nil  // Reset trigger
+                // Trigger reload to show external user's list places
+                if let currentUserId = userSession.currentUserId {
+                    let currentRegion = getCurrentMapRegion()
+                    Task {
+                        if let region = currentRegion {
+                            await mapViewModel.onMapCameraSettled(region, userId: currentUserId)
+                        }
+                    }
+                }
             }
         }
         // Single sheet using item binding - prevents "only presenting a single sheet" warning
@@ -185,6 +222,29 @@ struct MapContainerView: View {
 
                 case .reviews:
                     ReviewsListPopupView()
+
+                case .externalReviews:
+                    ExternalReviewsListPopupView(userProfileVM: userProfileViewModel)
+
+                case .externalList(let listId):
+                    if let listIndex = userProfileViewModel.userLists.firstIndex(where: { $0.list_id == listId }) {
+                        ExternalUserLightweightListPopupView(
+                            viewModel: userProfileViewModel,
+                            lists: userProfileViewModel.userLists,
+                            initialListIndex: listIndex,
+                            placeColors: .constant([:])
+                        )
+                    } else {
+                        // Loading state while list is being validated
+                        VStack {
+                            ProgressView()
+                                .padding()
+                            Text("Loading list...")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
                 }
             }
             .environmentObject(profileViewModel)

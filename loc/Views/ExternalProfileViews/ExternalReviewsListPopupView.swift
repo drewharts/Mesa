@@ -4,7 +4,7 @@
 //
 //  Single Responsibility: Display paginated reviewed places for an external user in a popup grid
 //  MVVM: Delegates data loading and state to UserProfileViewModel
-//  DUMB Component: Uses PlaceListPopupView for consistent popup behavior
+//  Now presented from MapContainerView with all environment objects available
 //
 
 import SwiftUI
@@ -12,10 +12,10 @@ import SwiftUI
 struct ExternalReviewsListPopupView: View {
     @ObservedObject var userProfileVM: UserProfileViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
-    
+
     var body: some View {
         PlaceListPopupView(
-            title: "Reviews",
+            title: "\(userProfileVM.selectedUser?.firstName ?? "User")'s Reviews",
             count: userProfileVM.totalReviewedPlacesCount,
             isLoading: userProfileVM.isLoadingReviewedPlaces,
             isLoadingMore: userProfileVM.isLoadingMoreReviews,
@@ -25,6 +25,9 @@ struct ExternalReviewsListPopupView: View {
             emptyTitle: "No Reviews Yet",
             emptyMessage: "This user hasn't reviewed any places yet",
             loadMore: { await userProfileVM.loadMoreReviews() },
+            onBackToProfile: {
+                userProfileVM.isUserDetailPresented = true
+            },
             cardBuilder: { place, navigate in
                 PopupPlaceCard(
                     place: place,
@@ -42,15 +45,4 @@ struct ExternalReviewsListPopupView: View {
             }
         }
     }
-    
-    /// Navigate to place from external profile - dismisses entire profile sheet first
-    private func navigateToPlace(placeId: String) {
-        Task {
-            guard let detailPlace = try? await PlaceService.shared.fetchPlace(withId: placeId) else { return }
-            await MainActor.run {
-                userProfileVM.navigateToPlaceFromProfile(detailPlace, selectedPlaceVM: selectedPlaceVM)
-            }
-        }
-    }
 }
-
