@@ -34,6 +34,11 @@ struct UserProfileFavoritesReviewsView: View {
                     await userProfileVM.loadUserReviewedPlacesWithPagination()
                 }
             }
+
+            // Default to reviews tab if user has no favorites
+            if userProfileVM.userFavorites.isEmpty {
+                selectedTab = .reviews
+            }
         }
     }
     
