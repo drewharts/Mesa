@@ -48,79 +48,63 @@ struct PinterestPhotoGalleryView: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                // Blurred background that fills the entire sheet with rounded top corners
-                UnevenRoundedRectangle(
-                    topLeadingRadius: 12,
-                    bottomLeadingRadius: 0,
-                    bottomTrailingRadius: 0,
-                    topTrailingRadius: 12
-                )
-                .fill(.ultraThinMaterial)
-                .opacity(backgroundOpacity)
-                .frame(width: geometry.size.width, height: geometry.size.height)
-                .onTapGesture {
-                    dismissGallery()
-                }
-                
+                // Solid black background for true full-screen feel
+                Color.black
+                    .opacity(backgroundOpacity)
+                    .onTapGesture {
+                        dismissGallery()
+                    }
+
                 VStack(spacing: 0) {
                     // Header
                     headerView
-                    
+
                     // Photo content
                     photoContent
                         .offset(y: dragOffset.height)
                         .scaleEffect(dragScale)
                         .gesture(dismissDragGesture)
-                    
+
                     // Page indicator
                     if photos.count > 1 {
                         pageIndicator
                     }
                 }
             }
-            .frame(width: geometry.size.width, height: geometry.size.height)
-            .clipShape(
-                UnevenRoundedRectangle(
-                    topLeadingRadius: 12,
-                    bottomLeadingRadius: 0,
-                    bottomTrailingRadius: 0,
-                    topTrailingRadius: 12
-                )
-            )
         }
+        .ignoresSafeArea()
     }
     
     // MARK: - Header
     
     private var headerView: some View {
         HStack {
-            // Close button
+            // Close button - minimal modern style
             Button(action: dismissGallery) {
                 Image(systemName: "xmark")
-                    .font(.system(size: 17, weight: .medium))
+                    .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(.white)
-                    .frame(width: 44, height: 44)
-                    .background(Color.white.opacity(0.15))
+                    .frame(width: 36, height: 36)
+                    .background(Color.white.opacity(0.2))
                     .clipShape(Circle())
             }
-            
+
             Spacer()
-            
-            // Photo counter
+
+            // Photo counter - clean pill design
             if photos.count > 1 {
                 Text("\(currentIndex + 1) / \(photos.count)")
-                    .font(.subheadline)
-                    .fontWeight(.medium)
+                    .font(.system(size: 14, weight: .medium))
                     .foregroundColor(.white.opacity(0.9))
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(Color.white.opacity(0.15))
-                    .cornerRadius(16)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 7)
+                    .background(Color.white.opacity(0.2))
+                    .clipShape(Capsule())
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 8)
-        .padding(.bottom, 16)
+        .padding(.horizontal, 20)
+        .padding(.top, 60) // Account for safe area (notch)
+        .padding(.bottom, 12)
         .opacity(isDragging ? 0.3 : 1.0)
         .animation(.easeOut(duration: 0.2), value: isDragging)
     }
@@ -146,15 +130,17 @@ struct PinterestPhotoGalleryView: View {
     // MARK: - Page Indicator
     
     private var pageIndicator: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 8) {
             ForEach(0..<photos.count, id: \.self) { index in
-                Capsule()
+                Circle()
                     .fill(index == currentIndex ? Color.white : Color.white.opacity(0.4))
-                    .frame(width: index == currentIndex ? 20 : 6, height: 6)
+                    .frame(width: 8, height: 8)
+                    .scaleEffect(index == currentIndex ? 1.0 : 0.8)
                     .animation(.spring(response: 0.3), value: currentIndex)
             }
         }
-        .padding(.vertical, 20)
+        .padding(.vertical, 16)
+        .padding(.bottom, 20) // Account for home indicator
         .opacity(isDragging ? 0.3 : 1.0)
         .animation(.easeOut(duration: 0.2), value: isDragging)
     }

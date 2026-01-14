@@ -19,7 +19,6 @@ struct UserProfileFavoritesReviewsView: View {
     @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
     
     @State private var selectedTab: UserFavoritesReviewsTab = .favorites
-    @State private var showingReviewsPopup = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -35,9 +34,11 @@ struct UserProfileFavoritesReviewsView: View {
                     await userProfileVM.loadUserReviewedPlacesWithPagination()
                 }
             }
-        }
-        .sheet(isPresented: $showingReviewsPopup) {
-            ExternalReviewsListPopupView(userProfileVM: userProfileVM)
+
+            // Default to reviews tab if user has no favorites
+            if userProfileVM.userFavorites.isEmpty {
+                selectedTab = .reviews
+            }
         }
     }
     
@@ -100,6 +101,11 @@ struct UserProfileFavoritesReviewsView: View {
                 favoritesGrid
             }
         }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            // Dismiss profile and show favorites on map (matches reviews behavior)
+            userProfileVM.triggerExternalFavoritesOnMap()
+        }
     }
     
     private var emptyFavoritesState: some View {
@@ -150,7 +156,8 @@ struct UserProfileFavoritesReviewsView: View {
         }
         .contentShape(Rectangle())
         .onTapGesture {
-            showingReviewsPopup = true
+            // Dismiss profile and show reviews on map (matches current user behavior)
+            userProfileVM.triggerExternalReviewsOnMap()
         }
     }
     

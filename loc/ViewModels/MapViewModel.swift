@@ -16,12 +16,20 @@ enum MapSheetType: Identifiable, Equatable {
     case list(String)  // listId
     case tiktoks
     case reviews
+    case favorites  // Current user's favorites
+    case externalReviews  // External user's reviews
+    case externalList(String)  // External user's list
+    case externalFavorites  // External user's favorites
 
     var id: String {
         switch self {
         case .list(let listId): return "list-\(listId)"
         case .tiktoks: return "tiktoks"
         case .reviews: return "reviews"
+        case .favorites: return "favorites"
+        case .externalReviews: return "externalReviews"
+        case .externalList(let listId): return "externalList-\(listId)"
+        case .externalFavorites: return "externalFavorites"
         }
     }
 }
@@ -41,12 +49,23 @@ class MapViewModel: ObservableObject {
     @Published var pendingPlaceNavigation: String? = nil // Place ID to navigate to when sheet is open
     @Published var showingTikToksOnMap: Bool = false // When set, only show TikTok annotations
     @Published var showingReviewsOnMap: Bool = false // When set, only show reviewed place annotations
+    @Published var showingFavoritesOnMap: Bool = false // When set, only show favorite place annotations
+
+    // External user filtering state
+    @Published var externalUserId: String? = nil // When set, filter by this external user's places
+    @Published var showingExternalReviewsOnMap: Bool = false // When set, show external user's reviewed places
+    @Published var showingExternalFavoritesOnMap: Bool = false // When set, show external user's favorite places
+    @Published var externalListId: String? = nil // When set, show external user's list places
 
     // Computed properties for backwards compatibility with existing code
     var showingListPopup: Bool { if case .list = activeSheet { return true } else { return false } }
     var showingTikToksPopup: Bool { activeSheet == .tiktoks }
     var showingReviewsPopup: Bool { activeSheet == .reviews }
-    
+    var showingExternalReviewsPopup: Bool { activeSheet == .externalReviews }
+    var showingExternalListPopup: Bool { if case .externalList = activeSheet { return true } else { return false } }
+    var showingExternalFavoritesPopup: Bool { activeSheet == .externalFavorites }
+    var showingFavoritesPopup: Bool { activeSheet == .favorites }
+
     private var debounceTimer: Timer?
     private let placeService: PlaceService
     private let detailPlaceVM: DetailPlaceViewModel
@@ -101,6 +120,7 @@ class MapViewModel: ObservableObject {
     func selectTikToks() {
         showingTikToksOnMap = true
         showingReviewsOnMap = false
+        showingFavoritesOnMap = false
         selectedListId = nil
         activeSheet = .tiktoks
         // Clear current annotations - they will be reloaded with TikTok filter
@@ -113,6 +133,7 @@ class MapViewModel: ObservableObject {
     func selectReviews() {
         showingReviewsOnMap = true
         showingTikToksOnMap = false
+        showingFavoritesOnMap = false
         selectedListId = nil
         activeSheet = .reviews
         // Clear current annotations - they will be reloaded with reviews filter
@@ -121,11 +142,73 @@ class MapViewModel: ObservableObject {
         lastLoadedRegion = nil
     }
 
-    /// Clears all special filters (list, TikToks, reviews)
+    /// Sets the map to show only favorite places
+    func selectFavorites() {
+        showingFavoritesOnMap = true
+        showingTikToksOnMap = false
+        showingReviewsOnMap = false
+        selectedListId = nil
+        activeSheet = .favorites
+        // Clear current annotations - they will be reloaded with favorites filter
+        viewportAnnotations = []
+        communityMarkers = []
+        lastLoadedRegion = nil
+    }
+
+    /// Shows external user's reviews on the map with filtered annotations
+    func selectExternalReviews(userId: String) {
+        externalUserId = userId
+        showingExternalReviewsOnMap = true
+        showingReviewsOnMap = false
+        showingTikToksOnMap = false
+        selectedListId = nil
+        externalListId = nil
+        activeSheet = .externalReviews
+        viewportAnnotations = []
+        communityMarkers = []
+        lastLoadedRegion = nil
+    }
+
+    /// Shows external user's list on the map with filtered annotations
+    func selectExternalList(listId: String, userId: String) {
+        externalUserId = userId
+        externalListId = listId
+        showingExternalReviewsOnMap = false
+        showingReviewsOnMap = false
+        showingTikToksOnMap = false
+        selectedListId = nil
+        activeSheet = .externalList(listId)
+        viewportAnnotations = []
+        communityMarkers = []
+        lastLoadedRegion = nil
+    }
+
+    /// Shows external user's favorites on the map with filtered annotations
+    func selectExternalFavorites(userId: String) {
+        externalUserId = userId
+        showingExternalFavoritesOnMap = true
+        showingExternalReviewsOnMap = false
+        showingReviewsOnMap = false
+        showingTikToksOnMap = false
+        selectedListId = nil
+        externalListId = nil
+        activeSheet = .externalFavorites
+        viewportAnnotations = []
+        communityMarkers = []
+        lastLoadedRegion = nil
+    }
+
+    /// Clears all special filters (list, TikToks, reviews, favorites, external)
     func clearAllFilters() {
         selectedListId = nil
         showingTikToksOnMap = false
         showingReviewsOnMap = false
+        showingFavoritesOnMap = false
+        // Clear external user state
+        externalUserId = nil
+        showingExternalReviewsOnMap = false
+        showingExternalFavoritesOnMap = false
+        externalListId = nil
         activeSheet = nil
         viewportAnnotations = []
         communityMarkers = []
@@ -336,10 +419,38 @@ class MapViewModel: ObservableObject {
                     return
                 }
                 
-                // Fetch annotations based on current filter (list, TikToks, reviews, or all)
+                // Fetch annotations based on current filter (external user, list, TikToks, reviews, or all)
                 let annotations: [PlaceAnnotation]
-                if let listId = selectedListId {
-                    // Fetch annotations for the selected list only
+                if let extListId = externalListId, let extUserId = externalUserId {
+                    // External user's list - filter by their list
+                    annotations = try await placeService.fetchListAnnotationsInViewport(
+                        northLat: bounds.northLat,
+                        southLat: bounds.southLat,
+                        eastLng: bounds.eastLng,
+                        westLng: bounds.westLng,
+                        userId: extUserId,
+                        listId: extListId
+                    )
+                } else if showingExternalReviewsOnMap, let extUserId = externalUserId {
+                    // External user's reviews - filter by their reviewed places
+                    annotations = try await placeService.fetchReviewAnnotationsInViewport(
+                        northLat: bounds.northLat,
+                        southLat: bounds.southLat,
+                        eastLng: bounds.eastLng,
+                        westLng: bounds.westLng,
+                        userId: extUserId
+                    )
+                } else if showingExternalFavoritesOnMap, let extUserId = externalUserId {
+                    // External user's favorites - filter by their favorite places
+                    annotations = try await placeService.fetchFavoriteAnnotationsInViewport(
+                        northLat: bounds.northLat,
+                        southLat: bounds.southLat,
+                        eastLng: bounds.eastLng,
+                        westLng: bounds.westLng,
+                        userId: extUserId
+                    )
+                } else if let listId = selectedListId {
+                    // Current user's list - filter by list
                     annotations = try await placeService.fetchListAnnotationsInViewport(
                         northLat: bounds.northLat,
                         southLat: bounds.southLat,
@@ -358,8 +469,17 @@ class MapViewModel: ObservableObject {
                         userId: userId
                     )
                 } else if showingReviewsOnMap {
-                    // Fetch annotations for reviewed places only
+                    // Current user's reviewed places
                     annotations = try await placeService.fetchReviewAnnotationsInViewport(
+                        northLat: bounds.northLat,
+                        southLat: bounds.southLat,
+                        eastLng: bounds.eastLng,
+                        westLng: bounds.westLng,
+                        userId: userId
+                    )
+                } else if showingFavoritesOnMap {
+                    // Current user's favorite places
+                    annotations = try await placeService.fetchFavoriteAnnotationsInViewport(
                         northLat: bounds.northLat,
                         southLat: bounds.southLat,
                         eastLng: bounds.eastLng,
@@ -379,7 +499,7 @@ class MapViewModel: ObservableObject {
 
                 // Only fetch community markers if no filter is active
                 let community: [CommunityPlaceMarker]
-                let hasActiveFilter = selectedListId != nil || showingTikToksOnMap || showingReviewsOnMap
+                let hasActiveFilter = selectedListId != nil || showingTikToksOnMap || showingReviewsOnMap || showingFavoritesOnMap || externalUserId != nil
                 if !hasActiveFilter {
                     community = try await placeService.fetchCommunityPlacesInViewportWithUserId(
                     northLat: bounds.northLat,

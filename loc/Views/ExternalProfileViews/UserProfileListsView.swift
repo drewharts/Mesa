@@ -135,6 +135,7 @@ struct UserProfileListsView: View {
 
 /// Lightweight list section for external user profiles - similar to LightweightProfileListSection but for external users
 /// Staff Engineer Refactor: Removed GeometryReader anti-pattern for stable LazyVGrid rendering
+/// Now navigates to map (like current user's lists) instead of showing local sheet
 struct UserProfileLightweightListSection: View {
     @ObservedObject var viewModel: UserProfileViewModel
     let list: LightweightPlaceList
@@ -142,26 +143,25 @@ struct UserProfileLightweightListSection: View {
     let allLists: [LightweightPlaceList]
     let currentIndex: Int
     @Binding var placeColors: [UUID: Color]
-    
+
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @Environment(\.presentationMode) var presentationMode
-    
-    @State private var showingListPopup = false
-    
+
     private var totalPlaceCount: Int {
         return list.place_count
     }
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            // Photo collage button
+            // Photo collage button - navigates to map with list filter
             Button(action: {
-                showingListPopup = true
+                // Navigate to map with list filter (matching current user behavior)
+                viewModel.triggerExternalListOnMap(listId: list.list_id)
             }) {
                 ExternalUserListCardImage(places: places, placeColors: $placeColors)
             }
             .buttonStyle(PlainButtonStyle())
-            
+
             // List info
             VStack(alignment: .leading, spacing: 2) {
                 Text(list.name)
@@ -169,20 +169,11 @@ struct UserProfileLightweightListSection: View {
                     .fontWeight(.semibold)
                     .foregroundColor(.primary)
                     .lineLimit(1)
-                
+
                 Text("\(totalPlaceCount) place\(totalPlaceCount == 1 ? "" : "s")")
                     .font(.caption2)
                     .foregroundColor(.secondary)
             }
-        }
-        .sheet(isPresented: $showingListPopup) {
-            ExternalUserLightweightListPopupView(
-                viewModel: viewModel,
-                lists: allLists,
-                initialListIndex: currentIndex,
-                placeColors: $placeColors
-            )
-            .environmentObject(selectedPlaceVM)
         }
     }
 }
@@ -366,19 +357,22 @@ struct UserProfileLightweightPlacePreviewCard: View {
 
 /// Lightweight list popup view for external user profiles - matches MyProfile's LightweightListPopupView
 /// Note: Excludes collaborator button since this is viewing another user's lists
+/// Uses NavigationStack for in-sheet navigation to PlaceDetailView (matches LightweightListPopupView pattern)
 struct ExternalUserLightweightListPopupView: View {
     @ObservedObject var viewModel: UserProfileViewModel
     let lists: [LightweightPlaceList]
     let initialListIndex: Int
     @Binding var placeColors: [UUID: Color]
-    
+
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
+    @EnvironmentObject var mapViewModel: MapViewModel
     @Environment(\.presentationMode) var presentationMode
     @State private var currentListIndex: Int
     @State private var isLoadingMore: Bool = false
     @State private var hasMorePlaces: Bool = true
     @State private var currentPage: Int = 1
-    
+    @State private var navigationPath = NavigationPath()
+
     init(viewModel: UserProfileViewModel, lists: [LightweightPlaceList], initialListIndex: Int, placeColors: Binding<[UUID: Color]>) {
         self.viewModel = viewModel
         self.lists = lists
@@ -409,33 +403,34 @@ struct ExternalUserLightweightListPopupView: View {
     }
     
     var body: some View {
-        NavigationView {
+        NavigationStack(path: $navigationPath) {
             VStack(spacing: 0) {
                 // Header with list name and controls (matches LightweightListPopupView)
                 VStack(spacing: 12) {
-                    // Top bar with close button
+                    // Top bar with back to profile button
                     HStack {
                         Button(action: {
                             presentationMode.wrappedValue.dismiss()
+                            viewModel.isUserDetailPresented = true
                         }) {
-                            Image(systemName: "xmark")
-                                .foregroundColor(.primary)
+                            HStack(spacing: 4) {
+                                Image(systemName: "chevron.left")
+                                Text("Profile")
+                            }
+                            .foregroundColor(.primary)
                         }
-                        
                         Spacer()
-                        
-                        // No collaborator button for external users - just viewing their lists
                     }
                     .padding(.horizontal, 20)
                     .padding(.top, 20)
-                    
+
                     // List name and place count (matches internal popup)
                     VStack(spacing: 4) {
                         Text(currentList.name)
                             .font(.title2)
                             .fontWeight(.bold)
                             .foregroundColor(.black)
-                        
+
                         Text("\(currentList.place_count) place\(currentList.place_count == 1 ? "" : "s")")
                             .font(.caption)
                             .foregroundColor(.gray)
@@ -443,7 +438,7 @@ struct ExternalUserLightweightListPopupView: View {
                     .padding(.horizontal, 20)
                 }
                 .padding(.bottom, 10)
-                
+
                 // Content with swiping support
                 if lists.count > 1 {
                     // Multiple lists - use TabView for swiping
@@ -455,7 +450,10 @@ struct ExternalUserLightweightListPopupView: View {
                                 isLoadingMore: $isLoadingMore,
                                 hasMorePlaces: $hasMorePlaces,
                                 currentPage: $currentPage,
-                                onLoadMore: { loadMoreIfNeeded() }
+                                onLoadMore: { loadMoreIfNeeded() },
+                                onNavigateToPlace: { placeId in
+                                    navigationPath.append(placeId)
+                                }
                             )
                             .tag(index)
                         }
@@ -477,13 +475,28 @@ struct ExternalUserLightweightListPopupView: View {
                         isLoadingMore: $isLoadingMore,
                         hasMorePlaces: $hasMorePlaces,
                         currentPage: $currentPage,
-                        onLoadMore: { loadMoreIfNeeded() }
+                        onLoadMore: { loadMoreIfNeeded() },
+                        onNavigateToPlace: { placeId in
+                            navigationPath.append(placeId)
+                        }
                     )
                 }
             }
             .navigationBarHidden(true)
+            .navigationDestination(for: String.self) { placeId in
+                PlaceDetailViewInNavigation(placeId: placeId, minSheetHeight: 250)
+            }
+        }
+        .onChange(of: mapViewModel.pendingPlaceNavigation) { oldValue, newValue in
+            // When map annotation is tapped while popup is open, navigate to that place
+            if let placeId = newValue {
+                navigationPath.append(placeId)
+                mapViewModel.pendingPlaceNavigation = nil
+            }
         }
         .onAppear {
+            // Clear navigation path when sheet appears (ensures fresh state each time)
+            navigationPath = NavigationPath()
             // Load places for the current list
             loadPlacesIfNeeded()
         }
@@ -512,6 +525,7 @@ struct ExternalUserLightweightListPopupView: View {
 
 /// List content view for external users - matches MyProfile's ListContentView exactly
 /// Uses LightweightPlaceGridCell for consistent card styling
+/// DUMB Component: Delegates navigation via onNavigateToPlace callback
 struct ExternalUserListContentView: View {
     let list: LightweightPlaceList
     @ObservedObject var viewModel: UserProfileViewModel
@@ -519,19 +533,18 @@ struct ExternalUserListContentView: View {
     @Binding var hasMorePlaces: Bool
     @Binding var currentPage: Int
     let onLoadMore: () -> Void
-    
-    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
-    
+    let onNavigateToPlace: ((String) -> Void)?
+
     // Grid layout matching ProfileView lists (consistent spacing)
     private let columns = [
         GridItem(.flexible(), spacing: 12),
         GridItem(.flexible(), spacing: 12)
     ]
-    
+
     var places: [LightweightPlace] {
         viewModel.placeListPlaces[list.list_id] ?? []
     }
-    
+
     var body: some View {
         if !places.isEmpty {
             ScrollView {
@@ -542,7 +555,7 @@ struct ExternalUserListContentView: View {
                             place: place,
                             isCollaborativeList: list.isCollaborative,
                             onNavigate: { placeId in
-                                navigateToPlace(placeId: placeId)
+                                onNavigateToPlace?(placeId)
                             }
                         )
                         .onAppear {
@@ -555,7 +568,7 @@ struct ExternalUserListContentView: View {
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 10)
-                
+
                 // Loading indicator at bottom
                 if isLoadingMore {
                     HStack {
@@ -574,16 +587,6 @@ struct ExternalUserListContentView: View {
                 Spacer()
             }
             .padding(.vertical, 30)
-        }
-    }
-    
-    /// Navigate to place from external profile - dismisses entire profile sheet first
-    private func navigateToPlace(placeId: String) {
-        Task {
-            guard let detailPlace = try? await PlaceService.shared.fetchPlace(withId: placeId) else { return }
-            await MainActor.run {
-                viewModel.navigateToPlaceFromProfile(detailPlace, selectedPlaceVM: selectedPlaceVM)
-            }
         }
     }
 }

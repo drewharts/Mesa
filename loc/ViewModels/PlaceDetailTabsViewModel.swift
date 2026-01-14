@@ -237,7 +237,14 @@ class PlaceDetailTabsViewModel: ObservableObject {
             isPlaceInList = false
         }
     }
-    
+
+    /// Public method to refresh list membership state (call after saving to list)
+    func refreshPlaceListMembership() {
+        Task {
+            await checkPlaceListMembership(place: selectedPlaceVM.selectedPlace)
+        }
+    }
+
     /// Configure savers VM with navigation dependency (call from View)
     func configureSaversViewModel(userProfileViewModel: UserProfileViewModel) {
         placeSaversViewModel.configure(userProfileViewModel: userProfileViewModel)
