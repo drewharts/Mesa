@@ -118,21 +118,25 @@ class SelectedPlaceViewModel: ObservableObject {
     
     /// Merges fresh backend data with original place, preserving local-only properties.
     /// Single Responsibility: Handles data merging without side effects.
-    /// 
-    /// Properties preserved from original when fresh is nil/empty:
-    /// - `isCustom`: Backend doesn't know about custom places
+    ///
+    /// Properties preserved from original:
     /// - `id`: Always keep the original ID
+    /// - `isCustom`: Backend doesn't know about custom places
+    /// - `coordinate`: Prevents beacon jumping when fresh data arrives
     /// - `openHours`: Preserve if fresh data doesn't have it
     private func mergePlaceData(original: DetailPlace, fresh: DetailPlace) -> DetailPlace {
         var merged = fresh
         merged.id = original.id
         merged.isCustom = original.isCustom
-        
+
+        // Preserve coordinate from original to prevent beacon jumping when fresh data arrives
+        merged.coordinate = original.coordinate
+
         // Preserve openHours from original if fresh doesn't have it
         if merged.openHours == nil || merged.openHours?.isEmpty == true {
             merged.openHours = original.openHours
         }
-        
+
         return merged
     }
     @Published var isDetailSheetPresented: Bool = false

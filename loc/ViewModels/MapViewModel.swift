@@ -54,6 +54,7 @@ class MapViewModel: ObservableObject {
     // External user filtering state
     @Published var externalUserId: String? = nil // When set, filter by this external user's places
     @Published var showingExternalReviewsOnMap: Bool = false // When set, show external user's reviewed places
+    @Published var showingExternalFavoritesOnMap: Bool = false // When set, show external user's favorite places
     @Published var externalListId: String? = nil // When set, show external user's list places
 
     // Computed properties for backwards compatibility with existing code
@@ -185,6 +186,7 @@ class MapViewModel: ObservableObject {
     /// Shows external user's favorites on the map with filtered annotations
     func selectExternalFavorites(userId: String) {
         externalUserId = userId
+        showingExternalFavoritesOnMap = true
         showingExternalReviewsOnMap = false
         showingReviewsOnMap = false
         showingTikToksOnMap = false
@@ -205,6 +207,7 @@ class MapViewModel: ObservableObject {
         // Clear external user state
         externalUserId = nil
         showingExternalReviewsOnMap = false
+        showingExternalFavoritesOnMap = false
         externalListId = nil
         activeSheet = nil
         viewportAnnotations = []
@@ -431,6 +434,15 @@ class MapViewModel: ObservableObject {
                 } else if showingExternalReviewsOnMap, let extUserId = externalUserId {
                     // External user's reviews - filter by their reviewed places
                     annotations = try await placeService.fetchReviewAnnotationsInViewport(
+                        northLat: bounds.northLat,
+                        southLat: bounds.southLat,
+                        eastLng: bounds.eastLng,
+                        westLng: bounds.westLng,
+                        userId: extUserId
+                    )
+                } else if showingExternalFavoritesOnMap, let extUserId = externalUserId {
+                    // External user's favorites - filter by their favorite places
+                    annotations = try await placeService.fetchFavoriteAnnotationsInViewport(
                         northLat: bounds.northLat,
                         southLat: bounds.southLat,
                         eastLng: bounds.eastLng,
