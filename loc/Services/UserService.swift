@@ -633,7 +633,21 @@ class UserService: ObservableObject {
             }
         }
     }
-    
+
+    /// Updates the place association for a TikTok (external place) - for correcting wrong places
+    /// Single Responsibility: Coordinate update via SupabaseUserService
+    /// - Parameters:
+    ///   - externalPlaceId: The external_places row ID to update
+    ///   - newPlaceId: The new place ID to associate with
+    ///   - userId: The user's ID for verification
+    func updateTikTokPlaceAssociation(externalPlaceId: String, newPlaceId: String, userId: String) async throws {
+        try await supabase.updateExternalPlaceAssociation(
+            externalPlaceId: externalPlaceId,
+            newPlaceId: newPlaceId,
+            userId: userId
+        )
+    }
+
     func deleteUserAccount(userId: String, completion: @escaping (Error?) -> Void) {
         print("⚠️ [UserService] deleteUserAccount not fully implemented")
         completion(nil)

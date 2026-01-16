@@ -51,7 +51,11 @@ struct PlaceDetailView: View {
                             showPhotoGallery = true
                         },
                         onAddToList: { showListSelection = true },
-                        onAddReview: { showCreatePost = true }
+                        onAddReview: { showCreatePost = true },
+                        onPlaceChanged: { newPlaceId in
+                            // Navigate to the new place after TikTok association change
+                            selectedPlaceVM.navigateToPlace(placeId: newPlaceId)
+                        }
                     )
                     .environmentObject(userProfileViewModel)
                     .environmentObject(detailPlaceViewModel)

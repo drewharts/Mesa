@@ -18,7 +18,10 @@ struct AboutTabContent: View {
     @EnvironmentObject var userSession: UserSession
     
     let onPhotoTapped: ([UIImage], Int) -> Void
-    
+
+    /// Callback when user changes a TikTok's place association - parent should navigate to new place
+    var onPlaceChanged: ((String) -> Void)?
+
     // MARK: - View-Owned Presentation State
     @State private var showingNoteSheet = false
     
@@ -41,7 +44,8 @@ struct AboutTabContent: View {
             TikTokVideosSection(
                 viewModel: viewModel.tikTokVideosViewModel,
                 placeId: viewModel.placeId,
-                selectedPlace: viewModel.place
+                selectedPlace: viewModel.place,
+                onPlaceChanged: onPlaceChanged
             )
             .environmentObject(profile)
             .environmentObject(userSession)
