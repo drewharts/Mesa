@@ -28,10 +28,13 @@ struct AboutTabContent: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // NOTE: CustomPlaceCreatorView moved to PlaceDetailTabsView type row
-            
+
             // 1. DUMB COMPONENT: Pure display of place info
             if let place = viewModel.place {
-                PlaceInfoSection(place: place)
+                PlaceInfoSection(
+                    place: place,
+                    isDescriptionLoading: viewModel.isDescriptionLoading
+                )
             }
             
             // 2. User's private note (only shown if note exists)

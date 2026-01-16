@@ -10,7 +10,8 @@ import SwiftUI
 
 struct PlaceInfoSection: View {
     let place: DetailPlace
-    
+    let isDescriptionLoading: Bool
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Rating Row (Google/Mapbox)
@@ -20,19 +21,19 @@ struct PlaceInfoSection: View {
                         Image(systemName: "star.fill")
                             .font(.subheadline)
                             .foregroundColor(.yellow)
-                        
+
                         Text(String(format: "%.1f", rating))
                             .font(.subheadline)
                             .fontWeight(.semibold)
                             .foregroundColor(.black)
-                        
+
                         if let count = place.userRatingsTotal, count > 0 {
                             Text("(\(count.formatted()) reviews)")
                                 .font(.subheadline)
                                 .foregroundColor(.gray)
                         }
                     }
-                    
+
                     // Google logo
                     Image("GoogleLogo")
                         .resizable()
@@ -41,12 +42,25 @@ struct PlaceInfoSection: View {
                 }
                 .padding(.bottom, 8)
             }
-            
-            Text(place.description ?? "No description available")
-                .font(.footnote)
-                .foregroundColor(.black)
-                .fixedSize(horizontal: false, vertical: true)
+
+            // Description with loading state
+            if isDescriptionLoading {
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                    Text("Customizing description...")
+                        .font(.footnote)
+                        .foregroundColor(.gray)
+                        .italic()
+                }
                 .padding(.bottom, 20)
+            } else {
+                Text(place.description ?? "No description available")
+                    .font(.footnote)
+                    .foregroundColor(.black)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.bottom, 20)
+            }
         }
     }
 }
@@ -58,8 +72,8 @@ struct PlaceInfoSection: View {
     mockPlace.description = "A cozy Italian restaurant serving authentic pasta and pizza in a warm, family-friendly atmosphere."
     mockPlace.rating = 4.5
     mockPlace.userRatingsTotal = 234
-    
-    return PlaceInfoSection(place: mockPlace)
+
+    return PlaceInfoSection(place: mockPlace, isDescriptionLoading: false)
         .padding()
 }
 
