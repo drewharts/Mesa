@@ -224,6 +224,13 @@ private struct InteractiveImageView: View {
                 .onTapGesture(count: 2) {
                     handleDoubleTap()
                 }
+                .onAppear {
+                    // Reset zoom and pan state when view appears
+                    scale = 1.0
+                    lastScale = 1.0
+                    offset = .zero
+                    lastOffset = .zero
+                }
         }
     }
     
