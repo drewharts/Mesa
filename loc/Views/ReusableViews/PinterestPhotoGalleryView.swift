@@ -46,29 +46,27 @@ struct PinterestPhotoGalleryView: View {
     // MARK: - Body
     
     var body: some View {
-        GeometryReader { geometry in
-            ZStack {
-                // Solid black background for true full-screen feel
-                Color.black
-                    .opacity(backgroundOpacity)
-                    .onTapGesture {
-                        dismissGallery()
-                    }
+        ZStack {
+            // Solid black background for true full-screen feel
+            Color.black
+                .opacity(backgroundOpacity)
+                .onTapGesture {
+                    dismissGallery()
+                }
 
-                VStack(spacing: 0) {
-                    // Header
-                    headerView
+            VStack(spacing: 0) {
+                // Header
+                headerView
 
-                    // Photo content
-                    photoContent
-                        .offset(y: dragOffset.height)
-                        .scaleEffect(dragScale)
-                        .gesture(dismissDragGesture)
+                // Photo content
+                photoContent
+                    .offset(y: dragOffset.height)
+                    .scaleEffect(dragScale)
+                    .gesture(dismissDragGesture)
 
-                    // Page indicator
-                    if photos.count > 1 {
-                        pageIndicator
-                    }
+                // Page indicator
+                if photos.count > 1 {
+                    pageIndicator
                 }
             }
         }
@@ -216,8 +214,7 @@ private struct InteractiveImageView: View {
                 .scaledToFit()
                 .scaleEffect(scale)
                 .offset(offset)
-                .frame(width: geometry.size.width, height: geometry.size.height)
-                .position(x: geometry.size.width / 2, y: geometry.size.height / 2)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .contentShape(Rectangle())
                 .gesture(magnificationGesture)
                 .gesture(scale > 1 ? panGesture(in: geometry) : nil)
@@ -232,6 +229,7 @@ private struct InteractiveImageView: View {
                     lastOffset = .zero
                 }
         }
+        .clipped()
     }
     
     private var magnificationGesture: some Gesture {
