@@ -44,73 +44,73 @@ struct PinterestPhotoGalleryView: View {
     }
     
     // MARK: - Body
-    
+
     var body: some View {
-        ZStack {
-            // Solid black background for true full-screen feel
-            Color.black
-                .opacity(backgroundOpacity)
-                .onTapGesture {
-                    dismissGallery()
+        GeometryReader { geometry in
+            ZStack {
+                // Background - tappable to dismiss
+                Color.black
+                    .opacity(backgroundOpacity)
+                    .onTapGesture { dismissGallery() }
+
+                // Photo content with page indicator
+                VStack(spacing: 0) {
+                    photoContent
+                        .offset(y: dragOffset.height)
+                        .scaleEffect(dragScale)
+                        .gesture(dismissDragGesture)
+
+                    if photos.count > 1 {
+                        pageIndicator(safeAreaBottom: geometry.safeAreaInsets.bottom)
+                    }
                 }
 
-            VStack(spacing: 0) {
-                // Header
-                headerView
-
-                // Photo content
-                photoContent
-                    .offset(y: dragOffset.height)
-                    .scaleEffect(dragScale)
-                    .gesture(dismissDragGesture)
-
-                // Page indicator
-                if photos.count > 1 {
-                    pageIndicator
+                // Header overlay - positioned at top, independent of content
+                VStack {
+                    headerView(safeAreaTop: geometry.safeAreaInsets.top)
+                    Spacer()
                 }
             }
         }
         .ignoresSafeArea()
     }
-    
-    // MARK: - Header
-    
-    private var headerView: some View {
-        HStack {
-            Spacer()
 
-            // Photo counter - centered, minimal pill design
+    // MARK: - Header
+
+    private func headerView(safeAreaTop: CGFloat) -> some View {
+        ZStack {
+            // Counter - truly centered (independent of X button)
             if photos.count > 1 {
                 Text("\(currentIndex + 1)/\(photos.count)")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.white.opacity(0.85))
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(.ultraThinMaterial.opacity(0.6))
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(.white.opacity(0.9))
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(.ultraThinMaterial)
                     .clipShape(Capsule())
             }
 
-            Spacer()
-
-            // Close button - minimal modern style, top right
-            Button(action: dismissGallery) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.white.opacity(0.85))
-                    .frame(width: 28, height: 28)
-                    .background(.ultraThinMaterial.opacity(0.6))
-                    .clipShape(Circle())
+            // X button - pinned to trailing edge
+            HStack {
+                Spacer()
+                Button(action: dismissGallery) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.9))
+                        .frame(width: 32, height: 32)
+                        .background(.ultraThinMaterial)
+                        .clipShape(Circle())
+                }
             }
         }
         .padding(.horizontal, 16)
-        .padding(.top, 56) // Account for safe area (notch)
-        .padding(.bottom, 8)
+        .padding(.top, safeAreaTop + 8)
         .opacity(isDragging ? 0.3 : 1.0)
         .animation(.easeOut(duration: 0.2), value: isDragging)
     }
-    
+
     // MARK: - Photo Content
-    
+
     private var photoContent: some View {
         Group {
             if photos.count > 1 {
@@ -126,21 +126,19 @@ struct PinterestPhotoGalleryView: View {
             }
         }
     }
-    
+
     // MARK: - Page Indicator
-    
-    private var pageIndicator: some View {
+
+    private func pageIndicator(safeAreaBottom: CGFloat) -> some View {
         HStack(spacing: 8) {
             ForEach(0..<photos.count, id: \.self) { index in
                 Circle()
                     .fill(index == currentIndex ? Color.white : Color.white.opacity(0.4))
-                    .frame(width: 8, height: 8)
-                    .scaleEffect(index == currentIndex ? 1.0 : 0.8)
-                    .animation(.spring(response: 0.3), value: currentIndex)
+                    .frame(width: 6, height: 6)
             }
         }
-        .padding(.vertical, 16)
-        .padding(.bottom, 20) // Account for home indicator
+        .padding(.vertical, 12)
+        .padding(.bottom, max(safeAreaBottom, 16))
         .opacity(isDragging ? 0.3 : 1.0)
         .animation(.easeOut(duration: 0.2), value: isDragging)
     }
