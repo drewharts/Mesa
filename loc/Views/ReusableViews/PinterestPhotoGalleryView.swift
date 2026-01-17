@@ -77,32 +77,34 @@ struct PinterestPhotoGalleryView: View {
     
     private var headerView: some View {
         HStack {
-            // Close button - minimal modern style
-            Button(action: dismissGallery) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(.white)
-                    .frame(width: 36, height: 36)
-                    .background(Color.white.opacity(0.2))
-                    .clipShape(Circle())
+            Spacer()
+
+            // Photo counter - centered, minimal pill design
+            if photos.count > 1 {
+                Text("\(currentIndex + 1)/\(photos.count)")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.white.opacity(0.85))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(.ultraThinMaterial.opacity(0.6))
+                    .clipShape(Capsule())
             }
 
             Spacer()
 
-            // Photo counter - clean pill design
-            if photos.count > 1 {
-                Text("\(currentIndex + 1) / \(photos.count)")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.white.opacity(0.9))
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 7)
-                    .background(Color.white.opacity(0.2))
-                    .clipShape(Capsule())
+            // Close button - minimal modern style, top right
+            Button(action: dismissGallery) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.white.opacity(0.85))
+                    .frame(width: 28, height: 28)
+                    .background(.ultraThinMaterial.opacity(0.6))
+                    .clipShape(Circle())
             }
         }
-        .padding(.horizontal, 20)
-        .padding(.top, 60) // Account for safe area (notch)
-        .padding(.bottom, 12)
+        .padding(.horizontal, 16)
+        .padding(.top, 56) // Account for safe area (notch)
+        .padding(.bottom, 8)
         .opacity(isDragging ? 0.3 : 1.0)
         .animation(.easeOut(duration: 0.2), value: isDragging)
     }
