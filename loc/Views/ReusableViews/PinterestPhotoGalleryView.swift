@@ -104,7 +104,7 @@ struct PinterestPhotoGalleryView: View {
             }
         }
         .padding(.horizontal, 16)
-        .padding(.top, safeAreaTop + 8)
+        .padding(.top, safeAreaTop + 16)
         .opacity(isDragging ? 0.3 : 1.0)
         .animation(.easeOut(duration: 0.2), value: isDragging)
     }
