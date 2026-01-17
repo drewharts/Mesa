@@ -260,5 +260,6 @@ struct PlaceDetailViewContent: View {
                 .zIndex(100)
             }
         }
+        .navigationBarHidden(showPhotoGallery)
     }
 }
