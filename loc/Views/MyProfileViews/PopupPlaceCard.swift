@@ -18,7 +18,7 @@ import SwiftUI
 
 struct PopupPlaceCard: View {
     let place: LightweightPlace
-    
+
     // Configuration
     var preferTikTokThumbnail: Bool = true
     var allowDelete: Bool = false
@@ -28,10 +28,10 @@ struct PopupPlaceCard: View {
     /// Custom navigation callback - when provided, bypasses default navigation
     /// Use this for external profile views that need to dismiss the profile sheet first
     var onNavigate: ((String) -> Void)? = nil
-    
+
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @Environment(\.presentationMode) var presentationMode
-    
+
     @State private var showDeleteConfirmation = false
     
     // MARK: - Computed Properties
@@ -215,11 +215,11 @@ struct PopupPlaceCard: View {
 
 // MARK: - Delete Gesture Modifier
 
-/// Conditional long press gesture modifier for delete functionality
+/// Conditional long press gesture modifier for showing delete confirmation
 private struct DeleteGestureModifier: ViewModifier {
     let allowDelete: Bool
     @Binding var showDeleteConfirmation: Bool
-    
+
     func body(content: Content) -> some View {
         if allowDelete {
             content.onLongPressGesture {

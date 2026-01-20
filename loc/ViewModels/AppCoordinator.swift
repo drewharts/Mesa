@@ -7,6 +7,7 @@
 
 import SwiftUI
 import Combine
+import MapKit
 
 /// Coordinates high-level app state and navigation
 /// Only contains cross-cutting concerns that truly need to be global
@@ -21,7 +22,18 @@ class AppCoordinator: ObservableObject {
     @Published var isSearchExpanded = false
     @Published var selectedPlace: Place?
     @Published var selectedUserId: String?
-    
+
+    // MARK: - Map State
+    /// Current visible map region - updated by MapView when camera settles
+    /// Used for viewport-based keyword search filtering
+    @Published var currentMapRegion: MKCoordinateRegion?
+
+    // MARK: - Keyword Results Popup Trigger
+    /// Used to trigger keyword results popup from search (SearchContainerView -> MainView -> MapContainerView)
+    @Published var showKeywordResultsPopup: Bool = false
+    @Published var keywordForPopup: String? = nil
+    @Published var keywordTypesForPopup: [String] = []
+
     // MARK: - Loading States
     @Published var isProcessingDeepLink = false
     @Published var isProcessingTikTok = false
@@ -56,6 +68,14 @@ class AppCoordinator: ObservableObject {
         alertTitle = title
         alertMessage = message
         showAlert = true
+    }
+
+    /// Trigger keyword results popup from search
+    /// Called by MainView when user taps "View All" in keyword search results
+    func triggerKeywordResultsPopup(keyword: String, types: [String]) {
+        keywordForPopup = keyword
+        keywordTypesForPopup = types
+        showKeywordResultsPopup = true
     }
 }
 

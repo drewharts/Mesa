@@ -32,10 +32,9 @@ struct CustomPlaceAnnotationView: View {
                     .zIndex(isSelected ? 100 : 0)
                     .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isSelected)
             } else {
-                // Fallback to pin icon if no image
-                Image(systemName: "mappin.circle.fill")
-                    .font(.system(size: isSelected ? 36 : 28))
-                    .foregroundColor(.red)
+                // Fallback: show category emoji based on place type
+                Text(PlaceTypeEmoji.emoji(for: annotation.placeType))
+                    .font(.system(size: isSelected ? 32 : 24))
                     .shadow(color: isSelected ? Color.blue.opacity(0.8) : .clear, radius: 15)
                     .shadow(color: isSelected ? Color.blue.opacity(0.5) : .clear, radius: 25)
                     .shadow(color: isSelected ? Color.blue.opacity(0.3) : .clear, radius: 35)
@@ -45,6 +44,7 @@ struct CustomPlaceAnnotationView: View {
                         x: 0,
                         y: isSelected ? 4 : 2
                     )
+                    .scaleEffect(isSelected ? 1.2 : 1.0)
                     .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isSelected)
             }
         }

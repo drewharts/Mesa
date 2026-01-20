@@ -501,14 +501,36 @@ class PlacePhotosViewModel: ObservableObject {
         externalReviewPhotoLoadingStates[state.placeId] = loadingState
     }
     
+    /// Transform Google CDN URL to request higher resolution
+    /// Google's lh3.googleusercontent.com URLs support size parameters like =s1600
+    private func getHighResGoogleURL(_ imageUrl: String, maxSize: Int = 1600) -> String {
+        guard imageUrl.contains("lh3.googleusercontent.com") else {
+            return imageUrl
+        }
+
+        // Remove existing size parameters (=s123, =w123-h456, etc.)
+        var baseUrl = imageUrl
+        if let range = baseUrl.range(of: "=s\\d+.*$", options: .regularExpression) {
+            baseUrl.removeSubrange(range)
+        }
+        if let range = baseUrl.range(of: "=w\\d+-h\\d+.*$", options: .regularExpression) {
+            baseUrl.removeSubrange(range)
+        }
+
+        return "\(baseUrl)=s\(maxSize)"
+    }
+
     /// Load image directly from URL
     private func loadImageFromURL(imageUrl: String) async -> UIImage? {
         // Block Firebase Storage URLs (migrated to Supabase)
         if imageUrl.contains("firebasestorage.googleapis.com") {
             return nil
         }
-        
-        guard let url = URL(string: imageUrl) else {
+
+        // Request higher resolution for Google CDN images
+        let highResUrl = getHighResGoogleURL(imageUrl, maxSize: 1600)
+
+        guard let url = URL(string: highResUrl) else {
             return nil
         }
         

@@ -288,7 +288,16 @@ class SelectedPlaceViewModel: ObservableObject {
             }
         }
     }
-    
+
+    /// Updates just the description of the currently selected place
+    /// Used when polling for AI-generated descriptions
+    func updatePlaceDescription(_ description: String) {
+        if var place = selectedPlace {
+            place.description = description
+            selectedPlace = place
+        }
+    }
+
     /// Navigate to a place by ID - fetches place details and presents the detail sheet
     /// Single Responsibility: Coordinate place navigation from lightweight place references
     func navigateToPlace(placeId: String, onDismiss: (() -> Void)? = nil) {

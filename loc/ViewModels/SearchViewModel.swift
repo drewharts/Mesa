@@ -9,6 +9,7 @@
 import SwiftUI
 import Combine
 import CoreLocation
+import MapKit
 
 /// ViewModel for search functionality
 /// Single Responsibility: Coordinate search operations and manage search state
@@ -21,11 +22,21 @@ class SearchViewModel: ObservableObject {
     @Published var searchError: String?
     @Published var showNoPlaceFound: Bool = false
     @Published var isSearching: Bool = false
-    
+
+    /// Keyword-matched results from local database
+    @Published var keywordResults: [DetailPlace] = []
+    @Published var matchedKeyword: String? = nil
+    @Published var hasMoreKeywordResults: Bool = false
+    @Published var isLoadingMoreKeywords: Bool = false
+
     /// Snapshot of user profile photos - updates only when search completes
     /// This prevents main thread blocking from reactive observation of ProfilePhotoCache
     @Published private(set) var userPhotosSnapshot: [String: UIImage] = [:]
-    
+
+    /// Current map region for viewport-based keyword searches
+    /// Set by parent view to enable location-aware keyword results
+    var currentMapRegion: MKCoordinateRegion?
+
     // MARK: - Dependencies (Services only, NOT other ViewModels)
     private let placeService: PlaceService
     private let userService: UserService
@@ -46,6 +57,11 @@ class SearchViewModel: ObservableObject {
     private var currentSearchTask: Task<Void, Never>?
     private var cancellables = Set<AnyCancellable>()
     private var hasSetupPipeline = false  // ✅ Track if pipeline is setup
+
+    // Keyword pagination state
+    private var keywordSearchOffset: Int = 0
+    private(set) var currentKeywordTypes: [String] = []
+    private let keywordPageSize: Int = 10
     
     // MARK: - Callbacks (instead of direct ViewModel references)
     var onPlaceSelected: ((DetailPlace) -> Void)?
@@ -102,30 +118,42 @@ class SearchViewModel: ObservableObject {
         currentSearchTask = nil
         searchResults = []
         userResults = []
+        keywordResults = []
+        matchedKeyword = nil
         userPhotosSnapshot = [:]  // Clear photo snapshot
         searchError = nil
         showNoPlaceFound = false
         isSearching = false
+
+        // Reset keyword search pagination state
+        currentKeywordTypes = []
+        keywordSearchOffset = 0
+        hasMoreKeywordResults = false
     }
     
     /// Perform search for places and users
     private func performSearch(query: String) async {
         // Check if task was cancelled
         guard !Task.isCancelled else { return }
-        
-        // Check cache first for instant results
+
+        // Check cache first for instant place results
         if let cachedResults = searchCache[query] {
             searchResults = cachedResults
             showNoPlaceFound = cachedResults.isEmpty
+            // Still run keyword search even with cached results
+            // (keyword results depend on viewport and aren't cached)
+            await searchByKeyword(query: query)
             isSearching = false
             return
         }
-        
+
         // Clear previous results
         searchResults = []
+        keywordResults = []
+        matchedKeyword = nil
         searchError = nil
         showNoPlaceFound = false
-        
+
         // Perform parallel search operations
         await withTaskGroup(of: Void.self) { group in
             group.addTask {
@@ -134,6 +162,92 @@ class SearchViewModel: ObservableObject {
             group.addTask {
                 await self.searchUsers(query: query)
             }
+            group.addTask {
+                await self.searchByKeyword(query: query)
+            }
+        }
+    }
+
+    /// Search for places matching keyword-to-type mappings within current viewport
+    private func searchByKeyword(query: String) async {
+        let matches = KeywordMappingService.shared.findMatchingKeywords(in: query)
+
+        guard let firstMatch = matches.first else {
+            // No keyword matches found
+            return
+        }
+
+        // Reset pagination for new search
+        keywordSearchOffset = 0
+        currentKeywordTypes = firstMatch.types
+
+        // Get viewport bounds for location-aware results
+        let bounds = getViewportBounds()
+
+        do {
+            // Fetch one extra to check if more results exist
+            let places = try await SupabasePlaceService.shared.searchPlacesByTypes(
+                types: firstMatch.types,
+                bounds: bounds,
+                limit: keywordPageSize + 1,
+                offset: 0
+            )
+
+            matchedKeyword = firstMatch.keyword
+
+            // Check if there are more results
+            if places.count > keywordPageSize {
+                keywordResults = Array(places.prefix(keywordPageSize))
+                hasMoreKeywordResults = true
+            } else {
+                keywordResults = places
+                hasMoreKeywordResults = false
+            }
+
+            keywordSearchOffset = keywordResults.count
+        } catch {
+            // Don't log cancellation errors - expected when user types quickly
+            if !Task.isCancelled && (error as NSError).code != NSURLErrorCancelled {
+                print("❌ [SearchViewModel] Error searching by keyword: \(error)")
+            }
+        }
+    }
+
+    /// Load more keyword search results (pagination)
+    func loadMoreKeywordResults() {
+        guard !isLoadingMoreKeywords, hasMoreKeywordResults, !currentKeywordTypes.isEmpty else { return }
+
+        isLoadingMoreKeywords = true
+
+        Task {
+            let bounds = getViewportBounds()
+
+            do {
+                let places = try await SupabasePlaceService.shared.searchPlacesByTypes(
+                    types: currentKeywordTypes,
+                    bounds: bounds,
+                    limit: keywordPageSize + 1,
+                    offset: keywordSearchOffset
+                )
+
+                // Check if there are more results
+                if places.count > keywordPageSize {
+                    keywordResults.append(contentsOf: Array(places.prefix(keywordPageSize)))
+                    hasMoreKeywordResults = true
+                } else {
+                    keywordResults.append(contentsOf: places)
+                    hasMoreKeywordResults = false
+                }
+
+                keywordSearchOffset = keywordResults.count
+            } catch {
+                // Don't log cancellation errors
+                if !Task.isCancelled && (error as NSError).code != NSURLErrorCancelled {
+                    print("❌ [SearchViewModel] Error loading more keyword results: \(error)")
+                }
+            }
+
+            isLoadingMoreKeywords = false
         }
     }
     
@@ -285,12 +399,24 @@ class SearchViewModel: ObservableObject {
     }
     
     // MARK: - Cache Management
-    
+
     /// Limit cache size to prevent memory issues
     private func limitCacheSize() {
         if searchCache.count > 50 {
             let keysToRemove = Array(searchCache.keys.prefix(searchCache.count - 50))
             keysToRemove.forEach { searchCache.removeValue(forKey: $0) }
         }
+    }
+
+    // MARK: - Viewport Helpers
+
+    /// Convert current map region to adaptive viewport bounds for database queries
+    /// Uses ViewportBoundsHelper to ensure bounds are within reasonable min/max thresholds
+    /// Falls back to user's current location if no map region is available
+    private func getViewportBounds() -> (northLat: Double, southLat: Double, eastLng: Double, westLng: Double)? {
+        return ViewportBoundsHelper.getAdaptiveBounds(
+            from: currentMapRegion,
+            fallbackLocation: locationManager.currentLocation?.coordinate
+        )
     }
 }

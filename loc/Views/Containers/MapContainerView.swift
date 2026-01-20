@@ -13,6 +13,7 @@ struct MapContainerView: View {
     @StateObject private var mapViewModel: MapViewModel
     @EnvironmentObject var locationManager: LocationManager
     @EnvironmentObject var userSession: UserSession
+    @EnvironmentObject var appCoordinator: AppCoordinator
     
     @Binding var mapPosition: MapCameraPosition
     @Binding var recenterMap: Bool
@@ -226,6 +227,25 @@ struct MapContainerView: View {
                 }
             }
         }
+        .onChange(of: appCoordinator.showKeywordResultsPopup) { _, shouldShow in
+            // Show keyword search results as full list popup with map annotations
+            if shouldShow, let keyword = appCoordinator.keywordForPopup {
+                mapViewModel.selectKeywordResults(
+                    keyword: keyword,
+                    types: appCoordinator.keywordTypesForPopup
+                )
+                appCoordinator.showKeywordResultsPopup = false  // Reset trigger
+                // Trigger reload to show keyword-matching places on map
+                if let userId = userSession.currentUserId {
+                    let currentRegion = getCurrentMapRegion()
+                    Task {
+                        if let region = currentRegion {
+                            await mapViewModel.onMapCameraSettled(region, userId: userId)
+                        }
+                    }
+                }
+            }
+        }
         // Single sheet using item binding - prevents "only presenting a single sheet" warning
         .sheet(item: $mapViewModel.activeSheet) { sheetType in
             Group {
@@ -283,6 +303,9 @@ struct MapContainerView: View {
 
                 case .externalFavorites:
                     ExternalFavoritesListPopupView(userProfileVM: userProfileViewModel)
+
+                case .keywordResults(let keyword, let types):
+                    KeywordResultsPopupView(keyword: keyword, types: types)
                 }
             }
             .environmentObject(profileViewModel)

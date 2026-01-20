@@ -284,6 +284,17 @@ class PlaceService: ObservableObject {
         )
     }
 
+    /// Fetches map annotations for keyword search results (filtered by place types)
+    func fetchKeywordAnnotationsInViewport(northLat: Double, southLat: Double, eastLng: Double, westLng: Double, types: [String]) async throws -> [PlaceAnnotation] {
+        return try await supabase.fetchKeywordAnnotationsInViewport(
+            northLat: northLat,
+            southLat: southLat,
+            eastLng: eastLng,
+            westLng: westLng,
+            types: types
+        )
+    }
+
     /// Fetch community places in viewport - places saved by users outside your network
     /// Returns lightweight emoji markers using grid-based clustering for O(n) performance
     /// Note: Prefer `fetchCommunityPlacesInViewportWithUserId` when caller already has user ID

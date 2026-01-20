@@ -44,73 +44,73 @@ struct PinterestPhotoGalleryView: View {
     }
     
     // MARK: - Body
-    
+
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                // Solid black background for true full-screen feel
+                // Background - tappable to dismiss
                 Color.black
                     .opacity(backgroundOpacity)
-                    .onTapGesture {
-                        dismissGallery()
-                    }
+                    .onTapGesture { dismissGallery() }
 
+                // Photo content with page indicator
                 VStack(spacing: 0) {
-                    // Header
-                    headerView
-
-                    // Photo content
                     photoContent
                         .offset(y: dragOffset.height)
                         .scaleEffect(dragScale)
                         .gesture(dismissDragGesture)
 
-                    // Page indicator
                     if photos.count > 1 {
-                        pageIndicator
+                        pageIndicator(safeAreaBottom: geometry.safeAreaInsets.bottom)
                     }
+                }
+
+                // Header overlay - positioned at top, independent of content
+                VStack {
+                    headerView(safeAreaTop: geometry.safeAreaInsets.top)
+                    Spacer()
                 }
             }
         }
         .ignoresSafeArea()
     }
-    
+
     // MARK: - Header
-    
-    private var headerView: some View {
-        HStack {
-            // Close button - minimal modern style
-            Button(action: dismissGallery) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(.white)
-                    .frame(width: 36, height: 36)
-                    .background(Color.white.opacity(0.2))
-                    .clipShape(Circle())
-            }
 
-            Spacer()
-
-            // Photo counter - clean pill design
+    private func headerView(safeAreaTop: CGFloat) -> some View {
+        ZStack {
+            // Counter - truly centered (independent of X button)
             if photos.count > 1 {
-                Text("\(currentIndex + 1) / \(photos.count)")
-                    .font(.system(size: 14, weight: .medium))
+                Text("\(currentIndex + 1)/\(photos.count)")
+                    .font(.system(size: 13, weight: .medium))
                     .foregroundColor(.white.opacity(0.9))
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 7)
-                    .background(Color.white.opacity(0.2))
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(.ultraThinMaterial)
                     .clipShape(Capsule())
             }
+
+            // X button - pinned to trailing edge
+            HStack {
+                Spacer()
+                Button(action: dismissGallery) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.9))
+                        .frame(width: 32, height: 32)
+                        .background(.ultraThinMaterial)
+                        .clipShape(Circle())
+                }
+            }
         }
-        .padding(.horizontal, 20)
-        .padding(.top, 60) // Account for safe area (notch)
-        .padding(.bottom, 12)
+        .padding(.horizontal, 16)
+        .padding(.top, safeAreaTop + 16)
         .opacity(isDragging ? 0.3 : 1.0)
         .animation(.easeOut(duration: 0.2), value: isDragging)
     }
-    
+
     // MARK: - Photo Content
-    
+
     private var photoContent: some View {
         Group {
             if photos.count > 1 {
@@ -126,21 +126,19 @@ struct PinterestPhotoGalleryView: View {
             }
         }
     }
-    
+
     // MARK: - Page Indicator
-    
-    private var pageIndicator: some View {
+
+    private func pageIndicator(safeAreaBottom: CGFloat) -> some View {
         HStack(spacing: 8) {
             ForEach(0..<photos.count, id: \.self) { index in
                 Circle()
                     .fill(index == currentIndex ? Color.white : Color.white.opacity(0.4))
-                    .frame(width: 8, height: 8)
-                    .scaleEffect(index == currentIndex ? 1.0 : 0.8)
-                    .animation(.spring(response: 0.3), value: currentIndex)
+                    .frame(width: 6, height: 6)
             }
         }
-        .padding(.vertical, 16)
-        .padding(.bottom, 20) // Account for home indicator
+        .padding(.vertical, 12)
+        .padding(.bottom, max(safeAreaBottom, 16))
         .opacity(isDragging ? 0.3 : 1.0)
         .animation(.easeOut(duration: 0.2), value: isDragging)
     }
@@ -223,7 +221,15 @@ private struct InteractiveImageView: View {
                 .onTapGesture(count: 2) {
                     handleDoubleTap()
                 }
+                .onAppear {
+                    // Reset zoom and pan state when view appears
+                    scale = 1.0
+                    lastScale = 1.0
+                    offset = .zero
+                    lastOffset = .zero
+                }
         }
+        .clipped()
     }
     
     private var magnificationGesture: some Gesture {
