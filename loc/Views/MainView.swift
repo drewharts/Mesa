@@ -102,6 +102,15 @@ struct MainView: View {
                     searchCoordinator: searchCoordinator,
                     onSheetHeightChange: { newHeight in
                         sheetHeight = newHeight
+                    },
+                    onViewAllKeywords: {
+                        // Trigger keyword results popup via AppCoordinator
+                        if let keyword = searchViewModel.matchedKeyword {
+                            appCoordinator.triggerKeywordResultsPopup(
+                                keyword: keyword,
+                                types: searchViewModel.currentKeywordTypes
+                            )
+                        }
                     }
                 )
                 }
@@ -206,6 +215,12 @@ struct MainView: View {
             // When navigating BACK from user profile (true -> false), ensure search is collapsed and keyboard dismissed
             if oldValue == true && newValue == false {
                 appCoordinator.isSearchExpanded = false
+            }
+        }
+        .onChange(of: appCoordinator.isSearchExpanded) { _, isExpanded in
+            // Pass current map region to SearchViewModel for viewport-based keyword searches
+            if isExpanded {
+                searchViewModel.currentMapRegion = appCoordinator.currentMapRegion
             }
         }
     }

@@ -13,5 +13,9 @@
       "Bash(xcrun simctl openurl:*)"
     ],
     "deny": []
-  }
+  },
+  "enabledMcpjsonServers": [
+    "supabase"
+  ],
+  "enableAllProjectMcpServers": true
 }

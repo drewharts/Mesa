@@ -23,7 +23,19 @@ struct PlaceAnnotation: Identifiable, Codable {
         case userIds = "user_ids"
         case placeType = "place_type"
     }
-    
+
+    // MARK: - Memberwise Initializer
+
+    init(id: String, name: String, coordinate: CLLocationCoordinate2D, userIds: [String], placeType: String) {
+        self.id = id
+        self.name = name
+        self.coordinate = coordinate
+        self.userIds = userIds
+        self.placeType = placeType
+    }
+
+    // MARK: - Codable Initializer
+
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         

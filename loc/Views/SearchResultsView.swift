@@ -19,8 +19,18 @@ struct SearchResultsView: View {
     let isSearching: Bool
     let onSelectPlace: (MesaPlaceSuggestion) -> Void
     let onSelectUser: (ProfileData) -> Void
-    
+
+    // Keyword search results from local database
+    let keywordResults: [DetailPlace]
+    let matchedKeyword: String?
+    let hasMoreKeywordResults: Bool
+    let isLoadingMoreKeywords: Bool
+    let onSelectKeywordPlace: (DetailPlace) -> Void
+    let onLoadMoreKeywords: () -> Void
+    let onViewAllKeywords: () -> Void
+
     @State private var isUsersCollapsed: Bool = false
+    @State private var isKeywordCollapsed: Bool = false
 
     var body: some View {
         GeometryReader { geometry in
@@ -35,6 +45,16 @@ struct SearchResultsView: View {
                             isCollapsed: $isUsersCollapsed,
                             onSelectUser: onSelectUser
                         )
+                        KeywordResultsView(
+                            keywordResults: keywordResults,
+                            matchedKeyword: matchedKeyword,
+                            isCollapsed: $isKeywordCollapsed,
+                            hasMoreResults: hasMoreKeywordResults,
+                            isLoadingMore: isLoadingMoreKeywords,
+                            onSelectPlace: onSelectKeywordPlace,
+                            onLoadMore: onLoadMoreKeywords,
+                            onViewAll: onViewAllKeywords
+                        )
                         PlaceResultsView(
                             placeResults: placeResults,
                             showNoPlaceFound: showNoPlaceFound,
@@ -45,7 +65,7 @@ struct SearchResultsView: View {
                 }
             }
             .scrollDismissesKeyboard(.interactively)
-            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxHeight: geometry.size.height)
         }
     }
     
@@ -62,6 +82,126 @@ struct SearchResultsView: View {
     }
 }
 
+/// DUMB Component: Displays keyword-matched place results from local database
+/// Shows places that match keywords like "burger", "coffee", etc.
+struct KeywordResultsView: View {
+    let keywordResults: [DetailPlace]
+    let matchedKeyword: String?
+    @Binding var isCollapsed: Bool
+    let hasMoreResults: Bool
+    let isLoadingMore: Bool
+    let onSelectPlace: (DetailPlace) -> Void
+    let onLoadMore: () -> Void
+    let onViewAll: () -> Void
+
+    var body: some View {
+        if !keywordResults.isEmpty, let keyword = matchedKeyword {
+            VStack(alignment: .leading, spacing: 5) {
+                // Header with collapse toggle and View All button
+                HStack(spacing: 6) {
+                    // Collapse/expand button
+                    Button(action: {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            isCollapsed.toggle()
+                        }
+                    }) {
+                        HStack(spacing: 6) {
+                            Text("\(keyword.capitalized) nearby")
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.secondary)
+
+                            Image(systemName: isCollapsed ? "chevron.down" : "chevron.up")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(.secondary)
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Color(.systemBackground))
+                        .clipShape(Capsule())
+                        .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+
+                    Spacer()
+
+                    // View All button - shows full list popup with map annotations
+                    Button(action: onViewAll) {
+                        Image(systemName: "list.bullet")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.primary)
+                            .padding(8)
+                            .background(Color(.systemBackground))
+                            .clipShape(Circle())
+                            .shadow(color: .black.opacity(0.15), radius: 2, x: 0, y: 1)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                }
+                .padding(.horizontal, 20)
+                .contentShape(Rectangle())
+
+                // Keyword results - only show when not collapsed
+                if !isCollapsed {
+                    ForEach(keywordResults, id: \.id) { place in
+                        Button(action: { onSelectPlace(place) }) {
+                            HStack(spacing: 12) {
+                                Image(systemName: "fork.knife.circle.fill")
+                                    .font(.system(size: 24))
+                                    .foregroundColor(.orange.opacity(0.8))
+
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(place.name)
+                                        .font(.body)
+                                        .foregroundColor(.black)
+                                        .lineLimit(1)
+
+                                    if let address = place.address, !address.isEmpty {
+                                        Text(address)
+                                            .font(.caption)
+                                            .foregroundColor(.gray)
+                                            .lineLimit(1)
+                                    }
+                                }
+
+                                Spacer()
+                            }
+                            .padding()
+                            .background(Color.white)
+                            .cornerRadius(10)
+                            .shadow(color: .black.opacity(0.1), radius: 3, x: 0, y: 2)
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        .padding(.horizontal, 20)
+                    }
+
+                    // Load More button
+                    if hasMoreResults {
+                        Button(action: onLoadMore) {
+                            HStack {
+                                if isLoadingMore {
+                                    ProgressView()
+                                        .scaleEffect(0.8)
+                                } else {
+                                    Text("Load More")
+                                        .font(.subheadline)
+                                        .fontWeight(.medium)
+                                }
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(Color.gray.opacity(0.1))
+                            .cornerRadius(10)
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        .padding(.horizontal, 20)
+                        .disabled(isLoadingMore)
+                    }
+                }
+            }
+        }
+    }
+}
+
 /// DUMB Component: Displays place search results
 struct PlaceResultsView: View {
     let placeResults: [MesaPlaceSuggestion]
@@ -73,9 +213,14 @@ struct PlaceResultsView: View {
         VStack(alignment: .leading, spacing: 5) {
             if !placeResults.isEmpty {
                 Text("Places")
-                    .font(.headline)
-                    .foregroundColor(.gray)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.secondary)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(Color(.systemBackground))
+                    .clipShape(Capsule())
+                    .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
                     .padding(.horizontal, 20)
                     .padding(.top, 10)
                 
@@ -112,9 +257,14 @@ struct PlaceResultsView: View {
                 }
             } else if showNoPlaceFound {
                 Text("Places")
-                    .font(.headline)
-                    .foregroundColor(.gray)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.secondary)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(Color(.systemBackground))
+                    .clipShape(Capsule())
+                    .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
                     .padding(.horizontal, 20)
                     .padding(.top, 10)
                 
@@ -168,15 +318,19 @@ struct UserResultsView: View {
                 }) {
                     HStack(spacing: 6) {
                         Text("Users")
-                            .font(.headline)
-                            .foregroundColor(.gray)
-                        
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.secondary)
+
                         Image(systemName: isCollapsed ? "chevron.down" : "chevron.up")
                             .font(.system(size: 12, weight: .semibold))
-                            .foregroundColor(.gray.opacity(0.8))
-                        
-                        Spacer()
+                            .foregroundColor(.secondary)
                     }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(Color(.systemBackground))
+                    .clipShape(Capsule())
+                    .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 20)
                     .contentShape(Rectangle())
@@ -248,23 +402,34 @@ struct RecentSearchesView: View {
             }
         }
         .scrollDismissesKeyboard(.immediately)
-        .fixedSize(horizontal: false, vertical: true)
     }
-    
+
     // MARK: - Header
     
     private var headerView: some View {
         HStack {
             Text("Recent")
-                .font(.headline)
-                .foregroundColor(.gray)
-            
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .foregroundColor(.secondary)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(Color(.systemBackground))
+                .clipShape(Capsule())
+                .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
+
             Spacer()
-            
+
             Button(action: onClearAll) {
                 Text("Clear")
                     .font(.subheadline)
-                    .foregroundColor(.gray)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.secondary)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(Color(.systemBackground))
+                    .clipShape(Capsule())
+                    .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
             }
         }
         .padding(.horizontal, 20)
