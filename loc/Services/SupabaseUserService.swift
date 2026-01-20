@@ -1115,8 +1115,28 @@ extension SupabaseUserService {
             .eq("user_id", value: userId)
             .eq("place_id", value: placeId)
             .execute()
-        
+
         print("✅ [SupabaseUserService] Deleted external places for user \(userId), place \(placeId)")
+    }
+
+    // MARK: - External Place Update
+
+    /// Updates the place_id for an external_places record (TikTok place correction)
+    /// Single Responsibility: Execute Supabase update operation for external place association
+    /// - Parameters:
+    ///   - externalPlaceId: The external_places row ID to update
+    ///   - newPlaceId: The new place ID to associate with
+    ///   - userId: The user's ID for verification
+    /// - Throws: Database errors if update fails
+    func updateExternalPlaceAssociation(externalPlaceId: String, newPlaceId: String, userId: String) async throws {
+        try await supabase.client
+            .from("external_places")
+            .update(["place_id": newPlaceId])
+            .eq("id", value: externalPlaceId)
+            .eq("user_id", value: userId)
+            .execute()
+
+        print("✅ [SupabaseUserService] Updated external place \(externalPlaceId) to place \(newPlaceId)")
     }
 }
 

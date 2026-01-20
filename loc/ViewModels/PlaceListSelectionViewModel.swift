@@ -210,14 +210,15 @@ class PlaceListSelectionViewModel: ObservableObject {
                 userId: userId,
                 searchTerm: searchText
             )
-            
-            // Apply local filters (shared filter) on top of search results
-            filteredLists = applyLocalFilters(to: searchResults)
-            
-            // Load place membership for search results
+
+            // Load place membership BEFORE updating filteredLists
+            // This prevents race condition where UI renders before membership data is ready
             if let placeId = currentPlace?.id.uuidString, !searchResults.isEmpty {
                 await loadPlaceMembershipForLists(searchResults, placeId: placeId)
             }
+
+            // Now apply local filters and update UI with membership data ready
+            filteredLists = applyLocalFilters(to: searchResults)
         } catch {
             // Fallback to local filtering on error
             filteredLists = applyLocalFilters(to: lists)

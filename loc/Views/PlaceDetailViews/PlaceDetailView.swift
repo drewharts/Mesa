@@ -13,6 +13,7 @@ struct PlaceDetailView: View {
     @State private var selectedImageIndex: Int?
     @State private var showPhotoGallery = false
     @State private var galleryPhotos: [UIImage] = []
+    @State private var galleryPresentationCount = 0
     @State private var showNoPhoneNumberAlert = false
     @State private var showListSelection = false
     @State private var showCreatePost = false
@@ -48,10 +49,15 @@ struct PlaceDetailView: View {
                         onPhotoTapped: { photos, index in
                             galleryPhotos = photos
                             selectedImageIndex = index
+                            galleryPresentationCount += 1
                             showPhotoGallery = true
                         },
                         onAddToList: { showListSelection = true },
-                        onAddReview: { showCreatePost = true }
+                        onAddReview: { showCreatePost = true },
+                        onPlaceChanged: { newPlaceId in
+                            // Navigate to the new place after TikTok association change
+                            selectedPlaceVM.navigateToPlace(placeId: newPlaceId)
+                        }
                     )
                     .environmentObject(userProfileViewModel)
                     .environmentObject(detailPlaceViewModel)
@@ -160,6 +166,7 @@ struct PlaceDetailView: View {
                     initialIndex: selectedIndex,
                     isPresented: $showPhotoGallery
                 )
+                .id(galleryPresentationCount) // Force fresh view on each presentation
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .transition(.opacity)
                 .zIndex(100)

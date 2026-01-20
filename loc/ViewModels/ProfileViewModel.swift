@@ -1649,12 +1649,12 @@ class ProfileViewModel: ObservableObject {
     private func removeFromLocalTikTokState(placeId: String, userId: String) {
         // Remove from lightweight places array
         lightweightExternalPlaces.removeAll { $0.place_id == placeId }
-        
+
         // Remove from ID tracking collections
         allTikTokPlaceIds.removeAll { $0 == placeId }
         loadedTikTokPlaceIds.removeAll { $0 == placeId }
         userExternalPlaces.removeValue(forKey: placeId)
-        
+
         // Remove from placeSavers (so it doesn't appear on map)
         if var savers = detailPlaceViewModel.placeSavers[placeId] {
             savers.removeAll { $0 == userId }
@@ -1664,14 +1664,119 @@ class ProfileViewModel: ObservableObject {
                 detailPlaceViewModel.placeSavers[placeId] = savers
             }
         }
-        
+
         // Remove from places dictionary
         detailPlaceViewModel.places.removeValue(forKey: placeId)
-        
+
         // Recalculate map annotations
         detailPlaceViewModel.calculateAnnotationPlaces()
     }
-    
+
+    /// Updates a TikTok place to point to a different place (for correcting wrong place associations)
+    /// - Parameters:
+    ///   - place: The current LightweightPlace to update
+    ///   - newPlaceId: The new place ID to associate with
+    ///   - newPlaceName: The new place name for optimistic UI update
+    func updateTikTokPlace(_ place: LightweightPlace, newPlaceId: String, newPlaceName: String) async {
+        guard let userId = user?.id,
+              let externalPlaceId = place.external_place_id else {
+            print("❌ [ProfileViewModel] Cannot update TikTok place: missing userId or externalPlaceId")
+            return
+        }
+
+        let oldPlaceId = place.place_id
+
+        // Optimistic update: Update local state immediately
+        if let index = lightweightExternalPlaces.firstIndex(where: { $0.place_id == oldPlaceId && $0.external_place_id == externalPlaceId }) {
+            var updatedPlace = lightweightExternalPlaces[index]
+            updatedPlace = LightweightPlace(
+                place_id: newPlaceId,
+                name: newPlaceName,
+                latest_review_photo: updatedPlace.latest_review_photo,
+                external_place_id: externalPlaceId,
+                tiktok_url: updatedPlace.tiktok_url,
+                added_by_user_id: updatedPlace.added_by_user_id,
+                added_by_name: updatedPlace.added_by_name,
+                added_by_photo_url: updatedPlace.added_by_photo_url
+            )
+            lightweightExternalPlaces[index] = updatedPlace
+        }
+
+        // Update ID tracking
+        allTikTokPlaceIds.removeAll { $0 == oldPlaceId }
+        allTikTokPlaceIds.append(newPlaceId)
+        loadedTikTokPlaceIds.removeAll { $0 == oldPlaceId }
+        loadedTikTokPlaceIds.append(newPlaceId)
+
+        // Persist to backend
+        do {
+            try await userService.updateTikTokPlaceAssociation(
+                externalPlaceId: externalPlaceId,
+                newPlaceId: newPlaceId,
+                userId: userId
+            )
+            print("✅ [ProfileViewModel] Updated TikTok place from \(oldPlaceId) to \(newPlaceId)")
+        } catch {
+            print("❌ [ProfileViewModel] Error updating TikTok place: \(error.localizedDescription)")
+            // Revert optimistic update on failure
+            await refreshTikTokPlacesAfterImport()
+        }
+    }
+
+    /// Updates a TikTok place association by external place ID (used from PlaceDetailView)
+    /// - Parameters:
+    ///   - externalPlaceId: The external_places table ID
+    ///   - newPlaceId: The new place ID to associate with
+    ///   - newPlaceName: The new place name for optimistic UI update
+    func updateTikTokPlaceById(externalPlaceId: String, newPlaceId: String, newPlaceName: String) async {
+        guard let userId = user?.id else {
+            print("❌ [ProfileViewModel] Cannot update TikTok place: missing userId")
+            return
+        }
+
+        // Find the existing place to get old placeId for tracking updates
+        let existingPlace = lightweightExternalPlaces.first { $0.external_place_id == externalPlaceId }
+        let oldPlaceId = existingPlace?.place_id
+
+        // Optimistic update: Update local state immediately
+        if let index = lightweightExternalPlaces.firstIndex(where: { $0.external_place_id == externalPlaceId }) {
+            let original = lightweightExternalPlaces[index]
+            let updatedPlace = LightweightPlace(
+                place_id: newPlaceId,
+                name: newPlaceName,
+                latest_review_photo: original.latest_review_photo,
+                external_place_id: externalPlaceId,
+                tiktok_url: original.tiktok_url,
+                added_by_user_id: original.added_by_user_id,
+                added_by_name: original.added_by_name,
+                added_by_photo_url: original.added_by_photo_url
+            )
+            lightweightExternalPlaces[index] = updatedPlace
+        }
+
+        // Update ID tracking
+        if let old = oldPlaceId {
+            allTikTokPlaceIds.removeAll { $0 == old }
+            loadedTikTokPlaceIds.removeAll { $0 == old }
+        }
+        allTikTokPlaceIds.append(newPlaceId)
+        loadedTikTokPlaceIds.append(newPlaceId)
+
+        // Persist to backend
+        do {
+            try await userService.updateTikTokPlaceAssociation(
+                externalPlaceId: externalPlaceId,
+                newPlaceId: newPlaceId,
+                userId: userId
+            )
+            print("✅ [ProfileViewModel] Updated TikTok place to \(newPlaceId)")
+        } catch {
+            print("❌ [ProfileViewModel] Error updating TikTok place: \(error.localizedDescription)")
+            // Revert optimistic update on failure
+            await refreshTikTokPlacesAfterImport()
+        }
+    }
+
     // MARK: - Reviewed Places Access
     
     /// Cached set of place IDs the user has reviewed (for unvisited filtering)
