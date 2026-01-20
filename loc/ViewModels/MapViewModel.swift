@@ -20,6 +20,7 @@ enum MapSheetType: Identifiable, Equatable {
     case externalReviews  // External user's reviews
     case externalList(String)  // External user's list
     case externalFavorites  // External user's favorites
+    case keywordResults(keyword: String, types: [String])  // Keyword search results
 
     var id: String {
         switch self {
@@ -30,6 +31,7 @@ enum MapSheetType: Identifiable, Equatable {
         case .externalReviews: return "externalReviews"
         case .externalList(let listId): return "externalList-\(listId)"
         case .externalFavorites: return "externalFavorites"
+        case .keywordResults(let keyword, _): return "keywordResults-\(keyword)"
         }
     }
 }
@@ -57,6 +59,10 @@ class MapViewModel: ObservableObject {
     @Published var showingExternalFavoritesOnMap: Bool = false // When set, show external user's favorite places
     @Published var externalListId: String? = nil // When set, show external user's list places
 
+    // Keyword results popup state
+    @Published var showingKeywordResultsPopup: Bool = false
+    @Published var keywordTypesFilter: [String]? = nil  // Types to filter by when showing keyword results
+
     // Computed properties for backwards compatibility with existing code
     var showingListPopup: Bool { if case .list = activeSheet { return true } else { return false } }
     var showingTikToksPopup: Bool { activeSheet == .tiktoks }
@@ -65,6 +71,7 @@ class MapViewModel: ObservableObject {
     var showingExternalListPopup: Bool { if case .externalList = activeSheet { return true } else { return false } }
     var showingExternalFavoritesPopup: Bool { activeSheet == .externalFavorites }
     var showingFavoritesPopup: Bool { activeSheet == .favorites }
+    var showingKeywordPopup: Bool { if case .keywordResults = activeSheet { return true } else { return false } }
 
     private var debounceTimer: Timer?
     private let placeService: PlaceService
@@ -155,6 +162,21 @@ class MapViewModel: ObservableObject {
         lastLoadedRegion = nil
     }
 
+    /// Shows keyword search results on the map with filtered annotations
+    func selectKeywordResults(keyword: String, types: [String]) {
+        showingKeywordResultsPopup = true
+        keywordTypesFilter = types  // Store types for loadPlacesForViewport filtering
+        showingTikToksOnMap = false
+        showingReviewsOnMap = false
+        showingFavoritesOnMap = false
+        selectedListId = nil
+        activeSheet = .keywordResults(keyword: keyword, types: types)
+        // Clear current annotations - they will be reloaded by onMapCameraSettled
+        viewportAnnotations = []
+        communityMarkers = []
+        lastLoadedRegion = nil
+    }
+
     /// Shows external user's reviews on the map with filtered annotations
     func selectExternalReviews(userId: String) {
         externalUserId = userId
@@ -204,6 +226,8 @@ class MapViewModel: ObservableObject {
         showingTikToksOnMap = false
         showingReviewsOnMap = false
         showingFavoritesOnMap = false
+        showingKeywordResultsPopup = false
+        keywordTypesFilter = nil
         // Clear external user state
         externalUserId = nil
         showingExternalReviewsOnMap = false
@@ -283,8 +307,13 @@ class MapViewModel: ObservableObject {
         for annotation in viewportAnnotations {
             // Get up to 3 profile pictures for users who saved this place
             let profilePictures = annotation.userIds.prefix(3).compactMap { userProfilePictures[$0] }
-            
-            // Create combined image
+
+            // Skip annotations without user photos - CustomPlaceAnnotationView will show emoji fallback
+            guard !profilePictures.isEmpty else {
+                continue
+            }
+
+            // Create combined image from user profile photos
             let combinedImage: UIImage
             switch profilePictures.count {
             case 1:
@@ -294,10 +323,9 @@ class MapViewModel: ObservableObject {
             case 3:
                 combinedImage = combinedCircularImage(image1: profilePictures[0], image2: profilePictures[1], image3: profilePictures[2])
             default:
-                // If no profile pictures, use a default image
-                combinedImage = combinedCircularImage(image1: nil)
+                continue
             }
-            
+
             annotationImages[annotation.id] = combinedImage
         }
     }
@@ -486,6 +514,15 @@ class MapViewModel: ObservableObject {
                         westLng: bounds.westLng,
                         userId: userId
                     )
+                } else if showingKeywordResultsPopup, let types = keywordTypesFilter {
+                    // Keyword search results - filter by place types
+                    annotations = try await placeService.fetchKeywordAnnotationsInViewport(
+                        northLat: bounds.northLat,
+                        southLat: bounds.southLat,
+                        eastLng: bounds.eastLng,
+                        westLng: bounds.westLng,
+                        types: types
+                    )
                 } else {
                     // Fetch all annotations (normal behavior)
                     annotations = try await placeService.fetchPlacesInViewportWithUserId(
@@ -499,7 +536,7 @@ class MapViewModel: ObservableObject {
 
                 // Only fetch community markers if no filter is active
                 let community: [CommunityPlaceMarker]
-                let hasActiveFilter = selectedListId != nil || showingTikToksOnMap || showingReviewsOnMap || showingFavoritesOnMap || externalUserId != nil
+                let hasActiveFilter = selectedListId != nil || showingTikToksOnMap || showingReviewsOnMap || showingFavoritesOnMap || showingKeywordResultsPopup || externalUserId != nil
                 if !hasActiveFilter {
                     community = try await placeService.fetchCommunityPlacesInViewportWithUserId(
                     northLat: bounds.northLat,

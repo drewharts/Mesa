@@ -21,6 +21,7 @@ struct SearchOverlayView: View {
     
     // MARK: - Callbacks for state updates
     let onSheetHeightChange: (CGFloat) -> Void
+    let onViewAllKeywords: () -> Void
     
     // MARK: - Animation Configuration
     // Staff Engineer: Extract animation config for consistency and maintainability
@@ -49,7 +50,8 @@ struct SearchOverlayView: View {
                 searchViewModel: searchViewModel,
                 isSearchExpanded: $isSearchExpanded,
                 onPlaceSelected: handlePlaceSelection,
-                onUserSelected: searchCoordinator.handleUserSelection
+                onUserSelected: searchCoordinator.handleUserSelection,
+                onViewAllKeywords: onViewAllKeywords
             )
             .id("SearchContainer")  // Stable identity prevents recreation
             .transition(.opacity)

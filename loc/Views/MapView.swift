@@ -14,6 +14,7 @@ struct MapView: View {
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var detailPlaceVM: DetailPlaceViewModel
     @EnvironmentObject var mapViewModel: MapViewModel
+    @EnvironmentObject var appCoordinator: AppCoordinator
 
     @Binding var recenterMap: Bool
     @Binding var mapPosition: MapCameraPosition
@@ -43,7 +44,8 @@ struct MapView: View {
                              mapViewModel.showingFavoritesPopup ||
                              mapViewModel.showingExternalListPopup ||
                              mapViewModel.showingExternalReviewsPopup ||
-                             mapViewModel.showingExternalFavoritesPopup
+                             mapViewModel.showingExternalFavoritesPopup ||
+                             mapViewModel.showingKeywordPopup
         if isShowingPlace,
            let selectedId = selectedPlaceVM.selectedPlace?.id.uuidString {
             return mapViewModel.viewportAnnotations.filter { $0.id != selectedId }
@@ -84,7 +86,8 @@ struct MapView: View {
                 mapViewModel.showingFavoritesPopup ||
                 mapViewModel.showingExternalListPopup ||
                 mapViewModel.showingExternalReviewsPopup ||
-                mapViewModel.showingExternalFavoritesPopup),
+                mapViewModel.showingExternalFavoritesPopup ||
+                mapViewModel.showingKeywordPopup),
                let selectedPlace = selectedPlaceVM.selectedPlace,
                let coordinate = selectedPlace.coordinate {
                 Annotation(
@@ -224,7 +227,8 @@ struct MapView: View {
                        mapViewModel.showingFavoritesPopup ||
                        mapViewModel.showingExternalListPopup ||
                        mapViewModel.showingExternalReviewsPopup ||
-                       mapViewModel.showingExternalFavoritesPopup {
+                       mapViewModel.showingExternalFavoritesPopup ||
+                       mapViewModel.showingKeywordPopup {
                         // Set pending navigation - popup view will observe this and push to NavigationStack
                         // This makes annotation taps behave the same as clicking a place tile in the popup
                         mapViewModel.pendingPlaceNavigation = place.id.uuidString
@@ -247,7 +251,10 @@ struct MapView: View {
                 .onMapCameraChange(frequency: .onEnd) { context in
                     // This fires only when camera stops moving - Apple handles debouncing!
                     currentMapRegion = context.region
-                    
+
+                    // Update global map region for viewport-based searches
+                    appCoordinator.currentMapRegion = context.region
+
                     // Only load if user profile is available (View coordinates data flow)
                     if let userId = profile.user?.id {
                         Task.detached(priority: .background) {

@@ -1205,10 +1205,159 @@ class SupabasePlaceService: ObservableObject {
                 .value
             
             let places = response.map { convertToDetailPlace($0) }
-            
+
             return places
         } catch {
             print("❌ [Supabase] Error batch fetching place details: \(error)")
+            throw error
+        }
+    }
+
+    // MARK: - Search Places by Type
+
+    /// Search for places matching any of the given place types within viewport bounds
+    /// Used for keyword-based search (e.g., "chinese" -> ["chinese_restaurant", "cantonese_restaurant"])
+    /// Note: Uses client-side filtering for bounds since location is stored as PostGIS geometry
+    /// - Parameters:
+    ///   - types: Array of place type strings to match against categories
+    ///   - bounds: Optional viewport bounds for filtering results
+    ///   - limit: Maximum number of results to return
+    ///   - offset: Number of results to skip (for pagination)
+    func searchPlacesByTypes(
+        types: [String],
+        bounds: (northLat: Double, southLat: Double, eastLng: Double, westLng: Double)?,
+        limit: Int = 20,
+        offset: Int = 0
+    ) async throws -> [DetailPlace] {
+        guard !types.isEmpty else { return [] }
+
+        do {
+            // Build the query - filter by categories array overlap
+            // Use overlaps for array matching - finds places where categories overlaps with our types
+            // PostgreSQL: categories && ARRAY['chinese_restaurant', 'cantonese_restaurant']
+            let query = supabase.client
+                .from("places")
+                .select()
+                .overlaps("categories", value: types)
+
+            // Fetch more records to account for client-side filtering
+            // Need extra for both bounds filtering and pagination
+            let fetchLimit = bounds != nil ? (limit + offset) * 5 : limit
+            let fetchOffset = bounds != nil ? 0 : offset  // Can't use DB offset with client-side filtering
+
+            let response: [PlaceRecord] = try await query
+                .limit(fetchLimit)
+                .range(from: fetchOffset, to: fetchOffset + fetchLimit - 1)
+                .execute()
+                .value
+
+            var places = response.map { convertToDetailPlace($0) }
+
+            // Filter by viewport bounds client-side (location is stored as PostGIS geometry)
+            if let bounds = bounds {
+                places = places.filter { place in
+                    guard let coordinate = place.coordinate else { return false }
+                    let lat = coordinate.latitude
+                    let lng = coordinate.longitude
+                    return lat >= bounds.southLat &&
+                           lat <= bounds.northLat &&
+                           lng >= bounds.westLng &&
+                           lng <= bounds.eastLng
+                }
+                // Apply pagination after client-side filtering
+                if offset > 0 && places.count > offset {
+                    places = Array(places.dropFirst(offset))
+                } else if offset > 0 {
+                    places = []
+                }
+            }
+
+            return Array(places.prefix(limit))
+        } catch {
+            print("❌ [Supabase] Error searching places by types: \(error)")
+            throw error
+        }
+    }
+
+    /// Fetch keyword annotations for map viewport - returns PlaceAnnotation for map display
+    /// Uses searchPlacesByTypes internally and converts results to annotations
+    func fetchKeywordAnnotationsInViewport(
+        northLat: Double,
+        southLat: Double,
+        eastLng: Double,
+        westLng: Double,
+        types: [String]
+    ) async throws -> [PlaceAnnotation] {
+        let places = try await searchPlacesByTypes(
+            types: types,
+            bounds: (northLat: northLat, southLat: southLat,
+                     eastLng: eastLng, westLng: westLng),
+            limit: 100,
+            offset: 0
+        )
+
+        return places.compactMap { place -> PlaceAnnotation? in
+            guard let coord = place.coordinate else { return nil }
+            return PlaceAnnotation(
+                id: place.id.uuidString,
+                name: place.name,
+                coordinate: coord,
+                userIds: [],
+                placeType: place.categories?.first ?? "restaurant"
+            )
+        }
+    }
+
+    /// Search places by category types with photos - uses RPC for consistent photo loading
+    /// Returns LightweightPlace with latest_review_photo from reviews table
+    func searchPlacesByTypesWithPhotos(
+        types: [String],
+        bounds: (northLat: Double, southLat: Double, eastLng: Double, westLng: Double),
+        limit: Int = 20,
+        offset: Int = 0
+    ) async throws -> [LightweightPlace] {
+        struct SearchParams: Encodable {
+            let p_types: [String]
+            let p_north_lat: Double
+            let p_south_lat: Double
+            let p_east_lng: Double
+            let p_west_lng: Double
+            let p_limit: Int
+            let p_offset: Int
+        }
+
+        struct SearchResult: Codable {
+            let place_id: String
+            let name: String
+            let latest_review_photo: String?
+            let categories: [String]?
+        }
+
+        let params = SearchParams(
+            p_types: types,
+            p_north_lat: bounds.northLat,
+            p_south_lat: bounds.southLat,
+            p_east_lng: bounds.eastLng,
+            p_west_lng: bounds.westLng,
+            p_limit: limit,
+            p_offset: offset
+        )
+
+        do {
+            let results: [SearchResult] = try await supabase.client
+                .rpc("search_places_by_types", params: params)
+                .execute()
+                .value
+
+            return results.map { result in
+                LightweightPlace(
+                    place_id: result.place_id,
+                    name: result.name,
+                    latest_review_photo: result.latest_review_photo
+                )
+            }
+        } catch {
+            print("❌ [Supabase] Error searching places by types with photos: \(error)")
             throw error
         }
     }

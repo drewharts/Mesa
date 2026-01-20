@@ -18,18 +18,21 @@ struct SearchContainerView: View {
     
     let onPlaceSelected: (DetailPlace) -> Void
     let onUserSelected: (ProfileData) -> Void
-    
+    let onViewAllKeywords: () -> Void
+
     init(
         searchViewModel: SearchViewModel,
         isSearchExpanded: Binding<Bool>,
         onPlaceSelected: @escaping (DetailPlace) -> Void,
-        onUserSelected: @escaping (ProfileData) -> Void
+        onUserSelected: @escaping (ProfileData) -> Void,
+        onViewAllKeywords: @escaping () -> Void
     ) {
         self.searchViewModel = searchViewModel
         self._isSearchExpanded = isSearchExpanded
         self.onPlaceSelected = onPlaceSelected
         self.onUserSelected = onUserSelected
-        
+        self.onViewAllKeywords = onViewAllKeywords
+
         // Set callback (NOT ViewModel reference)
         searchViewModel.onPlaceSelected = onPlaceSelected
     }
@@ -119,6 +122,7 @@ struct SearchContainerView: View {
     private var shouldShowSearchResults: Bool {
         !searchViewModel.searchResults.isEmpty ||
         !searchViewModel.userResults.isEmpty ||
+        !searchViewModel.keywordResults.isEmpty ||
         searchViewModel.showNoPlaceFound ||
         searchViewModel.isSearching
     }
@@ -183,9 +187,9 @@ struct SearchContainerView: View {
             onSelectPlace: { suggestion in
                 // CRITICAL: Dismiss keyboard BEFORE network call to prevent keyboard from affecting sheet height
                 dismissKeyboard()
-                
+
                 searchViewModel.selectSuggestion(suggestion)
-                
+
                 // Collapse search UI after keyboard is dismissed
                 withAnimation {
                     isSearchExpanded = false
@@ -194,19 +198,45 @@ struct SearchContainerView: View {
             onSelectUser: { user in
                 // Dismiss keyboard immediately to prevent UI conflicts
                 dismissKeyboard()
-                
+
                 // Save user to recent selections
                 searchViewModel.saveUserSelection(user)
-                
+
                 onUserSelected(user)
-                
+
                 withAnimation {
                     isSearchExpanded = false
                 }
+            },
+            keywordResults: searchViewModel.keywordResults,
+            matchedKeyword: searchViewModel.matchedKeyword,
+            hasMoreKeywordResults: searchViewModel.hasMoreKeywordResults,
+            isLoadingMoreKeywords: searchViewModel.isLoadingMoreKeywords,
+            onSelectKeywordPlace: { place in
+                // Dismiss keyboard before navigating
+                dismissKeyboard()
+
+                // Navigate to the selected place
+                onPlaceSelected(place)
+
+                withAnimation {
+                    isSearchExpanded = false
+                }
+            },
+            onLoadMoreKeywords: {
+                searchViewModel.loadMoreKeywordResults()
+            },
+            onViewAllKeywords: {
+                // Dismiss keyboard and collapse search before triggering popup
+                dismissKeyboard()
+                withAnimation {
+                    isSearchExpanded = false
+                }
+                onViewAllKeywords()
             }
-    )
-    .frame(maxWidth: .infinity)
-    .padding(.top, 10)
-    .padding(.bottom, 50)
-}
+        )
+        .frame(maxWidth: .infinity)
+        .padding(.top, 10)
+        .padding(.bottom, 50)
+    }
 }

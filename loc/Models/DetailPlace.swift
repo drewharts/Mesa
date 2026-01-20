@@ -331,3 +331,17 @@ struct DetailPlace: Codable, Identifiable, Equatable {
     
     // Removed MapboxSearch OpenHours serialization - now using Google Places API
 }
+
+// MARK: - LightweightPlace Conversion
+
+extension DetailPlace {
+    /// Convert to LightweightPlace for use in grid tiles
+    /// Uses first photo URL as latest_review_photo for consistency with other popups
+    var asLightweightPlace: LightweightPlace {
+        LightweightPlace(
+            place_id: id.uuidString,
+            name: name,
+            latest_review_photo: photoUrls?.first
+        )
+    }
+}
