@@ -52,12 +52,30 @@ struct MapView: View {
         }
         return mapViewModel.viewportAnnotations
     }
-    
+
+    // Filters out selected community marker when beacon is showing
+    private var communityMarkersToDisplay: [CommunityPlaceMarker] {
+        let isShowingPlace = selectedPlaceVM.isDetailSheetPresented ||
+                             mapViewModel.showingListPopup ||
+                             mapViewModel.showingTikToksPopup ||
+                             mapViewModel.showingReviewsPopup ||
+                             mapViewModel.showingFavoritesPopup ||
+                             mapViewModel.showingExternalListPopup ||
+                             mapViewModel.showingExternalReviewsPopup ||
+                             mapViewModel.showingExternalFavoritesPopup ||
+                             mapViewModel.showingKeywordPopup
+        if isShowingPlace,
+           let selectedId = selectedPlaceVM.selectedPlace?.id.uuidString {
+            return mapViewModel.communityMarkers.filter { $0.id != selectedId }
+        }
+        return mapViewModel.communityMarkers
+    }
+
     // Map content extracted to help Swift type checker
     private var mapContentView: some View {
         Map(position: $mapPosition) {
             // Community places as small white dots (shown behind network places)
-            ForEach(mapViewModel.communityMarkers) { marker in
+            ForEach(communityMarkersToDisplay) { marker in
                 Annotation(
                     "",
                     coordinate: marker.coordinate,
@@ -139,10 +157,9 @@ struct MapView: View {
     }
 
     // Community marker view - small emoji markers for places saved by users you don't follow
+    // Note: Community markers do NOT show blue circle highlight when selected.
+    // Selection is indicated by the separate pulsing beacon (selectedPlaceAnnotationView).
     private func communityMarkerView(for marker: CommunityPlaceMarker) -> some View {
-        let isSelected = selectedPlaceVM.isDetailSheetPresented && 
-                        selectedPlaceVM.selectedPlace?.id.uuidString == marker.id
-        
         // Scale size based on popularity (save count)
         let fontSize: CGFloat = {
             switch marker.saveCount {
@@ -151,32 +168,10 @@ struct MapView: View {
             default: return 24
             }
         }()
-        
-        return Text(marker.emoji)
-            .font(.system(size: isSelected ? fontSize * 1.8 : fontSize))
-            .padding(isSelected ? 12 : 0)
-            .background(
-                ZStack {
-                    // Outer glow layers for prominent halo effect
-                    if isSelected {
-                        Circle()
-                            .fill(Color.white)
-                            .shadow(color: Color.blue.opacity(0.6), radius: 20)
-                            .shadow(color: Color.blue.opacity(0.4), radius: 30)
-                            .shadow(color: Color.blue.opacity(0.2), radius: 40)
 
-                        // Crisp ring border
-                        Circle()
-                            .strokeBorder(Color.blue.opacity(0.8), lineWidth: 3)
-                    } else {
-                        Circle()
-                            .fill(Color.clear)
-                    }
-                }
-            )
+        return Text(marker.emoji)
+            .font(.system(size: fontSize))
             .shadow(color: .black.opacity(0.3), radius: 2, x: 0, y: 1)
-            .zIndex(isSelected ? 100 : 0)
-            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isSelected)
             .onTapGesture {
                 handleCommunityMarkerTap(marker)
             }

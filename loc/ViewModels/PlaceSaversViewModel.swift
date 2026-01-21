@@ -19,12 +19,18 @@ import Combine
 @MainActor
 class PlaceSaversViewModel: ObservableObject {
     // MARK: - Published Properties (What the View Needs)
-    @Published private(set) var savers: [ProfileData] = []
+    @Published private(set) var followedSavers: [ProfileData] = []  // Users current user follows
+    @Published private(set) var unfollowedSavers: [ProfileData] = []  // Users current user doesn't follow
     @Published private(set) var isLoading: Bool = false
     @Published private(set) var error: Error?
     @Published private(set) var currentUserSaved: Bool = false
-    @Published private(set) var totalSaverCount: Int = 0  // Count of visible savers (profiles you can see)
+    @Published private(set) var totalSaverCount: Int = 0  // Count of all savers (excluding current user)
     @Published private(set) var totalGlobalSaveCount: Int = 0  // Total saves from ALL users (for display)
+
+    /// All savers combined (for backward compatibility)
+    var savers: [ProfileData] {
+        followedSavers + unfollowedSavers
+    }
     
     // MARK: - Dependencies (Services, not other ViewModels)
     private let userService: UserService
@@ -78,116 +84,144 @@ class PlaceSaversViewModel: ObservableObject {
     func selectUser(_ user: ProfileData, dismiss: @escaping () -> Void) {
         guard let currentUserId = userSession.currentUserId,
               let userProfileVM = userProfileViewModel else { return }
-        
+
         // Dismiss sheet first (View handles this)
         dismiss()
-        
+
         // Navigate after brief delay for smooth transition
+        // Pass fromPlaceDetail: true so state can be restored when returning
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            userProfileVM.selectUser(user, currentUserId: currentUserId)
+            userProfileVM.selectUser(user, currentUserId: currentUserId, fromPlaceDetail: true)
         }
     }
     
     // MARK: - Computed Properties
-    
-    /// Savers excluding current user (for indicator and sheet list)
-    /// Rationale: "Saved by" is about social discovery - you already know you saved it
-    var displayableSavers: [ProfileData] {
-        guard let currentUserId = userSession.currentUserId else { return savers }
-        return savers.filter { $0.id != currentUserId }
+
+    /// Followed savers excluding current user (for indicator circles)
+    var displayableFollowedSavers: [ProfileData] {
+        guard let currentUserId = userSession.currentUserId else { return followedSavers }
+        return followedSavers.filter { $0.id != currentUserId }
     }
-    
+
+    /// Unfollowed savers excluding current user
+    var displayableUnfollowedSavers: [ProfileData] {
+        guard let currentUserId = userSession.currentUserId else { return unfollowedSavers }
+        return unfollowedSavers.filter { $0.id != currentUserId }
+    }
+
+    /// All savers excluding current user (for backward compatibility)
+    var displayableSavers: [ProfileData] {
+        displayableFollowedSavers + displayableUnfollowedSavers
+    }
+
     /// Count of savers excluding current user (for indicator)
     var displayableSaverCount: Int {
         displayableSavers.count
     }
-    
+
     /// Number of additional savers beyond visible circles (for "+X" display)
-    /// Excludes current user - only shows count of OTHER savers
     var additionalSaverCount: Int {
         max(0, displayableSaverCount - 3)
     }
-    
+
     /// Whether to show the savers indicator at all
-    /// Only show if OTHER people (not just you) have saved this place
+    /// Only show if OTHER people (besides just the current user) have saved this place
     var shouldShowSaversIndicator: Bool {
-        displayableSaverCount > 0
+        // If current user saved, need at least 2 total saves to show indicator
+        // If current user didn't save, any saves will show indicator
+        currentUserSaved ? totalGlobalSaveCount > 1 : totalGlobalSaveCount > 0
+    }
+
+    /// Whether there are any followed savers to display (excluding current user)
+    var hasFollowedSavers: Bool {
+        displayableFollowedSavers.count > 0
+    }
+
+    /// Whether there are any unfollowed savers to display
+    var hasUnfollowedSavers: Bool {
+        displayableUnfollowedSavers.count > 0
     }
     
     /// Get first N saver IDs for profile circle display (excluding current user)
+    /// Shows followed users first, then unfollowed users
     func saverIdsForDisplay(limit: Int = 3) -> [String] {
         return Array(displayableSavers.prefix(limit).map { $0.id })
     }
-    
+
     /// Get first N savers (ProfileData) for profile circle display (excluding current user)
-    /// Shows only OTHER people who saved this place - you don't need to see your own face
+    /// Shows followed users first, then unfollowed users
     func saversForDisplay(limit: Int = 3) -> [ProfileData] {
         return Array(displayableSavers.prefix(limit))
     }
     
     // MARK: - Private Methods
-    
+
     /// Fetches place savers from database in real-time
     private func fetchSaversFromDatabase(placeId: String) {
         fetchTask = Task { [weak self] in
             guard let self = self else { return }
-            
-            // Don't show loading for quick fetches (better UX)
-            // isLoading = true
-            
+
             do {
                 let requestingUserId = self.userSession.currentUserId
-                
-                // Fetch savers and total count in parallel
-                async let saverProfilesTask = self.userService.fetchPlaceSavers(
+
+                // Fetch ALL savers (database now returns everyone with is_followed flag)
+                let saverProfiles = try await self.userService.fetchPlaceSavers(
                     placeId: placeId,
                     requestingUserId: requestingUserId
                 )
-                async let totalCountTask = SupabasePlaceService.shared.fetchTotalSaveCount(for: placeId)
-                
-                let (saverProfiles, globalCount) = try await (saverProfilesTask, totalCountTask)
-                
+
                 // Check if task was cancelled
                 guard !Task.isCancelled else { return }
-                
-                // Update state
-                self.savers = saverProfiles.map { $0.toProfileData() }
-                self.totalSaverCount = saverProfiles.count
-                self.totalGlobalSaveCount = globalCount
-                
+
+                // Separate followed and unfollowed savers based on is_followed flag
+                let followed = saverProfiles.filter { $0.isFollowed }.map { $0.toProfileData() }
+                let unfollowed = saverProfiles.filter { !$0.isFollowed }.map { $0.toProfileData() }
+
                 // Check if current user is in the savers list
+                let userSaved: Bool
                 if let currentUserId = requestingUserId {
-                    self.currentUserSaved = saverProfiles.contains { $0.userId == currentUserId }
+                    userSaved = saverProfiles.contains { $0.userId == currentUserId }
                 } else {
-                    self.currentUserSaved = false
+                    userSaved = false
                 }
-                
+
+                // Update state
+                self.followedSavers = followed
+                self.unfollowedSavers = unfollowed
+                self.totalSaverCount = saverProfiles.count
+                self.totalGlobalSaveCount = saverProfiles.count  // Now we have all savers
+                self.currentUserSaved = userSaved
+
                 // Update detailPlaceViewModel.placeSavers for consistency with map annotations
                 let saverIds = saverProfiles.map { $0.userId }
                 if !saverIds.isEmpty {
                     self.detailPlaceViewModel.placeSavers[placeId] = saverIds
                 }
-                
+
                 self.error = nil
                 self.isLoading = false
-                
-                print("✅ [PlaceSavers] Fetched \(saverProfiles.count) visible savers, \(globalCount) total saves for place \(placeId.prefix(8))...")
-                
+
+                let followedCount = followed.count
+                let unfollowedCount = unfollowed.count
+                print("✅ [PlaceSavers] Fetched \(saverProfiles.count) savers (\(followedCount) followed, \(unfollowedCount) unfollowed) for place \(placeId.prefix(8))...")
+
             } catch {
                 guard !Task.isCancelled else { return }
-                
+
                 print("❌ [PlaceSavers] Error fetching savers: \(error.localizedDescription)")
                 self.error = error
                 self.isLoading = false
                 self.totalSaverCount = 0
                 self.totalGlobalSaveCount = 0
-                self.savers = []
+                self.followedSavers = []
+                self.unfollowedSavers = []
             }
         }
     }
     
     private func resetState() {
-        savers = []
+        followedSavers = []
+        unfollowedSavers = []
         isLoading = false
         error = nil
         currentUserSaved = false

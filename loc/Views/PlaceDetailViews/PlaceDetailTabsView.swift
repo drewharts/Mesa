@@ -350,11 +350,11 @@ private struct SavedByIndicator: View {
     let savers: [ProfileData]
     let additionalCount: Int
     let onTap: () -> Void
-    
+
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: 4) {
-                // Overlapping profile circles in their own container
+                // Profile circles for savers (followed first, then unfollowed)
                 HStack(spacing: -8) {
                     ForEach(savers, id: \.id) { saver in
                         if let photoURL = saver.profilePhotoURL {
@@ -381,8 +381,8 @@ private struct SavedByIndicator: View {
                         }
                     }
                 }
-                
-                // +X indicator outside the overlapping circles
+
+                // +X indicator for additional savers beyond the circles
                 if additionalCount > 0 {
                     Text("+\(additionalCount)")
                         .font(.caption2)
@@ -393,7 +393,7 @@ private struct SavedByIndicator: View {
         }
         .buttonStyle(.plain)
     }
-    
+
     private func placeholderCircle(for saver: ProfileData) -> some View {
         Circle()
             .fill(Color(.systemGray4))

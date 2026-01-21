@@ -142,6 +142,7 @@ class SelectedPlaceViewModel: ObservableObject {
     @Published var isDetailSheetPresented: Bool = false
     @Published var isRestaurantOpen: Bool = false // New property to track open status
     @Published var allowAutoPresent: Bool = true
+    @Published var preservedPlaceForNavigation: DetailPlace? = nil  // Preserve place state during navigation
     @Published var shouldAnimateMapToPlace: Bool = false // Track if map should animate to place location
     @Published private var placePosts: [String: [PlacePost]] = [:] // Cache for posts by placeId
     @Published private var placeTikToks: [String: [TikTokVideo]] = [:] // Cache for TikToks by placeId
@@ -607,9 +608,30 @@ class SelectedPlaceViewModel: ObservableObject {
         // Set up place selection FIRST (so it's ready when profile dismisses)
         self.selectPlaceAndFetchDetails(place, shouldAnimateMap: true)
         self.isDetailSheetPresented = true
-        
+
         // Dismiss immediately - place detail is already set up and will appear as profile animates away
         dismissNavigation()
+    }
+
+    // MARK: - State Preservation (for navigation from place detail)
+
+    /// Preserves current place state before navigating to user profile
+    func preserveStateForNavigation() {
+        preservedPlaceForNavigation = selectedPlace
+    }
+
+    /// Restores place state after returning from user profile navigation
+    func restoreStateAfterNavigation() {
+        if let preserved = preservedPlaceForNavigation {
+            selectedPlace = preserved
+            isDetailSheetPresented = true
+            preservedPlaceForNavigation = nil
+        }
+    }
+
+    /// Clears preserved state (e.g., when user navigates elsewhere)
+    func clearPreservedState() {
+        preservedPlaceForNavigation = nil
     }
     
     // MARK: - Logout Cleanup

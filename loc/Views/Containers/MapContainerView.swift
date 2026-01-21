@@ -89,7 +89,7 @@ struct MapContainerView: View {
                     mapViewModel.selectList(listId, availableLists: profileViewModel.lightweightPlaceLists)
                     // Trigger reload if we have a current region
                     if let userId = userSession.currentUserId {
-                        let currentRegion = getCurrentMapRegion()
+                        let currentRegion = appCoordinator.currentMapRegion
                         Task {
                             if let region = currentRegion {
                                 await mapViewModel.onMapCameraSettled(region, userId: userId)
@@ -100,7 +100,7 @@ struct MapContainerView: View {
                     mapViewModel.clearListFilter()
                     // Trigger reload to show all annotations
                     if let userId = userSession.currentUserId {
-                        let currentRegion = getCurrentMapRegion()
+                        let currentRegion = appCoordinator.currentMapRegion
                         Task {
                             if let region = currentRegion {
                                 await mapViewModel.onMapCameraSettled(region, userId: userId)
@@ -116,7 +116,7 @@ struct MapContainerView: View {
                     profileViewModel.showTikToksOnMap = false // Reset trigger
                     // Trigger reload with TikTok filter
                     if let userId = userSession.currentUserId {
-                        let currentRegion = getCurrentMapRegion()
+                        let currentRegion = appCoordinator.currentMapRegion
                         Task {
                             if let region = currentRegion {
                                 await mapViewModel.onMapCameraSettled(region, userId: userId)
@@ -132,7 +132,7 @@ struct MapContainerView: View {
                     profileViewModel.showReviewsOnMap = false // Reset trigger
                     // Trigger reload with reviews filter
                     if let userId = userSession.currentUserId {
-                        let currentRegion = getCurrentMapRegion()
+                        let currentRegion = appCoordinator.currentMapRegion
                         Task {
                             if let region = currentRegion {
                                 await mapViewModel.onMapCameraSettled(region, userId: userId)
@@ -148,7 +148,7 @@ struct MapContainerView: View {
                     profileViewModel.showFavoritesOnMap = false // Reset trigger
                     // Trigger reload with favorites filter
                     if let userId = userSession.currentUserId {
-                        let currentRegion = getCurrentMapRegion()
+                        let currentRegion = appCoordinator.currentMapRegion
                         Task {
                             if let region = currentRegion {
                                 await mapViewModel.onMapCameraSettled(region, userId: userId)
@@ -171,9 +171,11 @@ struct MapContainerView: View {
             // Dismiss popup sheets when navigating to user profile from within nested PlaceDetailView
             // MVVM: View observes ViewModel state changes and coordinates sheet dismissal
             if isPresented {
-                // Clear selected place to reset beacon when navigating to external profile
-                // Prevents stale beacon from previous context showing on map
-                selectedPlaceViewModel.selectedPlace = nil
+                // Only clear selected place if NOT navigating from place detail
+                // (we want to preserve it for restoration when coming back)
+                if !userProfileViewModel.navigatedFromPlaceDetail {
+                    selectedPlaceViewModel.selectedPlace = nil
+                }
                 if mapViewModel.activeSheet != nil {
                     mapViewModel.activeSheet = nil
                 }
@@ -186,7 +188,7 @@ struct MapContainerView: View {
                 userProfileViewModel.showExternalReviewsOnMap = false  // Reset trigger
                 // Trigger reload to show external user's reviewed places
                 if let currentUserId = userSession.currentUserId {
-                    let currentRegion = getCurrentMapRegion()
+                    let currentRegion = appCoordinator.currentMapRegion
                     Task {
                         if let region = currentRegion {
                             await mapViewModel.onMapCameraSettled(region, userId: currentUserId)
@@ -202,7 +204,7 @@ struct MapContainerView: View {
                 userProfileViewModel.showExternalListOnMap = nil  // Reset trigger
                 // Trigger reload to show external user's list places
                 if let currentUserId = userSession.currentUserId {
-                    let currentRegion = getCurrentMapRegion()
+                    let currentRegion = appCoordinator.currentMapRegion
                     Task {
                         if let region = currentRegion {
                             await mapViewModel.onMapCameraSettled(region, userId: currentUserId)
@@ -218,7 +220,7 @@ struct MapContainerView: View {
                 userProfileViewModel.showExternalFavoritesOnMap = false  // Reset trigger
                 // Trigger reload to show external user's favorite places
                 if let currentUserId = userSession.currentUserId {
-                    let currentRegion = getCurrentMapRegion()
+                    let currentRegion = appCoordinator.currentMapRegion
                     Task {
                         if let region = currentRegion {
                             await mapViewModel.onMapCameraSettled(region, userId: currentUserId)
@@ -237,7 +239,7 @@ struct MapContainerView: View {
                 appCoordinator.showKeywordResultsPopup = false  // Reset trigger
                 // Trigger reload to show keyword-matching places on map
                 if let userId = userSession.currentUserId {
-                    let currentRegion = getCurrentMapRegion()
+                    let currentRegion = appCoordinator.currentMapRegion
                     Task {
                         if let region = currentRegion {
                             await mapViewModel.onMapCameraSettled(region, userId: userId)
@@ -329,7 +331,7 @@ struct MapContainerView: View {
 
                 // Trigger map annotation reload to show all annotations
                 if let userId = userSession.currentUserId {
-                    let currentRegion = getCurrentMapRegion()
+                    let currentRegion = appCoordinator.currentMapRegion
                     Task {
                         if let region = currentRegion {
                             await mapViewModel.onMapCameraSettled(region, userId: userId)
@@ -338,29 +340,6 @@ struct MapContainerView: View {
                 }
             }
         }
-    }
-
-    /// Helper to get current map region from location manager or default
-    private func getCurrentMapRegion() -> MKCoordinateRegion? {
-        // Use location manager's current location as the center
-        if let location = locationManager.currentLocation?.coordinate {
-            return MKCoordinateRegion(
-                center: location,
-                span: MKCoordinateSpan(
-                    latitudeDelta: 0.1,
-                    longitudeDelta: 0.1
-                )
-            )
-        }
-        // Fallback to default center if no location available
-        let defaultCenter = CLLocationCoordinate2D(latitude: 39.5, longitude: -98.0)
-        return MKCoordinateRegion(
-            center: defaultCenter,
-            span: MKCoordinateSpan(
-                latitudeDelta: 0.1,
-                longitudeDelta: 0.1
-            )
-        )
     }
 }
 
