@@ -182,12 +182,18 @@ class PlaceDetailTabsViewModel: ObservableObject {
         // Forward PlaceSaversViewModel state to trigger view updates
         // IMPORTANT: Set up this observer BEFORE the place observer so state is forwarded correctly
         // This is necessary because child VM changes don't automatically trigger parent view re-render
-        placeSaversViewModel.$totalSaverCount
-            .sink { [weak self] count in
-                self?.saverCount = count
-                self?.showSaversIndicator = count > 0
-            }
-            .store(in: &cancellables)
+        // Observe both totalGlobalSaveCount and currentUserSaved to compute correct indicator visibility
+        Publishers.CombineLatest(
+            placeSaversViewModel.$totalGlobalSaveCount,
+            placeSaversViewModel.$currentUserSaved
+        )
+        .sink { [weak self] globalCount, currentUserSaved in
+            self?.saverCount = globalCount
+            // Only show indicator if OTHER people (besides current user) saved this place
+            // If current user saved, need at least 2 total saves to show indicator
+            self?.showSaversIndicator = currentUserSaved ? globalCount > 1 : globalCount > 0
+        }
+        .store(in: &cancellables)
         
         // Forward OpenStatusViewModel state to trigger view updates
         // This is necessary because child VM changes don't automatically trigger parent view re-render

@@ -698,20 +698,22 @@ struct PlaceSaverProfile: Codable, Identifiable {
     let userId: String
     let fullName: String?
     let profilePhotoUrl: String?
-    
+    let isFollowed: Bool
+
     var id: String { userId }
-    
+
     enum CodingKeys: String, CodingKey {
         case userId = "user_id"
         case fullName = "full_name"
         case profilePhotoUrl = "profile_photo_url"
+        case isFollowed = "is_followed"
     }
-    
+
     /// Convert to ProfileData for compatibility with existing UI components
     func toProfileData() -> ProfileData {
         // Convert String URL to URL type
         let photoURL: URL? = profilePhotoUrl.flatMap { URL(string: $0) }
-        
+
         return ProfileData(
             id: userId,
             firstName: fullName?.components(separatedBy: " ").first ?? "",

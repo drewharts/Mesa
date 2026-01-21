@@ -163,11 +163,21 @@ struct MainView: View {
                     .presentationBackgroundInteraction(.enabled(upThrough: .height(800)))
                     .interactiveDismissDisabled(false)
             }
-            .onChange(of: userProfileViewModel.isUserDetailPresented) { _, isPresented in
+            .onChange(of: userProfileViewModel.isUserDetailPresented) { oldValue, newValue in
                 // Dismiss PlaceDetailView sheet when navigating to user profile
                 // MVVM: View observes ViewModel state changes and coordinates sheet dismissal
-                if isPresented && selectedPlaceVM.isDetailSheetPresented {
+                if newValue && selectedPlaceVM.isDetailSheetPresented {
+                    // Preserve state if navigating from place detail context
+                    if userProfileViewModel.navigatedFromPlaceDetail {
+                        selectedPlaceVM.preserveStateForNavigation()
+                    }
                     selectedPlaceVM.isDetailSheetPresented = false
+                }
+
+                // Restore state when returning from profile (if navigated from place detail)
+                if oldValue && !newValue && userProfileViewModel.navigatedFromPlaceDetail {
+                    selectedPlaceVM.restoreStateAfterNavigation()
+                    userProfileViewModel.navigatedFromPlaceDetail = false
                 }
             }
             .fullScreenCover(isPresented: $shouldNavigateToProfile) {

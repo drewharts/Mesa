@@ -13,6 +13,7 @@ class UserProfileViewModel: ObservableObject {
     // MARK: - Profile Navigation State
     @Published var selectedUser: ProfileData?
     @Published var isUserDetailPresented = false
+    @Published var navigatedFromPlaceDetail: Bool = false  // Track if we came from place detail (for state restoration)
     @Published var showExternalReviewsOnMap = false  // Triggers map sheet for external reviews
     @Published var showExternalListOnMap: String? = nil  // List ID to show on map (triggers map sheet)
     @Published var showExternalFavoritesOnMap = false  // Triggers map sheet for external favorites
@@ -128,10 +129,12 @@ class UserProfileViewModel: ObservableObject {
     /// - Parameters:
     ///   - user: The user profile data to select
     ///   - currentUserId: The current user's ID for following status checks
-    ///   - shouldPresent: If true, triggers programmatic navigation via isUserDetailPresented. 
+    ///   - shouldPresent: If true, triggers programmatic navigation via isUserDetailPresented.
     ///     Set to false when NavigationLink is handling navigation to prevent double navigation.
-    func selectUser(_ user: ProfileData, currentUserId: String, shouldPresent: Bool = true) {
+    ///   - fromPlaceDetail: If true, indicates navigation originated from place detail (for state restoration)
+    func selectUser(_ user: ProfileData, currentUserId: String, shouldPresent: Bool = true, fromPlaceDetail: Bool = false) {
         self.selectedUser = user
+        self.navigatedFromPlaceDetail = fromPlaceDetail
         if shouldPresent {
         self.isUserDetailPresented = true
         }

@@ -21,12 +21,12 @@ struct PlaceSaversSheetView: View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 0) {
                 headerSection
-                
+
                 if viewModel.isLoading {
                     loadingView
                 } else if let error = viewModel.error {
                     errorView(error)
-                } else if viewModel.displayableSavers.isEmpty && !viewModel.currentUserSaved {
+                } else if viewModel.totalGlobalSaveCount == 0 {
                     emptyStateView
                 } else {
                     saversList
@@ -41,8 +41,8 @@ struct PlaceSaversSheetView: View {
             Text("Saved by")
                 .font(.title2)
                 .fontWeight(.bold)
-            
-            Text("\(viewModel.totalSaverCount) \(viewModel.totalSaverCount == 1 ? "person" : "people")")
+
+            Text("\(viewModel.totalGlobalSaveCount) \(viewModel.totalGlobalSaveCount == 1 ? "person" : "people")")
                 .font(.subheadline)
                 .foregroundColor(.gray)
         }
@@ -101,7 +101,7 @@ struct PlaceSaversSheetView: View {
         .frame(maxWidth: .infinity)
         .padding()
     }
-    
+
     // MARK: - Savers List
     private var saversList: some View {
         ScrollView {
@@ -109,30 +109,59 @@ struct PlaceSaversSheetView: View {
                 // Current user row (if they saved)
                 if viewModel.currentUserSaved {
                     currentUserRow
-                    
-                    if !viewModel.displayableSavers.isEmpty {
+                    Divider()
+                        .padding(.leading, 70)
+                }
+
+                // Friends section (followed users)
+                if viewModel.hasFollowedSavers {
+                    sectionHeader("Friends")
+
+                    ForEach(viewModel.displayableFollowedSavers, id: \.id) { user in
+                        SaverRowView(
+                            user: user,
+                            onTap: {
+                                viewModel.selectUser(user, dismiss: { dismiss() })
+                            }
+                        )
+
                         Divider()
                             .padding(.leading, 70)
                     }
                 }
-                
-                // Other savers
-                ForEach(viewModel.displayableSavers, id: \.id) { user in
-                    SaverRowView(
-                        user: user,
-                        onTap: {
-                            viewModel.selectUser(user, dismiss: { dismiss() })
+
+                // Others section (unfollowed users)
+                if viewModel.hasUnfollowedSavers {
+                    sectionHeader("Others")
+
+                    ForEach(viewModel.displayableUnfollowedSavers, id: \.id) { user in
+                        SaverRowView(
+                            user: user,
+                            onTap: {
+                                viewModel.selectUser(user, dismiss: { dismiss() })
+                            }
+                        )
+
+                        if user.id != viewModel.displayableUnfollowedSavers.last?.id {
+                            Divider()
+                                .padding(.leading, 70)
                         }
-                    )
-                    
-                    if user.id != viewModel.displayableSavers.last?.id {
-                        Divider()
-                            .padding(.leading, 70)
                     }
                 }
             }
             .padding(.horizontal, 20)
         }
+    }
+
+    // MARK: - Section Header
+    private func sectionHeader(_ title: String) -> some View {
+        Text(title)
+            .font(.subheadline)
+            .fontWeight(.semibold)
+            .foregroundColor(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.top, 16)
+            .padding(.bottom, 8)
     }
     
     // MARK: - Current User Row
