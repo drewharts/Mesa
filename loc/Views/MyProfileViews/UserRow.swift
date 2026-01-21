@@ -20,6 +20,7 @@ struct UserRow: View {
                 userId: user.id,
                 UserProfileVM: userProfileVM
             )
+            .id(user.id)  // Force new view identity when user changes
             .environmentObject(profile)
             .environmentObject(detailPlaceVM)
             .environmentObject(userSession) // Add userSession for currentUserId
