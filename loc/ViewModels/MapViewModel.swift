@@ -569,8 +569,7 @@ class MapViewModel: ObservableObject {
                     let duplicateIds = community.filter { friendsPlaceIds.contains($0.id) }.map { $0.id }
                     print("🔍 [MapViewModel] Filtered \(duplicateCount) duplicate community markers: \(duplicateIds)")
                 }
-                print("🔍 [MapViewModel] Friends: \(annotations.count), Community before: \(community.count), after: \(filteredCommunity.count)")
-                
+
                 self.communityMarkers = filteredCommunity
                 
                 self.lastLoadedRegion = region

@@ -725,16 +725,18 @@ class SupabasePlaceService: ObservableObject {
                 let p_min_lat: Double
                 let p_max_lon: Double
                 let p_max_lat: Double
+                let p_grid_cells_across: Int
             }
-            
+
             let params = ViewportParams(
                 p_user_id: userId,
                 p_min_lon: westLng,
                 p_min_lat: southLat,
                 p_max_lon: eastLng,
-                p_max_lat: northLat
+                p_max_lat: northLat,
+                p_grid_cells_across: 15  // Reduced from default 25 for less cluttered map (225 max vs 625 max)
             )
-            
+
             let response: [PlaceAnnotation] = try await supabase.client
                 .rpc("get_visible_annotations_with_users", params: params)
                 .execute()
