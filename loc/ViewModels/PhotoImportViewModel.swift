@@ -28,11 +28,24 @@ class PhotoImportViewModel: ObservableObject {
     @Published var isSavingPlace: Bool = false
     @Published var isUserCreatedPlace: Bool = false
     @Published var isInPhotoImportFlow: Bool = false
-    
-    private let nearbyPlacesService = NearbyPlacesService()
-    private let placeService = PlaceService.shared
-    private let userService = UserService.shared
-    
+
+    private let nearbyPlacesService: NearbyPlacesService
+    private let placeService: PlaceService
+    private let userService: UserService
+    private let mesaBackendService: MesaBackendService
+
+    init(
+        nearbyPlacesService: NearbyPlacesService = NearbyPlacesService(),
+        placeService: PlaceService = PlaceService.shared,
+        userService: UserService = UserService.shared,
+        mesaBackendService: MesaBackendService = MesaBackendService()
+    ) {
+        self.nearbyPlacesService = nearbyPlacesService
+        self.placeService = placeService
+        self.userService = userService
+        self.mesaBackendService = mesaBackendService
+    }
+
     // Callback for when a place is successfully saved
     var onPlaceSaved: (() -> Void)?
     var onPlaceSavedWithDetail: ((DetailPlace) -> Void)?
@@ -214,13 +227,24 @@ class PhotoImportViewModel: ObservableObject {
             print("❌ No authenticated user found")
             return
         }
-        
+
         isSavingPlace = true
-        
+
         do {
-            // Convert NearbyPlaceFeature to DetailPlace
-            let detailPlace = convertToDetailPlace(nearbyPlace)
-            
+            let detailPlace: DetailPlace
+
+            // For Google Places, fetch from backend (handles deduplication)
+            if let googlePlaceId = nearbyPlace.properties.placeId,
+               nearbyPlace.properties.source != "user_created" {
+                print("🔄 Fetching place from backend with Google Place ID: \(googlePlaceId)")
+                detailPlace = try await fetchPlaceFromBackend(googlePlaceId: googlePlaceId)
+                print("✅ Got place from backend with UUID: \(detailPlace.id)")
+            } else {
+                // User-created places - convert locally (they're unique by definition)
+                print("📝 Converting user-created place locally")
+                detailPlace = convertToDetailPlace(nearbyPlace)
+            }
+
             // Save to main places collection
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
                 placeService.addToAllPlaces(place: detailPlace) { error in
@@ -233,7 +257,7 @@ class PhotoImportViewModel: ObservableObject {
                     }
                 }
             }
-            
+
             // Only save to user's myPlaces collection if this is a user-created place
             if nearbyPlace.properties.source == "user_created" {
                 try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
@@ -248,7 +272,7 @@ class PhotoImportViewModel: ObservableObject {
                     }
                 }
             }
-            
+
             // Add to user's map places for tracking
             userService.addOrUpdateMapPlace(userId: currentUserId, place: detailPlace) { error in
                 if let error = error {
@@ -257,29 +281,50 @@ class PhotoImportViewModel: ObservableObject {
                     print("✅ Successfully updated map place")
                 }
             }
-            
+
+            // Store the place for navigation and notify
+            createdPlaceForDetail = detailPlace
+
             // Notify other components to refresh map annotations
             NotificationCenter.default.post(name: NSNotification.Name("RefreshMapAnnotations"), object: nil)
-            
+
             print("✅ Place '\(detailPlace.name)' successfully saved to Firestore")
-            
+
             // Notify parent view that a place is successfully saved
             onPlaceSaved?()
             onPlaceSavedWithDetail?(detailPlace)
-            
+
         } catch {
             print("❌ Failed to save place to Firestore: \(error.localizedDescription)")
         }
-        
+
         isSavingPlace = false
     }
+
+    /// Fetch place from backend using Google Place ID
+    /// Backend handles deduplication - returns existing place or creates new one
+    private func fetchPlaceFromBackend(googlePlaceId: String) async throws -> DetailPlace {
+        return try await withCheckedThrowingContinuation { continuation in
+            mesaBackendService.fetchPlaceDetails(
+                placeId: googlePlaceId,
+                source: "google"
+            ) { result in
+                switch result {
+                case .success(let place):
+                    continuation.resume(returning: place)
+                case .failure(let error):
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
     
+    /// Convert a NearbyPlaceFeature to DetailPlace for user-created places only.
+    /// Note: For Google Places, use fetchPlaceFromBackend() instead to get proper backend-assigned UUIDs.
     private func convertToDetailPlace(_ nearbyPlace: NearbyPlaceFeature) -> DetailPlace {
         var detailPlace = DetailPlace()
-        
-        // TODO: This should use the backend to get/assign place IDs instead of creating them locally
-        // RISK: Hash-based UUIDs might not match backend-assigned UUIDs, causing duplicate places
-        // Create a consistent UUID from the actualId by hashing it
+
+        // For user-created places, generate a UUID from the actualId
         detailPlace.id = createConsistentUUID(from: nearbyPlace.properties.actualId)
         detailPlace.name = nearbyPlace.properties.name
         detailPlace.address = nearbyPlace.properties.address
@@ -290,38 +335,30 @@ class PhotoImportViewModel: ObservableObject {
         detailPlace.rating = nearbyPlace.properties.rating
         detailPlace.categories = nearbyPlace.properties.types
         detailPlace.description = nearbyPlace.properties.description
-        
-        // Handle Google Places specific data
+
         if let placeId = nearbyPlace.properties.placeId {
-            detailPlace.mapboxId = placeId // Using mapboxId field for Google Place ID
+            detailPlace.mapboxId = placeId
         }
-        
-        // Handle price level
+
         if let priceLevel = nearbyPlace.properties.priceLevel {
             detailPlace.priceLevel = String(priceLevel)
         }
-        
+
         return detailPlace
     }
-    
+
+    /// Create a consistent UUID from a string identifier.
+    /// Used only for user-created places where we need to generate a local ID.
     private func createConsistentUUID(from string: String) -> UUID {
         // Try to parse as UUID first (for existing UUID-based places)
         if let uuid = UUID(uuidString: string) {
             return uuid
         }
-        
-        // TODO: This hash-based approach is problematic
-        // The backend might assign different UUIDs for the same place, causing duplicates
-        // BETTER APPROACH: Send the Google Place ID to backend, let it assign/find the UUID
-        
-        // For non-UUID strings (like Google Place IDs), create a consistent UUID by hashing
-        // This ensures the same string always produces the same UUID
+
+        // For user-created places, create a deterministic UUID by hashing the identifier
         let hash = abs(string.hashValue)
-        
-        // Create a deterministic UUID from the hash
-        // We'll use the hash to seed the UUID generation
         let uuidString = String(format: "%08x-0000-0000-0000-%012x", hash, hash)
-        
+
         return UUID(uuidString: uuidString) ?? UUID()
     }
     
