@@ -12,6 +12,8 @@ struct PlaceInfoSection: View {
     let place: DetailPlace
     let isDescriptionLoading: Bool
 
+    @State private var showingMenu = false
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Rating Row (Google/Mapbox)
@@ -59,7 +61,38 @@ struct PlaceInfoSection: View {
                     .font(.footnote)
                     .foregroundColor(.black)
                     .fixedSize(horizontal: false, vertical: true)
-                    .padding(.bottom, 20)
+                    .padding(.bottom, 12)
+
+                // Menu button - only show if menu URL exists
+                if let menuUrl = place.menuUrl, !menuUrl.isEmpty, let url = URL(string: menuUrl) {
+                    Button {
+                        showingMenu = true
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "book.pages")
+                                .font(.system(size: 14, weight: .medium))
+                            Text("Menu")
+                                .font(.system(size: 14, weight: .semibold))
+                        }
+                        .foregroundColor(.primary)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 10)
+                        .background(
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(Color(.systemGray6))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(Color(.systemGray4), lineWidth: 0.5)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.bottom, 12)
+                    .sheet(isPresented: $showingMenu) {
+                        SafariView(url: url)
+                            .ignoresSafeArea()
+                    }
+                }
             }
         }
     }

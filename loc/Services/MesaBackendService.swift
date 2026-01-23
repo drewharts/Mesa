@@ -314,7 +314,8 @@ class MesaBackendService {
                 detailPlace.serversDinner = placeDict["servesDinner"] as? Bool
                 detailPlace.Instagram = placeDict["instagram"] as? String
                 detailPlace.X = placeDict["twitter"] as? String
-                
+                detailPlace.menuUrl = placeDict["menuUrl"] as? String
+
                 // Manually extract coordinates and create CLLocationCoordinate2D
                 if let locationDict = placeDict["location"] as? [String: Any],
                    let latitude = locationDict["latitude"] as? Double,
