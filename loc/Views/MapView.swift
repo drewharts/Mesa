@@ -71,6 +71,19 @@ struct MapView: View {
         return mapViewModel.communityMarkers
     }
 
+    // Check when the screen-center beacon should show
+    private var shouldShowSelectedPlaceBeacon: Bool {
+        selectedPlaceVM.isDetailSheetPresented ||
+        mapViewModel.showingListPopup ||
+        mapViewModel.showingTikToksPopup ||
+        mapViewModel.showingReviewsPopup ||
+        mapViewModel.showingFavoritesPopup ||
+        mapViewModel.showingExternalListPopup ||
+        mapViewModel.showingExternalReviewsPopup ||
+        mapViewModel.showingExternalFavoritesPopup ||
+        mapViewModel.showingKeywordPopup
+    }
+
     // Map content extracted to help Swift type checker
     private var mapContentView: some View {
         Map(position: $mapPosition) {
@@ -84,7 +97,7 @@ struct MapView: View {
                     communityMarkerView(for: marker)
                 }
             }
-            
+
             // Network places (user + followed users) as main annotations
             ForEach(annotationsToDisplay) { annotation in
                 Annotation(
@@ -93,30 +106,6 @@ struct MapView: View {
                     anchor: .bottom
                 ) {
                     annotationMarkerView(for: annotation)
-                }
-            }
-
-            // Selected place annotation (shown when detail sheet or popup is presenting a place)
-            if (selectedPlaceVM.isDetailSheetPresented ||
-                mapViewModel.showingListPopup ||
-                mapViewModel.showingTikToksPopup ||
-                mapViewModel.showingReviewsPopup ||
-                mapViewModel.showingFavoritesPopup ||
-                mapViewModel.showingExternalListPopup ||
-                mapViewModel.showingExternalReviewsPopup ||
-                mapViewModel.showingExternalFavoritesPopup ||
-                mapViewModel.showingKeywordPopup),
-               let selectedPlace = selectedPlaceVM.selectedPlace,
-               let coordinate = selectedPlace.coordinate {
-                Annotation(
-                    selectedPlace.name,
-                    coordinate: CLLocationCoordinate2D(
-                        latitude: coordinate.latitude,
-                        longitude: coordinate.longitude
-                    ),
-                    anchor: .bottom
-                ) {
-                    selectedPlaceAnnotationView(for: selectedPlace)
                 }
             }
 
@@ -129,6 +118,18 @@ struct MapView: View {
                 ) {
                     userLocationMarker
                 }
+            }
+        }
+        .overlay {
+            // Selected place beacon - rendered at screen center, not as geo annotation
+            // This prevents lateral drift during map animation since the map animates to center on the place
+            if shouldShowSelectedPlaceBeacon,
+               let selectedPlace = selectedPlaceVM.selectedPlace,
+               selectedPlace.coordinate != nil {
+                PulsingBeaconView()
+                    .onTapGesture {
+                        selectedPlaceVM.isDetailSheetPresented = true
+                    }
             }
         }
     }
@@ -148,17 +149,9 @@ struct MapView: View {
         }
     }
 
-    // Selected place annotation view - pulsing beacon for searched places
-    private func selectedPlaceAnnotationView(for place: DetailPlace) -> some View {
-        PulsingBeaconView()
-            .onTapGesture {
-                selectedPlaceVM.isDetailSheetPresented = true
-            }
-    }
-
     // Community marker view - small emoji markers for places saved by users you don't follow
     // Note: Community markers do NOT show blue circle highlight when selected.
-    // Selection is indicated by the separate pulsing beacon (selectedPlaceAnnotationView).
+    // Selection is indicated by the screen-center pulsing beacon overlay.
     private func communityMarkerView(for marker: CommunityPlaceMarker) -> some View {
         // Scale size based on popularity (save count)
         let fontSize: CGFloat = {
