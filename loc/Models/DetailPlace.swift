@@ -30,6 +30,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
     var X: String?
     var tikTokVideos: [TikTokVideo]?
     var photoUrls: [String]? = []
+    var menuUrl: String?
     
     // Backend-specific fields (ignored by iOS but needed for decoding)
     var googlePlaceId: String?
@@ -60,6 +61,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         case Instagram
         case X
         case tikTokVideos = "tiktok_videos"
+        case menuUrl = "menu_url"
         case googlePlaceId = "google_place_id"
         case googlePlacesId  // Firestore uses "googlePlacesId" (with 's')
         case source
@@ -97,11 +99,12 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         self.X = nil
         self.tikTokVideos = nil
         self.photoUrls = nil
+        self.menuUrl = nil
         self.googlePlaceId = nil
         self.source = nil
         self.createdAt = nil
         self.isCustom = nil
-        
+
         // Now decode all the optional properties
         try decodeBasicProperties(from: container)
         try decodeExtendedProperties(from: container)
@@ -145,8 +148,9 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         self.serversDinner = try container.decodeIfPresent(Bool.self, forKey: .serversDinner)
         self.Instagram = try container.decodeIfPresent(String.self, forKey: .Instagram)
         self.X = try container.decodeIfPresent(String.self, forKey: .X)
+        self.menuUrl = try container.decodeIfPresent(String.self, forKey: .menuUrl)
     }
-    
+
     private mutating func decodeTikTokProperties(from container: KeyedDecodingContainer<CodingKeys>) throws {
         self.tikTokVideos = try container.decodeIfPresent([TikTokVideo].self, forKey: .tikTokVideos)
         
@@ -228,6 +232,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         try container.encodeIfPresent(Instagram, forKey: .Instagram)
         try container.encodeIfPresent(X, forKey: .X)
         try container.encodeIfPresent(tikTokVideos, forKey: .tikTokVideos)
+        try container.encodeIfPresent(menuUrl, forKey: .menuUrl)
         try container.encodeIfPresent(googlePlaceId, forKey: .googlePlaceId)
         try container.encodeIfPresent(source, forKey: .source)
         try container.encodeIfPresent(createdAt, forKey: .createdAt)
@@ -257,12 +262,13 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         self.X = nil
         self.tikTokVideos = nil
         self.photoUrls = nil
+        self.menuUrl = nil
         self.googlePlaceId = nil
         self.source = nil
         self.createdAt = nil
         self.isCustom = nil
     }
-    
+
     init(place: Place) {
         self.id = place.id
         self.name = place.name
@@ -284,12 +290,13 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         self.X = nil
         self.tikTokVideos = nil
         self.photoUrls = nil
+        self.menuUrl = nil
         self.googlePlaceId = nil
         self.source = nil
         self.createdAt = nil
         self.isCustom = nil
     }
-    
+
     init(id: UUID, name: String, address: String?, city: String?) {
         self.id = id
         self.name = name
@@ -312,6 +319,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         self.X = nil
         self.tikTokVideos = nil
         self.photoUrls = nil
+        self.menuUrl = nil
         self.googlePlaceId = nil
         self.source = nil
         self.createdAt = nil

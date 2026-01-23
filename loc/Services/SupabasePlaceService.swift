@@ -1462,7 +1462,8 @@ class SupabasePlaceService: ObservableObject {
         place.googlePlaceId = record.google_places_id
         place.source = record.source
         place.isCustom = record.is_custom
-        
+        place.menuUrl = record.menu_url
+
         // Handle coordinate from PostGIS geometry
         if let locationData = record.location {
             // Try to parse the GeoJSON format: {"type":"Point","coordinates":[-122.4,37.8]}
