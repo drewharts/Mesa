@@ -34,45 +34,8 @@ struct MapView: View {
     
     var onMapTap: (() -> Void)?
     
-    // Helper computed property to simplify type checking
-    // Filters out selected place when beacon is showing (detail sheet or popups)
-    private var annotationsToDisplay: [PlaceAnnotation] {
-        let isShowingPlace = selectedPlaceVM.isDetailSheetPresented ||
-                             mapViewModel.showingListPopup ||
-                             mapViewModel.showingTikToksPopup ||
-                             mapViewModel.showingReviewsPopup ||
-                             mapViewModel.showingFavoritesPopup ||
-                             mapViewModel.showingExternalListPopup ||
-                             mapViewModel.showingExternalReviewsPopup ||
-                             mapViewModel.showingExternalFavoritesPopup ||
-                             mapViewModel.showingKeywordPopup
-        if isShowingPlace,
-           let selectedId = selectedPlaceVM.selectedPlace?.id.uuidString {
-            return mapViewModel.viewportAnnotations.filter { $0.id != selectedId }
-        }
-        return mapViewModel.viewportAnnotations
-    }
-
-    // Filters out selected community marker when beacon is showing
-    private var communityMarkersToDisplay: [CommunityPlaceMarker] {
-        let isShowingPlace = selectedPlaceVM.isDetailSheetPresented ||
-                             mapViewModel.showingListPopup ||
-                             mapViewModel.showingTikToksPopup ||
-                             mapViewModel.showingReviewsPopup ||
-                             mapViewModel.showingFavoritesPopup ||
-                             mapViewModel.showingExternalListPopup ||
-                             mapViewModel.showingExternalReviewsPopup ||
-                             mapViewModel.showingExternalFavoritesPopup ||
-                             mapViewModel.showingKeywordPopup
-        if isShowingPlace,
-           let selectedId = selectedPlaceVM.selectedPlace?.id.uuidString {
-            return mapViewModel.communityMarkers.filter { $0.id != selectedId }
-        }
-        return mapViewModel.communityMarkers
-    }
-
-    // Check when the screen-center beacon should show
-    private var shouldShowSelectedPlaceBeacon: Bool {
+    // Check when a place is actively selected (detail sheet or any popup)
+    private var isPlaceSelected: Bool {
         selectedPlaceVM.isDetailSheetPresented ||
         mapViewModel.showingListPopup ||
         mapViewModel.showingTikToksPopup ||
@@ -87,8 +50,8 @@ struct MapView: View {
     // Map content extracted to help Swift type checker
     private var mapContentView: some View {
         Map(position: $mapPosition) {
-            // Community places as small white dots (shown behind network places)
-            ForEach(communityMarkersToDisplay) { marker in
+            // Community places as small emoji markers (shown behind network places)
+            ForEach(mapViewModel.communityMarkers) { marker in
                 Annotation(
                     "",
                     coordinate: marker.coordinate,
@@ -99,7 +62,7 @@ struct MapView: View {
             }
 
             // Network places (user + followed users) as main annotations
-            ForEach(annotationsToDisplay) { annotation in
+            ForEach(mapViewModel.viewportAnnotations) { annotation in
                 Annotation(
                     annotation.name,
                     coordinate: annotation.coordinate,
@@ -120,24 +83,12 @@ struct MapView: View {
                 }
             }
         }
-        .overlay {
-            // Selected place beacon - rendered at screen center, not as geo annotation
-            // This prevents lateral drift during map animation since the map animates to center on the place
-            if shouldShowSelectedPlaceBeacon,
-               let selectedPlace = selectedPlaceVM.selectedPlace,
-               selectedPlace.coordinate != nil {
-                PulsingBeaconView()
-                    .onTapGesture {
-                        selectedPlaceVM.isDetailSheetPresented = true
-                    }
-            }
-        }
     }
     
     // Annotation marker view with user photos
     private func annotationMarkerView(for annotation: PlaceAnnotation) -> some View {
-        // Only highlight annotation if detail sheet is presented AND this is the selected place
-        let isSelected = selectedPlaceVM.isDetailSheetPresented &&
+        // Highlight annotation when it's the selected place and any sheet/popup is open
+        let isSelected = isPlaceSelected &&
                         selectedPlaceVM.selectedPlace?.id.uuidString == annotation.id
         return CustomPlaceAnnotationView(
             annotation: annotation,
@@ -150,9 +101,11 @@ struct MapView: View {
     }
 
     // Community marker view - small emoji markers for places saved by users you don't follow
-    // Note: Community markers do NOT show blue circle highlight when selected.
-    // Selection is indicated by the screen-center pulsing beacon overlay.
     private func communityMarkerView(for marker: CommunityPlaceMarker) -> some View {
+        // Check if this marker is selected
+        let isSelected = isPlaceSelected &&
+                        selectedPlaceVM.selectedPlace?.id.uuidString == marker.id
+
         // Scale size based on popularity (save count)
         let fontSize: CGFloat = {
             switch marker.saveCount {
@@ -162,12 +115,14 @@ struct MapView: View {
             }
         }()
 
-        return Text(marker.emoji)
-            .font(.system(size: fontSize))
-            .shadow(color: .black.opacity(0.3), radius: 2, x: 0, y: 1)
-            .onTapGesture {
-                handleCommunityMarkerTap(marker)
-            }
+        return CommunityMarkerView(
+            emoji: marker.emoji,
+            fontSize: fontSize,
+            isSelected: isSelected
+        )
+        .onTapGesture {
+            handleCommunityMarkerTap(marker)
+        }
     }
     
     // Handle community marker tap
