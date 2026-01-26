@@ -15,25 +15,24 @@
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION public.get_list_annotations_with_users(
-    p_user_id text, 
+    p_user_id text,
     p_list_id text,
-    p_min_lon double precision, 
-    p_min_lat double precision, 
-    p_max_lon double precision, 
+    p_min_lon double precision,
+    p_min_lat double precision,
+    p_max_lon double precision,
     p_max_lat double precision,
     p_grid_cells_across integer DEFAULT 25
 )
 RETURNS TABLE(id text, name text, coordinate geometry, user_ids text[], place_type text)
 LANGUAGE plpgsql
 STABLE
+SECURITY DEFINER
 AS $function$
 DECLARE
-    v_user_friends text[];
     v_bbox geometry;
     v_grid_size_lon double precision;
     v_grid_size_lat double precision;
 BEGIN
-    v_user_friends := ARRAY(SELECT * FROM get_user_and_friends(p_user_id));
     v_bbox := get_bounding_box(p_min_lon, p_min_lat, p_max_lon, p_max_lat);
     
     v_grid_size_lon := (p_max_lon - p_min_lon) / p_grid_cells_across;
@@ -57,7 +56,6 @@ BEGIN
         INNER JOIN place_lists pl ON pli.list_id = pl.id
         INNER JOIN places p ON pli.place_id = p.id
         WHERE pli.list_id = p_list_id
-        AND COALESCE(pli.added_by, pl.user_id) = ANY(v_user_friends)
         AND ST_Intersects(p.location, v_bbox)
         GROUP BY pli.place_id, p.name, p.location, p.categories
     ),

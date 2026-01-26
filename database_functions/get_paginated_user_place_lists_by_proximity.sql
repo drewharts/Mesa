@@ -8,15 +8,15 @@
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION get_paginated_user_place_lists_by_proximity(
-    p_user_id TEXT, 
-    p_user_location geometry, 
-    p_page INTEGER, 
+    p_user_id text,
+    p_user_location geometry,
+    p_page INTEGER,
     p_page_size INTEGER
 )
 RETURNS TABLE(
-    list_id TEXT, 
-    name TEXT, 
-    average_location geometry, 
+    list_id TEXT,
+    name TEXT,
+    average_location TEXT,
     is_public BOOLEAN, 
     image TEXT, 
     created_at TIMESTAMP WITHOUT TIME ZONE, 
@@ -46,10 +46,10 @@ BEGIN
         combined.collaborator_photos
     FROM (
         -- Lists WITH average_location (sorted by proximity)
-    SELECT 
+    SELECT
         pl.id::TEXT AS list_id,
         pl.name,
-        pl.average_location,
+        ST_AsText(pl.average_location) AS average_location,
         pl.is_public,
         pl.image,
         pl.created_at,
@@ -71,14 +71,14 @@ BEGIN
     FROM place_lists pl
     WHERE pl.user_id = p_user_id
         AND pl.average_location IS NOT NULL
-        
+
         UNION ALL
-        
+
         -- Lists WITHOUT average_location (empty/new lists, sorted by created_at)
-        SELECT 
+        SELECT
             pl.id::TEXT AS list_id,
             pl.name,
-            pl.average_location,
+            ST_AsText(pl.average_location) AS average_location,
             pl.is_public,
             pl.image,
             pl.created_at,
@@ -110,4 +110,4 @@ BEGIN
 END;
 $function$;
 
-GRANT EXECUTE ON FUNCTION get_paginated_user_place_lists_by_proximity(TEXT, geometry, INTEGER, INTEGER) TO authenticated;
+GRANT EXECUTE ON FUNCTION get_paginated_user_place_lists_by_proximity(text, geometry, INTEGER, INTEGER) TO authenticated;
