@@ -121,9 +121,11 @@ struct PlaceSelectionView: View {
                                     place: place,
                                     onSelect: {
                                         selectedPlaceVM.allowAutoPresent = false
-                                        photoImportVM.selectPlace(place)
+                                        Task {
+                                            await photoImportVM.selectPlace(place)
+                                        }
                                     },
-                                    isLoading: photoImportVM.isSavingPlace
+                                    isLoading: photoImportVM.isSavingPlace || photoImportVM.isResolvingPlace
                                 )
                             }
                         }
@@ -210,10 +212,12 @@ struct PlaceSelectionView: View {
             
             // Create a temporary NearbyPlaceFeature from the new place
             let newNearbyPlace = createNearbyPlaceFeature(id: generatedId, name: name, description: description, coordinate: coordinate)
-            
+
             // Select the newly created place
-            photoImportVM.selectPlace(newNearbyPlace)
-            
+            Task {
+                await photoImportVM.selectPlace(newNearbyPlace)
+            }
+
             // Reset popup fields
             newPlaceName = ""
             newPlaceDescription = ""

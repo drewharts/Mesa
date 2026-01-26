@@ -11,8 +11,14 @@ struct CustomPlaceAnnotationView: View {
     let annotation: PlaceAnnotation
     let annotationImage: UIImage?
     let isSelected: Bool
-    
+
     var body: some View {
+        annotationContent
+    }
+
+    // MARK: - Annotation Content
+
+    private var annotationContent: some View {
         VStack(spacing: 2) {
             if let annotationImage = annotationImage {
                 Image(uiImage: annotationImage)
@@ -50,4 +56,3 @@ struct CustomPlaceAnnotationView: View {
         }
     }
 }
-

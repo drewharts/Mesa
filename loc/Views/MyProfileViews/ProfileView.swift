@@ -297,10 +297,10 @@ struct SheetsModifier: ViewModifier {
     
     private var createPostScreen: some View {
         Group {
-            if let selectedPlace = photoImportVM.selectedPlace,
+            if let resolvedPlace = photoImportVM.resolvedPlace,
                !photoImportVM.selectedImages.isEmpty {
                 CreatePostView(
-                    place: profile.convertToDetailPlace(selectedPlace),
+                    place: resolvedPlace,
                     userId: userSession.currentUserId ?? "",
                     profilePhotoUrl: profile.user?.profilePhotoURL?.absoluteString ?? "",
                     userFirstName: profile.user?.firstName ?? "",
@@ -311,6 +311,16 @@ struct SheetsModifier: ViewModifier {
                     }
                 )
                 .environmentObject(selectedPlaceVM)
+            } else if photoImportVM.isResolvingPlace {
+                // Show loading while resolving place
+                VStack(spacing: 16) {
+                    ProgressView()
+                        .scaleEffect(1.2)
+                    Text("Loading place...")
+                        .font(.subheadline)
+                        .foregroundColor(.gray)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 EmptyView()
             }
@@ -319,22 +329,28 @@ struct SheetsModifier: ViewModifier {
     
     private func handlePostSubmission(place: DetailPlace) {
         postWasSubmitted = true
-        
+
+        // Use resolvedPlace which has the correct backend UUID
+        guard let resolvedPlace = photoImportVM.resolvedPlace else {
+            print("❌ No resolved place for navigation")
+            return
+        }
+
         Task {
             await photoImportVM.saveSelectedPlaceAfterReview()
-            
+
             // End the photo import flow before navigating
             await MainActor.run {
                 photoImportVM.isInPhotoImportFlow = false
                 showCreatePost = false
             }
-            
+
             // Allow time for the sheet to dismiss before navigating
             try? await Task.sleep(nanoseconds: 300_000_000) // 0.3 seconds
-            
+
             await MainActor.run {
                 selectedPlaceVM.allowAutoPresent = true
-                photoImportVM.navigateToPlaceDetail(place: place)
+                photoImportVM.navigateToPlaceDetail(place: resolvedPlace)
             }
         }
     }

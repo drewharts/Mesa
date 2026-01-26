@@ -31,6 +31,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
     var tikTokVideos: [TikTokVideo]?
     var photoUrls: [String]? = []
     var menuUrl: String?
+    var websiteUrl: String?
     
     // Backend-specific fields (ignored by iOS but needed for decoding)
     var googlePlaceId: String?
@@ -62,6 +63,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         case X
         case tikTokVideos = "tiktok_videos"
         case menuUrl = "menu_url"
+        case websiteUrl = "website"
         case googlePlaceId = "google_place_id"
         case googlePlacesId  // Firestore uses "googlePlacesId" (with 's')
         case source
@@ -100,6 +102,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         self.tikTokVideos = nil
         self.photoUrls = nil
         self.menuUrl = nil
+        self.websiteUrl = nil
         self.googlePlaceId = nil
         self.source = nil
         self.createdAt = nil
@@ -149,6 +152,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         self.Instagram = try container.decodeIfPresent(String.self, forKey: .Instagram)
         self.X = try container.decodeIfPresent(String.self, forKey: .X)
         self.menuUrl = try container.decodeIfPresent(String.self, forKey: .menuUrl)
+        self.websiteUrl = try container.decodeIfPresent(String.self, forKey: .websiteUrl)
     }
 
     private mutating func decodeTikTokProperties(from container: KeyedDecodingContainer<CodingKeys>) throws {
@@ -233,6 +237,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         try container.encodeIfPresent(X, forKey: .X)
         try container.encodeIfPresent(tikTokVideos, forKey: .tikTokVideos)
         try container.encodeIfPresent(menuUrl, forKey: .menuUrl)
+        try container.encodeIfPresent(websiteUrl, forKey: .websiteUrl)
         try container.encodeIfPresent(googlePlaceId, forKey: .googlePlaceId)
         try container.encodeIfPresent(source, forKey: .source)
         try container.encodeIfPresent(createdAt, forKey: .createdAt)
@@ -263,6 +268,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         self.tikTokVideos = nil
         self.photoUrls = nil
         self.menuUrl = nil
+        self.websiteUrl = nil
         self.googlePlaceId = nil
         self.source = nil
         self.createdAt = nil
@@ -291,6 +297,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         self.tikTokVideos = nil
         self.photoUrls = nil
         self.menuUrl = nil
+        self.websiteUrl = nil
         self.googlePlaceId = nil
         self.source = nil
         self.createdAt = nil
@@ -320,6 +327,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         self.tikTokVideos = nil
         self.photoUrls = nil
         self.menuUrl = nil
+        self.websiteUrl = nil
         self.googlePlaceId = nil
         self.source = nil
         self.createdAt = nil

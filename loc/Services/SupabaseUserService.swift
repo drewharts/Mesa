@@ -734,15 +734,15 @@ class SupabaseUserService: ObservableObject {
             page_size: limit,
             page_number: pageNumber
         )
-        
-        let profiles: [ProfileData] = try await supabase.client
+
+        let records: [FollowingProfileRecord] = try await supabase.client
             .rpc("get_follower_profiles_paginated", params: params)
             .execute()
             .value
-        
-        return profiles
+
+        return records.map { convertFollowingRecordToProfileData($0) }
     }
-    
+
     /// Fetch following profiles - LAZY! Only call when user clicks "Following"
     /// Uses pagination for optimal performance
     func fetchFollowingProfilesData(for userId: String, limit: Int, offset: Int = 0) async throws -> [ProfileData] {
@@ -759,15 +759,15 @@ class SupabaseUserService: ObservableObject {
             page_size: limit,
             page_number: pageNumber
         )
-        
-        let profiles: [ProfileData] = try await supabase.client
+
+        let records: [FollowingProfileRecord] = try await supabase.client
             .rpc("get_following_profiles_paginated", params: params)
             .execute()
             .value
-        
-        return profiles
+
+        return records.map { convertFollowingRecordToProfileData($0) }
     }
-    
+
     /// ✅ NEW: Fetch following user IDs only (not full profiles) - SUPER FAST!
     func fetchFollowingUserIds(userId: String) async throws -> [String] {
         let followRecords: [FollowingRecord] = try await supabase.client
@@ -798,7 +798,23 @@ class SupabaseUserService: ObservableObject {
             fcmToken: record.fcm_token
         )
     }
-    
+
+    private func convertFollowingRecordToProfileData(_ record: FollowingProfileRecord) -> ProfileData {
+        return ProfileData(
+            id: record.id,
+            firstName: record.first_name,
+            lastName: record.last_name,
+            email: record.email,
+            profilePhotoURL: record.profile_photo_url.flatMap { URL(string: $0) },
+            phoneNumber: record.phone_number ?? "",
+            fullNameLower: record.full_name_lower ?? record.full_name.lowercased(),
+            fullName: record.full_name,
+            fcmToken: record.fcm_token,
+            firebaseUid: nil,
+            supabaseUid: record.supabase_uid
+        )
+    }
+
     // MARK: - Additional methods used by the app
     
     func deleteAccount(userId: String, completion: @escaping (Error?) -> Void) {
@@ -997,8 +1013,23 @@ struct ProfileDataRecord: Codable {
     let fcm_token: String?
 }
 
+/// Response type for following/followers RPC calls - handles nullable database fields
+private struct FollowingProfileRecord: Codable {
+    let id: String
+    let first_name: String
+    let last_name: String
+    let full_name: String
+    let full_name_lower: String?  // Can be NULL for older users
+    let email: String
+    let phone_number: String?     // Can be NULL
+    let profile_photo_url: String?
+    let fcm_token: String?
+    let created_at: String?       // Returned by DB but not needed
+    let supabase_uid: String?
+}
+
 /// Lightweight favorite place data for display
-struct FavoritePlace: Codable, Identifiable {
+struct FavoritePlace: Codable, Identifiable, Equatable {
     let place_id: String
     let name: String
     let latest_review_photo: String?
