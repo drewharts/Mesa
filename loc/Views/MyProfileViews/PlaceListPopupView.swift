@@ -39,7 +39,6 @@ struct PlaceListPopupView<CardView: View>: View {
     @ViewBuilder let cardBuilder: (LightweightPlace, @escaping (String) -> Void) -> CardView
 
     @Environment(\.presentationMode) var presentationMode
-    @EnvironmentObject var mapViewModel: MapViewModel
 
     // Default initializer with optional onBackToProfile
     init(
@@ -89,28 +88,9 @@ struct PlaceListPopupView<CardView: View>: View {
                     content
                 }
             }
-            .onChange(of: places.count) {
-                // Re-check pagination when places count changes (after load completes)
-                if places.count > 0 {
-                    triggerPaginationIfNeeded(index: places.count - 1)
-                }
-            }
-            .onChange(of: isLoadingMore) { newValue in
-                // When loading finishes, if at end and more data exists, trigger next load
-                if !newValue && hasMore && !places.isEmpty {
-                    triggerPaginationIfNeeded(index: places.count - 1)
-                }
-            }
             .navigationBarHidden(true)
             .navigationDestination(for: String.self) { placeId in
                 PlaceDetailViewInNavigation(placeId: placeId, minSheetHeight: 250)
-            }
-        }
-        .onChange(of: mapViewModel.pendingPlaceNavigation) { oldValue, newValue in
-            // When map annotation is tapped while popup is open, navigate to that place
-            if let placeId = newValue {
-                navigationPath.append(placeId)
-                mapViewModel.pendingPlaceNavigation = nil
             }
         }
     }
@@ -240,8 +220,9 @@ struct PlaceListPopupView<CardView: View>: View {
     // MARK: - Pagination Helper
     
     private func triggerPaginationIfNeeded(index: Int) {
-        // Trigger when within 6 items of the end (aggressive prefetch for smooth infinite scroll)
-        guard index >= places.count - 6 && hasMore && !isLoadingMore else { return }
+        // Trigger at exactly the 3rd-to-last item (matches LightweightListPopupView pattern)
+        // Exact match prevents auto-re-triggering after loads complete
+        guard index == places.count - 3 && hasMore && !isLoadingMore else { return }
         Task { await loadMore() }
     }
 }

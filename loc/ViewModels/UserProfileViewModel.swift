@@ -20,6 +20,7 @@ class UserProfileViewModel: ObservableObject {
     
     // MARK: - External Profile Data
     @Published var userFavorites: [FavoritePlace] = []
+    @Published var isLoadingFavorites: Bool = false
     @Published var userLists: [LightweightPlaceList] = []
     @Published var placeListPlaces: [String: [LightweightPlace]] = [:] // [listId: places]
     
@@ -160,6 +161,7 @@ class UserProfileViewModel: ObservableObject {
         currentListPage = 1
         hasMoreLists = true
         isLoadingMoreLists = false
+        isLoadingFavorites = false
     }
     
     func fetchAndSelectUser(userId: String, currentUserId: String) {
@@ -324,16 +326,19 @@ class UserProfileViewModel: ObservableObject {
     }
     
     private func fetchProfileFavorites(userId: String) {
+        isLoadingFavorites = true
         Task {
             do {
                 let favorites = try await userService.fetchUserFavorites(userId: userId)
                 await MainActor.run {
                     self.userFavorites = favorites
+                    self.isLoadingFavorites = false
                 }
             } catch {
                 print("❌ [UserProfileViewModel] Error fetching favorites: \(error)")
                 await MainActor.run {
                     self.userFavorites = []
+                    self.isLoadingFavorites = false
                 }
             }
         }

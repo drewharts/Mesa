@@ -122,14 +122,14 @@ class SelectedPlaceViewModel: ObservableObject {
     /// Properties preserved from original:
     /// - `id`: Always keep the original ID
     /// - `isCustom`: Backend doesn't know about custom places
-    /// - `coordinate`: Prevents beacon jumping when fresh data arrives
+    /// - `coordinate`: Prevents selection indicator jumping when fresh data arrives
     /// - `openHours`: Preserve if fresh data doesn't have it
     private func mergePlaceData(original: DetailPlace, fresh: DetailPlace) -> DetailPlace {
         var merged = fresh
         merged.id = original.id
         merged.isCustom = original.isCustom
 
-        // Preserve coordinate from original to prevent beacon jumping when fresh data arrives
+        // Preserve coordinate from original to prevent selection indicator jumping when fresh data arrives
         merged.coordinate = original.coordinate
 
         // Preserve openHours from original if fresh doesn't have it

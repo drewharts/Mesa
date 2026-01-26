@@ -87,11 +87,21 @@ struct MapContainerView: View {
                 if let listId = newValue {
                     // Validate list exists before showing sheet (prevents competing views)
                     mapViewModel.selectList(listId, availableLists: profileViewModel.lightweightPlaceLists)
-                    // Trigger reload if we have a current region
+
+                    // Navigate map to list's location if available
+                    if let listCenter = profileViewModel.lightweightPlaceLists
+                        .first(where: { $0.list_id == listId })?.averageLocation {
+                        mapPosition = .region(MKCoordinateRegion(
+                            center: listCenter,
+                            span: MKCoordinateSpan(latitudeDelta: 0.08, longitudeDelta: 0.08)
+                        ))
+                    }
+
+                    // Trigger reload after map moves (delay for animation)
                     if let userId = userSession.currentUserId {
-                        let currentRegion = appCoordinator.currentMapRegion
                         Task {
-                            if let region = currentRegion {
+                            try? await Task.sleep(nanoseconds: 300_000_000) // 0.3s
+                            if let region = appCoordinator.currentMapRegion {
                                 await mapViewModel.onMapCameraSettled(region, userId: userId)
                             }
                         }
@@ -184,7 +194,7 @@ struct MapContainerView: View {
         .onChange(of: userProfileViewModel.showExternalReviewsOnMap) { _, shouldShow in
             // Show external user's reviews on map with filtered annotations
             if shouldShow, let userId = userProfileViewModel.selectedUser?.id {
-                mapViewModel.selectExternalReviews(userId: userId)
+                mapViewModel.selectExternalReviews(userId: userId, userPhotoUrl: userProfileViewModel.selectedUser?.profilePhotoURL)
                 userProfileViewModel.showExternalReviewsOnMap = false  // Reset trigger
                 // Trigger reload to show external user's reviewed places
                 if let currentUserId = userSession.currentUserId {
@@ -200,14 +210,31 @@ struct MapContainerView: View {
         .onChange(of: userProfileViewModel.showExternalListOnMap) { _, listId in
             // Show external user's list on map with filtered annotations
             if let listId = listId, let userId = userProfileViewModel.selectedUser?.id {
-                mapViewModel.selectExternalList(listId: listId, userId: userId)
+                print("📍 [MapContainer] External list selected: \(listId)")
+                if let listCenter = userProfileViewModel.userLists.first(where: { $0.list_id == listId })?.averageLocation {
+                    print("   listCenter: \(listCenter.latitude), \(listCenter.longitude)")
+                }
+
+                mapViewModel.selectExternalList(listId: listId, userId: userId, userPhotoUrl: userProfileViewModel.selectedUser?.profilePhotoURL)
                 userProfileViewModel.showExternalListOnMap = nil  // Reset trigger
-                // Trigger reload to show external user's list places
+
+                // Center map on list's location before triggering annotation reload
+                if let listCenter = userProfileViewModel.userLists
+                    .first(where: { $0.list_id == listId })?.averageLocation {
+                    // Move map to list's center
+                    mapPosition = .region(MKCoordinateRegion(
+                        center: listCenter,
+                        span: MKCoordinateSpan(latitudeDelta: 0.08, longitudeDelta: 0.08)
+                    ))
+                }
+
+                // Trigger reload after map moves (using slight delay to let map settle)
                 if let currentUserId = userSession.currentUserId {
-                    let currentRegion = appCoordinator.currentMapRegion
                     Task {
-                        if let region = currentRegion {
-                            await mapViewModel.onMapCameraSettled(region, userId: currentUserId)
+                        try? await Task.sleep(nanoseconds: 300_000_000) // 0.3s for map animation
+                        print("📍 [MapContainer] After delay, region: \(String(describing: appCoordinator.currentMapRegion))")
+                        if let newRegion = appCoordinator.currentMapRegion {
+                            await mapViewModel.onMapCameraSettled(newRegion, userId: currentUserId)
                         }
                     }
                 }
@@ -216,7 +243,7 @@ struct MapContainerView: View {
         .onChange(of: userProfileViewModel.showExternalFavoritesOnMap) { _, shouldShow in
             // Show external user's favorites on map with filtered annotations
             if shouldShow, let userId = userProfileViewModel.selectedUser?.id {
-                mapViewModel.selectExternalFavorites(userId: userId)
+                mapViewModel.selectExternalFavorites(userId: userId, userPhotoUrl: userProfileViewModel.selectedUser?.profilePhotoURL)
                 userProfileViewModel.showExternalFavoritesOnMap = false  // Reset trigger
                 // Trigger reload to show external user's favorite places
                 if let currentUserId = userSession.currentUserId {

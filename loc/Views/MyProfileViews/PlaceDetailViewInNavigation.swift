@@ -63,7 +63,7 @@ struct PlaceDetailViewInNavigation: View {
             // MVVM: Clean up state when view is dismissed
             selectedPlaceVM.allowAutoPresent = originalAllowAutoPresent
 
-            // Clear selected place to remove beacon when navigating back to list
+            // Clear selected place to remove selection indicator when navigating back to list
             selectedPlaceVM.selectedPlace = nil
         }
     }

@@ -63,6 +63,9 @@ class MapViewModel: ObservableObject {
     @Published var showingKeywordResultsPopup: Bool = false
     @Published var keywordTypesFilter: [String]? = nil  // Types to filter by when showing keyword results
 
+    // Preserved annotation for selected place (survives density culling during zoom out)
+    @Published var preservedSelectedAnnotation: PlaceAnnotation?
+
     // Computed properties for backwards compatibility with existing code
     var showingListPopup: Bool { if case .list = activeSheet { return true } else { return false } }
     var showingTikToksPopup: Bool { activeSheet == .tiktoks }
@@ -178,7 +181,7 @@ class MapViewModel: ObservableObject {
     }
 
     /// Shows external user's reviews on the map with filtered annotations
-    func selectExternalReviews(userId: String) {
+    func selectExternalReviews(userId: String, userPhotoUrl: URL?) {
         externalUserId = userId
         showingExternalReviewsOnMap = true
         showingReviewsOnMap = false
@@ -189,10 +192,17 @@ class MapViewModel: ObservableObject {
         viewportAnnotations = []
         communityMarkers = []
         lastLoadedRegion = nil
+
+        // Load external user's photo
+        if let photoUrl = userPhotoUrl {
+            Task {
+                await loadExternalUserPhoto(userId: userId, photoUrl: photoUrl)
+            }
+        }
     }
 
     /// Shows external user's list on the map with filtered annotations
-    func selectExternalList(listId: String, userId: String) {
+    func selectExternalList(listId: String, userId: String, userPhotoUrl: URL?) {
         externalUserId = userId
         externalListId = listId
         showingExternalReviewsOnMap = false
@@ -203,10 +213,17 @@ class MapViewModel: ObservableObject {
         viewportAnnotations = []
         communityMarkers = []
         lastLoadedRegion = nil
+
+        // Load external user's photo
+        if let photoUrl = userPhotoUrl {
+            Task {
+                await loadExternalUserPhoto(userId: userId, photoUrl: photoUrl)
+            }
+        }
     }
 
     /// Shows external user's favorites on the map with filtered annotations
-    func selectExternalFavorites(userId: String) {
+    func selectExternalFavorites(userId: String, userPhotoUrl: URL?) {
         externalUserId = userId
         showingExternalFavoritesOnMap = true
         showingExternalReviewsOnMap = false
@@ -218,6 +235,13 @@ class MapViewModel: ObservableObject {
         viewportAnnotations = []
         communityMarkers = []
         lastLoadedRegion = nil
+
+        // Load external user's photo
+        if let photoUrl = userPhotoUrl {
+            Task {
+                await loadExternalUserPhoto(userId: userId, photoUrl: photoUrl)
+            }
+        }
     }
 
     /// Clears all special filters (list, TikToks, reviews, favorites, external)
@@ -237,6 +261,31 @@ class MapViewModel: ObservableObject {
         viewportAnnotations = []
         communityMarkers = []
         lastLoadedRegion = nil
+    }
+
+    // MARK: - Selected Annotation Preservation
+
+    /// Sets a preserved annotation from a DetailPlace so it remains visible during zoom out
+    /// When density-based culling removes the selected annotation from viewportAnnotations,
+    /// the preserved annotation ensures it still displays on the map
+    /// - Parameter place: The currently selected DetailPlace (nil to clear)
+    func setPreservedAnnotation(for place: DetailPlace?) {
+        guard let place = place, let coord = place.coordinate else {
+            preservedSelectedAnnotation = nil
+            return
+        }
+        preservedSelectedAnnotation = PlaceAnnotation(
+            id: place.id.uuidString,
+            name: place.name,
+            coordinate: CLLocationCoordinate2D(latitude: coord.latitude, longitude: coord.longitude),
+            userIds: [],
+            placeType: place.categories?.first ?? "other"
+        )
+    }
+
+    /// Clears the preserved annotation (call when deselecting a place)
+    func clearPreservedAnnotation() {
+        preservedSelectedAnnotation = nil
     }
 
     // MARK: - Photo Loading (Called by View when profile is available)
@@ -282,7 +331,7 @@ class MapViewModel: ObservableObject {
             for photo in photos {
                 guard let urlString = photo.profilePhotoUrl,
                       let url = URL(string: urlString) else { continue }
-                
+
                 group.addTask {
                     do {
                         let (data, _) = try await URLSession.shared.data(from: url)
@@ -293,12 +342,29 @@ class MapViewModel: ObservableObject {
                     }
                 }
             }
-            
+
             for await (userId, image) in group {
                 if let image = image {
                     self.userProfilePictures[userId] = image
                 }
             }
+        }
+    }
+
+    /// Load a single external user's profile photo into the cache
+    private func loadExternalUserPhoto(userId: String, photoUrl: URL) async {
+        // Skip if already cached
+        guard userProfilePictures[userId] == nil else { return }
+
+        do {
+            let (data, _) = try await URLSession.shared.data(from: photoUrl)
+            if let image = UIImage(data: data) {
+                self.userProfilePictures[userId] = image
+                // Regenerate annotation images to use the new photo
+                generateAnnotationImages()
+            }
+        } catch {
+            print("Failed to load external user photo: \(error)")
         }
     }
     
@@ -451,6 +517,8 @@ class MapViewModel: ObservableObject {
                 let annotations: [PlaceAnnotation]
                 if let extListId = externalListId, let extUserId = externalUserId {
                     // External user's list - filter by their list
+                    print("🗺️ [MapViewModel] Fetching external list: listId=\(extListId), userId=\(extUserId)")
+                    print("   bounds: N:\(bounds.northLat), S:\(bounds.southLat), E:\(bounds.eastLng), W:\(bounds.westLng)")
                     annotations = try await placeService.fetchListAnnotationsInViewport(
                         northLat: bounds.northLat,
                         southLat: bounds.southLat,
@@ -459,6 +527,7 @@ class MapViewModel: ObservableObject {
                         userId: extUserId,
                         listId: extListId
                     )
+                    print("🗺️ [MapViewModel] Received \(annotations.count) external list annotations")
                 } else if showingExternalReviewsOnMap, let extUserId = externalUserId {
                     // External user's reviews - filter by their reviewed places
                     annotations = try await placeService.fetchReviewAnnotationsInViewport(
