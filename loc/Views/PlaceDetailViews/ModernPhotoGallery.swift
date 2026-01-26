@@ -10,6 +10,8 @@ import SwiftUI
 struct ModernPhotoGallery: View {
     let images: [UIImage]
     let onImageTapped: (Int) -> Void
+    var overflowCount: Int = 0  // Number of additional photos not shown
+    var allPhotosForViewer: [UIImage]? = nil  // All photos to pass to viewer when tapping "+X"
 
     @ObservedObject var photosViewModel: PlacePhotosViewModel
 
@@ -69,6 +71,26 @@ struct ModernPhotoGallery: View {
     }
     }
 
+    // Helper to check if a photo should show the overflow indicator
+    private func shouldShowOverflow(at index: Int) -> Bool {
+        return index == images.count - 1 && overflowCount > 0
+    }
+
+    // Overlay view for "+X more" indicator
+    @ViewBuilder
+    private func overflowOverlay(at index: Int) -> some View {
+        if shouldShowOverflow(at: index) {
+            ZStack {
+                Color.black.opacity(0.5)
+                Text("+\(overflowCount)")
+                    .font(.title)
+                    .fontWeight(.bold)
+                    .foregroundColor(.white)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             if images.isEmpty {
@@ -101,6 +123,7 @@ struct ModernPhotoGallery: View {
                                         RoundedRectangle(cornerRadius: cornerRadius)
                                             .stroke(Color.gray.opacity(0.1), lineWidth: 0.5)
                                     )
+                                    .overlay(overflowOverlay(at: 0))
                                     .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 4)
                             }
                             .frame(height: heroImageHeight)
@@ -126,6 +149,7 @@ struct ModernPhotoGallery: View {
                                             RoundedRectangle(cornerRadius: cornerRadius)
                                                 .stroke(Color.gray.opacity(0.1), lineWidth: 0.5)
                                         )
+                                        .overlay(overflowOverlay(at: actualIndex))
                                         .shadow(color: Color.black.opacity(0.08), radius: 6, x: 0, y: 2)
                                 }
                                 .aspectRatio(5/3, contentMode: .fill)
@@ -155,6 +179,7 @@ struct ModernPhotoGallery: View {
                                                     RoundedRectangle(cornerRadius: cornerRadius)
                                                         .stroke(Color.gray.opacity(0.1), lineWidth: 0.5)
                                                 )
+                                                .overlay(overflowOverlay(at: actualIndex))
                                                 .shadow(color: Color.black.opacity(0.08), radius: 6, x: 0, y: 2)
                                         }
                                         .aspectRatio(5/4, contentMode: .fill)

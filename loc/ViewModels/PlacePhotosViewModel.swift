@@ -158,6 +158,18 @@ class PlacePhotosViewModel: ObservableObject {
         guard let placeId = place?.id.uuidString else { return true }
         return externalReviewPhotosAllLoadedByPlace[placeId] ?? false
     }
+
+    /// Combined photos from both internal reviews and external sources
+    var combinedPhotos: [UIImage] {
+        let internalPhotos = photos
+        let external = externalReviewPhotos
+        return internalPhotos + external
+    }
+
+    /// Total count of all available photos (for "+X more" indicator)
+    var totalPhotoCount: Int {
+        return photos.count + externalReviewPhotos.count
+    }
     
     var allPhotosLoadedForCurrentPlace: Bool {
         return allPhotosLoaded
