@@ -47,11 +47,37 @@ struct MapView: View {
         mapViewModel.showingKeywordPopup
     }
 
+    // Sort annotations so selected one renders last (on top)
+    // MapKit renders annotations in ForEach order, so last = topmost
+    // Also includes preserved annotation if it was culled by density reduction
+    private var sortedAnnotations: [PlaceAnnotation] {
+        let selectedId = selectedPlaceVM.selectedPlace?.id.uuidString
+
+        // Start with viewport annotations
+        var annotations = mapViewModel.viewportAnnotations
+
+        // Add preserved annotation if not already present (survives zoom-out culling)
+        if let preserved = mapViewModel.preservedSelectedAnnotation,
+           !annotations.contains(where: { $0.id == preserved.id }) {
+            annotations.append(preserved)
+        }
+
+        return annotations.sorted { a, b in
+            // Selected annotation goes last (renders on top)
+            if a.id == selectedId { return false }
+            if b.id == selectedId { return true }
+            return false // Maintain original order for non-selected
+        }
+    }
+
     // Map content extracted to help Swift type checker
     private var mapContentView: some View {
         Map(position: $mapPosition) {
             // Community places as small emoji markers (shown behind network places)
-            ForEach(mapViewModel.communityMarkers) { marker in
+            // Filter out the community marker that's currently selected (to avoid duplicate with preserved annotation)
+            ForEach(mapViewModel.communityMarkers.filter { marker in
+                selectedPlaceVM.selectedPlace?.id.uuidString != marker.id
+            }) { marker in
                 Annotation(
                     "",
                     coordinate: marker.coordinate,
@@ -62,7 +88,8 @@ struct MapView: View {
             }
 
             // Network places (user + followed users) as main annotations
-            ForEach(mapViewModel.viewportAnnotations) { annotation in
+            // Use sortedAnnotations so selected annotation renders last (on top)
+            ForEach(sortedAnnotations) { annotation in
                 Annotation(
                     annotation.name,
                     coordinate: annotation.coordinate,
@@ -130,6 +157,8 @@ struct MapView: View {
         Task {
             if let place = await mapViewModel.loadPlaceDetails(for: marker) {
                 await MainActor.run {
+                    // Preserve the annotation so it survives zoom-out density culling
+                    mapViewModel.setPreservedAnnotation(for: place)
                     // Don't animate map when tapping marker - user is already looking at it
                     selectedPlaceVM.selectPlaceAndFetchDetails(place, shouldAnimateMap: false)
                     selectedPlaceVM.isDetailSheetPresented = true
@@ -162,6 +191,9 @@ struct MapView: View {
         Task {
             if let place = await mapViewModel.loadPlaceDetails(for: annotation) {
                 await MainActor.run {
+                    // Preserve the annotation so it survives zoom-out density culling
+                    mapViewModel.setPreservedAnnotation(for: place)
+
                     // Check if any popup sheet is open - if so, navigate within the sheet instead
                     // MVVM: View coordinates navigation based on ViewModel state
                     if mapViewModel.showingListPopup ||
@@ -423,6 +455,12 @@ struct MapView: View {
             VisiblePlacesPopupView(mapRegion: currentMapRegion)
                 .environmentObject(selectedPlaceVM)
                 .presentationDragIndicator(.visible)
+        }
+        .onChange(of: selectedPlaceVM.selectedPlace?.id) { oldValue, newValue in
+            // Clear preserved annotation when place is deselected
+            if newValue == nil {
+                mapViewModel.clearPreservedAnnotation()
+            }
         }
     }
     
