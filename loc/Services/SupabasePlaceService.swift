@@ -1464,6 +1464,7 @@ class SupabasePlaceService: ObservableObject {
         place.source = record.source
         place.isCustom = record.is_custom
         place.menuUrl = record.menu_url
+        place.websiteUrl = record.website
 
         // Handle coordinate from PostGIS geometry
         if let locationData = record.location {
