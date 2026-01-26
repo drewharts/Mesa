@@ -28,6 +28,8 @@ class PhotoImportViewModel: ObservableObject {
     @Published var isSavingPlace: Bool = false
     @Published var isUserCreatedPlace: Bool = false
     @Published var isInPhotoImportFlow: Bool = false
+    @Published var resolvedPlace: DetailPlace?
+    @Published var isResolvingPlace: Bool = false
 
     private let nearbyPlacesService: NearbyPlacesService
     private let placeService: PlaceService
@@ -208,18 +210,35 @@ class PhotoImportViewModel: ObservableObject {
         isLoadingNearbyPlaces = false
     }
     
-    func selectPlace(_ place: NearbyPlaceFeature) {
+    func selectPlace(_ place: NearbyPlaceFeature) async {
         selectedPlace = place
+        isUserCreatedPlace = false  // Always Google Place in photo import flow
+
+        print("✅ Selected place: \(place.properties.name)")
+
+        // Always fetch from backend to get proper UUID
+        guard let googlePlaceId = place.properties.placeId else {
+            print("❌ No Google Place ID found")
+            resolvedPlace = convertToDetailPlace(place)
+            showPlaceSelection = false
+            showPostCreation = true
+            return
+        }
+
+        isResolvingPlace = true
+        do {
+            let detailPlace = try await fetchPlaceFromBackend(googlePlaceId: googlePlaceId)
+            resolvedPlace = detailPlace
+            print("✅ Resolved place from backend with UUID: \(detailPlace.id)")
+        } catch {
+            print("❌ Failed to resolve place from backend: \(error)")
+            // Fallback to client-side conversion if backend fails
+            resolvedPlace = convertToDetailPlace(place)
+        }
+        isResolvingPlace = false
+
         showPlaceSelection = false
         showPostCreation = true
-        
-        // Track if this is a user-created place (will be saved later when review is submitted)
-        isUserCreatedPlace = place.properties.source == "user_created"
-        
-        print("✅ Selected place: \(place.properties.name)")
-        print("📝 User-created place: \(isUserCreatedPlace)")
-        
-        // Note: Place will be saved to Firestore only when review is submitted
     }
     
     private func saveSelectedPlaceToFirestore(_ nearbyPlace: NearbyPlaceFeature) async {
@@ -373,19 +392,57 @@ class PhotoImportViewModel: ObservableObject {
     
     // Called when a review is submitted to save the place to Firestore
     func saveSelectedPlaceAfterReview() async {
-        guard let place = selectedPlace else {
-            print("❌ No selected place to save")
+        guard let place = resolvedPlace else {
+            print("❌ No resolved place to save")
             return
         }
-        
-        // Only save if this is a user-created place (existing places are already in Firestore)
-        if !isUserCreatedPlace {
-            // Existing place selected from API – ensure it's in Firestore & user collections
-            print("💾 Saving existing selected place after review submission: \(place.properties.name)")
-            await saveSelectedPlaceToFirestore(place)
-        } else {
-            print("ℹ️ Skipping extra save for newly-created place: \(place.properties.name)")
+
+        guard let currentUserId = SupabaseAuthService.shared.currentUserId else {
+            print("❌ No authenticated user found")
+            return
         }
+
+        isSavingPlace = true
+
+        do {
+            // Save to main places collection (upsert - handles deduplication)
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                placeService.addToAllPlaces(place: place) { error in
+                    if let error = error {
+                        continuation.resume(throwing: error)
+                    } else {
+                        continuation.resume()
+                    }
+                }
+            }
+
+            // For user-created places, also save to myPlaces
+            if isUserCreatedPlace {
+                try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                    placeService.addToMyPlaces(userId: currentUserId, place: place) { error in
+                        if let error = error {
+                            continuation.resume(throwing: error)
+                        } else {
+                            continuation.resume()
+                        }
+                    }
+                }
+            }
+
+            // Update map places
+            userService.addOrUpdateMapPlace(userId: currentUserId, place: place) { _ in }
+
+            createdPlaceForDetail = place
+            NotificationCenter.default.post(name: NSNotification.Name("RefreshMapAnnotations"), object: nil)
+
+            onPlaceSaved?()
+            onPlaceSavedWithDetail?(place)
+
+        } catch {
+            print("❌ Failed to save place: \(error)")
+        }
+
+        isSavingPlace = false
     }
     
     func clearSelection() {
@@ -402,5 +459,7 @@ class PhotoImportViewModel: ObservableObject {
         searchRadiusUsed = 50
         isUserCreatedPlace = false
         isInPhotoImportFlow = false
+        resolvedPlace = nil
+        isResolvingPlace = false
     }
 } 

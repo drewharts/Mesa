@@ -25,21 +25,35 @@ struct PlacePhotosView: View {
                                 .padding()
                             
                         case .loaded:
-                            let photos = viewModel.photos
-                            if !photos.isEmpty {
+                            let allPhotos = viewModel.combinedPhotos
+                            let displayPhotos = Array(allPhotos.prefix(10))
+                            let overflowCount = max(0, allPhotos.count - 10)
+
+                            if !displayPhotos.isEmpty {
                                 ModernPhotoGallery(
-                                    images: photos,
+                                    images: displayPhotos,
                                     onImageTapped: { index in
-                                        onPhotoTapped(photos, index)
+                                        // When tapping "+X more" photo, pass all photos to viewer
+                                        onPhotoTapped(allPhotos, index)
                                     },
+                                    overflowCount: overflowCount,
+                                    allPhotosForViewer: allPhotos,
                                     photosViewModel: viewModel
                                 )
+                            } else {
+                                // Show empty state when no photos available
+                                VStack(spacing: 16) {
+                                    Image(systemName: "photo.on.rectangle.angled")
+                                        .font(.system(size: 48))
+                                        .foregroundColor(.gray.opacity(0.5))
+
+                                    Text("No photos yet")
+                                        .font(.subheadline)
+                                        .foregroundColor(.gray)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 40)
                             }
-                            
-                            ExternalReviewPhotoGallery(
-                                onPhotoTapped: onPhotoTapped,
-                                photosViewModel: viewModel
-                            )
                             
                         case .error(let error):
                             Text("Failed to load photos: \(error.localizedDescription)")
@@ -55,6 +69,9 @@ struct PlacePhotosView: View {
                 }
                 .padding(.bottom, 20)
             }
+        }
+        .onAppear {
+            viewModel.loadInitialExternalReviewPhotos()
         }
     }
 }

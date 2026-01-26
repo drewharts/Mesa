@@ -13,6 +13,34 @@ struct PlaceInfoSection: View {
     let isDescriptionLoading: Bool
 
     @State private var showingMenu = false
+    @State private var showingWebsite = false
+
+    private var hasActionButtons: Bool {
+        let hasMenu = place.menuUrl != nil && !place.menuUrl!.isEmpty
+        let hasWebsite = place.websiteUrl != nil && !place.websiteUrl!.isEmpty
+        let hasPhone = place.phone != nil && !place.phone!.isEmpty
+        return hasMenu || hasWebsite || hasPhone
+    }
+
+    private func actionButtonLabel(icon: String, text: String) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.system(size: 14, weight: .medium))
+            Text(text)
+                .font(.system(size: 14, weight: .semibold))
+        }
+        .foregroundColor(.primary)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(Color(.systemGray6))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(Color(.systemGray4), lineWidth: 0.5)
+        )
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -63,35 +91,56 @@ struct PlaceInfoSection: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.bottom, 12)
 
-                // Menu button - only show if menu URL exists
-                if let menuUrl = place.menuUrl, !menuUrl.isEmpty, let url = URL(string: menuUrl) {
-                    Button {
-                        showingMenu = true
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: "book.pages")
-                                .font(.system(size: 14, weight: .medium))
-                            Text("Menu")
-                                .font(.system(size: 14, weight: .semibold))
+                // Action buttons (Menu, Website) - horizontal scroll if both present
+                if hasActionButtons {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 10) {
+                            // Menu button
+                            if let menuUrl = place.menuUrl, !menuUrl.isEmpty, let url = URL(string: menuUrl) {
+                                Button {
+                                    showingMenu = true
+                                } label: {
+                                    actionButtonLabel(icon: "book.pages", text: "Menu")
+                                }
+                                .buttonStyle(.plain)
+                                .sheet(isPresented: $showingMenu) {
+                                    SafariView(url: url)
+                                        .ignoresSafeArea()
+                                }
+                            }
+
+                            // Website button
+                            if let websiteUrl = place.websiteUrl, !websiteUrl.isEmpty, let url = URL(string: websiteUrl) {
+                                Button {
+                                    showingWebsite = true
+                                } label: {
+                                    actionButtonLabel(icon: "globe", text: "Website")
+                                }
+                                .buttonStyle(.plain)
+                                .sheet(isPresented: $showingWebsite) {
+                                    SafariView(url: url)
+                                        .ignoresSafeArea()
+                                }
+                            }
+
+                            // Call button
+                            if let phone = place.phone, !phone.isEmpty {
+                                Button {
+                                    let cleanedPhone = phone.replacingOccurrences(of: " ", with: "")
+                                        .replacingOccurrences(of: "-", with: "")
+                                        .replacingOccurrences(of: "(", with: "")
+                                        .replacingOccurrences(of: ")", with: "")
+                                    if let url = URL(string: "tel://\(cleanedPhone)") {
+                                        UIApplication.shared.open(url)
+                                    }
+                                } label: {
+                                    actionButtonLabel(icon: "phone.fill", text: "Call")
+                                }
+                                .buttonStyle(.plain)
+                            }
                         }
-                        .foregroundColor(.primary)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 10)
-                        .background(
-                            RoundedRectangle(cornerRadius: 10)
-                                .fill(Color(.systemGray6))
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 10)
-                                .stroke(Color(.systemGray4), lineWidth: 0.5)
-                        )
                     }
-                    .buttonStyle(.plain)
                     .padding(.bottom, 12)
-                    .sheet(isPresented: $showingMenu) {
-                        SafariView(url: url)
-                            .ignoresSafeArea()
-                    }
                 }
             }
         }

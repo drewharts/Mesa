@@ -764,25 +764,26 @@ class SupabasePlaceService: ObservableObject {
                 let p_max_lat: Double
             }
             
-            // Convert String listId to UUID for the SQL function
-            guard let listUUID = UUID(uuidString: listId) else {
+            // Validate listId is a valid UUID format, but keep original casing
+            // (Swift's UUID.uuidString always returns uppercase, but PostgreSQL text comparison is case-sensitive)
+            guard UUID(uuidString: listId) != nil else {
                 throw NSError(domain: "MapViewModel", code: 400, userInfo: [NSLocalizedDescriptionKey: "Invalid list ID format"])
             }
-            
+
             let params = ListViewportParams(
                 p_user_id: userId,
-                p_list_id: listUUID.uuidString,
+                p_list_id: listId,
                 p_min_lon: westLng,
                 p_min_lat: southLat,
                 p_max_lon: eastLng,
                 p_max_lat: northLat
             )
-            
+
             let response: [PlaceAnnotation] = try await supabase.client
                 .rpc("get_list_annotations_with_users", params: params)
                 .execute()
                 .value
-            
+
             return response
         } catch {
             if !Task.isCancelled && !(error is CancellationError) && (error as NSError).code != NSURLErrorCancelled {
@@ -1463,6 +1464,7 @@ class SupabasePlaceService: ObservableObject {
         place.source = record.source
         place.isCustom = record.is_custom
         place.menuUrl = record.menu_url
+        place.websiteUrl = record.website
 
         // Handle coordinate from PostGIS geometry
         if let locationData = record.location {

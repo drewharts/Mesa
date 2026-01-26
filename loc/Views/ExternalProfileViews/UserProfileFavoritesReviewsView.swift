@@ -19,7 +19,8 @@ struct UserProfileFavoritesReviewsView: View {
     @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
     
     @State private var selectedTab: UserFavoritesReviewsTab = .favorites
-    
+    @State private var hasSetInitialTab: Bool = false
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             tabHeader
@@ -35,9 +36,21 @@ struct UserProfileFavoritesReviewsView: View {
                 }
             }
 
-            // Default to reviews tab if user has no favorites
-            if userProfileVM.userFavorites.isEmpty {
-                selectedTab = .reviews
+            // Set initial tab if favorites loading is already complete
+            if !hasSetInitialTab && !userProfileVM.isLoadingFavorites {
+                hasSetInitialTab = true
+                if userProfileVM.userFavorites.isEmpty && !userProfileVM.lightweightReviewedPlaces.isEmpty {
+                    selectedTab = .reviews
+                }
+            }
+        }
+        .onChange(of: userProfileVM.isLoadingFavorites) { _, isLoading in
+            // When favorites finish loading, decide which tab to show
+            if !isLoading && !hasSetInitialTab {
+                hasSetInitialTab = true
+                if userProfileVM.userFavorites.isEmpty && !userProfileVM.lightweightReviewedPlaces.isEmpty {
+                    selectedTab = .reviews
+                }
             }
         }
     }
