@@ -126,6 +126,7 @@ struct MainView: View {
                 .environmentObject(profileViewModel)
                 .environmentObject(selectedPlaceVM)
                 .environmentObject(detailPlaceViewModel)
+                .environmentObject(serviceContainer)
             }
             .sheet(isPresented: $profileViewModel.isShowingPlaceSelection) {
                 TikTokPlaceSelectionView()

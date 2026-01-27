@@ -16,6 +16,7 @@ struct ProfileView: View {
     @EnvironmentObject var userProfileViewModel: UserProfileViewModel
     @EnvironmentObject var deepLinkViewModel: DeepLinkViewModel
     @EnvironmentObject var dataManager: DataManager
+    @EnvironmentObject var serviceContainer: ServiceContainer
     @StateObject private var photoImportVM = PhotoImportViewModel()
     @StateObject private var tikTokService = TikTokService()
     
@@ -42,7 +43,8 @@ struct ProfileView: View {
                 .navigationBarTitleDisplayMode(.inline)
                 .modifier(ToolbarModifier(
                     presentationMode: presentationMode,
-                    photoImportVM: photoImportVM
+                    photoImportVM: photoImportVM,
+                    profile: profile
                 ))
                 .navigationDestination(isPresented: $userProfileViewModel.isUserDetailPresented) {
                     UserProfileView(
@@ -52,7 +54,8 @@ struct ProfileView: View {
                     .environmentObject(profile)
                     .environmentObject(selectedPlaceVM)
                     .environmentObject(placeVM)
-                    .environmentObject(userSession) // Add userSession for currentUserId
+                    .environmentObject(userSession)
+                    .environmentObject(serviceContainer)
                 }
                 .navigationDestination(for: FollowListDestination.self) { destination in
                     // Navigate to followers or following list
@@ -209,7 +212,9 @@ struct ProfileView: View {
 struct ToolbarModifier: ViewModifier {
     @Binding var presentationMode: PresentationMode
     @ObservedObject var photoImportVM: PhotoImportViewModel
-    
+    @ObservedObject var profile: ProfileViewModel
+    @EnvironmentObject var serviceContainer: ServiceContainer
+
     func body(content: Content) -> some View {
         content
             .toolbar {
@@ -223,9 +228,9 @@ struct ToolbarModifier: ViewModifier {
                 }
             }
     }
-    
+
     // MARK: - Toolbar Components
-    
+
     private var backButton: some View {
         Button(action: {
             presentationMode.dismiss()
@@ -238,9 +243,19 @@ struct ToolbarModifier: ViewModifier {
             }
         }
     }
-    
+
     private var trailingToolbarItems: some View {
         HStack(spacing: 16) {
+            // Share own profile button
+            if let user = profile.user {
+                ProfileShareButton(
+                    userId: user.id,
+                    fullName: user.fullName,
+                    profilePhotoURL: user.profilePhotoURL?.absoluteString,
+                    style: .toolbar
+                )
+            }
+
             PhotosPicker(
                 selection: $photoImportVM.selectedItems,
                 maxSelectionCount: 10,
@@ -251,7 +266,7 @@ struct ToolbarModifier: ViewModifier {
                     .foregroundColor(.black)
                     .font(.body)
             }
-            
+
             AccountMenuView()
         }
     }

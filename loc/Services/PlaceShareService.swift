@@ -87,6 +87,33 @@ class PlaceShareService: ObservableObject {
         presentShareSheet(with: activityItems)
     }
 
+    // MARK: - Share Profile Methods
+
+    @MainActor
+    func shareProfile(_ profileData: ProfileData) {
+        let shareableProfile = ShareableProfile(from: profileData)
+        shareProfile(shareableProfile)
+    }
+
+    @MainActor
+    func shareProfile(userId: String, fullName: String, profilePhotoURL: String?) {
+        let shareableProfile = ShareableProfile(id: userId, fullName: fullName, profilePhotoURL: profilePhotoURL)
+        shareProfile(shareableProfile)
+    }
+
+    @MainActor
+    private func shareProfile(_ shareableProfile: ShareableProfile) {
+        guard let universalLink = generateUniversalLinkURL(for: shareableProfile) else {
+            print("❌ Failed to generate Universal Link URL for profile: \(shareableProfile.fullName)")
+            return
+        }
+
+        let shareText = createShareText(for: shareableProfile)
+        let activityItems: [Any] = [shareText, universalLink]
+
+        presentShareSheet(with: activityItems)
+    }
+
     // MARK: - Share Text Generation
     
     private func createShareText(for place: ShareablePlace) -> String {
@@ -115,15 +142,22 @@ class PlaceShareService: ObservableObject {
     
     private func createShareText(for list: ShareableLightweightList) -> String {
         var shareText = "Check out my list \"\(list.name)\""
-        
+
         if !list.city.isEmpty {
             shareText += " in \(list.city)"
         }
-        
+
         shareText += " on Mesa!"
         return shareText
     }
-    
+
+    private func createShareText(for profile: ShareableProfile) -> String {
+        if profile.fullName.isEmpty {
+            return "Check out this profile on Mesa!"
+        }
+        return "Check out \(profile.fullName)'s profile on Mesa!"
+    }
+
     // MARK: - Activity Sheet Presentation
     
     @MainActor
@@ -229,16 +263,35 @@ class PlaceShareService: ObservableObject {
         components.scheme = "https"
         components.host = universalLinkHost
         components.path = "/list/\(shareableList.id)"
-        
+
         var queryItems: [URLQueryItem] = []
         queryItems.append(URLQueryItem(name: "name", value: shareableList.name))
         queryItems.append(URLQueryItem(name: "city", value: shareableList.city))
         queryItems.append(URLQueryItem(name: "userId", value: shareableList.userId))
-        
+
         components.queryItems = queryItems
         return components.url
     }
-    
+
+    /// Generates a Universal Link URL for a profile
+    /// Format: https://mesa-backend-staging.up.railway.app/profile/[userId]?name=...
+    private func generateUniversalLinkURL(for profile: ShareableProfile) -> URL? {
+        var components = URLComponents()
+        components.scheme = "https"
+        components.host = universalLinkHost
+        components.path = "/profile/\(profile.id)"
+
+        var queryItems: [URLQueryItem] = []
+        queryItems.append(URLQueryItem(name: "name", value: profile.fullName))
+
+        if let photoURL = profile.profilePhotoURL {
+            queryItems.append(URLQueryItem(name: "photoURL", value: photoURL))
+        }
+
+        components.queryItems = queryItems
+        return components.url
+    }
+
     // MARK: - Image Helpers
     
     private func getFirstImageURL(from detailPlace: DetailPlace) -> String? {

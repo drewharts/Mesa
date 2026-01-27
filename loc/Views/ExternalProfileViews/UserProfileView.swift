@@ -16,6 +16,7 @@ struct UserProfileView: View {
     @EnvironmentObject var profileVM: ProfileViewModel
     @EnvironmentObject var userSession: UserSession // Add userSession to get current user ID
     @EnvironmentObject var detailPlaceVM: DetailPlaceViewModel
+    @EnvironmentObject var serviceContainer: ServiceContainer
     @Environment(\.presentationMode) var presentationMode
 
     var body: some View {
@@ -95,6 +96,18 @@ struct UserProfileView: View {
             }
         }
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                if let selectedUser = UserProfileVM.selectedUser {
+                    ProfileShareButton(
+                        userId: selectedUser.id,
+                        fullName: selectedUser.fullName,
+                        profilePhotoURL: selectedUser.profilePhotoURL?.absoluteString,
+                        style: .toolbar
+                    )
+                }
+            }
+        }
         .alert("Follow Error", isPresented: $UserProfileVM.showFollowError) {
             Button("OK") {
                 UserProfileVM.showFollowError = false

@@ -267,16 +267,27 @@ struct locApp: App {
             
         } else if path.hasPrefix("/list/") {
             let listId = String(path.dropFirst("/list/".count))
-            
+
             var deepLinkComponents = URLComponents()
             deepLinkComponents.scheme = "loc"
             deepLinkComponents.host = "list"
             deepLinkComponents.path = "/\(listId)"
             deepLinkComponents.queryItems = incomingComponents.queryItems
-            
+
+            return deepLinkComponents.url
+
+        } else if path.hasPrefix("/profile/") {
+            let userId = String(path.dropFirst("/profile/".count))
+
+            var deepLinkComponents = URLComponents()
+            deepLinkComponents.scheme = "loc"
+            deepLinkComponents.host = "profile"
+            deepLinkComponents.path = "/\(userId)"
+            deepLinkComponents.queryItems = incomingComponents.queryItems
+
             return deepLinkComponents.url
         }
-        
+
         return nil
     }
 }

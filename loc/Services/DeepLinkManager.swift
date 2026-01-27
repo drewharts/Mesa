@@ -84,6 +84,9 @@ class DeepLinkManager: ObservableObject {
         case "list":
             print("📋 [DeepLinkManager] Routing to handleListDeepLink")
             await handleListDeepLink(url)
+        case "profile":
+            print("👤 [DeepLinkManager] Routing to handleProfileDeepLink")
+            await handleProfileDeepLink(url)
         case "tiktok-shared":
             print("🎵 [DeepLinkManager] host is 'tiktok-shared', routing to handleTikTokFromExtension")
             await handleTikTokFromExtension()
@@ -109,17 +112,17 @@ class DeepLinkManager: ObservableObject {
             print("❌ [DeepLinkManager] Failed to parse ShareableList from URL")
             return
         }
-        
+
         guard let userProfileViewModel = userProfileViewModel else {
             print("❌ [DeepLinkManager] UserProfileViewModel not set, cannot navigate to profile")
             return
         }
-        
+
         guard let currentUserId = userSession?.currentUserId else {
             print("❌ [DeepLinkManager] No current user ID available")
             return
         }
-        
+
         // Delegate to UserProfileViewModel - it owns the profile navigation responsibility
         userProfileViewModel.navigateToUserWithList(
             userId: shareableList.userId,
@@ -127,7 +130,29 @@ class DeepLinkManager: ObservableObject {
             currentUserId: currentUserId
         )
     }
-    
+
+    private func handleProfileDeepLink(_ url: URL) async {
+        guard let shareableProfile = ShareableProfile.from(url: url) else {
+            print("❌ [DeepLinkManager] Failed to parse ShareableProfile from URL")
+            return
+        }
+
+        guard let userProfileViewModel = userProfileViewModel else {
+            print("❌ [DeepLinkManager] UserProfileViewModel not set, cannot navigate to profile")
+            return
+        }
+
+        guard let currentUserId = userSession?.currentUserId else {
+            print("❌ [DeepLinkManager] No current user ID available")
+            return
+        }
+
+        print("👤 [DeepLinkManager] Navigating to profile: \(shareableProfile.id)")
+
+        // Navigate to profile using UserProfileViewModel
+        userProfileViewModel.fetchAndSelectUser(userId: shareableProfile.id, currentUserId: currentUserId)
+    }
+
     private func handlePlaceDeepLink(_ url: URL) async {
         guard let shareablePlace = ShareablePlace.from(url: url) else {
             return

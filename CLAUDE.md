@@ -8,6 +8,30 @@ Mesa (Loc) is a social iOS app for sharing and discovering places. Built with Sw
 
 **📚 For detailed architecture guidance, see `ARCHITECTURE.md`**
 
+## ⚠️ Core Principles (ALWAYS FOLLOW)
+
+### Architecture Standards
+- **STRICT MVVM ARCHITECTURE**: All code MUST follow Model-View-ViewModel architecture without exception
+  - **Model**: Data structures and business entities only
+  - **View**: Purely declarative UI with zero business logic
+  - **ViewModel**: All business logic, state management, and data coordination
+  - Never bypass MVVM for "quick fixes" or "simple cases"
+
+### Single Responsibility Principle (SRP)
+- **ONE REASON TO CHANGE**: Every class, struct, and function should have exactly one reason to change
+- **FOCUSED COMPONENTS**: Each component does one thing and does it well
+- **CLEAR BOUNDARIES**: If a component has multiple responsibilities, split it immediately
+- **NO GOD OBJECTS**: Avoid classes/structs that know or do too much
+
+### Code Quality Standards
+- **STAFF ENGINEER LEVEL**: All code must meet staff engineer quality standards:
+  - Clean, readable, and self-documenting code
+  - Proper error handling and edge case coverage
+  - Thoughtful API design and abstractions
+  - Performance-conscious implementations
+  - Maintainable and extensible architecture
+  - No shortcuts or technical debt without explicit documentation
+
 ## Development Commands
 
 ### Build and Run
@@ -76,6 +100,33 @@ struct TikTokVideosSection: View {
     var body: some View { /* Observes ViewModel */ }
 }
 ```
+
+## Documentation Standards
+
+### Function Comments
+- **ONE COMMENT PER FUNCTION**: Every function MUST have exactly one comment directly above it
+- **DESCRIBE THE BEHAVIOR**: The comment must clearly describe what the function does, not how
+- **KEEP COMMENTS UPDATED**: When a function's behavior changes, the comment MUST be updated immediately
+- **NO STALE COMMENTS**: A wrong comment is worse than no comment - always verify accuracy
+
+### Comment Format
+```swift
+/// Fetches user places from the database and updates the local cache.
+func fetchUserPlaces() async throws { ... }
+
+/// Calculates the distance between two coordinates in meters.
+func calculateDistance(from: CLLocationCoordinate2D, to: CLLocationCoordinate2D) -> Double { ... }
+
+/// Validates the input form and returns any validation errors found.
+func validateForm() -> [ValidationError] { ... }
+```
+
+### Comment Rules
+- Use `///` for documentation comments (Swift standard)
+- Start with a verb (Fetches, Calculates, Validates, Returns, etc.)
+- Be specific but concise (one sentence is ideal)
+- Include parameter context only if not obvious from names
+- Update comment FIRST when modifying function behavior
 
 ## Key Features Implementation
 
@@ -174,6 +225,20 @@ Located in `functions/src/index.ts`:
 - **ENVIRONMENT OBJECTS**: Use `@EnvironmentObject` to access ViewModels
 - **SIMPLE BINDINGS**: Only simple `@State` for local UI state like animations or temporary states
 
+### Git Commit Rules
+- **NEVER COMMIT WITHOUT USER TESTING**: All code changes MUST be tested by the user before committing
+- **WAIT FOR CONFIRMATION**: After implementing changes, wait for explicit user confirmation that the feature works
+- **NO PREMATURE COMMITS**: Do not commit based on assumptions or theoretical correctness
+- **TEST FIRST, COMMIT SECOND**: The workflow is always: implement → user tests → user confirms → then commit
+- **REVERT MISTAKES IMMEDIATELY**: If a commit causes issues, revert it immediately and fix properly
+
+### Acceptable in Views
+- `var body: some View { ... }`
+- Simple computed properties for formatting (e.g., `var formattedDate: String`)
+- `@State` for simple UI state
+- `@EnvironmentObject` and `@ObservedObject` property wrappers
+- View modifiers and layout code
+
 ### Violations to Flag and Fix
 1. **Multiple struct View declarations in one file**
 2. **Functions defined inside View structs**
@@ -181,6 +246,11 @@ Located in `functions/src/index.ts`:
 4. **Network calls or async operations in Views**
 5. **Complex data manipulation in Views**
 6. **Functions longer than 30 lines**
+7. **MVVM violations**: Any code that bypasses the MVVM architecture
+8. **SRP violations**: Components with multiple responsibilities
+9. **Missing function comments**: Functions without a describing comment
+10. **Stale comments**: Comments that don't match the function's current behavior
+11. **Sub-standard code quality**: Code that doesn't meet staff engineer standards
 
 ### Migration Strategy
 When finding violations:
@@ -190,4 +260,10 @@ When finding violations:
 4. **Update Dependencies**: Ensure proper `@EnvironmentObject` setup
 5. **Refactor Long Functions**: Break functions longer than 30 lines into smaller, focused functions
 
-**Note**: These standards are enforced to maintain code quality, readability, and proper MVVM architecture. Every code change should be reviewed against these rules.
+## Enforcement
+
+- Every Pull Request should be checked against these rules
+- Use these rules during code review
+- Refactor existing code when making changes to follow these patterns
+- These standards are enforced to maintain code quality, readability, and proper MVVM architecture
+- Every code change should be reviewed against these rules
