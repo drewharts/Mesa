@@ -167,6 +167,22 @@ struct MapContainerView: View {
                     }
                 }
             }
+            .onChange(of: profileViewModel.showMyPlacesOnMap) { _, newValue in
+                // Navigate to map showing user's created places
+                if newValue {
+                    mapViewModel.selectMyPlaces()
+                    profileViewModel.showMyPlacesOnMap = false // Reset trigger
+                    // Trigger reload with my places filter
+                    if let userId = userSession.currentUserId {
+                        let currentRegion = appCoordinator.currentMapRegion
+                        Task {
+                            if let region = currentRegion {
+                                await mapViewModel.onMapCameraSettled(region, userId: userId)
+                            }
+                        }
+                    }
+                }
+            }
 
         }
         .ignoresSafeArea()
@@ -306,6 +322,9 @@ struct MapContainerView: View {
 
                 case .favorites:
                     FavoritesPopupView()
+
+                case .myPlaces:
+                    MyPlacesListView()
 
                 case .externalReviews:
                     ExternalReviewsListPopupView(userProfileVM: userProfileViewModel)

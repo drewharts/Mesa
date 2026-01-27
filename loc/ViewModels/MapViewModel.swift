@@ -17,6 +17,7 @@ enum MapSheetType: Identifiable, Equatable {
     case tiktoks
     case reviews
     case favorites  // Current user's favorites
+    case myPlaces  // Current user's created places
     case externalReviews  // External user's reviews
     case externalList(String)  // External user's list
     case externalFavorites  // External user's favorites
@@ -28,6 +29,7 @@ enum MapSheetType: Identifiable, Equatable {
         case .tiktoks: return "tiktoks"
         case .reviews: return "reviews"
         case .favorites: return "favorites"
+        case .myPlaces: return "myPlaces"
         case .externalReviews: return "externalReviews"
         case .externalList(let listId): return "externalList-\(listId)"
         case .externalFavorites: return "externalFavorites"
@@ -52,6 +54,7 @@ class MapViewModel: ObservableObject {
     @Published var showingTikToksOnMap: Bool = false // When set, only show TikTok annotations
     @Published var showingReviewsOnMap: Bool = false // When set, only show reviewed place annotations
     @Published var showingFavoritesOnMap: Bool = false // When set, only show favorite place annotations
+    @Published var showingMyPlacesOnMap: Bool = false // When set, only show user's created place annotations
 
     // External user filtering state
     @Published var externalUserId: String? = nil // When set, filter by this external user's places
@@ -74,6 +77,7 @@ class MapViewModel: ObservableObject {
     var showingExternalListPopup: Bool { if case .externalList = activeSheet { return true } else { return false } }
     var showingExternalFavoritesPopup: Bool { activeSheet == .externalFavorites }
     var showingFavoritesPopup: Bool { activeSheet == .favorites }
+    var showingMyPlacesPopup: Bool { activeSheet == .myPlaces }
     var showingKeywordPopup: Bool { if case .keywordResults = activeSheet { return true } else { return false } }
 
     private var debounceTimer: Timer?
@@ -131,6 +135,7 @@ class MapViewModel: ObservableObject {
         showingTikToksOnMap = true
         showingReviewsOnMap = false
         showingFavoritesOnMap = false
+        showingMyPlacesOnMap = false
         selectedListId = nil
         activeSheet = .tiktoks
         // Clear current annotations - they will be reloaded with TikTok filter
@@ -144,6 +149,7 @@ class MapViewModel: ObservableObject {
         showingReviewsOnMap = true
         showingTikToksOnMap = false
         showingFavoritesOnMap = false
+        showingMyPlacesOnMap = false
         selectedListId = nil
         activeSheet = .reviews
         // Clear current annotations - they will be reloaded with reviews filter
@@ -157,9 +163,24 @@ class MapViewModel: ObservableObject {
         showingFavoritesOnMap = true
         showingTikToksOnMap = false
         showingReviewsOnMap = false
+        showingMyPlacesOnMap = false
         selectedListId = nil
         activeSheet = .favorites
         // Clear current annotations - they will be reloaded with favorites filter
+        viewportAnnotations = []
+        communityMarkers = []
+        lastLoadedRegion = nil
+    }
+
+    /// Sets the map to show only user's created places
+    func selectMyPlaces() {
+        showingMyPlacesOnMap = true
+        showingTikToksOnMap = false
+        showingReviewsOnMap = false
+        showingFavoritesOnMap = false
+        selectedListId = nil
+        activeSheet = .myPlaces
+        // Clear current annotations - they will be reloaded with my places filter
         viewportAnnotations = []
         communityMarkers = []
         lastLoadedRegion = nil
@@ -244,12 +265,13 @@ class MapViewModel: ObservableObject {
         }
     }
 
-    /// Clears all special filters (list, TikToks, reviews, favorites, external)
+    /// Clears all special filters (list, TikToks, reviews, favorites, my places, external)
     func clearAllFilters() {
         selectedListId = nil
         showingTikToksOnMap = false
         showingReviewsOnMap = false
         showingFavoritesOnMap = false
+        showingMyPlacesOnMap = false
         showingKeywordResultsPopup = false
         keywordTypesFilter = nil
         // Clear external user state
@@ -583,6 +605,15 @@ class MapViewModel: ObservableObject {
                         westLng: bounds.westLng,
                         userId: userId
                     )
+                } else if showingMyPlacesOnMap {
+                    // Current user's created places
+                    annotations = try await placeService.fetchMyPlacesAnnotationsInViewport(
+                        northLat: bounds.northLat,
+                        southLat: bounds.southLat,
+                        eastLng: bounds.eastLng,
+                        westLng: bounds.westLng,
+                        userId: userId
+                    )
                 } else if showingKeywordResultsPopup, let types = keywordTypesFilter {
                     // Keyword search results - filter by place types
                     annotations = try await placeService.fetchKeywordAnnotationsInViewport(
@@ -605,7 +636,7 @@ class MapViewModel: ObservableObject {
 
                 // Only fetch community markers if no filter is active
                 let community: [CommunityPlaceMarker]
-                let hasActiveFilter = selectedListId != nil || showingTikToksOnMap || showingReviewsOnMap || showingFavoritesOnMap || showingKeywordResultsPopup || externalUserId != nil
+                let hasActiveFilter = selectedListId != nil || showingTikToksOnMap || showingReviewsOnMap || showingFavoritesOnMap || showingMyPlacesOnMap || showingKeywordResultsPopup || externalUserId != nil
                 if !hasActiveFilter {
                     community = try await placeService.fetchCommunityPlacesInViewportWithUserId(
                     northLat: bounds.northLat,

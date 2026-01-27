@@ -284,6 +284,17 @@ class PlaceService: ObservableObject {
         )
     }
 
+    /// Fetches map annotations for user's created places (my places)
+    func fetchMyPlacesAnnotationsInViewport(northLat: Double, southLat: Double, eastLng: Double, westLng: Double, userId: String) async throws -> [PlaceAnnotation] {
+        return try await supabase.fetchMyPlacesAnnotationsInViewport(
+            northLat: northLat,
+            southLat: southLat,
+            eastLng: eastLng,
+            westLng: westLng,
+            userId: userId
+        )
+    }
+
     /// Fetches map annotations for keyword search results (filtered by place types)
     func fetchKeywordAnnotationsInViewport(northLat: Double, southLat: Double, eastLng: Double, westLng: Double, types: [String]) async throws -> [PlaceAnnotation] {
         return try await supabase.fetchKeywordAnnotationsInViewport(

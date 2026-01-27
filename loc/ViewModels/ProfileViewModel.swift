@@ -74,6 +74,7 @@ class ProfileViewModel: ObservableObject {
     @Published var showTikToksOnMap: Bool = false // When set, triggers map to show TikTok places
     @Published var showReviewsOnMap: Bool = false // When set, triggers map to show reviewed places
     @Published var showFavoritesOnMap: Bool = false // When set, triggers map to show favorite places
+    @Published var showMyPlacesOnMap: Bool = false // When set, triggers map to show user's created places
     @Published var isLoadingMoreExternalPlaces: Bool = false
     @Published var hasMoreExternalPlaces: Bool = true
     @Published var isLoadingMorePlaceLists: Bool = false

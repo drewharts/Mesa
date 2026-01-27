@@ -14,22 +14,10 @@ struct ProfileFollowCountsView: View {
     @EnvironmentObject var userSession: UserSession
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var detailPlaceVM: DetailPlaceViewModel
-    
+    @Environment(\.presentationMode) var presentationMode
+
     @Binding var navigationPath: NavigationPath
     @State private var refreshToggle = false
-    
-    // Keep sheet for My Places (not converting to navigation yet)
-    enum SheetType: Identifiable {
-        case myPlaces
-        
-        var id: Int {
-            switch self {
-            case .myPlaces: return 2
-            }
-        }
-    }
-    
-    @State private var activeSheet: SheetType?
     
     var body: some View {
         HStack(spacing: 24) {
@@ -81,7 +69,8 @@ struct ProfileFollowCountsView: View {
             
             // My Places count (Created places only)
             Button(action: {
-                activeSheet = .myPlaces
+                profile.showMyPlacesOnMap = true
+                presentationMode.wrappedValue.dismiss()
             }) {
                 VStack {
                     if profile.isMyPlacesLoading {
@@ -101,17 +90,6 @@ struct ProfileFollowCountsView: View {
             }
         }
         .padding(.vertical, 10)
-        .sheet(item: $activeSheet) { sheetType in
-            switch sheetType {
-            case .myPlaces:
-                MyPlacesListView()
-                    .environmentObject(profile)
-                    .environmentObject(userProfileViewModel)
-                    .environmentObject(dataManager)
-                    .environmentObject(userSession)
-                    .environmentObject(selectedPlaceVM)
-            }
-        }
         .onAppear {
             let userId = userSession.currentUserId ?? ""
             // CRITICAL: Use Task.detached to run on separate thread, not blocked by main thread

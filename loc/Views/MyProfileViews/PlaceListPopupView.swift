@@ -36,12 +36,12 @@ struct PlaceListPopupView<CardView: View>: View {
     let emptyMessage: String
     let loadMore: () async -> Void
     let onBackToProfile: (() -> Void)?  // Optional: Shows "Profile" button when provided
+    let pendingPlaceNavigation: Binding<String?>?  // Optional: For map annotation navigation
     @ViewBuilder let cardBuilder: (LightweightPlace, @escaping (String) -> Void) -> CardView
 
     @Environment(\.presentationMode) var presentationMode
-    @EnvironmentObject var mapViewModel: MapViewModel
 
-    // Default initializer with optional onBackToProfile
+    // Default initializer with optional onBackToProfile and pendingPlaceNavigation
     init(
         title: String,
         count: Int? = nil,
@@ -54,6 +54,7 @@ struct PlaceListPopupView<CardView: View>: View {
         emptyMessage: String,
         loadMore: @escaping () async -> Void,
         onBackToProfile: (() -> Void)? = nil,
+        pendingPlaceNavigation: Binding<String?>? = nil,
         @ViewBuilder cardBuilder: @escaping (LightweightPlace, @escaping (String) -> Void) -> CardView
     ) {
         self.title = title
@@ -67,6 +68,7 @@ struct PlaceListPopupView<CardView: View>: View {
         self.emptyMessage = emptyMessage
         self.loadMore = loadMore
         self.onBackToProfile = onBackToProfile
+        self.pendingPlaceNavigation = pendingPlaceNavigation
         self.cardBuilder = cardBuilder
     }
 
@@ -94,10 +96,10 @@ struct PlaceListPopupView<CardView: View>: View {
                 PlaceDetailViewInNavigation(placeId: placeId, minSheetHeight: 250)
             }
         }
-        .onChange(of: mapViewModel.pendingPlaceNavigation) { oldValue, newValue in
+        .onChange(of: pendingPlaceNavigation?.wrappedValue) { oldValue, newValue in
             if let placeId = newValue {
                 navigationPath.append(placeId)
-                mapViewModel.pendingPlaceNavigation = nil
+                pendingPlaceNavigation?.wrappedValue = nil
             }
         }
     }
