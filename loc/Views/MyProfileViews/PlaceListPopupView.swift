@@ -39,6 +39,7 @@ struct PlaceListPopupView<CardView: View>: View {
     @ViewBuilder let cardBuilder: (LightweightPlace, @escaping (String) -> Void) -> CardView
 
     @Environment(\.presentationMode) var presentationMode
+    @EnvironmentObject var mapViewModel: MapViewModel
 
     // Default initializer with optional onBackToProfile
     init(
@@ -91,6 +92,12 @@ struct PlaceListPopupView<CardView: View>: View {
             .navigationBarHidden(true)
             .navigationDestination(for: String.self) { placeId in
                 PlaceDetailViewInNavigation(placeId: placeId, minSheetHeight: 250)
+            }
+        }
+        .onChange(of: mapViewModel.pendingPlaceNavigation) { oldValue, newValue in
+            if let placeId = newValue {
+                navigationPath.append(placeId)
+                mapViewModel.pendingPlaceNavigation = nil
             }
         }
     }
