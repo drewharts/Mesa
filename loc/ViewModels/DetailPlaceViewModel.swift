@@ -448,11 +448,34 @@ class DetailPlaceViewModel: ObservableObject {
     func isPlaceImageLoading(placeId: String) -> Bool {
         return placeImageLoadingStates[placeId] ?? false
     }
-    
+
     // Initialize colors for all existing places
     func initializePlaceColors() {
         for placeId in places.keys {
             generateColorForPlace(placeId)
+        }
+    }
+
+    // MARK: - Profile Picture Loading
+
+    /// Loads and caches a profile picture if not already cached.
+    /// Used by nested navigation views to ensure profile pictures load at all depths.
+    func loadProfilePictureIfNeeded(for profile: ProfileData) {
+        // Skip if already cached
+        guard userProfilePicture[profile.id] == nil,
+              let photoURL = profile.profilePhotoURL else { return }
+
+        Task.detached(priority: .background) {
+            do {
+                let (data, _) = try await URLSession.shared.data(from: photoURL)
+                if let image = UIImage(data: data) {
+                    await MainActor.run {
+                        self.userProfilePicture[profile.id] = image
+                    }
+                }
+            } catch {
+                print("Failed to load profile picture for \(profile.id): \(error)")
+            }
         }
     }
 }
