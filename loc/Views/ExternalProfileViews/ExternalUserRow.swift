@@ -1,16 +1,16 @@
 //
-//  UserRow.swift
+//  ExternalUserRow.swift
 //  loc
 //
-//  Created by Andrew Hartsfield II on 5/29/25.
+//  User row for external profile navigation. Uses ExternalUserProfileViewWrapper
+//  to create independent ViewModel instances for each profile in the navigation stack.
 //
 
 import SwiftUI
 
-/// User row for profile navigation from the current user's followers/following lists.
-/// Uses ExternalUserProfileViewWrapper which creates its own @StateObject ViewModel,
-/// enabling Instagram-style nested navigation where each profile maintains independent state.
-struct UserRow: View {
+/// User row for nested profile navigation within external profiles.
+/// Each row navigates to ExternalUserProfileViewWrapper which creates its own @StateObject ViewModel.
+struct ExternalUserRow: View {
     let user: ProfileData
 
     @EnvironmentObject var profile: ProfileViewModel
