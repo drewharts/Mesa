@@ -13,6 +13,7 @@ struct ExternalUserProfileContentView: View {
     @EnvironmentObject var profileVM: ProfileViewModel
     @EnvironmentObject var userSession: UserSession
     @EnvironmentObject var detailPlaceVM: DetailPlaceViewModel
+    @EnvironmentObject var userProfileVM: UserProfileViewModel
     @Environment(\.presentationMode) var presentationMode
 
     var body: some View {

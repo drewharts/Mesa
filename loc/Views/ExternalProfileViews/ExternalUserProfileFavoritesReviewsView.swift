@@ -14,6 +14,8 @@ struct ExternalUserProfileFavoritesReviewsView: View {
 
     @State private var selectedTab: UserFavoritesReviewsTab = .favorites
     @State private var hasSetInitialTab: Bool = false
+    @State private var showFavoritesPopup = false
+    @State private var showReviewsPopup = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -21,6 +23,14 @@ struct ExternalUserProfileFavoritesReviewsView: View {
             contentGrid
             Divider()
                 .padding(.horizontal, 20)
+        }
+        .sheet(isPresented: $showFavoritesPopup) {
+            NestedFavoritesPopupView(viewModel: viewModel)
+                .environmentObject(selectedPlaceVM)
+        }
+        .sheet(isPresented: $showReviewsPopup) {
+            NestedReviewsPopupView(viewModel: viewModel)
+                .environmentObject(selectedPlaceVM)
         }
         .onAppear {
             // Load reviewed places data if needed
@@ -109,6 +119,11 @@ struct ExternalUserProfileFavoritesReviewsView: View {
             }
         }
         .contentShape(Rectangle())
+        .onTapGesture {
+            // Show local popup instead of triggering map display
+            // This preserves the navigation stack for nested profiles
+            showFavoritesPopup = true
+        }
     }
 
     private var emptyFavoritesState: some View {
@@ -158,6 +173,11 @@ struct ExternalUserProfileFavoritesReviewsView: View {
             }
         }
         .contentShape(Rectangle())
+        .onTapGesture {
+            // Show local popup instead of triggering map display
+            // This preserves the navigation stack for nested profiles
+            showReviewsPopup = true
+        }
     }
 
     private var loadingReviewsState: some View {

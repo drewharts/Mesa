@@ -16,6 +16,7 @@ struct NestedFollowersListView: View {
     @EnvironmentObject var detailPlaceVM: DetailPlaceViewModel
     @EnvironmentObject var userSession: UserSession
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
+    @EnvironmentObject var userProfileVM: UserProfileViewModel
 
     var body: some View {
         VStack {

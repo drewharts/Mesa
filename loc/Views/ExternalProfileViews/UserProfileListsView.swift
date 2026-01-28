@@ -13,7 +13,7 @@ import SwiftUI
 struct UserProfileListsView: View {
     @ObservedObject var viewModel: UserProfileViewModel
     let placeLists: [LightweightPlaceList]
-    
+
     @State private var placeColors: [UUID: Color] = [:]
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
 
@@ -70,14 +70,13 @@ struct UserProfileListsView: View {
                     list: list,
                     places: viewModel.placeListPlaces[list.list_id] ?? [],
                     allLists: placeLists,
-                    currentIndex: placeLists.firstIndex(where: { $0.id == list.id }) ?? 0,
                     placeColors: $placeColors
                 )
                 .onAppear {
                     handleListAppear(list)
                 }
             }
-            
+
             // Loading indicator for pagination
             if viewModel.isLoadingMoreLists {
                 paginationLoadingIndicator
@@ -102,7 +101,9 @@ struct UserProfileListsView: View {
                 viewModel: viewModel,
                 lists: placeLists,
                 initialListIndex: index,
-                placeColors: $placeColors
+                placeColors: $placeColors,
+                useMapDisplayPlaces: false,
+                showBackToProfileButton: false
             )
             .environmentObject(selectedPlaceVM)
         }
@@ -135,17 +136,13 @@ struct UserProfileListsView: View {
 
 /// Lightweight list section for external user profiles - similar to LightweightProfileListSection but for external users
 /// Staff Engineer Refactor: Removed GeometryReader anti-pattern for stable LazyVGrid rendering
-/// Now navigates to map (like current user's lists) instead of showing local sheet
+/// Always navigates to map when tapped to show list there
 struct UserProfileLightweightListSection: View {
     @ObservedObject var viewModel: UserProfileViewModel
     let list: LightweightPlaceList
     let places: [LightweightPlace]
     let allLists: [LightweightPlaceList]
-    let currentIndex: Int
     @Binding var placeColors: [UUID: Color]
-
-    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
-    @Environment(\.presentationMode) var presentationMode
 
     private var totalPlaceCount: Int {
         return list.place_count
@@ -153,10 +150,9 @@ struct UserProfileLightweightListSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            // Photo collage button - navigates to map with list filter
+            // Photo collage button - always navigates to map
             Button(action: {
-                // Navigate to map with list filter (matching current user behavior)
-                viewModel.triggerExternalListOnMap(listId: list.list_id)
+                handleListTap()
             }) {
                 ExternalUserListCardImage(places: places, placeColors: $placeColors)
             }
@@ -175,6 +171,18 @@ struct UserProfileLightweightListSection: View {
                     .foregroundColor(.secondary)
             }
         }
+    }
+
+    /// Handles list tap - always navigates to map to show list
+    private func handleListTap() {
+        viewModel.triggerExternalListOnMap(
+            listId: list.list_id,
+            userId: viewModel.selectedUser?.id ?? "",
+            userName: viewModel.selectedUser?.firstName,
+            userPhotoUrl: viewModel.selectedUser?.profilePhotoURL?.absoluteString,
+            lists: allLists,
+            listPlaces: viewModel.placeListPlaces
+        )
     }
 }
 
@@ -363,9 +371,14 @@ struct ExternalUserLightweightListPopupView: View {
     let lists: [LightweightPlaceList]
     let initialListIndex: Int
     @Binding var placeColors: [UUID: Color]
+    /// When true, uses mapDisplayListPlaces instead of placeListPlaces to avoid data leakage
+    let useMapDisplayPlaces: Bool
+    /// When true, sets isUserDetailPresented on dismiss to navigate back to profile (used when shown from map)
+    /// When false, just dismisses the sheet (used when shown from within profile)
+    let showBackToProfileButton: Bool
 
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
-    @EnvironmentObject var mapViewModel: MapViewModel
+    var mapViewModel: MapViewModel?  // Optional parameter, not environment object
     @Environment(\.presentationMode) var presentationMode
     @State private var currentListIndex: Int
     @State private var isLoadingMore: Bool = false
@@ -373,11 +386,14 @@ struct ExternalUserLightweightListPopupView: View {
     @State private var currentPage: Int = 1
     @State private var navigationPath = NavigationPath()
 
-    init(viewModel: UserProfileViewModel, lists: [LightweightPlaceList], initialListIndex: Int, placeColors: Binding<[UUID: Color]>) {
+    init(viewModel: UserProfileViewModel, lists: [LightweightPlaceList], initialListIndex: Int, placeColors: Binding<[UUID: Color]>, useMapDisplayPlaces: Bool = false, showBackToProfileButton: Bool = true, mapViewModel: MapViewModel? = nil) {
         self.viewModel = viewModel
         self.lists = lists
         self.initialListIndex = initialListIndex
         self._placeColors = placeColors
+        self.useMapDisplayPlaces = useMapDisplayPlaces
+        self.showBackToProfileButton = showBackToProfileButton
+        self.mapViewModel = mapViewModel
         self._currentListIndex = State(initialValue: initialListIndex)
     }
     
@@ -399,7 +415,11 @@ struct ExternalUserLightweightListPopupView: View {
     }
     
     private var places: [LightweightPlace] {
-        viewModel.placeListPlaces[currentList.list_id] ?? []
+        if useMapDisplayPlaces {
+            return viewModel.mapDisplayListPlaces[currentList.list_id] ?? []
+        } else {
+            return viewModel.placeListPlaces[currentList.list_id] ?? []
+        }
     }
     
     var body: some View {
@@ -411,7 +431,11 @@ struct ExternalUserLightweightListPopupView: View {
                     HStack {
                         Button(action: {
                             presentationMode.wrappedValue.dismiss()
-                            viewModel.isUserDetailPresented = true
+                            // Only set isUserDetailPresented when shown from map (to navigate back to profile)
+                            // When shown from within profile, just dismiss (profile is already behind)
+                            if showBackToProfileButton {
+                                viewModel.isUserDetailPresented = true
+                            }
                         }) {
                             HStack(spacing: 4) {
                                 Image(systemName: "chevron.left")
@@ -453,7 +477,8 @@ struct ExternalUserLightweightListPopupView: View {
                                 onLoadMore: { loadMoreIfNeeded() },
                                 onNavigateToPlace: { placeId in
                                     navigationPath.append(placeId)
-                                }
+                                },
+                                useMapDisplayPlaces: useMapDisplayPlaces
                             )
                             .tag(index)
                         }
@@ -478,7 +503,8 @@ struct ExternalUserLightweightListPopupView: View {
                         onLoadMore: { loadMoreIfNeeded() },
                         onNavigateToPlace: { placeId in
                             navigationPath.append(placeId)
-                        }
+                        },
+                        useMapDisplayPlaces: useMapDisplayPlaces
                     )
                 }
             }
@@ -487,11 +513,11 @@ struct ExternalUserLightweightListPopupView: View {
                 PlaceDetailViewInNavigation(placeId: placeId, minSheetHeight: 250)
             }
         }
-        .onChange(of: mapViewModel.pendingPlaceNavigation) { oldValue, newValue in
+        .onChange(of: mapViewModel?.pendingPlaceNavigation) { oldValue, newValue in
             // When map annotation is tapped while popup is open, navigate to that place
             if let placeId = newValue {
                 navigationPath.append(placeId)
-                mapViewModel.pendingPlaceNavigation = nil
+                mapViewModel?.pendingPlaceNavigation = nil
             }
         }
         .onAppear {
@@ -500,11 +526,17 @@ struct ExternalUserLightweightListPopupView: View {
             // Load places for the current list
             loadPlacesIfNeeded()
         }
+        .onDisappear {
+            // Clear navigation path on disappear to prevent stale state
+            navigationPath = NavigationPath()
+        }
     }
     
     private func loadPlacesIfNeeded() {
         let list = lists[currentListIndex]
-        if viewModel.placeListPlaces[list.list_id] == nil {
+        // When using map display places, check that dictionary instead
+        let placesDict = useMapDisplayPlaces ? viewModel.mapDisplayListPlaces : viewModel.placeListPlaces
+        if placesDict[list.list_id] == nil {
             viewModel.loadPlacesForList(list)
         }
     }
@@ -534,6 +566,8 @@ struct ExternalUserListContentView: View {
     @Binding var currentPage: Int
     let onLoadMore: () -> Void
     let onNavigateToPlace: ((String) -> Void)?
+    /// When true, uses mapDisplayListPlaces instead of placeListPlaces to avoid data leakage
+    let useMapDisplayPlaces: Bool
 
     // Grid layout matching ProfileView lists (consistent spacing)
     private let columns = [
@@ -542,7 +576,22 @@ struct ExternalUserListContentView: View {
     ]
 
     var places: [LightweightPlace] {
-        viewModel.placeListPlaces[list.list_id] ?? []
+        if useMapDisplayPlaces {
+            return viewModel.mapDisplayListPlaces[list.list_id] ?? []
+        } else {
+            return viewModel.placeListPlaces[list.list_id] ?? []
+        }
+    }
+
+    init(list: LightweightPlaceList, viewModel: UserProfileViewModel, isLoadingMore: Binding<Bool>, hasMorePlaces: Binding<Bool>, currentPage: Binding<Int>, onLoadMore: @escaping () -> Void, onNavigateToPlace: ((String) -> Void)?, useMapDisplayPlaces: Bool = false) {
+        self.list = list
+        self.viewModel = viewModel
+        self._isLoadingMore = isLoadingMore
+        self._hasMorePlaces = hasMorePlaces
+        self._currentPage = currentPage
+        self.onLoadMore = onLoadMore
+        self.onNavigateToPlace = onNavigateToPlace
+        self.useMapDisplayPlaces = useMapDisplayPlaces
     }
 
     var body: some View {

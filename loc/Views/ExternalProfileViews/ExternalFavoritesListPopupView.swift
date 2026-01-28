@@ -15,10 +15,10 @@ struct ExternalFavoritesListPopupView: View {
 
     var body: some View {
         PlaceListPopupView(
-            title: "\(userProfileVM.selectedUser?.firstName ?? "User")'s Favorites",
-            isLoading: false, // Favorites are loaded with profile, no separate loading
+            title: "\(userProfileVM.mapDisplayUserName ?? "User")'s Favorites",
+            isLoading: false, // Data is already loaded when triggering map display
             isLoadingMore: false, // No pagination for favorites
-            places: userProfileVM.lightweightFavorites,
+            places: userProfileVM.mapDisplayFavorites,
             hasMore: false, // No pagination for favorites
             emptyIcon: "heart",
             emptyTitle: "No Favorites Yet",

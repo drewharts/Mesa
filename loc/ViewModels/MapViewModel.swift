@@ -205,6 +205,7 @@ class MapViewModel: ObservableObject {
     func selectExternalReviews(userId: String, userPhotoUrl: URL?) {
         externalUserId = userId
         showingExternalReviewsOnMap = true
+        showingExternalFavoritesOnMap = false  // Reset favorites flag for consistency
         showingReviewsOnMap = false
         showingTikToksOnMap = false
         selectedListId = nil
@@ -227,6 +228,7 @@ class MapViewModel: ObservableObject {
         externalUserId = userId
         externalListId = listId
         showingExternalReviewsOnMap = false
+        showingExternalFavoritesOnMap = false  // Reset favorites flag for consistency
         showingReviewsOnMap = false
         showingTikToksOnMap = false
         selectedListId = nil
@@ -279,7 +281,8 @@ class MapViewModel: ObservableObject {
         showingExternalReviewsOnMap = false
         showingExternalFavoritesOnMap = false
         externalListId = nil
-        activeSheet = nil
+        // Note: activeSheet is NOT cleared here - it's managed by the sheet presentation logic
+        // Clearing it here causes race conditions when switching between external user sheets
         viewportAnnotations = []
         communityMarkers = []
         lastLoadedRegion = nil

@@ -45,6 +45,9 @@ struct ExternalFollowersListView: View {
                     ForEach(userProfileVM.externalUserFollowers) { user in
                         UserRow(user: user)
                             .onAppear {
+                                // Load profile picture when row appears
+                                detailPlaceVM.loadProfilePictureIfNeeded(for: user)
+
                                 // Load more when user scrolls to the last few items
                                 if let index = userProfileVM.externalUserFollowers.firstIndex(where: { $0.id == user.id }),
                                    index >= userProfileVM.externalUserFollowers.count - 3,

@@ -15,16 +15,16 @@ struct ExternalReviewsListPopupView: View {
 
     var body: some View {
         PlaceListPopupView(
-            title: "\(userProfileVM.selectedUser?.firstName ?? "User")'s Reviews",
-            count: userProfileVM.totalReviewedPlacesCount,
-            isLoading: userProfileVM.isLoadingReviewedPlaces,
-            isLoadingMore: userProfileVM.isLoadingMoreReviews,
-            places: userProfileVM.lightweightReviewedPlaces,
-            hasMore: userProfileVM.hasMoreReviews,
+            title: "\(userProfileVM.mapDisplayUserName ?? "User")'s Reviews",
+            count: userProfileVM.mapDisplayReviewsCount,
+            isLoading: false, // Data is already loaded when triggering map display
+            isLoadingMore: false, // No pagination in map display mode
+            places: userProfileVM.mapDisplayReviews,
+            hasMore: false, // No pagination in map display mode
             emptyIcon: "star.bubble",
             emptyTitle: "No Reviews Yet",
             emptyMessage: "This user hasn't reviewed any places yet",
-            loadMore: { await userProfileVM.loadMoreReviews() },
+            loadMore: { }, // No pagination in map display mode
             onBackToProfile: {
                 userProfileVM.isUserDetailPresented = true
             },
@@ -37,12 +37,5 @@ struct ExternalReviewsListPopupView: View {
                 )
             }
         )
-        .onAppear {
-            if userProfileVM.lightweightReviewedPlaces.isEmpty {
-                Task {
-                    await userProfileVM.loadUserReviewedPlacesWithPagination()
-                }
-            }
-        }
     }
 }

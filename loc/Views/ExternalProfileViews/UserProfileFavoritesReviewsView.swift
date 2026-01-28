@@ -116,8 +116,13 @@ struct UserProfileFavoritesReviewsView: View {
         }
         .contentShape(Rectangle())
         .onTapGesture {
-            // Dismiss profile and show favorites on map (matches reviews behavior)
-            userProfileVM.triggerExternalFavoritesOnMap()
+            // Dismiss profile and show favorites on map (uses selectedUser since this is main profile)
+            userProfileVM.triggerExternalFavoritesOnMap(
+                userId: userProfileVM.selectedUser?.id ?? "",
+                userName: userProfileVM.selectedUser?.firstName,
+                userPhotoUrl: userProfileVM.selectedUser?.profilePhotoURL?.absoluteString,
+                favorites: userProfileVM.userFavorites
+            )
         }
     }
     
@@ -169,8 +174,14 @@ struct UserProfileFavoritesReviewsView: View {
         }
         .contentShape(Rectangle())
         .onTapGesture {
-            // Dismiss profile and show reviews on map (matches current user behavior)
-            userProfileVM.triggerExternalReviewsOnMap()
+            // Dismiss profile and show reviews on map (uses selectedUser since this is main profile)
+            userProfileVM.triggerExternalReviewsOnMap(
+                userId: userProfileVM.selectedUser?.id ?? "",
+                userName: userProfileVM.selectedUser?.firstName,
+                userPhotoUrl: userProfileVM.selectedUser?.profilePhotoURL?.absoluteString,
+                reviews: userProfileVM.lightweightReviewedPlaces,
+                totalCount: userProfileVM.totalReviewedPlacesCount
+            )
         }
     }
     

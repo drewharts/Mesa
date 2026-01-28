@@ -17,7 +17,21 @@ class UserProfileViewModel: ObservableObject {
     @Published var showExternalReviewsOnMap = false  // Triggers map sheet for external reviews
     @Published var showExternalListOnMap: String? = nil  // List ID to show on map (triggers map sheet)
     @Published var showExternalFavoritesOnMap = false  // Triggers map sheet for external favorites
-    
+
+    // MARK: - Map Display Context (separate from navigation state)
+    // These properties store the user context for map displays without affecting navigation
+    @Published var mapDisplayUserId: String?
+    @Published var mapDisplayUserPhotoUrl: String?
+    @Published var mapDisplayUserName: String?  // For popup titles ("User's Reviews")
+
+    // MARK: - Map Display Data (isolated from profile data to prevent overwrites)
+    // These store the data to display in map popups WITHOUT modifying profile state
+    @Published var mapDisplayReviews: [LightweightPlace] = []
+    @Published var mapDisplayReviewsCount: Int = 0
+    @Published var mapDisplayFavorites: [LightweightPlace] = []
+    @Published var mapDisplayLists: [LightweightPlaceList] = []
+    @Published var mapDisplayListPlaces: [String: [LightweightPlace]] = [:]
+
     // MARK: - External Profile Data
     @Published var userFavorites: [FavoritePlace] = []
     @Published var isLoadingFavorites: Bool = false
@@ -922,53 +936,97 @@ class UserProfileViewModel: ObservableObject {
         shouldShowListPopup = false
         pendingListIndex = nil
         pendingListIdToOpen = nil
-        
+
         // Clear error state
         showFollowError = false
         followErrorMessage = ""
-        
+
+        // Clear map display data
+        mapDisplayUserId = nil
+        mapDisplayUserName = nil
+        mapDisplayUserPhotoUrl = nil
+        mapDisplayReviews.removeAll()
+        mapDisplayReviewsCount = 0
+        mapDisplayFavorites.removeAll()
+        mapDisplayLists.removeAll()
+        mapDisplayListPlaces.removeAll()
+
         print("✅ [UserProfileViewModel] All user data cleared")
     }
     
     // MARK: - Navigation
 
     /// Shows external user's reviews on the map (dismisses profile, shows map sheet)
-    /// Matches the behavior of current user's reviews flow
-    /// Uses staggered timing for smooth transition
-    func triggerExternalReviewsOnMap() {
-        // Dismiss profile first
-        isUserDetailPresented = false
+    /// - Parameters:
+    ///   - userId: The user whose reviews to display
+    ///   - userName: The user's name for popup title
+    ///   - userPhotoUrl: The user's profile photo URL for annotations
+    ///   - reviews: The reviewed places to display
+    ///   - totalCount: Total count of reviewed places
+    func triggerExternalReviewsOnMap(userId: String, userName: String?, userPhotoUrl: String?, reviews: [LightweightPlace], totalCount: Int) {
+        // Store map display context (separate from selectedUser navigation state)
+        mapDisplayUserId = userId
+        mapDisplayUserName = userName
+        mapDisplayUserPhotoUrl = userPhotoUrl
+        // Store in map-specific properties to avoid overwriting profile data
+        mapDisplayReviews = reviews
+        mapDisplayReviewsCount = totalCount
 
-        // Show map sheet after profile has begun dismissing
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
-            self?.showExternalReviewsOnMap = true
-        }
+        // Dismiss profile and trigger map display together for smoother transition
+        isUserDetailPresented = false
+        showExternalReviewsOnMap = true
     }
 
     /// Shows external user's list on the map (dismisses profile, shows map sheet)
-    /// Matches the behavior of current user's list flow
-    /// Uses staggered timing for smooth transition
-    func triggerExternalListOnMap(listId: String) {
-        // Dismiss profile first
-        isUserDetailPresented = false
+    /// - Parameters:
+    ///   - listId: The list ID to display
+    ///   - userId: The user who owns the list
+    ///   - userName: The user's name for popup title
+    ///   - userPhotoUrl: The user's profile photo URL for annotations
+    ///   - lists: The user's lists to display in the popup
+    ///   - listPlaces: Dictionary of list ID to places for each list
+    func triggerExternalListOnMap(listId: String, userId: String, userName: String?, userPhotoUrl: String?, lists: [LightweightPlaceList], listPlaces: [String: [LightweightPlace]]) {
+        // Store map display context (separate from selectedUser navigation state)
+        mapDisplayUserId = userId
+        mapDisplayUserName = userName
+        mapDisplayUserPhotoUrl = userPhotoUrl
+        // Store in map-specific properties to avoid overwriting profile data
+        mapDisplayLists = lists
+        mapDisplayListPlaces = listPlaces
 
-        // Show map sheet after profile has begun dismissing
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
-            self?.showExternalListOnMap = listId
-        }
+        // Dismiss profile and trigger map display together for smoother transition
+        isUserDetailPresented = false
+        showExternalListOnMap = listId
     }
 
     /// Shows external user's favorites on the map (dismisses profile, shows map sheet)
-    /// Matches the behavior of reviews and lists flow
-    /// Uses staggered timing for smooth transition
-    func triggerExternalFavoritesOnMap() {
-        // Dismiss profile first
-        isUserDetailPresented = false
-
-        // Show map sheet after profile has begun dismissing
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
-            self?.showExternalFavoritesOnMap = true
+    /// - Parameters:
+    ///   - userId: The user whose favorites to display
+    ///   - userName: The user's name for popup title
+    ///   - userPhotoUrl: The user's profile photo URL for annotations
+    ///   - favorites: The favorite places to display
+    func triggerExternalFavoritesOnMap(userId: String, userName: String?, userPhotoUrl: String?, favorites: [FavoritePlace]) {
+        // Store map display context (separate from selectedUser navigation state)
+        mapDisplayUserId = userId
+        mapDisplayUserName = userName
+        mapDisplayUserPhotoUrl = userPhotoUrl
+        // Convert FavoritePlace to LightweightPlace and store in map-specific property
+        mapDisplayFavorites = favorites.map { fav in
+            LightweightPlace(
+                place_id: fav.place_id,
+                name: fav.name,
+                latest_review_photo: fav.latest_review_photo,
+                external_place_id: nil,
+                tiktok_url: nil,
+                added_by_user_id: nil,
+                added_by_name: nil,
+                added_by_photo_url: nil
+            )
         }
+
+        // Dismiss profile and trigger map display together for smoother transition
+        isUserDetailPresented = false
+        showExternalFavoritesOnMap = true
     }
 
     /// Centralized navigation method for all external profile places (favorites, lists, reviews)

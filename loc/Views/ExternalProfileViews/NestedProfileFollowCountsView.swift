@@ -16,6 +16,7 @@ struct NestedProfileFollowCountsView: View {
     @EnvironmentObject var detailPlaceVM: DetailPlaceViewModel
     @EnvironmentObject var userSession: UserSession
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
+    @EnvironmentObject var userProfileVM: UserProfileViewModel
 
     var body: some View {
         HStack(spacing: 24) {
@@ -25,6 +26,7 @@ struct NestedProfileFollowCountsView: View {
                 .environmentObject(detailPlaceVM)
                 .environmentObject(userSession)
                 .environmentObject(selectedPlaceVM)
+                .environmentObject(userProfileVM)
             ) {
                 VStack {
                     Text("\(viewModel.followers)")
@@ -43,6 +45,7 @@ struct NestedProfileFollowCountsView: View {
                 .environmentObject(detailPlaceVM)
                 .environmentObject(userSession)
                 .environmentObject(selectedPlaceVM)
+                .environmentObject(userProfileVM)
             ) {
                 VStack {
                     Text("\(viewModel.followingCount)")

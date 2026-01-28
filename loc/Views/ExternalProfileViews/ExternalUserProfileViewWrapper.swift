@@ -18,6 +18,7 @@ struct ExternalUserProfileViewWrapper: View {
     @EnvironmentObject var detailPlaceVM: DetailPlaceViewModel
     @EnvironmentObject var userSession: UserSession
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
+    @EnvironmentObject var userProfileVM: UserProfileViewModel
 
     init(user: ProfileData) {
         self.user = user
@@ -30,6 +31,7 @@ struct ExternalUserProfileViewWrapper: View {
             .environmentObject(detailPlaceVM)
             .environmentObject(userSession)
             .environmentObject(selectedPlaceVM)
+            .environmentObject(userProfileVM)
             .task {
                 guard let currentUserId = userSession.currentUserId else { return }
                 await viewModel.loadInitialData(currentUserId: currentUserId)

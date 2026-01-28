@@ -17,6 +17,7 @@ struct UserRow: View {
     @EnvironmentObject var detailPlaceVM: DetailPlaceViewModel
     @EnvironmentObject var userSession: UserSession
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
+    @EnvironmentObject var userProfileVM: UserProfileViewModel
 
     var body: some View {
         NavigationLink(destination: {
@@ -26,6 +27,7 @@ struct UserRow: View {
                 .environmentObject(detailPlaceVM)
                 .environmentObject(userSession)
                 .environmentObject(selectedPlaceVM)
+                .environmentObject(userProfileVM)
         }) {
             HStack(spacing: 12) {
                 // User profile photo
