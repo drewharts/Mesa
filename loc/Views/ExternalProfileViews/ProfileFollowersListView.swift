@@ -1,16 +1,18 @@
 //
-//  NestedFollowersListView.swift
+//  ProfileFollowersListView.swift
 //  loc
 //
 //  Created by Andrew Hartsfield II on 1/26/25.
 //
-//  For the NESTED NAVIGATION path: Uses @ObservedObject ExternalUserProfileViewModel.
-//  Navigates to ExternalUserRow which uses ExternalUserProfileViewWrapper for continued nested navigation.
+//  Unified followers list view for external profiles.
+//  Uses @ObservedObject ExternalUserProfileViewModel for per-profile state.
+//  Navigates to UserRow which uses ExternalUserProfileViewWrapper for nested navigation.
 //
 
 import SwiftUI
 
-struct NestedFollowersListView: View {
+/// Displays a paginated list of followers for an external user profile.
+struct ProfileFollowersListView: View {
     @ObservedObject var viewModel: ExternalUserProfileViewModel
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var detailPlaceVM: DetailPlaceViewModel
@@ -44,7 +46,7 @@ struct NestedFollowersListView: View {
             } else {
                 List {
                     ForEach(viewModel.externalUserFollowers) { user in
-                        ExternalUserRow(user: user)
+                        UserRow(user: user)
                             .onAppear {
                                 // Load profile picture when row appears
                                 detailPlaceVM.loadProfilePictureIfNeeded(for: user)

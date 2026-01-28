@@ -1,16 +1,16 @@
 //
-//  NestedReviewsPopupView.swift
+//  ProfileReviewsPopupView.swift
 //  loc
 //
-//  Local popup view for reviews in nested profiles.
+//  Unified popup view for reviews in external user profiles.
 //  Does NOT trigger map display - shows reviews in a local sheet.
 //  Follows the same pattern as ExternalUserListPopupView for consistent UX.
 //
 
 import SwiftUI
 
-/// Displays paginated reviewed places for a nested external user profile in a local popup sheet
-struct NestedReviewsPopupView: View {
+/// Displays paginated reviewed places for an external user profile in a local popup sheet.
+struct ProfileReviewsPopupView: View {
     @ObservedObject var viewModel: ExternalUserProfileViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @Environment(\.presentationMode) var presentationMode
@@ -153,7 +153,7 @@ struct NestedReviewsPopupView: View {
 
     // MARK: - Pagination
 
-    /// Triggers loading more reviews when approaching the end of the list
+    /// Triggers loading more reviews when approaching the end of the list.
     private func triggerPaginationIfNeeded(index: Int) {
         guard index == viewModel.lightweightReviewedPlaces.count - 3,
               viewModel.hasMoreReviews,

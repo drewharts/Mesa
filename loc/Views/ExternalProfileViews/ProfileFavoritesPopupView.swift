@@ -1,16 +1,16 @@
 //
-//  NestedFavoritesPopupView.swift
+//  ProfileFavoritesPopupView.swift
 //  loc
 //
-//  Local popup view for favorites in nested profiles.
+//  Unified popup view for favorites in external user profiles.
 //  Does NOT trigger map display - shows favorites in a local sheet.
 //  Follows the same pattern as ExternalUserListPopupView for consistent UX.
 //
 
 import SwiftUI
 
-/// Displays favorite places for a nested external user profile in a local popup sheet
-struct NestedFavoritesPopupView: View {
+/// Displays favorite places for an external user profile in a local popup sheet.
+struct ProfileFavoritesPopupView: View {
     @ObservedObject var viewModel: ExternalUserProfileViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @Environment(\.presentationMode) var presentationMode

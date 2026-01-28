@@ -14,7 +14,11 @@ struct ExternalUserProfileContentView: View {
     @EnvironmentObject var userSession: UserSession
     @EnvironmentObject var detailPlaceVM: DetailPlaceViewModel
     @EnvironmentObject var userProfileVM: UserProfileViewModel
+    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @Environment(\.presentationMode) var presentationMode
+
+    @State private var showFollowers = false
+    @State private var showFollowing = false
 
     var body: some View {
         ScrollView {
@@ -46,8 +50,13 @@ struct ExternalUserProfileContentView: View {
                         .fontWeight(.bold)
                         .foregroundColor(.black)
 
-                    // Clickable Followers/Following counts (uses Nested* views for nested navigation)
-                    NestedProfileFollowCountsView(viewModel: viewModel)
+                    // Clickable Followers/Following counts
+                    ProfileFollowCountsView(
+                        data: .external(followers: viewModel.followers, following: viewModel.followingCount),
+                        onFollowersTap: { showFollowers = true },
+                        onFollowingTap: { showFollowing = true },
+                        onMyPlacesTap: nil
+                    )
                 }
                 .padding(.top, -8)
                 .padding(.bottom, 16)
@@ -69,6 +78,33 @@ struct ExternalUserProfileContentView: View {
             }
         }
         .navigationBarTitleDisplayMode(.inline)
+        .background(
+            Group {
+                NavigationLink(
+                    destination: ProfileFollowersListView(viewModel: viewModel)
+                        .environmentObject(profileVM)
+                        .environmentObject(detailPlaceVM)
+                        .environmentObject(userSession)
+                        .environmentObject(selectedPlaceVM)
+                        .environmentObject(userProfileVM),
+                    isActive: $showFollowers
+                ) {
+                    EmptyView()
+                }
+
+                NavigationLink(
+                    destination: ProfileFollowingListView(viewModel: viewModel)
+                        .environmentObject(profileVM)
+                        .environmentObject(detailPlaceVM)
+                        .environmentObject(userSession)
+                        .environmentObject(selectedPlaceVM)
+                        .environmentObject(userProfileVM),
+                    isActive: $showFollowing
+                ) {
+                    EmptyView()
+                }
+            }
+        )
         .alert("Follow Error", isPresented: $viewModel.showFollowError) {
             Button("OK") {
                 viewModel.showFollowError = false

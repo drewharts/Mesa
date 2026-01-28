@@ -41,7 +41,7 @@ class UserProfileViewModel: ObservableObject {
     // MARK: - Deep Link List Popup State (ViewModel owns presentation logic)
     @Published var shouldShowListPopup = false
     @Published var pendingListIndex: Int?
-    private var pendingListIdToOpen: String?
+    private(set) var pendingListIdToOpen: String?
     
     // MARK: - List Pagination State
     @Published var isLoadingMoreLists: Bool = false
@@ -71,16 +71,6 @@ class UserProfileViewModel: ObservableObject {
     private var hasAttemptedLoadReviewedPlaces: [String: Bool] = [:]
     private var hasMoreReviewsForUser: [String: Bool] = [:] // userId -> hasMoreReviews (for reference)
     private let reviewsPerPage: Int = 8
-
-    // MARK: - External User Followers/Following Lists
-    @Published var externalUserFollowers: [ProfileData] = []
-    @Published var externalUserFollowing: [ProfileData] = []
-    @Published var followingCount: Int = 0
-    @Published var isExternalFollowersLoading: Bool = false
-    @Published var isExternalFollowingLoading: Bool = false
-    @Published var hasMoreExternalFollowers: Bool = true
-    @Published var hasMoreExternalFollowing: Bool = true
-    private let followersPerPage: Int = 20
 
     // MARK: - Favorites as LightweightPlace (for popup display)
     /// Converts userFavorites to LightweightPlace format for consistent popup display
@@ -161,21 +151,11 @@ class UserProfileViewModel: ObservableObject {
         self.selectedUser = user
         self.navigatedFromPlaceDetail = fromPlaceDetail
         if shouldPresent {
-        self.isUserDetailPresented = true
+            self.isUserDetailPresented = true
         }
-        
-        // Reset ALL state for new user (Single Responsibility: one place for all resets)
-        resetListPaginationState()
-        resetReviewedPlacesLoadingState()
-        resetExternalFollowState()
-        totalPlacesCount = 0
-
-        self.checkIfFollowing(currentUserId: currentUserId)
-        self.fetchProfileFavorites(userId: user.id)
-        self.fetchLists(userId: user.id)
-        self.fetchFollowers(userId: user.id)
-        self.fetchFollowingCount(userId: user.id)
-        self.fetchTotalPlacesCount(userId: user.id)
+        // Note: Data loading is now handled by ExternalUserProfileViewModel.loadInitialData()
+        // which is called when ExternalUserProfileViewWrapper appears.
+        // UserProfileViewModel only manages navigation state for external profiles.
     }
     
     /// Resets all list-related state when switching to a new user profile
@@ -190,17 +170,6 @@ class UserProfileViewModel: ObservableObject {
         isLoadingFavorites = false
     }
 
-    /// Resets external followers/following state when switching to a new user profile
-    private func resetExternalFollowState() {
-        externalUserFollowers = []
-        externalUserFollowing = []
-        followingCount = 0
-        isExternalFollowersLoading = false
-        isExternalFollowingLoading = false
-        hasMoreExternalFollowers = true
-        hasMoreExternalFollowing = true
-    }
-    
     func fetchAndSelectUser(userId: String, currentUserId: String) {
         userService.fetchUserById(userId: userId) { [weak self] result in
             switch result {
@@ -256,93 +225,6 @@ class UserProfileViewModel: ObservableObject {
         }
     }
 
-    func fetchFollowingCount(userId: String) {
-        Task {
-            do {
-                let count = try await userService.getNumberFollowing(forUserId: userId)
-                await MainActor.run {
-                    self.followingCount = count
-                }
-            } catch {
-                print("Error fetching following count: \(error.localizedDescription)")
-            }
-        }
-    }
-
-    // MARK: - External User Followers/Following Loading
-
-    /// Load external user's followers with pagination
-    func loadExternalFollowers(offset: Int = 0) {
-        guard let userId = selectedUser?.id else { return }
-
-        let isInitialLoad = offset == 0
-        if isInitialLoad {
-            isExternalFollowersLoading = true
-            externalUserFollowers = []
-        }
-
-        Task {
-            do {
-                let profiles = try await userService.fetchFollowerProfilesData(for: userId, limit: followersPerPage, offset: offset)
-
-                await MainActor.run {
-                    if isInitialLoad {
-                        self.externalUserFollowers = profiles
-                    } else {
-                        // Deduplicate before appending
-                        let existingIds = Set(self.externalUserFollowers.map { $0.id })
-                        let newProfiles = profiles.filter { !existingIds.contains($0.id) }
-                        self.externalUserFollowers.append(contentsOf: newProfiles)
-                    }
-                    self.hasMoreExternalFollowers = profiles.count >= self.followersPerPage
-                    self.isExternalFollowersLoading = false
-                }
-            } catch {
-                print("❌ [UserProfileVM] Error loading external followers: \(error)")
-                await MainActor.run {
-                    self.isExternalFollowersLoading = false
-                    self.hasMoreExternalFollowers = false
-                }
-            }
-        }
-    }
-
-    /// Load external user's following with pagination
-    func loadExternalFollowing(offset: Int = 0) {
-        guard let userId = selectedUser?.id else { return }
-
-        let isInitialLoad = offset == 0
-        if isInitialLoad {
-            isExternalFollowingLoading = true
-            externalUserFollowing = []
-        }
-
-        Task {
-            do {
-                let profiles = try await userService.fetchFollowingProfilesData(for: userId, limit: followersPerPage, offset: offset)
-
-                await MainActor.run {
-                    if isInitialLoad {
-                        self.externalUserFollowing = profiles
-                    } else {
-                        // Deduplicate before appending
-                        let existingIds = Set(self.externalUserFollowing.map { $0.id })
-                        let newProfiles = profiles.filter { !existingIds.contains($0.id) }
-                        self.externalUserFollowing.append(contentsOf: newProfiles)
-                    }
-                    self.hasMoreExternalFollowing = profiles.count >= self.followersPerPage
-                    self.isExternalFollowingLoading = false
-                }
-            } catch {
-                print("❌ [UserProfileVM] Error loading external following: \(error)")
-                await MainActor.run {
-                    self.isExternalFollowingLoading = false
-                    self.hasMoreExternalFollowing = false
-                }
-            }
-        }
-    }
-    
     func fetchTotalPlacesCount(userId: String) {
         Task {
             do {
@@ -909,17 +791,8 @@ class UserProfileViewModel: ObservableObject {
         // Clear social state
         isFollowing = false
         followers = 0
-        followingCount = 0
         totalPlacesCount = 0
 
-        // Clear external followers/following data
-        externalUserFollowers.removeAll()
-        externalUserFollowing.removeAll()
-        isExternalFollowersLoading = false
-        isExternalFollowingLoading = false
-        hasMoreExternalFollowers = true
-        hasMoreExternalFollowing = true
-        
         // Reset pagination state
         currentListPage = 1
         hasMoreLists = true

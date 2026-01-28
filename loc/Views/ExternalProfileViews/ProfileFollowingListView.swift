@@ -1,38 +1,41 @@
 //
-//  ExternalFollowersListView.swift
+//  ProfileFollowingListView.swift
 //  loc
 //
 //  Created by Andrew Hartsfield II on 1/26/25.
 //
-//  For the DEEP LINK path: Uses @EnvironmentObject UserProfileViewModel.
-//  Navigates to UserRow which uses UserProfileView for continued deep link navigation.
+//  Unified following list view for external profiles.
+//  Uses @ObservedObject ExternalUserProfileViewModel for per-profile state.
+//  Navigates to UserRow which uses ExternalUserProfileViewWrapper for nested navigation.
 //
 
 import SwiftUI
 
-struct ExternalFollowersListView: View {
-    @EnvironmentObject var userProfileVM: UserProfileViewModel
+/// Displays a paginated list of users that an external user is following.
+struct ProfileFollowingListView: View {
+    @ObservedObject var viewModel: ExternalUserProfileViewModel
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var detailPlaceVM: DetailPlaceViewModel
     @EnvironmentObject var userSession: UserSession
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
+    @EnvironmentObject var userProfileVM: UserProfileViewModel
 
     var body: some View {
         VStack {
-            if userProfileVM.externalUserFollowers.isEmpty {
-                if userProfileVM.isExternalFollowersLoading {
+            if viewModel.externalUserFollowing.isEmpty {
+                if viewModel.isExternalFollowingLoading {
                     Spacer()
                     ProgressView()
                     Spacer()
                 } else {
                     VStack(spacing: 16) {
                         Spacer()
-                        Text("No Followers Yet")
+                        Text("Not Following Anyone Yet")
                             .font(.title3)
                             .fontWeight(.medium)
                             .foregroundColor(.gray)
 
-                        Text("When someone follows this user, they'll appear here.")
+                        Text("When this user follows someone, they'll appear here.")
                             .font(.body)
                             .foregroundColor(.gray)
                             .multilineTextAlignment(.center)
@@ -42,24 +45,24 @@ struct ExternalFollowersListView: View {
                 }
             } else {
                 List {
-                    ForEach(userProfileVM.externalUserFollowers) { user in
+                    ForEach(viewModel.externalUserFollowing) { user in
                         UserRow(user: user)
                             .onAppear {
                                 // Load profile picture when row appears
                                 detailPlaceVM.loadProfilePictureIfNeeded(for: user)
 
                                 // Load more when user scrolls to the last few items
-                                if let index = userProfileVM.externalUserFollowers.firstIndex(where: { $0.id == user.id }),
-                                   index >= userProfileVM.externalUserFollowers.count - 3,
-                                   !userProfileVM.isExternalFollowersLoading,
-                                   userProfileVM.hasMoreExternalFollowers {
-                                    userProfileVM.loadExternalFollowers(offset: userProfileVM.externalUserFollowers.count)
+                                if let index = viewModel.externalUserFollowing.firstIndex(where: { $0.id == user.id }),
+                                   index >= viewModel.externalUserFollowing.count - 3,
+                                   !viewModel.isExternalFollowingLoading,
+                                   viewModel.hasMoreExternalFollowing {
+                                    viewModel.loadExternalFollowing(offset: viewModel.externalUserFollowing.count)
                                 }
                             }
                     }
 
                     // Loading indicator at bottom while loading more
-                    if userProfileVM.isExternalFollowersLoading {
+                    if viewModel.isExternalFollowingLoading {
                         HStack {
                             Spacer()
                             ProgressView()
@@ -71,17 +74,17 @@ struct ExternalFollowersListView: View {
                 }
                 .listStyle(PlainListStyle())
                 .refreshable {
-                    // Pull-to-refresh: reload followers data
-                    userProfileVM.loadExternalFollowers(offset: 0)
+                    // Pull-to-refresh: reload following data
+                    viewModel.loadExternalFollowing(offset: 0)
                 }
             }
         }
-        .navigationTitle("Followers")
+        .navigationTitle("Following")
         .navigationBarTitleDisplayMode(.inline)
         .task {
             // Only load on initial appearance if list is empty
-            if userProfileVM.externalUserFollowers.isEmpty && !userProfileVM.isExternalFollowersLoading {
-                userProfileVM.loadExternalFollowers(offset: 0)
+            if viewModel.externalUserFollowing.isEmpty && !viewModel.isExternalFollowingLoading {
+                viewModel.loadExternalFollowing(offset: 0)
             }
         }
     }

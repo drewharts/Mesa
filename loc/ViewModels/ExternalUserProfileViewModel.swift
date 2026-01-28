@@ -88,9 +88,14 @@ class ExternalUserProfileViewModel: ObservableObject {
 
     // MARK: - Initialization
 
-    init(user: ProfileData) {
+    /// Creates a ViewModel for an external user profile.
+    /// - Parameters:
+    ///   - user: The user profile data
+    ///   - pendingListId: Optional list ID to auto-open after data loads (for deep link navigation)
+    init(user: ProfileData, pendingListId: String? = nil) {
         self.userId = user.id
         self.user = user
+        self.pendingListIdToOpen = pendingListId
         self.userService = ServiceContainer.shared.userService
         self.placeService = ServiceContainer.shared.placeService
         self.postService = ServiceContainer.shared.postService
@@ -203,13 +208,76 @@ class ExternalUserProfileViewModel: ObservableObject {
             self.currentListPage = 1
             self.hasMoreLists = lists.count >= self.listsPerPage
 
+            // Check if there's a pending list to open (for deep links)
+            await checkAndShowPendingList(lists: lists)
+
             // Preload places for first few visible lists
             await preloadPlacesForLists(Array(lists.prefix(3)))
         } catch {
             print("ExternalUserProfileViewModel Error fetching lists: \(error)")
             self.userLists = []
             self.hasMoreLists = false
+            clearPendingListState()
         }
+    }
+
+    /// Checks if there's a pending list to open and triggers popup if found.
+    private func checkAndShowPendingList(lists: [LightweightPlaceList]) async {
+        guard let pendingListId = pendingListIdToOpen else { return }
+
+        if let index = lists.firstIndex(where: { $0.list_id == pendingListId }) {
+            // Found in current page - show popup
+            await MainActor.run {
+                self.pendingListIndex = index
+                // Small delay to allow profile view to settle
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    self.shouldShowListPopup = true
+                    self.pendingListIdToOpen = nil
+                }
+            }
+        } else {
+            // List not in first page - fetch it specifically
+            await fetchAndShowSpecificList(listId: pendingListId)
+        }
+    }
+
+    /// Fetches a specific list by ID and shows it (for deep links when list isn't in first page).
+    private func fetchAndShowSpecificList(listId: String) async {
+        do {
+            guard let list = try await userService.fetchPlaceListById(listId: listId) else {
+                print("ExternalUserProfileViewModel Could not find list with ID: \(listId)")
+                await MainActor.run { self.clearPendingListState() }
+                return
+            }
+
+            await MainActor.run {
+                // Insert at the beginning so it appears first
+                if !self.userLists.contains(where: { $0.list_id == listId }) {
+                    self.userLists.insert(list, at: 0)
+                }
+
+                // Now find the index and show popup
+                if let index = self.userLists.firstIndex(where: { $0.list_id == listId }) {
+                    self.pendingListIndex = index
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        self.shouldShowListPopup = true
+                        self.pendingListIdToOpen = nil
+                    }
+                } else {
+                    self.clearPendingListState()
+                }
+            }
+        } catch {
+            print("ExternalUserProfileViewModel Error fetching specific list: \(error)")
+            await MainActor.run { self.clearPendingListState() }
+        }
+    }
+
+    /// Clears all pending list state.
+    private func clearPendingListState() {
+        pendingListIdToOpen = nil
+        pendingListIndex = nil
+        shouldShowListPopup = false
     }
 
     private func fetchFollowers() async {

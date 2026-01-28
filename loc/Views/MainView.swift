@@ -119,14 +119,17 @@ struct MainView: View {
             }
             .navigationBarHidden(true)
             .navigationDestination(isPresented: $userProfileViewModel.isUserDetailPresented) {
-                UserProfileView(
-                    userId: userSession.currentUserId ?? "",
-                    UserProfileVM: userProfileViewModel
-                )
-                .environmentObject(profileViewModel)
-                .environmentObject(selectedPlaceVM)
-                .environmentObject(detailPlaceViewModel)
-                .environmentObject(serviceContainer)
+                if let selectedUser = userProfileViewModel.selectedUser {
+                    ExternalUserProfileViewWrapper(
+                        user: selectedUser,
+                        pendingListId: userProfileViewModel.pendingListIdToOpen
+                    )
+                    .environmentObject(profileViewModel)
+                    .environmentObject(selectedPlaceVM)
+                    .environmentObject(detailPlaceViewModel)
+                    .environmentObject(userSession)
+                    .environmentObject(userProfileViewModel)
+                }
             }
             .sheet(isPresented: $profileViewModel.isShowingPlaceSelection) {
                 TikTokPlaceSelectionView()

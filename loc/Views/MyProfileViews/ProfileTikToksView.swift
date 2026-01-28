@@ -2,6 +2,9 @@
 //  ProfileTikToksView.swift
 //  loc
 //
+//  Displays the TikToks section in the user's profile.
+//  Uses shared ProfilePlacesPreviewGrid and ProfileEmptyState components.
+//
 
 import SwiftUI
 
@@ -9,20 +12,15 @@ struct ProfileTikToksView: View {
     @EnvironmentObject var profile: ProfileViewModel
     @State private var showingTikToksPopup = false
     @State private var showingHelpSheet = false
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             headerRow
-            
             tiktoksCard
-            
             Divider()
                 .padding(.horizontal, 20)
         }
-        // ✅ MVVM + SRP: ViewModel automatically loads data when user is set
-        // No manual loading needed - reactive observer handles it
         .onAppear {
-            // Refresh TikTok places when view appears to show latest data
             profile.refreshTikTokPlacesAfterImport()
         }
         .sheet(isPresented: $showingTikToksPopup) {
@@ -32,16 +30,16 @@ struct ProfileTikToksView: View {
             TikTokImportHelpView()
         }
     }
-    
+
     // MARK: - Header Row
-    
+
     private var headerRow: some View {
         HStack {
             Text("TIKTOKS")
                 .font(.headline)
                 .fontWeight(.semibold)
                 .foregroundColor(.primary)
-            
+
             Button(action: { showingHelpSheet = true }) {
                 Image(systemName: "questionmark.circle")
                     .font(.subheadline)
@@ -51,9 +49,9 @@ struct ProfileTikToksView: View {
         }
         .padding(.horizontal, 20)
     }
-    
+
     // MARK: - TikToks Card
-    
+
     private var tiktoksCard: some View {
         Button(action: { showingTikToksPopup = true }) {
             Group {
@@ -62,14 +60,14 @@ struct ProfileTikToksView: View {
                 } else if profile.lightweightExternalPlaces.isEmpty {
                     emptyState
                 } else {
-                    tiktoksGrid
+                    ProfilePlacesPreviewGrid(tiktokPlaces: profile.lightweightExternalPlaces)
                 }
             }
         }
         .buttonStyle(PlainButtonStyle())
-        .padding(.horizontal, 16) // Match list padding for edge alignment
+        .padding(.horizontal, 16)
     }
-    
+
     private var loadingState: some View {
         VStack(spacing: 12) {
             ProgressView()
@@ -80,44 +78,12 @@ struct ProfileTikToksView: View {
         .frame(height: 120)
         .frame(maxWidth: .infinity)
     }
-    
+
     private var emptyState: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "video")
-                .font(.system(size: 32))
-                .foregroundColor(.gray.opacity(0.5))
-            
-            Text("No TikToks yet")
-                .font(.subheadline)
-                .foregroundColor(.gray)
-            
-            Text("Add places from TikTok videos to see them here")
-                .font(.caption)
-                .foregroundColor(.gray.opacity(0.7))
-                .multilineTextAlignment(.center)
-        }
-        .frame(height: 120)
-        .frame(maxWidth: .infinity)
-    }
-    
-    private var tiktoksGrid: some View {
-        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
-            ForEach(profile.lightweightExternalPlaces.prefix(6)) { place in
-                TikTokPlaceCard(place: place)
-            }
-            
-            // Fill remaining slots
-            ForEach(0..<max(0, 6 - profile.lightweightExternalPlaces.count), id: \.self) { _ in
-                Rectangle()
-                    .fill(Color.gray.opacity(0.1))
-                    .frame(height: 90)
-                    .cornerRadius(8)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(Color.gray.opacity(0.2), lineWidth: 1)
-                    )
-            }
-        }
+        ProfileEmptyState(
+            icon: "video",
+            title: "No TikToks yet",
+            message: "Add places from TikTok videos to see them here"
+        )
     }
 }
-

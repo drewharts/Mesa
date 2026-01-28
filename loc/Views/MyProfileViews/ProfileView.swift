@@ -47,15 +47,17 @@ struct ProfileView: View {
                     profile: profile
                 ))
                 .navigationDestination(isPresented: $userProfileViewModel.isUserDetailPresented) {
-                    UserProfileView(
-                        userId: userSession.currentUserId ?? "",
-                        UserProfileVM: userProfileViewModel
-                    )
-                    .environmentObject(profile)
-                    .environmentObject(selectedPlaceVM)
-                    .environmentObject(placeVM)
-                    .environmentObject(userSession)
-                    .environmentObject(serviceContainer)
+                    if let selectedUser = userProfileViewModel.selectedUser {
+                        ExternalUserProfileViewWrapper(
+                            user: selectedUser,
+                            pendingListId: userProfileViewModel.pendingListIdToOpen
+                        )
+                        .environmentObject(profile)
+                        .environmentObject(selectedPlaceVM)
+                        .environmentObject(placeVM)
+                        .environmentObject(userSession)
+                        .environmentObject(userProfileViewModel)
+                    }
                 }
                 .navigationDestination(for: FollowListDestination.self) { destination in
                     // Navigate to followers or following list

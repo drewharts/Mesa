@@ -2,17 +2,20 @@
 //  ExternalUserProfileListsView.swift
 //  loc
 //
-//  Displays place lists for external user profiles using ExternalUserProfileViewModel.
+//  Displays place lists for external user profiles.
+//  Uses shared ProfileListCard component for consistent UI.
 //
 
 import SwiftUI
 
-/// Displays a user's place lists with lazy loading
+/// Displays a user's place lists with lazy loading.
 struct ExternalUserProfileListsView: View {
     @ObservedObject var viewModel: ExternalUserProfileViewModel
     let placeLists: [LightweightPlaceList]
 
     @State private var placeColors: [UUID: Color] = [:]
+    @State private var selectedListIndex: Int?
+    @State private var showListPopup = false
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
 
     var body: some View {
@@ -24,6 +27,17 @@ struct ExternalUserProfileListsView: View {
             viewModel.onListPopupDismissed()
         }) {
             deepLinkListPopup
+        }
+        .sheet(isPresented: $showListPopup) {
+            if let index = selectedListIndex, index < placeLists.count {
+                ExternalUserListPopupView(
+                    viewModel: viewModel,
+                    lists: placeLists,
+                    initialListIndex: index,
+                    placeColors: $placeColors
+                )
+                .environmentObject(selectedPlaceVM)
+            }
         }
     }
 
@@ -62,14 +76,16 @@ struct ExternalUserProfileListsView: View {
 
     private var listItems: some View {
         LazyVGrid(columns: listColumns, spacing: 16) {
-            ForEach(placeLists, id: \.id) { list in
-                ExternalUserProfileListSection(
-                    viewModel: viewModel,
+            ForEach(Array(placeLists.enumerated()), id: \.element.id) { index, list in
+                ProfileListCard(
                     list: list,
                     places: viewModel.placeListPlaces[list.list_id] ?? [],
-                    allLists: placeLists,
-                    currentIndex: placeLists.firstIndex(where: { $0.id == list.id }) ?? 0,
-                    placeColors: $placeColors
+                    placeColors: $placeColors,
+                    config: .external,
+                    onTap: {
+                        selectedListIndex = index
+                        showListPopup = true
+                    }
                 )
                 .onAppear {
                     handleListAppear(list)
@@ -108,6 +124,7 @@ struct ExternalUserProfileListsView: View {
 
     // MARK: - Event Handlers
 
+    /// Handles list appearing - loads places and triggers pagination if needed.
     private func handleListAppear(_ list: LightweightPlaceList) {
         // Lazy load places for this list if not loaded yet
         if viewModel.placeListPlaces[list.list_id] == nil {
@@ -120,113 +137,13 @@ struct ExternalUserProfileListsView: View {
         }
     }
 
-    /// Returns true if this list is near the end, triggering pagination
+    /// Returns true if this list is near the end, triggering pagination.
     private func isNearEndOfLists(_ list: LightweightPlaceList) -> Bool {
         guard placeLists.count >= 3 else { return false }
         guard let currentIndex = placeLists.firstIndex(where: { $0.id == list.id }) else { return false }
 
-        // Trigger when viewing one of the last 3 items
         let threshold = placeLists.count - 3
         return currentIndex >= threshold
-    }
-}
-
-// MARK: - External User Profile List Section
-
-struct ExternalUserProfileListSection: View {
-    @ObservedObject var viewModel: ExternalUserProfileViewModel
-    let list: LightweightPlaceList
-    let places: [LightweightPlace]
-    let allLists: [LightweightPlaceList]
-    let currentIndex: Int
-    @Binding var placeColors: [UUID: Color]
-
-    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
-    @Environment(\.presentationMode) var presentationMode
-
-    @State private var showListPopup = false
-
-    private var totalPlaceCount: Int {
-        return list.place_count
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            // Photo collage button - shows popup for list
-            Button(action: {
-                showListPopup = true
-            }) {
-                ExternalUserListCardImageView(places: places, placeColors: $placeColors)
-            }
-            .buttonStyle(PlainButtonStyle())
-
-            // List info
-            VStack(alignment: .leading, spacing: 2) {
-                Text(list.name)
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.primary)
-                    .lineLimit(1)
-
-                Text("\(totalPlaceCount) place\(totalPlaceCount == 1 ? "" : "s")")
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
-            }
-        }
-        .sheet(isPresented: $showListPopup) {
-            ExternalUserListPopupView(
-                viewModel: viewModel,
-                lists: allLists,
-                initialListIndex: currentIndex,
-                placeColors: $placeColors
-            )
-            .environmentObject(selectedPlaceVM)
-        }
-    }
-}
-
-// MARK: - External User List Card Image View
-
-private struct ExternalUserListCardImageView: View {
-    let places: [LightweightPlace]
-    @Binding var placeColors: [UUID: Color]
-
-    var body: some View {
-        Group {
-            if !places.isEmpty {
-                ListPhotoCollage(
-                    places: Array(places.prefix(3)),
-                    placeColors: $placeColors
-                )
-            } else {
-                ExternalUserEmptyListCardView()
-            }
-        }
-        .aspectRatio(1, contentMode: .fit)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-        .shadow(color: .black.opacity(0.08), radius: 6, x: 0, y: 3)
-    }
-}
-
-// MARK: - External User Empty List Card View
-
-private struct ExternalUserEmptyListCardView: View {
-    var body: some View {
-        VStack(spacing: 8) {
-            Image(systemName: "photo.on.rectangle.angled")
-                .font(.system(size: 24))
-                .foregroundColor(.gray.opacity(0.5))
-
-            Text("No places yet")
-                .font(.caption)
-                .foregroundColor(.gray)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(.systemBackground))
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(Color.gray.opacity(0.1), lineWidth: 1)
-        )
     }
 }
 
@@ -278,71 +195,63 @@ struct ExternalUserListPopupView: View {
     var body: some View {
         NavigationStack(path: $navigationPath) {
             VStack(spacing: 0) {
-                // Header with list name and controls
-                VStack(spacing: 12) {
-                    // Top bar with close button
-                    HStack {
-                        Button(action: {
-                            presentationMode.wrappedValue.dismiss()
-                        }) {
-                            HStack(spacing: 4) {
-                                Image(systemName: "chevron.left")
-                                Text("Profile")
-                            }
-                            .foregroundColor(.primary)
-                        }
-                        Spacer()
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.top, 20)
+                popupHeader
+                popupContent
+            }
+            .navigationBarHidden(true)
+            .navigationDestination(for: String.self) { placeId in
+                PlaceDetailViewInNavigation(placeId: placeId, minSheetHeight: 250)
+            }
+        }
+        .onAppear {
+            navigationPath = NavigationPath()
+            loadPlacesIfNeeded()
+        }
+    }
 
-                    // List name and place count
-                    VStack(spacing: 4) {
-                        Text(currentList.name)
-                            .font(.title2)
-                            .fontWeight(.bold)
-                            .foregroundColor(.black)
+    // MARK: - Popup Header
 
-                        Text("\(currentList.place_count) place\(currentList.place_count == 1 ? "" : "s")")
-                            .font(.caption)
-                            .foregroundColor(.gray)
+    private var popupHeader: some View {
+        VStack(spacing: 12) {
+            HStack {
+                Button(action: {
+                    presentationMode.wrappedValue.dismiss()
+                }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "chevron.left")
+                        Text("Profile")
                     }
-                    .padding(.horizontal, 20)
+                    .foregroundColor(.primary)
                 }
-                .padding(.bottom, 10)
+                Spacer()
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 20)
 
-                // Content with swiping support
-                if lists.count > 1 {
-                    // Multiple lists - use TabView for swiping
-                    TabView(selection: $currentListIndex) {
-                        ForEach(lists.indices, id: \.self) { index in
-                            ExternalUserListContentScrollView(
-                                list: lists[index],
-                                viewModel: viewModel,
-                                isLoadingMore: $isLoadingMore,
-                                hasMorePlaces: $hasMorePlaces,
-                                currentPage: $currentPage,
-                                onLoadMore: { loadMoreIfNeeded() },
-                                onNavigateToPlace: { placeId in
-                                    navigationPath.append(placeId)
-                                }
-                            )
-                            .tag(index)
-                        }
-                    }
-                    .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
-                    .onChange(of: currentListIndex) { _, newIndex in
-                        // Reset pagination state when switching lists
-                        isLoadingMore = false
-                        hasMorePlaces = true
-                        currentPage = 1
-                        // Load places for new list if needed
-                        loadPlacesIfNeeded()
-                    }
-                } else {
-                    // Single list - no swiping needed
+            VStack(spacing: 4) {
+                Text(currentList.name)
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .foregroundColor(.black)
+
+                Text("\(currentList.place_count) place\(currentList.place_count == 1 ? "" : "s")")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+            }
+            .padding(.horizontal, 20)
+        }
+        .padding(.bottom, 10)
+    }
+
+    // MARK: - Popup Content
+
+    @ViewBuilder
+    private var popupContent: some View {
+        if lists.count > 1 {
+            TabView(selection: $currentListIndex) {
+                ForEach(lists.indices, id: \.self) { index in
                     ExternalUserListContentScrollView(
-                        list: currentList,
+                        list: lists[index],
                         viewModel: viewModel,
                         isLoadingMore: $isLoadingMore,
                         hasMorePlaces: $hasMorePlaces,
@@ -352,21 +261,34 @@ struct ExternalUserListPopupView: View {
                             navigationPath.append(placeId)
                         }
                     )
+                    .tag(index)
                 }
             }
-            .navigationBarHidden(true)
-            .navigationDestination(for: String.self) { placeId in
-                PlaceDetailViewInNavigation(placeId: placeId, minSheetHeight: 250)
+            .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
+            .onChange(of: currentListIndex) { _, newIndex in
+                isLoadingMore = false
+                hasMorePlaces = true
+                currentPage = 1
+                loadPlacesIfNeeded()
             }
-        }
-        .onAppear {
-            // Clear navigation path when sheet appears
-            navigationPath = NavigationPath()
-            // Load places for the current list
-            loadPlacesIfNeeded()
+        } else {
+            ExternalUserListContentScrollView(
+                list: currentList,
+                viewModel: viewModel,
+                isLoadingMore: $isLoadingMore,
+                hasMorePlaces: $hasMorePlaces,
+                currentPage: $currentPage,
+                onLoadMore: { loadMoreIfNeeded() },
+                onNavigateToPlace: { placeId in
+                    navigationPath.append(placeId)
+                }
+            )
         }
     }
 
+    // MARK: - Data Loading
+
+    /// Loads places for the current list if not already loaded.
     private func loadPlacesIfNeeded() {
         let list = lists[currentListIndex]
         if viewModel.placeListPlaces[list.list_id] == nil {
@@ -374,6 +296,7 @@ struct ExternalUserListPopupView: View {
         }
     }
 
+    /// Loads more places when approaching end of list.
     private func loadMoreIfNeeded() {
         guard !isLoadingMore && hasMorePlaces else { return }
 
@@ -399,7 +322,6 @@ struct ExternalUserListContentScrollView: View {
     let onLoadMore: () -> Void
     let onNavigateToPlace: ((String) -> Void)?
 
-    // Grid layout matching ProfileView lists
     private let columns = [
         GridItem(.flexible(), spacing: 12),
         GridItem(.flexible(), spacing: 12)
@@ -422,7 +344,6 @@ struct ExternalUserListContentScrollView: View {
                             }
                         )
                         .onAppear {
-                            // Load more when user scrolls to 3rd-to-last item
                             if index == places.count - 3 {
                                 onLoadMore()
                             }
@@ -432,7 +353,6 @@ struct ExternalUserListContentScrollView: View {
                 .padding(.horizontal, 16)
                 .padding(.vertical, 10)
 
-                // Loading indicator at bottom
                 if isLoadingMore {
                     HStack {
                         Spacer()
