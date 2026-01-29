@@ -10,12 +10,16 @@
       "Bash(mkdir:*)",
       "Bash(rm:*)",
       "Bash(ls:*)",
-      "Bash(xcrun simctl openurl:*)"
+      "Bash(xcrun simctl openurl:*)",
+      "WebSearch",
+      "mcp__ide__getDiagnostics",
+      "Bash(xcodebuild:*)",
+      "Bash(wc:*)"
     ],
     "deny": []
   },
+  "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [
     "supabase"
-  ],
-  "enableAllProjectMcpServers": true
+  ]
 }

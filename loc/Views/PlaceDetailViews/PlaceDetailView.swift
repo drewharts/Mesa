@@ -221,7 +221,7 @@ struct PlaceDetailView: View {
         )
 
         vm.onDismissMaxFavoritesAlert = { [weak profile] in
-            profile?.showMaxFavoritesAlert = false
+            profile?.favoritesViewModel.showMaxFavoritesAlert = false
         }
 
         vm.configureSaversViewModel(userProfileViewModel: userProfileViewModel)

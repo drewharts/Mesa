@@ -358,6 +358,15 @@ class SelectedPlaceViewModel: ObservableObject {
         }
     }
     
+    /// Sets posts for a place and notifies observers. Optionally updates TikToks.
+    private func setPostsAndNotify(placeId: String, posts: [PlacePost], tiktoks: [TikTokVideo]? = nil) {
+        placePosts[placeId] = posts
+        if let tiktoks = tiktoks {
+            placeTikToks[placeId] = tiktoks
+        }
+        postsUpdateCounter += 1
+    }
+
     private func loadPosts(for place: DetailPlace) {
         let placeId = place.id.uuidString
         DispatchQueue.main.async {
@@ -369,7 +378,7 @@ class SelectedPlaceViewModel: ObservableObject {
             guard let currentUserId = SupabaseAuthService.shared.currentUserId else {
                 print("Error: Current user ID is not available")
                 self.postLoadingStates[placeId] = .error(NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "User not logged in"]))
-                self.placePosts[placeId] = []
+                self.setPostsAndNotify(placeId: placeId, posts: [], tiktoks: [])
                 self.updateCurrentPlaceFullyLoaded()
                 return
             }
@@ -386,21 +395,15 @@ class SelectedPlaceViewModel: ObservableObject {
                 let (posts, tiktoks) = try await postService.fetchPosts(placeId: placeId, latestOnly: false)
                 
                 await MainActor.run {
-                    self.placePosts[placeId] = posts
-                    self.placeTikToks[placeId] = tiktoks // Store TikToks
+                    self.setPostsAndNotify(placeId: placeId, posts: posts, tiktoks: tiktoks)
                     self.postLoadingStates[placeId] = .loaded
-                    
-                    // Photos are loaded automatically by PlacePhotosViewModel via observers
-                    
                     self.updateCurrentPlaceFullyLoaded()
                 }
             } catch {
                 await MainActor.run {
                     print("❌ [SelectedPlaceViewModel] Error fetching posts/TikToks for place \(placeId): \(error.localizedDescription)")
                     self.postLoadingStates[placeId] = .error(error)
-                    self.placePosts[placeId] = []
-                    self.placeTikToks[placeId] = []
-                    
+                    self.setPostsAndNotify(placeId: placeId, posts: [], tiktoks: [])
                     self.updateCurrentPlaceFullyLoaded()
                 }
             }
@@ -409,17 +412,15 @@ class SelectedPlaceViewModel: ObservableObject {
     
     
     // MARK: - Public Methods
+    /// Adds a new post to the current place's posts list.
     func addPost(_ post: PlacePost) {
         guard let placeId = selectedPlace?.id.uuidString else { return }
-        
+
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
             var currentPosts = self.placePosts[placeId] ?? []
-            currentPosts.insert(post, at: 0) // Insert at the beginning
-            self.placePosts[placeId] = currentPosts
-            
-            // Notify observers that posts have changed (triggers photo reload in PlacePhotosViewModel)
-            self.postsUpdateCounter += 1
+            currentPosts.insert(post, at: 0)
+            self.setPostsAndNotify(placeId: placeId, posts: currentPosts)
         }
     }
     
@@ -434,41 +435,31 @@ class SelectedPlaceViewModel: ObservableObject {
         return nil
     }
     
+    /// Deletes a post from the current place and updates local cache.
     func deletePost(postId: String, completion: @escaping (Result<Void, Error>) -> Void) {
         guard let placeId = selectedPlace?.id.uuidString else {
             completion(.failure(NSError(domain: "SelectedPlaceViewModel", code: -1, userInfo: [NSLocalizedDescriptionKey: "No selected place"])))
             return
         }
-        
-        // Find the post to get the userId
-        guard let post = placePosts[placeId]?.first(where: { $0.id == postId }) else {
+
+        guard placePosts[placeId]?.contains(where: { $0.id == postId }) == true else {
             completion(.failure(NSError(domain: "SelectedPlaceViewModel", code: -1, userInfo: [NSLocalizedDescriptionKey: "Post not found in cache"])))
             return
         }
-        
+
         postService.deletePost(postId: postId) { [weak self] result in
             guard let self = self else { return }
-            
+
             switch result {
             case .success:
                 DispatchQueue.main.async {
-                    // Remove the post from local cache
-                    if var currentPosts = self.placePosts[placeId] {
-                        // Find and remove the post
-                        if let index = currentPosts.firstIndex(where: { $0.id == postId }) {
-                            currentPosts.remove(at: index)
-                            self.placePosts[placeId] = currentPosts
-                            
-                            // Remove from liked posts set if it was there
-                            self.likedPosts.remove(postId)
-                            
-                            // Notify observers that posts have changed
-                            self.postsUpdateCounter += 1
-                        }
-                    }
+                    var currentPosts = self.placePosts[placeId] ?? []
+                    currentPosts.removeAll { $0.id == postId }
+                    self.likedPosts.remove(postId)
+                    self.setPostsAndNotify(placeId: placeId, posts: currentPosts)
                     completion(.success(()))
                 }
-                
+
             case .failure(let error):
                 print("❌ Failed to delete post: \(error.localizedDescription)")
                 completion(.failure(error))
@@ -562,8 +553,8 @@ class SelectedPlaceViewModel: ObservableObject {
             
             // Update ProfileViewModel's myPlaces list
             if let profileVM = profileVM {
-                if !profileVM.myPlaces.contains(newPlace.id.uuidString) {
-                    profileVM.myPlaces.append(newPlace.id.uuidString)
+                if !profileVM.myPlacesViewModel.myPlaces.contains(newPlace.id.uuidString) {
+                    profileVM.myPlacesViewModel.myPlaces.append(newPlace.id.uuidString)
                 }
             }
             

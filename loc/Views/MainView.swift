@@ -37,6 +37,9 @@ struct MainView: View {
     @State private var recenterMap = false
     @State private var isCreatePlacePopupActive = false
     @State private var mapPosition = MapCameraPosition.automatic
+
+    /// Convenience accessor for TikTok view model.
+    private var tikTokVM: ProfileTikTokViewModel { profileViewModel.tikTokViewModel }
     
     // MARK: - Initialization
     init(
@@ -131,7 +134,10 @@ struct MainView: View {
                     .environmentObject(userProfileViewModel)
                 }
             }
-            .sheet(isPresented: $profileViewModel.isShowingPlaceSelection) {
+            .sheet(isPresented: Binding(
+                get: { tikTokVM.isShowingPlaceSelection },
+                set: { tikTokVM.isShowingPlaceSelection = $0 }
+            )) {
                 TikTokPlaceSelectionView()
                     .environmentObject(profileViewModel)
                     .environmentObject(selectedPlaceVM)
@@ -140,8 +146,11 @@ struct MainView: View {
                     .environmentObject(userSession)
                     .presentationDragIndicator(.visible)
             }
-            .sheet(isPresented: $profileViewModel.isShowingNoPlacesFound) {
-                TikTokNoPlacesFoundView(tikTokUrl: profileViewModel.noPlacesFoundTikTokUrl)
+            .sheet(isPresented: Binding(
+                get: { tikTokVM.isShowingNoPlacesFound },
+                set: { tikTokVM.isShowingNoPlacesFound = $0 }
+            )) {
+                TikTokNoPlacesFoundView(tikTokUrl: tikTokVM.noPlacesFoundTikTokUrl)
                     .environmentObject(profileViewModel)
                     .environmentObject(userSession)
                     .environmentObject(detailPlaceViewModel)
@@ -304,14 +313,14 @@ struct MainView: View {
     // MARK: - Loading Overlay
     private var loadingOverlay: some View {
         Group {
-            if deepLinkViewModel.isProcessingDeepLink || 
-               profileViewModel.isProcessingTikTok || 
-               profileViewModel.isWaitingForPlaceDetail {
+            if deepLinkViewModel.isProcessingDeepLink ||
+               tikTokVM.isProcessingTikTok ||
+               tikTokVM.isWaitingForPlaceDetail {
                 Color.black.opacity(0.4)
                     .ignoresSafeArea()
-                
+
                 VStack(spacing: 16) {
-                    if profileViewModel.tikTokImportError != nil {
+                    if tikTokVM.tikTokImportError != nil {
                         errorView
                     } else {
                         loadingView
@@ -332,14 +341,14 @@ struct MainView: View {
                 .font(.headline)
                 .foregroundColor(.white)
             
-            Text(profileViewModel.tikTokImportError ?? "Unknown error")
+            Text(tikTokVM.tikTokImportError ?? "Unknown error")
                 .font(.subheadline)
                 .foregroundColor(.white.opacity(0.8))
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 40)
             
             Button("Try Again") {
-                profileViewModel.clearTikTokImportError()
+                tikTokVM.clearTikTokImportError()
             }
             .padding(.horizontal, 24)
             .padding(.vertical, 8)

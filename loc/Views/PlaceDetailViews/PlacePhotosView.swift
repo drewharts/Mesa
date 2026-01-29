@@ -87,11 +87,8 @@ struct PlacePhotosView: View {
         imageService: services.imageService
     )
     
-    let photosViewModel = PlacePhotosViewModel(
-        postService: services.postService,
-        selectedPlaceVM: selectedPlaceVM
-    )
-    
+    let photosViewModel = PlacePhotosViewModel()
+
     // Create a mock place with all properties
     let mockPlace: DetailPlace = {
         var place = DetailPlace()
@@ -100,10 +97,10 @@ struct PlacePhotosView: View {
         place.coordinate = CLLocationCoordinate2D(latitude: 37.7749, longitude: -122.4194)
         return place
     }()
-    
-    // Simulate place selection
-    selectedPlaceVM.selectedPlace = mockPlace
-    
+
+    // Set place data on refactored ViewModel
+    photosViewModel.setPlace(mockPlace)
+
     return PlacePhotosView(
         viewModel: photosViewModel,
         onPhotoTapped: { photos, index in

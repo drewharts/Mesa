@@ -487,16 +487,17 @@ private struct SavedByIndicator: View {
             
             // Create the new ViewModel (Our Single Source of Truth!)
             let tabsViewModel = PlaceDetailTabsViewModel(
-                placeService: services.placeService,
-                postService: services.postService,
-                userService: services.userService,
-                notificationManager: NotificationManager.shared,
-                placeShareService: services.placeShareService,
-                selectedPlaceVM: selectedPlaceVM,
-                profileVM: profileVM,
                 userSession: userSession,
-                detailPlaceViewModel: detailPlaceVM
+                profileVM: profileVM,
+                detailPlaceViewModel: detailPlaceVM,
+                selectedPlaceVM: selectedPlaceVM
             )
+
+            // Set initial data
+            tabsViewModel.setPlace(mockPlace)
+            tabsViewModel.setPosts([], rating: 0)
+            tabsViewModel.setFavoriteStatus(false)
+            tabsViewModel.setTikTokVideos(placeVideos: [], userVideos: [])
             
             return PlaceDetailTabsView(
                 viewModel: tabsViewModel,

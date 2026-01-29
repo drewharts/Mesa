@@ -38,7 +38,7 @@ class SwipeableListPopupViewModel: ObservableObject {
     }
     
     func generateColorsForCurrentList(placeColors: inout [UUID: Color], profileViewModel: ProfileViewModel, detailPlaceViewModel: DetailPlaceViewModel) {
-        guard let placeIds = profileViewModel.userListsPlaces[currentList.id.uuidString] else { return }
+        guard let placeIds = profileViewModel.listsViewModel.userListsPlaces[currentList.id.uuidString] else { return }
         let places = placeIds.compactMap { detailPlaceViewModel.places[$0] }
         
         for place in places {

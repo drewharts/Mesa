@@ -194,17 +194,12 @@ struct PlaceNoteSheetView: View {
         deepLinkViewModel: nil
     )
     
-    let notesVM = NotesTabViewModel(
-        userService: services.userService,
-        selectedPlaceVM: selectedPlaceVM,
-        profileVM: profileVM,
-        userSession: userSession
-    )
-    
+    let notesVM = NotesTabViewModel(userSession: userSession)
+
     var mockPlace = DetailPlace()
     mockPlace.name = "Sample Restaurant"
-    selectedPlaceVM.selectedPlace = mockPlace
-    
+    notesVM.setPlace(mockPlace)
+
     return PlaceNoteSheetView(viewModel: notesVM)
 }
 

@@ -13,6 +13,9 @@ struct ProfileTikToksView: View {
     @State private var showingTikToksPopup = false
     @State private var showingHelpSheet = false
 
+    /// Convenience accessor for TikTok view model.
+    private var tikTokVM: ProfileTikTokViewModel { profile.tikTokViewModel }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             headerRow
@@ -55,12 +58,12 @@ struct ProfileTikToksView: View {
     private var tiktoksCard: some View {
         Button(action: { showingTikToksPopup = true }) {
             Group {
-                if profile.isLoadingTikTokPlaces {
+                if tikTokVM.isLoadingTikTokPlaces {
                     loadingState
-                } else if profile.lightweightExternalPlaces.isEmpty {
+                } else if tikTokVM.lightweightExternalPlaces.isEmpty {
                     emptyState
                 } else {
-                    ProfilePlacesPreviewGrid(tiktokPlaces: profile.lightweightExternalPlaces)
+                    ProfilePlacesPreviewGrid(tiktokPlaces: tikTokVM.lightweightExternalPlaces)
                 }
             }
         }

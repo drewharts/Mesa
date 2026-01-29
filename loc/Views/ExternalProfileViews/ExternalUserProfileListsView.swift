@@ -8,15 +8,28 @@
 
 import SwiftUI
 
+/// Wrapper to make Int identifiable for sheet presentation.
+struct IdentifiableInt: Identifiable {
+    let id: Int
+    var value: Int { id }
+}
+
 /// Displays a user's place lists with lazy loading.
 struct ExternalUserProfileListsView: View {
     @ObservedObject var viewModel: ExternalUserProfileViewModel
     let placeLists: [LightweightPlaceList]
 
     @State private var placeColors: [UUID: Color] = [:]
-    @State private var selectedListIndex: Int?
-    @State private var showListPopup = false
+    @State private var selectedListItem: IdentifiableInt?
+
+    // Environment objects needed for place detail navigation
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
+    @EnvironmentObject var profile: ProfileViewModel
+    @EnvironmentObject var locationManager: LocationManager
+    @EnvironmentObject var userProfileViewModel: UserProfileViewModel
+    @EnvironmentObject var userSession: UserSession
+    @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
+    @EnvironmentObject var dataManager: DataManager
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -28,15 +41,22 @@ struct ExternalUserProfileListsView: View {
         }) {
             deepLinkListPopup
         }
-        .sheet(isPresented: $showListPopup) {
-            if let index = selectedListIndex, index < placeLists.count {
+        .sheet(item: $selectedListItem) { item in
+            if item.value < placeLists.count {
                 ExternalUserListPopupView(
                     viewModel: viewModel,
                     lists: placeLists,
-                    initialListIndex: index,
+                    initialListIndex: item.value,
                     placeColors: $placeColors
                 )
                 .environmentObject(selectedPlaceVM)
+                .environmentObject(profile)
+                .environmentObject(locationManager)
+                .environmentObject(userProfileViewModel)
+                .environmentObject(userSession)
+                .environmentObject(detailPlaceViewModel)
+                .environmentObject(ServiceContainer.shared)
+                .environmentObject(dataManager)
             }
         }
     }
@@ -83,8 +103,7 @@ struct ExternalUserProfileListsView: View {
                     placeColors: $placeColors,
                     config: .external,
                     onTap: {
-                        selectedListIndex = index
-                        showListPopup = true
+                        selectedListItem = IdentifiableInt(id: index)
                     }
                 )
                 .onAppear {
@@ -119,6 +138,13 @@ struct ExternalUserProfileListsView: View {
                 placeColors: $placeColors
             )
             .environmentObject(selectedPlaceVM)
+            .environmentObject(profile)
+            .environmentObject(locationManager)
+            .environmentObject(userProfileViewModel)
+            .environmentObject(userSession)
+            .environmentObject(detailPlaceViewModel)
+            .environmentObject(ServiceContainer.shared)
+            .environmentObject(dataManager)
         }
     }
 
@@ -162,6 +188,7 @@ struct ExternalUserListPopupView: View {
     @State private var hasMorePlaces: Bool = true
     @State private var currentPage: Int = 1
     @State private var navigationPath = NavigationPath()
+    @State private var isLoadingInitial: Bool = true
 
     init(viewModel: ExternalUserProfileViewModel, lists: [LightweightPlaceList], initialListIndex: Int, placeColors: Binding<[UUID: Color]>) {
         self.viewModel = viewModel
@@ -256,6 +283,7 @@ struct ExternalUserListPopupView: View {
                         isLoadingMore: $isLoadingMore,
                         hasMorePlaces: $hasMorePlaces,
                         currentPage: $currentPage,
+                        isLoadingInitial: $isLoadingInitial,
                         onLoadMore: { loadMoreIfNeeded() },
                         onNavigateToPlace: { placeId in
                             navigationPath.append(placeId)
@@ -278,6 +306,7 @@ struct ExternalUserListPopupView: View {
                 isLoadingMore: $isLoadingMore,
                 hasMorePlaces: $hasMorePlaces,
                 currentPage: $currentPage,
+                isLoadingInitial: $isLoadingInitial,
                 onLoadMore: { loadMoreIfNeeded() },
                 onNavigateToPlace: { placeId in
                     navigationPath.append(placeId)
@@ -288,11 +317,17 @@ struct ExternalUserListPopupView: View {
 
     // MARK: - Data Loading
 
-    /// Loads places for the current list if not already loaded.
+    /// Loads places for the current list if not already loaded or empty.
     private func loadPlacesIfNeeded() {
         let list = lists[currentListIndex]
-        if viewModel.placeListPlaces[list.list_id] == nil {
+        let existingPlaces = viewModel.placeListPlaces[list.list_id]
+
+        // Load if nil OR empty (empty array might exist from failed previous attempt)
+        if existingPlaces == nil || existingPlaces?.isEmpty == true {
+            isLoadingInitial = true
             viewModel.loadPlacesForList(list)
+        } else {
+            isLoadingInitial = false
         }
     }
 
@@ -319,6 +354,7 @@ struct ExternalUserListContentScrollView: View {
     @Binding var isLoadingMore: Bool
     @Binding var hasMorePlaces: Bool
     @Binding var currentPage: Int
+    @Binding var isLoadingInitial: Bool
     let onLoadMore: () -> Void
     let onNavigateToPlace: ((String) -> Void)?
 
@@ -336,9 +372,10 @@ struct ExternalUserListContentScrollView: View {
             ScrollView {
                 LazyVGrid(columns: columns, spacing: 16) {
                     ForEach(Array(places.enumerated()), id: \.element.id) { index, place in
-                        LightweightPlaceGridCell(
+                        PopupPlaceCard(
                             place: place,
-                            isCollaborativeList: list.isCollaborative,
+                            preferTikTokThumbnail: true,
+                            allowDelete: false,
                             onNavigate: { placeId in
                                 onNavigateToPlace?(placeId)
                             }
@@ -362,6 +399,23 @@ struct ExternalUserListContentScrollView: View {
                     }
                 }
             }
+            .onAppear {
+                // Places loaded, clear loading state
+                if isLoadingInitial {
+                    isLoadingInitial = false
+                }
+            }
+        } else if isLoadingInitial {
+            VStack(spacing: 12) {
+                Spacer()
+                ProgressView()
+                    .scaleEffect(1.2)
+                Text("Loading places...")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                Spacer()
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             VStack(spacing: 8) {
                 Spacer()

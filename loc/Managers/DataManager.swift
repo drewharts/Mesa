@@ -74,8 +74,8 @@ class DataManager: ObservableObject {
                 
         // Reset loading flags since we're not loading follower/following profiles yet
         await MainActor.run {
-            profileViewModel.isFollowersListLoading = false
-            profileViewModel.isFollowingListLoading = false
+            profileViewModel.socialViewModel.isFollowersListLoading = false
+            profileViewModel.socialViewModel.isFollowingListLoading = false
         }
         
     }
@@ -92,10 +92,10 @@ class DataManager: ObservableObject {
         
         await MainActor.run {
             // Store just the IDs - full place data loads on-demand
-            self.profileViewModel.userFavorites = favIds ?? []
-            self.profileViewModel.myPlaces = myPlaceIdsResult ?? []
-            self.profileViewModel.userLists = listMetadataResult ?? []
-            
+            self.profileViewModel.favoritesViewModel.userFavorites = favIds ?? []
+            self.profileViewModel.myPlacesViewModel.myPlaces = myPlaceIdsResult ?? []
+            self.profileViewModel.listsViewModel.userLists = listMetadataResult ?? []
+
         }
     }
     
@@ -206,9 +206,9 @@ class DataManager: ObservableObject {
 
     // Sets all relevant loading flags to true before data loading begins
     func startDataLoadingFlags() {
-        profileViewModel.isFollowersListLoading = true
-        profileViewModel.isFollowingListLoading = true
-        profileViewModel.isMyPlacesLoading = true
+        profileViewModel.socialViewModel.isFollowersListLoading = true
+        profileViewModel.socialViewModel.isFollowingListLoading = true
+        profileViewModel.myPlacesViewModel.isMyPlacesLoading = true
     }
     
     func calculateMapAnnotations() {
@@ -222,10 +222,10 @@ class DataManager: ObservableObject {
     
     func loadUserMyPlaces(userId: String, offset: Int = 0) async {
         if offset == 0 {
-            profileViewModel.isMyPlacesLoading = true
+            profileViewModel.myPlacesViewModel.isMyPlacesLoading = true
         } else {
             await MainActor.run {
-                profileViewModel.isLoadingMoreMyPlaces = true
+                profileViewModel.myPlacesViewModel.isLoadingMoreMyPlaces = true
             }
         }
         
@@ -237,16 +237,16 @@ class DataManager: ObservableObject {
             await MainActor.run {
                 if offset == 0 {
                     // Initial load - replace existing
-                    self.profileViewModel.lightweightMyPlaces = lightweightPlaces
-                    self.profileViewModel.myPlaces = lightweightPlaces.map { $0.place_id }
+                    self.profileViewModel.myPlacesViewModel.lightweightMyPlaces = lightweightPlaces
+                    self.profileViewModel.myPlacesViewModel.myPlaces = lightweightPlaces.map { $0.place_id }
                 } else {
                     // Pagination - append new places
-                    self.profileViewModel.lightweightMyPlaces.append(contentsOf: lightweightPlaces)
-                    self.profileViewModel.myPlaces.append(contentsOf: lightweightPlaces.map { $0.place_id })
+                    self.profileViewModel.myPlacesViewModel.lightweightMyPlaces.append(contentsOf: lightweightPlaces)
+                    self.profileViewModel.myPlacesViewModel.myPlaces.append(contentsOf: lightweightPlaces.map { $0.place_id })
                 }
-                
+
                 // Update hasMore flag
-                self.profileViewModel.hasMoreMyPlaces = lightweightPlaces.count >= 8
+                self.profileViewModel.myPlacesViewModel.hasMoreMyPlaces = lightweightPlaces.count >= 8
             }
             
             // Add the current user as a saver for their own places (for map display)
@@ -264,20 +264,20 @@ class DataManager: ObservableObject {
         }
         
         if offset == 0 {
-            profileViewModel.isMyPlacesLoading = false
+            profileViewModel.myPlacesViewModel.isMyPlacesLoading = false
         } else {
             await MainActor.run {
-                profileViewModel.isLoadingMoreMyPlaces = false
+                profileViewModel.myPlacesViewModel.isLoadingMoreMyPlaces = false
             }
         }
     }
-    
+
     /// Load more my places (pagination)
     @MainActor
     func loadMoreMyPlaces(userId: String) async {
-        guard !profileViewModel.isLoadingMoreMyPlaces && profileViewModel.hasMoreMyPlaces else { return }
-        
-        let offset = profileViewModel.lightweightMyPlaces.count
+        guard !profileViewModel.myPlacesViewModel.isLoadingMoreMyPlaces && profileViewModel.myPlacesViewModel.hasMoreMyPlaces else { return }
+
+        let offset = profileViewModel.myPlacesViewModel.lightweightMyPlaces.count
         await loadUserMyPlaces(userId: userId, offset: offset)
     }
     
@@ -287,27 +287,27 @@ class DataManager: ObservableObject {
     /// MVVM architecture: ViewModel should own pagination state and logic.
     func loadUserExternalPlaces(userId: String, offset: Int = 0) async {
         if offset == 0 {
-            profileViewModel.isLoadingTikTokPlaces = true
+            profileViewModel.tikTokViewModel.isLoadingTikTokPlaces = true
         } else {
             await MainActor.run {
-                profileViewModel.isLoadingMoreExternalPlaces = true
+                profileViewModel.tikTokViewModel.isLoadingMoreExternalPlaces = true
             }
         }
-        
+
         defer {
             if offset == 0 {
-                profileViewModel.isLoadingTikTokPlaces = false
+                profileViewModel.tikTokViewModel.isLoadingTikTokPlaces = false
             } else {
                 Task { @MainActor in
-                    profileViewModel.isLoadingMoreExternalPlaces = false
+                    profileViewModel.tikTokViewModel.isLoadingMoreExternalPlaces = false
                 }
             }
         }
-        
+
         do {
             // Load 8 places at a time
             let lightweightPlaces = try await userService.fetchUserExternalPlaces(userId: userId, limit: 8, offset: offset)
-            
+
             // Prefetch TikTok metadata for all TikTok URLs to populate cache
             let tiktokUrls = lightweightPlaces.compactMap { $0.tiktok_url }.filter { !$0.isEmpty }
             if !tiktokUrls.isEmpty {
@@ -316,47 +316,47 @@ class DataManager: ObservableObject {
                     print("✅ [DataManager] Prefetched TikTok metadata for \(tiktokUrls.count) URLs")
                 }
             }
-            
+
             // Store lightweight places in ProfileViewModel
             await MainActor.run {
                 if offset == 0 {
                     // Initial load - replace existing
-                    self.profileViewModel.lightweightExternalPlaces = lightweightPlaces
+                    self.profileViewModel.tikTokViewModel.lightweightExternalPlaces = lightweightPlaces
                 } else {
                     // Pagination - append new places
-                    self.profileViewModel.lightweightExternalPlaces.append(contentsOf: lightweightPlaces)
+                    self.profileViewModel.tikTokViewModel.lightweightExternalPlaces.append(contentsOf: lightweightPlaces)
                 }
-                
+
                 // Update hasMore flag: false if empty or if we got less than a full page
-                self.profileViewModel.hasMoreExternalPlaces = !lightweightPlaces.isEmpty && lightweightPlaces.count >= 8
+                self.profileViewModel.tikTokViewModel.hasMoreExternalPlaces = !lightweightPlaces.isEmpty && lightweightPlaces.count >= 8
             }
-            
-            print("✅ [DataManager] Loaded \(lightweightPlaces.count) lightweight external places (offset: \(offset), hasMore: \(profileViewModel.hasMoreExternalPlaces))")
+
+            print("✅ [DataManager] Loaded \(lightweightPlaces.count) lightweight external places (offset: \(offset), hasMore: \(profileViewModel.tikTokViewModel.hasMoreExternalPlaces))")
         } catch {
             print("❌ [DataManager] Error loading external places: \(error.localizedDescription)")
             // Set hasMore to false on error to prevent infinite retry loops
             await MainActor.run {
-                profileViewModel.hasMoreExternalPlaces = false
+                profileViewModel.tikTokViewModel.hasMoreExternalPlaces = false
             }
         }
     }
-    
+
     /// Load more external places (pagination)
     /// ⚠️ DEPRECATED: Use ProfileViewModel.loadMoreExternalPlaces() instead
     /// This method is kept for backward compatibility but should not be used in new code.
     /// MVVM architecture: ViewModel should own pagination state and logic.
     @MainActor
     func loadMoreExternalPlaces(userId: String) async {
-        guard !profileViewModel.isLoadingMoreExternalPlaces && profileViewModel.hasMoreExternalPlaces else { return }
-        
-        let offset = profileViewModel.lightweightExternalPlaces.count
+        guard !profileViewModel.tikTokViewModel.isLoadingMoreExternalPlaces && profileViewModel.tikTokViewModel.hasMoreExternalPlaces else { return }
+
+        let offset = profileViewModel.tikTokViewModel.lightweightExternalPlaces.count
         await loadUserExternalPlaces(userId: userId, offset: offset)
     }
     
     /// Refresh My Places data (for when user clicks on My Places)
     func refreshMyPlaces(userId: String) async {
         // Clear existing data and reload
-        profileViewModel.myPlaces.removeAll()
+        profileViewModel.myPlacesViewModel.myPlaces.removeAll()
         await loadUserMyPlaces(userId: userId)
     }
     
@@ -364,7 +364,7 @@ class DataManager: ObservableObject {
     /// Delegates state reset to ViewModel (single responsibility principle)
     func refreshReviewedPlaces(userId: String) async {
         // Delegate state reset to ViewModel - it owns all its pagination state
-        profileViewModel.resetMyReviewedPlacesPagination()
+        profileViewModel.reviewsViewModel.resetMyReviewedPlacesPagination()
         // Reload will happen automatically when view appears via onAppear
     }
     
@@ -423,7 +423,7 @@ class DataManager: ObservableObject {
             let places = try await placeService.fetchProfileFavorites(userId: userId)
             // If this is for the current user, update the ProfileViewModel
             if forUser == nil {
-                self.profileViewModel.userFavorites = places.map { $0.id.uuidString }
+                self.profileViewModel.favoritesViewModel.userFavorites = places.map { $0.id.uuidString }
             }
             // Store DetailPlace objects in DetailPlaceViewModel
             for place in places {
@@ -457,18 +457,18 @@ class DataManager: ObservableObject {
             
             // If this is for the current user, update the ProfileViewModel
             if forUser == nil {
-                self.profileViewModel.userLists = lists
+                self.profileViewModel.listsViewModel.userLists = lists
                 // Initialize with empty place arrays - will be populated via place_list_items query
-                self.profileViewModel.userListsPlaces = lists.reduce(into: [String: [String]]()) { result, list in
+                self.profileViewModel.listsViewModel.userListsPlaces = lists.reduce(into: [String: [String]]()) { result, list in
                     result[list.id.uuidString] = []
                 }
-                
+
                 // If we used proximity sorting, lists are already sorted by distance
                 // If we used regular sorting, sort by distance after loading
                 if userLocation == nil {
                     self.profileViewModel.sortListsByDistance()
                 }
-                
+
                 // Use the optimized loading method instead of the old preloading
                 print("📍 [DataManager] Triggering optimized list loading...")
                 self.profileViewModel.ensureListsLoaded()
@@ -498,7 +498,7 @@ class DataManager: ObservableObject {
         // Mark these lists as loaded in ProfileViewModel
         await MainActor.run {
             for list in sortedLists {
-                self.profileViewModel.loadedListIds.insert(list.id)
+                self.profileViewModel.listsViewModel.loadedListIds.insert(list.id)
             }
         }
     }
@@ -545,7 +545,7 @@ class DataManager: ObservableObject {
             print("Error fetching place from Firestore: \(error.localizedDescription)")
             
             // Create fallback DetailPlace from the list data
-            if let list = profileViewModel.userLists.first(where: { $0.id.uuidString == listId }),
+            if let list = profileViewModel.listsViewModel.userLists.first(where: { $0.id.uuidString == listId }),
                let place = list.places.first(where: { $0.id.uuidString == placeId }) {
                 let fallbackDetailPlace = DetailPlace(id: place.id, name: place.name, address: place.address, city: nil)
                 await MainActor.run {
@@ -564,23 +564,23 @@ class DataManager: ObservableObject {
     
     // Load places for a specific list when it becomes visible
     func loadPlacesForList(listId: UUID, userId: String) async {
-        guard let list = profileViewModel.userLists.first(where: { $0.id == listId }) else {
+        guard let list = profileViewModel.listsViewModel.userLists.first(where: { $0.id == listId }) else {
             print("❌ [DataManager] loadPlacesForList: List not found for ID \(listId)")
             return
         }
-        
-        
+
+
         // Process places in batches for better performance
         let batchSize = 10
         var loadedPlaceIds: [String] = []
-        
+
         for batch in list.places.chunked(into: batchSize) {
             let batchPlaceIds = batch.map { $0.id.uuidString }
             loadedPlaceIds.append(contentsOf: batchPlaceIds)
-            
+
             // Update UI with current batch
             await MainActor.run {
-                self.profileViewModel.userListsPlaces[listId.uuidString] = loadedPlaceIds
+                self.profileViewModel.listsViewModel.userListsPlaces[listId.uuidString] = loadedPlaceIds
             }
             
             // Process places in this batch
@@ -648,42 +648,42 @@ class DataManager: ObservableObject {
     func loadFollowing(userId: String, offset: Int = 0) async {
         let isInitialLoad = offset == 0
         let pageSize = 10
-        
+
         if isInitialLoad {
             await MainActor.run {
-                self.profileViewModel.hasMoreFollowing = true
+                self.profileViewModel.socialViewModel.hasMoreFollowing = true
             }
         }
-        
-        profileViewModel.isFollowingListLoading = true
-        
+
+        profileViewModel.socialViewModel.isFollowingListLoading = true
+
         do {
             let profiles = try await userService.fetchFollowingProfilesData(for: userId, limit: pageSize, offset: offset)
-            
+
             await MainActor.run {
                 if isInitialLoad {
-                    self.profileViewModel.userFollowing = profiles
+                    self.profileViewModel.socialViewModel.userFollowing = profiles
                 } else {
-                    self.profileViewModel.userFollowing.append(contentsOf: profiles)
+                    self.profileViewModel.socialViewModel.userFollowing.append(contentsOf: profiles)
                 }
-                
+
                 // If we received fewer profiles than requested, we've reached the end
                 if profiles.count < pageSize {
-                    self.profileViewModel.hasMoreFollowing = false
+                    self.profileViewModel.socialViewModel.hasMoreFollowing = false
                 }
             }
-            
+
             // Load profile pictures
             for profile in profiles {
                 if let profilePhotoURL = profile.profilePhotoURL {
                     self.AddProfilePicture(userId: profile.id, profilePhotoUrl: profilePhotoURL)
                 }
             }
-            
-            profileViewModel.isFollowingListLoading = false
+
+            profileViewModel.socialViewModel.isFollowingListLoading = false
         } catch {
             print("❌ [DataManager] Error loading following profiles: \(error.localizedDescription)")
-            profileViewModel.isFollowingListLoading = false
+            profileViewModel.socialViewModel.isFollowingListLoading = false
         }
     }
     
@@ -711,56 +711,56 @@ class DataManager: ObservableObject {
     func loadFollowers(userId: String, offset: Int = 0) async {
         let isInitialLoad = offset == 0
         let pageSize = 10
-        
+
         if isInitialLoad {
             await MainActor.run {
-                self.profileViewModel.hasMoreFollowers = true
+                self.profileViewModel.socialViewModel.hasMoreFollowers = true
             }
         }
-        
-        profileViewModel.isFollowersListLoading = true
-        
+
+        profileViewModel.socialViewModel.isFollowersListLoading = true
+
         do {
             let profiles = try await userService.fetchFollowerProfilesData(for: userId, limit: pageSize, offset: offset)
-            
+
             await MainActor.run {
                 if isInitialLoad {
-                    self.profileViewModel.userFollowers = profiles
+                    self.profileViewModel.socialViewModel.userFollowers = profiles
                 } else {
-                    self.profileViewModel.userFollowers.append(contentsOf: profiles)
+                    self.profileViewModel.socialViewModel.userFollowers.append(contentsOf: profiles)
                 }
-                
+
                 // If we received fewer profiles than requested, we've reached the end
                 if profiles.count < pageSize {
-                    self.profileViewModel.hasMoreFollowers = false
+                    self.profileViewModel.socialViewModel.hasMoreFollowers = false
                 }
             }
-            
+
             // Load profile pictures
             for profile in profiles {
                 if let profilePhotoURL = profile.profilePhotoURL {
                     self.AddProfilePicture(userId: profile.id, profilePhotoUrl: profilePhotoURL)
                 }
             }
-            
-            profileViewModel.isFollowersListLoading = false
+
+            profileViewModel.socialViewModel.isFollowersListLoading = false
         } catch {
             print("❌ [DataManager] Error loading follower profiles: \(error.localizedDescription)")
-            profileViewModel.isFollowersListLoading = false
+            profileViewModel.socialViewModel.isFollowersListLoading = false
         }
     }
     
     /// FAST: Load all profile counts, favorites, and place lists in parallel (~20-50ms total!)
     /// Called when profile view appears
     func loadProfileCounts(userId: String) async {
-        
-        profileViewModel.isFollowersLoading = true
-        profileViewModel.isFollowingLoading = true
-        profileViewModel.isMyPlacesLoading = true
-        
+
+        profileViewModel.socialViewModel.isFollowersLoading = true
+        profileViewModel.socialViewModel.isFollowingLoading = true
+        profileViewModel.myPlacesViewModel.isMyPlacesLoading = true
+
         // Get user location for proximity-based list sorting
         let userLocation = locationManager.currentLocation?.coordinate
-        
+
         // Run all queries in parallel
         async let followers: Int = (try? await userService.getNumberFollowers(forUserId: userId)) ?? 0
         async let following: Int = (try? await userService.getNumberFollowing(forUserId: userId)) ?? 0
@@ -768,23 +768,23 @@ class DataManager: ObservableObject {
         async let totalLists: Int = (try? await userService.getTotalListCount(forUserId: userId)) ?? 0
         async let favorites: [FavoritePlace] = (try? await userService.fetchUserFavorites(userId: userId)) ?? []
         async let totalUniquePlaces: Int = (try? await userService.getTotalPlacesCount(forUserId: userId)) ?? 0
-        
+
         let (followersCount, followingCount, myPlacesCount, totalListCount, favoritePlaces, totalUniquePlacesCount) = await (followers, following, myPlaces, totalLists, favorites, totalUniquePlaces)
-        
+
         // Update counts and favorites immediately - don't wait for place lists
         await MainActor.run {
-            profileViewModel.followersCount = followersCount
-            profileViewModel.followingCount = followingCount
-            profileViewModel.totalListCount = totalListCount
+            profileViewModel.socialViewModel.followersCount = followersCount
+            profileViewModel.socialViewModel.followingCount = followingCount
+            profileViewModel.listsViewModel.totalListCount = totalListCount
             profileViewModel.totalUniquePlacesCount = totalUniquePlacesCount
             print("🔢 [DataManager] Set totalUniquePlacesCount = \(totalUniquePlacesCount)")
             // Update my places count - we'll store this as the count of myPlaces array
-            profileViewModel.myPlaces = Array(repeating: "", count: myPlacesCount) // Placeholder IDs
-            profileViewModel.lightweightFavorites = favoritePlaces
-            profileViewModel.isFollowersLoading = false
-            profileViewModel.isFollowingLoading = false
-            profileViewModel.isMyPlacesLoading = false
-            
+            profileViewModel.myPlacesViewModel.myPlaces = Array(repeating: "", count: myPlacesCount) // Placeholder IDs
+            profileViewModel.favoritesViewModel.lightweightFavorites = favoritePlaces
+            profileViewModel.socialViewModel.isFollowersLoading = false
+            profileViewModel.socialViewModel.isFollowingLoading = false
+            profileViewModel.myPlacesViewModel.isMyPlacesLoading = false
+
             // Update placeSavers for favorites so "Saved By" feature works
             for favorite in favoritePlaces {
                 let placeId = favorite.place_id
@@ -797,214 +797,20 @@ class DataManager: ObservableObject {
             print("📍 [DataManager] Updated placeSavers with \(favoritePlaces.count) favorites")
         }
         
-        // Load place lists in background - don't block UI
-        // Set loading state BEFORE spawning background task (SRP: DataManager coordinates state)
-        await MainActor.run {
-            self.profileViewModel.isLoadingInitialLists = true
-        }
-        
+        // Delegate list loading to ProfileListsViewModel (MVVM: ViewModel owns its data loading)
+        // Run in background to not block UI
         Task.detached(priority: .userInitiated) { [weak self] in
-            guard let self = self else { return }
-            
-            // Guaranteed cleanup of loading state (staff engineer pattern)
-            defer {
-                Task { @MainActor in
-                    self.profileViewModel.isLoadingInitialLists = false
-                }
-            }
-            
-            let pageSize = 6 // Consistent page size for initial load and pagination
-            
-            // Fetch owned lists - use proximity sorting if location available, otherwise use default
-            var ownedLists: [LightweightPlaceList] = []
-            
-            if let location = userLocation {
-                do {
-                    ownedLists = try await self.userService.fetchPlaceListsByProximity(
-                        userId: userId,
-                        userLatitude: location.latitude,
-                        userLongitude: location.longitude,
-                        page: 1,
-                        pageSize: pageSize
-                    )
-                } catch {
-                    print("❌ [DataManager] Error fetching owned lists with proximity: \(error)")
-                    // Try fallback without location
-                    ownedLists = await self.fetchListsWithoutLocation(userId: userId, pageSize: pageSize)
-                }
-            } else {
-                print("⚠️ [DataManager] No user location available - loading lists without proximity sorting")
-                ownedLists = await self.fetchListsWithoutLocation(userId: userId, pageSize: pageSize)
-            }
-            
-            // Fetch shared and collaborative lists in parallel
-            var sharedLists: [SharedListInfo] = []
-            var collaborativeOwnedLists: [CollaborativeOwnedList] = []
-            
-            do {
-                sharedLists = try await CollaborationService.shared.fetchSharedLists(userId: userId)
-            } catch {
-                print("❌ [DataManager] Error fetching shared lists: \(error)")
-            }
-            
-            do {
-                collaborativeOwnedLists = try await CollaborationService.shared.fetchCollaborativeOwnedLists(userId: userId)
-            } catch {
-                print("❌ [DataManager] Error fetching collaborative owned lists: \(error)")
-            }
-            
-            // Convert collaborative lists to LightweightPlaceList format
-            let sharedAsLightweight = sharedLists.map { $0.toLightweightPlaceList() }
-            let collaborativeOwnedAsLightweight = collaborativeOwnedLists.map { $0.toLightweightPlaceList() }
-            
-            // Get IDs of lists already in owned lists (to avoid duplicates)
-            let ownedListIds = Set(ownedLists.map { $0.list_id })
-            
-            // Filter out collaborative owned lists that are already in paginated owned lists
-            let additionalCollaborativeLists = collaborativeOwnedAsLightweight.filter { 
-                !ownedListIds.contains($0.list_id) 
-            }
-            
-            // Merge: owned (paginated) + collaborative owned (not in page 1) + shared with me
-            let allLists = ownedLists + additionalCollaborativeLists + sharedAsLightweight
-            
-            print("📋 [DataManager] Loaded \(ownedLists.count) owned lists + \(additionalCollaborativeLists.count) additional collaborative owned + \(sharedLists.count) shared lists")
-            
-            // Update place lists on main thread
-            await MainActor.run {
-                self.profileViewModel.lightweightPlaceLists = allLists
-                self.profileViewModel.placeListsCurrentPage = 1
-                // Set hasMore based on whether we got a full page of owned lists
-                self.profileViewModel.hasMorePlaceLists = ownedLists.count >= pageSize
-            }
-            
-            // Load places for each list
-            if !allLists.isEmpty {
-                await self.loadPlacesForLists(allLists)
-            }
-        }
-    }
-    
-    /// Fallback: Fetch lists without location-based sorting
-    /// Used when user location is unavailable
-    private func fetchListsWithoutLocation(userId: String, pageSize: Int) async -> [LightweightPlaceList] {
-        do {
-            // Use dedicated method that returns lists with place counts
-            let lists = try await userService.fetchPlaceListsWithoutLocation(
-                userId: userId,
-                page: 1,
-                pageSize: pageSize
-            )
-            print("✅ [DataManager] Fetched \(lists.count) lists without proximity sorting")
-            return lists
-        } catch {
-            print("❌ [DataManager] Error fetching lists without location: \(error)")
-            return []
-        }
-    }
-    
-    /// Load more place lists (pagination)
-    @MainActor
-    func loadMorePlaceLists(userId: String, userLatitude: Double? = nil, userLongitude: Double? = nil) async {
-        // Guard: Require a valid user ID before attempting pagination
-        guard !userId.isEmpty else {
-            print("⚠️ [DataManager] Missing user id, deferring loadMorePlaceLists")
-            return
-        }
-
-        // Guard: Already loading
-        guard !profileViewModel.isLoadingMorePlaceLists else {
-            print("⚠️ [DataManager] Already loading more place lists, skipping duplicate request")
-            return
-        }
-        
-        // Guard: No more lists to load
-        guard profileViewModel.hasMorePlaceLists else {
-            print("ℹ️ [DataManager] No more place lists to load")
-            return
-        }
-        
-        // Use provided coordinates or fall back to user's current location
-        let latitude: Double
-        let longitude: Double
-        
-        if let lat = userLatitude, let lng = userLongitude {
-            latitude = lat
-            longitude = lng
-        } else if let location = locationManager.currentLocation?.coordinate {
-            latitude = location.latitude
-            longitude = location.longitude
-        } else {
-            print("⚠️ [DataManager] No location available for loading more place lists")
-            return
-        }
-        
-        // Set loading state with guaranteed cleanup
-        profileViewModel.isLoadingMorePlaceLists = true
-        defer { 
-            profileViewModel.isLoadingMorePlaceLists = false
-        }
-        
-        let nextPage = profileViewModel.placeListsCurrentPage + 1
-        let pageSize = 6
-        
-        do {
-            let moreLists = try await userService.fetchPlaceListsByProximity(
-                userId: userId,
-                userLatitude: latitude,
-                userLongitude: longitude,
-                page: nextPage,
-                pageSize: pageSize
-            )
-            
-            await MainActor.run {
-                // Delegate state management to ViewModel (Single Responsibility Principle)
-                // ViewModel handles deduplication and state updates
-                profileViewModel.appendPlaceLists(moreLists, nextPage: nextPage, pageSize: pageSize)
-            }
-            
-            if !moreLists.isEmpty {
-                // Load places for new lists in background
-                Task.detached(priority: .userInitiated) { [weak self] in
-                    await self?.loadPlacesForLists(moreLists)
-                }
-            }
-        } catch {
-            print("❌ [DataManager] Error loading more place lists: \(error.localizedDescription)")
-            // Don't set hasMorePlaceLists to false on error - allow retry
+            await self?.profileViewModel.listsViewModel.loadInitialLists()
         }
     }
     
     /// Load place lists by proximity to a specific place's coordinates (for save-to-list sheet)
+    /// Delegates to ProfileListsViewModel for MVVM compliance.
     func loadPlaceListsByPlaceCoordinates(userId: String, placeLatitude: Double, placeLongitude: Double) async {
-        do {
-            let lists = try await userService.fetchPlaceListsByProximity(
-                userId: userId,
-                userLatitude: placeLatitude,
-                userLongitude: placeLongitude,
-                page: 1,
-                pageSize: 6
-            )
-            
-            await MainActor.run {
-                profileViewModel.lightweightPlaceLists = lists
-                profileViewModel.placeListsCurrentPage = 1
-                profileViewModel.hasMorePlaceLists = lists.count >= 6  // Keep loading if we got 6 or more lists
-                
-                var updatedCounts: [String: Int] = [:]
-                for list in lists {
-                    updatedCounts[list.list_id] = profileViewModel.lightweightPlaceListCounts[list.list_id] ?? list.place_count
-                }
-                profileViewModel.lightweightPlaceListCounts = updatedCounts
-            }
-            
-            // Load places for each list in background
-            Task.detached(priority: .userInitiated) { [weak self] in
-                await self?.loadPlacesForLists(lists)
-            }
-        } catch {
-            print("❌ [DataManager] Error loading place lists by coordinates: \(error.localizedDescription)")
-        }
+        await profileViewModel.listsViewModel.loadListsByPlaceCoordinates(
+            placeLatitude: placeLatitude,
+            placeLongitude: placeLongitude
+        )
     }
     
     
@@ -1036,119 +842,6 @@ class DataManager: ObservableObject {
         try await userService.removePlaceFromList(listId: listId, placeId: placeId)
     }
     
-    /// Fetch places for a specific place list (pagination support)
-    func fetchPlacesForPlaceList(listId: String, page: Int = 1, pageSize: Int = 6) async throws -> [LightweightPlace] {
-        return try await userService.fetchPlacesForPlaceList(listId: listId, page: page, pageSize: pageSize)
-    }
-    
-    /// Load more places for a list (pagination) and update placeSavers
-    /// Returns the loaded places for the caller to use
-    func loadMorePlacesForList(listId: String, page: Int, pageSize: Int = 6) async throws -> [LightweightPlace] {
-        let places = try await userService.fetchPlacesForPlaceList(listId: listId, page: page, pageSize: pageSize)
-        
-        await MainActor.run {
-            // Delegate state management to ViewModel (Single Responsibility Principle)
-            // ViewModel handles deduplication and state updates
-            profileViewModel.appendPlacesForList(listId: listId, newPlaces: places)
-            
-            // Update placeSavers for the current user so "Saved By" feature works
-            guard let currentUserId = self.userSession.currentUserId else { return }
-            for place in places {
-                let placeId = place.place_id
-                if self.detailPlaceViewModel.placeSavers[placeId] == nil {
-                    self.detailPlaceViewModel.placeSavers[placeId] = [currentUserId]
-                } else if !self.detailPlaceViewModel.placeSavers[placeId]!.contains(currentUserId) {
-                    self.detailPlaceViewModel.placeSavers[placeId]!.append(currentUserId)
-                }
-            }
-        }
-        
-        return places
-    }
-    
-    /// Load the first 6 places for each place list (background task)
-    func loadPlacesForLightweightList(listId: String) async {
-        do {
-            let places = try await userService.fetchPlacesForPlaceList(listId: listId, page: 1, pageSize: 6)
-            
-            await MainActor.run {
-                // Delegate state management to ViewModel (Single Responsibility Principle)
-                // ViewModel handles deduplication
-                profileViewModel.setPlacesForList(listId: listId, places: places)
-                
-                // Update placeSavers for the current user so "Saved By" feature works
-                guard let currentUserId = self.userSession.currentUserId else { return }
-                for place in places {
-                    let placeId = place.place_id
-                    if self.detailPlaceViewModel.placeSavers[placeId] == nil {
-                        self.detailPlaceViewModel.placeSavers[placeId] = [currentUserId]
-                    } else if !self.detailPlaceViewModel.placeSavers[placeId]!.contains(currentUserId) {
-                        self.detailPlaceViewModel.placeSavers[placeId]!.append(currentUserId)
-                    }
-                }
-            }
-        } catch {
-            print("❌ [DataManager] Error loading places for list \(listId): \(error.localizedDescription)")
-        }
-    }
-    
-    private func loadPlacesForLists(_ lists: [LightweightPlaceList]) async {
-        // Load all places in parallel, then batch update on main thread
-        var allPlaces: [String: [LightweightPlace]] = [:]
-        
-        await withTaskGroup(of: (String, [LightweightPlace]?).self) { group in
-            for list in lists {
-                group.addTask {
-                    do {
-                        let places = try await self.userService.fetchPlacesForPlaceList(listId: list.list_id, page: 1, pageSize: 6)
-                        return (list.list_id, places)
-                    } catch {
-                        print("❌ [DataManager] Error loading places for list \(list.list_id): \(error.localizedDescription)")
-                        return (list.list_id, nil)
-                    }
-                }
-            }
-            
-            for await (listId, places) in group {
-                if let places = places {
-                    allPlaces[listId] = places
-                }
-            }
-        }
-        
-        // Prefetch TikTok metadata for all TikTok URLs
-        let allTiktokUrls = allPlaces.values.flatMap { $0.compactMap { $0.tiktok_url } }.filter { !$0.isEmpty }
-        if !allTiktokUrls.isEmpty {
-            Task {
-                await TikTokMetadataCache.shared.prefetchMetadata(for: Array(allTiktokUrls))
-            }
-        }
-        
-        // Single main thread update - prevents multiple view re-renders
-        // Also update placeSavers for the current user so "Saved By" feature works
-        await MainActor.run {
-            guard let currentUserId = self.userSession.currentUserId else { return }
-            
-            for (listId, places) in allPlaces {
-                // Delegate state management to ViewModel (Single Responsibility Principle)
-                // ViewModel handles deduplication
-                profileViewModel.setPlacesForList(listId: listId, places: places)
-                
-                // Update placeSavers for each place in the list
-                for place in places {
-                    let placeId = place.place_id
-                    if self.detailPlaceViewModel.placeSavers[placeId] == nil {
-                        self.detailPlaceViewModel.placeSavers[placeId] = [currentUserId]
-                    } else if !self.detailPlaceViewModel.placeSavers[placeId]!.contains(currentUserId) {
-                        self.detailPlaceViewModel.placeSavers[placeId]!.append(currentUserId)
-                    }
-                }
-            }
-            
-            print("📍 [DataManager] Updated placeSavers with \(allPlaces.values.flatMap { $0 }.count) places from lists")
-            print("📍 [DataManager] Total placeSavers count: \(self.detailPlaceViewModel.placeSavers.count)")
-        }
-    }
     
     // Loads all places the user has posted about, even if not in favorites or lists
     func loadUserReviewedPlaces(userId: String) async {
@@ -1220,7 +913,7 @@ class DataManager: ObservableObject {
     
     // Loads all reviewed places for the current user and their following
     func loadReviewedPlacesForUserAndFollowing(userId: String) async {
-        let followingIds = profileViewModel.userFollowing.map { $0.id }
+        let followingIds = profileViewModel.socialViewModel.userFollowing.map { $0.id }
         let allUserIds = followingIds + [userId]
         for uid in allUserIds {
             await loadUserReviewedPlaces(userId: uid)
@@ -1228,15 +921,15 @@ class DataManager: ObservableObject {
     }
     
     // MARK: - Public Accessors
-    
+
     /// Get external places for a specific place ID
     func getExternalPlace(for placeId: String) -> ExternalPlace? {
-        return profileViewModel.userExternalPlaces[placeId]
+        return profileViewModel.tikTokViewModel.userExternalPlaces[placeId]
     }
-    
+
     /// Get all external places
     func getAllExternalPlaces() -> [String: ExternalPlace] {
-        return profileViewModel.userExternalPlaces
+        return profileViewModel.tikTokViewModel.userExternalPlaces
     }
 }
 

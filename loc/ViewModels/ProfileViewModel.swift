@@ -35,96 +35,143 @@ struct ListPlacePagination {
 
 @MainActor
 class ProfileViewModel: ObservableObject {
-    @Published var user: ProfileData? 
+    @Published var user: ProfileData?
     @Published var userPicture: UIImage?
-    @Published var userLists: [PlaceList] = []
-    @Published var userListsPlaces: [String: [String]] = [:] // [listId: [placeId]]
-    @Published var placeListCounts: [UUID: Int] = [:]
-    @Published var userFavorites: [String] = [] // Legacy - full place IDs
-    @Published var lightweightFavorites: [FavoritePlace] = [] // New - lightweight data for display
 
-    /// Converts lightweightFavorites to LightweightPlace format for consistent popup display
-    var favoritesAsLightweight: [LightweightPlace] {
-        lightweightFavorites.map { favorite in
-            LightweightPlace(
-                place_id: favorite.place_id,
-                name: favorite.name,
-                latest_review_photo: favorite.latest_review_photo,
-                external_place_id: nil,
-                tiktok_url: nil,
-                added_by_user_id: nil,
-                added_by_name: nil,
-                added_by_photo_url: nil
-            )
-        }
+    // MARK: - Lists Properties (Proxies to listsViewModel for backwards compatibility)
+
+    /// User's place lists (legacy) - proxies to listsViewModel
+    var userLists: [PlaceList] {
+        get { listsViewModel.userLists }
+        set { listsViewModel.userLists = newValue }
     }
 
-    @Published var lightweightPlaceLists: [LightweightPlaceList] = [] // New - lightweight place lists by proximity
-    @Published var lightweightPlaceListPlaces: [String: [LightweightPlace]] = [:] // [listId: places]
-    @Published var lightweightPlaceListCounts: [String: Int] = [:] // [listId: placeCount]
-    @Published var lightweightMyPlaces: [LightweightPlace] = [] // Lightweight my places for tiles
-    @Published var totalMyPlacesCount: Int = 0 // Total My Places count from database (not just loaded count)
-    @Published var isLoadingMoreMyPlaces: Bool = false
-    @Published var hasMoreMyPlaces: Bool = true
-    @Published var lightweightExternalPlaces: [LightweightPlace] = [] // Lightweight external/TikTok places for tiles
-    @Published var totalExternalPlacesCount: Int = 0 // Total TikTok count from database (not just loaded count)
-    
+    /// Places in each list by list ID - proxies to listsViewModel
+    var userListsPlaces: [String: [String]] {
+        get { listsViewModel.userListsPlaces }
+        set { listsViewModel.userListsPlaces = newValue }
+    }
+
+    /// Place counts per list - proxies to listsViewModel
+    var placeListCounts: [UUID: Int] {
+        get { listsViewModel.placeListCounts }
+        set { listsViewModel.placeListCounts = newValue }
+    }
+
+    /// Lightweight place lists by proximity - proxies to listsViewModel
+    var lightweightPlaceLists: [LightweightPlaceList] {
+        get { listsViewModel.lightweightPlaceLists }
+        set { listsViewModel.lightweightPlaceLists = newValue }
+    }
+
+    /// Places in each lightweight list - proxies to listsViewModel
+    var lightweightPlaceListPlaces: [String: [LightweightPlace]] {
+        get { listsViewModel.lightweightPlaceListPlaces }
+        set { listsViewModel.lightweightPlaceListPlaces = newValue }
+    }
+
+    /// Place counts for lightweight lists - proxies to listsViewModel
+    var lightweightPlaceListCounts: [String: Int] {
+        get { listsViewModel.lightweightPlaceListCounts }
+        set { listsViewModel.lightweightPlaceListCounts = newValue }
+    }
     // Map filtering triggers
     @Published var selectedListIdForMap: String? = nil // When set, triggers map to show only this list's annotations (String because LightweightPlaceList.id is String)
     @Published var showTikToksOnMap: Bool = false // When set, triggers map to show TikTok places
     @Published var showReviewsOnMap: Bool = false // When set, triggers map to show reviewed places
     @Published var showFavoritesOnMap: Bool = false // When set, triggers map to show favorite places
     @Published var showMyPlacesOnMap: Bool = false // When set, triggers map to show user's created places
-    @Published var isLoadingMoreExternalPlaces: Bool = false
-    @Published var hasMoreExternalPlaces: Bool = true
-    @Published var isLoadingMorePlaceLists: Bool = false
-    @Published var hasMorePlaceLists: Bool = true
-    var placeListsCurrentPage: Int = 1
-    
-    // MARK: - Initial List Loading State
-    /// True while initial list fetch (owned + shared) is in progress
-    @Published var isLoadingInitialLists: Bool = false
-    
-    // MARK: - List Filter State
-    @Published var showOnlySharedLists: Bool = false
-    
-    // MARK: - List Search State
-    @Published var isSearchingLists: Bool = false
-    @Published var listSearchText: String = ""
-    private var listSearchCancellable: AnyCancellable?
-    
-    /// Returns filtered lists based on current filter state
-    var filteredPlaceLists: [LightweightPlaceList] {
-        if showOnlySharedLists {
-            return lightweightPlaceLists.filter { $0.isCollaborative }
-        }
-        return lightweightPlaceLists
+    /// Loading more lists (pagination) - proxies to listsViewModel
+    var isLoadingMorePlaceLists: Bool {
+        get { listsViewModel.isLoadingMorePlaceLists }
+        set { listsViewModel.isLoadingMorePlaceLists = newValue }
     }
-    
-    /// Count of collaborative lists (shared with you OR you shared with others)
+
+    /// Has more lists to load - proxies to listsViewModel
+    var hasMorePlaceLists: Bool {
+        get { listsViewModel.hasMorePlaceLists }
+        set { listsViewModel.hasMorePlaceLists = newValue }
+    }
+
+    /// Current page for list pagination - proxies to listsViewModel
+    var placeListsCurrentPage: Int {
+        get { listsViewModel.placeListsCurrentPage }
+        set { listsViewModel.placeListsCurrentPage = newValue }
+    }
+
+    /// Loading initial lists - proxies to listsViewModel
+    var isLoadingInitialLists: Bool {
+        get { listsViewModel.isLoadingInitialLists }
+        set { listsViewModel.isLoadingInitialLists = newValue }
+    }
+
+    /// Show only shared/collaborative lists - proxies to listsViewModel
+    var showOnlySharedLists: Bool {
+        get { listsViewModel.showOnlySharedLists }
+        set { listsViewModel.showOnlySharedLists = newValue }
+    }
+
+    /// Searching lists state - proxies to listsViewModel
+    var isSearchingLists: Bool {
+        get { listsViewModel.isSearchingLists }
+        set { listsViewModel.isSearchingLists = newValue }
+    }
+
+    /// List search text - proxies to listsViewModel
+    var listSearchText: String {
+        get { listsViewModel.listSearchText }
+        set { listsViewModel.listSearchText = newValue }
+    }
+
+    /// Count of collaborative lists - proxies to listsViewModel
     var collaborativeListCount: Int {
-        lightweightPlaceLists.filter { $0.isCollaborative }.count
+        listsViewModel.collaborativeListCount
     }
-    
-    /// Whether there are any collaborative lists to filter
+
+    /// Whether there are any collaborative lists - proxies to listsViewModel
     var hasSharedLists: Bool {
-        collaborativeListCount > 0
+        listsViewModel.hasSharedLists
     }
-    
-    /// Whether the Shared filter button should be interactive
-    /// Disabled while initial load is in progress to prevent confusing empty states
+
+    /// Whether the Shared filter can be interacted with - proxies to listsViewModel
     var canInteractWithSharedFilter: Bool {
-        !isLoadingInitialLists
+        listsViewModel.canInteractWithSharedFilter
     }
-    
-    // Save-to-list sheet pagination (separate from profile view pagination)
-    @Published var userFollowing: [ProfileData] = []
-    @Published var userFollowers: [ProfileData] = []
-    @Published var myPlaces: [String] = [] // Legacy - keep for compatibility
-    @Published var userExternalPlaces: [String: ExternalPlace] = [:] // PlaceId -> ExternalPlace
-    @Published var recentlyCreatedListId: UUID?
-    private var listCreationTime: Date?
-    
+
+    /// Filtered place lists based on current filter state - proxies to listsViewModel
+    var filteredPlaceLists: [LightweightPlaceList] {
+        listsViewModel.filteredPlaceLists
+    }
+
+    // MARK: - Child ViewModels (Composition)
+
+    /// Child ViewModel for social features (followers, following, follow actions)
+    let socialViewModel: ProfileSocialViewModel
+
+    /// Child ViewModel for account management (deletion flow)
+    let accountViewModel: ProfileAccountViewModel
+
+    /// Child ViewModel for favorites management
+    let favoritesViewModel: ProfileFavoritesViewModel
+
+    /// Child ViewModel for user-created places (My Places)
+    let myPlacesViewModel: ProfileMyPlacesViewModel
+
+    /// Child ViewModel for reviewed places
+    let reviewsViewModel: ProfileReviewsViewModel
+
+    /// Child ViewModel for TikTok/external places
+    let tikTokViewModel: ProfileTikTokViewModel
+
+    /// Child ViewModel for place lists management
+    let listsViewModel: ProfileListsViewModel
+
+    /// Recently created list ID - proxies to listsViewModel
+    var recentlyCreatedListId: UUID? {
+        get { listsViewModel.recentlyCreatedListId }
+        set { listsViewModel.recentlyCreatedListId = newValue }
+    }
+
     private let userService: UserService
     private let imageService: ImageService
     private let placeService: PlaceService
@@ -136,92 +183,72 @@ class ProfileViewModel: ObservableObject {
     var userProfileViewModel: UserProfileViewModel?
     weak var mapViewModel: MapViewModel?  // For updating friends' places in viewport
 
-     @Published var showMaxFavoritesAlert: Bool = false
      @Published var isLoading: Bool = true
      @Published var isUploadingProfilePhoto: Bool = false
-     @Published var followersCount: Int = 0
-     @Published var followingCount: Int = 0
-     @Published var totalListCount: Int = 0
+
+     /// Total list count - proxies to listsViewModel
+     var totalListCount: Int {
+         get { listsViewModel.totalListCount }
+         set { listsViewModel.totalListCount = newValue }
+     }
+
      @Published var totalUniquePlacesCount: Int = 0  // Total unique places (saved + reviewed + created)
-     
-     // Follow error handling
-     @Published var showFollowError: Bool = false
-     @Published var followErrorMessage: String = ""
-    
-    // Separate loading states for counts
-    @Published var isFollowersLoading: Bool = true
-    @Published var isFollowingLoading: Bool = true
-    @Published var isMyPlacesLoading: Bool = true
-    // Popup list loading states
-    @Published var isFollowersListLoading: Bool = false
-    @Published var isFollowingListLoading: Bool = false
-    @Published var hasMoreFollowers: Bool = true
-    @Published var hasMoreFollowing: Bool = true
-    
-    // TikTok processing state
-    @Published var isProcessingTikTok: Bool = false
-    @Published var isWaitingForPlaceDetail: Bool = false
-    @Published var tikTokImportError: String? = nil
-    @Published var importedPlaces: [DetailPlace] = []
-    @Published var isShowingPlaceSelection: Bool = false
-    @Published var isShowingNoPlacesFound: Bool = false
-    @Published var noPlacesFoundTikTokUrl: String = ""
-    private var currentProcessingTikTokUrl: String? = nil // Store URL during processing
-    
-    // MARK: - Account Management State
-    @Published var showDeleteAccountWarning: Bool = false      // First warning
-    @Published var showDeleteAccountConfirmation: Bool = false // Final confirmation
-    @Published var isDeletingAccount: Bool = false
-    @Published var deleteAccountError: String?
-    
-    // Lazy loading state for lists
-    @Published var loadedListIds: Set<UUID> = []
-    @Published var loadingListIds: Set<UUID> = []
-    
-    // Pagination state for places within each list
-    @Published var listPlacePagination: [String: ListPlacePagination] = [:] // [listId: pagination state]
-    
+
+    // Lazy loading state for lists - proxies to listsViewModel
+    /// Loaded list IDs - proxies to listsViewModel
+    var loadedListIds: Set<UUID> {
+        get { listsViewModel.loadedListIds }
+        set { listsViewModel.loadedListIds = newValue }
+    }
+
+    /// Currently loading list IDs - proxies to listsViewModel
+    var loadingListIds: Set<UUID> {
+        get { listsViewModel.loadingListIds }
+        set { listsViewModel.loadingListIds = newValue }
+    }
+
+    /// Pagination state for places within each list - proxies to listsViewModel
+    var listPlacePagination: [String: ListPlacePagination] {
+        get { listsViewModel.listPlacePagination }
+        set { listsViewModel.listPlacePagination = newValue }
+    }
+
     // Performance optimization: image preloading cache
     @Published var preloadedImages: [String: Bool] = [:] // [imageURL: isPreloaded]
 
     // Add deduplication mechanism for TikTok URLs
     private var recentlyProcessedURLs: Set<String> = []
 
+    // TikTok URL processing state (kept in ProfileViewModel for URL processing flow)
+    private var currentProcessingTikTokUrl: String? = nil
+
     // Concurrency control for list loading
     private let maxConcurrentListLoads = 2
     private var activeListLoadTasks: [UUID: Task<Void, Never>] = [:]
-    
-    // Pagination for reviewed places (server-side pagination like TikToks)
-    @Published var isLoadingReviewedPlaces: Bool = false
-    @Published var isLoadingMoreReviews: Bool = false
-    @Published var hasMoreReviews: Bool = true
-    @Published var lightweightReviewedPlaces: [LightweightPlace] = [] // Lightweight reviewed places for tiles
-    @Published var totalReviewedPlacesCount: Int = 0 // Total reviewed places count from database (not just loaded count)
-    private var hasAttemptedInitialReviewsLoad: Bool = false // Prevents infinite reload when user has no reviews
-    private let reviewsPerPage: Int = 8
-    
-    // Pagination for TikTok places
-    @Published var isLoadingTikTokPlaces: Bool = false
-    
+
+    // List search cancellable
+    private var listSearchCancellable: AnyCancellable?
+
     // Place notes
     @Published var placeNotes: [String: PlaceNote] = [:] // [placeId: PlaceNote]
-    
-    // TikTok place flags
-    @Published var tikTokPlaceFlags: [String: TikTokPlaceFlag] = [:] // [placeId: TikTokPlaceFlag]
-    @Published var isLoadingMoreTikTokPlaces: Bool = false
-    private var _hasMoreTikTokPlaces: Bool = true
-    private var currentTikTokPage: Int = 0
-    private let tikTokPlacesPerPage: Int = 8
-    var allTikTokPlaceIds: [String] = []
-    private var loadedTikTokPlaceIds: [String] = []
     
     // Location manager for distance calculations
     private let locationManager: LocationManager
     private var cancellables = Set<AnyCancellable>()
     
     init(userSession: UserSession, userService: UserService, detailPlaceViewModel: DetailPlaceViewModel, imageService: ImageService, placeService: PlaceService, postService: PostService, locationManager: LocationManager, deepLinkManager: DeepLinkManager? = nil, deepLinkViewModel: DeepLinkViewModel? = nil, userProfileViewModel: UserProfileViewModel? = nil) {
-         self.userService = userService
-         self.detailPlaceViewModel = detailPlaceViewModel
+        // Initialize child ViewModels first (must happen before self is fully initialized)
+        self.socialViewModel = ProfileSocialViewModel(userService: userService, userSession: userSession)
+        self.accountViewModel = ProfileAccountViewModel(userService: userService, userSession: userSession)
+        self.favoritesViewModel = ProfileFavoritesViewModel(userSession: userSession)
+
+        self.myPlacesViewModel = ProfileMyPlacesViewModel(userService: userService, userSession: userSession)
+        self.reviewsViewModel = ProfileReviewsViewModel(userService: userService, userSession: userSession)
+        self.tikTokViewModel = ProfileTikTokViewModel(userService: userService, userSession: userSession)
+        self.listsViewModel = ProfileListsViewModel(userService: userService, placeService: placeService, userSession: userSession, locationManager: locationManager)
+
+        self.userService = userService
+        self.detailPlaceViewModel = detailPlaceViewModel
         self.userSession = userSession
         self.imageService = imageService
         self.placeService = placeService
@@ -230,7 +257,13 @@ class ProfileViewModel: ObservableObject {
         self.deepLinkManager = deepLinkManager
         self.deepLinkViewModel = deepLinkViewModel
         self.userProfileViewModel = userProfileViewModel
-        
+
+        // Wire up child ViewModel callbacks for cross-cutting map concerns
+        setupFavoritesCallbacks()
+        setupMyPlacesCallbacks()
+        setupReviewsCallbacks()
+        setupListsCallbacks()
+
         // Observe location changes using Combine
         setupLocationObserver()
         
@@ -239,7 +272,10 @@ class ProfileViewModel: ObservableObject {
         
         // Setup list search observer with debouncing
         setupListSearchObserver()
-        
+
+        // Forward child ViewModel changes to parent for SwiftUI observation
+        setupChildViewModelObservers()
+
         // Observe TikTok multiple places notifications
         NotificationCenter.default.addObserver(
             forName: NSNotification.Name("TikTokMultiplePlacesFound"),
@@ -258,7 +294,41 @@ class ProfileViewModel: ObservableObject {
             }
         }
      }
-    
+
+    /// Wires up callbacks from favoritesViewModel for cross-cutting map concerns.
+    private func setupFavoritesCallbacks() {
+        favoritesViewModel.onPlaceSaversUpdate = { [weak self] placeId, userId, isAdding in
+            self?.updatePlaceSavers(placeId: placeId, userId: userId, isAdding: isAdding)
+        }
+        favoritesViewModel.onAnnotationPlacesRecalculate = { [weak self] in
+            self?.detailPlaceViewModel.calculateAnnotationPlaces()
+        }
+    }
+
+    /// Wires up callbacks from myPlacesViewModel for cross-cutting map concerns.
+    private func setupMyPlacesCallbacks() {
+        myPlacesViewModel.onPlaceSaversUpdate = { [weak self] placeId, userId, isAdding in
+            self?.updatePlaceSavers(placeId: placeId, userId: userId, isAdding: isAdding)
+        }
+        myPlacesViewModel.onPlaceRemoveFromAnnotations = { [weak self] placeId in
+            self?.detailPlaceViewModel.places.removeValue(forKey: placeId)
+        }
+    }
+
+    /// Wires up callbacks from reviewsViewModel for cross-cutting map concerns.
+    private func setupReviewsCallbacks() {
+        reviewsViewModel.onLoadPlaceDetails = { [weak self] lightweightPlaces, userId in
+            await self?.loadPlaceDetailsForReviews(lightweightPlaces, userId: userId)
+        }
+    }
+
+    /// Wires up callbacks from listsViewModel for cross-cutting concerns.
+    private func setupListsCallbacks() {
+        listsViewModel.onPlaceSaversUpdate = { [weak self] placeId, userId, isAdding in
+            self?.updatePlaceSavers(placeId: placeId, userId: userId, isAdding: isAdding)
+        }
+    }
+
     private func setupLocationObserver() {
         // Sort immediately when location becomes available (no need to wait for places to load)
         locationManager.$currentLocation
@@ -275,11 +345,11 @@ class ProfileViewModel: ObservableObject {
     
     /// Sets up debounced observer for list search text changes
     private func setupListSearchObserver() {
-        listSearchCancellable = $listSearchText
+        listSearchCancellable = listsViewModel.$listSearchText
             .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
-            .sink { [weak self] _ in
+            .sink { [weak self] (_: String) in
                 Task { @MainActor [weak self] in
-                    await self?.performListSearch()
+                    await self?.listsViewModel.performListSearch()
                 }
             }
     }
@@ -307,7 +377,39 @@ class ProfileViewModel: ObservableObject {
             }
             .store(in: &cancellables)
     }
-    
+
+    /// Forwards child ViewModel objectWillChange to parent for SwiftUI observation.
+    /// Required because SwiftUI doesn't automatically observe nested ObservableObjects.
+    private func setupChildViewModelObservers() {
+        socialViewModel.objectWillChange.sink { [weak self] _ in
+            self?.objectWillChange.send()
+        }.store(in: &cancellables)
+
+        accountViewModel.objectWillChange.sink { [weak self] _ in
+            self?.objectWillChange.send()
+        }.store(in: &cancellables)
+
+        favoritesViewModel.objectWillChange.sink { [weak self] _ in
+            self?.objectWillChange.send()
+        }.store(in: &cancellables)
+
+        myPlacesViewModel.objectWillChange.sink { [weak self] _ in
+            self?.objectWillChange.send()
+        }.store(in: &cancellables)
+
+        reviewsViewModel.objectWillChange.sink { [weak self] _ in
+            self?.objectWillChange.send()
+        }.store(in: &cancellables)
+
+        tikTokViewModel.objectWillChange.sink { [weak self] _ in
+            self?.objectWillChange.send()
+        }.store(in: &cancellables)
+
+        listsViewModel.objectWillChange.sink { [weak self] _ in
+            self?.objectWillChange.send()
+        }.store(in: &cancellables)
+    }
+
      func changeProfilePhoto(_ newImage: UIImage) async {
         // Set loading state and update UI immediately on main thread
         await MainActor.run {
@@ -393,91 +495,15 @@ class ProfileViewModel: ObservableObject {
          return image
      }
     
-     func toggleFollowUser(userId: String) {
-        guard let currentUserId = user?.id else { return }
-        
-        // Store original state for potential rollback
-        let originalFollowingState = userFollowing.contains(where: { $0.id == userId })
-        let originalFollowingCount = followingCount
-        let originalUserFollowing = userFollowing
-        
-        if userFollowing.contains(where: { $0.id == userId }) {
-            // Optimistic update: immediately change UI
-            DispatchQueue.main.async {
-                self.userFollowing.removeAll { $0.id == userId }
-                self.followingCount = max(0, self.followingCount - 1)
-            }
-            
-            // Note: Friend tracking is now handled by PostgreSQL function - no need to update MapViewModel
-            
-            // Make the actual API call
-            userService.unfollowUser(followerId: currentUserId, followingId: userId) { [weak self] success, error in
-                if !success {
-                    // Revert on failure
-                    DispatchQueue.main.async {
-                        self?.userFollowing = originalUserFollowing
-                        self?.followingCount = originalFollowingCount
-                        // Show error alert
-                        self?.showFollowError = true
-                        self?.followErrorMessage = "Failed to unfollow user. Please try again."
-                    }
-                }
-            }
-        } else {
-            // Optimistic update: immediately change UI
-            DispatchQueue.main.async {
-                self.followingCount += 1
-            }
-            
-            // Make the actual API call
-            userService.followUser(followerId: currentUserId, followingId: userId) { [weak self] success, error in
-                if success {
-                    // Fetch the ProfileData for the followed user and add to userFollowing
-                    self?.userService.fetchUserById(userId: userId) { result in
-                        if case .success(let profileData) = result {
-                            DispatchQueue.main.async {
-                                self?.userFollowing.append(profileData)
-                                // Note: Friend tracking is now handled by PostgreSQL function
-                            }
-                        }
-                    }
-                } else {
-                    // Revert on failure
-                    DispatchQueue.main.async {
-                        self?.userFollowing = originalUserFollowing
-                        self?.followingCount = originalFollowingCount
-                        // Show error alert
-                        self?.showFollowError = true
-                        self?.followErrorMessage = "Failed to follow user. Please try again."
-                    }
-                }
-            }
-        }
+    /// Toggles follow/unfollow state for a user - delegates to socialViewModel.
+    func toggleFollowUser(userId: String) {
+        socialViewModel.toggleFollowUser(userId: userId, currentUserId: user?.id)
     }
-    
-    /// Update local following state after external follow/unfollow action
-    /// This does NOT make an API call - it only updates local state
+
+    /// Updates local following state after external follow/unfollow action - delegates to socialViewModel.
+    /// This does NOT make an API call - it only updates local state.
     func updateFollowingState(userId: String, isFollowing: Bool) {
-        if isFollowing {
-            // Add to following list if not already there
-            if !userFollowing.contains(where: { $0.id == userId }) {
-                followingCount += 1
-                // Fetch the user profile and add to following list
-                userService.fetchUserById(userId: userId) { [weak self] result in
-                    if case .success(let profileData) = result {
-                        DispatchQueue.main.async {
-                            self?.userFollowing.append(profileData)
-                        }
-                    }
-                }
-            }
-        } else {
-            // Remove from following list
-            if userFollowing.contains(where: { $0.id == userId }) {
-                userFollowing.removeAll { $0.id == userId }
-                followingCount = max(0, followingCount - 1)
-            }
-        }
+        socialViewModel.updateFollowingState(userId: userId, isFollowing: isFollowing)
     }
     
     /// Update friend IDs in MapViewModel for viewport filtering
@@ -713,74 +739,24 @@ class ProfileViewModel: ObservableObject {
          // Skip sorting for individual place removals to avoid frequent re-sorting
      }
     
-    /// Adds a place to favorites with server-side validation.
-    /// Uses FavoritesService for atomic check-and-insert to prevent race conditions.
+    // MARK: - Favorites (Delegates to favoritesViewModel)
+
+    /// Adds a place to favorites - delegates to favoritesViewModel.
     func addFavoritePlace(place: DetailPlace) {
-        guard let userId = userSession.currentUserId else {
-            print("⚠️ [ProfileViewModel] Cannot add favorite: no user ID")
-            return
-        }
-        
-        let placeId = place.id.uuidString
-        
-        // Quick client-side check (server will also validate)
-        if lightweightFavorites.contains(where: { $0.place_id == placeId }) {
-            return
-        }
-        
-        // Optimistic UI update - add immediately for responsive UX
-        let newFavorite = FavoritePlace(
-            place_id: placeId,
-            name: place.name,
-            latest_review_photo: place.photoUrls?.first
-        )
-        lightweightFavorites.append(newFavorite)
-        
-        // Also update legacy userFavorites array
-        if !userFavorites.contains(placeId) {
-            userFavorites.append(placeId)
-        }
-        
-        // Update placeSavers for map display
-        updatePlaceSavers(placeId: placeId, userId: userId, isAdding: true)
-        
-        // Persist using FavoritesService (server-side validation)
-        Task {
-            let result = await FavoritesService.shared.addFavorite(userId: userId, placeId: placeId)
-            
-            await MainActor.run {
-                switch result {
-                case .success:
-                    // Success - optimistic update was correct
-                    self.detailPlaceViewModel.calculateAnnotationPlaces()
-                    
-                case .maxLimit:
-                    // Server says max limit - revert and show alert
-                    print("⚠️ [ProfileViewModel] Server rejected: max favorites reached")
-                    self.revertFavoriteAdd(placeId: placeId, userId: userId)
-                    self.showMaxFavoritesAlert = true
-                    
-                case .duplicate:
-                    // Already favorited on server - keep local state as is
-                    break
-                    
-                case .error(let error):
-                    // Error - revert optimistic update
-                    print("❌ [ProfileViewModel] Error adding favorite: \(error)")
-                    self.revertFavoriteAdd(placeId: placeId, userId: userId)
-                }
-            }
-        }
+        favoritesViewModel.addFavoritePlace(place: place)
     }
-    
-    /// Reverts an optimistic favorite add
-    private func revertFavoriteAdd(placeId: String, userId: String) {
-        lightweightFavorites.removeAll { $0.place_id == placeId }
-        userFavorites.removeAll { $0 == placeId }
-        updatePlaceSavers(placeId: placeId, userId: userId, isAdding: false)
+
+    /// Removes a place from favorites - delegates to favoritesViewModel.
+    func removeFavoritePlace(place: DetailPlace) {
+        favoritesViewModel.removeFavoritePlace(place: place)
     }
-    
-    /// Updates placeSavers dictionary for map display
+
+    /// Checks if a place is in the user's favorites - delegates to favoritesViewModel.
+    func isPlaceFavorite(placeId: String) -> Bool {
+        return favoritesViewModel.isPlaceFavorite(placeId: placeId)
+    }
+
+    /// Updates placeSavers dictionary for map display (cross-cutting concern kept in parent).
     private func updatePlaceSavers(placeId: String, userId: String, isAdding: Bool) {
         if isAdding {
             if detailPlaceViewModel.placeSavers[placeId] == nil {
@@ -795,47 +771,7 @@ class ProfileViewModel: ObservableObject {
             }
         }
     }
-    
-    /// Removes a place from favorites.
-    func removeFavoritePlace(place: DetailPlace) {
-        guard let userId = userSession.currentUserId else {
-            print("⚠️ [ProfileViewModel] Cannot remove favorite: no user ID")
-            return
-        }
-        
-        let placeId = place.id.uuidString
-        
-        // Store for potential revert
-        let removedFavorite = lightweightFavorites.first { $0.place_id == placeId }
-        
-        // Optimistic UI update - remove immediately
-        lightweightFavorites.removeAll { $0.place_id == placeId }
-        userFavorites.removeAll { $0 == placeId }
-        
-        // Persist using FavoritesService
-        Task {
-            do {
-                try await FavoritesService.shared.removeFavorite(userId: userId, placeId: placeId)
-            } catch {
-                // Revert optimistic update on failure
-                print("❌ [ProfileViewModel] Error removing favorite: \(error)")
-                await MainActor.run {
-                    if let favorite = removedFavorite {
-                        self.lightweightFavorites.append(favorite)
-                    }
-                    if !self.userFavorites.contains(placeId) {
-                        self.userFavorites.append(placeId)
-                    }
-                }
-            }
-        }
-    }
-    
-    /// Checks if a place is in the user's favorites.
-    func isPlaceFavorite(placeId: String) -> Bool {
-        return lightweightFavorites.contains(where: { $0.place_id == placeId }) || userFavorites.contains(placeId)
-    }
-    
+
     // MARK: - Place Notes
     
     func savePlaceNote(for placeId: String, note: String?, link: String?) {
@@ -881,67 +817,31 @@ class ProfileViewModel: ObservableObject {
         }
     }
     
-    func getPlaceNote(for placeId: String) -> PlaceNote? {
-        return placeNotes[placeId]
-    }
-    
-    // MARK: - TikTok Place Flagging
-    
+    // MARK: - TikTok Place Flagging (Delegates to tikTokViewModel)
+
+    /// Flags a TikTok place - delegates to tikTokViewModel.
     func flagTikTokPlace(for placeId: String, flagType: TikTokPlaceFlagType, tikTokUrl: String? = nil, userComment: String? = nil) {
-        guard let userId = userSession.currentUserId else { return }
-        
-        let flag = TikTokPlaceFlag(
-            placeId: placeId,
-            userId: userId,
-            flagType: flagType,
-            tikTokUrl: tikTokUrl,
-            userComment: userComment
-        )
-        
-        userService.saveTikTokPlaceFlag(flag: flag) { [weak self] success, error in
-            if success {
-                DispatchQueue.main.async {
-                    self?.tikTokPlaceFlags[placeId] = flag
-                }
-            } else if let error = error {
-                print("Error saving TikTok place flag: \(error.localizedDescription)")
-            }
-        }
+        tikTokViewModel.flagTikTokPlace(for: placeId, flagType: flagType, tikTokUrl: tikTokUrl, userComment: userComment)
     }
-    
+
+    /// Loads a TikTok place flag - delegates to tikTokViewModel.
     func loadTikTokPlaceFlag(for placeId: String) {
-        guard let userId = userSession.currentUserId else { return }
-        
-        userService.hasUserFlaggedPlace(userId: userId, placeId: placeId) { [weak self] flag, error in
-            DispatchQueue.main.async {
-                if let flag = flag {
-                    self?.tikTokPlaceFlags[placeId] = flag
-                }
-            }
-        }
+        tikTokViewModel.loadTikTokPlaceFlag(for: placeId)
     }
-    
+
+    /// Removes a TikTok place flag - delegates to tikTokViewModel.
     func removeTikTokPlaceFlag(for placeId: String) {
-        guard let userId = userSession.currentUserId,
-              let flag = tikTokPlaceFlags[placeId] else { return }
-        
-        userService.deleteTikTokPlaceFlag(userId: userId, placeId: placeId) { [weak self] success, error in
-            if success {
-                DispatchQueue.main.async {
-                    self?.tikTokPlaceFlags.removeValue(forKey: placeId)
-                }
-            } else if let error = error {
-                print("Error deleting TikTok place flag: \(error.localizedDescription)")
-            }
-        }
+        tikTokViewModel.removeTikTokPlaceFlag(for: placeId)
     }
-    
+
+    /// Gets a TikTok place flag - delegates to tikTokViewModel.
     func getTikTokPlaceFlag(for placeId: String) -> TikTokPlaceFlag? {
-        return tikTokPlaceFlags[placeId]
+        return tikTokViewModel.getTikTokPlaceFlag(for: placeId)
     }
-    
+
+    /// Checks if a TikTok place has been flagged - delegates to tikTokViewModel.
     func hasFlaggedTikTokPlace(placeId: String) -> Bool {
-        return tikTokPlaceFlags[placeId] != nil
+        return tikTokViewModel.hasFlaggedTikTokPlace(placeId: placeId)
     }
     func addNewPlaceList(named name: String, city: String, emoji: String, image: String) async -> Result<PlaceList, Error> {
         guard let userId = userSession.currentUserId else { 
@@ -1048,7 +948,7 @@ class ProfileViewModel: ObservableObject {
          let uniqueUsers = userIds
              .filter { $0 != currentUserId }
              .compactMap { userId in
-                 userFollowing.first(where: { $0.id == userId })
+                 socialViewModel.userFollowing.first(where: { $0.id == userId })
              }
          
          return uniqueUsers
@@ -1076,121 +976,26 @@ class ProfileViewModel: ObservableObject {
     
     func refreshUserPlaces() async {
         // Combine all place IDs from favorites and all lists, then de-duplicate
-        var allPlaceIds = Set(userFavorites)
-        for list in userListsPlaces.values {
+        var allPlaceIds = Set(favoritesViewModel.userFavorites)
+        for list in listsViewModel.userListsPlaces.values {
             allPlaceIds.formUnion(list)
         }
         await detailPlaceViewModel.refreshPlaces(detailPlaces: Array(allPlaceIds))
     }
 
-    /// Load initial reviewed places (server-side pagination like TikToks)
+    // MARK: - Reviews (Delegates to reviewsViewModel)
+
+    /// Loads initial reviewed places - delegates to reviewsViewModel.
     func loadMyReviewedPlacesWithPagination() async {
-        guard let userId = user?.id else {
-            print("⚠️ [ProfileViewModel] Cannot load reviewed places: no user ID")
-            return
-        }
-        
-        // Don't reload if already loading, if we have data, or if we already attempted (prevents infinite loop with no reviews)
-        guard !isLoadingReviewedPlaces && lightweightReviewedPlaces.isEmpty && !hasAttemptedInitialReviewsLoad else {
-            return
-        }
-        
-        await loadInitialReviewedPlaces()
-    }
-    
-    /// Load initial reviewed places from database (server-side pagination)
-    private func loadInitialReviewedPlaces() async {
-        guard let userId = user?.id else {
-            print("⚠️ [ProfileViewModel] Cannot load initial reviewed places: no user ID")
-            return
-        }
-        
-        isLoadingReviewedPlaces = true
-        hasAttemptedInitialReviewsLoad = true // Mark that we've attempted the initial load
-        
-        defer {
-            isLoadingReviewedPlaces = false
-        }
-        
-        do {
-            // Fetch first page of lightweight reviewed places and total count in parallel
-            async let placesTask = userService.fetchUserReviewedPlaces(userId: userId, limit: 8, offset: 0)
-            async let countTask = SupabaseUserService.shared.getNumberReviewedPlaces(forUserId: userId)
-            
-            let lightweightPlaces = try await placesTask
-            let totalCount = (try? await countTask) ?? 0
-            
-            // Update state: replace existing places and update hasMore flag
-            lightweightReviewedPlaces = lightweightPlaces
-            totalReviewedPlacesCount = totalCount
-            hasMoreReviews = !lightweightPlaces.isEmpty && lightweightPlaces.count >= 8
-            
-            // Load full place details for display (non-blocking like TikTok prefetch)
-            Task {
-                await loadPlaceDetailsForReviews(lightweightPlaces, userId: userId)
-            }
-        } catch {
-            print("❌ [ProfileViewModel] Error loading initial reviewed places: \(error.localizedDescription)")
-            // Set hasMore to false on error to prevent infinite retry loops
-            hasMoreReviews = false
-        }
+        await reviewsViewModel.loadMyReviewedPlacesWithPagination()
     }
 
-    /// Load more reviewed places (pagination) - server-side like TikToks
+    /// Loads more reviewed places (pagination) - delegates to reviewsViewModel.
     func loadMoreMyReviews() async {
-        guard let userId = user?.id else {
-            print("⚠️ [ProfileViewModel] Cannot load more reviewed places: no user ID")
-            return
-        }
-        
-        // Guard: prevent multiple simultaneous loads and check if more data is available
-        guard !isLoadingMoreReviews && hasMoreReviews else {
-            return
-        }
-        
-        // Calculate offset based on current count
-        let offset = lightweightReviewedPlaces.count
-        
-        isLoadingMoreReviews = true
-        
-        defer {
-            isLoadingMoreReviews = false
-        }
-        
-        do {
-            // Fetch next page of lightweight reviewed places
-            let lightweightPlaces = try await userService.fetchUserReviewedPlaces(userId: userId, limit: 8, offset: offset)
-            
-            // Update state: append new places and update hasMore flag
-            // ⚠️ CRITICAL: Deduplicate to prevent SwiftUI rendering issues
-            let existingIds = Set(lightweightReviewedPlaces.map { $0.id })
-            let newUniquePlaces = lightweightPlaces.filter { !existingIds.contains($0.id) }
-            
-            if !newUniquePlaces.isEmpty {
-                lightweightReviewedPlaces.append(contentsOf: newUniquePlaces)
-                let duplicateCount = lightweightPlaces.count - newUniquePlaces.count
-                if duplicateCount > 0 {
-                    print("⚠️ [ProfileViewModel] Filtered \(duplicateCount) duplicate reviewed places")
-                }
-            } else if !lightweightPlaces.isEmpty {
-                print("⚠️ [ProfileViewModel] All \(lightweightPlaces.count) reviewed places were duplicates - potential pagination issue")
-            }
-            
-            // Update hasMore flag: false if empty or if we got less than a full page
-            hasMoreReviews = !lightweightPlaces.isEmpty && lightweightPlaces.count >= 8
-            
-            // Load full place details for display (non-blocking like TikTok prefetch)
-            Task {
-                await loadPlaceDetailsForReviews(newUniquePlaces, userId: userId)
-            }
-        } catch {
-            print("❌ [ProfileViewModel] Error loading more reviewed places: \(error.localizedDescription)")
-            // Set hasMore to false on error to prevent infinite retry loops
-            hasMoreReviews = false
-        }
+        await reviewsViewModel.loadMoreMyReviews()
     }
-    
-    /// Load full place details for reviewed places
+
+    /// Loads full place details for reviewed places (callback from reviewsViewModel).
     private func loadPlaceDetailsForReviews(_ lightweightPlaces: [LightweightPlace], userId: String) async {
         for place in lightweightPlaces {
             let placeId = place.place_id
@@ -1255,366 +1060,58 @@ class ProfileViewModel: ObservableObject {
         }
     }
 
-    /// Get reviewed places for display (server-side pagination)
+    /// Gets reviewed places for display (uses cross-cutting detailPlaceViewModel data).
     func getMyReviewedPlaces() -> [DetailPlace] {
-        return lightweightReviewedPlaces.compactMap { detailPlaceViewModel.places[$0.place_id] }
-    }
-    
-    /// Load image directly from URL and add to placeImages
-    private func loadImageFromURL(imageUrl: String, placeId: String) async {
-        // Block Firebase Storage URLs (migrated to Supabase)
-        if imageUrl.contains("firebasestorage.googleapis.com") {
-            return
-        }
-        
-        guard let url = URL(string: imageUrl) else {
-            print("⚠️ [ProfileViewModel] Invalid image URL: \(imageUrl)")
-            return
-        }
-        
-        do {
-            // Use a more efficient URLSession configuration for image loading
-            let config = URLSessionConfiguration.default
-            config.timeoutIntervalForRequest = 5.0  // ✅ Reduced timeout
-            config.timeoutIntervalForResource = 10.0  // ✅ Reduced timeout
-            let session = URLSession(configuration: config)
-            
-            let (data, _) = try await session.data(from: url)
-            if let image = UIImage(data: data) {
-                await MainActor.run {
-                    detailPlaceViewModel.placeImages[placeId] = image
-                    // Loaded review image for place
-                }
-            } else {
-                print("⚠️ [ProfileViewModel] Failed to create UIImage from data for place \(placeId)")
-            }
-        } catch {
-            print("⚠️ [ProfileViewModel] Failed to load image from URL for place \(placeId): \(error.localizedDescription)")
-        }
+        return reviewsViewModel.lightweightReviewedPlaces.compactMap { detailPlaceViewModel.places[$0.place_id] }
     }
 
-    /// Reset reviewed places pagination state (server-side pagination)
-    /// Single source of truth for all reviewed places state - ensures clean reload
-    func resetMyReviewedPlacesPagination() {
-        isLoadingReviewedPlaces = false
-        isLoadingMoreReviews = false
-        hasMoreReviews = true
-        lightweightReviewedPlaces = []
-        hasAttemptedInitialReviewsLoad = false  // Critical: allow fresh reload on next view appear
-    }
-
-    /// Get the total count of reviewed places (server-side pagination)
-    var reviewedPlacesCount: Int {
-        return lightweightReviewedPlaces.count
-    }
-    
     // MARK: - TikTok Places Refresh After Import
     
-    /// Refresh TikTok places list after a successful import
+    // MARK: - External Places (Delegates to tikTokViewModel)
+
+    /// Refreshes TikTok places list after a successful import - delegates to tikTokViewModel.
     func refreshTikTokPlacesAfterImport() {
-        // Reload lightweight external places to show new TikTok place in tiles
-        // Note: Actual refresh happens when place detail view appears (after backend creates entry)
-        Task {
-            await reloadLightweightExternalPlaces()
-        }
+        tikTokViewModel.refreshTikTokPlacesAfterImport()
     }
-    
-    /// Reload lightweight external places from the database
-    private func reloadLightweightExternalPlaces() async {
-        guard let userId = user?.id else {
-            print("⚠️ [ProfileViewModel] Cannot reload lightweight external places: no user ID")
-            return
-        }
-        
-        await MainActor.run {
-            isLoadingTikTokPlaces = true
-        }
-        
-        do {
-            // Fetch first page of lightweight external places and total count in parallel
-            async let placesTask = userService.fetchUserExternalPlaces(userId: userId, limit: 8, offset: 0)
-            async let countTask = userService.getNumberExternalPlaces(forUserId: userId)
-            
-            let lightweightPlaces = try await placesTask
-            let totalCount = (try? await countTask) ?? 0
-            
-            // Prefetch TikTok metadata for all TikTok URLs
-            let tiktokUrls = lightweightPlaces.compactMap { $0.tiktok_url }.filter { !$0.isEmpty }
-            if !tiktokUrls.isEmpty {
-                await TikTokMetadataCache.shared.prefetchMetadata(for: tiktokUrls)
-            }
-            
-            await MainActor.run {
-                lightweightExternalPlaces = lightweightPlaces
-                totalExternalPlacesCount = totalCount
-                hasMoreExternalPlaces = !lightweightPlaces.isEmpty && lightweightPlaces.count >= 8
-                isLoadingTikTokPlaces = false
-            }
-        } catch {
-            print("❌ [ProfileViewModel] Error reloading lightweight external places: \(error.localizedDescription)")
-            await MainActor.run {
-                isLoadingTikTokPlaces = false
-                hasMoreExternalPlaces = false
-            }
-        }
-    }
-    
-    // MARK: - External Places Pagination (MVVM Architecture)
-    
-    /// Load initial external places (TikTok places) - lightweight with pagination
-    /// This method handles the first page load when the TikTok tab appears
+
+    /// Loads initial external places (TikTok places) - delegates to tikTokViewModel.
     func loadInitialExternalPlaces() async {
-        guard let userId = user?.id else {
-            print("⚠️ [ProfileViewModel] Cannot load initial external places: no user ID")
-            return
-        }
-        
-        // Don't reload if already loading or if we have data
-        guard !isLoadingTikTokPlaces && lightweightExternalPlaces.isEmpty else {
-            return
-        }
-        
-        isLoadingTikTokPlaces = true
-        
-        defer {
-            isLoadingTikTokPlaces = false
-        }
-        
-        do {
-            // Fetch first page of lightweight external places and total count in parallel
-            async let placesTask = userService.fetchUserExternalPlaces(userId: userId, limit: 8, offset: 0)
-            async let countTask = userService.getNumberExternalPlaces(forUserId: userId)
-            
-            let lightweightPlaces = try await placesTask
-            let totalCount = (try? await countTask) ?? 0
-            
-            // Prefetch TikTok metadata for all TikTok URLs (non-blocking)
-            let tiktokUrls = lightweightPlaces.compactMap { $0.tiktok_url }.filter { !$0.isEmpty }
-            if !tiktokUrls.isEmpty {
-                Task {
-                    await TikTokMetadataCache.shared.prefetchMetadata(for: tiktokUrls)
-                }
-            }
-            
-            // Update state: replace existing places and update hasMore flag
-            lightweightExternalPlaces = lightweightPlaces
-            totalExternalPlacesCount = totalCount
-            hasMoreExternalPlaces = !lightweightPlaces.isEmpty && lightweightPlaces.count >= 8
-        } catch {
-            print("❌ [ProfileViewModel] Error loading initial external places: \(error.localizedDescription)")
-            // Set hasMore to false on error to prevent infinite retry loops
-            hasMoreExternalPlaces = false
-        }
+        await tikTokViewModel.loadInitialExternalPlaces()
     }
-    
-    /// Load more external places (pagination) - MVVM architecture
-    /// This method handles loading additional pages when user scrolls to the end
+
+    /// Loads more external places (pagination) - delegates to tikTokViewModel.
     func loadMoreExternalPlaces() async {
-        guard let userId = user?.id else {
-            print("⚠️ [ProfileViewModel] Cannot load more external places: no user ID")
-            return
-        }
-        
-        // Guard: prevent multiple simultaneous loads and check if more data is available
-        guard !isLoadingMoreExternalPlaces && hasMoreExternalPlaces else {
-            return
-        }
-        
-        // Calculate offset based on current count
-        let offset = lightweightExternalPlaces.count
-        
-        isLoadingMoreExternalPlaces = true
-        
-        defer {
-            isLoadingMoreExternalPlaces = false
-        }
-        
-        do {
-            // Fetch next page of lightweight external places
-            let lightweightPlaces = try await userService.fetchUserExternalPlaces(userId: userId, limit: 8, offset: offset)
-            
-            // Prefetch TikTok metadata for all TikTok URLs (non-blocking)
-            let tiktokUrls = lightweightPlaces.compactMap { $0.tiktok_url }.filter { !$0.isEmpty }
-            if !tiktokUrls.isEmpty {
-                Task {
-                    await TikTokMetadataCache.shared.prefetchMetadata(for: tiktokUrls)
-                }
-            }
-            
-            // Update state: append new places and update hasMore flag
-            // ⚠️ CRITICAL: Deduplicate to prevent SwiftUI rendering issues
-            let existingIds = Set(lightweightExternalPlaces.map { $0.id })
-            let newUniquePlaces = lightweightPlaces.filter { !existingIds.contains($0.id) }
-            
-            if !newUniquePlaces.isEmpty {
-                lightweightExternalPlaces.append(contentsOf: newUniquePlaces)
-                let duplicateCount = lightweightPlaces.count - newUniquePlaces.count
-                if duplicateCount > 0 {
-                    print("⚠️ [ProfileViewModel] Filtered \(duplicateCount) duplicate places")
-                }
-            } else if !lightweightPlaces.isEmpty {
-                print("⚠️ [ProfileViewModel] All \(lightweightPlaces.count) places were duplicates - potential pagination issue")
-            }
-            
-            // Update hasMore flag: false if empty or if we got less than a full page
-            hasMoreExternalPlaces = !lightweightPlaces.isEmpty && lightweightPlaces.count >= 8
-        } catch {
-            print("❌ [ProfileViewModel] Error loading more external places: \(error.localizedDescription)")
-            // Set hasMore to false on error to prevent infinite retry loops
-            hasMoreExternalPlaces = false
-        }
+        await tikTokViewModel.loadMoreExternalPlaces()
     }
     
-    // MARK: - My Places Pagination (MVVM Architecture)
-    
-    /// Load initial my places (created places) - lightweight with pagination
-    /// This method handles the first page load when the My Places popup appears
+    // MARK: - My Places (Delegates to myPlacesViewModel)
+
+    /// Loads initial my places - delegates to myPlacesViewModel.
     func loadInitialMyPlaces() async {
-        guard let userId = user?.id else {
-            print("⚠️ [ProfileViewModel] Cannot load initial my places: no user ID")
-            return
-        }
-        
-        // Don't reload if already loading or if we have data
-        guard !isMyPlacesLoading && lightweightMyPlaces.isEmpty else {
-            return
-        }
-        
-        isMyPlacesLoading = true
-        
-        defer {
-            isMyPlacesLoading = false
-        }
-        
-        do {
-            // Fetch first page of lightweight places and total count in parallel
-            async let placesTask = userService.fetchUserCreatedPlaces(userId: userId, limit: 8, offset: 0)
-            async let countTask = userService.getNumberCreatedPlaces(forUserId: userId)
-            
-            let lightweightPlaces = try await placesTask
-            let totalCount = (try? await countTask) ?? 0
-            
-            // Update state: replace existing places and update hasMore flag
-            lightweightMyPlaces = lightweightPlaces
-            myPlaces = lightweightPlaces.map { $0.place_id }
-            totalMyPlacesCount = totalCount
-            hasMoreMyPlaces = !lightweightPlaces.isEmpty && lightweightPlaces.count >= 8
-            
-            // Add the current user as a saver for their own places (for map display)
-            for place in lightweightPlaces {
-                let placeId = place.place_id
-                if detailPlaceViewModel.placeSavers[placeId] == nil {
-                    detailPlaceViewModel.placeSavers[placeId] = [userId]
-                } else if !detailPlaceViewModel.placeSavers[placeId]!.contains(userId) {
-                    detailPlaceViewModel.placeSavers[placeId]!.append(userId)
-                }
-            }
-        } catch {
-            print("❌ [ProfileViewModel] Error loading initial my places: \(error.localizedDescription)")
-            hasMoreMyPlaces = false
-        }
+        await myPlacesViewModel.loadInitialMyPlaces()
     }
-    
-    /// Load more my places (pagination) - MVVM architecture
-    /// This method handles loading additional pages when user scrolls to the end
+
+    /// Loads more my places (pagination) - delegates to myPlacesViewModel.
     func loadMoreMyPlaces() async {
-        guard let userId = user?.id else {
-            print("⚠️ [ProfileViewModel] Cannot load more my places: no user ID")
-            return
-        }
-        
-        // Guard: prevent multiple simultaneous loads and check if more data is available
-        guard !isLoadingMoreMyPlaces && hasMoreMyPlaces else {
-            return
-        }
-        
-        // Calculate offset based on current count
-        let offset = lightweightMyPlaces.count
-        
-        isLoadingMoreMyPlaces = true
-        
-        defer {
-            isLoadingMoreMyPlaces = false
-        }
-        
-        do {
-            // Fetch next page of lightweight places
-            let lightweightPlaces = try await userService.fetchUserCreatedPlaces(userId: userId, limit: 8, offset: offset)
-            
-            // Update state: append new places and update hasMore flag
-            // ⚠️ CRITICAL: Deduplicate to prevent SwiftUI rendering issues
-            let existingIds = Set(lightweightMyPlaces.map { $0.id })
-            let newUniquePlaces = lightweightPlaces.filter { !existingIds.contains($0.id) }
-            
-            if !newUniquePlaces.isEmpty {
-                lightweightMyPlaces.append(contentsOf: newUniquePlaces)
-                myPlaces.append(contentsOf: newUniquePlaces.map { $0.place_id })
-                
-                // Add the current user as a saver for their own places (for map display)
-                for place in newUniquePlaces {
-                    let placeId = place.place_id
-                    if detailPlaceViewModel.placeSavers[placeId] == nil {
-                        detailPlaceViewModel.placeSavers[placeId] = [userId]
-                    } else if !detailPlaceViewModel.placeSavers[placeId]!.contains(userId) {
-                        detailPlaceViewModel.placeSavers[placeId]!.append(userId)
-                    }
-                }
-                
-                let duplicateCount = lightweightPlaces.count - newUniquePlaces.count
-                if duplicateCount > 0 {
-                    print("⚠️ [ProfileViewModel] Filtered \(duplicateCount) duplicate places")
-                }
-            } else if !lightweightPlaces.isEmpty {
-                print("⚠️ [ProfileViewModel] All \(lightweightPlaces.count) places were duplicates - potential pagination issue")
-            }
-            
-            // Update hasMore flag: false if empty or if we got less than a full page
-            hasMoreMyPlaces = !lightweightPlaces.isEmpty && lightweightPlaces.count >= 8
-        } catch {
-            print("❌ [ProfileViewModel] Error loading more my places: \(error.localizedDescription)")
-            hasMoreMyPlaces = false
-        }
+        await myPlacesViewModel.loadMoreMyPlaces()
     }
-    
+
     // MARK: - TikTok Place Deletion
-    
+
+    /// Deletes a TikTok place with completion handler.
     func deleteTikTokPlace(_ place: DetailPlace, completion: @escaping (Bool) -> Void) {
         guard let userId = user?.id else {
             completion(false)
             return
         }
-        
+
         let placeId = place.id.uuidString
-        
-        // Remove from local state first (optimistic update)
-        if let index = allTikTokPlaceIds.firstIndex(of: placeId) {
-            allTikTokPlaceIds.remove(at: index)
-        }
-        if let index = loadedTikTokPlaceIds.firstIndex(of: placeId) {
-            loadedTikTokPlaceIds.remove(at: index)
-        }
-        
-        // Remove from userExternalPlaces
-        userExternalPlaces.removeValue(forKey: placeId)
-        
-        // Remove from placeSavers (so it doesn't appear on map)
-        if var savers = detailPlaceViewModel.placeSavers[placeId] {
-            savers.removeAll { $0 == userId }
-            if savers.isEmpty {
-                detailPlaceViewModel.placeSavers.removeValue(forKey: placeId)
-            } else {
-                detailPlaceViewModel.placeSavers[placeId] = savers
-            }
-        }
-        
-        // Remove from places dictionary
-        detailPlaceViewModel.places.removeValue(forKey: placeId)
-        
-        // Recalculate map annotations
-        detailPlaceViewModel.calculateAnnotationPlaces()
-        
+
+        // Optimistic update: Remove from all local collections immediately
+        removeFromLocalTikTokState(placeId: placeId, userId: userId)
+
         // Call backend to delete the TikTok place
-        userService.deleteTikTokPlace(userId: userId, placeId: placeId) { [weak self] error in
+        userService.deleteTikTokPlace(userId: userId, placeId: placeId) { error in
             DispatchQueue.main.async {
                 if let error = error {
                     print("❌ [ProfileViewModel] Error deleting TikTok place: \(error.localizedDescription)")
@@ -1645,18 +1142,13 @@ class ProfileViewModel: ObservableObject {
         }
     }
     
-    /// Helper: Remove TikTok place from all local state collections
-    /// Single Responsibility: Local state cleanup only
+    /// Removes TikTok place from all local state collections.
     private func removeFromLocalTikTokState(placeId: String, userId: String) {
-        // Remove from lightweight places array
-        lightweightExternalPlaces.removeAll { $0.place_id == placeId }
+        // Delegate TikTok-specific state cleanup to tikTokViewModel
+        tikTokViewModel.removeFromLocalTikTokState(placeId: placeId)
+        tikTokViewModel.userExternalPlaces.removeValue(forKey: placeId)
 
-        // Remove from ID tracking collections
-        allTikTokPlaceIds.removeAll { $0 == placeId }
-        loadedTikTokPlaceIds.removeAll { $0 == placeId }
-        userExternalPlaces.removeValue(forKey: placeId)
-
-        // Remove from placeSavers (so it doesn't appear on map)
+        // Cross-cutting map concerns (kept in parent ViewModel)
         if var savers = detailPlaceViewModel.placeSavers[placeId] {
             savers.removeAll { $0 == userId }
             if savers.isEmpty {
@@ -1666,69 +1158,11 @@ class ProfileViewModel: ObservableObject {
             }
         }
 
-        // Remove from places dictionary
         detailPlaceViewModel.places.removeValue(forKey: placeId)
-
-        // Recalculate map annotations
         detailPlaceViewModel.calculateAnnotationPlaces()
     }
 
-    /// Updates a TikTok place to point to a different place (for correcting wrong place associations)
-    /// - Parameters:
-    ///   - place: The current LightweightPlace to update
-    ///   - newPlaceId: The new place ID to associate with
-    ///   - newPlaceName: The new place name for optimistic UI update
-    func updateTikTokPlace(_ place: LightweightPlace, newPlaceId: String, newPlaceName: String) async {
-        guard let userId = user?.id,
-              let externalPlaceId = place.external_place_id else {
-            print("❌ [ProfileViewModel] Cannot update TikTok place: missing userId or externalPlaceId")
-            return
-        }
-
-        let oldPlaceId = place.place_id
-
-        // Optimistic update: Update local state immediately
-        if let index = lightweightExternalPlaces.firstIndex(where: { $0.place_id == oldPlaceId && $0.external_place_id == externalPlaceId }) {
-            var updatedPlace = lightweightExternalPlaces[index]
-            updatedPlace = LightweightPlace(
-                place_id: newPlaceId,
-                name: newPlaceName,
-                latest_review_photo: updatedPlace.latest_review_photo,
-                external_place_id: externalPlaceId,
-                tiktok_url: updatedPlace.tiktok_url,
-                added_by_user_id: updatedPlace.added_by_user_id,
-                added_by_name: updatedPlace.added_by_name,
-                added_by_photo_url: updatedPlace.added_by_photo_url
-            )
-            lightweightExternalPlaces[index] = updatedPlace
-        }
-
-        // Update ID tracking
-        allTikTokPlaceIds.removeAll { $0 == oldPlaceId }
-        allTikTokPlaceIds.append(newPlaceId)
-        loadedTikTokPlaceIds.removeAll { $0 == oldPlaceId }
-        loadedTikTokPlaceIds.append(newPlaceId)
-
-        // Persist to backend
-        do {
-            try await userService.updateTikTokPlaceAssociation(
-                externalPlaceId: externalPlaceId,
-                newPlaceId: newPlaceId,
-                userId: userId
-            )
-            print("✅ [ProfileViewModel] Updated TikTok place from \(oldPlaceId) to \(newPlaceId)")
-        } catch {
-            print("❌ [ProfileViewModel] Error updating TikTok place: \(error.localizedDescription)")
-            // Revert optimistic update on failure
-            await refreshTikTokPlacesAfterImport()
-        }
-    }
-
-    /// Updates a TikTok place association by external place ID (used from PlaceDetailView)
-    /// - Parameters:
-    ///   - externalPlaceId: The external_places table ID
-    ///   - newPlaceId: The new place ID to associate with
-    ///   - newPlaceName: The new place name for optimistic UI update
+    /// Updates a TikTok place association by external place ID (used from PlaceDetailView).
     func updateTikTokPlaceById(externalPlaceId: String, newPlaceId: String, newPlaceName: String) async {
         guard let userId = user?.id else {
             print("❌ [ProfileViewModel] Cannot update TikTok place: missing userId")
@@ -1736,12 +1170,12 @@ class ProfileViewModel: ObservableObject {
         }
 
         // Find the existing place to get old placeId for tracking updates
-        let existingPlace = lightweightExternalPlaces.first { $0.external_place_id == externalPlaceId }
+        let existingPlace = tikTokViewModel.lightweightExternalPlaces.first { $0.external_place_id == externalPlaceId }
         let oldPlaceId = existingPlace?.place_id
 
         // Optimistic update: Update local state immediately
-        if let index = lightweightExternalPlaces.firstIndex(where: { $0.external_place_id == externalPlaceId }) {
-            let original = lightweightExternalPlaces[index]
+        if let index = tikTokViewModel.lightweightExternalPlaces.firstIndex(where: { $0.external_place_id == externalPlaceId }) {
+            let original = tikTokViewModel.lightweightExternalPlaces[index]
             let updatedPlace = LightweightPlace(
                 place_id: newPlaceId,
                 name: newPlaceName,
@@ -1752,16 +1186,16 @@ class ProfileViewModel: ObservableObject {
                 added_by_name: original.added_by_name,
                 added_by_photo_url: original.added_by_photo_url
             )
-            lightweightExternalPlaces[index] = updatedPlace
+            tikTokViewModel.lightweightExternalPlaces[index] = updatedPlace
         }
 
         // Update ID tracking
         if let old = oldPlaceId {
-            allTikTokPlaceIds.removeAll { $0 == old }
-            loadedTikTokPlaceIds.removeAll { $0 == old }
+            tikTokViewModel.allTikTokPlaceIds.removeAll { $0 == old }
         }
-        allTikTokPlaceIds.append(newPlaceId)
-        loadedTikTokPlaceIds.append(newPlaceId)
+        if !tikTokViewModel.allTikTokPlaceIds.contains(newPlaceId) {
+            tikTokViewModel.allTikTokPlaceIds.append(newPlaceId)
+        }
 
         // Persist to backend
         do {
@@ -1774,56 +1208,9 @@ class ProfileViewModel: ObservableObject {
         } catch {
             print("❌ [ProfileViewModel] Error updating TikTok place: \(error.localizedDescription)")
             // Revert optimistic update on failure
-            await refreshTikTokPlacesAfterImport()
+            refreshTikTokPlacesAfterImport()
         }
     }
-
-    // MARK: - Reviewed Places Access
-    
-    /// Cached set of place IDs the user has reviewed (for unvisited filtering)
-    /// Loaded on-demand when needed for a specific set of places
-    @Published var verifiedReviewedPlaceIds: Set<String> = []
-    @Published var isLoadingVerifiedReviewedIds: Bool = false
-    
-    /// Check if user has reviewed a place (quick check against paginated data)
-    /// Note: For accurate filtering, use loadVerifiedReviewedPlaceIds() first
-    func hasReviewedPlace(placeId: String) -> Bool {
-        return lightweightReviewedPlaces.contains { $0.place_id == placeId }
-    }
-    
-    /// Check if user has reviewed a place (using database-verified IDs)
-    /// More accurate than hasReviewedPlace() - use after calling loadVerifiedReviewedPlaceIds()
-    func hasVerifiedReviewedPlace(placeId: String) -> Bool {
-        return verifiedReviewedPlaceIds.contains(placeId)
-    }
-    
-    /// Load verified reviewed place IDs from database for accurate filtering
-    /// Call this with the place IDs you want to filter, then use hasVerifiedReviewedPlace()
-    func loadVerifiedReviewedPlaceIds(for placeIds: [String]) async {
-        guard let userId = user?.id else { return }
-        guard !placeIds.isEmpty else { return }
-        guard !isLoadingVerifiedReviewedIds else { return }
-        
-        isLoadingVerifiedReviewedIds = true
-        
-        do {
-            let ids = try await SupabaseReviewService.shared.getReviewedPlaceIds(
-                userId: userId,
-                placeIds: placeIds
-            )
-            verifiedReviewedPlaceIds = ids
-        } catch {
-            print("❌ [ProfileViewModel] Error loading verified reviewed IDs: \(error)")
-        }
-        
-        isLoadingVerifiedReviewedIds = false
-    }
-    
-    /// Clear verified reviewed place IDs (call when switching contexts)
-    func clearVerifiedReviewedPlaceIds() {
-        verifiedReviewedPlaceIds = []
-    }
-    
     // MARK: - List Sorting by Distance
     
     private var hasPerformedInitialSort = false
@@ -1973,44 +1360,44 @@ class ProfileViewModel: ObservableObject {
         }
         
         // Check if already processing
-        if isProcessingTikTok {
+        if tikTokViewModel.isProcessingTikTok {
             print("⚠️ [ProfileViewModel] Already processing a TikTok URL, skipping: \(urlString)")
             return false
         }
-        
+
         // Mark as processing and add to recently processed
         await MainActor.run {
-            isProcessingTikTok = true
+            tikTokViewModel.isProcessingTikTok = true
             recentlyProcessedURLs.insert(urlString)
             currentProcessingTikTokUrl = urlString // Store URL for later use
         }
-        
+
         let result = await tikTokService.processTikTokURL(urlString)
-        
+
         // Don't set isProcessingTikTok = false here - let it persist until place detail is ready
         // The loading screen will be dismissed when placeDetailViewReady() is called
-        
+
         // Clear from recently processed after 30 seconds
         DispatchQueue.main.asyncAfter(deadline: .now() + 30.0) {
             self.recentlyProcessedURLs.remove(urlString)
         }
-        
+
         switch result {
         case .success(let detailPlaces):
             // Clear any previous errors
-            tikTokImportError = nil
-            
+            tikTokViewModel.tikTokImportError = nil
+
             Task { @MainActor in
                 if detailPlaces.count == 1 {
                     // Single place - show detail directly
                     let detailPlace = detailPlaces[0]
-                    
+
                     // Validate place has a name
                     if detailPlace.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                         print("❌ [ProfileViewModel] Single place found but has no name")
-                        noPlacesFoundTikTokUrl = urlString
-                        isShowingNoPlacesFound = true
-                        isProcessingTikTok = false
+                        tikTokViewModel.noPlacesFoundTikTokUrl = urlString
+                        tikTokViewModel.isShowingNoPlacesFound = true
+                        tikTokViewModel.isProcessingTikTok = false
                         deepLinkManager?.isProcessingDeepLink = false
                         return
                     }
@@ -2022,13 +1409,13 @@ class ProfileViewModel: ObservableObject {
                     placeVM.calculateAnnotationPlaces()
                     selectedPlaceVM.selectPlaceAndFetchDetails(detailPlace, shouldAnimateMap: true)
                     selectedPlaceVM.isDetailSheetPresented = true
-                    
+
                     // Clear loading states immediately
-                    isProcessingTikTok = false
-                    isWaitingForPlaceDetail = false
+                    tikTokViewModel.isProcessingTikTok = false
+                    tikTokViewModel.isWaitingForPlaceDetail = false
                     deepLinkManager?.isProcessingDeepLink = false
                     currentProcessingTikTokUrl = nil
-                    
+
                     // Note: TikTok places refresh happens in PlaceDetailView.onAppear
                     // after backend creates the external_place entry
                 
@@ -2045,91 +1432,91 @@ class ProfileViewModel: ObservableObject {
                     
                     if validPlaces.isEmpty {
                         print("❌ [ProfileViewModel] No valid places found after filtering")
-                        noPlacesFoundTikTokUrl = urlString
-                        isShowingNoPlacesFound = true
-                        isProcessingTikTok = false
+                        tikTokViewModel.noPlacesFoundTikTokUrl = urlString
+                        tikTokViewModel.isShowingNoPlacesFound = true
+                        tikTokViewModel.isProcessingTikTok = false
                         deepLinkManager?.isProcessingDeepLink = false
                         return
                     }
-                    
+
                     // Add all valid places to place manager
                     for place in validPlaces {
                         placeVM.places[place.id.uuidString] = place
                     }
-                    
-                    importedPlaces = validPlaces
-                    isShowingPlaceSelection = true
-                    
+
+                    tikTokViewModel.importedPlaces = validPlaces
+                    tikTokViewModel.isShowingPlaceSelection = true
+
                     // Clear loading states
-                    isProcessingTikTok = false
-                    isWaitingForPlaceDetail = false
+                    tikTokViewModel.isProcessingTikTok = false
+                    tikTokViewModel.isWaitingForPlaceDetail = false
                     deepLinkManager?.isProcessingDeepLink = false
-                    
+
                     // Note: TikTok places refresh happens in PlaceDetailView.onAppear
                     // after user selects a place and backend creates the external_place entry
                 } else {
                     // No places found - show flagging interface
                     print("❌ [ProfileViewModel] No places found: count = \(detailPlaces.count)")
-                    noPlacesFoundTikTokUrl = urlString
-                    isShowingNoPlacesFound = true
-                    isProcessingTikTok = false
-                    isWaitingForPlaceDetail = false
+                    tikTokViewModel.noPlacesFoundTikTokUrl = urlString
+                    tikTokViewModel.isShowingNoPlacesFound = true
+                    tikTokViewModel.isProcessingTikTok = false
+                    tikTokViewModel.isWaitingForPlaceDetail = false
                     deepLinkManager?.isProcessingDeepLink = false
                 }
             }
-            
+
             return true
-            
+
         case .failure(let error):
             print("❌ [ProfileViewModel] TikTok processing failed: \(error.localizedDescription)")
-            
+
             await MainActor.run {
                 // Set user-friendly error message based on error type
                 if error.localizedDescription.contains("network") || error.localizedDescription.contains("Internet") {
-                    tikTokImportError = "Please check your internet connection and try again"
+                    tikTokViewModel.tikTokImportError = "Please check your internet connection and try again"
                 } else if error.localizedDescription.contains("invalid") || error.localizedDescription.contains("URL") {
-                    tikTokImportError = "This doesn't appear to be a valid TikTok URL"
+                    tikTokViewModel.tikTokImportError = "This doesn't appear to be a valid TikTok URL"
                 } else {
-                    tikTokImportError = "We couldn't find any places in this TikTok video. Try sharing a different video that shows specific locations"
+                    tikTokViewModel.tikTokImportError = "We couldn't find any places in this TikTok video. Try sharing a different video that shows specific locations"
                 }
-                isProcessingTikTok = false
+                tikTokViewModel.isProcessingTikTok = false
                 deepLinkManager?.isProcessingDeepLink = false
                 currentProcessingTikTokUrl = nil
             }
-            
+
             return false
         }
     }
-    
-    /// Clear TikTok import error
+
+    /// Clears TikTok import error - delegates to tikTokViewModel.
     func clearTikTokImportError() {
-        tikTokImportError = nil
+        tikTokViewModel.clearTikTokImportError()
     }
-    
+
     /// Clear place selection state
     func clearPlaceSelection() {
-        importedPlaces = []
-        isShowingPlaceSelection = false
+        tikTokViewModel.importedPlaces = []
+        tikTokViewModel.isShowingPlaceSelection = false
         currentProcessingTikTokUrl = nil // Clear stored URL
-        
+
         // Refresh TikTok places list after clearing selection (in case places were added to lists)
         refreshTikTokPlacesAfterImport()
     }
-    
+
     /// Clear no places found state
     func clearNoPlacesFound() {
-        isShowingNoPlacesFound = false
-        noPlacesFoundTikTokUrl = ""
+        tikTokViewModel.isShowingNoPlacesFound = false
+        tikTokViewModel.noPlacesFoundTikTokUrl = ""
         // Ensure processing states are cleared when user closes the view
-        isProcessingTikTok = false
-        isWaitingForPlaceDetail = false
+        tikTokViewModel.isProcessingTikTok = false
+        tikTokViewModel.isWaitingForPlaceDetail = false
         deepLinkManager?.isProcessingDeepLink = false
         deepLinkViewModel?.isProcessingDeepLink = false  // Direct update to ensure sync
     }
     
     func placeSelectionViewAppeared() {
-        isWaitingForPlaceDetail = false
-        isProcessingTikTok = false
+        tikTokViewModel.isWaitingForPlaceDetail = false
+        tikTokViewModel.isProcessingTikTok = false
         deepLinkManager?.isProcessingDeepLink = false
         deepLinkViewModel?.isProcessingDeepLink = false  // Direct update to ensure sync
     }
@@ -2493,219 +1880,6 @@ class ProfileViewModel: ObservableObject {
         }
     }
     
-    // MARK: - Place List Pagination (for lists themselves, not places within lists)
-    
-    /// Performs server-side search across ALL user lists in database regardless of pagination
-    private func performListSearch() async {
-        guard let userId = userSession.currentUserId else { return }
-        
-        // If search is empty, do nothing (keep current lists)
-        // View layer will handle reloading when search mode is closed
-        if listSearchText.trimmingCharacters(in: .whitespaces).isEmpty {
-            return
-        }
-        
-        do {
-            let searchResults = try await PlaceListService.shared.searchListsByName(
-                userId: userId,
-                searchTerm: listSearchText
-            )
-            
-            // Update lists with search results
-            lightweightPlaceLists = searchResults
-            
-            // Update counts for search results
-            for list in searchResults {
-                if lightweightPlaceListCounts[list.list_id] == nil {
-                    lightweightPlaceListCounts[list.list_id] = list.place_count
-                }
-            }
-            
-            // Reset pagination state during search
-            hasMorePlaceLists = false
-            
-            // Load places for search results to display collage photos
-            await loadPlacesForSearchResults()
-        } catch {
-            // On error, keep current lists
-        }
-    }
-    
-    /// Loads places for search result lists in parallel to display photos in collages
-    private func loadPlacesForSearchResults() async {
-        // Load places for all search results in parallel for better performance
-        await withTaskGroup(of: (String, [LightweightPlace]?).self) { group in
-            for list in lightweightPlaceLists {
-                group.addTask {
-                    do {
-                        let places = try await self.userService.fetchPlacesForPlaceList(
-                            listId: list.list_id,
-                            page: 1,
-                            pageSize: 6
-                        )
-                        return (list.list_id, places)
-                    } catch {
-                        return (list.list_id, nil)
-                    }
-                }
-            }
-            
-            // Collect all results and update in a single batch
-            for await (listId, places) in group {
-                if let places = places {
-                    setPlacesForList(listId: listId, places: places)
-                }
-            }
-        }
-    }
-    
-    /// Reloads place lists when exiting search mode to restore normal paginated view
-    func reloadListsAfterSearch() async {
-        guard let userId = userSession.currentUserId else { return }
-        
-        isLoadingInitialLists = true
-        
-        do {
-            let location = locationManager.currentLocation?.coordinate
-            let lists: [LightweightPlaceList]
-            
-            if let location = location {
-                lists = try await userService.fetchPlaceListsByProximity(
-                    userId: userId,
-                    userLatitude: location.latitude,
-                    userLongitude: location.longitude,
-                    page: 1,
-                    pageSize: 6
-                )
-            } else {
-                lists = try await userService.fetchPlaceListsWithoutLocation(
-                    userId: userId,
-                    page: 1,
-                    pageSize: 6
-                )
-            }
-            
-            lightweightPlaceLists = lists
-            placeListsCurrentPage = 1
-            hasMorePlaceLists = lists.count >= 6
-        } catch {
-            // Keep existing lists on error
-        }
-        
-        isLoadingInitialLists = false
-    }
-    
-    /// Check if we should load more place lists based on current scroll position
-    func shouldLoadMorePlaceLists(currentItem: LightweightPlaceList, filteredLists: [LightweightPlaceList], isSearching: Bool) -> Bool {
-        // Don't load during search
-        guard !isSearching else { return false }
-        
-        // Check loading state and availability
-        guard !isLoadingMorePlaceLists && hasMorePlaceLists else { return false }
-        
-        // Calculate threshold (3 items from the end)
-        let threshold = max(0, filteredLists.count - 3)
-        
-        // Find current item's index
-        guard let currentIndex = filteredLists.firstIndex(where: { $0.id == currentItem.id }) else {
-            return false
-        }
-        
-        // Load more when at or past threshold
-        return currentIndex >= threshold
-    }
-    
-    /// Append new place lists with deduplication
-    /// Single Responsibility: ViewModel owns state management including deduplication
-    /// - Parameters:
-    ///   - newLists: Lists fetched from the service
-    ///   - nextPage: The page number these lists came from
-    ///   - pageSize: Number of items per page (for determining if more exist)
-    func appendPlaceLists(_ newLists: [LightweightPlaceList], nextPage: Int, pageSize: Int) {
-        // Guard: Nothing to append
-        guard !newLists.isEmpty else {
-            hasMorePlaceLists = false
-            return
-        }
-        
-        // Deduplication - ViewModel owns this logic because it owns the state
-        let existingIds = Set(lightweightPlaceLists.map { $0.list_id })
-        let uniqueNewLists = newLists.filter { !existingIds.contains($0.list_id) }
-        
-        // Log duplicates for debugging
-        let duplicateCount = newLists.count - uniqueNewLists.count
-        if duplicateCount > 0 {
-            print("⚠️ [ProfileViewModel] Filtered \(duplicateCount) duplicate place lists")
-        }
-        
-        // Update state with unique lists
-        if !uniqueNewLists.isEmpty {
-            lightweightPlaceLists.append(contentsOf: uniqueNewLists)
-            placeListsCurrentPage = nextPage
-            
-            // Update counts for new lists
-            for list in uniqueNewLists {
-                if lightweightPlaceListCounts[list.list_id] == nil {
-                    lightweightPlaceListCounts[list.list_id] = list.place_count
-                }
-            }
-            
-        } else {
-            print("⚠️ [ProfileViewModel] All \(newLists.count) lists were duplicates - potential pagination issue")
-        }
-        
-        // Update pagination flag based on fetched count (not unique count)
-        hasMorePlaceLists = newLists.count >= pageSize
-    }
-    
-    // MARK: - Place List Places State Management
-    
-    /// Append new places to a list with deduplication
-    /// Single Responsibility: ViewModel owns state management including deduplication
-    /// - Parameters:
-    ///   - listId: The list to append places to
-    ///   - newPlaces: Places fetched from the service
-    func appendPlacesForList(listId: String, newPlaces: [LightweightPlace]) {
-        guard !newPlaces.isEmpty else { return }
-        
-        // Get existing places or empty array
-        let existingPlaces = lightweightPlaceListPlaces[listId] ?? []
-        
-        // Deduplication - ViewModel owns this logic because it owns the state
-        let existingIds = Set(existingPlaces.map { $0.place_id })
-        let uniqueNewPlaces = newPlaces.filter { !existingIds.contains($0.place_id) }
-        
-        // Log duplicates for debugging
-        let duplicateCount = newPlaces.count - uniqueNewPlaces.count
-        if duplicateCount > 0 {
-            print("⚠️ [ProfileViewModel] Filtered \(duplicateCount) duplicate places for list \(listId)")
-        }
-        
-        // Update state with unique places
-        if !uniqueNewPlaces.isEmpty {
-            lightweightPlaceListPlaces[listId] = existingPlaces + uniqueNewPlaces
-        }
-    }
-    
-    /// Set places for a list with deduplication (for initial load)
-    /// Single Responsibility: ViewModel owns state management including deduplication
-    /// - Parameters:
-    ///   - listId: The list to set places for
-    ///   - places: Places fetched from the service
-    func setPlacesForList(listId: String, places: [LightweightPlace]) {
-        // Deduplicate places by place_id
-        var seenIds = Set<String>()
-        let uniquePlaces = places.filter { place in
-            if seenIds.contains(place.place_id) {
-                return false
-            }
-            seenIds.insert(place.place_id)
-            return true
-        }
-
-        lightweightPlaceListPlaces[listId] = uniquePlaces
-    }
-    
     /// Smart image preloading for visible places (simplified)
     func preloadImagesForVisiblePlaces(listId: UUID) {
         let displayedPlaceIds = getDisplayedPlaceIds(for: listId)
@@ -2730,11 +1904,11 @@ class ProfileViewModel: ObservableObject {
         for place in places {
             print("   - \(place.name) (ID: \(place.id))")
         }
-        
-        importedPlaces = places
-        isShowingPlaceSelection = true
+
+        tikTokViewModel.importedPlaces = places
+        tikTokViewModel.isShowingPlaceSelection = true
         // Keep isWaitingForPlaceDetail = true until the sheet actually appears
-        
+
         print("🎯 [ProfileViewModel] Set isShowingPlaceSelection = true")
     }
     
@@ -2794,98 +1968,54 @@ class ProfileViewModel: ObservableObject {
         user = nil
         userPicture = nil
         
-        // Clear TikTok/external places data
-        lightweightExternalPlaces.removeAll()
-        totalExternalPlacesCount = 0
-        userExternalPlaces.removeAll()
-        allTikTokPlaceIds.removeAll()
-        loadedTikTokPlaceIds.removeAll()
-        currentTikTokPage = 0
+        // Clear TikTok/external places data (delegated to child ViewModel)
+        tikTokViewModel.resetAllData()
         recentlyProcessedURLs.removeAll()
-        _hasMoreTikTokPlaces = true
-        
-        // Clear reviewed places data
-        lightweightReviewedPlaces.removeAll()
-        totalReviewedPlacesCount = 0
-        hasAttemptedInitialReviewsLoad = false
-        
-        // Clear user lists and places
-        userLists.removeAll()
-        userListsPlaces.removeAll()
-        lightweightPlaceLists.removeAll()
-        lightweightPlaceListPlaces.removeAll()
-        lightweightPlaceListCounts.removeAll()
-        placeListCounts.removeAll()
-        listPlacePagination.removeAll()
-        loadedListIds.removeAll()
-        loadingListIds.removeAll()
-        activeListLoadTasks.values.forEach { $0.cancel() }
-        activeListLoadTasks.removeAll()
-        placeListsCurrentPage = 1
-        
-        // Clear favorites
-        userFavorites.removeAll()
-        lightweightFavorites.removeAll()
-        lightweightMyPlaces.removeAll()
-        myPlaces.removeAll()
-        totalMyPlacesCount = 0
-        
-        // Clear social data
-        userFollowing.removeAll()
-        userFollowers.removeAll()
-        followersCount = 0
-        followingCount = 0
-        
-        // Clear place notes and flags
+
+        // Clear reviewed places (delegated to child ViewModel)
+        reviewsViewModel.resetAllData()
+
+        // Clear lists (delegated to child ViewModel)
+        listsViewModel.resetAllData()
+
+        // Clear favorites (delegated to child ViewModel)
+        favoritesViewModel.resetAllData()
+
+        // Clear my places (delegated to child ViewModel)
+        myPlacesViewModel.resetAllData()
+
+        // Clear social data (delegated to child ViewModel)
+        socialViewModel.resetAllData()
+
+        // Clear account deletion state (delegated to child ViewModel)
+        accountViewModel.resetAllData()
+
+        // Clear place notes (flags are handled by tikTokViewModel.resetAllData())
         placeNotes.removeAll()
-        tikTokPlaceFlags.removeAll()
-        
-        // Clear TikTok processing state
-        importedPlaces.removeAll()
+
+        // Clear TikTok processing state (kept in ProfileViewModel)
         currentProcessingTikTokUrl = nil
-        noPlacesFoundTikTokUrl = ""
-        
+
         // Reset loading states
-        isLoadingReviewedPlaces = false
-        isLoadingMoreReviews = false
-        hasMoreReviews = true
-        isLoadingTikTokPlaces = false
-        isLoadingMoreExternalPlaces = false
-        hasMoreExternalPlaces = true
-        isLoadingMoreMyPlaces = false
-        hasMoreMyPlaces = true
         isLoadingInitialLists = false
         isLoadingMorePlaceLists = false
-        hasMorePlaceLists = true
-        isLoadingMoreTikTokPlaces = false
-        isMyPlacesLoading = true
-        isFollowersLoading = true
-        isFollowingLoading = true
-        isFollowersListLoading = false
-        isFollowingListLoading = false
-        hasMoreFollowers = true
-        hasMoreFollowing = true
-        
+        // Note: TikTok loading states are reset via tikTokViewModel.resetAllData() above
+        // Note: Social loading states are reset via socialViewModel.resetAllData() above
+        // Note: My Places loading states are reset via myPlacesViewModel.resetAllData() above
+        // Note: Reviews loading states are reset via reviewsViewModel.resetAllData() above
+        // Note: Lists loading states are reset via listsViewModel.resetAllData() above
+
         // Clear other state
         preloadedImages.removeAll()
-        recentlyCreatedListId = nil
-        listCreationTime = nil
-        totalListCount = 0
         totalUniquePlacesCount = 0
-        showOnlySharedLists = false
         hasPerformedInitialSort = false
-        
+
         // Clear UI state flags
-        isProcessingTikTok = false
-        isWaitingForPlaceDetail = false
-        isShowingPlaceSelection = false
-        isShowingNoPlacesFound = false
-        tikTokImportError = nil
-        showMaxFavoritesAlert = false
         isUploadingProfilePhoto = false
-        showFollowError = false
-        followErrorMessage = ""
-        
+        // Note: TikTok UI flags are reset via tikTokViewModel.resetAllData() above
+        // Note: showFollowError and followErrorMessage are reset via socialViewModel.resetAllData() above
+        // Note: showMaxFavoritesAlert is reset via favoritesViewModel.resetAllData() above
+
         print("✅ [ProfileViewModel] All user data cleared")
     }
     
@@ -2932,73 +2062,39 @@ class ProfileViewModel: ObservableObject {
         }
     }
     
-    /// Helper to check if a list is "recently" created (within last 60 seconds)
+    /// Checks if a list is recently created - delegates to listsViewModel.
     func isListRecentlyCreated(_ listId: UUID) -> Bool {
-        guard let createdId = recentlyCreatedListId,
-              let creationTime = listCreationTime,
-              createdId == listId else {
-            return false
-        }
-        
-        // Only consider "recent" if created within last 60 seconds
-        return Date().timeIntervalSince(creationTime) < 60
+        return listsViewModel.isListRecentlyCreated(listId)
     }
     
-    /// Set the recently created list ID with timestamp
+    /// Sets the recently created list ID - delegates to listsViewModel.
     func setRecentlyCreatedList(_ listId: UUID) {
-        recentlyCreatedListId = listId
-        listCreationTime = Date()
+        listsViewModel.setRecentlyCreatedList(listId)
     }
-    
-    /// Clear the recently created list flag (called on user interaction)
+
+    /// Clears the recently created list flag - delegates to listsViewModel.
     func clearRecentlyCreatedList() {
-        recentlyCreatedListId = nil
-        listCreationTime = nil
+        listsViewModel.clearRecentlyCreatedList()
     }
     
-    // MARK: - External Places (TikTok-sourced places) - OLD CODE, KEEP FOR TikTok deletion
-    
-    /// OLD: This function is no longer used for loading - we use lightweight loading now
-    /// KEEP: Still needed for TikTok place deletion to work with userExternalPlaces dictionary
-    /// Note: This populates the dictionary for quick lookups, but getTikTokVideos() queries directly for accuracy
+    // MARK: - External Places (TikTok-sourced places)
+
+    /// Populates the userExternalPlaces dictionary and loads thumbnails as place images.
     func fetchUserExternalPlaces() async {
-        guard let userId = user?.id else { 
-            print("❌ [ProfileViewModel] No user ID available for fetching external places")
-            return 
-        }
-        
-        do {
-            let externalPlaces = try await userService.fetchAllUserExternalPlaces(userId: userId)
-            
-            // Convert array to dictionary (note: if multiple external places exist for same placeId,
-            // only the last one will be stored - this is okay for quick lookups)
-            let externalPlacesDict = Dictionary(uniqueKeysWithValues: externalPlaces.map { ($0.placeId, $0) })
-            
-            // Update on main thread
-            await MainActor.run {
-                self.userExternalPlaces = externalPlacesDict
-            }
-            
-            // Prefetch TikTok metadata for external places
-            let urls = externalPlaces.compactMap { $0.url }.filter { !$0.isEmpty }
-            await TikTokMetadataCache.shared.prefetchMetadata(for: urls)
-            
-            // Load thumbnails after metadata is fetched
-            await MainActor.run {
-                for externalPlace in externalPlaces {
-                    if let url = externalPlace.url,
-                       let thumbnailURL = TikTokMetadataCache.shared.getCachedThumbnailUrl(for: url) {
-                        Task {
-                            await self.loadTikTokThumbnailAsPlaceImage(
-                            placeId: externalPlace.placeId,
-                            thumbnailURL: thumbnailURL
-                        )
-                        }
-                    }
+        // Delegate core fetching to tikTokViewModel
+        await tikTokViewModel.fetchUserExternalPlaces()
+
+        // Load thumbnails as place images (cross-cutting concern with detailPlaceViewModel)
+        for externalPlace in tikTokViewModel.userExternalPlaces.values {
+            if let url = externalPlace.url,
+               let thumbnailURL = TikTokMetadataCache.shared.getCachedThumbnailUrl(for: url) {
+                Task {
+                    await self.loadTikTokThumbnailAsPlaceImage(
+                        placeId: externalPlace.placeId,
+                        thumbnailURL: thumbnailURL
+                    )
                 }
             }
-        } catch {
-            print("❌ [ProfileViewModel] Error fetching external places: \(error.localizedDescription)")
         }
     }
     
@@ -3090,33 +2186,6 @@ class ProfileViewModel: ObservableObject {
         }.resume()
     }
     
-    /// Get TikTok videos for a specific place ID (async)
-    /// Fetches all external_places for the place and returns TikTok videos with metadata
-    /// Fetch TikTok videos from ALL users for a place
-    /// Populates ownership data for proper deletion and UI display
-    func getTikTokVideos(for placeId: String) async -> [TikTokVideo] {
-        do {
-            // Fetch TikTok URLs from ALL users (not just current user)
-            let urlTuples = try await userService.fetchAllExternalPlaceURLs(placeId: placeId)
-            
-            // Fetch metadata for each URL and populate ownership
-            var tikTokVideos: [TikTokVideo] = []
-            for tuple in urlTuples {
-                if var tikTokVideo = await TikTokMetadataCache.shared.getMetadata(for: tuple.url) {
-                    // Populate ownership tracking for deletion/display
-                    tikTokVideo.savedByUserId = tuple.userId
-                    tikTokVideo.externalPlaceId = tuple.id
-                    tikTokVideos.append(tikTokVideo)
-                }
-            }
-            
-            return tikTokVideos
-        } catch {
-            print("❌ [ProfileViewModel] Error fetching TikTok videos for place \(placeId): \(error)")
-            return []
-        }
-    }
-    
     /// Get external_place_id for a TikTok video URL at a specific place
     func getExternalPlaceId(for placeId: String, videoUrl: String) async -> String? {
         guard let userId = user?.id else {
@@ -3132,27 +2201,97 @@ class ProfileViewModel: ObservableObject {
         }
     }
     
-    /// Check if user has TikTok videos for a specific place
-    /// Note: This is a quick check using cached data. For accurate results, use getTikTokVideos() instead.
+    /// Checks if user has TikTok videos for a specific place - delegates to tikTokViewModel.
     func hasTikTokVideos(for placeId: String) -> Bool {
-        // Check if any external place exists for this place in the cached dictionary
-        return userExternalPlaces.values.contains { $0.placeId == placeId && $0.url != nil && !$0.url!.isEmpty }
+        return tikTokViewModel.hasTikTokVideos(for: placeId)
     }
-    
-    /// Get the external place data for a specific place ID
-    func getExternalPlace(for placeId: String) -> ExternalPlace? {
-        return userExternalPlaces[placeId]
-    }
-    
-    /// Get first TikTok thumbnail URL for a place (synchronous, uses cache only)
-    func getFirstTikTokThumbnailURL(for placeId: String) -> String? {
-        guard let externalPlace = userExternalPlaces[placeId],
-              let url = externalPlace.url else {
-            return nil
+
+    /// Get TikTok videos for a place using cached metadata.
+    func getTikTokVideosSync(for placeId: String) -> [TikTokVideo] {
+        // Get all external places for this place ID from cache
+        let matchingPlaces = tikTokViewModel.userExternalPlaces.values.filter { $0.placeId == placeId && $0.url != nil && !$0.url!.isEmpty }
+        let currentUserId = userSession.currentUserId
+
+        var videos: [TikTokVideo] = []
+        for externalPlace in matchingPlaces {
+            guard let url = externalPlace.url else { continue }
+
+            // Try to get metadata from cache
+            if var video = TikTokMetadataCache.shared.getCachedMetadata(for: url) {
+                video.savedByUserId = currentUserId
+                video.externalPlaceId = externalPlace.id
+                videos.append(video)
+            } else {
+                // Create basic video if no cached metadata
+                let videoId = extractVideoIdFromTikTokURL(url) ?? UUID().uuidString
+                var basicVideo = TikTokVideo(
+                    videoID: videoId,
+                    url: url,
+                    title: nil,
+                    caption: nil,
+                    embedHTML: "",
+                    thumbnailURL: "",
+                    author: TikTokAuthor(displayName: "", url: "", username: ""),
+                    hashtags: [],
+                    createdAt: ISO8601DateFormatter().string(from: Date())
+                )
+                basicVideo.savedByUserId = currentUserId
+                basicVideo.externalPlaceId = externalPlace.id
+                videos.append(basicVideo)
+            }
         }
-        return TikTokMetadataCache.shared.getCachedThumbnailUrl(for: url)
+
+        return videos
+    }
+
+    /// Extract video ID from TikTok URL.
+    private func extractVideoIdFromTikTokURL(_ url: String) -> String? {
+        let patterns = [
+            "/photo/([0-9]+)",
+            "/video/([0-9]+)",
+            "@[^/]+/video/([0-9]+)"
+        ]
+
+        for pattern in patterns {
+            if let regex = try? NSRegularExpression(pattern: pattern),
+               let match = regex.firstMatch(in: url, range: NSRange(location: 0, length: url.count)),
+               let range = Range(match.range(at: 1), in: url) {
+                return String(url[range])
+            }
+        }
+
+        return nil
     }
     
+    /// Gets the external place data for a specific place ID - delegates to tikTokViewModel.
+    func getExternalPlace(for placeId: String) -> ExternalPlace? {
+        return tikTokViewModel.getExternalPlace(for: placeId)
+    }
+
+    /// Gets first TikTok thumbnail URL for a place - delegates to tikTokViewModel.
+    func getFirstTikTokThumbnailURL(for placeId: String) -> String? {
+        return tikTokViewModel.getFirstTikTokThumbnailURL(for: placeId)
+    }
+    
+    /// Loads an image from URL and stores it in placeImages.
+    private func loadImageFromURL(imageUrl: String, placeId: String) async {
+        guard let url = URL(string: imageUrl) else {
+            print("❌ [ProfileViewModel] Invalid image URL for place \(placeId): \(imageUrl)")
+            return
+        }
+
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            if let image = UIImage(data: data) {
+                await MainActor.run {
+                    self.detailPlaceViewModel.placeImages[placeId] = image
+                }
+            }
+        } catch {
+            print("❌ [ProfileViewModel] Error loading image for \(placeId): \(error.localizedDescription)")
+        }
+    }
+
     /// Load TikTok thumbnail as place image for external places
     private func loadTikTokThumbnailAsPlaceImage(placeId: String, thumbnailURL: String) async {
         guard let url = URL(string: thumbnailURL) else {
@@ -3210,7 +2349,7 @@ class ProfileViewModel: ObservableObject {
         let placeId = place.id.uuidString
         
         // Optimistically remove from local array
-        myPlaces.removeAll { $0 == placeId }
+        myPlacesViewModel.myPlaces.removeAll { $0 == placeId }
         
         // Remove from map annotations immediately (optimistic update)
         detailPlaceViewModel.places.removeValue(forKey: placeId)
@@ -3264,7 +2403,7 @@ class ProfileViewModel: ObservableObject {
                 } else {
                     // If deletion fails, revert the optimistic updates
                     print("❌ [ProfileViewModel] Failed to delete custom place, reverting changes")
-                    myPlaces.append(placeId)
+                    myPlacesViewModel.myPlaces.append(placeId)
                     detailPlaceViewModel.places[placeId] = place
                     
                     // Re-add to placeSavers
@@ -3320,109 +2459,10 @@ class ProfileViewModel: ObservableObject {
         }
     }
     
-    /// Helper: Remove my place from all local state collections
-    /// Single Responsibility: Local state cleanup only
+    /// Removes my place from local state - delegates to myPlacesViewModel.
     private func removeFromLocalMyPlacesState(placeId: String, userId: String) {
-        // Remove from lightweight places array
-        lightweightMyPlaces.removeAll { $0.place_id == placeId }
-        
-        // Remove from ID tracking collection
-        myPlaces.removeAll { $0 == placeId }
-        
-        // Update total count
-        if totalMyPlacesCount > 0 {
-            totalMyPlacesCount -= 1
-        }
-        
-        // Remove from map annotations
-        detailPlaceViewModel.places.removeValue(forKey: placeId)
-        
-        // Remove from placeSavers (so it doesn't appear on map)
-        if var savers = detailPlaceViewModel.placeSavers[placeId] {
-            savers.removeAll { $0 == userId }
-            if savers.isEmpty {
-                detailPlaceViewModel.placeSavers.removeValue(forKey: placeId)
-            } else {
-                detailPlaceViewModel.placeSavers[placeId] = savers
-            }
-        }
+        myPlacesViewModel.removeFromLocalState(placeId: placeId)
     }
-    
-    // MARK: - Account Deletion
-    
-    /// Show initial delete account warning (Step 1 of 2)
-    func showDeleteWarning() {
-        showDeleteAccountWarning = true
-    }
-    
-    /// Proceed to final confirmation (Step 2 of 2)
-    func proceedToFinalConfirmation() {
-        showDeleteAccountWarning = false
-        showDeleteAccountConfirmation = true
-    }
-    
-    /// Cancel delete account flow
-    func cancelDeleteAccount() {
-        showDeleteAccountWarning = false
-        showDeleteAccountConfirmation = false
-        deleteAccountError = nil
-    }
-    
-    /// Initiate account deletion with UI state management
-    /// Staff Engineer: Single entry point for delete account execution
-    func initiateAccountDeletion() {
-        isDeletingAccount = true
-        deleteAccountError = nil
-        
-        deleteAccount { [weak self] success, errorMessage in
-            guard let self = self else { return }
-            
-            self.isDeletingAccount = false
-            
-            if success {
-                self.showDeleteAccountConfirmation = false
-            } else {
-                self.deleteAccountError = errorMessage ?? "Failed to delete account. Please try again."
-            }
-        }
-    }
-    
-    /// Clear delete account error state
-    func clearDeleteAccountError() {
-        deleteAccountError = nil
-    }
-    
-    /// Delete user account and all associated data
-    func deleteAccount(completion: @escaping (Bool, String?) -> Void) {
-        guard let userId = user?.id else {
-            completion(false, "No user ID found")
-            return
-        }
-        
-        // Delete user data from Firestore
-        userService.deleteUserAccount(userId: userId) { [weak self] error in
-            DispatchQueue.main.async {
-                if let error = error {
-                    print("❌ [ProfileViewModel] Error deleting account: \(error.localizedDescription)")
-                    completion(false, error.localizedDescription)
-                } else {
-                    // Delete Supabase Auth user
-                    Task { @MainActor in
-                        do {
-                            try await SupabaseAuthService.shared.deleteAccount()
-                            
-                            // Log out the user
-                            self?.userSession.logout()
-                            
-                            completion(true, nil)
-                        } catch {
-                            print("❌ [ProfileViewModel] Error deleting Supabase Auth user: \(error.localizedDescription)")
-                            completion(false, "Failed to delete authentication account: \(error.localizedDescription)")
-                        }
-                    }
-                }
-            }
-        }
-    }
+
 }
 

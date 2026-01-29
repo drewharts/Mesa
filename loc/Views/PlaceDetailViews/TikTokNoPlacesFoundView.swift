@@ -14,14 +14,17 @@ struct TikTokNoPlacesFoundView: View {
     @EnvironmentObject var userSession: UserSession
     @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
     @Environment(\.presentationMode) var presentationMode
-    
+
+    /// Convenience accessor for TikTok view model.
+    private var tikTokVM: ProfileTikTokViewModel { profile.tikTokViewModel }
+
     @State private var userComment: String = ""
     @State private var showingCommentDialog = false
     @State private var isSubmitting = false
     @State private var showingSuccessAlert = false
     @State private var showingErrorAlert = false
     @State private var errorMessage = ""
-    
+
     // Place search functionality
     @State private var searchText: String = ""
     @State private var searchResults: [MesaPlaceSuggestion] = []
@@ -29,7 +32,7 @@ struct TikTokNoPlacesFoundView: View {
     @State private var showingPlaceAssignment = false
     @State private var selectedSuggestion: MesaPlaceSuggestion?
     @State private var showingAssignmentConfirmation = false
-    
+
     var body: some View {
         VStack(spacing: 20) {
             headerSection
@@ -41,8 +44,8 @@ struct TikTokNoPlacesFoundView: View {
         .padding(.vertical, 30)
         .onAppear {
             // Ensure all processing states are cleared when this view appears
-            profile.isProcessingTikTok = false
-            profile.isWaitingForPlaceDetail = false
+            tikTokVM.isProcessingTikTok = false
+            tikTokVM.isWaitingForPlaceDetail = false
             // Also clear DeepLinkViewModel state directly if we have access to it
             print("✅ [TikTokNoPlacesFoundView] onAppear: Cleared all processing states")
         }

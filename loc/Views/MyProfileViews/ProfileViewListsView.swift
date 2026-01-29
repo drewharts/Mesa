@@ -22,9 +22,10 @@ struct ProfileViewListsView: View {
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
     @EnvironmentObject var deepLinkManager: DeepLinkManager
-    @EnvironmentObject var dataManager: DataManager
-    @EnvironmentObject var userSession: UserSession
     @Environment(\.presentationMode) private var presentationMode
+
+    /// Convenience accessor for lists view model.
+    private var listsVM: ProfileListsViewModel { profile.listsViewModel }
 
     @State private var showingImagePicker = false
     @State private var inputImage: [UIImage] = []
@@ -33,25 +34,25 @@ struct ProfileViewListsView: View {
     @State private var placeColors: [UUID: Color] = [:]
     @State private var listToDelete: LightweightPlaceList?
     @State private var showDeleteConfirmation = false
-    
+
     // MARK: - Body
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             headerView
-            
+
             // Simple inline search bar
-            if profile.isSearchingLists {
+            if listsVM.isSearchingLists {
                 searchBar
             }
-            
+
             listContent
         }
-        .onChange(of: profile.isSearchingLists) { isSearching in
+        .onChange(of: listsVM.isSearchingLists) { isSearching in
             if !isSearching {
-                profile.listSearchText = ""
+                listsVM.listSearchText = ""
                 Task {
-                    await profile.reloadListsAfterSearch()
+                    await listsVM.reloadListsAfterSearch()
                 }
             }
         }
@@ -107,16 +108,16 @@ struct ProfileViewListsView: View {
     
     private var headerView: some View {
         ListHeaderView(
-            showOnlyShared: profile.showOnlySharedLists,
+            showOnlyShared: listsVM.showOnlySharedLists,
             hasSharedLists: profile.hasSharedLists,
             isFilterEnabled: profile.canInteractWithSharedFilter,
-            isSearching: profile.isSearchingLists,
+            isSearching: listsVM.isSearchingLists,
             onToggleFilter: {
-                profile.showOnlySharedLists.toggle()
+                listsVM.showOnlySharedLists.toggle()
             },
             onToggleSearch: {
                 withAnimation {
-                    profile.isSearchingLists.toggle()
+                    listsVM.isSearchingLists.toggle()
                 }
             },
             onAddList: {
@@ -133,16 +134,19 @@ struct ProfileViewListsView: View {
             Image(systemName: "magnifyingglass")
                 .foregroundColor(.gray)
                 .font(.system(size: 14))
-            
-            TextField("Search lists...", text: $profile.listSearchText)
+
+            TextField("Search lists...", text: Binding(
+                get: { listsVM.listSearchText },
+                set: { listsVM.listSearchText = $0 }
+            ))
                 .font(.subheadline)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
                 .submitLabel(.search)
-            
-            if !profile.listSearchText.isEmpty {
+
+            if !listsVM.listSearchText.isEmpty {
                 Button {
-                    profile.listSearchText = ""
+                    listsVM.listSearchText = ""
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundColor(.gray)
@@ -162,7 +166,7 @@ struct ProfileViewListsView: View {
     
     @ViewBuilder
     private var listContent: some View {
-        if profile.isLoadingInitialLists {
+        if listsVM.isLoadingInitialLists {
             // Initial loading state
             initialLoadingView
         } else if !profile.filteredPlaceLists.isEmpty {
@@ -200,7 +204,7 @@ struct ProfileViewListsView: View {
             ForEach(Array(profile.filteredPlaceLists.enumerated()), id: \.element.id) { index, list in
                 LightweightProfileListSection(
                     list: list,
-                    places: profile.lightweightPlaceListPlaces[list.list_id] ?? [],
+                    places: listsVM.lightweightPlaceListPlaces[list.list_id] ?? [],
                     allLists: profile.filteredPlaceLists,
                     currentIndex: index,
                     placeColors: $placeColors
@@ -217,9 +221,9 @@ struct ProfileViewListsView: View {
                     handleListAppear(list: list)
                 }
             }
-            
+
             // Pagination loading indicator
-            if profile.isLoadingMorePlaceLists {
+            if listsVM.isLoadingMorePlaceLists {
                 paginationLoadingView
             }
         }
@@ -230,7 +234,7 @@ struct ProfileViewListsView: View {
     
     private var emptyStateView: some View {
         Group {
-            if profile.showOnlySharedLists {
+            if listsVM.showOnlySharedLists {
                 noSharedListsView
             } else {
                 createListTileGrid
@@ -280,15 +284,15 @@ struct ProfileViewListsView: View {
     /// Handle list appearing - triggers pagination when approaching end
     private func handleListAppear(list: LightweightPlaceList) {
         // Don't paginate during search or shared filter
-        guard !profile.showOnlySharedLists && !profile.isSearchingLists else { return }
-        
-        if profile.shouldLoadMorePlaceLists(
+        guard !listsVM.showOnlySharedLists && !listsVM.isSearchingLists else { return }
+
+        if listsVM.shouldLoadMoreLists(
             currentItem: list,
             filteredLists: profile.filteredPlaceLists,
-            isSearching: profile.isSearchingLists
+            isSearching: listsVM.isSearchingLists
         ) {
             Task {
-                await dataManager.loadMorePlaceLists(userId: userSession.currentUserId ?? "")
+                await listsVM.loadMoreLists()
             }
         }
     }

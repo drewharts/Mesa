@@ -256,7 +256,7 @@ struct PlaceDetailViewContent: View {
 
         // Wire up callback to dismiss max favorites alert in ProfileViewModel
         vm.onDismissMaxFavoritesAlert = { [weak profile] in
-            profile?.showMaxFavoritesAlert = false
+            profile?.favoritesViewModel.showMaxFavoritesAlert = false
         }
 
         // Configure savers VM for navigation

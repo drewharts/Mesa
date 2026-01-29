@@ -17,7 +17,7 @@ struct FavoritesPopupView: View {
             title: "Favorites",
             isLoading: false, // Favorites are loaded with profile
             isLoadingMore: false, // No pagination for favorites
-            places: profile.favoritesAsLightweight,
+            places: profile.favoritesViewModel.favoritesAsLightweight,
             hasMore: false, // No pagination for favorites
             emptyIcon: "heart",
             emptyTitle: "No Favorites Yet",

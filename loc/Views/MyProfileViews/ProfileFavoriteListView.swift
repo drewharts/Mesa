@@ -24,7 +24,7 @@ struct ProfileFavoriteListView: View {
                 .padding(.horizontal, 20)
         }
         .onAppear {
-            print("📱 [ProfileFavoriteListView] View appeared - lightweightFavorites count: \(profile.lightweightFavorites.count)")
+            print("📱 [ProfileFavoriteListView] View appeared - lightweightFavorites count: \(profile.favoritesViewModel.lightweightFavorites.count)")
         }
     }
 
@@ -45,10 +45,10 @@ struct ProfileFavoriteListView: View {
             // Could open a favorites popup or navigate to favorites view
         }) {
             Group {
-                if profile.lightweightFavorites.isEmpty {
+                if profile.favoritesViewModel.lightweightFavorites.isEmpty {
                     emptyState
                 } else {
-                    ProfilePlacesPreviewGrid(favorites: profile.lightweightFavorites)
+                    ProfilePlacesPreviewGrid(favorites: profile.favoritesViewModel.lightweightFavorites)
                 }
             }
         }

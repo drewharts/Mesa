@@ -131,9 +131,9 @@ struct MapContainerView: View {
     /// Handles list selection changes from ProfileViewModel
     private func handleListSelectionChange(_ newValue: String?) {
         if let listId = newValue {
-            mapViewModel.selectList(listId, availableLists: profileViewModel.lightweightPlaceLists)
+            mapViewModel.selectList(listId, availableLists: profileViewModel.listsViewModel.lightweightPlaceLists)
 
-            if let listCenter = profileViewModel.lightweightPlaceLists
+            if let listCenter = profileViewModel.listsViewModel.lightweightPlaceLists
                 .first(where: { $0.list_id == listId })?.averageLocation {
                 mapPosition = .region(MKCoordinateRegion(
                     center: listCenter,
@@ -283,9 +283,9 @@ struct MapContainerView: View {
     /// Builds content for list sheet
     @ViewBuilder
     private func listSheetContent(listId: String) -> some View {
-        if let listIndex = profileViewModel.lightweightPlaceLists.firstIndex(where: { $0.id == listId }) {
+        if let listIndex = profileViewModel.listsViewModel.lightweightPlaceLists.firstIndex(where: { $0.id == listId }) {
             LightweightListPopupView(
-                lists: profileViewModel.lightweightPlaceLists,
+                lists: profileViewModel.listsViewModel.lightweightPlaceLists,
                 initialListIndex: listIndex
             )
             .id(listId)
@@ -298,12 +298,13 @@ struct MapContainerView: View {
     @ViewBuilder
     private func externalListSheetContent(listId: String) -> some View {
         if let listIndex = userProfileViewModel.mapDisplayLists.firstIndex(where: { $0.list_id == listId }) {
-            ExternalUserLightweightListPopupView(
-                viewModel: userProfileViewModel,
+            let popupViewModel = ExternalListPopupViewModel(
                 lists: userProfileViewModel.mapDisplayLists,
                 initialListIndex: listIndex,
-                placeColors: .constant([:]),
-                useMapDisplayPlaces: true,
+                preloadedPlaces: userProfileViewModel.mapDisplayListPlaces
+            )
+            ExternalUserLightweightListPopupView(
+                viewModel: popupViewModel,
                 showBackToProfileButton: true,
                 mapViewModel: mapViewModel
             )

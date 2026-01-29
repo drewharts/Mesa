@@ -15,12 +15,15 @@ struct TikTokChangeHandler: ViewModifier {
     @ObservedObject var selectedPlaceVM: SelectedPlaceViewModel
     @ObservedObject var profile: ProfileViewModel
 
+    /// Convenience accessor for TikTok view model.
+    private var tikTokVM: ProfileTikTokViewModel { profile.tikTokViewModel }
+
     func body(content: Content) -> some View {
         content
             .onChange(of: selectedPlaceVM.tiktokVideos) { _, newVideos in
                 handleTikTokVideosChanged(newVideos)
             }
-            .onChange(of: profile.userExternalPlaces.count) { _, _ in
+            .onChange(of: tikTokVM.userExternalPlaces.count) { _, _ in
                 handleExternalPlacesChanged()
             }
     }

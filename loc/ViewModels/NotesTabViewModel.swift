@@ -4,6 +4,7 @@
 //
 //  Created by Cursor on 1/22/25.
 //  Manages place notes with proper MVVM separation
+//  Data-Driven: Receives place data via setPlace() instead of observing ViewModels
 //
 
 import Foundation
@@ -21,51 +22,45 @@ class NotesTabViewModel: ObservableObject {
     @Published var showingDeleteAlert: Bool = false
     @Published var isLoading: Bool = false
     @Published var error: Error?
-    
-    // MARK: - Dependencies
+
+    // MARK: - Dependencies (Services only)
     private let userService: UserService
-    private let selectedPlaceVM: SelectedPlaceViewModel  // Temporary until fully refactored
-    private let profileVM: ProfileViewModel  // Temporary for placeNotes dictionary
-    
-    private var cancellables = Set<AnyCancellable>()
     private var currentUserId: String?
-    
+
+    // MARK: - Callbacks (replaces ViewModel mutations)
+    /// Called when a note is saved - allows parent to sync with ProfileViewModel
+    var onNoteSaved: ((_ placeId: String, _ note: PlaceNote?) -> Void)?
+    /// Called when a note is deleted - allows parent to sync with ProfileViewModel
+    var onNoteDeleted: ((_ placeId: String) -> Void)?
+
     // MARK: - Initialization
-    init(userService: UserService,
-         selectedPlaceVM: SelectedPlaceViewModel,
-         profileVM: ProfileViewModel,
-         userSession: UserSession) {
-        self.userService = userService
-        self.selectedPlaceVM = selectedPlaceVM
-        self.profileVM = profileVM
+    init(userSession: UserSession) {
+        self.userService = ServiceContainer.shared.userService
         self.currentUserId = userSession.currentUserId
-        
-        setupObservers()
     }
-    
-    // MARK: - Setup
-    private func setupObservers() {
-        // Observe place changes
-        selectedPlaceVM.$selectedPlace
-            .sink { [weak self] place in
-                self?.place = place
-                if let place = place {
-                    self?.loadNote(for: place.id.uuidString)
-                }
-            }
-            .store(in: &cancellables)
-        
-        // Observe note changes from ProfileViewModel
-        profileVM.$placeNotes
-            .sink { [weak self] notes in
-                guard let self = self,
-                      let placeId = self.place?.id.uuidString else { return }
-                self.placeNote = notes[placeId]
-                if !self.isEditing {
-                    self.loadExistingNoteToFields()
-                }
-            }
-            .store(in: &cancellables)
+
+    // MARK: - Data-Driven Updates
+
+    /// Called by parent when the selected place changes
+    func setPlace(_ place: DetailPlace?) {
+        self.place = place
+        if let place = place {
+            loadNote(for: place.id.uuidString)
+        } else {
+            // Clear state when no place
+            placeNote = nil
+            noteText = ""
+            linkText = ""
+            isEditing = false
+        }
+    }
+
+    /// Called by parent when notes are updated externally (e.g., from ProfileViewModel sync)
+    func setNote(_ note: PlaceNote?) {
+        self.placeNote = note
+        if !isEditing {
+            loadExistingNoteToFields()
+        }
     }
     
     // MARK: - Computed Properties
@@ -96,22 +91,24 @@ class NotesTabViewModel: ObservableObject {
     func saveNote() {
         guard let placeId = place?.id.uuidString,
               let userId = currentUserId else { return }
-        
+
         let trimmedNote = noteText.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedLink = linkText.trimmingCharacters(in: .whitespacesAndNewlines)
-        
+
         let note = PlaceNote(
             placeId: placeId,
             userId: userId,
             note: trimmedNote.isEmpty ? nil : trimmedNote,
             link: trimmedLink.isEmpty ? nil : trimmedLink
         )
-        
+
         userService.savePlaceNote(note: note) { [weak self] success, error in
             DispatchQueue.main.async {
                 if success {
                     self?.isEditing = false
-                    self?.profileVM.placeNotes[placeId] = note
+                    self?.placeNote = note
+                    // Notify parent to sync with ProfileViewModel
+                    self?.onNoteSaved?(placeId, note)
                 } else if let error = error {
                     self?.error = error
                     print("❌ Error saving place note: \(error.localizedDescription)")
@@ -119,18 +116,20 @@ class NotesTabViewModel: ObservableObject {
             }
         }
     }
-    
+
     func deleteNote() {
         guard let placeId = place?.id.uuidString,
               let userId = currentUserId else { return }
-        
+
         userService.deletePlaceNote(userId: userId, placeId: placeId) { [weak self] success, error in
             DispatchQueue.main.async {
                 if success {
                     self?.noteText = ""
                     self?.linkText = ""
                     self?.isEditing = false
-                    self?.profileVM.placeNotes.removeValue(forKey: placeId)
+                    self?.placeNote = nil
+                    // Notify parent to sync with ProfileViewModel
+                    self?.onNoteDeleted?(placeId)
                 } else if let error = error {
                     self?.error = error
                     print("❌ Error deleting place note: \(error.localizedDescription)")
@@ -165,16 +164,17 @@ class NotesTabViewModel: ObservableObject {
     // MARK: - Private Helpers
     private func loadNote(for placeId: String) {
         guard let userId = currentUserId else { return }
-        
+
         isLoading = true
-        
+
         userService.fetchPlaceNote(userId: userId, placeId: placeId) { [weak self] placeNote, error in
             DispatchQueue.main.async {
                 self?.isLoading = false
                 if let placeNote = placeNote {
                     self?.placeNote = placeNote
-                    self?.profileVM.placeNotes[placeId] = placeNote
                     self?.loadExistingNoteToFields()
+                    // Notify parent to sync with ProfileViewModel
+                    self?.onNoteSaved?(placeId, placeNote)
                 } else if let error = error {
                     self?.error = error
                     print("❌ Error loading place note: \(error.localizedDescription)")

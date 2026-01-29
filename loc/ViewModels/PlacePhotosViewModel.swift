@@ -4,6 +4,7 @@
 //
 //  Created by Cursor on 1/22/25.
 //  ViewModel for managing place photos and external review photos
+//  Data-Driven: Receives place/posts data via setPlace()/setPosts() instead of observing ViewModels
 //
 
 import Foundation
@@ -19,23 +20,23 @@ class PlacePhotosViewModel: ObservableObject {
     @Published private var photoPageLimit = 9
     @Published private var lastPhotoDocument: Any? // Replaced DocumentSnapshot for Supabase migration
     @Published private var allPhotosLoaded = false
-    
+
     // MARK: - Review Photos State
     @Published private var reviewPhotos: [String: [UIImage]] = [:] // Cache for review photos by reviewId
     @Published private var reviewPhotoLoadingStates: [String: LoadingState] = [:] // Loading states for review photos
-    
+
     // External review photos
     @Published private var externalReviewPhotosByPlace: [String: [UIImage]] = [:] // Cache for external review photos by placeId
     @Published private var externalReviewPhotoLoadingStates: [String: LoadingState] = [:] // Loading states for external review photos
     @Published private var externalReviewPhotosAllLoadedByPlace: [String: Bool] = [:] // Track completion of external photo loading per place
-    
+
     // Profile photos
     @Published private var userProfilePhotos: [String: UIImage] = [:] // Cache for profile photos by userId
     @Published private var profilePhotoLoadingStates: [String: LoadingState] = [:] // Loading states for profile photos
-    
+
     @Published var place: DetailPlace?
     @Published var placeId: String = ""
-    
+
     // MARK: - Private Properties
     private var externalReviewImageURLCache: [String: [String]] = [:] // placeId -> photo URLs
     private var externalReviewReviewOffsets: [String: Int] = [:] // placeId -> offset into external reviews
@@ -46,25 +47,26 @@ class PlacePhotosViewModel: ObservableObject {
     private let externalReviewPhotoBatchSize = 5
     private let maxExternalReviewRetries = 3 // Maximum retry attempts for external reviews
     private let externalReviewRetryDelay: TimeInterval = 2.0 // Delay between retries in seconds
-    
+
     // MARK: - Deduplication Tracking
     // Tracks URLs that have already been loaded to prevent duplicates
     private var loadedPlacePhotoURLs: [String: Set<String>] = [:]      // placeId -> loaded internal photo URLs
     private var loadedExternalPhotoURLs: [String: Set<String>] = [:]   // placeId -> loaded external photo URLs
     private var externalSeenURLs: [String: Set<String>] = [:]          // placeId -> seen external URLs (for URL cache dedup)
-    
-    // MARK: - Dependencies
+
+    // MARK: - Dependencies (Services only)
     private let postService: PostService
-    private let selectedPlaceVM: SelectedPlaceViewModel  // Temporary until fully refactored
-    private var cancellables = Set<AnyCancellable>()
-    
+
+    // Store current posts for photo loading
+    private var currentPosts: [PlacePost] = []
+
     // MARK: - Loading State Enum
     enum LoadingState: Equatable {
         case idle
         case loading
         case loaded
         case error(Error)
-        
+
         static func == (lhs: LoadingState, rhs: LoadingState) -> Bool {
             switch (lhs, rhs) {
             case (.idle, .idle), (.loading, .loading), (.loaded, .loaded):
@@ -76,57 +78,38 @@ class PlacePhotosViewModel: ObservableObject {
             }
         }
     }
-    
+
     // MARK: - Initialization
-    init(postService: PostService, selectedPlaceVM: SelectedPlaceViewModel) {
-        self.postService = postService
-        self.selectedPlaceVM = selectedPlaceVM
-        
-        setupObservers()
+    init() {
+        self.postService = ServiceContainer.shared.postService
     }
-    
-    // MARK: - Setup
-    private func setupObservers() {
-        // Observe place changes - reset state when place changes
-        selectedPlaceVM.$selectedPlace
-            .sink { [weak self] place in
-                guard let self = self else { return }
-                self.place = place
-                self.placeId = place?.id.uuidString ?? ""
-                
-                if let place = place {
-                    self.resetPhotoLoading()
-                    self.loadExternalReviewPhotos(for: place, reset: true)
-                }
-            }
-            .store(in: &cancellables)
-        
-        // Observe when posts are initially loaded (debounced to wait for posts to arrive)
-        selectedPlaceVM.$selectedPlace
-            .debounce(for: .milliseconds(500), scheduler: DispatchQueue.main)
-            .sink { [weak self] place in
-                guard let self = self, let place = place else { return }
-                self.loadPhotosForCurrentPosts(place: place)
-            }
-            .store(in: &cancellables)
-        
-        // Observe when posts are added/modified (e.g., after submitting a new post)
-        selectedPlaceVM.$postsUpdateCounter
-            .dropFirst() // Skip initial value
-            .sink { [weak self] _ in
-                guard let self = self, let place = self.place else { return }
-                self.loadPhotosForCurrentPosts(place: place)
-            }
-            .store(in: &cancellables)
+
+    // MARK: - Data-Driven Updates
+
+    /// Called by parent when the selected place changes
+    func setPlace(_ place: DetailPlace?) {
+        self.place = place
+        self.placeId = place?.id.uuidString ?? ""
+
+        if let place = place {
+            resetPhotoLoading()
+            loadExternalReviewPhotos(for: place, reset: true)
+        }
     }
-    
+
+    /// Called by parent when posts are loaded or updated
+    func setPosts(_ posts: [PlacePost]) {
+        self.currentPosts = posts
+        guard let place = place else { return }
+        loadPhotosForCurrentPosts(place: place, posts: posts)
+    }
+
     /// Loads photos for all current posts - called when posts are loaded or updated
-    private func loadPhotosForCurrentPosts(place: DetailPlace) {
+    private func loadPhotosForCurrentPosts(place: DetailPlace, posts: [PlacePost]) {
         // Load place-level photo gallery from post images
         getPlacePhotos(for: place, loadMore: false)
-        
+
         // Load individual post photos and profile photos
-        let posts = selectedPlaceVM.posts
         for post in posts {
             loadPostPhotos(for: post)
             loadProfilePhotoFromURL(userId: post.userId, photoUrl: post.profilePhotoUrl)
@@ -281,11 +264,11 @@ class PlacePhotosViewModel: ObservableObject {
     }
     
     // MARK: - Photo Deduplication Helpers
-    
+
     /// Collects unique photo URLs from posts, excluding already-loaded URLs
     /// Single Responsibility: URL collection and deduplication
     private func collectUniquePhotoURLs(for placeId: String) -> [String] {
-        let posts = selectedPlaceVM.posts
+        let posts = currentPosts
         let loadedURLs = loadedPlacePhotoURLs[placeId] ?? []
         
         // Use ordered set approach to maintain order while deduplicating

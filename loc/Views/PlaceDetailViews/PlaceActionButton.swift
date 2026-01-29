@@ -177,7 +177,7 @@ struct PlaceActionButton: View {
         }
         // ✅ SRP: View observes ViewModel's published state (proper MVVM)
         // Update when list membership changes (reactive to ViewModel state)
-        .onChange(of: profile.lightweightPlaceListPlaces) { _ in
+        .onChange(of: profile.listsViewModel.lightweightPlaceListPlaces) { _ in
             Task {
                 isInList = await profile.isPlaceInAnyList(placeId: place.id.uuidString)
             }

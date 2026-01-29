@@ -34,12 +34,12 @@ struct ProfileContentView: View {
                     // Follow Counts
                     ProfileFollowCountsView(
                         data: .myProfile(
-                            followers: profile.followersCount,
-                            following: profile.followingCount,
-                            myPlaces: profile.myPlaces.count,
-                            isFollowersLoading: profile.isFollowersLoading,
-                            isFollowingLoading: profile.isFollowingLoading,
-                            isMyPlacesLoading: profile.isMyPlacesLoading
+                            followers: profile.socialViewModel.followersCount,
+                            following: profile.socialViewModel.followingCount,
+                            myPlaces: profile.myPlacesViewModel.myPlaces.count,
+                            isFollowersLoading: profile.socialViewModel.isFollowersLoading,
+                            isFollowingLoading: profile.socialViewModel.isFollowingLoading,
+                            isMyPlacesLoading: profile.myPlacesViewModel.isMyPlacesLoading
                         ),
                         onFollowersTap: {
                             navigationPath.append(ProfileView.FollowListDestination.followers)

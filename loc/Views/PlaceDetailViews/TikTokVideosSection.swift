@@ -90,9 +90,6 @@ struct TikTokVideosSection: View {
                 }
             }
         }
-        .task(id: placeId) {
-            await viewModel.loadVideos(for: placeId)
-        }
         .sheet(isPresented: $showChangePlaceSheet) {
             if let place = selectedPlace, let video = currentUserVideo {
                 TikTokPlaceCorrectionSheet(
@@ -166,15 +163,15 @@ struct TikTokVideosSection: View {
         deepLinkViewModel: nil
     )
     
-    let tikTokVM = TikTokVideosViewModel(
-        tikTokService: TikTokPlaceService.shared,
-        selectedPlaceVM: selectedPlaceVM,
-        profileVM: profileVM
-    )
-    
+    // Create ViewModel (fully refactored - no ViewModel dependencies)
+    let tikTokVM = TikTokVideosViewModel()
+
     var mockPlace = DetailPlace()
     mockPlace.name = "Sample Restaurant"
-    
+
+    // Set sample videos
+    tikTokVM.setPlaceId("test-place-123")
+
     return TikTokVideosSection(
         viewModel: tikTokVM,
         placeId: "test-place-123",

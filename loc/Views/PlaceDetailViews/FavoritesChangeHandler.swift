@@ -15,15 +15,18 @@ struct FavoritesChangeHandler: ViewModifier {
     @ObservedObject var selectedPlaceVM: SelectedPlaceViewModel
     @ObservedObject var profile: ProfileViewModel
 
+    /// Convenience accessor for favorites view model
+    private var favoritesVM: ProfileFavoritesViewModel { profile.favoritesViewModel }
+
     func body(content: Content) -> some View {
         content
-            .onChange(of: profile.showMaxFavoritesAlert) { _, showAlert in
+            .onChange(of: favoritesVM.showMaxFavoritesAlert) { _, showAlert in
                 handleMaxFavoritesAlert(showAlert)
             }
-            .onChange(of: profile.lightweightFavorites) { _, _ in
+            .onChange(of: favoritesVM.lightweightFavorites) { _, _ in
                 handleFavoritesChanged()
             }
-            .onChange(of: profile.userFavorites) { _, _ in
+            .onChange(of: favoritesVM.userFavorites) { _, _ in
                 handleFavoritesChanged()
             }
     }
@@ -34,13 +37,13 @@ struct FavoritesChangeHandler: ViewModifier {
     private func handleMaxFavoritesAlert(_ showAlert: Bool) {
         guard showAlert else { return }
         tabsViewModel?.handleMaxFavoritesAlert()
-        profile.showMaxFavoritesAlert = false
+        favoritesVM.showMaxFavoritesAlert = false
     }
 
     /// Handles favorites list changes.
     private func handleFavoritesChanged() {
         guard let place = selectedPlaceVM.selectedPlace else { return }
-        let isFavorited = profile.isPlaceFavorite(placeId: place.id.uuidString)
+        let isFavorited = favoritesVM.isPlaceFavorite(placeId: place.id.uuidString)
         tabsViewModel?.setFavoriteStatus(isFavorited)
     }
 }

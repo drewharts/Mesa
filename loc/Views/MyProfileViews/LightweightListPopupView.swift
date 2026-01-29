@@ -11,12 +11,11 @@ struct LightweightListPopupView: View {
     @Environment(\.presentationMode) var presentationMode
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
-    @EnvironmentObject var dataManager: DataManager
     @EnvironmentObject var mapViewModel: MapViewModel // Add MapViewModel for pending navigation
-    
+
     let lists: [LightweightPlaceList]
     let initialListIndex: Int
-    
+
     @State private var currentListIndex: Int
     @State private var showOnlyUnvisited: Bool = false
     @State private var isLoadingMore: Bool = false
@@ -26,21 +25,27 @@ struct LightweightListPopupView: View {
     @State private var showCollaboratorsSheet: Bool = false
     @State private var cachedTabViewHeight: CGFloat = 300 // Cached height to prevent layout shift
     @State private var navigationPath = NavigationPath() // Navigation path for place detail navigation
-    
+
+    /// Convenience accessor for reviews view model.
+    private var reviewsVM: ProfileReviewsViewModel { profile.reviewsViewModel }
+
+    /// Convenience accessor for lists view model.
+    private var listsVM: ProfileListsViewModel { profile.listsViewModel }
+
     // Convenience initializer for single list (backward compatibility)
     init(list: LightweightPlaceList, places: [LightweightPlace] = []) {
         self.lists = [list]
         self.initialListIndex = 0
         self._currentListIndex = State(initialValue: 0)
     }
-    
+
     // Initializer for multiple lists with swiping
     init(lists: [LightweightPlaceList], initialListIndex: Int) {
         self.lists = lists
         self.initialListIndex = initialListIndex
         self._currentListIndex = State(initialValue: initialListIndex)
     }
-    
+
     // Current list being displayed (uses passed lists, not profile.lightweightPlaceLists for filtered support)
     private var currentList: LightweightPlaceList {
         guard currentListIndex >= 0 && currentListIndex < lists.count else {
@@ -58,10 +63,10 @@ struct LightweightListPopupView: View {
         }
         return lists[currentListIndex]
     }
-    
+
     // Get all places for the current list (from profile state) - used for filtering logic
     var allPlaces: [LightweightPlace] {
-        return profile.lightweightPlaceListPlaces[currentList.list_id] ?? []
+        return listsVM.lightweightPlaceListPlaces[currentList.list_id] ?? []
     }
     
     var body: some View {
@@ -248,7 +253,7 @@ struct LightweightListPopupView: View {
             updateTabViewHeight()
             
             // Load more lists when approaching the end (only if using full list, not filtered)
-            if newIndex >= lists.count - 3 && lists.count == profile.lightweightPlaceLists.count {
+            if newIndex >= lists.count - 3 && lists.count == listsVM.lightweightPlaceLists.count {
                 loadMoreListsIfNeeded()
             }
         }
@@ -277,13 +282,13 @@ struct LightweightListPopupView: View {
     
     private func loadPlacesForCurrentList() {
         // Load places for the current list if not already loaded
-        if profile.lightweightPlaceListPlaces[currentList.list_id] == nil {
+        if listsVM.lightweightPlaceListPlaces[currentList.list_id] == nil {
             Task {
-                await dataManager.loadPlacesForLightweightList(listId: currentList.list_id)
+                await listsVM.loadPlacesForList(listId: currentList.list_id)
             }
         }
     }
-    
+
     private func loadMoreIfNeeded() {
         guard hasMorePlaces else { return }
 
@@ -296,16 +301,19 @@ struct LightweightListPopupView: View {
         isLoadingMore = true
         pendingLoadRequest = false  // Clear any pending request since we're now loading
         let nextPage = currentPage + 1
-        
+
         Task {
             do {
-                // Use DataManager method that also updates placeSavers
-                let morePlaces = try await dataManager.loadMorePlacesForList(
+                // Load more places and update ViewModel state
+                let morePlaces = try await listsVM.loadMorePlacesForList(
                     listId: currentList.list_id,
                     page: nextPage,
                     pageSize: 6
                 )
-                
+
+                // Append places to ViewModel
+                listsVM.appendPlacesForList(listId: currentList.list_id, newPlaces: morePlaces)
+
                 await MainActor.run {
                     currentPage = nextPage
                     // Keep loading if we got 6 or more places, stop if we got fewer than 6
@@ -328,12 +336,10 @@ struct LightweightListPopupView: View {
     
     private func loadMoreListsIfNeeded() {
         // Check if we have more lists to load and not currently loading
-        guard profile.hasMorePlaceLists && !profile.isLoadingMorePlaceLists else { return }
-        
+        guard listsVM.hasMorePlaceLists && !listsVM.isLoadingMorePlaceLists else { return }
+
         Task {
-            if let userId = profile.user?.id {
-                await dataManager.loadMorePlaceLists(userId: userId)
-            }
+            await listsVM.loadMoreLists()
         }
     }
     
@@ -341,7 +347,7 @@ struct LightweightListPopupView: View {
     private func loadReviewedPlaceIdsViaViewModel() {
         let placeIds = allPlaces.map { $0.place_id }
         Task {
-            await profile.loadVerifiedReviewedPlaceIds(for: placeIds)
+            await reviewsVM.loadVerifiedReviewedPlaceIds(for: placeIds)
         }
     }
     
@@ -357,14 +363,14 @@ struct LightweightListPopupView: View {
     /// Staff Engineer: Uses actual filtered places count for accurate height calculation
     private func calculateTabViewHeight() -> CGFloat {
         // Calculate based on filtered places (respects showOnlyUnvisited filter)
-        let filteredCount = showOnlyUnvisited ? 
-            allPlaces.filter { !profile.hasVerifiedReviewedPlace(placeId: $0.place_id) }.count :
+        let filteredCount = showOnlyUnvisited ?
+            allPlaces.filter { !reviewsVM.hasVerifiedReviewedPlace(placeId: $0.place_id) }.count :
             allPlaces.count
-        
+
         // Each row has 2 places, approximate row height is 200
         let rows = ceil(Double(filteredCount) / 2.0)
         let estimatedHeight = rows * 200 + 100 // Row height + padding
-        
+
         // Ensure minimum height for empty/loading states, cap at reasonable max
         return max(300, min(estimatedHeight, 2000))
     }
@@ -381,24 +387,30 @@ struct ListContentView: View {
     @Binding var currentPage: Int
     let onLoadMore: () -> Void
     let onNavigateToPlace: ((String) -> Void)? // Navigation callback for NavigationStack
-    
+
     @EnvironmentObject var profile: ProfileViewModel
-    
+
+    /// Convenience accessor for reviews view model.
+    private var reviewsVM: ProfileReviewsViewModel { profile.reviewsViewModel }
+
+    /// Convenience accessor for lists view model.
+    private var listsVM: ProfileListsViewModel { profile.listsViewModel }
+
     // Grid layout matching ProfileView lists (consistent spacing)
     private let columns = [
         GridItem(.flexible(), spacing: 12),
         GridItem(.flexible(), spacing: 12)
     ]
-    
+
     // Get all places for this list (from profile state)
     var allPlaces: [LightweightPlace] {
-        return profile.lightweightPlaceListPlaces[list.list_id] ?? []
+        return listsVM.lightweightPlaceListPlaces[list.list_id] ?? []
     }
-    
+
     // Filtered places based on visited status (uses ViewModel's database-verified reviewed IDs)
     var filteredPlaces: [LightweightPlace] {
         let toFilter = showOnlyUnvisited ?
-            allPlaces.filter { !profile.hasVerifiedReviewedPlace(placeId: $0.place_id) } :
+            allPlaces.filter { !reviewsVM.hasVerifiedReviewedPlace(placeId: $0.place_id) } :
             allPlaces
 
         // Deduplicate by place_id
@@ -415,10 +427,11 @@ struct ListContentView: View {
             // Removed ScrollView wrapper - parent now handles scrolling
                 LazyVGrid(columns: columns, spacing: 16) {
                     ForEach(Array(filteredPlaces.enumerated()), id: \.element.id) { index, place in
-                        LightweightPlaceGridCell(
+                        PopupPlaceCard(
                             place: place,
-                            isCollaborativeList: list.isCollaborative,
-                            onNavigateToPlace: onNavigateToPlace
+                            preferTikTokThumbnail: true,
+                            allowDelete: false,
+                            onNavigate: onNavigateToPlace
                         )
                         .onAppear {
                             // Load more when user scrolls to 3rd-to-last item in FILTERED results

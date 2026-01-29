@@ -17,32 +17,27 @@ class TravelTimeViewModel: ObservableObject {
     @Published var currentTransportType: MapKitService.TransportType = .automobile
     @Published var travelTimes: [MapKitService.TransportType: String] = [:]
     @Published var place: DetailPlace?
-    
+
     // MARK: - Menu Expansion State
     /// Controls whether the transport type selection menu is expanded
     @Published private(set) var isMenuExpanded: Bool = false
     /// Currently highlighted menu item index during drag gesture
     @Published private(set) var selectedMenuIndex: Int? = nil
-    
-    // MARK: - Dependencies
-    private let selectedPlaceVM: SelectedPlaceViewModel  // Temporary until fully refactored
-    private var cancellables = Set<AnyCancellable>()
-    
+
     // MARK: - Initialization
-    init(selectedPlaceVM: SelectedPlaceViewModel) {
-        self.selectedPlaceVM = selectedPlaceVM
+    init() {
         loadDefaultTransportType()
-        setupObservers()
     }
-    
-    // MARK: - Setup
-    private func setupObservers() {
-        // Observe place changes
-        selectedPlaceVM.$selectedPlace
-            .sink { [weak self] place in
-                self?.place = place
-            }
-            .store(in: &cancellables)
+
+    // MARK: - Public Methods
+
+    /// Sets the current place and resets travel time state
+    func setPlace(_ place: DetailPlace?) {
+        self.place = place
+        if place == nil {
+            travelTime = "Calculating..."
+            travelTimes = [:]
+        }
     }
     
     // MARK: - Travel Time Management

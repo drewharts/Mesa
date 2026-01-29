@@ -112,12 +112,15 @@ struct ExternalUserProfileContentView: View {
         } message: {
             Text(viewModel.followErrorMessage)
         }
-        .alert("Follow Error", isPresented: $profileVM.showFollowError) {
+        .alert("Follow Error", isPresented: Binding(
+            get: { profileVM.socialViewModel.showFollowError },
+            set: { profileVM.socialViewModel.showFollowError = $0 }
+        )) {
             Button("OK") {
-                profileVM.showFollowError = false
+                profileVM.socialViewModel.showFollowError = false
             }
         } message: {
-            Text(profileVM.followErrorMessage)
+            Text(profileVM.socialViewModel.followErrorMessage)
         }
     }
 }

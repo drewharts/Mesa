@@ -15,11 +15,14 @@ struct FollowersListView: View {
     @EnvironmentObject var userSession: UserSession
     @EnvironmentObject var detailPlaceVM: DetailPlaceViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
-    
+
+    /// Convenience accessor for social view model
+    private var socialVM: ProfileSocialViewModel { profile.socialViewModel }
+
     var body: some View {
         VStack {
-            if profile.userFollowers.isEmpty {
-                if profile.isFollowersListLoading {
+            if socialVM.userFollowers.isEmpty {
+                if socialVM.isFollowersListLoading {
                     Spacer()
                     ProgressView()
                     Spacer()
@@ -30,7 +33,7 @@ struct FollowersListView: View {
                             .font(.title3)
                             .fontWeight(.medium)
                             .foregroundColor(.gray)
-                        
+
                         Text("When someone follows you, they'll appear here.")
                             .font(.body)
                             .foregroundColor(.gray)
@@ -41,23 +44,23 @@ struct FollowersListView: View {
                 }
             } else {
                 List {
-                    ForEach(profile.userFollowers) { user in
+                    ForEach(socialVM.userFollowers) { user in
                         UserRow(user: user)
                             .onAppear {
                                 // Load more when user scrolls to the last few items
-                                if let index = profile.userFollowers.firstIndex(where: { $0.id == user.id }),
-                                   index >= profile.userFollowers.count - 3,
-                                   !profile.isFollowersListLoading,
-                                   profile.hasMoreFollowers {
+                                if let index = socialVM.userFollowers.firstIndex(where: { $0.id == user.id }),
+                                   index >= socialVM.userFollowers.count - 3,
+                                   !socialVM.isFollowersListLoading,
+                                   socialVM.hasMoreFollowers {
                                     Task {
-                                        await dataManager.loadFollowers(userId: userSession.currentUserId ?? "", offset: profile.userFollowers.count)
+                                        await dataManager.loadFollowers(userId: userSession.currentUserId ?? "", offset: socialVM.userFollowers.count)
                                     }
                                 }
                             }
                     }
-                    
+
                     // Loading indicator at bottom while loading more
-                    if profile.isFollowersListLoading {
+                    if socialVM.isFollowersListLoading {
                         HStack {
                             Spacer()
                             ProgressView()
@@ -80,9 +83,9 @@ struct FollowersListView: View {
         .task {
             // Only load on initial appearance if list is empty (first-time users)
             // Enterprise: Don't reload on every appearance - preserves scroll position and avoids unnecessary network calls
-            if profile.userFollowers.isEmpty && !profile.isFollowersListLoading {
+            if socialVM.userFollowers.isEmpty && !socialVM.isFollowersListLoading {
                 await dataManager.loadFollowers(userId: userSession.currentUserId ?? "", offset: 0)
             }
         }
     }
-} 
+}

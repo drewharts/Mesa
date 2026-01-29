@@ -23,11 +23,11 @@ struct ProfileFavoritesTikToksView: View {
     /// Data source for the shared section component.
     private var sectionData: ProfileFavoritesReviewsSectionData {
         ProfileFavoritesReviewsSectionData(
-            favorites: profile.lightweightFavorites,
-            tiktokPlaces: profile.lightweightExternalPlaces,
-            reviewedPlaces: profile.lightweightReviewedPlaces,
-            isLoadingTikToks: profile.isLoadingTikTokPlaces,
-            isLoadingReviews: profile.isLoadingReviewedPlaces
+            favorites: profile.favoritesViewModel.lightweightFavorites,
+            tiktokPlaces: profile.tikTokViewModel.lightweightExternalPlaces,
+            reviewedPlaces: profile.reviewsViewModel.lightweightReviewedPlaces,
+            isLoadingTikToks: profile.tikTokViewModel.isLoadingTikTokPlaces,
+            isLoadingReviews: profile.reviewsViewModel.isLoadingReviewedPlaces
         )
     }
 

@@ -7,7 +7,7 @@
 import SwiftUI
 
 // DUMB Component: Displays list places in grid with unvisited filtering
-// Uses ProfileViewModel for reviewed place state (no local business logic)
+// Uses ProfileReviewsViewModel for reviewed place state (no local business logic)
 struct ListPlacesPopUpListView: View {
     let list: PlaceList
 
@@ -15,31 +15,37 @@ struct ListPlacesPopUpListView: View {
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
     @Environment(\.presentationMode) var presentationMode
-    
+
     @State private var showOnlyUnvisited: Bool = false
+
+    /// Convenience accessor for reviews view model.
+    private var reviewsVM: ProfileReviewsViewModel { profile.reviewsViewModel }
 
     // Reduced width to create more space between cards
     private let cardWidth: CGFloat = UIScreen.main.bounds.width / 2 - 35 // Increased spacing from edges
     private let cardHeight: CGFloat = 180 // Slightly reduced height
-    
+
     private let columns = [
         GridItem(.flexible(), spacing: 15),
         GridItem(.flexible(), spacing: 15)
     ]
-    
+
+    /// Convenience accessor for lists view model.
+    private var listsVM: ProfileListsViewModel { profile.listsViewModel }
+
     // Precompute places
     var places: [DetailPlace] {
-        guard let placeIds = profile.userListsPlaces[list.id.uuidString] else { return [] }
+        guard let placeIds = listsVM.userListsPlaces[list.id.uuidString] else { return [] }
         return placeIds.compactMap { detailPlaceViewModel.places[$0] }
     }
-    
+
     // Filtered places based on visited status (uses ViewModel's database-verified reviewed IDs)
     var filteredPlaces: [DetailPlace] {
         guard showOnlyUnvisited else { return places }
-        
+
         // Filter out places that the current user has reviewed (checked against ViewModel)
         return places.filter { place in
-            !profile.hasVerifiedReviewedPlace(placeId: place.id.uuidString)
+            !reviewsVM.hasVerifiedReviewedPlace(placeId: place.id.uuidString)
         }
     }
 
@@ -73,7 +79,7 @@ struct ListPlacesPopUpListView: View {
             .padding(.bottom, 10)
             
             // Content
-            if let _ = profile.userListsPlaces[list.id.uuidString] {
+            if let _ = listsVM.userListsPlaces[list.id.uuidString] {
                 if !filteredPlaces.isEmpty {
                     ScrollView {
                         LazyVGrid(columns: columns, spacing: 15) {
@@ -128,7 +134,7 @@ struct ListPlacesPopUpListView: View {
     private func loadReviewedPlaceIdsViaViewModel() {
         let placeIds = places.map { $0.id.uuidString }
         Task {
-            await profile.loadVerifiedReviewedPlaceIds(for: placeIds)
+            await reviewsVM.loadVerifiedReviewedPlaceIds(for: placeIds)
         }
     }
 }

@@ -223,11 +223,8 @@ struct ModernPhotoGallery: View {
         imageService: services.imageService
     )
     
-    let photosViewModel = PlacePhotosViewModel(
-        postService: services.postService,
-        selectedPlaceVM: selectedPlaceVM
-    )
-    
+    let photosViewModel = PlacePhotosViewModel()
+
     let sampleImages = [
         UIImage(systemName: "photo")!,
         UIImage(systemName: "photo.fill")!,

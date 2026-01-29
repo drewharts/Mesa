@@ -31,7 +31,7 @@ struct ListPlacesPopupView: View {
             showingDeleteConfirmation: $showingDeleteConfirmation
         )
         .onAppear {
-            if let placeIds = profile.userListsPlaces[list.id.uuidString] {
+            if let placeIds = profile.listsViewModel.userListsPlaces[list.id.uuidString] {
                 let places = placeIds.compactMap { detailPlaceViewModel.places[$0] }
                 for place in places {
                     if placeColors[place.id] == nil {
