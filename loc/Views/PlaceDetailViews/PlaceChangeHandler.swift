@@ -64,9 +64,15 @@ struct PlaceChangeHandler: ViewModifier {
         tabsViewModel?.setPostLoadingState(mapLoadingState(loadingState))
     }
 
-    /// Handles posts data updates.
+    /// Handles posts data updates and also refreshes TikToks since they load together.
     private func handlePostsUpdated() {
         tabsViewModel?.setPosts(selectedPlaceVM.posts, rating: selectedPlaceVM.placeRating)
+
+        // Also update TikToks since they're loaded alongside posts
+        guard let place = selectedPlaceVM.selectedPlace else { return }
+        let userVideos = profile.getTikTokVideosSync(for: place.id.uuidString)
+        print("🎬 [PlaceChangeHandler] handlePostsUpdated - placeVideos: \(selectedPlaceVM.tiktokVideos.count), userVideos: \(userVideos.count)")
+        tabsViewModel?.setTikTokVideos(placeVideos: selectedPlaceVM.tiktokVideos, userVideos: userVideos)
     }
 
     /// Maps SelectedPlaceViewModel loading state to PlacePostsViewModel loading state.

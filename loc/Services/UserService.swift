@@ -55,8 +55,7 @@ struct AnyCodable: Codable {
 struct PlaceData: Codable {
     let name: String?
     let address: String?
-    let latitude: Double?
-    let longitude: Double?
+    // Note: places table uses PostGIS 'location' geometry, not separate lat/lng columns
 }
 
 struct ExternalPlaceDirectResponse: Codable {
@@ -289,7 +288,8 @@ class UserService: ObservableObject {
     /// Use fetchUserExternalPlaces(userId:limit:offset:) for paginated lightweight results
     func fetchAllUserExternalPlaces(userId: String) async throws -> [ExternalPlace] {
         do {
-            // Fetch external places for the specific user, joining with places table for name/address/coordinates
+            // Fetch external places for the specific user, joining with places table for name/address
+            // Note: places table uses PostGIS 'location' geometry, not separate lat/lng columns
             let externalPlacesResponse: [ExternalPlaceDirectResponse] = try await SupabaseManager.shared.client
                 .from("external_places")
                 .select("""
@@ -301,15 +301,13 @@ class UserService: ObservableObject {
                     added_at,
                     places:place_id (
                         name,
-                        address,
-                        latitude,
-                        longitude
+                        address
                     )
                 """)
                 .eq("user_id", value: userId)
                 .execute()
                 .value
-            
+
             // If no external places found, try alternative user ID formats
             if externalPlacesResponse.isEmpty {
                 let alternativeUserIds = [
@@ -318,7 +316,7 @@ class UserService: ObservableObject {
                     userId.replacingOccurrences(of: "-", with: ""),
                     userId.replacingOccurrences(of: "-", with: "").lowercased()
                 ].filter { $0 != userId }
-                
+
                 for altUserId in alternativeUserIds {
                     let altResponse: [ExternalPlaceDirectResponse] = try await SupabaseManager.shared.client
                         .from("external_places")
@@ -331,26 +329,24 @@ class UserService: ObservableObject {
                             added_at,
                             places:place_id (
                                 name,
-                                address,
-                                latitude,
-                                longitude
+                                address
                             )
                         """)
                         .eq("user_id", value: altUserId)
                         .execute()
                         .value
-                    
+
                     if !altResponse.isEmpty {
                         return try await processDirectExternalPlacesResponse(altResponse)
                     }
                 }
-                
+
                 return []
             }
-            
+
             // Process the external places response
             return try await processDirectExternalPlacesResponse(externalPlacesResponse)
-            
+
         } catch {
             print("❌ [UserService] Error fetching external places: \(error.localizedDescription)")
             throw error
@@ -365,10 +361,12 @@ class UserService: ObservableObject {
                 print("⚠️ [UserService] No place data found for external place \(response.id)")
                 return nil
             }
-            
+
+            // Coordinates are not critical for TikTok lookups - use defaults
+            // The places table uses PostGIS 'location' geometry, not separate lat/lng columns
             let coordinates = ExternalPlaceCoordinates(
-                latitude: placeData.latitude ?? 0.0,
-                longitude: placeData.longitude ?? 0.0
+                latitude: 0.0,
+                longitude: 0.0
             )
             
             let externalPlace = ExternalPlace(

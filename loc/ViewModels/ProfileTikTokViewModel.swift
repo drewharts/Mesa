@@ -71,6 +71,9 @@ class ProfileTikTokViewModel: ObservableObject {
     var allTikTokPlaceIds: [String] = []
     private var loadedTikTokPlaceIds: [String] = []
 
+    /// Track whether we've already prefetched metadata to avoid duplicate calls
+    private var prefetchedMetadataForSession: Set<String> = []
+
     // MARK: - Dependencies
 
     private let userService: UserService
@@ -138,11 +141,13 @@ class ProfileTikTokViewModel: ObservableObject {
             let lightweightPlaces = try await placesTask
             let totalCount = (try? await countTask) ?? 0
 
-            // Prefetch TikTok metadata (non-blocking)
+            // Prefetch TikTok metadata (non-blocking) - only for URLs not already prefetched
             let tiktokUrls = lightweightPlaces.compactMap { $0.tiktok_url }.filter { !$0.isEmpty }
-            if !tiktokUrls.isEmpty {
+            let newUrls = tiktokUrls.filter { !prefetchedMetadataForSession.contains($0) }
+            if !newUrls.isEmpty {
+                prefetchedMetadataForSession.formUnion(newUrls)
                 Task {
-                    await TikTokMetadataCache.shared.prefetchMetadata(for: tiktokUrls)
+                    await TikTokMetadataCache.shared.prefetchMetadata(for: newUrls)
                 }
             }
 
@@ -177,11 +182,13 @@ class ProfileTikTokViewModel: ObservableObject {
         do {
             let lightweightPlaces = try await userService.fetchUserExternalPlaces(userId: userId, limit: 8, offset: offset)
 
-            // Prefetch TikTok metadata (non-blocking)
+            // Prefetch TikTok metadata (non-blocking) - only for URLs not already prefetched
             let tiktokUrls = lightweightPlaces.compactMap { $0.tiktok_url }.filter { !$0.isEmpty }
-            if !tiktokUrls.isEmpty {
+            let newUrls = tiktokUrls.filter { !prefetchedMetadataForSession.contains($0) }
+            if !newUrls.isEmpty {
+                prefetchedMetadataForSession.formUnion(newUrls)
                 Task {
-                    await TikTokMetadataCache.shared.prefetchMetadata(for: tiktokUrls)
+                    await TikTokMetadataCache.shared.prefetchMetadata(for: newUrls)
                 }
             }
 
@@ -351,6 +358,13 @@ class ProfileTikTokViewModel: ObservableObject {
 
         do {
             let externalPlaces = try await userService.fetchAllUserExternalPlaces(userId: userId)
+            print("🎬 [ProfileTikTokViewModel] fetchUserExternalPlaces returned \(externalPlaces.count) places for userId: \(userId)")
+            for place in externalPlaces.prefix(5) {
+                print("  - placeId: \(place.placeId), url: \(place.url ?? "nil")")
+            }
+            if externalPlaces.count > 5 {
+                print("  ... and \(externalPlaces.count - 5) more")
+            }
 
             var placesDict: [String: ExternalPlace] = [:]
             for place in externalPlaces {
@@ -359,11 +373,13 @@ class ProfileTikTokViewModel: ObservableObject {
 
             userExternalPlaces = placesDict
 
-            // Prefetch TikTok metadata
+            // Prefetch TikTok metadata - only for URLs not already prefetched
             let tiktokUrls = externalPlaces.compactMap { $0.url }.filter { !$0.isEmpty }
-            if !tiktokUrls.isEmpty {
+            let newUrls = tiktokUrls.filter { !prefetchedMetadataForSession.contains($0) }
+            if !newUrls.isEmpty {
+                prefetchedMetadataForSession.formUnion(newUrls)
                 Task {
-                    await TikTokMetadataCache.shared.prefetchMetadata(for: tiktokUrls)
+                    await TikTokMetadataCache.shared.prefetchMetadata(for: newUrls)
                 }
             }
         } catch {
@@ -546,7 +562,11 @@ class ProfileTikTokViewModel: ObservableObject {
 
     /// Gets TikTok videos for a place using cached metadata.
     func getTikTokVideosSync(for placeId: String) -> [TikTokVideo] {
+        print("🎬 [ProfileTikTokViewModel] getTikTokVideosSync for placeId: \(placeId)")
+        print("  - userExternalPlaces count: \(userExternalPlaces.count)")
+
         let matchingPlaces = userExternalPlaces.values.filter { $0.placeId == placeId && $0.url != nil && !$0.url!.isEmpty }
+        print("  - matchingPlaces for this placeId: \(matchingPlaces.count)")
         let currentUserId = getCurrentUserId?()
 
         var videos: [TikTokVideo] = []
@@ -576,6 +596,7 @@ class ProfileTikTokViewModel: ObservableObject {
             }
         }
 
+        print("  - Returning \(videos.count) videos")
         return videos
     }
 
@@ -623,6 +644,7 @@ class ProfileTikTokViewModel: ObservableObject {
         currentTikTokPage = 0
         allTikTokPlaceIds.removeAll()
         loadedTikTokPlaceIds.removeAll()
+        prefetchedMetadataForSession.removeAll()
     }
 
     // MARK: - TikTok Place Deletion

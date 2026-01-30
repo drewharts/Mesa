@@ -177,6 +177,19 @@ struct PlaceDetailView: View {
     private func handleAppear() {
         initializeViewModelIfNeeded()
         profile.refreshTikTokPlacesAfterImport()
+
+        // Fetch user's external places on-demand so getTikTokVideosSync() has data
+        Task {
+            await profile.fetchUserExternalPlaces()
+
+            // After fetch completes, force TikTok update since data is now available
+            await MainActor.run {
+                guard let place = selectedPlaceVM.selectedPlace else { return }
+                let userVideos = profile.getTikTokVideosSync(for: place.id.uuidString)
+                print("🎬 [PlaceDetailView] handleAppear - after fetchUserExternalPlaces, userVideos: \(userVideos.count)")
+                tabsViewModel?.setTikTokVideos(placeVideos: selectedPlaceVM.tiktokVideos, userVideos: userVideos)
+            }
+        }
     }
 
     /// Handles photo tap to show fullscreen gallery.

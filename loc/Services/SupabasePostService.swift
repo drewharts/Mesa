@@ -95,13 +95,15 @@ class SupabasePostService: ObservableObject {
             .value
         
         var tiktokVideos: [TikTokVideo] = []
-        
+
         if let firstRecord = tiktokResponse.first,
            let tiktokArray = firstRecord.tiktok_videos {
             let tiktokData = tiktokArray.compactMap { $0.value as? [String: Any] }
             tiktokVideos = parseTikTokData(tiktokData)
         }
-        
+
+        print("🎬 [SupabasePostService] get_place_tiktoks returned \(tiktokVideos.count) videos for place \(placeId)")
+
         if response.isEmpty {
             return ([], tiktokVideos)
         }
@@ -285,34 +287,65 @@ class SupabasePostService: ObservableObject {
         return Date()
     }
     
+    /// Parses TikTok data from the database into TikTokVideo objects.
+    /// The database returns basic info; full metadata is fetched on-demand via TikTokMetadataCache.
     private func parseTikTokData(_ tiktokData: [[String: Any]]) -> [TikTokVideo] {
         return tiktokData.compactMap { dict -> TikTokVideo? in
-            guard let videoId = dict["video_id"] as? String,
-                  let videoUrl = dict["url"] as? String else {
+            guard let videoUrl = dict["url"] as? String, !videoUrl.isEmpty else {
                 return nil
             }
-            
-            var author = TikTokAuthor(displayName: "", url: "", username: "")
-            if let authorDict = dict["author"] as? [String: Any] {
-                author = TikTokAuthor(
-                    displayName: authorDict["display_name"] as? String ?? "",
-                    url: authorDict["url"] as? String ?? "",
-                    username: authorDict["username"] as? String ?? ""
-                )
-            }
-            
-            return TikTokVideo(
+
+            // Extract video ID from URL or use external_place_id as fallback
+            let videoId = extractVideoIdFromTikTokURL(videoUrl) ?? (dict["external_place_id"] as? String ?? UUID().uuidString)
+
+            // Build author from saved_by fields (the user who saved this TikTok)
+            let savedByFirstName = dict["saved_by_first_name"] as? String ?? ""
+            let savedByLastName = dict["saved_by_last_name"] as? String ?? ""
+            let displayName = [savedByFirstName, savedByLastName].filter { !$0.isEmpty }.joined(separator: " ")
+
+            let author = TikTokAuthor(
+                displayName: displayName,
+                url: "",
+                username: ""
+            )
+
+            var video = TikTokVideo(
                 videoID: videoId,
                 url: videoUrl,
-                title: dict["title"] as? String,
-                caption: dict["caption"] as? String,
-                embedHTML: dict["embed_html"] as? String ?? "",
-                thumbnailURL: dict["thumbnail_url"] as? String ?? "",
+                title: nil,
+                caption: nil,
+                embedHTML: "",
+                thumbnailURL: "", // Fetched on-demand via TikTokMetadataCache
                 author: author,
-                hashtags: dict["hashtags"] as? [String] ?? [],
-                createdAt: dict["created_at"] as? String ?? ""
+                hashtags: [],
+                createdAt: dict["added_at"] as? String ?? ""
             )
+
+            // Attach saved_by info for display
+            video.savedByUserId = dict["saved_by_user_id"] as? String
+            video.externalPlaceId = dict["external_place_id"] as? String
+
+            return video
         }
+    }
+
+    /// Extracts video ID from a TikTok URL.
+    private func extractVideoIdFromTikTokURL(_ url: String) -> String? {
+        let patterns = [
+            "/photo/([0-9]+)",
+            "/video/([0-9]+)",
+            "@[^/]+/video/([0-9]+)"
+        ]
+
+        for pattern in patterns {
+            if let regex = try? NSRegularExpression(pattern: pattern),
+               let match = regex.firstMatch(in: url, range: NSRange(location: 0, length: url.count)),
+               let range = Range(match.range(at: 1), in: url) {
+                return String(url[range])
+            }
+        }
+
+        return nil
     }
 }
 
