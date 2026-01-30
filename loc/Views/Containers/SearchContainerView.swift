@@ -123,6 +123,8 @@ struct SearchContainerView: View {
         !searchViewModel.searchResults.isEmpty ||
         !searchViewModel.userResults.isEmpty ||
         !searchViewModel.keywordResults.isEmpty ||
+        !searchViewModel.aiSuggestionsViewModel.suggestions.isEmpty ||
+        searchViewModel.aiSuggestionsViewModel.isLoading ||
         searchViewModel.showNoPlaceFound ||
         searchViewModel.isSearching
     }
@@ -233,6 +235,35 @@ struct SearchContainerView: View {
                     isSearchExpanded = false
                 }
                 onViewAllKeywords()
+            },
+            aiSuggestions: searchViewModel.aiSuggestionsViewModel.suggestions,
+            isAILoading: searchViewModel.aiSuggestionsViewModel.isLoading,
+            aiError: searchViewModel.aiSuggestionsViewModel.error,
+            onSelectAIPlace: { place in
+                // Dismiss keyboard before navigating
+                dismissKeyboard()
+
+                // Save to recent searches
+                searchViewModel.saveAIPlaceSelection(place)
+
+                // Ensure the AI-suggested place exists in Supabase before navigating
+                Task {
+                    do {
+                        try await SupabasePlaceService.shared.ensurePlaceExists(place: place)
+                        print("✅ [AI Search] Place saved to Supabase: \(place.name)")
+                    } catch {
+                        print("⚠️ [AI Search] Failed to save place to Supabase: \(error.localizedDescription)")
+                        // Continue anyway - the place data from AI is sufficient for display
+                    }
+
+                    await MainActor.run {
+                        onPlaceSelected(place)
+                    }
+                }
+
+                withAnimation {
+                    isSearchExpanded = false
+                }
             }
         )
         .frame(maxWidth: .infinity)

@@ -29,8 +29,15 @@ struct SearchResultsView: View {
     let onLoadMoreKeywords: () -> Void
     let onViewAllKeywords: () -> Void
 
+    // AI suggestions
+    let aiSuggestions: [DetailPlace]
+    let isAILoading: Bool
+    let aiError: String?
+    let onSelectAIPlace: (DetailPlace) -> Void
+
     @State private var isUsersCollapsed: Bool = false
     @State private var isKeywordCollapsed: Bool = false
+    @State private var isAICollapsed: Bool = false
 
     var body: some View {
         GeometryReader { geometry in
@@ -44,6 +51,13 @@ struct SearchResultsView: View {
                             userPhotos: userPhotos,
                             isCollapsed: $isUsersCollapsed,
                             onSelectUser: onSelectUser
+                        )
+                        AISuggestionsSection(
+                            suggestions: aiSuggestions,
+                            isLoading: isAILoading,
+                            error: aiError,
+                            isCollapsed: $isAICollapsed,
+                            onSelectPlace: onSelectAIPlace
                         )
                         KeywordResultsView(
                             keywordResults: keywordResults,

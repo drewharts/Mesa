@@ -29,6 +29,9 @@ class SearchViewModel: ObservableObject {
     @Published var hasMoreKeywordResults: Bool = false
     @Published var isLoadingMoreKeywords: Bool = false
 
+    /// AI-powered suggestions child ViewModel
+    let aiSuggestionsViewModel = AISuggestionsViewModel()
+
     /// Snapshot of user profile photos - updates only when search completes
     /// This prevents main thread blocking from reactive observation of ProfilePhotoCache
     @Published private(set) var userPhotosSnapshot: [String: UIImage] = [:]
@@ -55,6 +58,7 @@ class SearchViewModel: ObservableObject {
     // MARK: - Private State
     private var searchCache: [String: [MesaPlaceSuggestion]] = [:]
     private var currentSearchTask: Task<Void, Never>?
+    private var currentAISearchTask: Task<Void, Never>?  // Separate task for AI search
     private var cancellables = Set<AnyCancellable>()
     private var hasSetupPipeline = false  // ✅ Track if pipeline is setup
 
@@ -86,7 +90,7 @@ class SearchViewModel: ObservableObject {
     }
     
     private func setupSearchPipeline() {
-        // Debounced search pipeline
+        // Debounced search pipeline (150ms for fast results)
         $searchText
             .debounce(for: .milliseconds(150), scheduler: DispatchQueue.main)
             .removeDuplicates()
@@ -94,13 +98,30 @@ class SearchViewModel: ObservableObject {
             .sink { [weak self] text in
                 self?.currentSearchTask?.cancel()
                 self?.isSearching = true
-                
+
                 self?.currentSearchTask = Task {
                     await self?.performSearch(query: text)
                 }
             }
             .store(in: &cancellables)
-        
+
+        // Separate AI search pipeline (500ms debounce - more expensive call)
+        $searchText
+            .debounce(for: .milliseconds(500), scheduler: DispatchQueue.main)
+            .removeDuplicates()
+            .filter { [weak self] text in
+                guard let self = self else { return false }
+                return self.shouldUseAISearch(text)
+            }
+            .sink { [weak self] text in
+                self?.currentAISearchTask?.cancel()
+
+                self?.currentAISearchTask = Task {
+                    await self?.searchAISuggestions(query: text)
+                }
+            }
+            .store(in: &cancellables)
+
         // Clear results immediately when search text is empty
         $searchText
             .filter { $0.isEmpty }
@@ -111,11 +132,13 @@ class SearchViewModel: ObservableObject {
     }
     
     // MARK: - Search Methods
-    
+
     /// Clear all search results
     private func clearResults() {
         currentSearchTask?.cancel()
         currentSearchTask = nil
+        currentAISearchTask?.cancel()
+        currentAISearchTask = nil
         searchResults = []
         userResults = []
         keywordResults = []
@@ -129,6 +152,9 @@ class SearchViewModel: ObservableObject {
         currentKeywordTypes = []
         keywordSearchOffset = 0
         hasMoreKeywordResults = false
+
+        // Clear AI suggestions
+        aiSuggestionsViewModel.clear()
     }
     
     /// Perform search for places and users
@@ -154,7 +180,7 @@ class SearchViewModel: ObservableObject {
         searchError = nil
         showNoPlaceFound = false
 
-        // Perform parallel search operations
+        // Perform parallel search operations (AI search has separate 500ms debounce pipeline)
         await withTaskGroup(of: Void.self) { group in
             group.addTask {
                 await self.searchPlaces(query: query)
@@ -166,6 +192,15 @@ class SearchViewModel: ObservableObject {
                 await self.searchByKeyword(query: query)
             }
         }
+    }
+
+    /// Search for AI-powered suggestions
+    private func searchAISuggestions(query: String) async {
+        let latitude = locationManager.currentLocation?.coordinate.latitude ?? 40.7128
+        let longitude = locationManager.currentLocation?.coordinate.longitude ?? -74.0060
+
+        print("🤖 [AI Search] Calling AI suggestions API with query: '\(query)', lat: \(latitude), lng: \(longitude)")
+        aiSuggestionsViewModel.search(query: query, latitude: latitude, longitude: longitude)
     }
 
     /// Search for places matching keyword-to-type mappings within current viewport
@@ -372,6 +407,15 @@ class SearchViewModel: ObservableObject {
             profilePhotoURL: user.profilePhotoURL?.absoluteString
         )
     }
+
+    /// Save an AI-suggested place selection to recent history
+    func saveAIPlaceSelection(_ place: DetailPlace) {
+        recentSearchesService.savePlace(
+            id: place.id.uuidString,
+            name: place.name,
+            address: place.address
+        )
+    }
     
     /// Handle selection of a recent place (fetch full details and navigate)
     /// Uses PlaceSearchService to resolve external IDs (Google/Mapbox) via Mesa backend
@@ -398,6 +442,20 @@ class SearchViewModel: ObservableObject {
         objectWillChange.send()  // Notify views to refresh
     }
     
+    // MARK: - AI Search Detection
+
+    /// Determine if a query should trigger AI search
+    /// Simple rule: if query is long enough, use AI search
+    private func shouldUseAISearch(_ query: String) -> Bool {
+        let shouldTrigger = query.count > 15
+
+        if shouldTrigger {
+            print("🤖 [AI Search] Triggering for query (\(query.count) chars): '\(query)'")
+        }
+
+        return shouldTrigger
+    }
+
     // MARK: - Cache Management
 
     /// Limit cache size to prevent memory issues

@@ -332,4 +332,139 @@ class MesaBackendService {
         
         task.resume()
     }
+
+    /// Fetch AI-powered place suggestions from Mesa backend
+    func fetchAISuggestions(
+        query: String,
+        latitude: Double,
+        longitude: Double,
+        limit: Int = 5,
+        completion: @escaping (Result<[DetailPlace], Error>) -> Void
+    ) {
+        guard !query.isEmpty else {
+            print("🤖 [MesaBackend] AI suggestions: empty query, returning empty")
+            completion(.success([]))
+            return
+        }
+
+        print("🤖 [MesaBackend] Fetching AI suggestions for: '\(query)'")
+
+        guard let url = URL(string: "\(baseURL)/search/ai-suggestions") else {
+            print("🤖 [MesaBackend] Invalid URL")
+            completion(.failure(NSError(domain: "MesaBackend", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"])))
+            return
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let body: [String: Any] = [
+            "text": query,
+            "latitude": latitude,
+            "longitude": longitude,
+            "limit": limit
+        ]
+
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        } catch {
+            completion(.failure(error))
+            return
+        }
+
+        let task = session.dataTask(with: request) { data, response, error in
+            if let error = error {
+                print("🤖 [MesaBackend] AI suggestions network error: \(error.localizedDescription)")
+                completion(.failure(error))
+                return
+            }
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                print("🤖 [MesaBackend] AI suggestions: invalid server response")
+                completion(.failure(NSError(domain: "MesaBackend", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid server response"])))
+                return
+            }
+
+            print("🤖 [MesaBackend] AI suggestions response status: \(httpResponse.statusCode)")
+
+            guard (200...299).contains(httpResponse.statusCode) else {
+                if let data = data, let body = String(data: data, encoding: .utf8) {
+                    print("🤖 [MesaBackend] AI suggestions error body: \(body.prefix(500))")
+                }
+                completion(.failure(NSError(domain: "MesaBackend", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: "Server returned status code \(httpResponse.statusCode)"])))
+                return
+            }
+
+            guard let data = data else {
+                print("🤖 [MesaBackend] AI suggestions: no data received")
+                completion(.failure(NSError(domain: "MesaBackend", code: -1, userInfo: [NSLocalizedDescriptionKey: "No data received"])))
+                return
+            }
+
+            do {
+                let places = try self.parseAISuggestionsResponse(data: data)
+                print("🤖 [MesaBackend] AI suggestions parsed \(places.count) places")
+                completion(.success(places))
+            } catch {
+                print("🤖 [MesaBackend] AI suggestions parse error: \(error.localizedDescription)")
+                completion(.failure(error))
+            }
+        }
+
+        task.resume()
+    }
+
+    /// Parse AI suggestions response into DetailPlace array
+    private func parseAISuggestionsResponse(data: Data) throws -> [DetailPlace] {
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let suggestionsArray = json["suggestions"] as? [[String: Any]] else {
+            throw NSError(domain: "MesaBackend", code: -2, userInfo: [NSLocalizedDescriptionKey: "Invalid AI suggestions response structure"])
+        }
+
+        return suggestionsArray.compactMap { suggestionDict -> DetailPlace? in
+            guard let idString = suggestionDict["id"] as? String,
+                  let placeId = UUID(uuidString: idString),
+                  let name = suggestionDict["name"] as? String else {
+                return nil
+            }
+
+            var detailPlace = DetailPlace()
+            detailPlace.id = placeId
+            detailPlace.name = name
+            detailPlace.address = suggestionDict["address"] as? String
+            detailPlace.city = suggestionDict["city"] as? String
+            detailPlace.description = suggestionDict["description"] as? String
+            detailPlace.mapboxId = suggestionDict["mapboxId"] as? String
+            detailPlace.categories = suggestionDict["categories"] as? [String]
+            detailPlace.openHours = suggestionDict["openHours"] as? [String]
+            detailPlace.phone = suggestionDict["phone"] as? String
+            detailPlace.priceLevel = suggestionDict["priceLevel"] as? String
+            detailPlace.rating = suggestionDict["rating"] as? Double
+            detailPlace.userRatingsTotal = suggestionDict["ratingCount"] as? Int
+            detailPlace.reservable = suggestionDict["reservable"] as? Bool
+            detailPlace.servesBreakfast = suggestionDict["servesBreakfast"] as? Bool
+            detailPlace.serversLunch = suggestionDict["servesLunch"] as? Bool
+            detailPlace.serversDinner = suggestionDict["servesDinner"] as? Bool
+            detailPlace.Instagram = suggestionDict["instagram"] as? String
+            detailPlace.X = suggestionDict["twitter"] as? String
+            detailPlace.menuUrl = suggestionDict["menuUrl"] as? String
+            detailPlace.websiteUrl = suggestionDict["website"] as? String
+            detailPlace.aiSuggestionReason = suggestionDict["aiSuggestionReason"] as? String
+
+            // Extract thumbnail URL for photos
+            if let thumbnailUrl = suggestionDict["thumbnailUrl"] as? String {
+                detailPlace.photoUrls = [thumbnailUrl]
+            }
+
+            // Extract coordinates
+            if let coordDict = suggestionDict["coordinate"] as? [String: Any],
+               let latitude = coordDict["latitude"] as? Double,
+               let longitude = coordDict["longitude"] as? Double {
+                detailPlace.coordinate = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+            }
+
+            return detailPlace
+        }
+    }
 }
