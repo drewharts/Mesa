@@ -443,7 +443,7 @@ class ProfileViewModel: ObservableObject {
     
     /// Sets up debounced observer for list search text changes
     private func setupListSearchObserver() {
-        listSearchCancellable = listsViewModel.$listSearchText
+        listSearchCancellable = listsViewModel.searchViewModel.$listSearchText
             .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
             .sink { [weak self] (_: String) in
                 Task { @MainActor [weak self] in
@@ -465,10 +465,12 @@ class ProfileViewModel: ObservableObject {
                 
                 // Automatically load TikToks and reviews when user becomes available
                 // This happens after login, ensuring data is ready for views
+                // Note: fetchUserExternalPlaces() is NOT called here - it's loaded on-demand
+                // when navigating to PlaceDetailView to avoid unnecessary startup load
                 Task {
                     async let tikToksLoad: () = self.loadInitialExternalPlaces()
                     async let reviewsLoad: () = self.loadMyReviewedPlacesWithPagination()
-                    
+
                     // Run in parallel for efficiency
                     _ = await (tikToksLoad, reviewsLoad)
                 }
@@ -690,6 +692,17 @@ class ProfileViewModel: ObservableObject {
     /// Flags a TikTok place - delegates to tikTokViewModel.
     func flagTikTokPlace(for placeId: String, flagType: TikTokPlaceFlagType, tikTokUrl: String? = nil, userComment: String? = nil) {
         tikTokViewModel.flagTikTokPlace(for: placeId, flagType: flagType, tikTokUrl: tikTokUrl, userComment: userComment)
+    }
+
+    /// Records a place correction flag for analytics after user corrects a TikTok place association.
+    func recordPlaceCorrectionFlag(for placeId: String, newPlaceId: String) {
+        let tikTokUrl = tikTokViewModel.getExternalPlace(for: placeId)?.url
+        tikTokViewModel.flagTikTokPlace(
+            for: placeId,
+            flagType: .wrongSuggestion,
+            tikTokUrl: tikTokUrl,
+            userComment: "Corrected to place: \(newPlaceId)"
+        )
     }
 
     /// Loads a TikTok place flag - delegates to tikTokViewModel.

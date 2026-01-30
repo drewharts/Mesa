@@ -19,15 +19,6 @@ struct TikTokVideosSection: View {
     /// Callback when user changes the place association - parent should navigate to new place
     var onPlaceChanged: ((String) -> Void)?
 
-    @State private var showChangePlaceSheet = false
-
-    // MARK: - Computed Properties
-
-    /// Find TikTok video saved by current user (for Change Place functionality)
-    private var currentUserVideo: TikTokVideo? {
-        viewModel.videos.first { $0.savedByUserId == userSession.currentUserId }
-    }
-
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             if viewModel.isLoading {
@@ -75,50 +66,16 @@ struct TikTokVideosSection: View {
                 }
                 .padding(.top, 15)
                 
-                // TikTok Place Flagging (only for TikTok places)
-                if profile.hasTikTokVideos(for: placeId) {
-                    if let place = selectedPlace {
-                        TikTokPlaceFlaggingView(place: place)
-                            .environmentObject(profile)
-                            .padding(.top, 15)
-                    }
+                // TikTok Place Flagging - shown when TikTok videos are visible
+                if let place = selectedPlace {
+                    TikTokPlaceFlaggingView(place: place, onPlaceChanged: onPlaceChanged)
+                        .environmentObject(profile)
+                        .padding(.top, 15)
                 }
-
-                // Change Place option (only show if current user saved this TikTok)
-                if currentUserVideo != nil {
-                    changePlaceButton
-                }
-            }
-        }
-        .sheet(isPresented: $showChangePlaceSheet) {
-            if let place = selectedPlace, let video = currentUserVideo {
-                TikTokPlaceCorrectionSheet(
-                    placeId: placeId,
-                    placeName: place.name,
-                    externalPlaceId: video.externalPlaceId,
-                    onPlaceChanged: onPlaceChanged
-                )
-                .environmentObject(profile)
             }
         }
     }
 
-    // MARK: - Change Place Button
-    private var changePlaceButton: some View {
-        Button {
-            showChangePlaceSheet = true
-        } label: {
-            HStack(spacing: 6) {
-                Image(systemName: "magnifyingglass")
-                    .font(.caption)
-                Text("Wrong place? Search for correct place")
-                    .font(.caption)
-            }
-            .foregroundColor(.blue)
-        }
-        .padding(.top, 12)
-    }
-    
     // MARK: - Private Actions
     private func deleteVideo(_ video: TikTokVideo) async {
         guard let userId = userSession.currentUserId else { return }
