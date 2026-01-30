@@ -18,6 +18,10 @@ struct ExternalUserProfileFavoritesReviewsView: View {
     @ObservedObject var viewModel: ExternalUserProfileViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
+    @EnvironmentObject var profileVM: ProfileViewModel
+    @EnvironmentObject var locationManager: LocationManager
+    @EnvironmentObject var userProfileVM: UserProfileViewModel
+    @EnvironmentObject var userSession: UserSession
 
     @State private var showFavoritesPopup = false
     @State private var showReviewsPopup = false
@@ -55,10 +59,20 @@ struct ExternalUserProfileFavoritesReviewsView: View {
         .sheet(isPresented: $showFavoritesPopup) {
             ProfileFavoritesPopupView(viewModel: viewModel)
                 .environmentObject(selectedPlaceVM)
+                .environmentObject(profileVM)
+                .environmentObject(locationManager)
+                .environmentObject(userProfileVM)
+                .environmentObject(userSession)
+                .environmentObject(detailPlaceViewModel)
         }
         .sheet(isPresented: $showReviewsPopup) {
             ProfileReviewsPopupView(viewModel: viewModel)
                 .environmentObject(selectedPlaceVM)
+                .environmentObject(profileVM)
+                .environmentObject(locationManager)
+                .environmentObject(userProfileVM)
+                .environmentObject(userSession)
+                .environmentObject(detailPlaceViewModel)
         }
         .onAppear {
             loadDataIfNeeded()

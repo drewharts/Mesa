@@ -17,6 +17,7 @@ struct ProfileView: View {
     @EnvironmentObject var deepLinkViewModel: DeepLinkViewModel
     @EnvironmentObject var dataManager: DataManager
     @EnvironmentObject var serviceContainer: ServiceContainer
+    @EnvironmentObject var locationManager: LocationManager
     @StateObject private var photoImportVM = PhotoImportViewModel()
     @StateObject private var tikTokService = TikTokService()
 
@@ -60,6 +61,8 @@ struct ProfileView: View {
                         .environmentObject(placeVM)
                         .environmentObject(userSession)
                         .environmentObject(userProfileViewModel)
+                        .environmentObject(locationManager)
+                        .environmentObject(dataManager)
                     }
                 }
                 .navigationDestination(for: FollowListDestination.self) { destination in

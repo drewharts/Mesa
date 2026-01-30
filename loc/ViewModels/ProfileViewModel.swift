@@ -216,12 +216,6 @@ class ProfileViewModel: ObservableObject {
     // Performance optimization: image preloading cache
     @Published var preloadedImages: [String: Bool] = [:] // [imageURL: isPreloaded]
 
-    // Add deduplication mechanism for TikTok URLs
-    private var recentlyProcessedURLs: Set<String> = []
-
-    // TikTok URL processing state (kept in ProfileViewModel for URL processing flow)
-    private var currentProcessingTikTokUrl: String? = nil
-
     // Concurrency control for list loading
     private let maxConcurrentListLoads = 2
     private var activeListLoadTasks: [UUID: Task<Void, Never>] = [:]
@@ -263,13 +257,14 @@ class ProfileViewModel: ObservableObject {
         setupMyPlacesCallbacks()
         setupReviewsCallbacks()
         setupListsCallbacks()
+        setupTikTokCallbacks()
 
         // Observe location changes using Combine
         setupLocationObserver()
-        
+
         // Setup reactive data loading (MVVM + SRP)
         setupDataLoadingObserver()
-        
+
         // Setup list search observer with debouncing
         setupListSearchObserver()
 
@@ -285,11 +280,11 @@ class ProfileViewModel: ObservableObject {
             if let places = notification.userInfo?["places"] as? [DetailPlace],
                let tikTokUrl = notification.userInfo?["tikTokUrl"] as? String {
                 Task { @MainActor in
-                    self?.handleMultiplePlacesNotification(places: places, tikTokUrl: tikTokUrl)
+                    self?.tikTokViewModel.handleMultiplePlacesNotification(places: places, tikTokUrl: tikTokUrl)
                 }
             } else if let places = notification.userInfo?["places"] as? [DetailPlace] {
                 Task { @MainActor in
-                    self?.handleMultiplePlaces(places)
+                    self?.tikTokViewModel.handleMultiplePlaces(places)
                 }
             }
         }
@@ -326,6 +321,13 @@ class ProfileViewModel: ObservableObject {
     private func setupListsCallbacks() {
         listsViewModel.onPlaceSaversUpdate = { [weak self] placeId, userId, isAdding in
             self?.updatePlaceSavers(placeId: placeId, userId: userId, isAdding: isAdding)
+        }
+    }
+
+    /// Wires up callbacks from tikTokViewModel for cross-cutting concerns.
+    private func setupTikTokCallbacks() {
+        tikTokViewModel.onRefreshTikTokPlaces = { [weak self] in
+            self?.refreshTikTokPlacesAfterImport()
         }
     }
 
@@ -1346,146 +1348,23 @@ class ProfileViewModel: ObservableObject {
         hasPerformedInitialSort = true
     }
     
-    // MARK: - TikTok Processing
-    
-    func processSharedTikTokURL(_ urlString: String, 
-                               tikTokService: TikTokService,
-                               selectedPlaceVM: SelectedPlaceViewModel,
-                               placeVM: DetailPlaceViewModel) async -> Bool {
-        
-        // Check if this URL was recently processed
-        if recentlyProcessedURLs.contains(urlString) {
-            print("⚠️ [ProfileViewModel] URL already processed recently, skipping: \(urlString)")
-            return false
-        }
-        
-        // Check if already processing
-        if tikTokViewModel.isProcessingTikTok {
-            print("⚠️ [ProfileViewModel] Already processing a TikTok URL, skipping: \(urlString)")
-            return false
-        }
+    // MARK: - TikTok Processing (Delegation to tikTokViewModel)
 
-        // Mark as processing and add to recently processed
-        await MainActor.run {
-            tikTokViewModel.isProcessingTikTok = true
-            recentlyProcessedURLs.insert(urlString)
-            currentProcessingTikTokUrl = urlString // Store URL for later use
-        }
-
-        let result = await tikTokService.processTikTokURL(urlString)
-
-        // Don't set isProcessingTikTok = false here - let it persist until place detail is ready
-        // The loading screen will be dismissed when placeDetailViewReady() is called
-
-        // Clear from recently processed after 30 seconds
-        DispatchQueue.main.asyncAfter(deadline: .now() + 30.0) {
-            self.recentlyProcessedURLs.remove(urlString)
-        }
-
-        switch result {
-        case .success(let detailPlaces):
-            // Clear any previous errors
-            tikTokViewModel.tikTokImportError = nil
-
-            Task { @MainActor in
-                if detailPlaces.count == 1 {
-                    // Single place - show detail directly
-                    let detailPlace = detailPlaces[0]
-
-                    // Validate place has a name
-                    if detailPlace.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                        print("❌ [ProfileViewModel] Single place found but has no name")
-                        tikTokViewModel.noPlacesFoundTikTokUrl = urlString
-                        tikTokViewModel.isShowingNoPlacesFound = true
-                        tikTokViewModel.isProcessingTikTok = false
-                        deepLinkManager?.isProcessingDeepLink = false
-                        return
-                    }
-                    placeVM.places[detailPlace.id.uuidString] = detailPlace
-                    // Add current user as saver so pin shows with profile
-                    if let uid = await SupabaseAuthService.shared.currentUserId {
-                        placeVM.placeSavers[detailPlace.id.uuidString] = [uid]
-                    }
-                    placeVM.calculateAnnotationPlaces()
-                    selectedPlaceVM.selectPlaceAndFetchDetails(detailPlace, shouldAnimateMap: true)
-                    selectedPlaceVM.isDetailSheetPresented = true
-
-                    // Clear loading states immediately
-                    tikTokViewModel.isProcessingTikTok = false
-                    tikTokViewModel.isWaitingForPlaceDetail = false
-                    deepLinkManager?.isProcessingDeepLink = false
-                    currentProcessingTikTokUrl = nil
-
-                    // Note: TikTok places refresh happens in PlaceDetailView.onAppear
-                    // after backend creates the external_place entry
-                
-                } else if detailPlaces.count > 1 {
-                    // Multiple places - show selection screen
-                    print("🎯 [ProfileViewModel] MULTIPLE PLACES DETECTED: \(detailPlaces.count) places - SHOULD SHOW SELECTION SCREEN")
-                    
-                    // Validate all places have names
-                    let validPlaces = detailPlaces.filter { !$0.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-                    
-                    for place in validPlaces {
-                        print("   ✓ \(place.name)")
-                    }
-                    
-                    if validPlaces.isEmpty {
-                        print("❌ [ProfileViewModel] No valid places found after filtering")
-                        tikTokViewModel.noPlacesFoundTikTokUrl = urlString
-                        tikTokViewModel.isShowingNoPlacesFound = true
-                        tikTokViewModel.isProcessingTikTok = false
-                        deepLinkManager?.isProcessingDeepLink = false
-                        return
-                    }
-
-                    // Add all valid places to place manager
-                    for place in validPlaces {
-                        placeVM.places[place.id.uuidString] = place
-                    }
-
-                    tikTokViewModel.importedPlaces = validPlaces
-                    tikTokViewModel.isShowingPlaceSelection = true
-
-                    // Clear loading states
-                    tikTokViewModel.isProcessingTikTok = false
-                    tikTokViewModel.isWaitingForPlaceDetail = false
-                    deepLinkManager?.isProcessingDeepLink = false
-
-                    // Note: TikTok places refresh happens in PlaceDetailView.onAppear
-                    // after user selects a place and backend creates the external_place entry
-                } else {
-                    // No places found - show flagging interface
-                    print("❌ [ProfileViewModel] No places found: count = \(detailPlaces.count)")
-                    tikTokViewModel.noPlacesFoundTikTokUrl = urlString
-                    tikTokViewModel.isShowingNoPlacesFound = true
-                    tikTokViewModel.isProcessingTikTok = false
-                    tikTokViewModel.isWaitingForPlaceDetail = false
-                    deepLinkManager?.isProcessingDeepLink = false
-                }
-            }
-
-            return true
-
-        case .failure(let error):
-            print("❌ [ProfileViewModel] TikTok processing failed: \(error.localizedDescription)")
-
-            await MainActor.run {
-                // Set user-friendly error message based on error type
-                if error.localizedDescription.contains("network") || error.localizedDescription.contains("Internet") {
-                    tikTokViewModel.tikTokImportError = "Please check your internet connection and try again"
-                } else if error.localizedDescription.contains("invalid") || error.localizedDescription.contains("URL") {
-                    tikTokViewModel.tikTokImportError = "This doesn't appear to be a valid TikTok URL"
-                } else {
-                    tikTokViewModel.tikTokImportError = "We couldn't find any places in this TikTok video. Try sharing a different video that shows specific locations"
-                }
-                tikTokViewModel.isProcessingTikTok = false
-                deepLinkManager?.isProcessingDeepLink = false
-                currentProcessingTikTokUrl = nil
-            }
-
-            return false
-        }
+    /// Processes a shared TikTok URL - delegates to tikTokViewModel.
+    func processSharedTikTokURL(
+        _ urlString: String,
+        tikTokService: TikTokService,
+        selectedPlaceVM: SelectedPlaceViewModel,
+        placeVM: DetailPlaceViewModel
+    ) async -> Bool {
+        return await tikTokViewModel.processSharedTikTokURL(
+            urlString,
+            tikTokService: tikTokService,
+            selectedPlaceVM: selectedPlaceVM,
+            placeVM: placeVM,
+            deepLinkManager: deepLinkManager,
+            deepLinkViewModel: deepLinkViewModel
+        )
     }
 
     /// Clears TikTok import error - delegates to tikTokViewModel.
@@ -1493,34 +1372,21 @@ class ProfileViewModel: ObservableObject {
         tikTokViewModel.clearTikTokImportError()
     }
 
-    /// Clear place selection state
+    /// Clears place selection state - delegates to tikTokViewModel.
     func clearPlaceSelection() {
-        tikTokViewModel.importedPlaces = []
-        tikTokViewModel.isShowingPlaceSelection = false
-        currentProcessingTikTokUrl = nil // Clear stored URL
-
-        // Refresh TikTok places list after clearing selection (in case places were added to lists)
-        refreshTikTokPlacesAfterImport()
+        tikTokViewModel.clearPlaceSelection()
     }
 
-    /// Clear no places found state
+    /// Clears the no places found state - delegates to tikTokViewModel.
     func clearNoPlacesFound() {
-        tikTokViewModel.isShowingNoPlacesFound = false
-        tikTokViewModel.noPlacesFoundTikTokUrl = ""
-        // Ensure processing states are cleared when user closes the view
-        tikTokViewModel.isProcessingTikTok = false
-        tikTokViewModel.isWaitingForPlaceDetail = false
-        deepLinkManager?.isProcessingDeepLink = false
-        deepLinkViewModel?.isProcessingDeepLink = false  // Direct update to ensure sync
+        tikTokViewModel.clearNoPlacesFound(deepLinkManager: deepLinkManager, deepLinkViewModel: deepLinkViewModel)
     }
-    
+
+    /// Called when the place selection view appears - delegates to tikTokViewModel.
     func placeSelectionViewAppeared() {
-        tikTokViewModel.isWaitingForPlaceDetail = false
-        tikTokViewModel.isProcessingTikTok = false
-        deepLinkManager?.isProcessingDeepLink = false
-        deepLinkViewModel?.isProcessingDeepLink = false  // Direct update to ensure sync
+        tikTokViewModel.placeSelectionViewAppeared(deepLinkManager: deepLinkManager, deepLinkViewModel: deepLinkViewModel)
     }
-    
+
     func ensureListsLoaded() {
         guard let userId = user?.id else { 
             return 
@@ -1899,31 +1765,6 @@ class ProfileViewModel: ObservableObject {
         }
     }
     
-    private func handleMultiplePlaces(_ places: [DetailPlace]) {
-        print("🎯 [ProfileViewModel] Received \(places.count) places from DeepLinkManager")
-        for place in places {
-            print("   - \(place.name) (ID: \(place.id))")
-        }
-
-        tikTokViewModel.importedPlaces = places
-        tikTokViewModel.isShowingPlaceSelection = true
-        // Keep isWaitingForPlaceDetail = true until the sheet actually appears
-
-        print("🎯 [ProfileViewModel] Set isShowingPlaceSelection = true")
-    }
-    
-    /// Handle multiple places notification from DeepLinkManager
-    /// This is called when a notification is received with multiple places and TikTok URL
-    func handleMultiplePlacesNotification(places: [DetailPlace], tikTokUrl: String?) {
-        print("🎯 [ProfileViewModel] Handling multiple places notification with TikTok URL")
-        if let tikTokUrl = tikTokUrl {
-            currentProcessingTikTokUrl = tikTokUrl
-        }
-        handleMultiplePlaces(places)
-    }
-    
-
-    
     // MARK: - Place Conversion
     
     func convertToDetailPlace(_ nearbyPlace: NearbyPlaceFeature) -> DetailPlace {
@@ -1970,7 +1811,6 @@ class ProfileViewModel: ObservableObject {
         
         // Clear TikTok/external places data (delegated to child ViewModel)
         tikTokViewModel.resetAllData()
-        recentlyProcessedURLs.removeAll()
 
         // Clear reviewed places (delegated to child ViewModel)
         reviewsViewModel.resetAllData()
@@ -1992,9 +1832,6 @@ class ProfileViewModel: ObservableObject {
 
         // Clear place notes (flags are handled by tikTokViewModel.resetAllData())
         placeNotes.removeAll()
-
-        // Clear TikTok processing state (kept in ProfileViewModel)
-        currentProcessingTikTokUrl = nil
 
         // Reset loading states
         isLoadingInitialLists = false
@@ -2019,30 +1856,36 @@ class ProfileViewModel: ObservableObject {
         print("✅ [ProfileViewModel] All user data cleared")
     }
     
-    func handleTikTokNotification(url: String, 
-                                 tikTokService: TikTokService,
-                                 selectedPlaceVM: SelectedPlaceViewModel,
-                                 placeVM: DetailPlaceViewModel) {
-        Task {
-            await processSharedTikTokURL(url, 
-                                       tikTokService: tikTokService,
-                                       selectedPlaceVM: selectedPlaceVM,
-                                       placeVM: placeVM)
-        }
+    /// Handles a TikTok notification by processing the URL - delegates to tikTokViewModel.
+    func handleTikTokNotification(
+        url: String,
+        tikTokService: TikTokService,
+        selectedPlaceVM: SelectedPlaceViewModel,
+        placeVM: DetailPlaceViewModel
+    ) {
+        tikTokViewModel.handleTikTokNotification(
+            url: url,
+            tikTokService: tikTokService,
+            selectedPlaceVM: selectedPlaceVM,
+            placeVM: placeVM,
+            deepLinkManager: deepLinkManager,
+            deepLinkViewModel: deepLinkViewModel
+        )
     }
-    
-    func checkPendingTikTokURL(tikTokService: TikTokService,
-                              selectedPlaceVM: SelectedPlaceViewModel,
-                              placeVM: DetailPlaceViewModel) {
-        if let pendingURL = UserDefaults.standard.string(forKey: "pendingTikTokURL") {
-            Task {
-                await processSharedTikTokURL(pendingURL,
-                                           tikTokService: tikTokService,
-                                           selectedPlaceVM: selectedPlaceVM,
-                                           placeVM: placeVM)
-            }
-            UserDefaults.standard.removeObject(forKey: "pendingTikTokURL")
-        }
+
+    /// Checks for pending TikTok URL in UserDefaults - delegates to tikTokViewModel.
+    func checkPendingTikTokURL(
+        tikTokService: TikTokService,
+        selectedPlaceVM: SelectedPlaceViewModel,
+        placeVM: DetailPlaceViewModel
+    ) {
+        tikTokViewModel.checkPendingTikTokURL(
+            tikTokService: tikTokService,
+            selectedPlaceVM: selectedPlaceVM,
+            placeVM: placeVM,
+            deepLinkManager: deepLinkManager,
+            deepLinkViewModel: deepLinkViewModel
+        )
     }
     
     /// Formats distance for display (meters to miles/kilometers)

@@ -181,7 +181,13 @@ struct ExternalUserListPopupView: View {
     let initialListIndex: Int
     @Binding var placeColors: [UUID: Color]
 
+    // Environment objects needed to flow through to PlaceDetailViewInNavigation
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
+    @EnvironmentObject var profile: ProfileViewModel
+    @EnvironmentObject var locationManager: LocationManager
+    @EnvironmentObject var userProfileViewModel: UserProfileViewModel
+    @EnvironmentObject var userSession: UserSession
+    @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
     @Environment(\.presentationMode) var presentationMode
     @State private var currentListIndex: Int
     @State private var isLoadingMore: Bool = false

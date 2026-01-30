@@ -132,6 +132,8 @@ struct MainView: View {
                     .environmentObject(detailPlaceViewModel)
                     .environmentObject(userSession)
                     .environmentObject(userProfileViewModel)
+                    .environmentObject(locationManager)
+                    .environmentObject(dataManager)
                 }
             }
             .sheet(isPresented: Binding(

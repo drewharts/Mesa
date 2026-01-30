@@ -15,6 +15,8 @@ struct ExternalUserProfileContentView: View {
     @EnvironmentObject var detailPlaceVM: DetailPlaceViewModel
     @EnvironmentObject var userProfileVM: UserProfileViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
+    @EnvironmentObject var locationManager: LocationManager
+    @EnvironmentObject var dataManager: DataManager
     @Environment(\.presentationMode) var presentationMode
 
     @State private var showFollowers = false

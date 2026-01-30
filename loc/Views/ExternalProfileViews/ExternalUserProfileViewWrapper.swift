@@ -20,6 +20,8 @@ struct ExternalUserProfileViewWrapper: View {
     @EnvironmentObject var userSession: UserSession
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var userProfileVM: UserProfileViewModel
+    @EnvironmentObject var locationManager: LocationManager
+    @EnvironmentObject var dataManager: DataManager
 
     /// Creates a wrapper for an external user profile.
     /// - Parameters:
@@ -38,6 +40,8 @@ struct ExternalUserProfileViewWrapper: View {
             .environmentObject(userSession)
             .environmentObject(selectedPlaceVM)
             .environmentObject(userProfileVM)
+            .environmentObject(locationManager)
+            .environmentObject(dataManager)
             .task {
                 guard let currentUserId = userSession.currentUserId else { return }
                 await viewModel.loadInitialData(currentUserId: currentUserId)
