@@ -10,7 +10,6 @@ import UIKit
 
 struct FollowersListView: View {
     @EnvironmentObject var profile: ProfileViewModel
-    @EnvironmentObject var userProfileViewModel: UserProfileViewModel
     @EnvironmentObject var dataManager: DataManager
     @EnvironmentObject var userSession: UserSession
     @EnvironmentObject var detailPlaceVM: DetailPlaceViewModel

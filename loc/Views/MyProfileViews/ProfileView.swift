@@ -13,7 +13,8 @@ struct ProfileView: View {
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var placeVM: DetailPlaceViewModel
-    @EnvironmentObject var userProfileViewModel: UserProfileViewModel
+    @EnvironmentObject var userProfileNavigationViewModel: UserProfileNavigationViewModel
+    @EnvironmentObject var mapDisplayCoordinatorViewModel: MapDisplayCoordinatorViewModel
     @EnvironmentObject var deepLinkViewModel: DeepLinkViewModel
     @EnvironmentObject var dataManager: DataManager
     @EnvironmentObject var serviceContainer: ServiceContainer
@@ -50,17 +51,18 @@ struct ProfileView: View {
                     photoImportVM: photoImportVM,
                     profile: profile
                 ))
-                .navigationDestination(isPresented: $userProfileViewModel.isUserDetailPresented) {
-                    if let selectedUser = userProfileViewModel.selectedUser {
+                .navigationDestination(isPresented: $userProfileNavigationViewModel.isUserDetailPresented) {
+                    if let selectedUser = userProfileNavigationViewModel.selectedUser {
                         ExternalUserProfileViewWrapper(
                             user: selectedUser,
-                            pendingListId: userProfileViewModel.pendingListIdToOpen
+                            pendingListId: userProfileNavigationViewModel.pendingListIdToOpen
                         )
                         .environmentObject(profile)
                         .environmentObject(selectedPlaceVM)
                         .environmentObject(placeVM)
                         .environmentObject(userSession)
-                        .environmentObject(userProfileViewModel)
+                        .environmentObject(userProfileNavigationViewModel)
+                        .environmentObject(mapDisplayCoordinatorViewModel)
                         .environmentObject(locationManager)
                         .environmentObject(dataManager)
                     }
@@ -73,7 +75,7 @@ struct ProfileView: View {
                         case .followers:
                             FollowersListView()
                                 .environmentObject(profile)
-                                .environmentObject(userProfileViewModel)
+                                .environmentObject(userProfileNavigationViewModel)
                                 .environmentObject(dataManager)
                                 .environmentObject(userSession)
                                 .environmentObject(placeVM)
@@ -81,7 +83,7 @@ struct ProfileView: View {
                         case .following:
                             FollowingListView()
                                 .environmentObject(profile)
-                                .environmentObject(userProfileViewModel)
+                                .environmentObject(userProfileNavigationViewModel)
                                 .environmentObject(dataManager)
                                 .environmentObject(userSession)
                                 .environmentObject(placeVM)

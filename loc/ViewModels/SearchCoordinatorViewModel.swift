@@ -17,21 +17,21 @@ import UIKit
 class SearchCoordinatorViewModel {
     // MARK: - Dependencies (Weak references to prevent retain cycles)
     private weak var selectedPlaceVM: SelectedPlaceViewModel?
-    private weak var userProfileViewModel: UserProfileViewModel?
+    private weak var userProfileNavigationViewModel: UserProfileNavigationViewModel?
     private weak var userSession: UserSession?
-    
+
     // MARK: - Constants (Computed, not stored)
     var minSheetHeight: CGFloat { 250 }
     var maxSheetHeight: CGFloat { UIScreen.main.bounds.height * 0.85 }
-    
+
     // MARK: - Initialization
     init(
         selectedPlaceVM: SelectedPlaceViewModel,
-        userProfileViewModel: UserProfileViewModel,
+        userProfileNavigationViewModel: UserProfileNavigationViewModel,
         userSession: UserSession
     ) {
         self.selectedPlaceVM = selectedPlaceVM
-        self.userProfileViewModel = userProfileViewModel
+        self.userProfileNavigationViewModel = userProfileNavigationViewModel
         self.userSession = userSession
     }
     
@@ -53,7 +53,7 @@ class SearchCoordinatorViewModel {
     /// Single Responsibility: Coordinate user profile navigation
     func handleUserSelection(_ profileData: ProfileData) {
         guard let currentUserId = userSession?.currentUserId else { return }
-        userProfileViewModel?.selectUser(profileData, currentUserId: currentUserId)
+        userProfileNavigationViewModel?.selectUser(profileData, currentUserId: currentUserId)
     }
     
     /// Calculate sheet height for collapse if currently expanded

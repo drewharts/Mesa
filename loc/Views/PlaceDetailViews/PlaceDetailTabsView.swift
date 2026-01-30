@@ -17,7 +17,7 @@ struct PlaceDetailTabsView: View {
     // MARK: - Still needed for child views (temporary during migration)
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
-    @EnvironmentObject var userProfileViewModel: UserProfileViewModel
+    @EnvironmentObject var userProfileNavigationVM: UserProfileNavigationViewModel
     @EnvironmentObject var userSession: UserSession
     @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
 
@@ -149,7 +149,7 @@ struct PlaceDetailTabsView: View {
                     viewModel: viewModel.aboutTabViewModel.customPlaceCreatorViewModel,
                     onCreatorTapped: { userId in
                         guard let currentUserId = userSession.currentUserId else { return }
-                        userProfileViewModel.fetchAndSelectUser(userId: userId, currentUserId: currentUserId)
+                        userProfileNavigationVM.fetchAndSelectUser(userId: userId, currentUserId: currentUserId)
                     }
                 )
             } else if let restaurantType = viewModel.restaurantType {
@@ -254,7 +254,7 @@ struct PlaceDetailTabsView: View {
                 onAddPost: onAddReview
             )
             .environmentObject(selectedPlaceVM)
-            .environmentObject(userProfileViewModel)
+            .environmentObject(userProfileNavigationVM)
         }
     }
     
@@ -461,12 +461,8 @@ private struct SavedByIndicator: View {
                 detailPlaceViewModel: detailPlaceVM
             )
             
-            let userProfileVM = UserProfileViewModel(
-                dataManager: dataManager,
-                detailPlaceViewModel: detailPlaceVM,
-                placeService: services.placeService,
+            let userProfileNavigationVM = UserProfileNavigationViewModel(
                 userService: services.userService,
-                postService: services.postService,
                 userSession: userSession
             )
             
@@ -510,7 +506,7 @@ private struct SavedByIndicator: View {
             )
             .environmentObject(profileVM)
             .environmentObject(selectedPlaceVM)
-            .environmentObject(userProfileVM)
+            .environmentObject(userProfileNavigationVM)
             .environmentObject(userSession)
             .environmentObject(detailPlaceVM)
             .padding()

@@ -17,7 +17,7 @@ struct PlaceDetailViewInNavigation: View {
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var locationManager: LocationManager
-    @EnvironmentObject var userProfileViewModel: UserProfileViewModel
+    @EnvironmentObject var userProfileNavigationVM: UserProfileNavigationViewModel
     @EnvironmentObject var userSession: UserSession
     @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
     
@@ -45,7 +45,7 @@ struct PlaceDetailViewInNavigation: View {
                     .environmentObject(selectedPlaceVM)
                     .environmentObject(profile)
                     .environmentObject(locationManager)
-                    .environmentObject(userProfileViewModel)
+                    .environmentObject(userProfileNavigationVM)
                     .environmentObject(userSession)
                     .environmentObject(detailPlaceViewModel)
             }
@@ -118,7 +118,7 @@ struct PlaceDetailViewContent: View {
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var locationManager: LocationManager
-    @EnvironmentObject var userProfileViewModel: UserProfileViewModel
+    @EnvironmentObject var userProfileNavigationVM: UserProfileNavigationViewModel
     @EnvironmentObject var userSession: UserSession
     @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
 
@@ -146,7 +146,7 @@ struct PlaceDetailViewContent: View {
                             selectedPlaceVM.navigateToPlace(placeId: newPlaceId)
                         }
                     )
-                    .environmentObject(userProfileViewModel)
+                    .environmentObject(userProfileNavigationVM)
                     .environmentObject(detailPlaceViewModel)
                 }
             }
@@ -260,7 +260,7 @@ struct PlaceDetailViewContent: View {
         }
 
         // Configure savers VM for navigation
-        vm.configureSaversViewModel(userProfileViewModel: userProfileViewModel)
+        vm.configureSaversViewModel(userProfileNavigationViewModel: userProfileNavigationVM)
 
         // Set initial data
         if let place = selectedPlaceVM.selectedPlace {

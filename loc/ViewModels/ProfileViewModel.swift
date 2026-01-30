@@ -183,7 +183,7 @@ class ProfileViewModel: ObservableObject {
      private let userSession: UserSession
     private var deepLinkManager: DeepLinkManager?
     private var deepLinkViewModel: DeepLinkViewModel?
-    var userProfileViewModel: UserProfileViewModel?
+    var userProfileNavigationViewModel: UserProfileNavigationViewModel?
     weak var mapViewModel: MapViewModel?  // For updating friends' places in viewport
 
      @Published var isLoading: Bool = true
@@ -232,7 +232,7 @@ class ProfileViewModel: ObservableObject {
     private let locationManager: LocationManager
     private var cancellables = Set<AnyCancellable>()
     
-    init(userSession: UserSession, userService: UserService, detailPlaceViewModel: DetailPlaceViewModel, imageService: ImageService, placeService: PlaceService, postService: PostService, locationManager: LocationManager, deepLinkManager: DeepLinkManager? = nil, deepLinkViewModel: DeepLinkViewModel? = nil, userProfileViewModel: UserProfileViewModel? = nil) {
+    init(userSession: UserSession, userService: UserService, detailPlaceViewModel: DetailPlaceViewModel, imageService: ImageService, placeService: PlaceService, postService: PostService, locationManager: LocationManager, deepLinkManager: DeepLinkManager? = nil, deepLinkViewModel: DeepLinkViewModel? = nil) {
         // Initialize child ViewModels first (must happen before self is fully initialized)
         self.socialViewModel = ProfileSocialViewModel(userService: userService, userSession: userSession)
         self.accountViewModel = ProfileAccountViewModel(userService: userService, userSession: userSession)
@@ -253,7 +253,6 @@ class ProfileViewModel: ObservableObject {
         self.locationManager = locationManager
         self.deepLinkManager = deepLinkManager
         self.deepLinkViewModel = deepLinkViewModel
-        self.userProfileViewModel = userProfileViewModel
 
         // Wire up child ViewModel callbacks for cross-cutting map concerns
         setupFavoritesCallbacks()

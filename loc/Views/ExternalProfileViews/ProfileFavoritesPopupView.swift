@@ -17,7 +17,7 @@ struct ProfileFavoritesPopupView: View {
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var locationManager: LocationManager
-    @EnvironmentObject var userProfileViewModel: UserProfileViewModel
+    @EnvironmentObject var userProfileNavigationVM: UserProfileNavigationViewModel
     @EnvironmentObject var userSession: UserSession
     @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
     @Environment(\.presentationMode) var presentationMode

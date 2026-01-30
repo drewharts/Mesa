@@ -281,8 +281,8 @@ class PlaceDetailTabsViewModel: ObservableObject {
     }
 
     /// Configure savers VM with navigation dependency (call from View)
-    func configureSaversViewModel(userProfileViewModel: UserProfileViewModel) {
-        placeSaversViewModel.configure(userProfileViewModel: userProfileViewModel)
+    func configureSaversViewModel(userProfileNavigationViewModel: UserProfileNavigationViewModel) {
+        placeSaversViewModel.configure(userProfileNavigationViewModel: userProfileNavigationViewModel)
     }
     
     private func handlePlaceChanged(_ place: DetailPlace?) {

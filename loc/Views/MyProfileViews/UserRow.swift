@@ -17,7 +17,8 @@ struct UserRow: View {
     @EnvironmentObject var detailPlaceVM: DetailPlaceViewModel
     @EnvironmentObject var userSession: UserSession
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
-    @EnvironmentObject var userProfileVM: UserProfileViewModel
+    @EnvironmentObject var userProfileNavigationVM: UserProfileNavigationViewModel
+    @EnvironmentObject var mapDisplayCoordinatorVM: MapDisplayCoordinatorViewModel
     @EnvironmentObject var locationManager: LocationManager
     @EnvironmentObject var dataManager: DataManager
 
@@ -29,7 +30,8 @@ struct UserRow: View {
                 .environmentObject(detailPlaceVM)
                 .environmentObject(userSession)
                 .environmentObject(selectedPlaceVM)
-                .environmentObject(userProfileVM)
+                .environmentObject(userProfileNavigationVM)
+                .environmentObject(mapDisplayCoordinatorVM)
                 .environmentObject(locationManager)
                 .environmentObject(dataManager)
         }) {

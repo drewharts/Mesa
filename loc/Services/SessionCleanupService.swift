@@ -31,8 +31,9 @@ final class SessionCleanupService {
     private weak var detailPlaceViewModel: DetailPlaceViewModel?
     private weak var selectedPlaceViewModel: SelectedPlaceViewModel?
     private weak var profileViewModel: ProfileViewModel?
-    private weak var userProfileViewModel: UserProfileViewModel?
-    
+    private weak var userProfileNavigationViewModel: UserProfileNavigationViewModel?
+    private weak var mapDisplayCoordinatorViewModel: MapDisplayCoordinatorViewModel?
+
     private init() {}
     
     // MARK: - Configuration
@@ -43,12 +44,14 @@ final class SessionCleanupService {
         detailPlaceViewModel: DetailPlaceViewModel,
         selectedPlaceViewModel: SelectedPlaceViewModel,
         profileViewModel: ProfileViewModel,
-        userProfileViewModel: UserProfileViewModel
+        userProfileNavigationViewModel: UserProfileNavigationViewModel,
+        mapDisplayCoordinatorViewModel: MapDisplayCoordinatorViewModel
     ) {
         self.detailPlaceViewModel = detailPlaceViewModel
         self.selectedPlaceViewModel = selectedPlaceViewModel
         self.profileViewModel = profileViewModel
-        self.userProfileViewModel = userProfileViewModel
+        self.userProfileNavigationViewModel = userProfileNavigationViewModel
+        self.mapDisplayCoordinatorViewModel = mapDisplayCoordinatorViewModel
     }
     
     // MARK: - Public API
@@ -71,13 +74,16 @@ final class SessionCleanupService {
     private func clearViewModelCaches() {
         // Clear ProfileViewModel's user-specific data (profile picture, TikToks, reviewed places, etc.)
         profileViewModel?.clearAllUserData()
-        
-        // Clear UserProfileViewModel's cached user data
-        userProfileViewModel?.clearAllUserData()
-        
+
+        // Clear navigation ViewModel's cached user data
+        userProfileNavigationViewModel?.clearAllUserData()
+
+        // Clear map display ViewModel's cached data
+        mapDisplayCoordinatorViewModel?.clearAllUserData()
+
         // Clear DetailPlaceViewModel's user-specific data (profile pictures, places, annotations)
         detailPlaceViewModel?.clearAllUserData()
-        
+
         // Clear SelectedPlaceViewModel's cached posts and TikToks
         selectedPlaceViewModel?.clearAllUserData()
     }

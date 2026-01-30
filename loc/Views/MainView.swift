@@ -18,7 +18,8 @@ struct MainView: View {
     // MARK: - Required ViewModels (passed from parent as @ObservedObject)
     @ObservedObject var selectedPlaceVM: SelectedPlaceViewModel
     @ObservedObject var profileViewModel: ProfileViewModel
-    @ObservedObject var userProfileViewModel: UserProfileViewModel
+    @ObservedObject var userProfileNavigationViewModel: UserProfileNavigationViewModel
+    @ObservedObject var mapDisplayCoordinatorViewModel: MapDisplayCoordinatorViewModel
     @ObservedObject var detailPlaceViewModel: DetailPlaceViewModel
     @ObservedObject var deepLinkViewModel: DeepLinkViewModel
     @ObservedObject var notificationManager: NotificationManager
@@ -45,7 +46,8 @@ struct MainView: View {
     init(
         selectedPlaceVM: SelectedPlaceViewModel,
         profileViewModel: ProfileViewModel,
-        userProfileViewModel: UserProfileViewModel,
+        userProfileNavigationViewModel: UserProfileNavigationViewModel,
+        mapDisplayCoordinatorViewModel: MapDisplayCoordinatorViewModel,
         detailPlaceViewModel: DetailPlaceViewModel,
         deepLinkViewModel: DeepLinkViewModel,
         notificationManager: NotificationManager,
@@ -57,7 +59,8 @@ struct MainView: View {
     ) {
         self.selectedPlaceVM = selectedPlaceVM
         self.profileViewModel = profileViewModel
-        self.userProfileViewModel = userProfileViewModel
+        self.userProfileNavigationViewModel = userProfileNavigationViewModel
+        self.mapDisplayCoordinatorViewModel = mapDisplayCoordinatorViewModel
         self.detailPlaceViewModel = detailPlaceViewModel
         self.deepLinkViewModel = deepLinkViewModel
         self.notificationManager = notificationManager
@@ -66,7 +69,7 @@ struct MainView: View {
         self.deepLinkManager = deepLinkManager
         self.dataManager = dataManager
         self.serviceContainer = serviceContainer
-        
+
         // Initialize sheet height to min - partially expanded on first open
         self._sheetHeight = State(initialValue: searchCoordinator.minSheetHeight)
     }
@@ -85,7 +88,8 @@ struct MainView: View {
                     placeService: serviceContainer.placeService,
                     profileViewModel: profileViewModel,
                     dataManager: dataManager,
-                    userProfileViewModel: userProfileViewModel,
+                    userProfileNavigationViewModel: userProfileNavigationViewModel,
+                    mapDisplayCoordinatorViewModel: mapDisplayCoordinatorViewModel,
                     serviceContainer: serviceContainer,
                     notificationManager: notificationManager,
                     onMapTap: handleMapTap
@@ -121,17 +125,18 @@ struct MainView: View {
                 loadingOverlay
             }
             .navigationBarHidden(true)
-            .navigationDestination(isPresented: $userProfileViewModel.isUserDetailPresented) {
-                if let selectedUser = userProfileViewModel.selectedUser {
+            .navigationDestination(isPresented: $userProfileNavigationViewModel.isUserDetailPresented) {
+                if let selectedUser = userProfileNavigationViewModel.selectedUser {
                     ExternalUserProfileViewWrapper(
                         user: selectedUser,
-                        pendingListId: userProfileViewModel.pendingListIdToOpen
+                        pendingListId: userProfileNavigationViewModel.pendingListIdToOpen
                     )
                     .environmentObject(profileViewModel)
                     .environmentObject(selectedPlaceVM)
                     .environmentObject(detailPlaceViewModel)
                     .environmentObject(userSession)
-                    .environmentObject(userProfileViewModel)
+                    .environmentObject(userProfileNavigationViewModel)
+                    .environmentObject(mapDisplayCoordinatorViewModel)
                     .environmentObject(locationManager)
                     .environmentObject(dataManager)
                 }
@@ -166,7 +171,7 @@ struct MainView: View {
                     .environmentObject(selectedPlaceVM)
                     .environmentObject(locationManager)
                     .environmentObject(userSession)
-                    .environmentObject(userProfileViewModel)
+                    .environmentObject(userProfileNavigationViewModel)
                     .environmentObject(notificationManager)
                     .environmentObject(profileViewModel)
                     .environmentObject(detailPlaceViewModel)
@@ -178,26 +183,27 @@ struct MainView: View {
                     .presentationBackgroundInteraction(.enabled(upThrough: .height(800)))
                     .interactiveDismissDisabled(false)
             }
-            .onChange(of: userProfileViewModel.isUserDetailPresented) { oldValue, newValue in
+            .onChange(of: userProfileNavigationViewModel.isUserDetailPresented) { oldValue, newValue in
                 // Dismiss PlaceDetailView sheet when navigating to user profile
                 // MVVM: View observes ViewModel state changes and coordinates sheet dismissal
                 if newValue && selectedPlaceVM.isDetailSheetPresented {
                     // Preserve state if navigating from place detail context
-                    if userProfileViewModel.navigatedFromPlaceDetail {
+                    if userProfileNavigationViewModel.navigatedFromPlaceDetail {
                         selectedPlaceVM.preserveStateForNavigation()
                     }
                     selectedPlaceVM.isDetailSheetPresented = false
                 }
 
                 // Restore state when returning from profile (if navigated from place detail)
-                if oldValue && !newValue && userProfileViewModel.navigatedFromPlaceDetail {
+                if oldValue && !newValue && userProfileNavigationViewModel.navigatedFromPlaceDetail {
                     selectedPlaceVM.restoreStateAfterNavigation()
-                    userProfileViewModel.navigatedFromPlaceDetail = false
+                    userProfileNavigationViewModel.navigatedFromPlaceDetail = false
                 }
             }
             .fullScreenCover(isPresented: $shouldNavigateToProfile) {
                 ProfileView()
-                    .environmentObject(userProfileViewModel)
+                    .environmentObject(userProfileNavigationViewModel)
+                    .environmentObject(mapDisplayCoordinatorViewModel)
                     .environmentObject(deepLinkViewModel)
                     .environmentObject(selectedPlaceVM)
                     .environmentObject(detailPlaceViewModel)
@@ -236,7 +242,7 @@ struct MainView: View {
                 }
             }
         }
-        .onChange(of: userProfileViewModel.isUserDetailPresented) { oldValue, newValue in
+        .onChange(of: userProfileNavigationViewModel.isUserDetailPresented) { oldValue, newValue in
             // When navigating BACK from user profile (true -> false), ensure search is collapsed and keyboard dismissed
             if oldValue == true && newValue == false {
                 appCoordinator.isSearchExpanded = false

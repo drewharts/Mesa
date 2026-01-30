@@ -25,7 +25,7 @@ struct PlaceDetailView: View {
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var locationManager: LocationManager
-    @EnvironmentObject var userProfileViewModel: UserProfileViewModel
+    @EnvironmentObject var userProfileNavigationViewModel: UserProfileNavigationViewModel
     @EnvironmentObject var userSession: UserSession
     @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
 
@@ -104,7 +104,7 @@ struct PlaceDetailView: View {
             onAddReview: { showCreatePost = true },
             onPlaceChanged: handlePlaceNavigation
         )
-        .environmentObject(userProfileViewModel)
+        .environmentObject(userProfileNavigationViewModel)
         .environmentObject(detailPlaceViewModel)
     }
 
@@ -224,7 +224,7 @@ struct PlaceDetailView: View {
             profile?.favoritesViewModel.showMaxFavoritesAlert = false
         }
 
-        vm.configureSaversViewModel(userProfileViewModel: userProfileViewModel)
+        vm.configureSaversViewModel(userProfileNavigationViewModel: userProfileNavigationViewModel)
 
         configureInitialData(for: vm)
 

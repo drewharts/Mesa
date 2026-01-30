@@ -26,7 +26,7 @@ struct ExternalUserProfileListsView: View {
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var locationManager: LocationManager
-    @EnvironmentObject var userProfileViewModel: UserProfileViewModel
+    @EnvironmentObject var userProfileNavigationVM: UserProfileNavigationViewModel
     @EnvironmentObject var userSession: UserSession
     @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
     @EnvironmentObject var dataManager: DataManager
@@ -52,7 +52,7 @@ struct ExternalUserProfileListsView: View {
                 .environmentObject(selectedPlaceVM)
                 .environmentObject(profile)
                 .environmentObject(locationManager)
-                .environmentObject(userProfileViewModel)
+                .environmentObject(userProfileNavigationVM)
                 .environmentObject(userSession)
                 .environmentObject(detailPlaceViewModel)
                 .environmentObject(ServiceContainer.shared)
@@ -140,7 +140,7 @@ struct ExternalUserProfileListsView: View {
             .environmentObject(selectedPlaceVM)
             .environmentObject(profile)
             .environmentObject(locationManager)
-            .environmentObject(userProfileViewModel)
+            .environmentObject(userProfileNavigationVM)
             .environmentObject(userSession)
             .environmentObject(detailPlaceViewModel)
             .environmentObject(ServiceContainer.shared)
@@ -185,7 +185,7 @@ struct ExternalUserListPopupView: View {
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var locationManager: LocationManager
-    @EnvironmentObject var userProfileViewModel: UserProfileViewModel
+    @EnvironmentObject var userProfileNavigationVM: UserProfileNavigationViewModel
     @EnvironmentObject var userSession: UserSession
     @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
     @Environment(\.presentationMode) var presentationMode

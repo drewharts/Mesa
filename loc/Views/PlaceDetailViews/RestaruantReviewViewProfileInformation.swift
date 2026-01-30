@@ -6,7 +6,7 @@ struct PostProfileInformationView: View {
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var userSession: UserSession
-    @EnvironmentObject var userProfileViewModel: UserProfileViewModel
+    @EnvironmentObject var userProfileNavigationVM: UserProfileNavigationViewModel
     @State private var shouldNavigateToProfile = false
 
     var body: some View {
@@ -20,11 +20,11 @@ struct PostProfileInformationView: View {
                     .clipShape(Circle())
                     .onTapGesture {
                         guard let currentUserId = userSession.currentUserId else { return }
-                        
+
                         if post.userId == currentUserId {
                             shouldNavigateToProfile = true
                         } else {
-                            userProfileViewModel.fetchAndSelectUser(userId: post.userId, currentUserId: currentUserId)
+                            userProfileNavigationVM.fetchAndSelectUser(userId: post.userId, currentUserId: currentUserId)
                         }
                     }
             } else if photosViewModel.profilePhotoLoadingState(forUserId: post.userId) == .loading {

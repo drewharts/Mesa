@@ -20,7 +20,8 @@ struct ExternalUserProfileFavoritesReviewsView: View {
     @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
     @EnvironmentObject var profileVM: ProfileViewModel
     @EnvironmentObject var locationManager: LocationManager
-    @EnvironmentObject var userProfileVM: UserProfileViewModel
+    @EnvironmentObject var userProfileNavigationVM: UserProfileNavigationViewModel
+    @EnvironmentObject var mapDisplayCoordinatorVM: MapDisplayCoordinatorViewModel
     @EnvironmentObject var userSession: UserSession
 
     @State private var showFavoritesPopup = false
@@ -61,7 +62,8 @@ struct ExternalUserProfileFavoritesReviewsView: View {
                 .environmentObject(selectedPlaceVM)
                 .environmentObject(profileVM)
                 .environmentObject(locationManager)
-                .environmentObject(userProfileVM)
+                .environmentObject(userProfileNavigationVM)
+                .environmentObject(mapDisplayCoordinatorVM)
                 .environmentObject(userSession)
                 .environmentObject(detailPlaceViewModel)
         }
@@ -70,7 +72,8 @@ struct ExternalUserProfileFavoritesReviewsView: View {
                 .environmentObject(selectedPlaceVM)
                 .environmentObject(profileVM)
                 .environmentObject(locationManager)
-                .environmentObject(userProfileVM)
+                .environmentObject(userProfileNavigationVM)
+                .environmentObject(mapDisplayCoordinatorVM)
                 .environmentObject(userSession)
                 .environmentObject(detailPlaceViewModel)
         }

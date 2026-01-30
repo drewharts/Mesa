@@ -40,7 +40,7 @@ class PlaceSaversViewModel: ObservableObject {
     var onSaversUpdated: ((_ placeId: String, _ saverIds: [String]) -> Void)?
 
     // For user navigation (temporary coupling during migration)
-    private weak var userProfileViewModel: UserProfileViewModel?
+    private weak var userProfileNavigationViewModel: UserProfileNavigationViewModel?
 
     private var currentPlaceId: String?
     private var fetchTask: Task<Void, Never>?
@@ -54,9 +54,9 @@ class PlaceSaversViewModel: ObservableObject {
     
     // MARK: - Configuration
     
-    /// Call this to set up the UserProfileViewModel reference for navigation
-    func configure(userProfileViewModel: UserProfileViewModel) {
-        self.userProfileViewModel = userProfileViewModel
+    /// Call this to set up the UserProfileNavigationViewModel reference for navigation
+    func configure(userProfileNavigationViewModel: UserProfileNavigationViewModel) {
+        self.userProfileNavigationViewModel = userProfileNavigationViewModel
     }
     
     // MARK: - Public Actions
@@ -82,7 +82,7 @@ class PlaceSaversViewModel: ObservableObject {
     /// Takes dismiss closure from View (View owns presentation state)
     func selectUser(_ user: ProfileData, dismiss: @escaping () -> Void) {
         guard let currentUserId = userSession.currentUserId,
-              let userProfileVM = userProfileViewModel else { return }
+              let userProfileNavVM = userProfileNavigationViewModel else { return }
 
         // Dismiss sheet first (View handles this)
         dismiss()
@@ -90,7 +90,7 @@ class PlaceSaversViewModel: ObservableObject {
         // Navigate after brief delay for smooth transition
         // Pass fromPlaceDetail: true so state can be restored when returning
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            userProfileVM.selectUser(user, currentUserId: currentUserId, fromPlaceDetail: true)
+            userProfileNavVM.selectUser(user, currentUserId: currentUserId, fromPlaceDetail: true)
         }
     }
     

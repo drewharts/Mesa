@@ -33,7 +33,7 @@ class NotificationManager: ObservableObject {
         highlightedReviewId = reviewId
     }
     
-    /// Handles follow notification tap by posting notification for UserProfileViewModel to observe
+    /// Handles follow notification tap by posting notification for UserProfileNavigationViewModel to observe
     func handleFollowNotificationTap(userId: String) {
         DispatchQueue.main.async {
             NotificationCenter.default.post(

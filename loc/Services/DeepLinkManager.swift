@@ -27,7 +27,7 @@ class DeepLinkManager: ObservableObject {
     
     // Weak references to avoid retain cycles (set after init due to circular dependencies)
     private weak var profileViewModel: ProfileViewModel?
-    private weak var userProfileViewModel: UserProfileViewModel?
+    private weak var userProfileNavigationViewModel: UserProfileNavigationViewModel?
     private weak var userSession: UserSession?
     
     // MARK: - TikTok Processing State
@@ -58,8 +58,8 @@ class DeepLinkManager: ObservableObject {
         self.profileViewModel = profileViewModel
     }
     
-    func setUserProfileViewModel(_ userProfileViewModel: UserProfileViewModel) {
-        self.userProfileViewModel = userProfileViewModel
+    func setUserProfileNavigationViewModel(_ userProfileNavigationViewModel: UserProfileNavigationViewModel) {
+        self.userProfileNavigationViewModel = userProfileNavigationViewModel
     }
     
     func setUserSession(_ userSession: UserSession) {
@@ -113,8 +113,8 @@ class DeepLinkManager: ObservableObject {
             return
         }
 
-        guard let userProfileViewModel = userProfileViewModel else {
-            print("❌ [DeepLinkManager] UserProfileViewModel not set, cannot navigate to profile")
+        guard let userProfileNavigationViewModel = userProfileNavigationViewModel else {
+            print("❌ [DeepLinkManager] UserProfileNavigationViewModel not set, cannot navigate to profile")
             return
         }
 
@@ -123,8 +123,8 @@ class DeepLinkManager: ObservableObject {
             return
         }
 
-        // Delegate to UserProfileViewModel - it owns the profile navigation responsibility
-        userProfileViewModel.navigateToUserWithList(
+        // Delegate to UserProfileNavigationViewModel - it owns the profile navigation responsibility
+        userProfileNavigationViewModel.navigateToUserWithList(
             userId: shareableList.userId,
             listId: shareableList.id,
             currentUserId: currentUserId
@@ -137,8 +137,8 @@ class DeepLinkManager: ObservableObject {
             return
         }
 
-        guard let userProfileViewModel = userProfileViewModel else {
-            print("❌ [DeepLinkManager] UserProfileViewModel not set, cannot navigate to profile")
+        guard let userProfileNavigationViewModel = userProfileNavigationViewModel else {
+            print("❌ [DeepLinkManager] UserProfileNavigationViewModel not set, cannot navigate to profile")
             return
         }
 
@@ -149,8 +149,8 @@ class DeepLinkManager: ObservableObject {
 
         print("👤 [DeepLinkManager] Navigating to profile: \(shareableProfile.id)")
 
-        // Navigate to profile using UserProfileViewModel
-        userProfileViewModel.fetchAndSelectUser(userId: shareableProfile.id, currentUserId: currentUserId)
+        // Navigate to profile using UserProfileNavigationViewModel
+        userProfileNavigationViewModel.fetchAndSelectUser(userId: shareableProfile.id, currentUserId: currentUserId)
     }
 
     private func handlePlaceDeepLink(_ url: URL) async {
