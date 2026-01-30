@@ -98,6 +98,31 @@ class ProfileListsViewModel: ObservableObject {
     /// Called when places dictionary needs updating
     var onPlacesUpdate: ((String, DetailPlace?) -> Void)?
 
+    /// Called to get place coordinate for distance calculation
+    var getPlaceCoordinate: ((String) -> CLLocationCoordinate2D?)?
+
+    /// Called to get current user's info for collaborative list attribution
+    var getUserInfo: (() -> (fullName: String?, profilePhotoURL: URL?)?)?
+
+    /// Called to get placeSavers for a place
+    var getPlaceSavers: ((String) -> [String]?)?
+
+    /// Called to fetch place image
+    var onFetchPlaceImage: ((String) -> Void)?
+
+    /// Called to set parent's loading state
+    var onSetLoading: ((Bool) -> Void)?
+
+    /// Called to get current user ID
+    var getCurrentUserId: (() -> String?)?
+
+    /// Called to check if a place exists in the places dictionary
+    var hasPlace: ((String) -> Bool)?
+
+    // MARK: - Private State for Sorting
+
+    private var hasPerformedInitialSort = false
+
     // MARK: - Initialization
 
     /// Initializes the lists view model with required dependencies.
@@ -135,7 +160,7 @@ class ProfileListsViewModel: ObservableObject {
 
     // MARK: - List CRUD
 
-    /// Creates a new place list.
+    /// Creates a new place list with full state management.
     func addNewPlaceList(named name: String, city: String, emoji: String, image: String) async -> Result<PlaceList, Error> {
         guard let userId = userSession?.currentUserId else {
             return .failure(NSError(domain: "ProfileListsViewModel", code: -1,
@@ -153,6 +178,7 @@ class ProfileListsViewModel: ObservableObject {
 
             // Update old format (for backward compatibility)
             userLists.append(createdList)
+            sortListsByDistance()
             setRecentlyCreatedList(createdList.id)
 
             // Add new list to top of lightweightPlaceLists for immediate UI update
@@ -169,17 +195,40 @@ class ProfileListsViewModel: ObservableObject {
             )
             lightweightPlaceLists.insert(lightweightList, at: 0)
 
+            // Refresh lightweight place lists to include the new list with proper sorting
+            if let location = locationManager?.currentLocation?.coordinate {
+                do {
+                    let lists = try await SupabaseUserService.shared.fetchPlaceListsByProximity(
+                        userId: userId,
+                        userLatitude: location.latitude,
+                        userLongitude: location.longitude,
+                        page: 1,
+                        pageSize: 6
+                    )
+                    // Merge: keep new list at top, then add others (avoiding duplicates)
+                    var merged = [lightweightList]
+                    merged.append(contentsOf: lists.filter { $0.list_id != lightweightList.list_id })
+                    lightweightPlaceLists = merged
+                    placeListsCurrentPage = 1
+                    hasMorePlaceLists = lists.count >= 6
+                } catch {
+                    // Non-critical error - list was already added locally
+                }
+            }
+
             return .success(createdList)
         } catch {
             return .failure(error)
         }
     }
 
-    /// Deletes a lightweight place list.
+    /// Deletes a lightweight place list from database and removes from local state.
     func deleteLightweightList(_ list: LightweightPlaceList) async -> Result<Void, Error> {
         do {
+            // Delete from database
             try await PlaceListService.shared.deleteList(listId: list.list_id)
 
+            // Remove from local state
             lightweightPlaceLists.removeAll { $0.list_id == list.list_id }
             lightweightPlaceListPlaces.removeValue(forKey: list.list_id)
             lightweightPlaceListCounts.removeValue(forKey: list.list_id)
@@ -190,23 +239,352 @@ class ProfileListsViewModel: ObservableObject {
         }
     }
 
-    /// Removes a place list (legacy).
+    /// Removes a place list (legacy PlaceList format).
     func removePlaceList(placeList: PlaceList) {
-        guard let userId = userSession?.currentUserId else { return }
+        guard let index = userLists.firstIndex(where: { $0.id == placeList.id }) else { return }
+        guard let currentUserId = userSession?.currentUserId else { return }
 
-        userLists.removeAll { $0.id == placeList.id }
-        userListsPlaces.removeValue(forKey: placeList.id.uuidString)
+        // Optimistic update: remove from local state
+        userLists.remove(at: index)
+        sortListsByDistance()
 
+        // Persist deletion to database
         Task {
-            try? await PlaceListService.shared.deleteList(listId: placeList.id.uuidString)
+            do {
+                try await PlaceListService.shared.deleteList(listId: placeList.id.uuidString)
+            } catch {
+                // Re-add the list if deletion failed
+                await MainActor.run {
+                    self.userLists.append(placeList)
+                    self.sortListsByDistance()
+                }
+                print("❌ [ProfileListsViewModel] Failed to delete list: \(error)")
+            }
         }
     }
 
-    // MARK: - Place Count
+    // MARK: - Place Count & Membership
 
     /// Gets place count for a list.
     func placeCount(forListId listId: UUID) -> Int {
         return placeListCounts[listId] ?? 0
+    }
+
+    /// Checks if a place is in a specific list.
+    func isPlaceInList(listId: UUID, placeId: String) -> Bool {
+        let listIdString = listId.uuidString
+        let places = userListsPlaces[listIdString] ?? []
+        return places.contains(placeId)
+    }
+
+    /// Checks if a place is in any of the user's lists (uses SQL function).
+    func isPlaceInAnyList(placeId: String) async -> Bool {
+        guard let userId = userSession?.currentUserId else { return false }
+
+        do {
+            return try await PlaceListService.shared.isPlaceInAnyUserList(
+                userId: userId,
+                placeId: placeId
+            )
+        } catch {
+            print("❌ [ProfileListsViewModel] Error checking place list membership: \(error)")
+            return false
+        }
+    }
+
+    // MARK: - Add/Remove Place from List
+
+    /// Add a place to a lightweight list (current format).
+    func addPlaceToLightweightList(listId: String, place: DetailPlace, updatedCount: Int? = nil) {
+        guard let userId = userSession?.currentUserId else { return }
+
+        let placeId = place.id.uuidString
+
+        // Create lightweight place object with added_by info for collaborative lists
+        let userInfo = getUserInfo?()
+        let lightweightPlace = LightweightPlace(
+            place_id: placeId,
+            name: place.name,
+            latest_review_photo: place.photoUrls?.first,
+            external_place_id: nil, // Not a TikTok external place
+            tiktok_url: nil,
+            added_by_user_id: userId,
+            added_by_name: userInfo?.fullName,
+            added_by_photo_url: userInfo?.profilePhotoURL?.absoluteString
+        )
+
+        var didInsert = false
+
+        // Update local lightweightPlaceListPlaces
+        // Insert at index 0 so new places appear first (matches DB sort_order behavior)
+        if var existingPlaces = lightweightPlaceListPlaces[listId] {
+            if !existingPlaces.contains(where: { $0.place_id == placeId }) {
+                existingPlaces.insert(lightweightPlace, at: 0)  // Prepend, not append
+                lightweightPlaceListPlaces[listId] = existingPlaces
+                didInsert = true
+            }
+        } else {
+            lightweightPlaceListPlaces[listId] = [lightweightPlace]
+            didInsert = true
+        }
+
+        if didInsert {
+            if let finalCount = updatedCount {
+                // Caller owns state and has already done the math - just store it
+                lightweightPlaceListCounts[listId] = finalCount
+            } else {
+                // Legacy path: we own the state, so we do the math
+                let startingCount = lightweightPlaceListCounts[listId]
+                    ?? lightweightPlaceLists.first(where: { $0.list_id == listId })?.place_count
+                    ?? 0
+                lightweightPlaceListCounts[listId] = startingCount + 1
+            }
+        }
+
+        // Update places dictionary for immediate UI update
+        onPlacesUpdate?(placeId, place)
+
+        // Add current user as saver so places appear on map with profile picture
+        let existingSavers = getPlaceSavers?(placeId)
+        if existingSavers == nil || !(existingSavers?.contains(userId) ?? false) {
+            onPlaceSaversUpdate?(placeId, userId, true)
+        }
+
+        // Recalculate map annotations to include the new place
+        onAnnotationPlacesRecalculate?()
+
+        // Persist to Supabase with added_by for collaborative list attribution
+        Task {
+            do {
+                try await SupabaseUserService.shared.addPlaceToList(
+                    listId: listId,
+                    placeId: placeId,
+                    addedBy: userId
+                )
+            } catch {
+                print("❌ [ProfileListsViewModel] Failed to add place to list: \(error)")
+            }
+        }
+    }
+
+    /// Add a place to a list (old UUID-based format) - delegates to addPlaceToLightweightList.
+    /// DEPRECATED: Use addPlaceToLightweightList directly for new code
+    func addPlaceToList(listId: UUID, place: DetailPlace) {
+        let listIdString = listId.uuidString
+        guard let listIndex = userLists.firstIndex(where: { $0.id == listId }) else { return }
+
+        // Delegate to new implementation for core functionality
+        addPlaceToLightweightList(listId: listIdString, place: place)
+
+        // Legacy-specific: Update old PlaceList format
+        let placeForList = place.toPlace()
+        var places = userListsPlaces[listIdString] ?? []
+        if !places.contains(place.id.uuidString) {
+            places.append(place.id.uuidString)
+            userListsPlaces[listIdString] = places
+        }
+
+        if !userLists[listIndex].places.contains(where: { $0.id == place.id }) {
+            userLists[listIndex].places.append(placeForList)
+            placeListCounts[listId] = userLists[listIndex].places.count
+        }
+
+        // Legacy-specific: Update average coordinates and pagination
+        recalculateAverageCoordinates(for: listId)
+        resetListPagination(listId: listId)
+    }
+
+    /// Remove a place from a lightweight list.
+    func removePlaceFromLightweightList(listId: String, place: DetailPlace, updatedCount: Int? = nil) {
+        guard let userId = userSession?.currentUserId else {
+            return
+        }
+
+        var didRemove = false
+
+        // Update local lightweightPlaceListPlaces
+        if var places = lightweightPlaceListPlaces[listId] {
+            let originalCount = places.count
+            places.removeAll { $0.place_id == place.id.uuidString }
+            if places.count != originalCount {
+                didRemove = true
+            }
+            lightweightPlaceListPlaces[listId] = places
+        }
+
+        if didRemove {
+            if let finalCount = updatedCount {
+                // Caller owns state and has already done the math - just store it
+                lightweightPlaceListCounts[listId] = finalCount
+            } else {
+                // Legacy path: we own the state, so we do the math
+                let startingCount = lightweightPlaceListCounts[listId]
+                    ?? lightweightPlaceLists.first(where: { $0.list_id == listId })?.place_count
+                    ?? 0
+                lightweightPlaceListCounts[listId] = max(startingCount - 1, 0)
+            }
+        }
+
+        // Remove current user as saver
+        onPlaceSaversUpdate?(place.id.uuidString, userId, false)
+
+        // Recalculate map annotations
+        onAnnotationPlacesRecalculate?()
+
+        // Persist to Supabase
+        Task {
+            do {
+                try await SupabaseUserService.shared.removePlaceFromList(listId: listId, placeId: place.id.uuidString)
+            } catch {
+                print("❌ [ProfileListsViewModel] Failed to remove place from lightweight list: \(error)")
+            }
+        }
+    }
+
+    /// Remove a place from a list (old UUID-based format).
+    func removePlaceFromList(listId: UUID, place: DetailPlace) {
+        let listIdString = listId.uuidString
+        guard
+            var places = userListsPlaces[listIdString],
+            let index = places.firstIndex(of: place.id.uuidString),
+            let userId = userSession?.currentUserId,
+            let list = userLists.first(where: { $0.id == listId })
+        else {
+            return
+        }
+
+        places.remove(at: index)
+        userListsPlaces[listIdString] = places
+
+        let placeForList = place.toPlace()
+
+        placeService.removePlaceFromList(userId: userId, listId: list.id.uuidString, placeId: placeForList.id.uuidString) { error in
+            if let error = error {
+                print("❌ Error removing place from list: \(error)")
+            }
+        }
+
+        // Recalculate average coordinates for this list
+        recalculateAverageCoordinates(for: listId)
+
+        // Reset pagination to reflect the removed place
+        resetListPagination(listId: listId)
+
+        // Skip sorting for individual place removals to avoid frequent re-sorting
+    }
+
+    /// Reset pagination for a list (call when places are added/removed).
+    func resetListPagination(listId: UUID) {
+        let listIdString = listId.uuidString
+        listPlacePagination.removeValue(forKey: listIdString)
+
+        // Re-initialize pagination if the list has places
+        if let placeIds = userListsPlaces[listIdString], !placeIds.isEmpty {
+            initializeListPagination(listId: listId)
+        }
+    }
+
+    /// Initialize pagination state for a list.
+    private func initializeListPagination(listId: UUID) {
+        let listIdString = listId.uuidString
+        guard let allPlaceIds = userListsPlaces[listIdString], !allPlaceIds.isEmpty else {
+            return
+        }
+
+        // Initialize pagination state
+        var pagination = ListPlacePagination()
+        pagination.allPlaceIds = allPlaceIds
+        pagination.hasMorePlaces = allPlaceIds.count > pagination.placesPerPage
+
+        // Store initial pagination before loading the first page
+        listPlacePagination[listIdString] = pagination
+
+        // Load first page
+        loadNextPageForList(listId: listId)
+    }
+
+    /// Public method to initialize pagination if needed (called from views).
+    func initializeListPaginationIfNeeded(listId: UUID) {
+        let listIdString = listId.uuidString
+
+        // Only initialize if not already initialized
+        if listPlacePagination[listIdString] == nil {
+            initializeListPagination(listId: listId)
+        }
+    }
+
+    /// Load the next page of places for a specific list.
+    func loadNextPageForList(listId: UUID) {
+        let listIdString = listId.uuidString
+        guard var pagination = listPlacePagination[listIdString],
+              !pagination.isLoadingMore,
+              pagination.hasMorePlaces else {
+            return
+        }
+
+        pagination.isLoadingMore = true
+        listPlacePagination[listIdString] = pagination
+
+        let startIndex = pagination.currentPage * pagination.placesPerPage
+        let endIndex = min(startIndex + pagination.placesPerPage, pagination.allPlaceIds.count)
+
+        guard startIndex < pagination.allPlaceIds.count else {
+            pagination.isLoadingMore = false
+            pagination.hasMorePlaces = false
+            listPlacePagination[listIdString] = pagination
+            return
+        }
+
+        let placeIdsToLoad = Array(pagination.allPlaceIds[startIndex..<endIndex])
+
+        Task {
+            // Load place details for the new place IDs
+            for placeId in placeIdsToLoad {
+                do {
+                    let detailPlace = try await placeService.fetchPlace(withId: placeId)
+                    onPlacesUpdate?(placeId, detailPlace)
+                    onFetchPlaceImage?(placeId)
+                } catch {
+                    print("❌ [ProfileListsViewModel] loadNextPageForList: Failed to load place \(placeId): \(error.localizedDescription)")
+                }
+            }
+
+            await MainActor.run {
+                // Update pagination state
+                if var updatedPagination = self.listPlacePagination[listIdString] {
+                    updatedPagination.loadedPlaceIds.append(contentsOf: placeIdsToLoad)
+                    updatedPagination.currentPage += 1
+                    updatedPagination.isLoadingMore = false
+                    updatedPagination.hasMorePlaces = endIndex < updatedPagination.allPlaceIds.count
+
+                    self.listPlacePagination[listIdString] = updatedPagination
+                }
+            }
+        }
+    }
+
+    /// Get the displayed place IDs for a list (respecting pagination).
+    func getDisplayedPlaceIds(for listId: UUID) -> [String] {
+        let listIdString = listId.uuidString
+        return listPlacePagination[listIdString]?.displayedPlaceIds ?? []
+    }
+
+    /// Check if a list has more places to load.
+    func hasMorePlaces(for listId: UUID) -> Bool {
+        let listIdString = listId.uuidString
+        return listPlacePagination[listIdString]?.hasMorePlaces ?? false
+    }
+
+    /// Check if a list is currently loading more places.
+    func isLoadingMorePlaces(for listId: UUID) -> Bool {
+        let listIdString = listId.uuidString
+        return listPlacePagination[listIdString]?.isLoadingMore ?? false
+    }
+
+    /// Get the total number of places in a list.
+    func getTotalPlaceCount(for listId: UUID) -> Int {
+        let listIdString = listId.uuidString
+        return listPlacePagination[listIdString]?.totalPlaces ?? 0
     }
 
     // MARK: - Recently Created List
@@ -233,10 +611,129 @@ class ProfileListsViewModel: ObservableObject {
         return Date().timeIntervalSince(creationTime) < 60
     }
 
+    // MARK: - List Sorting by Distance
+
+    /// Sorts userLists by their distance from the user's current location (closest first).
+    func sortListsByDistance() {
+        guard locationManager?.currentLocation != nil else {
+            return
+        }
+
+        userLists.sort { list1, list2 in
+            let distance1 = calculateDistanceToList(list1)
+            let distance2 = calculateDistanceToList(list2)
+
+            if distance1 != Double.infinity && distance2 != Double.infinity {
+                return distance1 < distance2
+            } else if distance1 != Double.infinity {
+                return true
+            } else if distance2 != Double.infinity {
+                return false
+            } else {
+                return list1.name < list2.name
+            }
+        }
+
+        hasPerformedInitialSort = true
+    }
+
+    /// Whether the initial sort has been performed.
+    var hasCompletedInitialSort: Bool {
+        hasPerformedInitialSort
+    }
+
+    /// Calculates the distance from the user's current location to a list.
+    private func calculateDistanceToList(_ list: PlaceList) -> Double {
+        guard let currentLocation = locationManager?.currentLocation else {
+            return Double.infinity
+        }
+
+        // Use pre-calculated average coordinates if available
+        if let averageCoordinate = list.averageCoordinate {
+            let listLocation = CLLocation(
+                latitude: averageCoordinate.latitude,
+                longitude: averageCoordinate.longitude
+            )
+            return currentLocation.distance(from: listLocation)
+        }
+
+        // Fallback to calculating average distance from individual places
+        let listPlaceIds = userListsPlaces[list.id.uuidString] ?? []
+        guard !listPlaceIds.isEmpty else { return Double.infinity }
+
+        var totalDistance: Double = 0
+        var validPlaceCount: Int = 0
+
+        for placeId in listPlaceIds {
+            if let coordinate = getPlaceCoordinate?(placeId) {
+                let placeLocation = CLLocation(
+                    latitude: coordinate.latitude,
+                    longitude: coordinate.longitude
+                )
+                totalDistance += currentLocation.distance(from: placeLocation)
+                validPlaceCount += 1
+            }
+        }
+
+        return validPlaceCount > 0 ? totalDistance / Double(validPlaceCount) : Double.infinity
+    }
+
+    /// Recalculates the average coordinates for a specific list.
+    func recalculateAverageCoordinates(for listId: UUID) {
+        guard let listIndex = userLists.firstIndex(where: { $0.id == listId }),
+              let placeIds = userListsPlaces[listId.uuidString] else {
+            return
+        }
+
+        var totalLatitude: Double = 0
+        var totalLongitude: Double = 0
+        var validPlaceCount: Int = 0
+
+        for placeId in placeIds {
+            if let coordinate = getPlaceCoordinate?(placeId) {
+                totalLatitude += coordinate.latitude
+                totalLongitude += coordinate.longitude
+                validPlaceCount += 1
+            }
+        }
+
+        if validPlaceCount > 0 {
+            let averageLatitude = totalLatitude / Double(validPlaceCount)
+            let averageLongitude = totalLongitude / Double(validPlaceCount)
+
+            userLists[listIndex].averageCoordinate = CLLocationCoordinate2D(
+                latitude: averageLatitude,
+                longitude: averageLongitude
+            )
+            userLists[listIndex].lastCoordinateUpdate = Date()
+
+            // Persist to backend
+            if let userId = userSession?.currentUserId {
+                Task {
+                    await updateListAverageCoordinates(
+                        userId: userId,
+                        listId: listId,
+                        averageCoordinate: userLists[listIndex].averageCoordinate!
+                    )
+                }
+            }
+        } else {
+            userLists[listIndex].averageCoordinate = nil
+            userLists[listIndex].lastCoordinateUpdate = Date()
+        }
+    }
+
+    /// Updates the average coordinates in Supabase.
+    private func updateListAverageCoordinates(userId: String, listId: UUID, averageCoordinate: CLLocationCoordinate2D) async {
+        // TODO: Implement with Supabase
+        print("⚠️ updateListAverageCoordinates not yet implemented for Supabase")
+    }
+
     // MARK: - Reset
 
     /// Resets all lists data (used during logout).
     func resetAllData() {
+        hasPerformedInitialSort = false
         userLists.removeAll()
         userListsPlaces.removeAll()
         placeListCounts.removeAll()
@@ -509,6 +1006,237 @@ class ProfileListsViewModel: ObservableObject {
         }
 
         return places
+    }
+
+    // MARK: - Legacy List Loading (DetailPlace-based)
+
+    /// Ensures lists are loaded with DetailPlace data for legacy views.
+    func ensureListsLoaded() {
+        guard let userId = getCurrentUserId?() else {
+            return
+        }
+
+        // Check if we need to load places for the first 3 lists
+        let firstThreeLists = Array(userLists.prefix(3))
+        let needsPlaceLoading = firstThreeLists.contains { list in
+            userListsPlaces[list.id.uuidString]?.isEmpty != false
+        }
+
+        if !needsPlaceLoading {
+            onSetLoading?(false)
+            return
+        }
+
+        // Indicate loading state so UI can show a spinner
+        onSetLoading?(true)
+
+        Task {
+            do {
+                // Use the existing lists (already loaded by DataManager)
+                let lists = self.userLists
+
+                // Load places and counts for the first 3 visible lists
+                let firstThreeListIds = Array(lists.prefix(3).map { $0.id.uuidString })
+
+                if !firstThreeListIds.isEmpty {
+                    // Fetch places for first 3 lists (6 places each)
+                    let placesForLists = try await placeService.fetchPlacesForLists(listIds: firstThreeListIds, maxPlacesPerList: 6)
+
+                    // Fetch place counts for all lists
+                    let placeCounts = try await placeService.getPlaceCountsForLists(listIds: lists.map { $0.id.uuidString })
+
+                    await MainActor.run {
+                        // Update places for first 3 lists
+                        for (listId, places) in placesForLists {
+                            let placeIds = places.map { $0.id.uuidString }
+                            self.userListsPlaces[listId] = placeIds
+
+                            // Store places in detailPlaceViewModel for immediate access
+                            for place in places {
+                                self.onPlacesUpdate?(place.id.uuidString, place)
+                            }
+
+                            // Load images for these places
+                            for place in places {
+                                self.onFetchPlaceImage?(place.id.uuidString)
+                            }
+
+                            // Mark as loaded
+                            if let uuid = UUID(uuidString: listId) {
+                                self.loadedListIds.insert(uuid)
+                            }
+                        }
+
+                        // Store place counts for all lists (for display)
+                        for (listId, count) in placeCounts {
+                            if let uuid = UUID(uuidString: listId) {
+                                self.placeListCounts[uuid] = count
+                            }
+                        }
+
+                        self.onSetLoading?(false)
+                    }
+                } else {
+                    await MainActor.run {
+                        self.onSetLoading?(false)
+                    }
+                }
+
+            } catch {
+                print("❌ [ProfileListsViewModel] ensureListsLoaded: Error loading places for lists: \(error.localizedDescription)")
+                await MainActor.run {
+                    self.onSetLoading?(false)
+                }
+            }
+        }
+    }
+
+    /// Loads list data if needed for a specific list.
+    func loadListDataIfNeeded(listId: UUID) {
+        guard !loadedListIds.contains(listId) && !loadingListIds.contains(listId),
+              let userId = getCurrentUserId?() else {
+            return
+        }
+
+        // Check if we're at the concurrency limit
+        if activeListLoadTasks.count >= maxConcurrentListLoads {
+            // Queue the task for later execution
+            let task = Task {
+                // Wait for a slot to become available
+                while activeListLoadTasks.count >= maxConcurrentListLoads {
+                    try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 second
+                    if Task.isCancelled { return }
+                }
+                await self.performListLoad(listId: listId, userId: userId)
+            }
+            activeListLoadTasks[listId] = task
+            return
+        }
+
+        // Execute immediately if under the limit
+        let task = Task {
+            await self.performListLoad(listId: listId, userId: userId)
+        }
+        activeListLoadTasks[listId] = task
+    }
+
+    /// Performs the actual list load operation.
+    private func performListLoad(listId: UUID, userId: String) async {
+        // Check if places are already loaded (e.g., from preloading)
+        let alreadyLoaded = await MainActor.run {
+            let listIdString = listId.uuidString
+            let hasPlaceIds = userListsPlaces[listIdString]?.isEmpty == false
+            let hasDetailPlaces = userListsPlaces[listIdString]?.allSatisfy { placeId in
+                hasPlace?(placeId) ?? false
+            } ?? false
+            return hasPlaceIds && hasDetailPlaces
+        }
+
+        if alreadyLoaded {
+            await MainActor.run {
+                self.loadedListIds.insert(listId)
+                self.initializeListPaginationIfNeeded(listId: listId)
+            }
+            return
+        }
+
+        _ = await MainActor.run {
+            self.loadingListIds.insert(listId)
+        }
+
+        // Use the optimized method to load places for this list
+        do {
+            let placesForLists = try await placeService.fetchPlacesForLists(
+                listIds: [listId.uuidString],
+                maxPlacesPerList: 50 // Load more places when list is opened
+            )
+
+            if let places = placesForLists[listId.uuidString] {
+                await MainActor.run {
+                    let placeIds = places.map { $0.id.uuidString }
+                    self.userListsPlaces[listId.uuidString] = placeIds
+
+                    // Store places in detailPlaceViewModel for immediate access
+                    for place in places {
+                        self.onPlacesUpdate?(place.id.uuidString, place)
+                    }
+
+                    // Load images for these places
+                    for place in places {
+                        self.onFetchPlaceImage?(place.id.uuidString)
+                    }
+
+                    self.loadedListIds.insert(listId)
+                    self.loadingListIds.remove(listId)
+                    self.activeListLoadTasks.removeValue(forKey: listId)
+
+                    // Initialize pagination for this list
+                    self.initializeListPaginationIfNeeded(listId: listId)
+                }
+            }
+        } catch {
+            print("❌ [ProfileListsViewModel] performListLoad: Error loading places for list \(listId): \(error)")
+            await MainActor.run {
+                self.loadingListIds.remove(listId)
+                self.activeListLoadTasks.removeValue(forKey: listId)
+            }
+        }
+    }
+
+    /// Load more lists when user scrolls (lazy loading).
+    func loadMoreListsIfNeeded() {
+        // Find the next 3 lists that haven't been loaded yet
+        let unloadedLists = userLists.filter { !loadedListIds.contains($0.id) && !loadingListIds.contains($0.id) }
+        let nextThreeLists = Array(unloadedLists.prefix(3))
+
+        guard !nextThreeLists.isEmpty else { return }
+
+        let listIds = nextThreeLists.map { $0.id.uuidString }
+
+        Task {
+            do {
+                // Mark as loading
+                await MainActor.run {
+                    for list in nextThreeLists {
+                        self.loadingListIds.insert(list.id)
+                    }
+                }
+
+                // Fetch places for these lists
+                let placesForLists = try await placeService.fetchPlacesForLists(listIds: listIds, maxPlacesPerList: 6)
+
+                await MainActor.run {
+                    // Update places for these lists
+                    for (listId, places) in placesForLists {
+                        let placeIds = places.map { $0.id.uuidString }
+                        self.userListsPlaces[listId] = placeIds
+
+                        // Store places in detailPlaceViewModel for immediate access
+                        for place in places {
+                            self.onPlacesUpdate?(place.id.uuidString, place)
+                        }
+
+                        // Load images for these places
+                        for place in places {
+                            self.onFetchPlaceImage?(place.id.uuidString)
+                        }
+
+                        // Mark as loaded
+                        if let uuid = UUID(uuidString: listId) {
+                            self.loadedListIds.insert(uuid)
+                            self.loadingListIds.remove(uuid)
+                        }
+                    }
+                }
+            } catch {
+                print("❌ [ProfileListsViewModel] loadMoreListsIfNeeded: Error loading more lists: \(error)")
+                await MainActor.run {
+                    for list in nextThreeLists {
+                        self.loadingListIds.remove(list.id)
+                    }
+                }
+            }
+        }
     }
 
     // MARK: - State Management

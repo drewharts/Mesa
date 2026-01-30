@@ -81,6 +81,27 @@ class ProfileTikTokViewModel: ObservableObject {
     /// Callback to refresh TikTok places after import (wired by parent ViewModel).
     var onRefreshTikTokPlaces: (() -> Void)?
 
+    /// Callback to set a place image (wired by parent ViewModel to update detailPlaceViewModel).
+    var onPlaceImageLoaded: ((String, UIImage) -> Void)?
+
+    /// Callback to check if a place image exists (wired by parent ViewModel).
+    var hasPlaceImage: ((String) -> Bool)?
+
+    /// Callback to fetch a place image (wired by parent ViewModel).
+    var onFetchPlaceImage: ((String) -> Void)?
+
+    /// Callback to get the current user ID.
+    var getCurrentUserId: (() -> String?)?
+
+    /// Callback to update placeSavers (placeId, userId, isAdding).
+    var onPlaceSaversUpdate: ((String, String, Bool) -> Void)?
+
+    /// Callback to remove a place from places dictionary.
+    var onPlacesRemove: ((String) -> Void)?
+
+    /// Callback to recalculate annotation places.
+    var onAnnotationPlacesRecalculate: (() -> Void)?
+
     // MARK: - Initialization
 
     /// Initializes the TikTok view model with required dependencies.
@@ -286,24 +307,6 @@ class ProfileTikTokViewModel: ObservableObject {
         return userExternalPlaces.values.contains { $0.placeId == placeId && $0.url != nil && !$0.url!.isEmpty }
     }
 
-    /// Gets TikTok videos for a place using cached metadata.
-    func getTikTokVideosSync(for placeId: String) -> [TikTokVideo] {
-        let matchingPlaces = userExternalPlaces.values.filter { $0.placeId == placeId && $0.url != nil && !$0.url!.isEmpty }
-        let currentUserId = userSession?.currentUserId
-
-        var videos: [TikTokVideo] = []
-        for externalPlace in matchingPlaces {
-            guard let url = externalPlace.url else { continue }
-
-            if var tikTokVideo = TikTokMetadataCache.shared.getCachedMetadata(for: url) {
-                tikTokVideo.savedByUserId = currentUserId
-                tikTokVideo.externalPlaceId = externalPlace.id
-                videos.append(tikTokVideo)
-            }
-        }
-        return videos
-    }
-
     /// Gets external place for a place ID.
     func getExternalPlace(for placeId: String) -> ExternalPlace? {
         return userExternalPlaces.values.first { $0.placeId == placeId }
@@ -368,6 +371,233 @@ class ProfileTikTokViewModel: ObservableObject {
         }
     }
 
+    // MARK: - External Places Image Loading
+
+    /// Ensures a TikTok thumbnail is cached for display.
+    func ensureTikTokThumbnailCached(for placeId: String) {
+        if hasPlaceImage?(placeId) == true {
+            return
+        }
+
+        Task { [weak self] in
+            await self?.fetchFallbackImages(for: [placeId])
+        }
+    }
+
+    /// Fetches fallback images for places from multiple sources.
+    func fetchFallbackImages(for placeIds: [String]) async {
+        var remaining = placeIds.filter { hasPlaceImage?($0) != true }
+        guard !remaining.isEmpty else { return }
+
+        guard let userId = getCurrentUserId?() else { return }
+
+        // Try TikTok thumbnails first
+        do {
+            let urlMap = try await SupabaseUserService.shared.fetchExternalPlaceURLs(placeIds: Array(remaining), userId: userId)
+
+            for placeId in remaining {
+                guard let url = urlMap[placeId], !url.isEmpty else { continue }
+                guard hasPlaceImage?(placeId) != true else { continue }
+
+                guard let video = await TikTokMetadataCache.shared.getMetadata(for: url) else { continue }
+                let thumbnailURL = video.thumbnailURL
+                guard !thumbnailURL.isEmpty else { continue }
+
+                loadRemoteImageAsPlaceImage(placeId: placeId, imageURL: thumbnailURL)
+            }
+        } catch {
+            print("❌ [ProfileTikTokViewModel] Error fetching TikTok thumbnails: \(error.localizedDescription)")
+        }
+
+        remaining = remaining.filter { hasPlaceImage?($0) != true }
+        guard !remaining.isEmpty else { return }
+
+        // Try regular user reviews (from reviews table)
+        do {
+            let regularReviewImages = try await SupabaseUserService.shared.fetchRegularReviewImages(for: Array(remaining))
+            for (placeId, imageUrl) in regularReviewImages {
+                guard hasPlaceImage?(placeId) != true else { continue }
+                loadRemoteImageAsPlaceImage(placeId: placeId, imageURL: imageUrl)
+            }
+        } catch {
+            print("❌ [ProfileTikTokViewModel] Error fetching regular review images: \(error.localizedDescription)")
+        }
+
+        remaining = remaining.filter { hasPlaceImage?($0) != true }
+        guard !remaining.isEmpty else { return }
+
+        // Finally try external reviews (from external_reviews table)
+        do {
+            let externalReviewImages = try await SupabaseUserService.shared.fetchExternalReviewImages(for: Array(remaining))
+            for (placeId, imageUrl) in externalReviewImages {
+                guard hasPlaceImage?(placeId) != true else { continue }
+                loadRemoteImageAsPlaceImage(placeId: placeId, imageURL: imageUrl)
+            }
+        } catch {
+            print("❌ [ProfileTikTokViewModel] Error fetching external review images: \(error.localizedDescription)")
+        }
+    }
+
+    /// Loads an image from a remote URL and stores it via callback.
+    private func loadRemoteImageAsPlaceImage(placeId: String, imageURL: String) {
+        if hasPlaceImage?(placeId) == true {
+            return
+        }
+
+        guard let url = URL(string: imageURL) else {
+            print("❌ [ProfileTikTokViewModel] Invalid image URL for place \(placeId): \(imageURL)")
+            return
+        }
+
+        URLSession.shared.dataTask(with: url) { [weak self] data, response, error in
+            DispatchQueue.main.async {
+                if let error = error {
+                    print("❌ [ProfileTikTokViewModel] Error loading image for \(placeId): \(error.localizedDescription)")
+                } else if let data = data, let image = UIImage(data: data) {
+                    self?.onPlaceImageLoaded?(placeId, image)
+                } else {
+                    print("⚠️ [ProfileTikTokViewModel] No image data returned for place \(placeId)")
+                }
+            }
+        }.resume()
+    }
+
+    /// Loads an image from URL asynchronously.
+    private func loadImageFromURL(imageUrl: String, placeId: String) async {
+        guard let url = URL(string: imageUrl) else {
+            print("❌ [ProfileTikTokViewModel] Invalid image URL for place \(placeId): \(imageUrl)")
+            return
+        }
+
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            if let image = UIImage(data: data) {
+                await MainActor.run {
+                    self.onPlaceImageLoaded?(placeId, image)
+                }
+            }
+        } catch {
+            print("❌ [ProfileTikTokViewModel] Error loading image for \(placeId): \(error.localizedDescription)")
+        }
+    }
+
+    /// Loads TikTok thumbnail as place image.
+    func loadTikTokThumbnailAsPlaceImage(placeId: String, thumbnailURL: String) async {
+        guard let url = URL(string: thumbnailURL) else {
+            print("❌ [ProfileTikTokViewModel] Invalid thumbnail URL for place \(placeId): \(thumbnailURL)")
+            return
+        }
+
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            if let image = UIImage(data: data) {
+                await MainActor.run {
+                    self.onPlaceImageLoaded?(placeId, image)
+                }
+            } else {
+                print("⚠️ [ProfileTikTokViewModel] No image data returned for TikTok thumbnail \(placeId)")
+            }
+        } catch {
+            print("❌ [ProfileTikTokViewModel] Error loading TikTok thumbnail for \(placeId): \(error.localizedDescription)")
+        }
+    }
+
+    /// Loads images for places with prioritization.
+    func loadPriorityImagesForPlaces(_ places: [DetailPlace], priorityCount: Int = 8) {
+        let priorityPlaces = Array(places.prefix(priorityCount))
+        let remainingPlaces = Array(places.dropFirst(priorityCount))
+
+        // Load priority places immediately
+        for place in priorityPlaces {
+            onFetchPlaceImage?(place.id.uuidString)
+        }
+
+        // Load remaining places in background
+        if !remainingPlaces.isEmpty {
+            Task.detached(priority: .background) { [weak self] in
+                try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+
+                for place in remainingPlaces {
+                    await MainActor.run {
+                        self?.onFetchPlaceImage?(place.id.uuidString)
+                    }
+                    try? await Task.sleep(nanoseconds: 50_000_000) // 0.05 seconds
+                }
+            }
+        }
+    }
+
+    // MARK: - External Place Lookups
+
+    /// Gets external_place_id for a TikTok video URL at a specific place.
+    func getExternalPlaceId(for placeId: String, videoUrl: String) async -> String? {
+        guard let userId = getCurrentUserId?() else {
+            return nil
+        }
+
+        do {
+            let urlPairs = try await userService.fetchExternalPlaceURLs(placeId: placeId, userId: userId)
+            return urlPairs.first(where: { $0.url == videoUrl })?.id
+        } catch {
+            print("❌ [ProfileTikTokViewModel] Error fetching external_place_id: \(error)")
+            return nil
+        }
+    }
+
+    /// Gets TikTok videos for a place using cached metadata.
+    func getTikTokVideosSync(for placeId: String) -> [TikTokVideo] {
+        let matchingPlaces = userExternalPlaces.values.filter { $0.placeId == placeId && $0.url != nil && !$0.url!.isEmpty }
+        let currentUserId = getCurrentUserId?()
+
+        var videos: [TikTokVideo] = []
+        for externalPlace in matchingPlaces {
+            guard let url = externalPlace.url else { continue }
+
+            if var video = TikTokMetadataCache.shared.getCachedMetadata(for: url) {
+                video.savedByUserId = currentUserId
+                video.externalPlaceId = externalPlace.id
+                videos.append(video)
+            } else {
+                let videoId = extractVideoIdFromTikTokURL(url) ?? UUID().uuidString
+                var basicVideo = TikTokVideo(
+                    videoID: videoId,
+                    url: url,
+                    title: nil,
+                    caption: nil,
+                    embedHTML: "",
+                    thumbnailURL: "",
+                    author: TikTokAuthor(displayName: "", url: "", username: ""),
+                    hashtags: [],
+                    createdAt: ISO8601DateFormatter().string(from: Date())
+                )
+                basicVideo.savedByUserId = currentUserId
+                basicVideo.externalPlaceId = externalPlace.id
+                videos.append(basicVideo)
+            }
+        }
+
+        return videos
+    }
+
+    /// Extracts video ID from TikTok URL.
+    private func extractVideoIdFromTikTokURL(_ url: String) -> String? {
+        let patterns = [
+            "/photo/([0-9]+)",
+            "/video/([0-9]+)",
+            "@[^/]+/video/([0-9]+)"
+        ]
+
+        for pattern in patterns {
+            if let regex = try? NSRegularExpression(pattern: pattern),
+               let match = regex.firstMatch(in: url, range: NSRange(location: 0, length: url.count)),
+               let range = Range(match.range(at: 1), in: url) {
+                return String(url[range])
+            }
+        }
+
+        return nil
+    }
+
     // MARK: - Reset
 
     /// Resets all TikTok data (used during logout).
@@ -393,6 +623,112 @@ class ProfileTikTokViewModel: ObservableObject {
         currentTikTokPage = 0
         allTikTokPlaceIds.removeAll()
         loadedTikTokPlaceIds.removeAll()
+    }
+
+    // MARK: - TikTok Place Deletion
+
+    /// Deletes a TikTok place with completion handler.
+    func deleteTikTokPlace(_ place: DetailPlace, completion: @escaping (Bool) -> Void) {
+        guard let userId = getCurrentUserId?() else {
+            completion(false)
+            return
+        }
+
+        let placeId = place.id.uuidString
+
+        // Optimistic update: Remove from all local collections immediately
+        removeFromLocalTikTokStateWithMapUpdate(placeId: placeId, userId: userId)
+
+        // Call backend to delete the TikTok place
+        userService.deleteTikTokPlace(userId: userId, placeId: placeId) { error in
+            DispatchQueue.main.async {
+                if let error = error {
+                    print("❌ [ProfileTikTokViewModel] Error deleting TikTok place: \(error.localizedDescription)")
+                    completion(false)
+                } else {
+                    completion(true)
+                }
+            }
+        }
+    }
+
+    /// Delete a TikTok place using LightweightPlace (for popup views).
+    func deleteTikTokPlace(_ place: LightweightPlace) {
+        guard let userId = getCurrentUserId?() else { return }
+
+        let placeId = place.place_id
+
+        // Optimistic update: Remove from all local collections immediately
+        removeFromLocalTikTokStateWithMapUpdate(placeId: placeId, userId: userId)
+
+        // Persist deletion to backend
+        userService.deleteTikTokPlace(userId: userId, placeId: placeId) { error in
+            if let error = error {
+                print("❌ [ProfileTikTokViewModel] Error deleting TikTok place: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    /// Removes TikTok place from all local state collections and updates map.
+    private func removeFromLocalTikTokStateWithMapUpdate(placeId: String, userId: String) {
+        // Remove from TikTok-specific state
+        removeFromLocalTikTokState(placeId: placeId)
+        userExternalPlaces.removeValue(forKey: placeId)
+
+        // Cross-cutting map concerns via callbacks
+        onPlaceSaversUpdate?(placeId, userId, false)
+        onPlacesRemove?(placeId)
+        onAnnotationPlacesRecalculate?()
+    }
+
+    /// Updates a TikTok place association by external place ID.
+    func updateTikTokPlaceById(externalPlaceId: String, newPlaceId: String, newPlaceName: String) async {
+        guard let userId = getCurrentUserId?() else {
+            print("❌ [ProfileTikTokViewModel] Cannot update TikTok place: missing userId")
+            return
+        }
+
+        // Find the existing place to get old placeId for tracking updates
+        let existingPlace = lightweightExternalPlaces.first { $0.external_place_id == externalPlaceId }
+        let oldPlaceId = existingPlace?.place_id
+
+        // Optimistic update: Update local state immediately
+        if let index = lightweightExternalPlaces.firstIndex(where: { $0.external_place_id == externalPlaceId }) {
+            let original = lightweightExternalPlaces[index]
+            let updatedPlace = LightweightPlace(
+                place_id: newPlaceId,
+                name: newPlaceName,
+                latest_review_photo: original.latest_review_photo,
+                external_place_id: externalPlaceId,
+                tiktok_url: original.tiktok_url,
+                added_by_user_id: original.added_by_user_id,
+                added_by_name: original.added_by_name,
+                added_by_photo_url: original.added_by_photo_url
+            )
+            lightweightExternalPlaces[index] = updatedPlace
+        }
+
+        // Update ID tracking
+        if let old = oldPlaceId {
+            allTikTokPlaceIds.removeAll { $0 == old }
+        }
+        if !allTikTokPlaceIds.contains(newPlaceId) {
+            allTikTokPlaceIds.append(newPlaceId)
+        }
+
+        // Persist to backend
+        do {
+            try await userService.updateTikTokPlaceAssociation(
+                externalPlaceId: externalPlaceId,
+                newPlaceId: newPlaceId,
+                userId: userId
+            )
+            print("✅ [ProfileTikTokViewModel] Updated TikTok place to \(newPlaceId)")
+        } catch {
+            print("❌ [ProfileTikTokViewModel] Error updating TikTok place: \(error.localizedDescription)")
+            // Revert optimistic update on failure
+            onRefreshTikTokPlaces?()
+        }
     }
 
     // MARK: - TikTok URL Processing

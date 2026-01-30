@@ -38,9 +38,19 @@ class ProfileMyPlacesViewModel: ObservableObject {
     /// Called when a place needs to be removed from map annotations
     var onPlaceRemoveFromAnnotations: ((String) -> Void)?
 
+    /// Called to update places dictionary
+    var onPlacesUpdate: ((String, DetailPlace?) -> Void)?
+
+    /// Called to recalculate map annotations
+    var onAnnotationPlacesRecalculate: (() -> Void)?
+
+    /// Called to get placeSavers for a place
+    var getPlaceSavers: ((String) -> [String]?)?
+
     // MARK: - Dependencies
 
     private let userService: UserService
+    private let placeService: PlaceService
     private weak var userSession: UserSession?
 
     // MARK: - Constants
@@ -50,9 +60,10 @@ class ProfileMyPlacesViewModel: ObservableObject {
     // MARK: - Initialization
 
     /// Initializes the my places view model with required dependencies.
-    init(userService: UserService, userSession: UserSession) {
+    init(userService: UserService, userSession: UserSession, placeService: PlaceService) {
         self.userService = userService
         self.userSession = userSession
+        self.placeService = placeService
     }
 
     // MARK: - Public Methods
@@ -173,6 +184,121 @@ class ProfileMyPlacesViewModel: ObservableObject {
 
         // Remove from placeSavers (via callback)
         onPlaceSaversUpdate?(placeId, userId, false)
+    }
+
+    // MARK: - Delete My Place
+
+    /// Deletes a user-created place (DetailPlace version) with completion handler.
+    func deleteMyPlace(_ place: DetailPlace, completion: @escaping (Bool) -> Void) {
+        guard let userId = userSession?.currentUserId else {
+            completion(false)
+            return
+        }
+
+        let placeId = place.id.uuidString
+
+        // Optimistically remove from local array
+        myPlaces.removeAll { $0 == placeId }
+        lightweightMyPlaces.removeAll { $0.place_id == placeId }
+
+        // Remove from map annotations immediately (optimistic update)
+        onPlaceRemoveFromAnnotations?(placeId)
+
+        // Remove from placeSavers (so it doesn't appear on map)
+        if var savers = getPlaceSavers?(placeId) {
+            savers.removeAll { $0 == userId }
+            if savers.isEmpty {
+                onPlaceSaversUpdate?(placeId, userId, false)
+            }
+        }
+
+        // Recalculate map annotations
+        onAnnotationPlacesRecalculate?()
+
+        // Send notification to refresh map annotations
+        NotificationCenter.default.post(name: NSNotification.Name("RefreshMapAnnotations"), object: nil)
+
+        // Asynchronously delete from backend
+        Task {
+            var myPlacesDeleteSuccess = false
+
+            // Delete from my_places
+            placeService.deletePlaceFromMyPlaces(userId: userId, placeId: placeId) { error in
+                if let error = error {
+                    print("❌ [ProfileMyPlacesViewModel] Error deleting place from my places: \(error)")
+                } else {
+                    myPlacesDeleteSuccess = true
+                }
+            }
+
+            // Delete from all_places (only for custom places)
+            placeService.deletePlaceFromAllPlaces(placeId: placeId) { error in
+                if let error = error {
+                    print("❌ [ProfileMyPlacesViewModel] Error deleting place from all places: \(error)")
+                }
+            }
+
+            // Wait a moment for both operations to complete
+            try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+
+            // On success, call completion on main thread
+            await MainActor.run {
+                if myPlacesDeleteSuccess {
+                    completion(true)
+                } else {
+                    // If deletion fails, revert the optimistic updates
+                    print("❌ [ProfileMyPlacesViewModel] Failed to delete custom place, reverting changes")
+                    self.myPlaces.append(placeId)
+
+                    // Re-add to placeSavers
+                    self.onPlaceSaversUpdate?(placeId, userId, true)
+
+                    // Re-add to places dictionary
+                    self.onPlacesUpdate?(placeId, place)
+
+                    // Recalculate map annotations
+                    self.onAnnotationPlacesRecalculate?()
+
+                    // Send notification to refresh map annotations
+                    NotificationCenter.default.post(name: NSNotification.Name("RefreshMapAnnotations"), object: nil)
+
+                    completion(false)
+                }
+            }
+        }
+    }
+
+    /// Deletes a user-created place (LightweightPlace version for PopupPlaceCard).
+    func deleteMyPlace(_ place: LightweightPlace) {
+        guard let userId = userSession?.currentUserId else { return }
+
+        let placeId = place.place_id
+
+        // Optimistic update: Remove from all local collections immediately
+        removeFromLocalState(placeId: placeId)
+
+        // Recalculate map annotations
+        onAnnotationPlacesRecalculate?()
+
+        // Send notification to refresh map annotations
+        NotificationCenter.default.post(name: NSNotification.Name("RefreshMapAnnotations"), object: nil)
+
+        // Persist deletion to backend
+        Task {
+            // Delete from my_places
+            placeService.deletePlaceFromMyPlaces(userId: userId, placeId: placeId) { error in
+                if let error = error {
+                    print("❌ [ProfileMyPlacesViewModel] Error deleting place from my_places: \(error.localizedDescription)")
+                }
+            }
+
+            // Delete from all_places (only for custom places)
+            placeService.deletePlaceFromAllPlaces(placeId: placeId) { error in
+                if let error = error {
+                    print("❌ [ProfileMyPlacesViewModel] Error deleting place from all_places: \(error.localizedDescription)")
+                }
+            }
+        }
     }
 
     /// Resets all my places data (used during logout).

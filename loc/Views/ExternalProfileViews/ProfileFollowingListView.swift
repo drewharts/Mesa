@@ -19,6 +19,8 @@ struct ProfileFollowingListView: View {
     @EnvironmentObject var userSession: UserSession
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var userProfileVM: UserProfileViewModel
+    @EnvironmentObject var locationManager: LocationManager
+    @EnvironmentObject var dataManager: DataManager
 
     var body: some View {
         VStack {

@@ -88,7 +88,9 @@ struct ExternalUserProfileContentView: View {
                         .environmentObject(detailPlaceVM)
                         .environmentObject(userSession)
                         .environmentObject(selectedPlaceVM)
-                        .environmentObject(userProfileVM),
+                        .environmentObject(userProfileVM)
+                        .environmentObject(locationManager)
+                        .environmentObject(dataManager),
                     isActive: $showFollowers
                 ) {
                     EmptyView()
@@ -100,7 +102,9 @@ struct ExternalUserProfileContentView: View {
                         .environmentObject(detailPlaceVM)
                         .environmentObject(userSession)
                         .environmentObject(selectedPlaceVM)
-                        .environmentObject(userProfileVM),
+                        .environmentObject(userProfileVM)
+                        .environmentObject(locationManager)
+                        .environmentObject(dataManager),
                     isActive: $showFollowing
                 ) {
                     EmptyView()
