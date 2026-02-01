@@ -42,7 +42,7 @@ struct SearchResultsView: View {
     var body: some View {
         GeometryReader { geometry in
             ScrollView {
-                VStack(spacing: 10) {
+                VStack(spacing: 0) {
                     if isSearching {
                         loadingView
                     } else {
@@ -82,7 +82,7 @@ struct SearchResultsView: View {
             .frame(maxHeight: geometry.size.height)
         }
     }
-    
+
     private var loadingView: some View {
         VStack(spacing: 12) {
             ProgressView()
@@ -110,10 +110,9 @@ struct KeywordResultsView: View {
 
     var body: some View {
         if !keywordResults.isEmpty, let keyword = matchedKeyword {
-            VStack(alignment: .leading, spacing: 5) {
+            VStack(alignment: .leading, spacing: 0) {
                 // Header with collapse toggle and View All button
                 HStack(spacing: 6) {
-                    // Collapse/expand button
                     Button(action: {
                         withAnimation(.easeInOut(duration: 0.2)) {
                             isCollapsed.toggle()
@@ -129,34 +128,26 @@ struct KeywordResultsView: View {
                                 .font(.system(size: 12, weight: .semibold))
                                 .foregroundColor(.secondary)
                         }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(Color(.systemBackground))
-                        .clipShape(Capsule())
-                        .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
                     }
                     .buttonStyle(PlainButtonStyle())
 
                     Spacer()
 
-                    // View All button - shows full list popup with map annotations
                     Button(action: onViewAll) {
                         Image(systemName: "list.bullet")
                             .font(.system(size: 14, weight: .medium))
                             .foregroundColor(.primary)
-                            .padding(8)
-                            .background(Color(.systemBackground))
-                            .clipShape(Circle())
-                            .shadow(color: .black.opacity(0.15), radius: 2, x: 0, y: 1)
                     }
                     .buttonStyle(PlainButtonStyle())
                 }
                 .padding(.horizontal, 20)
-                .contentShape(Rectangle())
+                .padding(.vertical, 12)
 
-                // Keyword results - only show when not collapsed
                 if !isCollapsed {
-                    ForEach(keywordResults, id: \.id) { place in
+                    Divider()
+                        .padding(.leading, 20)
+
+                    ForEach(Array(keywordResults.enumerated()), id: \.element.id) { index, place in
                         Button(action: { onSelectPlace(place) }) {
                             HStack(spacing: 12) {
                                 Image(systemName: "fork.knife.circle.fill")
@@ -166,29 +157,31 @@ struct KeywordResultsView: View {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(place.name)
                                         .font(.body)
-                                        .foregroundColor(.black)
+                                        .foregroundColor(.primary)
                                         .lineLimit(1)
 
                                     if let address = place.address, !address.isEmpty {
                                         Text(address)
                                             .font(.caption)
-                                            .foregroundColor(.gray)
+                                            .foregroundColor(.secondary)
                                             .lineLimit(1)
                                     }
                                 }
 
                                 Spacer()
                             }
-                            .padding()
-                            .background(Color.white)
-                            .cornerRadius(10)
-                            .shadow(color: .black.opacity(0.1), radius: 3, x: 0, y: 2)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 12)
+                            .contentShape(Rectangle())
                         }
                         .buttonStyle(PlainButtonStyle())
-                        .padding(.horizontal, 20)
+
+                        if index < keywordResults.count - 1 || hasMoreResults {
+                            Divider()
+                                .padding(.leading, 56)
+                        }
                     }
 
-                    // Load More button
                     if hasMoreResults {
                         Button(action: onLoadMore) {
                             HStack {
@@ -199,15 +192,13 @@ struct KeywordResultsView: View {
                                     Text("Load More")
                                         .font(.subheadline)
                                         .fontWeight(.medium)
+                                        .foregroundColor(.secondary)
                                 }
                             }
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 12)
-                            .background(Color.gray.opacity(0.1))
-                            .cornerRadius(10)
                         }
                         .buttonStyle(PlainButtonStyle())
-                        .padding(.horizontal, 20)
                         .disabled(isLoadingMore)
                     }
                 }
@@ -224,81 +215,77 @@ struct PlaceResultsView: View {
     let onSelectPlace: (MesaPlaceSuggestion) -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 5) {
+        VStack(alignment: .leading, spacing: 0) {
             if !placeResults.isEmpty {
                 Text("Places")
                     .font(.subheadline)
                     .fontWeight(.semibold)
                     .foregroundColor(.secondary)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(Color(.systemBackground))
-                    .clipShape(Capsule())
-                    .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
                     .padding(.horizontal, 20)
-                    .padding(.top, 10)
-                
-                ForEach(placeResults, id: \.id) { prediction in
+                    .padding(.vertical, 12)
+
+                Divider()
+                    .padding(.leading, 20)
+
+                ForEach(Array(placeResults.enumerated()), id: \.element.id) { index, prediction in
                     Button(action: { onSelectPlace(prediction) }) {
                         HStack(spacing: 12) {
                             Image(systemName: "mappin.circle.fill")
                                 .font(.system(size: 24))
                                 .foregroundColor(.red.opacity(0.8))
-                            
+
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(prediction.name)
                                     .font(.body)
-                                    .foregroundColor(.black)
+                                    .foregroundColor(.primary)
                                     .lineLimit(1)
-                                
+
                                 if let address = prediction.address, !address.isEmpty {
                                     Text(address)
                                         .font(.caption)
-                                        .foregroundColor(.gray)
+                                        .foregroundColor(.secondary)
                                         .lineLimit(1)
                                 }
                             }
-                            
+
                             Spacer()
                         }
-                        .padding()
-                        .background(Color.white)
-                        .cornerRadius(10)
-                        .shadow(color: .black.opacity(0.1), radius: 3, x: 0, y: 2)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 12)
+                        .contentShape(Rectangle())
                     }
                     .buttonStyle(PlainButtonStyle())
-                    .padding(.horizontal, 20)
+
+                    if index < placeResults.count - 1 {
+                        Divider()
+                            .padding(.leading, 56)
+                    }
                 }
             } else if showNoPlaceFound {
                 Text("Places")
                     .font(.subheadline)
                     .fontWeight(.semibold)
                     .foregroundColor(.secondary)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(Color(.systemBackground))
-                    .clipShape(Capsule())
-                    .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
                     .padding(.horizontal, 20)
-                    .padding(.top, 10)
-                
+                    .padding(.vertical, 12)
+
                 noPlacesFoundView
             }
         }
     }
-    
+
     private var noPlacesFoundView: some View {
         VStack(spacing: 12) {
             Image(systemName: "location.slash")
                 .font(.system(size: 40))
                 .foregroundColor(.gray.opacity(0.6))
-            
+
             VStack(spacing: 4) {
                 Text("No place found")
                     .font(.headline)
                     .fontWeight(.medium)
                     .foregroundColor(.gray)
-                
+
                 Text("We couldn't find '\(searchText)' in our database")
                     .font(.subheadline)
                     .foregroundColor(.gray)
@@ -306,10 +293,7 @@ struct PlaceResultsView: View {
             }
         }
         .frame(maxWidth: .infinity)
-        .padding()
-        .background(Color.white)
-        .cornerRadius(10)
-        .shadow(color: .black.opacity(0.1), radius: 3, x: 0, y: 2)
+        .padding(.vertical, 24)
         .padding(.horizontal, 20)
     }
 }
@@ -323,8 +307,7 @@ struct UserResultsView: View {
 
     var body: some View {
         if !userResults.isEmpty {
-            VStack(alignment: .leading, spacing: 5) {
-                // Tappable header to collapse/expand
+            VStack(alignment: .leading, spacing: 0) {
                 Button(action: {
                     withAnimation(.easeInOut(duration: 0.2)) {
                         isCollapsed.toggle()
@@ -339,47 +322,49 @@ struct UserResultsView: View {
                         Image(systemName: isCollapsed ? "chevron.down" : "chevron.up")
                             .font(.system(size: 12, weight: .semibold))
                             .foregroundColor(.secondary)
+
+                        Spacer()
                     }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(Color(.systemBackground))
-                    .clipShape(Capsule())
-                    .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
-                    .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 20)
+                    .padding(.vertical, 12)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(PlainButtonStyle())
-                
-                // User results - only show when not collapsed
+
                 if !isCollapsed {
-                    ForEach(userResults) { user in
+                    Divider()
+                        .padding(.leading, 20)
+
+                    ForEach(Array(userResults.enumerated()), id: \.element.id) { index, user in
                         Button(action: { onSelectUser(user) }) {
                             HStack(spacing: 12) {
                                 profilePhotoView(for: user)
-                                
+
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(user.fullName)
                                         .font(.body)
-                                        .foregroundColor(.black)
+                                        .foregroundColor(.primary)
                                         .lineLimit(1)
                                 }
-                                
+
                                 Spacer()
                             }
-                            .padding()
-                            .background(Color.white)
-                            .cornerRadius(10)
-                            .shadow(color: .black.opacity(0.1), radius: 3, x: 0, y: 2)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 12)
+                            .contentShape(Rectangle())
                         }
                         .buttonStyle(PlainButtonStyle())
-                        .padding(.horizontal, 20)
+
+                        if index < userResults.count - 1 {
+                            Divider()
+                                .padding(.leading, 56)
+                        }
                     }
                 }
             }
         }
     }
-    
+
     @ViewBuilder
     private func profilePhotoView(for user: ProfileData) -> some View {
         if let profilePhoto = userPhotos[user.id] {
@@ -407,11 +392,13 @@ struct RecentSearchesView: View {
     let onSelectPlace: (String) -> Void   // Place ID
     let onSelectUser: (String) -> Void    // User ID
     let onClearAll: () -> Void
-    
+
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 0) {
                 headerView
+                Divider()
+                    .padding(.leading, 20)
                 selectionsList
             }
         }
@@ -419,73 +406,66 @@ struct RecentSearchesView: View {
     }
 
     // MARK: - Header
-    
+
     private var headerView: some View {
         HStack {
             Text("Recent")
                 .font(.subheadline)
                 .fontWeight(.semibold)
                 .foregroundColor(.secondary)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(Color(.systemBackground))
-                .clipShape(Capsule())
-                .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
 
             Spacer()
 
             Button(action: onClearAll) {
                 Text("Clear")
                     .font(.subheadline)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.secondary)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(Color(.systemBackground))
-                    .clipShape(Capsule())
-                    .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
+                    .fontWeight(.medium)
+                    .foregroundColor(.blue)
             }
         }
         .padding(.horizontal, 20)
-        .padding(.top, 10)
+        .padding(.vertical, 12)
     }
-    
+
     // MARK: - Selections List
-    
+
     private var selectionsList: some View {
-        ForEach(selections) { selection in
+        ForEach(Array(selections.enumerated()), id: \.element.id) { index, selection in
             Button(action: { handleSelection(selection) }) {
                 HStack(spacing: 12) {
                     selectionIcon(for: selection)
-                    
+
                     VStack(alignment: .leading, spacing: 2) {
                         Text(selection.displayName)
                             .font(.body)
-                            .foregroundColor(.black)
+                            .foregroundColor(.primary)
                             .lineLimit(1)
-                        
+
                         if let subtitle = selection.subtitle, !subtitle.isEmpty {
                             Text(subtitle)
                                 .font(.caption)
-                                .foregroundColor(.gray)
+                                .foregroundColor(.secondary)
                                 .lineLimit(1)
                         }
                     }
-                    
+
                     Spacer()
                 }
-                .padding()
-                .background(Color.white)
-                .cornerRadius(10)
-                .shadow(color: .black.opacity(0.1), radius: 3, x: 0, y: 2)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
+                .contentShape(Rectangle())
             }
             .buttonStyle(PlainButtonStyle())
-            .padding(.horizontal, 20)
+
+            if index < selections.count - 1 {
+                Divider()
+                    .padding(.leading, 56)
+            }
         }
     }
-    
+
     // MARK: - Helpers
-    
+
     @ViewBuilder
     private func selectionIcon(for selection: RecentSelection) -> some View {
         switch selection {
@@ -494,7 +474,6 @@ struct RecentSearchesView: View {
                 .font(.system(size: 24))
                 .foregroundColor(.red.opacity(0.8))
         case .user(let id, _, let photoURLString):
-            // Try cached photo first, then fall back to AsyncImage
             if let photo = userPhotos[id] {
                 Image(uiImage: photo)
                     .resizable()
@@ -527,7 +506,7 @@ struct RecentSearchesView: View {
             }
         }
     }
-    
+
     private func handleSelection(_ selection: RecentSelection) {
         switch selection {
         case .place(let id, _, _):

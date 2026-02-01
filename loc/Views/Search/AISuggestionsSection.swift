@@ -18,7 +18,7 @@ struct AISuggestionsSection: View {
 
     var body: some View {
         if isLoading || !suggestions.isEmpty {
-            VStack(alignment: .leading, spacing: 5) {
+            VStack(alignment: .leading, spacing: 0) {
                 headerView
                 contentView
             }
@@ -47,27 +47,23 @@ struct AISuggestionsSection: View {
                 Image(systemName: isCollapsed ? "chevron.down" : "chevron.up")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(.secondary)
+
+                Spacer()
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(
-                LinearGradient(
-                    gradient: Gradient(colors: [.purple.opacity(0.1), .blue.opacity(0.1)]),
-                    startPoint: .leading,
-                    endPoint: .trailing
-                )
-            )
-            .clipShape(Capsule())
-            .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 12)
+            .contentShape(Rectangle())
         }
         .buttonStyle(PlainButtonStyle())
-        .padding(.horizontal, 20)
     }
 
     /// Renders the appropriate content based on loading/error/results state
     @ViewBuilder
     private var contentView: some View {
         if !isCollapsed {
+            Divider()
+                .padding(.leading, 20)
+
             if isLoading {
                 loadingView
             } else if let error = error {
@@ -90,11 +86,8 @@ struct AISuggestionsSection: View {
                 .italic()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding()
-        .background(Color.white)
-        .cornerRadius(10)
-        .shadow(color: .black.opacity(0.1), radius: 3, x: 0, y: 2)
         .padding(.horizontal, 20)
+        .padding(.vertical, 12)
     }
 
     /// Renders an error message with warning icon
@@ -107,20 +100,21 @@ struct AISuggestionsSection: View {
                 .font(.caption)
                 .foregroundColor(.secondary)
         }
-        .padding()
-        .background(Color.white)
-        .cornerRadius(10)
-        .shadow(color: .black.opacity(0.1), radius: 3, x: 0, y: 2)
         .padding(.horizontal, 20)
+        .padding(.vertical, 12)
     }
 
     /// Renders the list of AI suggestion rows
     private var suggestionsList: some View {
-        ForEach(suggestions, id: \.id) { place in
+        ForEach(Array(suggestions.enumerated()), id: \.element.id) { index, place in
             AISuggestionRow(place: place) {
                 onSelectPlace(place)
             }
-            .padding(.horizontal, 20)
+
+            if index < suggestions.count - 1 {
+                Divider()
+                    .padding(.leading, 56)
+            }
         }
     }
 }

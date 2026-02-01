@@ -28,10 +28,9 @@ struct AISuggestionRow: View {
 
                 ratingBadge
             }
-            .padding(12)
-            .background(Color.white)
-            .cornerRadius(12)
-            .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 12)
+            .contentShape(Rectangle())
         }
         .buttonStyle(PlainButtonStyle())
     }
@@ -48,13 +47,13 @@ struct AISuggestionRow: View {
                     image
                         .resizable()
                         .aspectRatio(contentMode: .fill)
-                        .frame(width: 60, height: 60)
+                        .frame(width: 48, height: 48)
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                 case .failure:
                     fallbackIcon
                 case .empty:
                     ProgressView()
-                        .frame(width: 60, height: 60)
+                        .frame(width: 48, height: 48)
                 @unknown default:
                     fallbackIcon
                 }
@@ -73,10 +72,10 @@ struct AISuggestionRow: View {
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 ))
-                .frame(width: 60, height: 60)
+                .frame(width: 48, height: 48)
 
             Image(systemName: "sparkles")
-                .font(.system(size: 24, weight: .semibold))
+                .font(.system(size: 20, weight: .semibold))
                 .foregroundColor(.white)
         }
     }
@@ -86,8 +85,8 @@ struct AISuggestionRow: View {
         HStack(spacing: 4) {
             Text(place.name)
                 .font(.body)
-                .fontWeight(.semibold)
-                .foregroundColor(.black)
+                .fontWeight(.medium)
+                .foregroundColor(.primary)
                 .lineLimit(1)
 
             Image(systemName: "sparkles")
@@ -102,7 +101,7 @@ struct AISuggestionRow: View {
         if let address = place.address, !address.isEmpty {
             Text(address)
                 .font(.caption)
-                .foregroundColor(.gray)
+                .foregroundColor(.secondary)
                 .lineLimit(1)
         }
     }

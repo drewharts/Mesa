@@ -17,7 +17,6 @@ struct MapContainerView: View {
 
     @Binding var mapPosition: MapCameraPosition
     @Binding var recenterMap: Bool
-    @Binding var isSearchExpanded: Bool
     @Binding var isCreatePlacePopupActive: Bool
 
     let selectedPlaceViewModel: SelectedPlaceViewModel
@@ -33,7 +32,6 @@ struct MapContainerView: View {
     init(
         mapPosition: Binding<MapCameraPosition>,
         recenterMap: Binding<Bool>,
-        isSearchExpanded: Binding<Bool>,
         isCreatePlacePopupActive: Binding<Bool>,
         selectedPlaceViewModel: SelectedPlaceViewModel,
         detailPlaceViewModel: DetailPlaceViewModel,
@@ -48,7 +46,6 @@ struct MapContainerView: View {
     ) {
         self._mapPosition = mapPosition
         self._recenterMap = recenterMap
-        self._isSearchExpanded = isSearchExpanded
         self._isCreatePlacePopupActive = isCreatePlacePopupActive
         self.selectedPlaceViewModel = selectedPlaceViewModel
         self.detailPlaceViewModel = detailPlaceViewModel
@@ -103,7 +100,6 @@ struct MapContainerView: View {
             MapView(
                 recenterMap: $recenterMap,
                 mapPosition: $mapPosition,
-                isSearchBarMinimized: !isSearchExpanded,
                 isCreatePlacePopupActive: $isCreatePlacePopupActive,
                 onMapTap: onMapTap
             )

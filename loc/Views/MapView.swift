@@ -18,7 +18,6 @@ struct MapView: View {
 
     @Binding var recenterMap: Bool
     @Binding var mapPosition: MapCameraPosition
-    var isSearchBarMinimized: Bool = true
     @Binding var isCreatePlacePopupActive: Bool
 
     private let defaultCenter = CLLocationCoordinate2D(latitude: 39.5, longitude: -98.0)
@@ -297,33 +296,31 @@ struct MapView: View {
                 isCreatePlacePopupActive = newValue
             }
             
-            // Visible Places Button - only show when search is minimized
-            if isSearchBarMinimized {
-                VStack {
-                    HStack {
-                        Button(action: {
-                            showVisiblePlacesPopup = true
-                        }) {
-                            HStack(spacing: 6) {
-                                Image(systemName: "map")
-                                    .font(.system(size: 14, weight: .medium))
-                                Text("View")
-                                    .font(.system(size: 14, weight: .medium))
-                            }
-                            .foregroundColor(.secondary)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .background(.ultraThinMaterial)
-                            .clipShape(RoundedRectangle(cornerRadius: 20))
-                            .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.gray.opacity(0.3), lineWidth: 1))
-                            .shadow(radius: 4)
+            // Visible Places Button
+            VStack {
+                HStack {
+                    Button(action: {
+                        showVisiblePlacesPopup = true
+                    }) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "map")
+                                .font(.system(size: 14, weight: .medium))
+                            Text("View")
+                                .font(.system(size: 14, weight: .medium))
                         }
-                        .padding(.leading, 20)
-                        .padding(.top, 70) // Position below top safe area
-                        Spacer()
+                        .foregroundColor(.secondary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(.ultraThinMaterial)
+                        .clipShape(RoundedRectangle(cornerRadius: 20))
+                        .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.gray.opacity(0.3), lineWidth: 1))
+                        .shadow(radius: 4)
                     }
+                    .padding(.leading, 20)
+                    .padding(.top, 70) // Position below top safe area
                     Spacer()
                 }
+                Spacer()
             }
             
             // Show the create place popup if needed

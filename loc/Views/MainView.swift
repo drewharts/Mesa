@@ -33,8 +33,8 @@ struct MainView: View {
     let serviceContainer: ServiceContainer
     
     // MARK: - Local UI State
-    @State private var sheetHeight: CGFloat
     @State private var shouldNavigateToProfile = false
+    @State private var showSearchPage = false
     @State private var recenterMap = false
     @State private var isCreatePlacePopupActive = false
     @State private var mapPosition = MapCameraPosition.automatic
@@ -70,8 +70,6 @@ struct MainView: View {
         self.dataManager = dataManager
         self.serviceContainer = serviceContainer
 
-        // Initialize sheet height to min - partially expanded on first open
-        self._sheetHeight = State(initialValue: searchCoordinator.minSheetHeight)
     }
     
     var body: some View {
@@ -81,7 +79,6 @@ struct MainView: View {
                 MapContainerView(
                     mapPosition: $mapPosition,
                     recenterMap: $recenterMap,
-                    isSearchExpanded: $appCoordinator.isSearchExpanded,
                     isCreatePlacePopupActive: $isCreatePlacePopupActive,
                     selectedPlaceViewModel: selectedPlaceVM,
                     detailPlaceViewModel: detailPlaceViewModel,
@@ -97,31 +94,7 @@ struct MainView: View {
                 
                 // UI Overlay (Top Controls, FABs)
                 uiOverlayLayer
-                
-                // Search Overlay (Isolated to prevent recreation)
-                // Staff Engineer: Separate layer prevents TextField destruction on MainView re-renders
-                // Single Responsibility: Only show search when list popup is not active
-                // MVVM: Uses ViewModel state to determine visibility
-                if shouldShowSearchOverlay {
-                SearchOverlayView(
-                    searchViewModel: searchViewModel,
-                    isSearchExpanded: $appCoordinator.isSearchExpanded,
-                    searchCoordinator: searchCoordinator,
-                    onSheetHeightChange: { newHeight in
-                        sheetHeight = newHeight
-                    },
-                    onViewAllKeywords: {
-                        // Trigger keyword results popup via AppCoordinator
-                        if let keyword = searchViewModel.matchedKeyword {
-                            appCoordinator.triggerKeywordResultsPopup(
-                                keyword: keyword,
-                                types: searchViewModel.currentKeywordTypes
-                            )
-                        }
-                    }
-                )
-                }
-                
+
                 loadingOverlay
             }
             .navigationBarHidden(true)
@@ -212,6 +185,9 @@ struct MainView: View {
                     .environmentObject(dataManager)
                     .environmentObject(serviceContainer)
             }
+            .fullScreenCover(isPresented: $showSearchPage) {
+                searchPageView
+            }
             .alert("No Location Found", isPresented: $deepLinkViewModel.showNoLocationAlert) {
                 Button("OK") {
                     deepLinkViewModel.dismissNoLocationAlert()
@@ -222,12 +198,6 @@ struct MainView: View {
         }
         .onAppear {
             locationManager.requestLocationPermission()
-        }
-        .onChange(of: selectedPlaceVM.isDetailSheetPresented) { _, newValue in
-            if newValue {
-                appCoordinator.isSearchExpanded = false
-                // Sheet opens at partial height, user can swipe up to expand
-            }
         }
         .onChange(of: selectedPlaceVM.shouldAnimateMapToPlace) { _, newValue in
             if newValue, let place = selectedPlaceVM.selectedPlace, let coordinate = place.coordinate {
@@ -240,18 +210,6 @@ struct MainView: View {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                     selectedPlaceVM.shouldAnimateMapToPlace = false
                 }
-            }
-        }
-        .onChange(of: userProfileNavigationViewModel.isUserDetailPresented) { oldValue, newValue in
-            // When navigating BACK from user profile (true -> false), ensure search is collapsed and keyboard dismissed
-            if oldValue == true && newValue == false {
-                appCoordinator.isSearchExpanded = false
-            }
-        }
-        .onChange(of: appCoordinator.isSearchExpanded) { _, isExpanded in
-            // Pass current map region to SearchViewModel for viewport-based keyword searches
-            if isExpanded {
-                searchViewModel.currentMapRegion = appCoordinator.currentMapRegion
             }
         }
     }
@@ -275,9 +233,7 @@ struct MainView: View {
                     .padding(.trailing, 20)
                 }
             }
-            .opacity(!appCoordinator.isSearchExpanded ? 1 : 0)
-            .allowsHitTesting(!appCoordinator.isSearchExpanded)
-            
+
             Spacer()
         }
         .overlay(floatingActionButtons)
@@ -290,12 +246,7 @@ struct MainView: View {
         Group {
             if shouldShowFloatingActionButtons {
                 FloatingActionButtons(
-                    searchCoordinator: searchCoordinator,
-                    isSearchBarMinimized: Binding(
-                        get: { !appCoordinator.isSearchExpanded },
-                        set: { appCoordinator.isSearchExpanded = !$0 }
-                    ),
-                    sheetHeight: $sheetHeight,
+                    showSearchPage: $showSearchPage,
                     shouldNavigateToProfile: $shouldNavigateToProfile
                 )
                 .environmentObject(profileViewModel)
@@ -306,16 +257,29 @@ struct MainView: View {
     /// Single Responsibility: Determines if floating action buttons should be visible
     /// MVVM: Pure function that checks ViewModel state - no side effects
     private var shouldShowFloatingActionButtons: Bool {
-        !appCoordinator.isSearchExpanded &&
         !selectedPlaceVM.isDetailSheetPresented &&
         !isCreatePlacePopupActive &&
         profileViewModel.selectedListIdForMap == nil // Hide when list popup is showing
     }
-    
-    /// Single Responsibility: Determines if search overlay should be visible
-    /// MVVM: Pure function that checks ViewModel state - no side effects
-    private var shouldShowSearchOverlay: Bool {
-        profileViewModel.selectedListIdForMap == nil // Hide search bar when list popup is showing
+
+    // MARK: - Search Page
+
+    /// Builds the search page view with proper ViewModel and callbacks
+    private var searchPageView: some View {
+        SearchPageViewWrapper(
+            searchViewModel: searchViewModel,
+            searchCoordinator: searchCoordinator,
+            showSearchPage: $showSearchPage
+        )
+        .environmentObject(userProfileNavigationViewModel)
+        .environmentObject(profileViewModel)
+        .environmentObject(selectedPlaceVM)
+        .environmentObject(detailPlaceViewModel)
+        .environmentObject(userSession)
+        .environmentObject(mapDisplayCoordinatorViewModel)
+        .environmentObject(locationManager)
+        .environmentObject(dataManager)
+        .environmentObject(appCoordinator)
     }
     
     // MARK: - Loading Overlay
@@ -384,9 +348,9 @@ struct MainView: View {
     }
     
     // MARK: - Actions
+
+    /// Handle map tap - no-op since search is now fullScreenCover
     private func handleMapTap() {
-        withAnimation {
-            appCoordinator.isSearchExpanded = false
-        }
+        // Search is now presented as fullScreenCover, no need to collapse
     }
 }

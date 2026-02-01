@@ -19,7 +19,6 @@ class AppCoordinator: ObservableObject {
     @Published var isShowingUserProfile = false
     
     // MARK: - UI State
-    @Published var isSearchExpanded = false
     @Published var selectedPlace: Place?
     @Published var selectedUserId: String?
 
