@@ -454,9 +454,13 @@ struct MapView: View {
                 .presentationDragIndicator(.visible)
         }
         .onChange(of: selectedPlaceVM.selectedPlace?.id) { oldValue, newValue in
-            // Clear preserved annotation when place is deselected
             if newValue == nil {
+                // Clear preserved annotation when place is deselected
                 mapViewModel.clearPreservedAnnotation()
+            } else if oldValue != newValue, let place = selectedPlaceVM.selectedPlace {
+                // Set preserved annotation when a new place is selected (e.g., from search)
+                // This ensures a pin appears on the map even if the place isn't in viewportAnnotations
+                mapViewModel.setPreservedAnnotation(for: place)
             }
         }
     }

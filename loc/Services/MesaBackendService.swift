@@ -318,9 +318,11 @@ class MesaBackendService {
                 detailPlace.websiteUrl = placeDict["website"] as? String
 
                 // Manually extract coordinates and create CLLocationCoordinate2D
-                if let locationDict = placeDict["location"] as? [String: Any],
-                   let latitude = locationDict["latitude"] as? Double,
-                   let longitude = locationDict["longitude"] as? Double {
+                // Try "coordinate" first (backend format), fall back to "location" (legacy)
+                let coordDict = placeDict["coordinate"] as? [String: Any] ?? placeDict["location"] as? [String: Any]
+                if let coordDict = coordDict,
+                   let latitude = coordDict["latitude"] as? Double,
+                   let longitude = coordDict["longitude"] as? Double {
                     detailPlace.coordinate = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
                 }
                 
