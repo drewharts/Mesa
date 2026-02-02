@@ -265,8 +265,8 @@ struct PlaceDetailView: View {
         }
     }
 
-    /// Maps SelectedPlaceViewModel loading state to PlacePostsViewModel loading state.
-    private func mapLoadingState(_ state: SelectedPlaceViewModel.LoadingState) -> PlacePostsViewModel.LoadingState {
+    /// Maps PlacePostsCacheViewModel loading state to PlacePostsViewModel loading state.
+    private func mapLoadingState(_ state: PlacePostsCacheViewModel.LoadingState) -> PlacePostsViewModel.LoadingState {
         switch state {
         case .idle:
             return .idle
