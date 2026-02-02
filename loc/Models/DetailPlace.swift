@@ -54,7 +54,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         case phone
         case rating
         case userRatingsTotal = "user_ratings_total"
-        case ratingCount  // Firestore uses "ratingCount"
+        case ratingCount  // Legacy field name "ratingCount"
         case openHours
         case description
         case priceLevel
@@ -68,11 +68,11 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         case menuUrl = "menu_url"
         case websiteUrl = "website"
         case googlePlaceId = "google_place_id"
-        case googlePlacesId  // Firestore uses "googlePlacesId" (with 's')
+        case googlePlacesId  // Legacy field name "googlePlacesId" (with 's')
         case source
         case createdAt = "created_at"
         case photoUrls
-        case thumbnailUrl  // Firestore uses "thumbnailUrl"
+        case thumbnailUrl  // Legacy field name "thumbnailUrl"
         case isCustom = "is_custom"
         case aiSuggestionReason
     }
@@ -128,7 +128,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         self.phone = try container.decodeIfPresent(String.self, forKey: .phone)
         self.rating = try container.decodeIfPresent(Double.self, forKey: .rating)
         
-        // Try both field names for rating count (backend uses user_ratings_total, Firestore uses ratingCount)
+        // Try both field names for rating count (backend uses user_ratings_total, legacy uses ratingCount)
         self.userRatingsTotal = try container.decodeIfPresent(Int.self, forKey: .userRatingsTotal) 
             ?? container.decodeIfPresent(Int.self, forKey: .ratingCount)
     }
@@ -137,7 +137,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         // Try to decode openHours as array of strings first (backend format)
         self.openHours = try? container.decodeIfPresent([String].self, forKey: .openHours)
         
-        // If that fails, try to decode as array of objects (Firestore format)
+        // If that fails, try to decode as array of objects (legacy format)
         if self.openHours == nil {
             if let openHoursObjects = try? container.decodeIfPresent([[String: String]].self, forKey: .openHours) {
                 // Convert from [{ day: "Monday", hours: "11 AM–11 PM" }] to ["Monday: 11 AM–11 PM"]
@@ -163,11 +163,11 @@ struct DetailPlace: Codable, Identifiable, Equatable {
     private mutating func decodeTikTokProperties(from container: KeyedDecodingContainer<CodingKeys>) throws {
         self.tikTokVideos = try container.decodeIfPresent([TikTokVideo].self, forKey: .tikTokVideos)
         
-        // Try both field names for Google Place ID (backend uses google_place_id, Firestore uses googlePlacesId)
+        // Try both field names for Google Place ID (backend uses google_place_id, legacy uses googlePlacesId)
         let googlePlaceIdBackend = try container.decodeIfPresent(String.self, forKey: .googlePlaceId)
-        let googlePlaceIdFirestore = try container.decodeIfPresent(String.self, forKey: .googlePlacesId)
-        
-        self.googlePlaceId = googlePlaceIdBackend ?? googlePlaceIdFirestore
+        let googlePlaceIdLegacy = try container.decodeIfPresent(String.self, forKey: .googlePlacesId)
+
+        self.googlePlaceId = googlePlaceIdBackend ?? googlePlaceIdLegacy
         
         self.source = try container.decodeIfPresent(String.self, forKey: .source)
         

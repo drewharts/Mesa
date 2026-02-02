@@ -2,7 +2,7 @@
 //  SupabaseRealtimeService.swift
 //  loc
 //
-//  Real-time service using Supabase Realtime (replacement for Firebase Realtime)
+//  Real-time service using Supabase Realtime for live updates.
 //
 
 import Foundation

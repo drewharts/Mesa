@@ -12,7 +12,7 @@ import MapKit
 
 @MainActor
 class DataManager: ObservableObject {
-    // Firestore Services
+    // Services
     private let userService: UserService
     private let placeService: PlaceService
     private let postService: PostService
@@ -542,7 +542,7 @@ class DataManager: ObservableObject {
                 }
             }
         } catch {
-            print("Error fetching place from Firestore: \(error.localizedDescription)")
+            print("Error fetching place from database: \(error.localizedDescription)")
             
             // Create fallback DetailPlace from the list data
             if let list = profileViewModel.listsViewModel.userLists.first(where: { $0.id.uuidString == listId }),

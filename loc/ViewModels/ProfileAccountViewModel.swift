@@ -100,7 +100,7 @@ class ProfileAccountViewModel: ObservableObject {
         // Capture userService before entering closure to avoid MainActor isolation issues
         let service = userService
 
-        // Delete user data from Firestore
+        // Delete user data from database
         service.deleteUserAccount(userId: userId) { [weak self] error in
             DispatchQueue.main.async {
                 if let error = error {

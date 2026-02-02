@@ -149,7 +149,7 @@ class DetailPlaceViewModel: ObservableObject {
         return type
     }
 
-    // Fetch place data (e.g., from Firestore)
+    /// Fetches place details from the database.
     func fetchPlaceDetails(placeId: String, completion: @escaping (DetailPlace?) -> Void) {
         placeService.fetchPlace(withId: placeId) { [weak self] result in
             guard let self = self else {

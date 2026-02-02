@@ -45,14 +45,6 @@ open Loc.xcodeproj
 # xcodebuild test -project Loc.xcodeproj -scheme Loc -destination 'platform=iOS Simulator,name=iPhone 15'
 ```
 
-### Firebase Functions
-```bash
-cd functions
-npm install
-npm run serve  # Local development
-npm run deploy # Deploy to Firebase
-```
-
 ### Testing Deep Links
 ```bash
 # Test deep link in simulator
@@ -146,27 +138,10 @@ URL scheme: `loc://`
 - Handled in `Loc/AppDelegate.swift` and `Loc/LocApp.swift`
 - Routes: `/profile/{userId}`, `/place/{placeId}`, `/list/{listId}`
 
-## Firebase Configuration
-
-### Firestore Collections
-- `users`: User profiles and settings
-- `places`: Place details and reviews
-- `lists`: User-created place lists
-- `activities`: Social activity feed
-- `notifications`: Push notification data
-
-### Cloud Functions
-Located in `functions/src/index.ts`:
-- `onUserCreate`: Initialize new user data
-- `onFollowCreate`: Send follow notifications
-- `onActivityCreate`: Trigger activity notifications
-- `sendNotification`: Helper for push notifications
-
 ## Testing Considerations
 
 ### Unit Tests
 - Test ViewModels with mock services
-- Firebase rules testing for security
 - Deep link URL parsing tests
 
 ### UI Tests
@@ -176,10 +151,10 @@ Located in `functions/src/index.ts`:
 
 ## Common Issues and Solutions
 
-### Firebase Authentication
-- Check GoogleService-Info.plist is included
-- Verify bundle ID matches Firebase config
-- Test with Firebase Auth emulator for development
+### Supabase Authentication
+- Verify Supabase URL and anon key are set correctly
+- Check bundle ID matches Supabase project config
+- See PUSH_NOTIFICATIONS_SETUP.md for push notification configuration
 
 ### Map Integration
 - Ensure API keys are set in Info.plist
@@ -188,7 +163,7 @@ Located in `functions/src/index.ts`:
 
 ### Push Notifications
 - Register for notifications in AppDelegate
-- Test with Firebase Console
+- See PUSH_NOTIFICATIONS_SETUP.md for Supabase push notification setup
 - Handle notification permissions gracefully
 
 ## Coding Standards and Architecture Rules

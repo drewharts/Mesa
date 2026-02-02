@@ -78,8 +78,8 @@ class PlaceMetadataViewModel: ObservableObject {
                     self.placeRating = updatedPlace.rating ?? 0
                     onUpdate(mergedPlace)
 
-                    // Update Firestore in background
-                    self.updatePlaceInFirestore(mergedPlace)
+                    // Update database in background
+                    self.updatePlaceInDatabase(mergedPlace)
                 }
             } catch {
                 print("❌ [PlaceMetadataVM] Failed to fetch ratings for '\(place.name)': \(error.localizedDescription)")
@@ -98,11 +98,11 @@ class PlaceMetadataViewModel: ObservableObject {
         }
     }
 
-    /// Updates place in Firestore with fresh data.
-    private func updatePlaceInFirestore(_ place: DetailPlace) {
+    /// Updates place in database with fresh data.
+    private func updatePlaceInDatabase(_ place: DetailPlace) {
         placeService.updatePlace(place: place) { error in
             if let error = error {
-                print("❌ [PlaceMetadataVM] Failed to update place in Firestore: \(error.localizedDescription)")
+                print("❌ [PlaceMetadataVM] Failed to update place in database: \(error.localizedDescription)")
             }
         }
     }

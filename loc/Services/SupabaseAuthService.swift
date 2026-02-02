@@ -2,7 +2,7 @@
 //  SupabaseAuthService.swift
 //  loc
 //
-//  Authentication service using Supabase Auth (replacement for Firebase Auth)
+//  Authentication service using Supabase Auth.
 //
 
 import Foundation

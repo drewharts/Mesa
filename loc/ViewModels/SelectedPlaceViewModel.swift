@@ -382,8 +382,8 @@ class SelectedPlaceViewModel: ObservableObject {
                     let mergedPlace = self.mergePlaceData(original: place, fresh: freshPlace)
                     self.selectionState.updatePlaceDetails(mergedPlace)
 
-                    // Update Firestore in background
-                    self.updatePlaceInFirestore(mergedPlace)
+                    // Update database in background
+                    self.updatePlaceInDatabase(mergedPlace)
                 }
             } catch {
                 print("❌ [SelectedPlaceViewModel] fetchPlaceDetails failed for '\(place.name)': \(error.localizedDescription)")
@@ -410,11 +410,11 @@ class SelectedPlaceViewModel: ObservableObject {
         return merged
     }
 
-    /// Updates place in Firestore.
-    private func updatePlaceInFirestore(_ place: DetailPlace) {
+    /// Updates place in database.
+    private func updatePlaceInDatabase(_ place: DetailPlace) {
         placeService.updatePlace(place: place) { error in
             if let error = error {
-                print("❌ [SelectedPlaceViewModel] Failed to update place in Firestore: \(error.localizedDescription)")
+                print("❌ [SelectedPlaceViewModel] Failed to update place in database: \(error.localizedDescription)")
             }
         }
     }

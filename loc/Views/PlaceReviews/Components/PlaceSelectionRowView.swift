@@ -53,7 +53,7 @@ struct PlaceSelectionRowView: View {
                         .foregroundColor(.black)
                         .multilineTextAlignment(.leading)
                     
-                    // Show description for Firestore places, address for Google Places
+                    // Show description for saved places, address for Google Places
                     if let description = place.properties.description, !description.isEmpty {
                         Text(description)
                             .font(.subheadline)

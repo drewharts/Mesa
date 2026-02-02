@@ -2,7 +2,7 @@
 //  SupabaseUserService.swift
 //  loc
 //
-//  User service using Supabase (replacement for Firebase UserService)
+//  User service using Supabase for user data operations.
 //
 
 import Foundation
@@ -15,7 +15,7 @@ class SupabaseUserService: ObservableObject {
     
     private init() {}
     
-    // MARK: - User Profile (matching Firebase UserService interface)
+    // MARK: - User Profile
 
     func fetchUserBySupabaseUid(supabaseUid: String, completion: @escaping (User?, Error?) -> Void) {
         Task {
@@ -335,7 +335,7 @@ class SupabaseUserService: ObservableObject {
         Task {
             do {
                 // Try to update by id OR supabase_uid since we might receive either
-                // (id is the legacy Firebase ID, supabase_uid is the Supabase auth ID)
+                // (id is the legacy user ID, supabase_uid is the Supabase auth ID)
                 try await supabase.client
                     .from("users")
                     .update(["fcm_token": token])
@@ -1141,7 +1141,7 @@ extension SupabaseUserService {
     /// Deletes all external_places records for a user and place combination
     /// Single Responsibility: Execute Supabase delete operation for external places
     /// - Parameters:
-    ///   - userId: The user's ID (Firebase UID)
+    ///   - userId: The user's ID
     ///   - placeId: The place ID to remove from user's saved TikToks
     /// - Throws: Database errors if deletion fails
     func deleteExternalPlaces(userId: String, placeId: String) async throws {
