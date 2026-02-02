@@ -5,22 +5,24 @@ import Foundation
 struct LightweightPlace: Codable, Identifiable, Equatable {
     let place_id: String
     let name: String
+    let address: String?
     let latest_review_photo: String?
     let external_place_id: String? // UUID from external_places table (row ID, unique per TikTok video)
     let tiktok_url: String? // TikTok video URL from external_places table
-    
+
     // MARK: - Added By Info (for collaborative lists)
     // These fields are only populated when fetching places from a collaborative list
     // For personal lists, these will be nil (no need to show "added by" for single-user lists)
     let added_by_user_id: String?
     let added_by_name: String?
     let added_by_photo_url: String?
-    
+
     var id: String { place_id }
-    
+
     enum CodingKeys: String, CodingKey {
         case place_id
         case name
+        case address
         case latest_review_photo
         case external_place_id
         case tiktok_url
@@ -29,12 +31,13 @@ struct LightweightPlace: Codable, Identifiable, Equatable {
         case added_by_photo_url
         // Intentionally omitting coordinate - we don't need it for tiles
     }
-    
+
     // MARK: - Convenience Initializer for Backward Compatibility
-    
+
     init(
         place_id: String,
         name: String,
+        address: String? = nil,
         latest_review_photo: String?,
         external_place_id: String? = nil,
         tiktok_url: String? = nil,
@@ -44,6 +47,7 @@ struct LightweightPlace: Codable, Identifiable, Equatable {
     ) {
         self.place_id = place_id
         self.name = name
+        self.address = address
         self.latest_review_photo = latest_review_photo
         self.external_place_id = external_place_id
         self.tiktok_url = tiktok_url

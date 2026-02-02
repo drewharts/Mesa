@@ -65,6 +65,7 @@ struct ProfileContentView: View {
                     
                     // Favorites/TikToks (tabbed) & Lists
                     ProfileFavoritesTikToksView()
+                    TripsSectionView()
                     ProfileViewListsView()
 
                     // No Location Data Error

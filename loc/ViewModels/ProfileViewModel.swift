@@ -169,6 +169,9 @@ class ProfileViewModel: ObservableObject {
     /// Child ViewModel for place notes management
     let notesViewModel: ProfileNotesViewModel
 
+    /// Child ViewModel for trips management
+    let tripsViewModel: ProfileTripsViewModel
+
     /// Recently created list ID - proxies to listsViewModel
     var recentlyCreatedListId: UUID? {
         get { listsViewModel.recentlyCreatedListId }
@@ -243,6 +246,7 @@ class ProfileViewModel: ObservableObject {
         self.tikTokViewModel = ProfileTikTokViewModel(userService: userService, userSession: userSession)
         self.listsViewModel = ProfileListsViewModel(userService: userService, placeService: placeService, userSession: userSession, locationManager: locationManager)
         self.notesViewModel = ProfileNotesViewModel(userService: userService, userSession: userSession)
+        self.tripsViewModel = ProfileTripsViewModel(userSession: userSession, locationManager: locationManager)
 
         self.userService = userService
         self.detailPlaceViewModel = detailPlaceViewModel
@@ -510,6 +514,10 @@ class ProfileViewModel: ObservableObject {
         }.store(in: &cancellables)
 
         notesViewModel.objectWillChange.sink { [weak self] _ in
+            self?.objectWillChange.send()
+        }.store(in: &cancellables)
+
+        tripsViewModel.objectWillChange.sink { [weak self] _ in
             self?.objectWillChange.send()
         }.store(in: &cancellables)
     }
@@ -1032,6 +1040,9 @@ class ProfileViewModel: ObservableObject {
 
         // Clear place notes (delegated to child ViewModel)
         notesViewModel.resetAllData()
+
+        // Clear trips (delegated to child ViewModel)
+        tripsViewModel.resetAllData()
 
         // Reset loading states
         isLoadingInitialLists = false

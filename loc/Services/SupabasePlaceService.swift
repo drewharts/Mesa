@@ -667,12 +667,12 @@ class SupabasePlaceService: ObservableObject {
     /// Uses upsert to insert if not exists, or do nothing if already present
     func ensurePlaceExists(place: DetailPlace) async throws {
         let placeData = convertToPlaceData(place)
-        
+
         try await supabase.client
             .from("places")
             .upsert(placeData, onConflict: "id")
             .execute()
-        
+
         print("✅ [Supabase] Place ensured in database: \(place.id.uuidString)")
     }
     
@@ -2004,6 +2004,100 @@ struct MyPlaceRecord: Codable {
     let place_id: String
     let name: String
     let coordinate: LocationData? // PostGIS geometry as custom struct (same as PlaceRecord)
+}
+
+// MARK: - Place Coordinates Extension
+
+extension SupabasePlaceService {
+    /// Fetches coordinates for a list of place IDs.
+    func fetchPlaceCoordinates(placeIds: [String]) async throws -> [String: CLLocationCoordinate2D] {
+        guard !placeIds.isEmpty else { return [:] }
+
+        struct PlaceCoordRecord: Codable {
+            let id: String
+            let location: LocationData?
+        }
+
+        let records: [PlaceCoordRecord] = try await supabase.client
+            .from("places")
+            .select("id, location")
+            .in("id", values: placeIds)
+            .execute()
+            .value
+
+        var coordinates: [String: CLLocationCoordinate2D] = [:]
+
+        for record in records {
+            if let locationData = record.location,
+               let coords = locationData.coordinates,
+               coords.count >= 2 {
+                coordinates[record.id] = CLLocationCoordinate2D(
+                    latitude: coords[1],
+                    longitude: coords[0]
+                )
+            }
+        }
+
+        return coordinates
+    }
+
+    // MARK: - Place Search for Trips
+
+    /// Searches places by name for trip planning.
+    func searchPlaces(query: String, limit: Int = 20) async throws -> [LightweightPlace] {
+        struct PlaceSearchResult: Decodable {
+            let id: String
+            let name: String
+            let address: String?
+            let thumbnail_url: String?
+        }
+
+        let results: [PlaceSearchResult] = try await supabase.client
+            .from("places")
+            .select("id, name, address, thumbnail_url")
+            .ilike("name", pattern: "%\(query)%")
+            .limit(limit)
+            .execute()
+            .value
+
+        return results.map { result in
+            LightweightPlace(
+                place_id: result.id,
+                name: result.name,
+                address: result.address,
+                latest_review_photo: result.thumbnail_url
+            )
+        }
+    }
+
+    /// Fetches a single lightweight place by ID.
+    func fetchLightweightPlace(placeId: String) async throws -> LightweightPlace? {
+        struct PlaceResult: Decodable {
+            let id: String
+            let name: String
+            let address: String?
+            let thumbnail_url: String?
+        }
+
+        let results: [PlaceResult] = try await supabase.client
+            .from("places")
+            .select("id, name, address, thumbnail_url")
+            .eq("id", value: placeId)
+            .limit(1)
+            .execute()
+            .value
+
+        guard let result = results.first else {
+            return nil
+        }
+
+        return LightweightPlace(
+            place_id: result.id,
+            name: result.name,
+            address: result.address,
+            latest_review_photo: result.thumbnail_url
+        )
+    }
 }
 
 struct PlaceListItemRecord: Codable {

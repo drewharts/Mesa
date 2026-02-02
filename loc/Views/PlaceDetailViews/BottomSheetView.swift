@@ -159,23 +159,5 @@ extension EnvironmentValues {
     }
 }
 
-// RoundedCorner and cornerRadius extension (unchanged)
-struct RoundedCorner: Shape {
-    var radius: CGFloat = 0.0
-    var corners: UIRectCorner = .allCorners
-        
-    func path(in rect: CGRect) -> Path {
-        let path = UIBezierPath(
-            roundedRect: rect,
-            byRoundingCorners: corners,
-            cornerRadii: CGSize(width: radius, height: radius)
-        )
-        return Path(path.cgPath)
-    }
-}
-
-extension View {
-    func cornerRadius(_ radius: CGFloat, corners: UIRectCorner) -> some View {
-        clipShape(RoundedCorner(radius: radius, corners: corners))
-    }
-}
+// Note: Uses RoundedCornerShape from loc/Views/ReusableViews/RoundedCornerShape.swift
+// for the cornerRadius(_:corners:) extension
