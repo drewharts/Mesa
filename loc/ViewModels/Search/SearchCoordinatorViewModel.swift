@@ -45,8 +45,18 @@ class SearchCoordinatorViewModel {
     func handlePlaceSelection(_ detailPlace: DetailPlace) -> CGFloat {
         selectedPlaceVM?.selectPlaceAndFetchDetails(detailPlace, shouldAnimateMap: true)
         selectedPlaceVM?.isDetailSheetPresented = true
-        
+
         return minSheetHeight
+    }
+
+    /// Prepares the map to animate to the selected place (call before dismiss for parallel animation).
+    func prepareMapForPlace(_ detailPlace: DetailPlace) {
+        selectedPlaceVM?.selectPlaceAndFetchDetails(detailPlace, shouldAnimateMap: true)
+    }
+
+    /// Presents the place detail sheet (call after dismiss animation starts).
+    func presentPlaceDetail() {
+        selectedPlaceVM?.isDetailSheetPresented = true
     }
     
     /// Handle user selection from search

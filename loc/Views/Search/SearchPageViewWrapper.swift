@@ -86,34 +86,39 @@ private struct SearchPageViewContent: View {
     var body: some View {
         SearchPageView(viewModel: viewModel)
             .onAppear {
-                configureCallbacks()
+                viewModel.onDismiss = {
+                    showSearchPage = false
+                }
+
+                viewModel.onPlaceSelected = { place in
+                    // Start map animation immediately (runs parallel to search dismiss)
+                    searchCoordinator.prepareMapForPlace(place)
+
+                    // Dismiss search page
+                    showSearchPage = false
+
+                    // Present detail sheet after dismiss animation starts (avoids iOS sheet conflict)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                        searchCoordinator.presentPlaceDetail()
+                    }
+                }
+
+                viewModel.onUserSelected = { _ in
+                    // User selection navigates within search NavigationStack
+                    // Don't dismiss - let user navigate back
+                }
+
+                viewModel.onViewAllKeywords = { keyword, types in
+                    print("🔍 [SearchPageViewWrapper] onViewAllKeywords callback triggered")
+                    print("   - keyword: \(keyword)")
+                    print("   - types: \(types)")
+                    showSearchPage = false
+                    appCoordinator.triggerKeywordResultsPopup(keyword: keyword, types: types)
+                    print("   ✅ triggerKeywordResultsPopup called")
+                }
+
+                // Set map region for viewport-based searches
+                viewModel.setMapRegion(appCoordinator.currentMapRegion)
             }
-    }
-
-    // MARK: - Private Methods
-
-    /// Configure ViewModel callbacks
-    private func configureCallbacks() {
-        viewModel.onDismiss = {
-            showSearchPage = false
-        }
-
-        viewModel.onPlaceSelected = { place in
-            showSearchPage = false
-            _ = searchCoordinator.handlePlaceSelection(place)
-        }
-
-        viewModel.onUserSelected = { _ in
-            // User selection navigates within search NavigationStack
-            // Don't dismiss - let user navigate back
-        }
-
-        viewModel.onViewAllKeywords = { keyword, types in
-            showSearchPage = false
-            appCoordinator.triggerKeywordResultsPopup(keyword: keyword, types: types)
-        }
-
-        // Set map region for viewport-based searches
-        viewModel.setMapRegion(appCoordinator.currentMapRegion)
     }
 }
