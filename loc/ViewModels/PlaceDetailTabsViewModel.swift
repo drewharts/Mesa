@@ -28,6 +28,7 @@ class PlaceDetailTabsViewModel: ObservableObject {
     private let placeShareService: PlaceShareService
     private let userSession: UserSession
     private let placeListService = PlaceListService.shared
+    private let postsCacheService = ServiceContainer.shared.postsCacheService
 
     // MARK: - Callbacks (replaces ViewModel observations)
     /// Called when max favorites alert should be dismissed in ProfileViewModel
@@ -159,6 +160,7 @@ class PlaceDetailTabsViewModel: ObservableObject {
         }
 
         setupObservers()
+        setupPostsCacheObserver()
     }
 
     // MARK: - Setup
@@ -194,10 +196,81 @@ class PlaceDetailTabsViewModel: ObservableObject {
             .store(in: &cancellables)
     }
 
+    /// Sets up reactive subscription to posts cache - triggers when posts for current place change.
+    private func setupPostsCacheObserver() {
+        // Combine currentPlace with postsCache - fires when either changes
+        // This is the proper reactive pattern: subscribe to actual data, not manual triggers
+        Publishers.CombineLatest3(
+            $currentPlace.map { $0?.id.uuidString },
+            postsCacheService.$postsCache,
+            postsCacheService.$loadingStates
+        )
+        .receive(on: RunLoop.main)
+        .sink { [weak self] placeId, postsCache, loadingStates in
+            self?.handlePostsDataChanged(
+                placeId: placeId,
+                postsCache: postsCache,
+                loadingStates: loadingStates
+            )
+        }
+        .store(in: &cancellables)
+
+        // Separate subscription for TikToks cache
+        Publishers.CombineLatest(
+            $currentPlace.map { $0?.id.uuidString },
+            postsCacheService.$tiktoksCache
+        )
+        .receive(on: RunLoop.main)
+        .sink { [weak self] placeId, tiktoksCache in
+            guard let placeId = placeId else { return }
+            let tiktoks = tiktoksCache[placeId] ?? []
+            self?.aboutTabViewModel.tikTokVideosViewModel.setPlaceVideos(tiktoks)
+        }
+        .store(in: &cancellables)
+    }
+
+    /// Handles posts data changes from the reactive subscription.
+    private func handlePostsDataChanged(
+        placeId: String?,
+        postsCache: [String: [PlacePost]],
+        loadingStates: [String: PlacePostsCacheService.LoadingState]
+    ) {
+        guard let placeId = placeId else { return }
+
+        let posts = postsCache[placeId] ?? []
+        let loadingState = loadingStates[placeId] ?? .idle
+
+        self.hasPosts = !posts.isEmpty
+        self.postCount = posts.count
+
+        placePhotosViewModel.setPosts(posts)
+        postsViewModel.setPosts(posts)
+        postsViewModel.setLoadingState(mapLoadingState(loadingState))
+
+        if posts.isEmpty && selectedTab == .reviews {
+            selectedTab = .about
+        }
+    }
+
+    /// Maps PlacePostsCacheService loading state to PlacePostsViewModel loading state.
+    private func mapLoadingState(_ state: PlacePostsCacheService.LoadingState) -> PlacePostsViewModel.LoadingState {
+        switch state {
+        case .idle:
+            return .idle
+        case .loading:
+            return .loading
+        case .loaded:
+            return .loaded
+        case .error(let error):
+            return .error(error)
+        }
+    }
+
     // MARK: - Data-Driven Updates (Called by View via .onChange)
 
     /// Called by View when selected place changes.
     func setPlace(_ place: DetailPlace?) {
+        // Setting currentPlace triggers the reactive subscription automatically
         handlePlaceChanged(place)
 
         // Update all child ViewModels with new place
@@ -215,7 +288,8 @@ class PlaceDetailTabsViewModel: ObservableObject {
         }
     }
 
-    /// Called by View when posts/rating change.
+    /// Called by View when posts/rating change (legacy method for backward compatibility).
+    /// Posts are now primarily synced via PlacePostsCacheService subscription.
     func setPosts(_ posts: [PlacePost], rating: Double) {
         self.placeRating = rating
         self.hasPosts = !posts.isEmpty
@@ -229,6 +303,11 @@ class PlaceDetailTabsViewModel: ObservableObject {
         if posts.isEmpty && selectedTab == .reviews {
             selectedTab = .about
         }
+    }
+
+    /// Called when the place rating changes.
+    func setRating(_ rating: Double) {
+        self.placeRating = rating
     }
 
     /// Called by View when favorite status changes.

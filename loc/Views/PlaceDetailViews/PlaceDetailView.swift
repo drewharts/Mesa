@@ -49,10 +49,15 @@ struct PlaceDetailView: View {
     @ViewBuilder
     private var mainContent: some View {
         VStack(spacing: 16) {
-            if selectedPlaceVM.selectedPlace == nil {
+            if let place = selectedPlaceVM.selectedPlace {
+                if let tabsViewModel = tabsViewModel {
+                    tabsContent(viewModel: tabsViewModel)
+                } else {
+                    // Show place header with loading state while ViewModel initializes
+                    placeLoadingView(place: place)
+                }
+            } else {
                 loadingView
-            } else if let tabsViewModel = tabsViewModel {
-                tabsContent(viewModel: tabsViewModel)
             }
         }
         .frame(maxWidth: .infinity)
@@ -88,9 +93,85 @@ struct PlaceDetailView: View {
         ))
     }
 
-    /// Loading indicator shown while place data is being fetched.
+    /// Loading indicator shown when no place is selected yet.
     private var loadingView: some View {
         ProgressView("Loading Place Details...")
+    }
+
+    /// Loading view that shows place name while full details are loading.
+    private func placeLoadingView(place: DetailPlace) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 5) {
+                // Header row with place name (matches PlaceDetailTabsView style)
+                HStack(alignment: .center) {
+                    Text(place.name)
+                        .font(.largeTitle)
+                        .fontWeight(.bold)
+                        .foregroundColor(.black)
+
+                    Spacer()
+
+                    // Placeholder bookmark icon (disabled)
+                    Image(systemName: "bookmark")
+                        .font(.title3)
+                        .foregroundColor(.gray.opacity(0.4))
+                        .frame(width: 32, height: 32)
+
+                    // Placeholder share icon (disabled)
+                    Image(systemName: "square.and.arrow.up")
+                        .font(.title3)
+                        .foregroundColor(.gray.opacity(0.4))
+                        .frame(width: 32, height: 32)
+                }
+                .padding(.bottom, 3)
+
+                // Info row placeholder with shimmer effect
+                HStack(spacing: 10) {
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Color.gray.opacity(0.2))
+                        .frame(width: 80, height: 16)
+
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Color.gray.opacity(0.2))
+                        .frame(width: 60, height: 16)
+                }
+                .padding(.bottom, 10)
+
+                // Tab bar placeholder
+                HStack(spacing: 12) {
+                    Text("ABOUT")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.gray.opacity(0.5))
+
+                    Text("FEED")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.gray.opacity(0.5))
+
+                    Spacer()
+                }
+                .padding(.bottom, 10)
+
+                // Loading indicator for content
+                VStack {
+                    Spacer()
+                        .frame(height: 60)
+                    ProgressView()
+                        .scaleEffect(1.2)
+                    Text("Loading details...")
+                        .font(.subheadline)
+                        .foregroundColor(.gray)
+                        .padding(.top, 8)
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity)
+                .frame(minHeight: 200)
+            }
+            .padding(.horizontal, 24)
+            .padding(.top, 24)
+        }
+        .navigationBarTitleDisplayMode(.inline)
     }
 
     /// The place detail tabs view with all callbacks configured.
@@ -265,8 +346,8 @@ struct PlaceDetailView: View {
         }
     }
 
-    /// Maps PlacePostsCacheViewModel loading state to PlacePostsViewModel loading state.
-    private func mapLoadingState(_ state: PlacePostsCacheViewModel.LoadingState) -> PlacePostsViewModel.LoadingState {
+    /// Maps PlacePostsCacheService loading state to PlacePostsViewModel loading state.
+    private func mapLoadingState(_ state: PlacePostsCacheService.LoadingState) -> PlacePostsViewModel.LoadingState {
         switch state {
         case .idle:
             return .idle

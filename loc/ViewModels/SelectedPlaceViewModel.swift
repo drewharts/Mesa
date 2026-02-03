@@ -7,9 +7,11 @@
 //
 //  Child ViewModels:
 //  - selectionState: Manages selection, sheet presentation, navigation
-//  - postsCache: Manages posts/TikToks caching, loading, likes
 //  - metadata: Manages ratings, restaurant type, open status
 //  - creation: Manages custom place creation
+//
+//  Services:
+//  - postsCacheService: Manages posts/TikToks caching, loading, likes (singleton service)
 //
 
 import Foundation
@@ -22,9 +24,12 @@ class SelectedPlaceViewModel: ObservableObject {
     // MARK: - Child ViewModels
 
     let selectionState: PlaceSelectionStateViewModel
-    let postsCache: PlacePostsCacheViewModel
     let metadata: PlaceMetadataViewModel
     let creation: PlaceCreationViewModel
+
+    // MARK: - Services
+
+    private let postsCacheService = ServiceContainer.shared.postsCacheService
 
     // MARK: - Dependencies
 
@@ -34,6 +39,7 @@ class SelectedPlaceViewModel: ObservableObject {
     private weak var detailPlaceViewModel: DetailPlaceViewModel?
 
     private var cancellables = Set<AnyCancellable>()
+    private var serviceCancellables = Set<AnyCancellable>()
 
     // MARK: - Initialization
 
@@ -54,12 +60,12 @@ class SelectedPlaceViewModel: ObservableObject {
 
         // Initialize child ViewModels
         self.selectionState = PlaceSelectionStateViewModel()
-        self.postsCache = PlacePostsCacheViewModel(postService: postService)
         self.metadata = PlaceMetadataViewModel(mesaBackendService: mesaBackendService, placeService: placeService)
         self.creation = PlaceCreationViewModel(placeService: placeService)
 
         setupChildCallbacks()
         setupChildObservers()
+        setupServiceObservers()
     }
 
     // MARK: - Setup
@@ -88,13 +94,16 @@ class SelectedPlaceViewModel: ObservableObject {
             .sink { [weak self] _ in self?.objectWillChange.send() }
             .store(in: &cancellables)
 
-        postsCache.objectWillChange
-            .sink { [weak self] _ in self?.objectWillChange.send() }
-            .store(in: &cancellables)
-
         metadata.objectWillChange
             .sink { [weak self] _ in self?.objectWillChange.send() }
             .store(in: &cancellables)
+    }
+
+    /// Sets up observers for singleton services.
+    private func setupServiceObservers() {
+        postsCacheService.objectWillChange
+            .sink { [weak self] _ in self?.objectWillChange.send() }
+            .store(in: &serviceCancellables)
     }
 
     // MARK: - Convenience Accessors (for backwards compatibility)
@@ -148,26 +157,22 @@ class SelectedPlaceViewModel: ObservableObject {
         metadata.isRestaurantOpen
     }
 
-    /// Posts update counter for observation.
-    var postsUpdateCounter: Int {
-        postsCache.postsUpdateCounter
-    }
-
     /// Whether the current place is fully loaded.
     var isCurrentPlaceFullyLoaded: Bool {
-        postsCache.isCurrentPlaceFullyLoaded
+        guard let placeId = selectedPlace?.id.uuidString else { return false }
+        return postsCacheService.isFullyLoaded(forPlaceId: placeId)
     }
 
     /// Posts for the currently selected place.
     var posts: [PlacePost] {
         guard let placeId = selectedPlace?.id.uuidString else { return [] }
-        return postsCache.posts(forPlaceId: placeId)
+        return postsCacheService.posts(forPlaceId: placeId)
     }
 
     /// TikToks for the currently selected place.
     var tiktokVideos: [TikTokVideo] {
         guard let placeId = selectedPlace?.id.uuidString else { return [] }
-        return postsCache.tiktoks(forPlaceId: placeId)
+        return postsCacheService.tiktoks(forPlaceId: placeId)
     }
 
     // MARK: - Public Methods (Delegation to Children)
@@ -215,29 +220,29 @@ class SelectedPlaceViewModel: ObservableObject {
     }
 
     /// Returns the loading state for posts.
-    func postLoadingState(forPlaceId placeId: String) -> PlacePostsCacheViewModel.LoadingState {
-        postsCache.postLoadingState(forPlaceId: placeId)
+    func postLoadingState(forPlaceId placeId: String) -> PlacePostsCacheService.LoadingState {
+        postsCacheService.loadingState(forPlaceId: placeId)
     }
 
     /// Formats a post's timestamp.
     func formattedTimestamp(for post: PlacePost) -> String {
-        postsCache.formattedTimestamp(for: post)
+        postsCacheService.formattedTimestamp(for: post)
     }
 
     /// Returns whether a post is liked.
     func isPostLiked(_ postId: String) -> Bool {
-        postsCache.isPostLiked(postId)
+        postsCacheService.isPostLiked(postId)
     }
 
     /// Gets a post by ID.
     func getPost(by postId: String) -> PlacePost? {
-        postsCache.getPost(by: postId)
+        postsCacheService.getPost(by: postId)
     }
 
     /// Adds a post to the current place.
     func addPost(_ post: PlacePost) {
         guard let placeId = selectedPlace?.id.uuidString else { return }
-        postsCache.addPost(post, forPlaceId: placeId)
+        postsCacheService.addPost(post, forPlaceId: placeId)
     }
 
     /// Deletes a post from the current place.
@@ -246,7 +251,7 @@ class SelectedPlaceViewModel: ObservableObject {
             completion(.failure(NSError(domain: "SelectedPlaceViewModel", code: -1, userInfo: [NSLocalizedDescriptionKey: "No selected place"])))
             return
         }
-        postsCache.deletePost(postId: postId, forPlaceId: placeId, completion: completion)
+        postsCacheService.deletePost(postId: postId, forPlaceId: placeId, completion: completion)
     }
 
     /// Checks like statuses for posts.
@@ -304,7 +309,7 @@ class SelectedPlaceViewModel: ObservableObject {
         print("🗑️ [SelectedPlaceViewModel] Clearing all user data for security")
 
         selectionState.clearAllState()
-        postsCache.clearAllData()
+        postsCacheService.clearAllData()
         metadata.clearAllData()
 
         print("✅ [SelectedPlaceViewModel] All user data cleared")
@@ -314,12 +319,12 @@ class SelectedPlaceViewModel: ObservableObject {
 
     /// Handles when a place is selected.
     private func handlePlaceSelected(_ place: DetailPlace) {
-        guard let currentLocation = locationManager.currentLocation else { return }
+        let currentCoordinate = locationManager.currentLocation?.coordinate
 
         if placeNeedsCompleteDetails(place) && !selectionState.isFetchingFreshDetails {
-            fetchCompletePlaceDetails(for: place, currentLocation: currentLocation.coordinate)
+            fetchCompletePlaceDetails(for: place, currentLocation: currentCoordinate)
         } else {
-            continueWithPlaceSetup(place: place, currentLocation: currentLocation.coordinate)
+            continueWithPlaceSetup(place: place, currentLocation: currentCoordinate)
         }
     }
 
@@ -340,20 +345,20 @@ class SelectedPlaceViewModel: ObservableObject {
     }
 
     /// Continues with place setup after data is ready.
-    private func continueWithPlaceSetup(place: DetailPlace, currentLocation: CLLocationCoordinate2D) {
-        // Compute metadata
+    private func continueWithPlaceSetup(place: DetailPlace, currentLocation: CLLocationCoordinate2D?) {
+        // Compute metadata (only if location available)
         metadata.computeMetadata(for: place)
 
-        // Load posts
-        postsCache.clearLikedPosts()
-        postsCache.loadPosts(forPlaceId: place.id.uuidString)
+        // Load posts (doesn't require location)
+        postsCacheService.clearLikedPosts()
+        postsCacheService.loadPosts(forPlaceId: place.id.uuidString)
 
         // Present sheet
         selectionState.presentDetailSheet()
     }
 
     /// Fetches complete place details when missing.
-    private func fetchCompletePlaceDetails(for place: DetailPlace, currentLocation: CLLocationCoordinate2D) {
+    private func fetchCompletePlaceDetails(for place: DetailPlace, currentLocation: CLLocationCoordinate2D?) {
         let placeId = place.id.uuidString
 
         mesaBackendService.fetchPlaceDetails(placeId: placeId, source: "google") { [weak self] result in

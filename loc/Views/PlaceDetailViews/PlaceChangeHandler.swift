@@ -2,13 +2,13 @@
 //  PlaceChangeHandler.swift
 //  loc
 //
-//  ViewModifier that handles place selection and posts update changes.
-//  Extracted to reduce type-checking complexity in PlaceDetailView.
+//  ViewModifier that handles place selection changes.
+//  Posts sync is now handled by PlacePostsCacheService subscription in PlaceDetailTabsViewModel.
 //
 
 import SwiftUI
 
-/// Handles onChange events for place selection and posts updates.
+/// Handles onChange events for place selection.
 struct PlaceChangeHandler: ViewModifier {
     @Binding var tabsViewModel: PlaceDetailTabsViewModel?
 
@@ -21,9 +21,6 @@ struct PlaceChangeHandler: ViewModifier {
             .onChange(of: selectedPlaceVM.selectedPlace) { _, newPlace in
                 handlePlaceChanged(newPlace)
             }
-            .onChange(of: selectedPlaceVM.postsUpdateCounter) { _, _ in
-                handlePostsUpdated()
-            }
     }
 
     // MARK: - Handler Methods
@@ -34,15 +31,12 @@ struct PlaceChangeHandler: ViewModifier {
 
         guard let place = newPlace else { return }
 
-        // Trigger photo loading state machine immediately with empty posts
-        // This prevents infinite loading state while posts are being fetched asynchronously
-        // When posts actually load, handlePostsUpdated() will call setPosts() again with real data
-        tabsViewModel?.setPosts([], rating: 0)
-
         updateTravelTime(for: place)
         updateFavoriteStatus(for: place)
-        updateTikTokVideos(for: place)
-        updatePostLoadingState(for: place)
+        updateUserTikTokVideos(for: place)
+
+        // Set rating from metadata (posts handled by PlacePostsCacheService subscription)
+        tabsViewModel?.setRating(selectedPlaceVM.placeRating)
     }
 
     /// Updates travel time for the given place.
@@ -57,43 +51,9 @@ struct PlaceChangeHandler: ViewModifier {
         tabsViewModel?.setFavoriteStatus(isFavorited)
     }
 
-    /// Updates TikTok videos for the given place.
-    private func updateTikTokVideos(for place: DetailPlace) {
+    /// Updates user TikTok videos for the given place (place TikToks handled by PlacePostsCacheService).
+    private func updateUserTikTokVideos(for place: DetailPlace) {
         let userVideos = profile.getTikTokVideosSync(for: place.id.uuidString)
-        tabsViewModel?.setTikTokVideos(placeVideos: selectedPlaceVM.tiktokVideos, userVideos: userVideos)
-    }
-
-    /// Updates post loading state for the given place.
-    private func updatePostLoadingState(for place: DetailPlace) {
-        let loadingState = selectedPlaceVM.postLoadingState(forPlaceId: place.id.uuidString)
-        tabsViewModel?.setPostLoadingState(mapLoadingState(loadingState))
-    }
-
-    /// Handles posts data updates and also refreshes TikToks and loading state since they load together.
-    private func handlePostsUpdated() {
-        tabsViewModel?.setPosts(selectedPlaceVM.posts, rating: selectedPlaceVM.placeRating)
-
-        // Also update TikToks since they're loaded alongside posts
-        guard let place = selectedPlaceVM.selectedPlace else { return }
-        let userVideos = profile.getTikTokVideosSync(for: place.id.uuidString)
-        print("🎬 [PlaceChangeHandler] handlePostsUpdated - placeVideos: \(selectedPlaceVM.tiktokVideos.count), userVideos: \(userVideos.count)")
-        tabsViewModel?.setTikTokVideos(placeVideos: selectedPlaceVM.tiktokVideos, userVideos: userVideos)
-
-        // Update loading state when posts finish loading
-        updatePostLoadingState(for: place)
-    }
-
-    /// Maps PlacePostsCacheViewModel loading state to PlacePostsViewModel loading state.
-    private func mapLoadingState(_ state: PlacePostsCacheViewModel.LoadingState) -> PlacePostsViewModel.LoadingState {
-        switch state {
-        case .idle:
-            return .idle
-        case .loading:
-            return .loading
-        case .loaded:
-            return .loaded
-        case .error(let error):
-            return .error(error)
-        }
+        tabsViewModel?.aboutTabViewModel.tikTokVideosViewModel.setUserVideos(userVideos)
     }
 }

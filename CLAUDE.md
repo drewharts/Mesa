@@ -361,6 +361,76 @@ struct DetailView: View {
 }
 ```
 
+### Reactive Data Patterns (Combine Best Practices)
+
+**Subscribe to Data, Not Triggers**
+- NEVER use manual trigger properties like `updateCounter` or `refreshFlag`
+- Subscribe directly to `@Published` data properties
+- Use Combine operators to filter and deduplicate
+
+```swift
+// BAD: Manual trigger pattern (code smell)
+@Published var updateCounter: Int = 0  // Incremented to trigger updates
+
+viewModel.$updateCounter
+    .sink { _ in self.refreshData() }  // Subscribing to a trigger, not data
+
+// GOOD: Subscribe to actual data changes
+@Published var posts: [Post] = []
+
+service.$postsCache
+    .map { $0[placeId] ?? [] }
+    .removeDuplicates()  // Prevent unnecessary updates
+    .sink { posts in self.posts = posts }
+```
+
+**Use CombineLatest for Multi-Source Updates**
+- When UI depends on multiple data sources, use `CombineLatest`
+- This ensures updates when ANY source changes
+
+```swift
+// GOOD: React to changes in either currentPlace OR postsCache
+Publishers.CombineLatest(
+    $currentPlaceId,
+    service.$postsCache
+)
+.map { placeId, cache in cache[placeId] ?? [] }
+.removeDuplicates()
+.sink { posts in self.updateUI(posts) }
+```
+
+**Service Layer Reactive Rules**
+- Services expose `@Published` properties for cached data
+- Services do NOT expose manual trigger mechanisms
+- ViewModels subscribe to service publishers via Combine
+- Use `receive(on: RunLoop.main)` for UI updates
+
+```swift
+// GOOD: Service with reactive properties
+@MainActor
+class PostsCacheService: ObservableObject {
+    @Published private(set) var postsCache: [String: [Post]] = [:]
+    @Published private(set) var loadingStates: [String: LoadingState] = [:]
+
+    // NO updateCounter or similar triggers!
+}
+
+// GOOD: ViewModel subscribes reactively
+@MainActor
+class MyViewModel: ObservableObject {
+    private let service = ServiceContainer.shared.postsCacheService
+
+    func setupSubscriptions() {
+        service.$postsCache
+            .receive(on: RunLoop.main)
+            .sink { [weak self] cache in
+                self?.handleCacheUpdate(cache)
+            }
+            .store(in: &cancellables)
+    }
+}
+```
+
 ### SwiftUI Views
 - **DECLARATIVE ONLY**: Views should be purely declarative UI descriptions
 - **NO SIDE EFFECTS**: No network calls, database operations, or complex logic in Views
@@ -395,6 +465,7 @@ struct DetailView: View {
 11. **Sub-standard code quality**: Code that doesn't meet staff engineer standards
 12. **God ViewModels**: ViewModels with 300+ lines or 10+ @Published properties handling multiple features - must be split into composed child ViewModels
 13. **Dependency Explosion**: Views with 4+ `@EnvironmentObject` dependencies - refactor to have ViewModels fetch their own dependencies from ServiceContainer
+14. **Manual Trigger Patterns**: Using `updateCounter`, `refreshFlag`, or similar properties to trigger updates - subscribe to actual data changes instead
 
 ### Migration Strategy
 When finding violations:

@@ -23,6 +23,9 @@ class ServiceContainer: ObservableObject {
     lazy var tikTokService = TikTokService()
     lazy var collaborationService = CollaborationService.shared
 
+    // MARK: - Cache Services
+    lazy var postsCacheService = PlacePostsCacheService.shared
+
     // MARK: - Presentation Service (centralized sheet/modal management)
     let presentationService = PresentationService.shared
     
