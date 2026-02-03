@@ -352,6 +352,7 @@ class PhotoImportViewModel: ObservableObject {
             longitude: nearbyPlace.geometry.longitude
         )
         detailPlace.rating = nearbyPlace.properties.rating
+        detailPlace.userRatingsTotal = nearbyPlace.properties.userRatingsTotal
         detailPlace.categories = nearbyPlace.properties.types
         detailPlace.description = nearbyPlace.properties.description
 

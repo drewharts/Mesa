@@ -88,80 +88,98 @@ struct ExternalReviewPhotoGallery: View {
                         .font(.footnote)
                 }
             } else {
-                VStack(spacing: gridSpacing) {
-                    if let firstImage = photos.first {
-                        GeometryReader { geo in
-                            Image(uiImage: firstImage)
-                                .resizable()
-                                .scaledToFill()
-                                .frame(width: geo.size.width, height: heroImageHeight)
-                                .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
-                                .contentShape(RoundedRectangle(cornerRadius: cornerRadius))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: cornerRadius)
-                                        .stroke(Color.gray.opacity(0.1), lineWidth: 0.5)
-                                )
-                                .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 4)
-                        }
-                        .frame(height: heroImageHeight)
-                        .onTapGesture {
-                            onPhotoTapped(photos, 0)
-                        }
-                    }
-                    
-                    ForEach(staggeredLayoutItems) { item in
-                        switch item {
-                        case .single(let actualIndex):
+                ZStack(alignment: .bottom) {
+                    VStack(spacing: gridSpacing) {
+                        if let firstImage = photos.first {
                             GeometryReader { geo in
-                                Image(uiImage: photos[actualIndex])
+                                Image(uiImage: firstImage)
                                     .resizable()
                                     .scaledToFill()
-                                    .frame(width: geo.size.width, height: geo.size.width * 0.6)
+                                    .frame(width: geo.size.width, height: heroImageHeight)
                                     .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
                                     .contentShape(RoundedRectangle(cornerRadius: cornerRadius))
                                     .overlay(
                                         RoundedRectangle(cornerRadius: cornerRadius)
                                             .stroke(Color.gray.opacity(0.1), lineWidth: 0.5)
                                     )
-                                    .shadow(color: Color.black.opacity(0.08), radius: 6, x: 0, y: 2)
+                                    .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 4)
                             }
-                            .aspectRatio(5/3, contentMode: .fill)
+                            .frame(height: heroImageHeight)
                             .onTapGesture {
-                                onPhotoTapped(photos, actualIndex)
+                                onPhotoTapped(photos, 0)
                             }
-                            .onAppear {
-                                photosViewModel.loadMoreExternalReviewPhotosIfNeeded(currentIndex: actualIndex)
-                            }
-                            
-                        case .double(let indices):
-                            HStack(spacing: gridSpacing) {
-                                ForEach(indices, id: \.self) { actualIndex in
-                                    GeometryReader { geo in
-                                        Image(uiImage: photos[actualIndex])
-                                            .resizable()
-                                            .scaledToFill()
-                                            .frame(width: geo.size.width, height: geo.size.width * 0.8)
-                                            .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
-                                            .contentShape(RoundedRectangle(cornerRadius: cornerRadius))
-                                            .overlay(
-                                                RoundedRectangle(cornerRadius: cornerRadius)
-                                                    .stroke(Color.gray.opacity(0.1), lineWidth: 0.5)
-                                            )
-                                            .shadow(color: Color.black.opacity(0.08), radius: 6, x: 0, y: 2)
-                                    }
-                                    .aspectRatio(5/4, contentMode: .fill)
-                                    .onTapGesture {
-                                        onPhotoTapped(photos, actualIndex)
-                                    }
-                                    .onAppear {
-                                        photosViewModel.loadMoreExternalReviewPhotosIfNeeded(currentIndex: actualIndex)
+                        }
+
+                        ForEach(staggeredLayoutItems) { item in
+                            switch item {
+                            case .single(let actualIndex):
+                                GeometryReader { geo in
+                                    Image(uiImage: photos[actualIndex])
+                                        .resizable()
+                                        .scaledToFill()
+                                        .frame(width: geo.size.width, height: geo.size.width * 0.6)
+                                        .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+                                        .contentShape(RoundedRectangle(cornerRadius: cornerRadius))
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: cornerRadius)
+                                                .stroke(Color.gray.opacity(0.1), lineWidth: 0.5)
+                                        )
+                                        .shadow(color: Color.black.opacity(0.08), radius: 6, x: 0, y: 2)
+                                }
+                                .aspectRatio(5/3, contentMode: .fill)
+                                .onTapGesture {
+                                    onPhotoTapped(photos, actualIndex)
+                                }
+                                .onAppear {
+                                    photosViewModel.loadMoreExternalReviewPhotosIfNeeded(currentIndex: actualIndex)
+                                }
+
+                            case .double(let indices):
+                                HStack(spacing: gridSpacing) {
+                                    ForEach(indices, id: \.self) { actualIndex in
+                                        GeometryReader { geo in
+                                            Image(uiImage: photos[actualIndex])
+                                                .resizable()
+                                                .scaledToFill()
+                                                .frame(width: geo.size.width, height: geo.size.width * 0.8)
+                                                .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+                                                .contentShape(RoundedRectangle(cornerRadius: cornerRadius))
+                                                .overlay(
+                                                    RoundedRectangle(cornerRadius: cornerRadius)
+                                                        .stroke(Color.gray.opacity(0.1), lineWidth: 0.5)
+                                                )
+                                                .shadow(color: Color.black.opacity(0.08), radius: 6, x: 0, y: 2)
+                                        }
+                                        .aspectRatio(5/4, contentMode: .fill)
+                                        .onTapGesture {
+                                            onPhotoTapped(photos, actualIndex)
+                                        }
+                                        .onAppear {
+                                            photosViewModel.loadMoreExternalReviewPhotosIfNeeded(currentIndex: actualIndex)
+                                        }
                                     }
                                 }
                             }
                         }
                     }
+
+                    // Refresh indicator overlay when refreshing stale images
+                    if photosViewModel.isRefreshingImages {
+                        HStack(spacing: 6) {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                            Text("Refreshing photos...")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(.ultraThinMaterial)
+                        .cornerRadius(8)
+                        .padding(.bottom, 8)
+                    }
                 }
-                
+
                 if loadingState == .loading && !photosViewModel.externalReviewPhotosFullyLoaded {
                     HStack {
                         Spacer()
