@@ -47,11 +47,35 @@ class ProfileTikTokViewModel: ObservableObject {
     /// Imported places from TikTok
     @Published var importedPlaces: [DetailPlace] = []
 
-    /// Whether showing place selection sheet
-    @Published var isShowingPlaceSelection: Bool = false
+    // MARK: - Sheet Presentation (via PresentationService)
 
-    /// Whether showing no places found alert
-    @Published var isShowingNoPlacesFound: Bool = false
+    /// Whether showing place selection sheet (reads from PresentationService).
+    var isShowingPlaceSelection: Bool {
+        get { PresentationService.shared.activeSheet == .tikTokPlaceSelection }
+        set {
+            if newValue {
+                PresentationService.shared.present(.tikTokPlaceSelection)
+            } else if PresentationService.shared.activeSheet == .tikTokPlaceSelection {
+                PresentationService.shared.dismiss()
+            }
+        }
+    }
+
+    /// Whether showing no places found alert (reads from PresentationService).
+    var isShowingNoPlacesFound: Bool {
+        get {
+            guard let sheet = PresentationService.shared.activeSheet else { return false }
+            if case .tikTokNoPlacesFound = sheet { return true }
+            return false
+        }
+        set {
+            if newValue {
+                PresentationService.shared.present(.tikTokNoPlacesFound(tikTokUrl: noPlacesFoundTikTokUrl))
+            } else if case .tikTokNoPlacesFound = PresentationService.shared.activeSheet {
+                PresentationService.shared.dismiss()
+            }
+        }
+    }
 
     /// TikTok URL when no places were found
     @Published var noPlacesFoundTikTokUrl: String = ""
@@ -358,13 +382,6 @@ class ProfileTikTokViewModel: ObservableObject {
 
         do {
             let externalPlaces = try await userService.fetchAllUserExternalPlaces(userId: userId)
-            print("🎬 [ProfileTikTokViewModel] fetchUserExternalPlaces returned \(externalPlaces.count) places for userId: \(userId)")
-            for place in externalPlaces.prefix(5) {
-                print("  - placeId: \(place.placeId), url: \(place.url ?? "nil")")
-            }
-            if externalPlaces.count > 5 {
-                print("  ... and \(externalPlaces.count - 5) more")
-            }
 
             var placesDict: [String: ExternalPlace] = [:]
             for place in externalPlaces {

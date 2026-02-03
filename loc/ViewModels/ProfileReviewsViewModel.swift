@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Combine
 
 /// Manages reviewed places for the current user's profile.
 @MainActor
@@ -57,6 +58,7 @@ class ProfileReviewsViewModel: ObservableObject {
 
     private let placeService: PlaceService
     private let postService: PostService
+    private let postsCacheService = ServiceContainer.shared.postsCacheService
 
     private let userService: UserService
     private weak var userSession: UserSession?
@@ -65,6 +67,7 @@ class ProfileReviewsViewModel: ObservableObject {
 
     private var hasAttemptedInitialReviewsLoad: Bool = false
     private let reviewsPerPage: Int = 8
+    private var cancellables = Set<AnyCancellable>()
 
     // MARK: - Initialization
 
@@ -74,6 +77,32 @@ class ProfileReviewsViewModel: ObservableObject {
         self.userSession = userSession
         self.placeService = placeService
         self.postService = postService
+
+        setupPostCreationObserver()
+    }
+
+    // MARK: - Reactive Setup
+
+    /// Subscribes to post creation signals to refresh reviews when user creates a new post.
+    private func setupPostCreationObserver() {
+        postsCacheService.$lastCreatedPostPlaceId
+            .dropFirst() // Skip initial nil value
+            .compactMap { $0 } // Only process non-nil values
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                self?.handlePostCreated()
+            }
+            .store(in: &cancellables)
+    }
+
+    /// Handles post creation by invalidating and refreshing the reviews list.
+    private func handlePostCreated() {
+        print("📝 [ProfileReviewsViewModel] Post created, refreshing reviews list")
+        // Reset pagination and reload to include the new review
+        resetMyReviewedPlacesPagination()
+        Task {
+            await loadInitialReviewedPlaces()
+        }
     }
 
     // MARK: - Computed Properties

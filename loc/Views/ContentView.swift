@@ -24,15 +24,11 @@ struct ContentView: View {
     let notificationManager: NotificationManager
     let dataManager: DataManager
     let serviceContainer: ServiceContainer
-    let searchViewModel: SearchViewModel  // ✅ Accept from parent
-    let searchCoordinator: SearchCoordinatorViewModel  // ✅ Search coordinator
+    let searchViewModel: SearchViewModel
+    let searchCoordinator: SearchCoordinatorViewModel
 
     @State private var showNavigationError = false
     @State private var navigationErrorMessage = ""
-
-    // Suggested profiles popup state
-    @State private var showSuggestedProfilesPopup = false
-    @StateObject private var suggestedProfilesVM = SuggestedProfilesViewModel()
 
     var body: some View {
         // ✅ Staff Engineer: Use visibility, not conditional rendering (prevents destruction)
@@ -75,28 +71,12 @@ struct ContentView: View {
             Text(navigationErrorMessage)
         }
         .onChange(of: userSession.isUserLoggedIn) { oldValue, newValue in
-            // Show suggested profiles popup on first login
+            // Show suggested profiles popup on first login via PresentationService
             if !oldValue && newValue && SuggestedProfilesViewModel.shouldShowPopup {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    showSuggestedProfilesPopup = true
+                    PresentationService.shared.present(.suggestedProfiles)
                 }
             }
-        }
-        .sheet(isPresented: $showSuggestedProfilesPopup) {
-            SuggestedProfilesPopupView(
-                viewModel: suggestedProfilesVM,
-                isPresented: $showSuggestedProfilesPopup
-            )
-            .environmentObject(profileViewModel)
-            .environmentObject(detailPlaceViewModel)
-            .environmentObject(userSession)
-            .environmentObject(selectedPlaceViewModel)
-            .environmentObject(userProfileNavigationViewModel)
-            .environmentObject(mapDisplayCoordinatorViewModel)
-            .environmentObject(locationManager)
-            .environmentObject(dataManager)
-            .presentationDetents([.medium, .large])
-            .presentationDragIndicator(.visible)
         }
     }
     

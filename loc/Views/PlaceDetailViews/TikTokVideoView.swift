@@ -11,7 +11,7 @@ struct TikTokVideoView: View {
     @StateObject private var viewModel: TikTokVideoViewModel
     @EnvironmentObject var userSession: UserSession
     @State private var refreshAttempted: Bool = false
-    @State private var isPressed: Bool = false
+    @State private var isRefreshingThumbnail: Bool = false
     @State private var showingDeleteConfirmation = false
 
     // Optional place for navigation instead of opening video
@@ -20,6 +20,7 @@ struct TikTokVideoView: View {
     let onDelete: (() -> Void)?
     let showDeleteOption: Bool
 
+    /// Initializes the TikTok video view with video data and optional navigation callbacks.
     init(tikTokVideo: TikTokVideo, externalPlaceId: String? = nil, associatedPlace: DetailPlace? = nil, onNavigateToPlace: ((DetailPlace) -> Void)? = nil, onDelete: (() -> Void)? = nil, showDeleteOption: Bool = false) {
         _viewModel = StateObject(wrappedValue: TikTokVideoViewModel(tikTokVideo: tikTokVideo, externalPlaceId: externalPlaceId))
         self.associatedPlace = associatedPlace
@@ -51,6 +52,7 @@ struct TikTokVideoView: View {
         .onChange(of: viewModel.tikTokVideo.thumbnailURL) { oldValue, newValue in
             if oldValue != newValue {
                 refreshAttempted = false
+                isRefreshingThumbnail = false
             }
         }
     }
@@ -58,7 +60,7 @@ struct TikTokVideoView: View {
     private var videoThumbnailButton: some View {
         ZStack {
             // Background that matches the tap area
-            Color(isPressed ? .systemGray4 : .systemGray6)
+            Color(.systemGray6)
                 .cornerRadius(12)
 
             // Image content
@@ -70,52 +72,47 @@ struct TikTokVideoView: View {
                 onFailure: {
                     if !refreshAttempted {
                         refreshAttempted = true
+                        isRefreshingThumbnail = true
                         Task {
                             await viewModel.refreshThumbnail()
+                            // If URL didn't change, refresh failed - stop showing loading
+                            await MainActor.run {
+                                isRefreshingThumbnail = false
+                            }
                         }
                     }
                 }
             )
             .id("\(viewModel.tikTokVideo.thumbnailURL)_\(viewModel.tikTokVideo.id)")
-            .opacity(isPressed ? 0.7 : 1.0)
-            .scaleEffect(isPressed ? 0.95 : 1.0)
+
+            // Show loading overlay while refreshing thumbnail (opaque to hide failure state)
+            if isRefreshingThumbnail {
+                Rectangle()
+                    .fill(Color(.systemGray6))
+                    .frame(width: 160, height: 160)
+                    .cornerRadius(8)
+                    .overlay(
+                        ProgressView()
+                            .scaleEffect(0.8)
+                    )
+            }
         }
         .frame(width: 192, height: 192) // Match the visual size
         .contentShape(Rectangle()) // Make the entire frame tappable
-        .gesture(
-            LongPressGesture(minimumDuration: 0.5)
-                .onEnded { _ in
-                    // Long press - show delete option
-                    if showDeleteOption {
-                        showingDeleteConfirmation = true
-                    }
-                }
-                .simultaneously(with: TapGesture()
-                    .onEnded { _ in
-                        // Regular tap - open video or navigate
-                        if let place = associatedPlace, let onNavigate = onNavigateToPlace {
-                            onNavigate(place)
-                        } else {
-                            viewModel.openVideo()
-                        }
-                    }
-                )
-        )
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { _ in
-                    if !isPressed {
-                        withAnimation(.easeInOut(duration: 0.1)) {
-                            isPressed = true
-                        }
-                    }
-                }
-                .onEnded { _ in
-                    withAnimation(.easeInOut(duration: 0.1)) {
-                        isPressed = false
-                    }
-                }
-        )
+        .onTapGesture {
+            // Regular tap - open video or navigate
+            if let place = associatedPlace, let onNavigate = onNavigateToPlace {
+                onNavigate(place)
+            } else {
+                viewModel.openVideo()
+            }
+        }
+        .onLongPressGesture(minimumDuration: 0.5) {
+            // Long press - show delete option
+            if showDeleteOption {
+                showingDeleteConfirmation = true
+            }
+        }
     }
     
     private var authorInfoSection: some View {
@@ -124,23 +121,6 @@ struct TikTokVideoView: View {
             .foregroundColor(.gray)
             .frame(maxWidth: 192, alignment: .leading)
             .lineLimit(1)
-    }
-}
-
-// MARK: - Associated Place Model
-struct TikTokAssociatedPlace: Identifiable, Codable {
-    let id: String
-    let name: String
-    let address: String?
-    let latitude: Double
-    let longitude: Double
-    
-    enum CodingKeys: String, CodingKey {
-        case id = "place_id"
-        case name = "place_name"
-        case address = "place_address"
-        case latitude
-        case longitude
     }
 }
 

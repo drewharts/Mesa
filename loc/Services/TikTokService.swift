@@ -198,7 +198,8 @@ class TikTokService: ObservableObject {
                 return .failure(TikTokError.invalidResponse)
             }
 
-            if let thumbnailURL = json["thumbnailURL"] as? String {
+            // Check for thumbnail URL (support both snake_case and camelCase)
+            if let thumbnailURL = json["thumbnail_url"] as? String ?? json["thumbnailURL"] as? String {
                 return .success(thumbnailURL)
             } else if let errorMsg = json["error"] as? String {
                 return .failure(NSError(domain: "TikTokService", code: 1, userInfo: [NSLocalizedDescriptionKey: errorMsg]))

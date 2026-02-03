@@ -36,12 +36,14 @@ struct PlaceListPopupView<CardView: View>: View {
     let emptyMessage: String
     let loadMore: () async -> Void
     let onBackToProfile: (() -> Void)?  // Optional: Shows "Profile" button when provided
-    let pendingPlaceNavigation: Binding<String?>?  // Optional: For map annotation navigation
     @ViewBuilder let cardBuilder: (LightweightPlace, @escaping (String) -> Void) -> CardView
 
     @Environment(\.presentationMode) var presentationMode
 
-    // Default initializer with optional onBackToProfile and pendingPlaceNavigation
+    /// Observed for pending place navigation when map annotation is tapped while sheet is open.
+    @ObservedObject private var presentationService = PresentationService.shared
+
+    // Default initializer with optional onBackToProfile
     init(
         title: String,
         count: Int? = nil,
@@ -54,7 +56,6 @@ struct PlaceListPopupView<CardView: View>: View {
         emptyMessage: String,
         loadMore: @escaping () async -> Void,
         onBackToProfile: (() -> Void)? = nil,
-        pendingPlaceNavigation: Binding<String?>? = nil,
         @ViewBuilder cardBuilder: @escaping (LightweightPlace, @escaping (String) -> Void) -> CardView
     ) {
         self.title = title
@@ -68,7 +69,6 @@ struct PlaceListPopupView<CardView: View>: View {
         self.emptyMessage = emptyMessage
         self.loadMore = loadMore
         self.onBackToProfile = onBackToProfile
-        self.pendingPlaceNavigation = pendingPlaceNavigation
         self.cardBuilder = cardBuilder
     }
 
@@ -96,10 +96,11 @@ struct PlaceListPopupView<CardView: View>: View {
                 PlaceDetailViewInNavigation(placeId: placeId, minSheetHeight: 250)
             }
         }
-        .onChange(of: pendingPlaceNavigation?.wrappedValue) { oldValue, newValue in
+        .onChange(of: presentationService.pendingPlaceNavigation) { oldValue, newValue in
+            // When map annotation is tapped while sheet is open, navigate to that place
             if let placeId = newValue {
                 navigationPath.append(placeId)
-                pendingPlaceNavigation?.wrappedValue = nil
+                presentationService.pendingPlaceNavigation = nil
             }
         }
     }
