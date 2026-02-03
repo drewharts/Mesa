@@ -11,6 +11,7 @@ struct TikTokVideoView: View {
     @StateObject private var viewModel: TikTokVideoViewModel
     @EnvironmentObject var userSession: UserSession
     @State private var refreshAttempted: Bool = false
+    @State private var isRefreshingThumbnail: Bool = false
     @State private var showingDeleteConfirmation = false
 
     // Optional place for navigation instead of opening video
@@ -51,6 +52,7 @@ struct TikTokVideoView: View {
         .onChange(of: viewModel.tikTokVideo.thumbnailURL) { oldValue, newValue in
             if oldValue != newValue {
                 refreshAttempted = false
+                isRefreshingThumbnail = false
             }
         }
     }
@@ -70,13 +72,30 @@ struct TikTokVideoView: View {
                 onFailure: {
                     if !refreshAttempted {
                         refreshAttempted = true
+                        isRefreshingThumbnail = true
                         Task {
                             await viewModel.refreshThumbnail()
+                            // If URL didn't change, refresh failed - stop showing loading
+                            await MainActor.run {
+                                isRefreshingThumbnail = false
+                            }
                         }
                     }
                 }
             )
             .id("\(viewModel.tikTokVideo.thumbnailURL)_\(viewModel.tikTokVideo.id)")
+
+            // Show loading overlay while refreshing thumbnail (opaque to hide failure state)
+            if isRefreshingThumbnail {
+                Rectangle()
+                    .fill(Color(.systemGray6))
+                    .frame(width: 160, height: 160)
+                    .cornerRadius(8)
+                    .overlay(
+                        ProgressView()
+                            .scaleEffect(0.8)
+                    )
+            }
         }
         .frame(width: 192, height: 192) // Match the visual size
         .contentShape(Rectangle()) // Make the entire frame tappable
