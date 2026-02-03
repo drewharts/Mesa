@@ -59,7 +59,7 @@ class PlaceTypeFilterViewModel: ObservableObject {
             .store(in: &cancellables)
 
         // Watch for changes to user lists places
-        profileVM.listsViewModel.$userListsPlaces
+        profileVM.listsViewModel.dataViewModel.$userListsPlaces
             .dropFirst() // Skip initial empty value
             .sink { [weak self] _ in
                 self?.calculateMostFrequentTypes()
@@ -88,14 +88,14 @@ class PlaceTypeFilterViewModel: ObservableObject {
     
     /// Setup observer for MapViewModel viewport changes
     func observeMapViewModel() {
-        guard let mapVM = mapViewModel else { 
+        guard let mapVM = mapViewModel else {
             print("⚠️ [PlaceTypeFilterVM] No MapViewModel available for observation")
-            return 
+            return
         }
-        
+
         print("✅ [PlaceTypeFilterVM] Setting up observer for MapViewModel viewport changes")
-        
-        mapVM.$viewportAnnotations
+
+        mapVM.viewportViewModel.$viewportAnnotations
             .sink { [weak self] _ in
                 self?.updateFilteredPlaces()
             }

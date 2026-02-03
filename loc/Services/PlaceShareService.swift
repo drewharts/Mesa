@@ -314,8 +314,22 @@ class PlaceShareService: ObservableObject {
         return nil
     }
     
+    // MARK: - Share Image
+
+    /// Shares an image via the system share sheet.
+    @MainActor
+    func shareImage(_ image: UIImage, with text: String? = nil) {
+        var activityItems: [Any] = [image]
+
+        if let shareText = text {
+            activityItems.insert(shareText, at: 0)
+        }
+
+        presentShareSheet(with: activityItems)
+    }
+
     // MARK: - Copy to Clipboard
-    
+
     @MainActor
     func copyPlaceLink(_ detailPlace: DetailPlace) {
         guard let url = generateShareURL(for: detailPlace) else {

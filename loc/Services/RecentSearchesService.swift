@@ -83,23 +83,35 @@ final class RecentSearchesService {
     }
     
     /// Save a selection to recent history
-    /// - Deduplicates by ID (moves existing to front)
+    /// - Deduplicates by ID and by name (for places)
+    /// - Moves existing to front with updated data
     /// - Trims to max count
     /// - Persists immediately
     func saveSelection(_ selection: RecentSelection) {
         var selections = getRecentSelections()
-        
+
         // Remove duplicate by ID
         selections.removeAll { $0.id == selection.id }
-        
+
+        // For places, also remove duplicates by name (case-insensitive)
+        // This handles cases where the same place has different IDs
+        if case .place(_, let name, _) = selection {
+            selections.removeAll { existing in
+                if case .place(_, let existingName, _) = existing {
+                    return existingName.lowercased() == name.lowercased()
+                }
+                return false
+            }
+        }
+
         // Insert at front
         selections.insert(selection, at: 0)
-        
+
         // Trim to max
         if selections.count > maxSelections {
             selections = Array(selections.prefix(maxSelections))
         }
-        
+
         // Persist as JSON
         if let data = try? JSONEncoder().encode(selections) {
             UserDefaults.standard.set(data, forKey: userDefaultsKey)

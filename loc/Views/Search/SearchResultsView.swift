@@ -338,7 +338,7 @@ struct UserResultsView: View {
                     ForEach(Array(userResults.enumerated()), id: \.element.id) { index, user in
                         Button(action: { onSelectUser(user) }) {
                             HStack(spacing: 12) {
-                                profilePhotoView(for: user)
+                                UserProfilePhotoView(user: user, userPhotos: userPhotos)
 
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(user.fullName)
@@ -365,8 +365,16 @@ struct UserResultsView: View {
         }
     }
 
-    @ViewBuilder
-    private func profilePhotoView(for user: ProfileData) -> some View {
+}
+
+// MARK: - User Profile Photo View
+
+/// DUMB Component: Displays user profile photo or fallback icon
+private struct UserProfilePhotoView: View {
+    let user: ProfileData
+    let userPhotos: [String: UIImage]
+
+    var body: some View {
         if let profilePhoto = userPhotos[user.id] {
             Image(uiImage: profilePhoto)
                 .resizable()
@@ -431,9 +439,16 @@ struct RecentSearchesView: View {
 
     private var selectionsList: some View {
         ForEach(Array(selections.enumerated()), id: \.element.id) { index, selection in
-            Button(action: { handleSelection(selection) }) {
+            Button(action: {
+                switch selection {
+                case .place(let id, _, _):
+                    onSelectPlace(id)
+                case .user(let id, _, _):
+                    onSelectUser(id)
+                }
+            }) {
                 HStack(spacing: 12) {
-                    selectionIcon(for: selection)
+                    RecentSelectionIconView(selection: selection, userPhotos: userPhotos)
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text(selection.displayName)
@@ -463,11 +478,16 @@ struct RecentSearchesView: View {
             }
         }
     }
+}
 
-    // MARK: - Helpers
+// MARK: - Recent Selection Icon View
 
-    @ViewBuilder
-    private func selectionIcon(for selection: RecentSelection) -> some View {
+/// DUMB Component: Displays icon for a recent selection (place or user)
+private struct RecentSelectionIconView: View {
+    let selection: RecentSelection
+    let userPhotos: [String: UIImage]
+
+    var body: some View {
         switch selection {
         case .place:
             Image(systemName: "mappin.circle.fill")
@@ -504,15 +524,6 @@ struct RecentSearchesView: View {
                     .font(.system(size: 24))
                     .foregroundColor(.gray)
             }
-        }
-    }
-
-    private func handleSelection(_ selection: RecentSelection) {
-        switch selection {
-        case .place(let id, _, _):
-            onSelectPlace(id)
-        case .user(let id, _, _):
-            onSelectUser(id)
         }
     }
 }

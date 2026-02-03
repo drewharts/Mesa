@@ -158,8 +158,9 @@ struct MapView: View {
                 await MainActor.run {
                     // Preserve the annotation so it survives zoom-out density culling
                     mapViewModel.setPreservedAnnotation(for: place)
+                    // Use selectPlace since data is already complete from backend
                     // Don't animate map when tapping marker - user is already looking at it
-                    selectedPlaceVM.selectPlaceAndFetchDetails(place, shouldAnimateMap: false)
+                    selectedPlaceVM.selectPlace(place, shouldAnimateMap: false)
                     selectedPlaceVM.isDetailSheetPresented = true
                 }
             }
@@ -208,7 +209,8 @@ struct MapView: View {
                         mapViewModel.pendingPlaceNavigation = place.id.uuidString
                     } else {
                         // Normal behavior: show place detail sheet
-                        selectedPlaceVM.selectPlaceAndFetchDetails(place, shouldAnimateMap: false)
+                        // Use selectPlace since data is already complete from backend
+                        selectedPlaceVM.selectPlace(place, shouldAnimateMap: false)
                         selectedPlaceVM.isDetailSheetPresented = true
                     }
                 }

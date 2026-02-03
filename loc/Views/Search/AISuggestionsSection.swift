@@ -67,7 +67,7 @@ struct AISuggestionsSection: View {
             if isLoading {
                 loadingView
             } else if let error = error {
-                errorView(error)
+                AIErrorView(errorMessage: error)
             } else {
                 suggestionsList
             }
@@ -90,20 +90,6 @@ struct AISuggestionsSection: View {
         .padding(.vertical, 12)
     }
 
-    /// Renders an error message with warning icon
-    private func errorView(_ errorMessage: String) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: "exclamationmark.triangle")
-                .foregroundColor(.orange)
-
-            Text(errorMessage)
-                .font(.caption)
-                .foregroundColor(.secondary)
-        }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 12)
-    }
-
     /// Renders the list of AI suggestion rows
     private var suggestionsList: some View {
         ForEach(Array(suggestions.enumerated()), id: \.element.id) { index, place in
@@ -116,5 +102,25 @@ struct AISuggestionsSection: View {
                     .padding(.leading, 56)
             }
         }
+    }
+}
+
+// MARK: - AI Error View
+
+/// DUMB Component: Displays an error message with warning icon
+private struct AIErrorView: View {
+    let errorMessage: String
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "exclamationmark.triangle")
+                .foregroundColor(.orange)
+
+            Text(errorMessage)
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 12)
     }
 }

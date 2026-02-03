@@ -149,7 +149,7 @@ struct LightweightListPopupView: View {
                 
                 Spacer()
                 
-                // Collaborators button with profile avatars + Share button
+                // Collaborators button with profile avatars + Share buttons
                 if let userId = profile.user?.id {
                     HStack(alignment: .center, spacing: 12) {
                         // Collaborators button
@@ -171,9 +171,13 @@ struct LightweightListPopupView: View {
                             }
                         }
                         .frame(minWidth: 44, minHeight: 44) // Tap target
-                        
-                        // Share button (Apple style - clean and simple)
-                        LightweightListShareButton(lightweightList: currentList, userId: userId, style: .apple)
+
+                        // Unified share button with menu for link sharing and story cards
+                        ListShareMenuButton(
+                            list: currentList,
+                            places: allPlaces,
+                            userId: userId
+                        )
                     }
                 }
             }

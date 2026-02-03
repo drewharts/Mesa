@@ -34,6 +34,11 @@ struct PlaceChangeHandler: ViewModifier {
 
         guard let place = newPlace else { return }
 
+        // Trigger photo loading state machine immediately with empty posts
+        // This prevents infinite loading state while posts are being fetched asynchronously
+        // When posts actually load, handlePostsUpdated() will call setPosts() again with real data
+        tabsViewModel?.setPosts([], rating: 0)
+
         updateTravelTime(for: place)
         updateFavoriteStatus(for: place)
         updateTikTokVideos(for: place)

@@ -47,11 +47,13 @@ struct PlaceInfoSection: View {
             // Rating Row (Google/Mapbox)
             if let rating = place.rating, rating > 0 {
                 HStack(spacing: 8) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "star.fill")
-                            .font(.subheadline)
-                            .foregroundColor(.yellow)
+                    // Google logo
+                    Image("GoogleLogo")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(height: 16)
 
+                    HStack(spacing: 4) {
                         Text(String(format: "%.1f", rating))
                             .font(.subheadline)
                             .fontWeight(.semibold)
@@ -63,12 +65,6 @@ struct PlaceInfoSection: View {
                                 .foregroundColor(.gray)
                         }
                     }
-
-                    // Google logo
-                    Image("GoogleLogo")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(height: 16)
                 }
                 .padding(.bottom, 8)
             }

@@ -14,7 +14,13 @@
       "WebSearch",
       "mcp__ide__getDiagnostics",
       "Bash(xcodebuild:*)",
-      "Bash(wc:*)"
+      "Bash(wc:*)",
+      "Bash(xargs cat:*)",
+      "mcp__supabase__list_projects",
+      "mcp__supabase__execute_sql",
+      "mcp__supabase__apply_migration",
+      "WebFetch(domain:mesa-backend-staging.up.railway.app)",
+      "Bash(curl:*)"
     ],
     "deny": []
   },

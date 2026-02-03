@@ -121,7 +121,8 @@ struct SearchContentView: View {
             isAILoading: searchViewModel.aiSuggestionsViewModel.isLoading,
             aiError: searchViewModel.aiSuggestionsViewModel.error,
             onSelectAIPlace: { place in
-                handleAIPlaceSelection(place)
+                searchViewModel.saveAIPlaceSelection(place)
+                onSelectPlace(place)
             }
         )
     }
@@ -140,30 +141,5 @@ struct SearchContentView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(.top, 80)
-    }
-
-    // MARK: - AI Place Selection Handler
-
-    private func handleAIPlaceSelection(_ place: DetailPlace) {
-        if let googlePlaceId = place.googlePlaceId, !googlePlaceId.isEmpty {
-            MesaBackendService().fetchPlaceDetails(placeId: googlePlaceId, source: "google") { result in
-                DispatchQueue.main.async {
-                    switch result {
-                    case .success(let resolvedPlace):
-                        var placeToNavigate = resolvedPlace
-                        placeToNavigate.aiSuggestionReason = place.aiSuggestionReason
-                        searchViewModel.saveAIPlaceSelection(placeToNavigate)
-                        onSelectPlace(placeToNavigate)
-
-                    case .failure:
-                        searchViewModel.saveAIPlaceSelection(place)
-                        onSelectPlace(place)
-                    }
-                }
-            }
-        } else {
-            searchViewModel.saveAIPlaceSelection(place)
-            onSelectPlace(place)
-        }
     }
 }

@@ -8,7 +8,7 @@
 import Foundation
 import SwiftUI
 
-struct ProfileData: Codable, Identifiable {
+struct ProfileData: Codable, Identifiable, Hashable {
     let id: String
     var firstName: String
     var lastName: String

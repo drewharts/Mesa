@@ -79,8 +79,17 @@ class SearchPageViewModel: ObservableObject {
 
     /// Handle view all keywords action
     func handleViewAllKeywords() {
-        guard let keyword = searchViewModel.matchedKeyword else { return }
+        print("🔍 [SearchPageViewModel] handleViewAllKeywords called")
+        print("   - matchedKeyword: \(searchViewModel.matchedKeyword ?? "nil")")
+        print("   - currentKeywordTypes: \(searchViewModel.currentKeywordTypes)")
+        print("   - onViewAllKeywords callback set: \(onViewAllKeywords != nil)")
+
+        guard let keyword = searchViewModel.matchedKeyword else {
+            print("   ❌ matchedKeyword is nil, returning early")
+            return
+        }
         onViewAllKeywords?(keyword, searchViewModel.currentKeywordTypes)
+        print("   ✅ Called onViewAllKeywords callback")
     }
 
     /// Set the current map region for viewport-based searches

@@ -151,7 +151,10 @@ struct locApp: App {
         self.dataManager = dataMgr
         self.searchViewModel = searchVM
         self.searchCoordinator = searchCoord
-        
+
+        // TODO: Remove after testing - resets suggested profiles popup
+        SuggestedProfilesViewModel.resetPopupSeenStatus()
+
         // Pass user service to AppDelegate
         appDelegate.userService = services.userService
         appDelegate.deepLinkViewModel = deepLinkVM

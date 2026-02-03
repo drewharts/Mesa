@@ -222,6 +222,17 @@ struct ProfileViewListsView: View {
                 }
             }
 
+            // Pagination trigger - always present at end of list to catch fast scrolling
+            if listsVM.hasMorePlaceLists && !listsVM.isLoadingMorePlaceLists {
+                Color.clear
+                    .frame(height: 1)
+                    .onAppear {
+                        Task {
+                            await listsVM.loadMoreLists()
+                        }
+                    }
+            }
+
             // Pagination loading indicator
             if listsVM.isLoadingMorePlaceLists {
                 paginationLoadingView

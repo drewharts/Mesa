@@ -102,8 +102,6 @@ class SupabasePostService: ObservableObject {
             tiktokVideos = parseTikTokData(tiktokData)
         }
 
-        print("🎬 [SupabasePostService] get_place_tiktoks returned \(tiktokVideos.count) videos for place \(placeId)")
-
         if response.isEmpty {
             return ([], tiktokVideos)
         }
@@ -230,12 +228,14 @@ class SupabasePostService: ObservableObject {
             let type: String?
             let imageUrl: String?
         }
-        
+
         struct ExternalReviewRecord: Codable {
             let id: String
             let media: [ExternalReviewMediaRecord]?
         }
-        
+
+        print("📸 [SupabasePostService] Fetching external reviews for placeId: \(placeId), offset: \(reviewOffset)")
+
         let records: [ExternalReviewRecord] = try await supabase.client
             .from("external_reviews")
             .select("id, media")
@@ -244,9 +244,11 @@ class SupabasePostService: ObservableObject {
             .range(from: reviewOffset, to: reviewOffset + reviewLimit - 1)
             .execute()
             .value
-        
+
+        print("📸 [SupabasePostService] Found \(records.count) external review records")
+
         var imageUrls: [String] = []
-        
+
         for record in records {
             guard let mediaItems = record.media else { continue }
             let urls = mediaItems.compactMap { item -> String? in
@@ -256,10 +258,12 @@ class SupabasePostService: ObservableObject {
             }
             imageUrls.append(contentsOf: urls)
         }
-        
+
+        print("📸 [SupabasePostService] Extracted \(imageUrls.count) image URLs from reviews")
+
         let nextOffset = reviewOffset + records.count
         let hasMore = records.count == reviewLimit
-        
+
         return (imageUrls, nextOffset, hasMore)
     }
     

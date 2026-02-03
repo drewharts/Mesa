@@ -47,13 +47,23 @@ struct SearchPageView: View {
                 SearchHeaderView(
                     searchText: searchTextBinding,
                     isFocused: $isSearchFocused,
-                    onCancel: handleCancel
+                    onCancel: {
+                        isSearchFocused = false
+                        viewModel.dismiss()
+                    }
                 )
 
                 SearchContentView(
                     searchViewModel: viewModel.searchViewModel,
-                    onSelectPlace: handlePlaceSelection,
-                    onSelectUser: handleUserSelection,
+                    onSelectPlace: { place in
+                        isSearchFocused = false
+                        viewModel.handlePlaceSelection(place)
+                        viewModel.dismiss()
+                    },
+                    onSelectUser: { user in
+                        isSearchFocused = false
+                        viewModel.handleUserSelection(user)
+                    },
                     onViewAllKeywords: viewModel.handleViewAllKeywords
                 )
                 .padding(.top, 8)
@@ -82,26 +92,5 @@ struct SearchPageView: View {
             viewModel.searchViewModel.searchText = ""
             isSearchFocused = true
         }
-    }
-
-    // MARK: - Actions
-
-    /// Dismiss the search page
-    private func handleCancel() {
-        isSearchFocused = false
-        viewModel.dismiss()
-    }
-
-    /// Handle place selection - dismiss and navigate to place
-    private func handlePlaceSelection(_ place: DetailPlace) {
-        isSearchFocused = false
-        viewModel.handlePlaceSelection(place)
-        viewModel.dismiss()
-    }
-
-    /// Handle user selection - navigate within search NavigationStack
-    private func handleUserSelection(_ user: ProfileData) {
-        isSearchFocused = false
-        viewModel.handleUserSelection(user)
     }
 }

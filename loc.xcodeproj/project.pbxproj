@@ -24,7 +24,6 @@
 		B06794542E9C439600B9D273 /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = B06794532E9C439600B9D273 /* Supabase */; };
 		B0821C682C641B9100BA126E /* CoreLocationUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B0821C672C641B9100BA126E /* CoreLocationUI.framework */; settings = {ATTRIBUTES = (Required, ); }; };
 		B093B3602F1EFC67003E3BF7 /* ViewportBoundsHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = B093B35F2F1EFC67003E3BF7 /* ViewportBoundsHelper.swift */; };
-		B0A819152CEA5F2A0041416F /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = B0A819142CEA5F2A0041416F /* GoogleService-Info.plist */; };
 		B0A819182CEA5F970041416F /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = B0A819172CEA5F970041416F /* GoogleSignIn */; };
 		B0A8191A2CEA5F970041416F /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = B0A819192CEA5F970041416F /* GoogleSignInSwift */; };
 /* End PBXBuildFile section */
@@ -89,7 +88,6 @@
 		B0667A9F2EB309CA00879683 /* MesaShare.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = MesaShare.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		B0821C672C641B9100BA126E /* CoreLocationUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreLocationUI.framework; path = System/Library/Frameworks/CoreLocationUI.framework; sourceTree = SDKROOT; };
 		B093B35F2F1EFC67003E3BF7 /* ViewportBoundsHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewportBoundsHelper.swift; sourceTree = "<group>"; };
-		B0A819142CEA5F2A0041416F /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		B0C31A862D94CB6400E481F4 /* .gitignore */ = {isa = PBXFileReference; lastKnownFileType = text; path = .gitignore; sourceTree = "<group>"; };
 		B0C31A872D94CB6400E481F4 /* loc.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text; path = loc.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -197,7 +195,6 @@
 				B054DC602C42F5DA00C98088 /* locApp.swift */,
 				B054DC642C42F5DB00C98088 /* Assets.xcassets */,
 				B054DC662C42F5DB00C98088 /* Preview Content */,
-				B0A819142CEA5F2A0041416F /* GoogleService-Info.plist */,
 				B0C31A872D94CB6400E481F4 /* loc.entitlements */,
 			);
 			path = loc;
@@ -397,7 +394,6 @@
 			files = (
 				B054DC682C42F5DB00C98088 /* Preview Assets.xcassets in Resources */,
 				B054DC652C42F5DB00C98088 /* Assets.xcassets in Resources */,
-				B0A819152CEA5F2A0041416F /* GoogleService-Info.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
