@@ -358,13 +358,6 @@ class ProfileTikTokViewModel: ObservableObject {
 
         do {
             let externalPlaces = try await userService.fetchAllUserExternalPlaces(userId: userId)
-            print("🎬 [ProfileTikTokViewModel] fetchUserExternalPlaces returned \(externalPlaces.count) places for userId: \(userId)")
-            for place in externalPlaces.prefix(5) {
-                print("  - placeId: \(place.placeId), url: \(place.url ?? "nil")")
-            }
-            if externalPlaces.count > 5 {
-                print("  ... and \(externalPlaces.count - 5) more")
-            }
 
             var placesDict: [String: ExternalPlace] = [:]
             for place in externalPlaces {
