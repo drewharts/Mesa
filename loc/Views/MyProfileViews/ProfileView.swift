@@ -13,19 +13,24 @@ struct ProfileView: View {
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var placeVM: DetailPlaceViewModel
-    @EnvironmentObject var userProfileViewModel: UserProfileViewModel
+    @EnvironmentObject var userProfileNavigationViewModel: UserProfileNavigationViewModel
+    @EnvironmentObject var mapDisplayCoordinatorViewModel: MapDisplayCoordinatorViewModel
     @EnvironmentObject var deepLinkViewModel: DeepLinkViewModel
     @EnvironmentObject var dataManager: DataManager
     @EnvironmentObject var serviceContainer: ServiceContainer
+    @EnvironmentObject var locationManager: LocationManager
     @StateObject private var photoImportVM = PhotoImportViewModel()
     @StateObject private var tikTokService = TikTokService()
-    
+
+    /// Convenience accessor for TikTok view model.
+    private var tikTokVM: ProfileTikTokViewModel { profile.tikTokViewModel }
+
     @State private var showCreatePost = false
     @State private var postWasSubmitted = false
-    
+
     // Track if we've already done initial data refresh
     @State private var hasRefreshedPlaces = false
-    
+
     // Navigation path for followers/following lists
     @State private var navigationPath = NavigationPath()
 
@@ -46,16 +51,21 @@ struct ProfileView: View {
                     photoImportVM: photoImportVM,
                     profile: profile
                 ))
-                .navigationDestination(isPresented: $userProfileViewModel.isUserDetailPresented) {
-                    UserProfileView(
-                        userId: userSession.currentUserId ?? "",
-                        UserProfileVM: userProfileViewModel
-                    )
-                    .environmentObject(profile)
-                    .environmentObject(selectedPlaceVM)
-                    .environmentObject(placeVM)
-                    .environmentObject(userSession)
-                    .environmentObject(serviceContainer)
+                .navigationDestination(isPresented: $userProfileNavigationViewModel.isUserDetailPresented) {
+                    if let selectedUser = userProfileNavigationViewModel.selectedUser {
+                        ExternalUserProfileViewWrapper(
+                            user: selectedUser,
+                            pendingListId: userProfileNavigationViewModel.pendingListIdToOpen
+                        )
+                        .environmentObject(profile)
+                        .environmentObject(selectedPlaceVM)
+                        .environmentObject(placeVM)
+                        .environmentObject(userSession)
+                        .environmentObject(userProfileNavigationViewModel)
+                        .environmentObject(mapDisplayCoordinatorViewModel)
+                        .environmentObject(locationManager)
+                        .environmentObject(dataManager)
+                    }
                 }
                 .navigationDestination(for: FollowListDestination.self) { destination in
                     // Navigate to followers or following list
@@ -65,7 +75,7 @@ struct ProfileView: View {
                         case .followers:
                             FollowersListView()
                                 .environmentObject(profile)
-                                .environmentObject(userProfileViewModel)
+                                .environmentObject(userProfileNavigationViewModel)
                                 .environmentObject(dataManager)
                                 .environmentObject(userSession)
                                 .environmentObject(placeVM)
@@ -73,7 +83,7 @@ struct ProfileView: View {
                         case .following:
                             FollowingListView()
                                 .environmentObject(profile)
-                                .environmentObject(userProfileViewModel)
+                                .environmentObject(userProfileNavigationViewModel)
                                 .environmentObject(dataManager)
                                 .environmentObject(userSession)
                                 .environmentObject(placeVM)
@@ -105,8 +115,11 @@ struct ProfileView: View {
             } message: {
                 Text(deepLinkViewModel.noLocationAlertMessage)
             }
-            .sheet(isPresented: $profile.isShowingNoPlacesFound) {
-                TikTokNoPlacesFoundView(tikTokUrl: profile.noPlacesFoundTikTokUrl)
+            .sheet(isPresented: Binding(
+                get: { tikTokVM.isShowingNoPlacesFound },
+                set: { tikTokVM.isShowingNoPlacesFound = $0 }
+            )) {
+                TikTokNoPlacesFoundView(tikTokUrl: tikTokVM.noPlacesFoundTikTokUrl)
                     .environmentObject(profile)
                     .environmentObject(userSession)
                     .environmentObject(placeVM)
@@ -118,7 +131,7 @@ struct ProfileView: View {
                     presentationMode.wrappedValue.dismiss()
                 }
             }
-            .modifier(AccountManagementModifier(profile: profile))
+            .modifier(AccountManagementModifier(accountViewModel: profile.accountViewModel))
     }
     
     /// Navigation destination enum for followers/following lists
@@ -134,7 +147,7 @@ struct ProfileView: View {
             ProfileContentView(photoImportVM: photoImportVM, navigationPath: $navigationPath)
             
             // TikTok Processing Overlay
-            if profile.isProcessingTikTok || profile.isWaitingForPlaceDetail || deepLinkViewModel.isProcessingDeepLink {
+            if tikTokVM.isProcessingTikTok || tikTokVM.isWaitingForPlaceDetail || deepLinkViewModel.isProcessingDeepLink {
                 tikTokOverlay
             }
         }
@@ -146,7 +159,7 @@ struct ProfileView: View {
                 .ignoresSafeArea()
             
             VStack(spacing: 16) {
-                if profile.tikTokImportError != nil {
+                if tikTokVM.tikTokImportError != nil {
                     errorContent
                 } else {
                     loadingContent
@@ -168,14 +181,14 @@ struct ProfileView: View {
                 .font(.headline)
                 .foregroundColor(.white)
             
-            Text(profile.tikTokImportError ?? "")
+            Text(tikTokVM.tikTokImportError ?? "")
                 .font(.subheadline)
                 .foregroundColor(.white.opacity(0.8))
                 .multilineTextAlignment(.center)
                 .padding(.horizontal)
-            
+
             Button("OK") {
-                profile.clearTikTokImportError()
+                tikTokVM.clearTikTokImportError()
             }
             .foregroundColor(.white)
             .padding(.horizontal, 24)
@@ -281,13 +294,19 @@ struct SheetsModifier: ViewModifier {
     @EnvironmentObject var userSession: UserSession
     @EnvironmentObject var dataManager: DataManager
     @Binding var postWasSubmitted: Bool
-    
+
+    /// Convenience accessor for TikTok view model.
+    private var tikTokVM: ProfileTikTokViewModel { profile.tikTokViewModel }
+
     func body(content: Content) -> some View {
         content
             .sheet(isPresented: $photoImportVM.showPlaceSelection) {
                 PlaceSelectionView(photoImportVM: photoImportVM)
             }
-            .sheet(isPresented: $profile.isShowingPlaceSelection) {
+            .sheet(isPresented: Binding(
+                get: { tikTokVM.isShowingPlaceSelection },
+                set: { tikTokVM.isShowingPlaceSelection = $0 }
+            )) {
                 TikTokPlaceSelectionView()
                     .environmentObject(profile)
                     .environmentObject(selectedPlaceVM)
@@ -296,8 +315,11 @@ struct SheetsModifier: ViewModifier {
                     .environmentObject(userSession)
                     .presentationDragIndicator(.visible)
             }
-            .sheet(isPresented: $profile.isShowingNoPlacesFound) {
-                TikTokNoPlacesFoundView(tikTokUrl: profile.noPlacesFoundTikTokUrl)
+            .sheet(isPresented: Binding(
+                get: { tikTokVM.isShowingNoPlacesFound },
+                set: { tikTokVM.isShowingNoPlacesFound = $0 }
+            )) {
+                TikTokNoPlacesFoundView(tikTokUrl: tikTokVM.noPlacesFoundTikTokUrl)
                     .environmentObject(profile)
                     .environmentObject(userSession)
                     .environmentObject(placeVM)
@@ -476,28 +498,28 @@ struct StateChangesModifier: ViewModifier {
 // MARK: - Account Management Modifier
 /// Single Responsibility: Handles delete account two-step confirmation and loading state UI
 struct AccountManagementModifier: ViewModifier {
-    @ObservedObject var profile: ProfileViewModel
-    
+    @ObservedObject var accountViewModel: ProfileAccountViewModel
+
     func body(content: Content) -> some View {
         content
             // Step 1: Initial Warning
-            .alert("Delete Account?", isPresented: $profile.showDeleteAccountWarning) {
+            .alert("Delete Account?", isPresented: $accountViewModel.showDeleteAccountWarning) {
                 Button("Cancel", role: .cancel) {
-                    profile.cancelDeleteAccount()
+                    accountViewModel.cancelDeleteAccount()
                 }
                 Button("Continue", role: .destructive) {
-                    profile.proceedToFinalConfirmation()
+                    accountViewModel.proceedToFinalConfirmation()
                 }
             } message: {
                 Text("This will permanently delete your account and all your data including:\n\n• All saved places\n• Your reviews and photos\n• Your lists\n• Followers and following\n\nThis action cannot be undone.")
             }
             // Step 2: Final Confirmation
-            .alert("⚠️ Final Warning", isPresented: $profile.showDeleteAccountConfirmation) {
+            .alert("⚠️ Final Warning", isPresented: $accountViewModel.showDeleteAccountConfirmation) {
                 Button("Cancel", role: .cancel) {
-                    profile.cancelDeleteAccount()
+                    accountViewModel.cancelDeleteAccount()
                 }
                 Button("Delete Forever", role: .destructive) {
-                    profile.initiateAccountDeletion()
+                    accountViewModel.initiateAccountDeletion()
                 }
             } message: {
                 Text("Are you absolutely sure? Your account and all data will be permanently deleted. This cannot be recovered.")
@@ -505,30 +527,30 @@ struct AccountManagementModifier: ViewModifier {
             // Error Alert
             .alert("Error", isPresented: deleteAccountErrorBinding) {
                 Button("OK") {
-                    profile.clearDeleteAccountError()
+                    accountViewModel.clearDeleteAccountError()
                 }
             } message: {
-                if let error = profile.deleteAccountError {
+                if let error = accountViewModel.deleteAccountError {
                     Text(error)
                 }
             }
             .overlay(deletingAccountOverlay)
     }
-    
+
     // MARK: - Computed Properties
-    
+
     private var deleteAccountErrorBinding: Binding<Bool> {
         Binding(
-            get: { profile.deleteAccountError != nil },
-            set: { if !$0 { profile.clearDeleteAccountError() } }
+            get: { accountViewModel.deleteAccountError != nil },
+            set: { if !$0 { accountViewModel.clearDeleteAccountError() } }
         )
     }
-    
+
     // MARK: - Overlay Views
-    
+
     @ViewBuilder
     private var deletingAccountOverlay: some View {
-        if profile.isDeletingAccount {
+        if accountViewModel.isDeletingAccount {
             ZStack {
                 Color.black.opacity(0.3)
                     .ignoresSafeArea()

@@ -18,7 +18,8 @@ struct MainView: View {
     // MARK: - Required ViewModels (passed from parent as @ObservedObject)
     @ObservedObject var selectedPlaceVM: SelectedPlaceViewModel
     @ObservedObject var profileViewModel: ProfileViewModel
-    @ObservedObject var userProfileViewModel: UserProfileViewModel
+    @ObservedObject var userProfileNavigationViewModel: UserProfileNavigationViewModel
+    @ObservedObject var mapDisplayCoordinatorViewModel: MapDisplayCoordinatorViewModel
     @ObservedObject var detailPlaceViewModel: DetailPlaceViewModel
     @ObservedObject var deepLinkViewModel: DeepLinkViewModel
     @ObservedObject var notificationManager: NotificationManager
@@ -32,17 +33,21 @@ struct MainView: View {
     let serviceContainer: ServiceContainer
     
     // MARK: - Local UI State
-    @State private var sheetHeight: CGFloat
     @State private var shouldNavigateToProfile = false
+    @State private var showSearchPage = false
     @State private var recenterMap = false
     @State private var isCreatePlacePopupActive = false
     @State private var mapPosition = MapCameraPosition.automatic
+
+    /// Convenience accessor for TikTok view model.
+    private var tikTokVM: ProfileTikTokViewModel { profileViewModel.tikTokViewModel }
     
     // MARK: - Initialization
     init(
         selectedPlaceVM: SelectedPlaceViewModel,
         profileViewModel: ProfileViewModel,
-        userProfileViewModel: UserProfileViewModel,
+        userProfileNavigationViewModel: UserProfileNavigationViewModel,
+        mapDisplayCoordinatorViewModel: MapDisplayCoordinatorViewModel,
         detailPlaceViewModel: DetailPlaceViewModel,
         deepLinkViewModel: DeepLinkViewModel,
         notificationManager: NotificationManager,
@@ -54,7 +59,8 @@ struct MainView: View {
     ) {
         self.selectedPlaceVM = selectedPlaceVM
         self.profileViewModel = profileViewModel
-        self.userProfileViewModel = userProfileViewModel
+        self.userProfileNavigationViewModel = userProfileNavigationViewModel
+        self.mapDisplayCoordinatorViewModel = mapDisplayCoordinatorViewModel
         self.detailPlaceViewModel = detailPlaceViewModel
         self.deepLinkViewModel = deepLinkViewModel
         self.notificationManager = notificationManager
@@ -63,9 +69,7 @@ struct MainView: View {
         self.deepLinkManager = deepLinkManager
         self.dataManager = dataManager
         self.serviceContainer = serviceContainer
-        
-        // Initialize sheet height to min - partially expanded on first open
-        self._sheetHeight = State(initialValue: searchCoordinator.minSheetHeight)
+
     }
     
     var body: some View {
@@ -75,14 +79,14 @@ struct MainView: View {
                 MapContainerView(
                     mapPosition: $mapPosition,
                     recenterMap: $recenterMap,
-                    isSearchExpanded: $appCoordinator.isSearchExpanded,
                     isCreatePlacePopupActive: $isCreatePlacePopupActive,
                     selectedPlaceViewModel: selectedPlaceVM,
                     detailPlaceViewModel: detailPlaceViewModel,
                     placeService: serviceContainer.placeService,
                     profileViewModel: profileViewModel,
                     dataManager: dataManager,
-                    userProfileViewModel: userProfileViewModel,
+                    userProfileNavigationViewModel: userProfileNavigationViewModel,
+                    mapDisplayCoordinatorViewModel: mapDisplayCoordinatorViewModel,
                     serviceContainer: serviceContainer,
                     notificationManager: notificationManager,
                     onMapTap: handleMapTap
@@ -90,45 +94,30 @@ struct MainView: View {
                 
                 // UI Overlay (Top Controls, FABs)
                 uiOverlayLayer
-                
-                // Search Overlay (Isolated to prevent recreation)
-                // Staff Engineer: Separate layer prevents TextField destruction on MainView re-renders
-                // Single Responsibility: Only show search when list popup is not active
-                // MVVM: Uses ViewModel state to determine visibility
-                if shouldShowSearchOverlay {
-                SearchOverlayView(
-                    searchViewModel: searchViewModel,
-                    isSearchExpanded: $appCoordinator.isSearchExpanded,
-                    searchCoordinator: searchCoordinator,
-                    onSheetHeightChange: { newHeight in
-                        sheetHeight = newHeight
-                    },
-                    onViewAllKeywords: {
-                        // Trigger keyword results popup via AppCoordinator
-                        if let keyword = searchViewModel.matchedKeyword {
-                            appCoordinator.triggerKeywordResultsPopup(
-                                keyword: keyword,
-                                types: searchViewModel.currentKeywordTypes
-                            )
-                        }
-                    }
-                )
-                }
-                
+
                 loadingOverlay
             }
             .navigationBarHidden(true)
-            .navigationDestination(isPresented: $userProfileViewModel.isUserDetailPresented) {
-                UserProfileView(
-                    userId: userSession.currentUserId ?? "",
-                    UserProfileVM: userProfileViewModel
-                )
-                .environmentObject(profileViewModel)
-                .environmentObject(selectedPlaceVM)
-                .environmentObject(detailPlaceViewModel)
-                .environmentObject(serviceContainer)
+            .navigationDestination(isPresented: $userProfileNavigationViewModel.isUserDetailPresented) {
+                if let selectedUser = userProfileNavigationViewModel.selectedUser {
+                    ExternalUserProfileViewWrapper(
+                        user: selectedUser,
+                        pendingListId: userProfileNavigationViewModel.pendingListIdToOpen
+                    )
+                    .environmentObject(profileViewModel)
+                    .environmentObject(selectedPlaceVM)
+                    .environmentObject(detailPlaceViewModel)
+                    .environmentObject(userSession)
+                    .environmentObject(userProfileNavigationViewModel)
+                    .environmentObject(mapDisplayCoordinatorViewModel)
+                    .environmentObject(locationManager)
+                    .environmentObject(dataManager)
+                }
             }
-            .sheet(isPresented: $profileViewModel.isShowingPlaceSelection) {
+            .sheet(isPresented: Binding(
+                get: { tikTokVM.isShowingPlaceSelection },
+                set: { tikTokVM.isShowingPlaceSelection = $0 }
+            )) {
                 TikTokPlaceSelectionView()
                     .environmentObject(profileViewModel)
                     .environmentObject(selectedPlaceVM)
@@ -137,8 +126,11 @@ struct MainView: View {
                     .environmentObject(userSession)
                     .presentationDragIndicator(.visible)
             }
-            .sheet(isPresented: $profileViewModel.isShowingNoPlacesFound) {
-                TikTokNoPlacesFoundView(tikTokUrl: profileViewModel.noPlacesFoundTikTokUrl)
+            .sheet(isPresented: Binding(
+                get: { tikTokVM.isShowingNoPlacesFound },
+                set: { tikTokVM.isShowingNoPlacesFound = $0 }
+            )) {
+                TikTokNoPlacesFoundView(tikTokUrl: tikTokVM.noPlacesFoundTikTokUrl)
                     .environmentObject(profileViewModel)
                     .environmentObject(userSession)
                     .environmentObject(detailPlaceViewModel)
@@ -152,7 +144,7 @@ struct MainView: View {
                     .environmentObject(selectedPlaceVM)
                     .environmentObject(locationManager)
                     .environmentObject(userSession)
-                    .environmentObject(userProfileViewModel)
+                    .environmentObject(userProfileNavigationViewModel)
                     .environmentObject(notificationManager)
                     .environmentObject(profileViewModel)
                     .environmentObject(detailPlaceViewModel)
@@ -164,26 +156,27 @@ struct MainView: View {
                     .presentationBackgroundInteraction(.enabled(upThrough: .height(800)))
                     .interactiveDismissDisabled(false)
             }
-            .onChange(of: userProfileViewModel.isUserDetailPresented) { oldValue, newValue in
+            .onChange(of: userProfileNavigationViewModel.isUserDetailPresented) { oldValue, newValue in
                 // Dismiss PlaceDetailView sheet when navigating to user profile
                 // MVVM: View observes ViewModel state changes and coordinates sheet dismissal
                 if newValue && selectedPlaceVM.isDetailSheetPresented {
                     // Preserve state if navigating from place detail context
-                    if userProfileViewModel.navigatedFromPlaceDetail {
+                    if userProfileNavigationViewModel.navigatedFromPlaceDetail {
                         selectedPlaceVM.preserveStateForNavigation()
                     }
                     selectedPlaceVM.isDetailSheetPresented = false
                 }
 
                 // Restore state when returning from profile (if navigated from place detail)
-                if oldValue && !newValue && userProfileViewModel.navigatedFromPlaceDetail {
+                if oldValue && !newValue && userProfileNavigationViewModel.navigatedFromPlaceDetail {
                     selectedPlaceVM.restoreStateAfterNavigation()
-                    userProfileViewModel.navigatedFromPlaceDetail = false
+                    userProfileNavigationViewModel.navigatedFromPlaceDetail = false
                 }
             }
             .fullScreenCover(isPresented: $shouldNavigateToProfile) {
                 ProfileView()
-                    .environmentObject(userProfileViewModel)
+                    .environmentObject(userProfileNavigationViewModel)
+                    .environmentObject(mapDisplayCoordinatorViewModel)
                     .environmentObject(deepLinkViewModel)
                     .environmentObject(selectedPlaceVM)
                     .environmentObject(detailPlaceViewModel)
@@ -191,6 +184,9 @@ struct MainView: View {
                     .environmentObject(deepLinkManager)
                     .environmentObject(dataManager)
                     .environmentObject(serviceContainer)
+            }
+            .fullScreenCover(isPresented: $showSearchPage) {
+                searchPageView
             }
             .alert("No Location Found", isPresented: $deepLinkViewModel.showNoLocationAlert) {
                 Button("OK") {
@@ -203,12 +199,6 @@ struct MainView: View {
         .onAppear {
             locationManager.requestLocationPermission()
         }
-        .onChange(of: selectedPlaceVM.isDetailSheetPresented) { _, newValue in
-            if newValue {
-                appCoordinator.isSearchExpanded = false
-                // Sheet opens at partial height, user can swipe up to expand
-            }
-        }
         .onChange(of: selectedPlaceVM.shouldAnimateMapToPlace) { _, newValue in
             if newValue, let place = selectedPlaceVM.selectedPlace, let coordinate = place.coordinate {
                 withAnimation(.easeInOut(duration: 0.6)) {
@@ -220,18 +210,6 @@ struct MainView: View {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                     selectedPlaceVM.shouldAnimateMapToPlace = false
                 }
-            }
-        }
-        .onChange(of: userProfileViewModel.isUserDetailPresented) { oldValue, newValue in
-            // When navigating BACK from user profile (true -> false), ensure search is collapsed and keyboard dismissed
-            if oldValue == true && newValue == false {
-                appCoordinator.isSearchExpanded = false
-            }
-        }
-        .onChange(of: appCoordinator.isSearchExpanded) { _, isExpanded in
-            // Pass current map region to SearchViewModel for viewport-based keyword searches
-            if isExpanded {
-                searchViewModel.currentMapRegion = appCoordinator.currentMapRegion
             }
         }
     }
@@ -255,9 +233,7 @@ struct MainView: View {
                     .padding(.trailing, 20)
                 }
             }
-            .opacity(!appCoordinator.isSearchExpanded ? 1 : 0)
-            .allowsHitTesting(!appCoordinator.isSearchExpanded)
-            
+
             Spacer()
         }
         .overlay(floatingActionButtons)
@@ -270,12 +246,7 @@ struct MainView: View {
         Group {
             if shouldShowFloatingActionButtons {
                 FloatingActionButtons(
-                    searchCoordinator: searchCoordinator,
-                    isSearchBarMinimized: Binding(
-                        get: { !appCoordinator.isSearchExpanded },
-                        set: { appCoordinator.isSearchExpanded = !$0 }
-                    ),
-                    sheetHeight: $sheetHeight,
+                    showSearchPage: $showSearchPage,
                     shouldNavigateToProfile: $shouldNavigateToProfile
                 )
                 .environmentObject(profileViewModel)
@@ -286,29 +257,42 @@ struct MainView: View {
     /// Single Responsibility: Determines if floating action buttons should be visible
     /// MVVM: Pure function that checks ViewModel state - no side effects
     private var shouldShowFloatingActionButtons: Bool {
-        !appCoordinator.isSearchExpanded &&
         !selectedPlaceVM.isDetailSheetPresented &&
         !isCreatePlacePopupActive &&
         profileViewModel.selectedListIdForMap == nil // Hide when list popup is showing
     }
-    
-    /// Single Responsibility: Determines if search overlay should be visible
-    /// MVVM: Pure function that checks ViewModel state - no side effects
-    private var shouldShowSearchOverlay: Bool {
-        profileViewModel.selectedListIdForMap == nil // Hide search bar when list popup is showing
+
+    // MARK: - Search Page
+
+    /// Builds the search page view with proper ViewModel and callbacks
+    private var searchPageView: some View {
+        SearchPageViewWrapper(
+            searchViewModel: searchViewModel,
+            searchCoordinator: searchCoordinator,
+            showSearchPage: $showSearchPage
+        )
+        .environmentObject(userProfileNavigationViewModel)
+        .environmentObject(profileViewModel)
+        .environmentObject(selectedPlaceVM)
+        .environmentObject(detailPlaceViewModel)
+        .environmentObject(userSession)
+        .environmentObject(mapDisplayCoordinatorViewModel)
+        .environmentObject(locationManager)
+        .environmentObject(dataManager)
+        .environmentObject(appCoordinator)
     }
     
     // MARK: - Loading Overlay
     private var loadingOverlay: some View {
         Group {
-            if deepLinkViewModel.isProcessingDeepLink || 
-               profileViewModel.isProcessingTikTok || 
-               profileViewModel.isWaitingForPlaceDetail {
+            if deepLinkViewModel.isProcessingDeepLink ||
+               tikTokVM.isProcessingTikTok ||
+               tikTokVM.isWaitingForPlaceDetail {
                 Color.black.opacity(0.4)
                     .ignoresSafeArea()
-                
+
                 VStack(spacing: 16) {
-                    if profileViewModel.tikTokImportError != nil {
+                    if tikTokVM.tikTokImportError != nil {
                         errorView
                     } else {
                         loadingView
@@ -329,14 +313,14 @@ struct MainView: View {
                 .font(.headline)
                 .foregroundColor(.white)
             
-            Text(profileViewModel.tikTokImportError ?? "Unknown error")
+            Text(tikTokVM.tikTokImportError ?? "Unknown error")
                 .font(.subheadline)
                 .foregroundColor(.white.opacity(0.8))
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 40)
             
             Button("Try Again") {
-                profileViewModel.clearTikTokImportError()
+                tikTokVM.clearTikTokImportError()
             }
             .padding(.horizontal, 24)
             .padding(.vertical, 8)
@@ -364,9 +348,9 @@ struct MainView: View {
     }
     
     // MARK: - Actions
+
+    /// Handle map tap - no-op since search is now fullScreenCover
     private func handleMapTap() {
-        withAnimation {
-            appCoordinator.isSearchExpanded = false
-        }
+        // Search is now presented as fullScreenCover, no need to collapse
     }
 }

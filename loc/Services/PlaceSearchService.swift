@@ -11,11 +11,12 @@ import CoreLocation
 /// A service that uses Mesa backend for place search
 class PlaceSearchService {
     // MARK: - Type Aliases for Callbacks
-    
+
     typealias SuggestionsCallback = ([MesaPlaceSuggestion]) -> Void
     typealias DetailCallback = (DetailPlace) -> Void
     typealias ErrorCallback = (String) -> Void
     typealias DetailResultCallback = (Result<Any, Error>) -> Void
+    typealias AISuggestionsCallback = ([DetailPlace]) -> Void
     
     // MARK: - Properties
     
@@ -93,6 +94,39 @@ class PlaceSearchService {
                 completion(.success(details))
             case .failure(let error):
                 completion(.failure(error))
+            }
+        }
+    }
+
+    /// Search for AI-powered place suggestions using natural language queries
+    /// - Parameters:
+    ///   - query: The natural language search query
+    ///   - latitude: User's latitude for location-aware results
+    ///   - longitude: User's longitude for location-aware results
+    ///   - onResultsUpdated: Callback with AI suggestions
+    ///   - onError: Callback for errors
+    func searchAISuggestions(
+        query: String,
+        latitude: Double,
+        longitude: Double,
+        onResultsUpdated: @escaping AISuggestionsCallback,
+        onError: @escaping ErrorCallback
+    ) {
+        guard !query.isEmpty else {
+            onResultsUpdated([])
+            return
+        }
+
+        mesaBackendService.fetchAISuggestions(query: query, latitude: latitude, longitude: longitude) { result in
+            switch result {
+            case .success(let suggestions):
+                DispatchQueue.main.async {
+                    onResultsUpdated(suggestions)
+                }
+            case .failure(let error):
+                DispatchQueue.main.async {
+                    onError(error.localizedDescription)
+                }
             }
         }
     }

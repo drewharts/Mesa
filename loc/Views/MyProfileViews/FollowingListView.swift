@@ -10,16 +10,18 @@ import UIKit
 
 struct FollowingListView: View {
     @EnvironmentObject var profile: ProfileViewModel
-    @EnvironmentObject var userProfileViewModel: UserProfileViewModel
     @EnvironmentObject var dataManager: DataManager
     @EnvironmentObject var userSession: UserSession
     @EnvironmentObject var detailPlaceVM: DetailPlaceViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
-    
+
+    /// Convenience accessor for social view model
+    private var socialVM: ProfileSocialViewModel { profile.socialViewModel }
+
     var body: some View {
         VStack {
-            if profile.userFollowing.isEmpty {
-                if profile.isFollowingListLoading {
+            if socialVM.userFollowing.isEmpty {
+                if socialVM.isFollowingListLoading {
                     Spacer()
                     ProgressView()
                     Spacer()
@@ -30,7 +32,7 @@ struct FollowingListView: View {
                             .font(.title3)
                             .fontWeight(.medium)
                             .foregroundColor(.gray)
-                        
+
                         Text("When you follow someone, they'll appear here.")
                             .font(.body)
                             .foregroundColor(.gray)
@@ -41,23 +43,23 @@ struct FollowingListView: View {
                 }
             } else {
                 List {
-                    ForEach(profile.userFollowing) { profileData in
+                    ForEach(socialVM.userFollowing) { profileData in
                         UserRow(user: profileData)
                             .onAppear {
                                 // Load more when user scrolls to the last few items
-                                if let index = profile.userFollowing.firstIndex(where: { $0.id == profileData.id }),
-                                   index >= profile.userFollowing.count - 3,
-                                   !profile.isFollowingListLoading,
-                                   profile.hasMoreFollowing {
+                                if let index = socialVM.userFollowing.firstIndex(where: { $0.id == profileData.id }),
+                                   index >= socialVM.userFollowing.count - 3,
+                                   !socialVM.isFollowingListLoading,
+                                   socialVM.hasMoreFollowing {
                                     Task {
-                                        await dataManager.loadFollowing(userId: userSession.currentUserId ?? "", offset: profile.userFollowing.count)
+                                        await dataManager.loadFollowing(userId: userSession.currentUserId ?? "", offset: socialVM.userFollowing.count)
                                     }
                                 }
                             }
                     }
-                    
+
                     // Loading indicator at bottom while loading more
-                    if profile.isFollowingListLoading {
+                    if socialVM.isFollowingListLoading {
                         HStack {
                             Spacer()
                             ProgressView()
@@ -80,9 +82,9 @@ struct FollowingListView: View {
         .task {
             // Only load on initial appearance if list is empty (first-time users)
             // Enterprise: Don't reload on every appearance - preserves scroll position and avoids unnecessary network calls
-            if profile.userFollowing.isEmpty && !profile.isFollowingListLoading {
+            if socialVM.userFollowing.isEmpty && !socialVM.isFollowingListLoading {
                 await dataManager.loadFollowing(userId: userSession.currentUserId ?? "", offset: 0)
             }
         }
     }
-} 
+}

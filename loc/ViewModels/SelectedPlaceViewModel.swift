@@ -2,305 +2,179 @@
 //  SelectedPlaceViewModel.swift
 //  loc
 //
-//  Created by Andrew Hartsfield II on 1/22/25.
+//  Parent coordinator ViewModel that composes child ViewModels for place selection.
+//  Single Responsibility: Coordinates between child ViewModels and handles cross-cutting concerns.
+//
+//  Child ViewModels:
+//  - selectionState: Manages selection, sheet presentation, navigation
+//  - postsCache: Manages posts/TikToks caching, loading, likes
+//  - metadata: Manages ratings, restaurant type, open status
+//  - creation: Manages custom place creation
 //
 
 import Foundation
 import CoreLocation
 import UIKit
-
-// MARK: - Services
-// Note: MesaBackendService import should be available via project imports
+import Combine
 
 @MainActor
 class SelectedPlaceViewModel: ObservableObject {
-    private let postService: PostService
-    private let userService: UserService
-    private let placeService: PlaceService
-    private let imageService: ImageService
-    private let mesaBackendService: MesaBackendService
+    // MARK: - Child ViewModels
+
+    let selectionState: PlaceSelectionStateViewModel
+    let postsCache: PlacePostsCacheViewModel
+    let metadata: PlaceMetadataViewModel
+    let creation: PlaceCreationViewModel
+
+    // MARK: - Dependencies
 
     private let locationManager: LocationManager
+    private let mesaBackendService: MesaBackendService
+    private let placeService: PlaceService
     private weak var detailPlaceViewModel: DetailPlaceViewModel?
 
-    init(locationManager: LocationManager, postService: PostService, placeService: PlaceService, userService: UserService, imageService: ImageService, mesaBackendService: MesaBackendService = MesaBackendService(), detailPlaceViewModel: DetailPlaceViewModel? = nil) {
+    private var cancellables = Set<AnyCancellable>()
+
+    // MARK: - Initialization
+
+    /// Initializes the parent ViewModel with dependencies and creates child ViewModels.
+    init(
+        locationManager: LocationManager,
+        postService: PostService,
+        placeService: PlaceService,
+        userService: UserService,
+        imageService: ImageService,
+        mesaBackendService: MesaBackendService = .shared,
+        detailPlaceViewModel: DetailPlaceViewModel? = nil
+    ) {
         self.locationManager = locationManager
-        self.postService = postService
-        self.placeService = placeService
-        self.userService = userService
-        self.imageService = imageService
         self.mesaBackendService = mesaBackendService
+        self.placeService = placeService
         self.detailPlaceViewModel = detailPlaceViewModel
+
+        // Initialize child ViewModels
+        self.selectionState = PlaceSelectionStateViewModel()
+        self.postsCache = PlacePostsCacheViewModel(postService: postService)
+        self.metadata = PlaceMetadataViewModel(mesaBackendService: mesaBackendService, placeService: placeService)
+        self.creation = PlaceCreationViewModel(placeService: placeService)
+
+        setupChildCallbacks()
+        setupChildObservers()
     }
 
-    private var isUpdatingPlaceDetails = false
-    private var isFetchingFreshDetails = false
+    // MARK: - Setup
 
-    @Published var selectedPlace: DetailPlace? {
-        didSet {
-            guard !isUpdatingPlaceDetails else { return }
-            handleSelectedPlaceChange()
+    /// Sets up callbacks from child ViewModels.
+    private func setupChildCallbacks() {
+        // When a place is selected, load its data
+        selectionState.onPlaceSelected = { [weak self] place in
+            self?.handlePlaceSelected(place)
+        }
+
+        // When fresh details are needed, fetch them
+        selectionState.onFetchFreshDetails = { [weak self] place in
+            self?.fetchFreshDetailsInBackground(for: place)
+        }
+
+        // When a custom place is created, select it
+        creation.onPlaceCreated = { [weak self] place in
+            self?.handlePlaceCreated(place)
         }
     }
 
-    private func handleSelectedPlaceChange() {
-        guard let place = selectedPlace else { return }
-        guard let currentLocation = locationManager.currentLocation else { return }
+    /// Sets up observers to forward child ViewModel changes to parent.
+    private func setupChildObservers() {
+        selectionState.objectWillChange
+            .sink { [weak self] _ in self?.objectWillChange.send() }
+            .store(in: &cancellables)
 
-        if placeNeedsCompleteDetails(place) {
-            handlePlaceWithIncompleteDetails(place, currentLocation: currentLocation.coordinate)
-        } else {
-            continueWithPlaceSetup(place: place, currentLocation: currentLocation.coordinate)
-        }
+        postsCache.objectWillChange
+            .sink { [weak self] _ in self?.objectWillChange.send() }
+            .store(in: &cancellables)
+
+        metadata.objectWillChange
+            .sink { [weak self] _ in self?.objectWillChange.send() }
+            .store(in: &cancellables)
     }
 
-    private func handlePlaceWithIncompleteDetails(_ place: DetailPlace, currentLocation: CLLocationCoordinate2D) {
-        if isFetchingFreshDetails {
-            continueWithPlaceSetup(place: place, currentLocation: currentLocation)
-            return
-        }
+    // MARK: - Convenience Accessors (for backwards compatibility)
 
-        fetchCompletePlaceDetails(for: place) { [weak self] freshPlace in
-            guard let self = self else { return }
-
-            DispatchQueue.main.async {
-                if let freshPlace = freshPlace {
-                    // Merge fresh data while preserving local-only properties (e.g., isCustom)
-                    let mergedPlace = self.mergePlaceData(original: place, fresh: freshPlace)
-                    
-                    self.isUpdatingPlaceDetails = true
-                    self.selectedPlace = mergedPlace
-                    self.isUpdatingPlaceDetails = false
-                    self.continueWithPlaceSetup(place: mergedPlace, currentLocation: currentLocation)
-                } else {
-                    print("❌ [SelectedPlaceViewModel] Failed to get complete details, continuing with current data")
-                    self.continueWithPlaceSetup(place: place, currentLocation: currentLocation)
-                }
-            }
-        }
+    /// The currently selected place.
+    var selectedPlace: DetailPlace? {
+        get { selectionState.selectedPlace }
+        set { selectionState.selectedPlace = newValue }
     }
 
-    private func placeNeedsCompleteDetails(_ place: DetailPlace) -> Bool {
-        let missingRating = place.rating == nil
-        let missingReviewCount = place.userRatingsTotal == nil
-        let missingCategories = place.categories == nil || place.categories?.isEmpty == true
-        return missingRating || missingReviewCount || missingCategories
+    /// Whether the detail sheet is presented.
+    var isDetailSheetPresented: Bool {
+        get { selectionState.isDetailSheetPresented }
+        set { selectionState.isDetailSheetPresented = newValue }
     }
 
-    private func continueWithPlaceSetup(place: DetailPlace, currentLocation: CLLocationCoordinate2D) {
-        loadData(for: place, currentLocation: currentLocation)
-        
-        // Load posts (photos will be loaded automatically by PlacePhotosViewModel)
-        loadPosts(for: place)
-
-        // Set Google rating from the place data
-        placeRating = place.rating ?? 0
-
-        // Clear previous likes when loading a new place
-        likedPosts.removeAll()
+    /// Whether to allow auto-presentation.
+    var allowAutoPresent: Bool {
+        get { selectionState.allowAutoPresent }
+        set { selectionState.allowAutoPresent = newValue }
     }
 
-    private func fetchCompletePlaceDetails(for place: DetailPlace, completion: @escaping (DetailPlace?) -> Void) {
-        // Backend now accepts UUID and handles everything automatically
-        let placeId = place.id.uuidString
-
-        mesaBackendService.fetchPlaceDetails(placeId: placeId, source: "google") { result in
-            switch result {
-            case .success(let completePlace):
-                completion(completePlace)
-            case .failure(let error):
-                completion(nil)
-            }
-        }
-    }
-    
-    // MARK: - Place Data Merging
-    
-    /// Merges fresh backend data with original place, preserving local-only properties.
-    /// Single Responsibility: Handles data merging without side effects.
-    ///
-    /// Properties preserved from original:
-    /// - `id`: Always keep the original ID
-    /// - `isCustom`: Backend doesn't know about custom places
-    /// - `coordinate`: Prevents selection indicator jumping when fresh data arrives
-    /// - `openHours`: Preserve if fresh data doesn't have it
-    private func mergePlaceData(original: DetailPlace, fresh: DetailPlace) -> DetailPlace {
-        var merged = fresh
-        merged.id = original.id
-        merged.isCustom = original.isCustom
-
-        // Preserve coordinate from original to prevent selection indicator jumping when fresh data arrives
-        merged.coordinate = original.coordinate
-
-        // Preserve openHours from original if fresh doesn't have it
-        if merged.openHours == nil || merged.openHours?.isEmpty == true {
-            merged.openHours = original.openHours
-        }
-
-        return merged
-    }
-    @Published var isDetailSheetPresented: Bool = false
-    @Published var isRestaurantOpen: Bool = false // New property to track open status
-    @Published var allowAutoPresent: Bool = true
-    @Published var preservedPlaceForNavigation: DetailPlace? = nil  // Preserve place state during navigation
-    @Published var shouldAnimateMapToPlace: Bool = false // Track if map should animate to place location
-    @Published private var placePosts: [String: [PlacePost]] = [:] // Cache for posts by placeId
-    @Published private var placeTikToks: [String: [TikTokVideo]] = [:] // Cache for TikToks by placeId
-    @Published private var restaurantTypes: [String: String] = [:] // Dictionary to store restaurant types by placeId
-    
-    /// Increments whenever posts are modified - allows observers to react to post changes
-    @Published private(set) var postsUpdateCounter: Int = 0
-    
-    @Published var placeRating: Double = 0
-    
-    @Published private var postLoadingStates: [String: LoadingState] = [:] // Loading states for posts
-    @Published var isCurrentPlaceFullyLoaded: Bool = false
-    
-    // Add new property to track liked posts
-    @Published private var likedPosts: Set<String> = []
-
-    // MARK: - Loading State Enum
-    enum LoadingState: Equatable {
-        case idle
-        case loading
-        case loaded
-        case error(Error)
-
-        static func == (lhs: LoadingState, rhs: LoadingState) -> Bool {
-            switch (lhs, rhs) {
-            case (.idle, .idle), (.loading, .loading), (.loaded, .loaded):
-                return true
-            case (.error, .error):
-                return true // All errors considered equal for simplicity
-            default:
-                return false
-            }
-        }
-    }
-    
-    // Get restaurant type for a place
-    func getRestaurantType(for placeId: String) -> String? {
-        return restaurantTypes[placeId]
-    }
-    
-    /// Update the isCurrentPlaceFullyLoaded property based on current loading states
-    private func updateCurrentPlaceFullyLoaded() {
-        guard let placeId = selectedPlace?.id.uuidString else {
-            isCurrentPlaceFullyLoaded = false
-            return
-        }
-        
-        let postState = postLoadingStates[placeId] ?? .idle
-
-        // Consider loaded if posts are either loaded or in error state
-        // (we don't want to wait forever if there's an error)
-        // Photos are managed independently by PlacePhotosViewModel
-        let postsReady: Bool
-        switch postState {
-        case .loaded, .error:
-            postsReady = true
-        case .idle, .loading:
-            postsReady = false
-        }
-
-        // Note: Photos are loaded separately by PlacePhotosViewModel and don't block
-        // the main place detail view from loading. Each section shows its own loading state.
-
-        let wasLoaded = isCurrentPlaceFullyLoaded
-        isCurrentPlaceFullyLoaded = postsReady
-        
-        // Debug logging when the state changes
-        // Place is now fully loaded
-    }
-    
-    // Calculate restaurant type and store in dictionary
-    func calculateAndStoreRestaurantType(for place: DetailPlace) {
-        let placeId = place.id.uuidString
-        let placeDetailVM = PlaceDetailViewModel()
-        if let type = placeDetailVM.getRestaurantType(for: place) {
-            restaurantTypes[placeId] = type
-        }
-    }
-    
-    // MARK: - Private Methods
-    private func loadData(for place: DetailPlace, currentLocation: CLLocationCoordinate2D) {
-        
-        // Compute whether the restaurant is open now using OpenStatusService
-        let openNow = OpenStatusService.isOpen(place)
-        
-        // Calculate and store restaurant type
-        calculateAndStoreRestaurantType(for: place)
-        
-        DispatchQueue.main.async {
-            self.isRestaurantOpen = openNow
-            // Only auto-present if allowed and not already presented
-            if self.allowAutoPresent && !self.isDetailSheetPresented {
-                self.isDetailSheetPresented = true
-            }
-            self.updateCurrentPlaceFullyLoaded()
-        }
-    }
-    
-    /// Lazy load external ratings (Google/Mapbox) if they're missing
-    private func refreshExternalRatingsIfNeeded(for place: DetailPlace) {
-        // Skip if we already have valid ratings (rating > 0 and count exists)
-        if let rating = place.rating, rating > 0, place.userRatingsTotal != nil {
-            return
-        }
-        
-        // Backend now accepts UUID and handles everything automatically
-        let placeId = place.id.uuidString
-        
-        mesaBackendService.fetchPlaceDetails(placeId: placeId, source: "google") { [weak self] result in
-            guard let self = self else { return }
-            
-            switch result {
-            case .success(let updatedPlace):
-                DispatchQueue.main.async {
-                    // Only update if this is still the selected place
-                    guard self.selectedPlace?.id == place.id else {
-                        return
-                    }
-                    
-                    // Update the selected place with fresh ratings
-                    var updatedSelectedPlace = self.selectedPlace
-                    updatedSelectedPlace?.rating = updatedPlace.rating
-                    updatedSelectedPlace?.userRatingsTotal = updatedPlace.userRatingsTotal
-                    
-                    self.selectedPlace = updatedSelectedPlace
-                    
-                    // Update Firestore in background (non-blocking)
-                    if let placeToUpdate = updatedSelectedPlace {
-                        self.updatePlaceInFirestore(placeToUpdate)
-                    }
-                }
-                
-            case .failure(let error):
-                print("❌ [SelectedPlaceViewModel] Failed to fetch ratings for '\(place.name)': \(error.localizedDescription)")
-            }
-        }
-    }
-    
-    /// Update place in Firestore with fresh data
-    private func updatePlaceInFirestore(_ place: DetailPlace) {
-        placeService.updatePlace(place: place) { error in
-            if let error = error {
-                print("❌ [SelectedPlaceViewModel] Failed to update place in Firestore: \(error.localizedDescription)")
-            }
-        }
+    /// Whether map should animate to place.
+    var shouldAnimateMapToPlace: Bool {
+        get { selectionState.shouldAnimateMapToPlace }
+        set { selectionState.shouldAnimateMapToPlace = newValue }
     }
 
-    /// Updates just the description of the currently selected place
-    /// Used when polling for AI-generated descriptions
-    func updatePlaceDescription(_ description: String) {
-        if var place = selectedPlace {
-            place.description = description
-            selectedPlace = place
-        }
+    /// Preserved place for navigation.
+    var preservedPlaceForNavigation: DetailPlace? {
+        get { selectionState.preservedPlaceForNavigation }
+        set { selectionState.preservedPlaceForNavigation = newValue }
     }
 
-    /// Navigate to a place by ID - fetches place details and presents the detail sheet
-    /// Single Responsibility: Coordinate place navigation from lightweight place references
+    /// The Google rating for the current place.
+    var placeRating: Double {
+        get { metadata.placeRating }
+        set { metadata.placeRating = newValue }
+    }
+
+    /// Whether the current place is open.
+    var isRestaurantOpen: Bool {
+        metadata.isRestaurantOpen
+    }
+
+    /// Posts update counter for observation.
+    var postsUpdateCounter: Int {
+        postsCache.postsUpdateCounter
+    }
+
+    /// Whether the current place is fully loaded.
+    var isCurrentPlaceFullyLoaded: Bool {
+        postsCache.isCurrentPlaceFullyLoaded
+    }
+
+    /// Posts for the currently selected place.
+    var posts: [PlacePost] {
+        guard let placeId = selectedPlace?.id.uuidString else { return [] }
+        return postsCache.posts(forPlaceId: placeId)
+    }
+
+    /// TikToks for the currently selected place.
+    var tiktokVideos: [TikTokVideo] {
+        guard let placeId = selectedPlace?.id.uuidString else { return [] }
+        return postsCache.tiktoks(forPlaceId: placeId)
+    }
+
+    // MARK: - Public Methods (Delegation to Children)
+
+    /// Selects a place that already has complete data.
+    func selectPlace(_ place: DetailPlace, shouldAnimateMap: Bool = true) {
+        selectionState.selectPlace(place, shouldAnimateMap: shouldAnimateMap)
+    }
+
+    /// Selects a place and fetches fresh details.
+    func selectPlaceAndFetchDetails(_ place: DetailPlace, shouldAnimateMap: Bool = true) {
+        selectionState.selectPlaceAndFetchDetails(place, shouldAnimateMap: shouldAnimateMap)
+    }
+
+    /// Navigates to a place by ID.
     func navigateToPlace(placeId: String, onDismiss: (() -> Void)? = nil) {
         Task {
             guard let detailPlace = try? await PlaceService.shared.fetchPlace(withId: placeId) else { return }
@@ -311,355 +185,237 @@ class SelectedPlaceViewModel: ObservableObject {
             }
         }
     }
-    
-    /// Select a place and fetch fresh details from backend
-    /// Use this when a user clicks on a place from lists, maps, etc.
-    func selectPlaceAndFetchDetails(_ place: DetailPlace, shouldAnimateMap: Bool = true) {
-        // Backend now accepts UUID and handles everything automatically
-        // Just send the UUID as place_id and "google" as provider
-        let placeId = place.id.uuidString
 
-        DispatchQueue.main.async {
-            self.isFetchingFreshDetails = true
-            self.selectedPlace = place
-            self.shouldAnimateMapToPlace = shouldAnimateMap
-        }
+    /// Navigates to map and selects a place.
+    func navigateToMapAndSelectPlace(_ place: DetailPlace, dismissNavigation: @escaping () -> Void) {
+        self.selectPlaceAndFetchDetails(place, shouldAnimateMap: true)
+        self.isDetailSheetPresented = true
+        dismissNavigation()
+    }
 
-        mesaBackendService.fetchPlaceDetails(placeId: placeId, source: "google") { [weak self] result in
-            guard let self = self else { return }
-            
-            switch result {
-            case .success(let freshPlace):
-                DispatchQueue.main.async {
-                    guard self.selectedPlace?.id == place.id else {
-                        return
-                    }
-
-                    self.isFetchingFreshDetails = false
-
-                    // Merge fresh data while preserving local-only properties (e.g., isCustom)
-                    let mergedPlace = self.mergePlaceData(original: place, fresh: freshPlace)
-                    
-                    self.selectedPlace = mergedPlace
-                    
-                    // Update Firestore in background
-                    self.updatePlaceInFirestore(mergedPlace)
-                }
-                
-            case .failure(let error):
-                print("❌ [SelectedPlaceViewModel] fetchPlaceDetails failed for '\(place.name)': \(error.localizedDescription)")
-                DispatchQueue.main.async {
-                    guard self.selectedPlace?.id == place.id else { return }
-
-                    self.isFetchingFreshDetails = false
-                    self.handleSelectedPlaceChange()
-                }
-            }
+    /// Updates just the description of the currently selected place.
+    func updatePlaceDescription(_ description: String) {
+        if var place = selectedPlace {
+            place.description = description
+            selectionState.updatePlaceDetails(place)
         }
     }
-    
-    private func loadPosts(for place: DetailPlace) {
-        let placeId = place.id.uuidString
-        DispatchQueue.main.async {
-            self.postLoadingStates[placeId] = .loading
-        }
-        
-        // Use Task to handle async call to get current user ID
-        Task { @MainActor in
-            guard let currentUserId = SupabaseAuthService.shared.currentUserId else {
-                print("Error: Current user ID is not available")
-                self.postLoadingStates[placeId] = .error(NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "User not logged in"]))
-                self.placePosts[placeId] = []
-                self.updateCurrentPlaceFullyLoaded()
-                return
-            }
-            
-            self.loadPostsWithUserId(placeId: placeId, currentUserId: currentUserId)
-        }
+
+    /// Returns the restaurant type for a place.
+    func getRestaurantType(for placeId: String) -> String? {
+        metadata.getRestaurantType(forPlaceId: placeId)
     }
-    
-    private func loadPostsWithUserId(placeId: String, currentUserId: String) {
-        
-        // Fetch posts AND TikToks for the specific place in a single query
-        Task {
-            do {
-                let (posts, tiktoks) = try await postService.fetchPosts(placeId: placeId, latestOnly: false)
-                
-                await MainActor.run {
-                    self.placePosts[placeId] = posts
-                    self.placeTikToks[placeId] = tiktoks // Store TikToks
-                    self.postLoadingStates[placeId] = .loaded
-                    
-                    // Photos are loaded automatically by PlacePhotosViewModel via observers
-                    
-                    self.updateCurrentPlaceFullyLoaded()
-                }
-            } catch {
-                await MainActor.run {
-                    print("❌ [SelectedPlaceViewModel] Error fetching posts/TikToks for place \(placeId): \(error.localizedDescription)")
-                    self.postLoadingStates[placeId] = .error(error)
-                    self.placePosts[placeId] = []
-                    self.placeTikToks[placeId] = []
-                    
-                    self.updateCurrentPlaceFullyLoaded()
-                }
-            }
-        }
+
+    /// Returns the loading state for posts.
+    func postLoadingState(forPlaceId placeId: String) -> PlacePostsCacheViewModel.LoadingState {
+        postsCache.postLoadingState(forPlaceId: placeId)
     }
-    
-    
-    // MARK: - Public Methods
+
+    /// Formats a post's timestamp.
+    func formattedTimestamp(for post: PlacePost) -> String {
+        postsCache.formattedTimestamp(for: post)
+    }
+
+    /// Returns whether a post is liked.
+    func isPostLiked(_ postId: String) -> Bool {
+        postsCache.isPostLiked(postId)
+    }
+
+    /// Gets a post by ID.
+    func getPost(by postId: String) -> PlacePost? {
+        postsCache.getPost(by: postId)
+    }
+
+    /// Adds a post to the current place.
     func addPost(_ post: PlacePost) {
         guard let placeId = selectedPlace?.id.uuidString else { return }
-        
-        DispatchQueue.main.async { [weak self] in
-            guard let self = self else { return }
-            var currentPosts = self.placePosts[placeId] ?? []
-            currentPosts.insert(post, at: 0) // Insert at the beginning
-            self.placePosts[placeId] = currentPosts
-            
-            // Notify observers that posts have changed (triggers photo reload in PlacePhotosViewModel)
-            self.postsUpdateCounter += 1
-        }
+        postsCache.addPost(post, forPlaceId: placeId)
     }
-    
-    /// Get a post by its ID to access original data
-    func getPost(by postId: String) -> PlacePost? {
-        // Search through all place posts to find the post with matching ID
-        for posts in placePosts.values {
-            if let post = posts.first(where: { $0.id == postId }) {
-                return post
-            }
-        }
-        return nil
-    }
-    
+
+    /// Deletes a post from the current place.
     func deletePost(postId: String, completion: @escaping (Result<Void, Error>) -> Void) {
         guard let placeId = selectedPlace?.id.uuidString else {
             completion(.failure(NSError(domain: "SelectedPlaceViewModel", code: -1, userInfo: [NSLocalizedDescriptionKey: "No selected place"])))
             return
         }
-        
-        // Find the post to get the userId
-        guard let post = placePosts[placeId]?.first(where: { $0.id == postId }) else {
-            completion(.failure(NSError(domain: "SelectedPlaceViewModel", code: -1, userInfo: [NSLocalizedDescriptionKey: "Post not found in cache"])))
-            return
-        }
-        
-        postService.deletePost(postId: postId) { [weak self] result in
-            guard let self = self else { return }
-            
-            switch result {
-            case .success:
-                DispatchQueue.main.async {
-                    // Remove the post from local cache
-                    if var currentPosts = self.placePosts[placeId] {
-                        // Find and remove the post
-                        if let index = currentPosts.firstIndex(where: { $0.id == postId }) {
-                            currentPosts.remove(at: index)
-                            self.placePosts[placeId] = currentPosts
-                            
-                            // Remove from liked posts set if it was there
-                            self.likedPosts.remove(postId)
-                            
-                            // Notify observers that posts have changed
-                            self.postsUpdateCounter += 1
-                        }
-                    }
-                    completion(.success(()))
-                }
-                
-            case .failure(let error):
-                print("❌ Failed to delete post: \(error.localizedDescription)")
-                completion(.failure(error))
-            }
-        }
+        postsCache.deletePost(postId: postId, forPlaceId: placeId, completion: completion)
     }
-    
-    func formattedTimestamp(for post: PlacePost) -> String {
-        let now = Date()
-        let calendar = Calendar.current
-        let components = calendar.dateComponents([.minute, .hour, .day], from: post.timestamp, to: now)
-        
-        if let minutes = components.minute, minutes < 60 && (components.hour ?? 0) == 0 && (components.day ?? 0) == 0 {
-            return minutes == 0 ? "Just now" : "\(minutes)m"
-        } else if let hours = components.hour, hours < 24 && (components.day ?? 0) == 0 {
-            return "\(hours)h"
-        } else if let days = components.day {
-            return "\(days)d"
-        } else {
-            let formatter = DateFormatter()
-            formatter.dateStyle = .short
-            formatter.timeStyle = .none
-            return formatter.string(from: post.timestamp)
-        }
-    }
-    
-    // Update the method to take userId as parameter
+
+    /// Checks like statuses for posts.
     func checkLikeStatuses(userId: String) {
-        guard let placeId = selectedPlace?.id.uuidString,
-              let posts = placePosts[placeId] else { return }
-        
-        // Clear previous likes before checking
-        likedPosts.removeAll()
-        
-        // TODO: Implement like status checking with PostService
-    }
-    
-    // MARK: - Public Accessors
-    var posts: [PlacePost] {
-        guard let placeId = selectedPlace?.id.uuidString else { return [] }
-        return placePosts[placeId] ?? []
+        // TODO: Implement with PostService
     }
 
-    var tiktokVideos: [TikTokVideo] {
-        guard let placeId = selectedPlace?.id.uuidString else { return [] }
-        return placeTikToks[placeId] ?? []
-    }
-
-    func postLoadingState(forPlaceId placeId: String) -> LoadingState {
-        return postLoadingStates[placeId] ?? .idle
-    }
-    
+    /// Likes a post.
     func likePost(_ post: PlacePost, userId: String) {
-        // TODO: Implement proper like/unlike logic with Supabase
+        // TODO: Implement with Supabase
     }
 
-    // Add helper method to check if a post is liked
-    func isPostLiked(_ postId: String) -> Bool {
-        return likedPosts.contains(postId)
-    }
-
-    func createNewPlace(idString: String?, name: String, description: String?, coordinate: CLLocationCoordinate2D, userId: String, profileVM: ProfileViewModel? = nil, detailPlaceVM: DetailPlaceViewModel? = nil) {
-        // Create a new place
-        var newPlace = DetailPlace()
-        if let idString = idString, let uuid = UUID(uuidString: idString) {
-            newPlace.id = uuid
-        }
-        newPlace.name = name
-        newPlace.description = description
-        newPlace.coordinate = CLLocationCoordinate2D(
-            latitude: coordinate.latitude,
-            longitude: coordinate.longitude
+    /// Creates a new custom place.
+    func createNewPlace(
+        idString: String?,
+        name: String,
+        description: String?,
+        coordinate: CLLocationCoordinate2D,
+        userId: String,
+        profileVM: ProfileViewModel? = nil,
+        detailPlaceVM: DetailPlaceViewModel? = nil
+    ) {
+        creation.createNewPlace(
+            idString: idString,
+            name: name,
+            description: description,
+            coordinate: coordinate,
+            userId: userId,
+            profileVM: profileVM,
+            detailPlaceVM: detailPlaceVM
         )
-        newPlace.isCustom = true // Mark as custom place
-        
-        // Immediately update local state for instant UI feedback
-        DispatchQueue.main.async {
-            // Add to DetailPlaceViewModel's places dictionary
-            if let detailPlaceVM = detailPlaceVM {
-                detailPlaceVM.places[newPlace.id.uuidString] = newPlace
-                
-                // Add current user to placeSavers for this place
-                detailPlaceVM.placeSavers[newPlace.id.uuidString] = [userId]
-                
-                // Trigger annotation calculation for immediate display
-                detailPlaceVM.calculateAnnotationPlaces()
-                
-                // Generate color for the new place
-                detailPlaceVM.generateColorForPlace(newPlace.id.uuidString)
-            }
-            
-            // Update ProfileViewModel's myPlaces list
-            if let profileVM = profileVM {
-                if !profileVM.myPlaces.contains(newPlace.id.uuidString) {
-                    profileVM.myPlaces.append(newPlace.id.uuidString)
-                }
-            }
-            
-            // Send notification to refresh map annotations
-            NotificationCenter.default.post(name: NSNotification.Name("RefreshMapAnnotations"), object: nil)
-        }
-        
-        // Save to database
-        Task { @MainActor in
-            SupabasePlaceService.shared.testSupabaseConnection { isConnected, error in
-                if !isConnected {
-                    print("❌ [SelectedPlaceViewModel] Supabase connection failed: \(error?.localizedDescription ?? "Unknown error")")
-                    return
-                }
-                
-                // Save to main places collection
-                self.placeService.addToAllPlaces(place: newPlace) { error in
-                    if let error = error {
-                        print("❌ [SelectedPlaceViewModel] Error saving place to main collection: \(error.localizedDescription)")
-                    } else {
-                        // Save to user's myPlaces collection
-                        self.placeService.addToMyPlaces(userId: userId, place: newPlace) { error in
-                            if let error = error {
-                                print("❌ [SelectedPlaceViewModel] Error saving place to user's collection: \(error.localizedDescription)")
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        
-        // Update the UI
-        selectedPlace = newPlace
-        if allowAutoPresent {
-            isDetailSheetPresented = true
-        }
-    }
-    
-    /// Navigate to map and select a place (for use when navigating from profile views)
-    /// This method sets up the place detail FIRST, then dismisses the profile for a smooth transition
-    func navigateToMapAndSelectPlace(_ place: DetailPlace, dismissNavigation: @escaping () -> Void) {
-        // Set up place selection FIRST (so it's ready when profile dismisses)
-        self.selectPlaceAndFetchDetails(place, shouldAnimateMap: true)
-        self.isDetailSheetPresented = true
-
-        // Dismiss immediately - place detail is already set up and will appear as profile animates away
-        dismissNavigation()
     }
 
-    // MARK: - State Preservation (for navigation from place detail)
+    // MARK: - State Preservation (Delegation)
 
-    /// Preserves current place state before navigating to user profile
+    /// Preserves current place state before navigation.
     func preserveStateForNavigation() {
-        preservedPlaceForNavigation = selectedPlace
+        selectionState.preserveStateForNavigation()
     }
 
-    /// Restores place state after returning from user profile navigation
+    /// Restores place state after navigation.
     func restoreStateAfterNavigation() {
-        if let preserved = preservedPlaceForNavigation {
-            selectedPlace = preserved
-            isDetailSheetPresented = true
-            preservedPlaceForNavigation = nil
-        }
+        selectionState.restoreStateAfterNavigation()
     }
 
-    /// Clears preserved state (e.g., when user navigates elsewhere)
+    /// Clears preserved state.
     func clearPreservedState() {
-        preservedPlaceForNavigation = nil
+        selectionState.clearPreservedState()
     }
-    
-    // MARK: - Logout Cleanup
-    
-    /// Clears all user-related cached data - MUST be called on logout to prevent data leakage
-    /// Single Responsibility: Only clears this ViewModel's cached state
+
+    // MARK: - Cleanup
+
+    /// Clears all user-related cached data - MUST be called on logout.
     func clearAllUserData() {
         print("🗑️ [SelectedPlaceViewModel] Clearing all user data for security")
-        
-        // Clear selected place state
-        selectedPlace = nil
-        isDetailSheetPresented = false
-        isCurrentPlaceFullyLoaded = false
-        
-        // Clear all cached data
-        placePosts.removeAll()
-        placeTikToks.removeAll()
-        restaurantTypes.removeAll()
-        postLoadingStates.removeAll()
-        likedPosts.removeAll()
-        
-        // Reset UI state
-        placeRating = 0
-        isRestaurantOpen = false
-        allowAutoPresent = true
-        shouldAnimateMapToPlace = false
-        postsUpdateCounter = 0
-        
+
+        selectionState.clearAllState()
+        postsCache.clearAllData()
+        metadata.clearAllData()
+
         print("✅ [SelectedPlaceViewModel] All user data cleared")
+    }
+
+    // MARK: - Private Methods
+
+    /// Handles when a place is selected.
+    private func handlePlaceSelected(_ place: DetailPlace) {
+        guard let currentLocation = locationManager.currentLocation else { return }
+
+        if placeNeedsCompleteDetails(place) && !selectionState.isFetchingFreshDetails {
+            fetchCompletePlaceDetails(for: place, currentLocation: currentLocation.coordinate)
+        } else {
+            continueWithPlaceSetup(place: place, currentLocation: currentLocation.coordinate)
+        }
+    }
+
+    /// Handles when a custom place is created.
+    private func handlePlaceCreated(_ place: DetailPlace) {
+        selectionState.selectedPlace = place
+        if allowAutoPresent {
+            selectionState.forcePresentDetailSheet()
+        }
+    }
+
+    /// Checks if a place needs complete details.
+    private func placeNeedsCompleteDetails(_ place: DetailPlace) -> Bool {
+        let missingRating = place.rating == nil
+        let missingReviewCount = place.userRatingsTotal == nil
+        let missingCategories = place.categories == nil || place.categories?.isEmpty == true
+        return missingRating || missingReviewCount || missingCategories
+    }
+
+    /// Continues with place setup after data is ready.
+    private func continueWithPlaceSetup(place: DetailPlace, currentLocation: CLLocationCoordinate2D) {
+        // Compute metadata
+        metadata.computeMetadata(for: place)
+
+        // Load posts
+        postsCache.clearLikedPosts()
+        postsCache.loadPosts(forPlaceId: place.id.uuidString)
+
+        // Present sheet
+        selectionState.presentDetailSheet()
+    }
+
+    /// Fetches complete place details when missing.
+    private func fetchCompletePlaceDetails(for place: DetailPlace, currentLocation: CLLocationCoordinate2D) {
+        let placeId = place.id.uuidString
+
+        mesaBackendService.fetchPlaceDetails(placeId: placeId, source: "google") { [weak self] result in
+            guard let self = self else { return }
+
+            DispatchQueue.main.async {
+                switch result {
+                case .success(let freshPlace):
+                    let mergedPlace = self.mergePlaceData(original: place, fresh: freshPlace)
+                    self.selectionState.updatePlaceDetails(mergedPlace)
+                    self.continueWithPlaceSetup(place: mergedPlace, currentLocation: currentLocation)
+
+                case .failure:
+                    print("❌ [SelectedPlaceViewModel] Failed to get complete details, continuing with current data")
+                    self.continueWithPlaceSetup(place: place, currentLocation: currentLocation)
+                }
+            }
+        }
+    }
+
+    /// Fetches fresh details in background.
+    private func fetchFreshDetailsInBackground(for place: DetailPlace) {
+        let placeId = place.id.uuidString
+
+        Task {
+            do {
+                let freshPlace = try await mesaBackendService.fetchPlaceDetails(placeId: placeId)
+
+                await MainActor.run {
+                    guard self.selectedPlace?.id == place.id else { return }
+
+                    self.selectionState.markFetchComplete()
+
+                    let mergedPlace = self.mergePlaceData(original: place, fresh: freshPlace)
+                    self.selectionState.updatePlaceDetails(mergedPlace)
+
+                    // Update database in background
+                    self.updatePlaceInDatabase(mergedPlace)
+                }
+            } catch {
+                print("❌ [SelectedPlaceViewModel] fetchPlaceDetails failed for '\(place.name)': \(error.localizedDescription)")
+
+                await MainActor.run {
+                    guard self.selectedPlace?.id == place.id else { return }
+                    self.selectionState.markFetchComplete()
+                }
+            }
+        }
+    }
+
+    /// Merges fresh backend data with original place, preserving local-only properties.
+    private func mergePlaceData(original: DetailPlace, fresh: DetailPlace) -> DetailPlace {
+        var merged = fresh
+        merged.id = original.id
+        merged.isCustom = original.isCustom
+        merged.coordinate = original.coordinate
+
+        if merged.openHours == nil || merged.openHours?.isEmpty == true {
+            merged.openHours = original.openHours
+        }
+
+        return merged
+    }
+
+    /// Updates place in database.
+    private func updatePlaceInDatabase(_ place: DetailPlace) {
+        placeService.updatePlace(place: place) { error in
+            if let error = error {
+                print("❌ [SelectedPlaceViewModel] Failed to update place in database: \(error.localizedDescription)")
+            }
+        }
     }
 }

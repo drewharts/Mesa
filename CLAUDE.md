@@ -45,14 +45,6 @@ open Loc.xcodeproj
 # xcodebuild test -project Loc.xcodeproj -scheme Loc -destination 'platform=iOS Simulator,name=iPhone 15'
 ```
 
-### Firebase Functions
-```bash
-cd functions
-npm install
-npm run serve  # Local development
-npm run deploy # Deploy to Firebase
-```
-
 ### Testing Deep Links
 ```bash
 # Test deep link in simulator
@@ -68,10 +60,11 @@ xcrun simctl openurl booted "loc://list/listId"
 See `ARCHITECTURE.md` for complete details. Quick reference:
 
 ### Golden Rules
-1. **One View, One ViewModel** - Each view has exactly one primary ViewModel
+1. **One View, One ViewModel** - Each view has exactly one primary ViewModel (which may expose child ViewModels)
 2. **Smart vs Dumb** - Behavior needs ViewModel, display doesn't
-3. **ViewModels depend on Services**, not other ViewModels
+3. **ViewModels depend on Services**, not other ViewModels (use composition, not dependencies)
 4. **Views are DUMB** (purely declarative), ViewModels are SMART (business logic)
+5. **NO GOD VIEWMODELS** - Split large ViewModels into composed parent/child ViewModels by feature
 
 ### File Organization
 - **Models**: Data structures in `loc/Models/`
@@ -145,27 +138,10 @@ URL scheme: `loc://`
 - Handled in `Loc/AppDelegate.swift` and `Loc/LocApp.swift`
 - Routes: `/profile/{userId}`, `/place/{placeId}`, `/list/{listId}`
 
-## Firebase Configuration
-
-### Firestore Collections
-- `users`: User profiles and settings
-- `places`: Place details and reviews
-- `lists`: User-created place lists
-- `activities`: Social activity feed
-- `notifications`: Push notification data
-
-### Cloud Functions
-Located in `functions/src/index.ts`:
-- `onUserCreate`: Initialize new user data
-- `onFollowCreate`: Send follow notifications
-- `onActivityCreate`: Trigger activity notifications
-- `sendNotification`: Helper for push notifications
-
 ## Testing Considerations
 
 ### Unit Tests
 - Test ViewModels with mock services
-- Firebase rules testing for security
 - Deep link URL parsing tests
 
 ### UI Tests
@@ -175,10 +151,10 @@ Located in `functions/src/index.ts`:
 
 ## Common Issues and Solutions
 
-### Firebase Authentication
-- Check GoogleService-Info.plist is included
-- Verify bundle ID matches Firebase config
-- Test with Firebase Auth emulator for development
+### Supabase Authentication
+- Verify Supabase URL and anon key are set correctly
+- Check bundle ID matches Supabase project config
+- See PUSH_NOTIFICATIONS_SETUP.md for push notification configuration
 
 ### Map Integration
 - Ensure API keys are set in Info.plist
@@ -187,7 +163,7 @@ Located in `functions/src/index.ts`:
 
 ### Push Notifications
 - Register for notifications in AppDelegate
-- Test with Firebase Console
+- See PUSH_NOTIFICATIONS_SETUP.md for Supabase push notification setup
 - Handle notification permissions gracefully
 
 ## Coding Standards and Architecture Rules
@@ -219,10 +195,176 @@ Located in `functions/src/index.ts`:
 - **PUBLISHED PROPERTIES**: Use `@Published` for properties that trigger UI updates
 - **ASYNC FUNCTIONS**: Handle async operations in ViewModels, not Views
 
+### ViewModel Composition (NO GOD VIEWMODELS)
+
+**CRITICAL**: Avoid "god" or "massive" ViewModels that handle too many responsibilities. Instead, use ViewModel composition where a parent/coordinating ViewModel owns or exposes focused child ViewModels.
+
+#### Signs of a God ViewModel (REFACTOR IMMEDIATELY)
+- More than 300-400 lines of code
+- Handles more than 2-3 distinct feature areas
+- Has 10+ `@Published` properties
+- Methods that don't relate to each other
+- Difficult to test in isolation
+- Changes frequently for unrelated reasons
+
+#### ViewModel Composition Pattern
+```swift
+// BAD: God ViewModel that does everything
+@MainActor class ProfileViewModel: ObservableObject {
+    // User data, favorites, lists, reviews, followers, following,
+    // TikToks, notifications, settings... 500+ lines
+}
+
+// GOOD: Composed ViewModels with clear responsibilities
+@MainActor class ProfileViewModel: ObservableObject {
+    // Coordinates child ViewModels, handles profile-level state only
+    @Published var user: User
+    @Published var isLoading: Bool = false
+
+    // Child ViewModels for specific features
+    let favoritesViewModel: FavoritesViewModel
+    let listsViewModel: ListsViewModel
+    let reviewsViewModel: ReviewsViewModel
+    let socialViewModel: SocialViewModel  // followers, following
+}
+
+@MainActor class FavoritesViewModel: ObservableObject {
+    // ONLY handles favorites - loading, adding, removing, display
+    @Published var favorites: [FavoritePlace] = []
+    @Published var isLoading: Bool = false
+}
+
+@MainActor class ListsViewModel: ObservableObject {
+    // ONLY handles lists - CRUD, sharing, collaboration
+    @Published var lists: [PlaceList] = []
+    @Published var isLoading: Bool = false
+}
+```
+
+#### When to Split a ViewModel
+1. **Feature boundaries**: Each distinct feature (favorites, lists, reviews) gets its own ViewModel
+2. **Data domain**: Different data types that don't need to interact constantly
+3. **Reusability**: When the same logic is needed in multiple places
+4. **Testability**: When you can't easily unit test a piece in isolation
+5. **Team ownership**: When different team members work on different features
+
+#### Composition Rules
+- **Parent coordinates, children execute**: Parent ViewModel manages lifecycle and cross-cutting concerns
+- **Children are independent**: Each child ViewModel can function without knowing about siblings
+- **Services are shared**: All ViewModels depend on Services, not each other
+- **Views observe their ViewModel**: A View observes ONE primary ViewModel (which may expose children)
+
+#### View Integration Example
+```swift
+struct ProfileView: View {
+    @StateObject var viewModel: ProfileViewModel
+
+    var body: some View {
+        VStack {
+            // Parent handles profile header
+            ProfileHeaderView(user: viewModel.user)
+
+            // Child ViewModels power child views
+            FavoritesSection(viewModel: viewModel.favoritesViewModel)
+            ListsSection(viewModel: viewModel.listsViewModel)
+            ReviewsSection(viewModel: viewModel.reviewsViewModel)
+        }
+    }
+}
+```
+
+#### Migration Strategy for God ViewModels
+1. **Identify responsibilities**: List all distinct feature areas in the ViewModel
+2. **Group related properties/methods**: Cluster by feature domain
+3. **Extract child ViewModels**: Create focused ViewModels for each group
+4. **Wire up composition**: Parent creates and exposes child ViewModels
+5. **Update Views**: Views now observe appropriate child ViewModels
+6. **Test in isolation**: Each child ViewModel should be independently testable
+
+### Dependency Management (AVOID DEPENDENCY EXPLOSION)
+
+**Environment Objects - Use Sparingly**
+- Environment objects should be reserved for **truly app-wide state** (UserSession, theme settings)
+- A view should have **at most 2-3** `@EnvironmentObject` dependencies
+- If a view needs more, it's a sign the view is doing too much or dependencies should be injected differently
+- **RED FLAG**: If you need to pass 5+ environment objects through a sheet, the architecture needs refactoring
+
+**ViewModels Should Be Self-Sufficient**
+- ViewModels should fetch their own service dependencies from `ServiceContainer.shared`
+- ViewModels should NOT be passed as environment objects between unrelated views
+- Instead, create new ViewModels that fetch their own dependencies
+
+**Dependency Injection Pattern**
+```swift
+// BAD: View with many environment objects (dependency explosion)
+struct MyView: View {
+    @EnvironmentObject var serviceA: ServiceA
+    @EnvironmentObject var viewModelA: ViewModelA
+    @EnvironmentObject var viewModelB: ViewModelB
+    @EnvironmentObject var viewModelC: ViewModelC
+    // ... This is a code smell!
+}
+
+// GOOD: ViewModel fetches its own dependencies
+@MainActor
+class MyViewModel: ObservableObject {
+    private let userService = ServiceContainer.shared.userService
+    private let placeService = ServiceContainer.shared.placeService
+
+    init(userId: String) {
+        // ViewModel is self-sufficient, only needs data (IDs) not dependencies
+    }
+}
+
+struct MyView: View {
+    @StateObject var viewModel: MyViewModel
+    @EnvironmentObject var userSession: UserSession  // Only truly global state
+}
+```
+
+**Navigation Without Dependency Chains**
+- When navigating to a new view, that view should create its own ViewModel
+- Pass only **data** (IDs, simple values) through navigation, not ViewModels or services
+- The destination view's ViewModel fetches its own dependencies from ServiceContainer
+
+```swift
+// BAD: Passing ViewModel through navigation
+NavigationLink(destination: DetailView(viewModel: parentViewModel.childViewModel))
+
+// GOOD: Pass data, let destination create its own ViewModel
+NavigationLink(destination: DetailView(itemId: item.id))
+
+struct DetailView: View {
+    let itemId: String
+    @StateObject private var viewModel: DetailViewModel
+
+    init(itemId: String) {
+        self.itemId = itemId
+        self._viewModel = StateObject(wrappedValue: DetailViewModel(itemId: itemId))
+    }
+}
+```
+
+**Sheet Presentation Pattern**
+- Use `sheet(item:)` instead of `sheet(isPresented:)` when sheet content depends on data
+- This bundles "should show" and "what to show" atomically, avoiding state sync issues
+
+```swift
+// BAD: Separate state that can get out of sync
+@State var selectedItem: Item?
+@State var showSheet = false
+
+// GOOD: Single atomic state
+@State var selectedItem: Item?  // nil = no sheet, non-nil = show sheet
+.sheet(item: $selectedItem) { item in
+    DetailSheet(item: item)
+}
+```
+
 ### SwiftUI Views
 - **DECLARATIVE ONLY**: Views should be purely declarative UI descriptions
 - **NO SIDE EFFECTS**: No network calls, database operations, or complex logic in Views
-- **ENVIRONMENT OBJECTS**: Use `@EnvironmentObject` to access ViewModels
+- **ENVIRONMENT OBJECTS**: Use `@EnvironmentObject` sparingly - only for truly global state
 - **SIMPLE BINDINGS**: Only simple `@State` for local UI state like animations or temporary states
 
 ### Git Commit Rules
@@ -251,6 +393,8 @@ Located in `functions/src/index.ts`:
 9. **Missing function comments**: Functions without a describing comment
 10. **Stale comments**: Comments that don't match the function's current behavior
 11. **Sub-standard code quality**: Code that doesn't meet staff engineer standards
+12. **God ViewModels**: ViewModels with 300+ lines or 10+ @Published properties handling multiple features - must be split into composed child ViewModels
+13. **Dependency Explosion**: Views with 4+ `@EnvironmentObject` dependencies - refactor to have ViewModels fetch their own dependencies from ServiceContainer
 
 ### Migration Strategy
 When finding violations:
@@ -259,6 +403,7 @@ When finding violations:
 3. **Create ViewModels**: If no ViewModel exists, create one for the business logic
 4. **Update Dependencies**: Ensure proper `@EnvironmentObject` setup
 5. **Refactor Long Functions**: Break functions longer than 30 lines into smaller, focused functions
+6. **Split God ViewModels**: Decompose large ViewModels into parent/child composition by feature domain
 
 ## Enforcement
 

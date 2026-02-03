@@ -15,58 +15,69 @@ class TikTokVideosViewModel: ObservableObject {
     @Published var videos: [TikTokVideo] = []
     @Published var isLoading: Bool = false
     @Published var error: Error?
-    
-    // MARK: - Dependencies (Services, not ViewModels)
+
+    // MARK: - Dependencies (Services only)
     private let tikTokService: TikTokPlaceService
-    
-    // Temporary: Still need these until we fully refactor
-    private let selectedPlaceVM: SelectedPlaceViewModel
-    private let profileVM: ProfileViewModel
-    
+
+    // MARK: - Callbacks
+    /// Called after a video is deleted so parent can refresh external places
+    var onVideoDeleted: (() -> Void)?
+
+    // MARK: - Private State
+    private var currentPlaceId: String?
+    private var placeVideos: [TikTokVideo] = []
+    private var userVideos: [TikTokVideo] = []
+
     // MARK: - Initialization
-    init(tikTokService: TikTokPlaceService,
-         selectedPlaceVM: SelectedPlaceViewModel,
-         profileVM: ProfileViewModel) {
+    /// Initializes the ViewModel with TikTok service dependency.
+    init(tikTokService: TikTokPlaceService = TikTokPlaceService.shared) {
         self.tikTokService = tikTokService
-        self.selectedPlaceVM = selectedPlaceVM
-        self.profileVM = profileVM
     }
-    
-    // MARK: - Actions
-    func loadVideos(for placeId: String) async {
-        isLoading = true
-        error = nil
-        
-        do {
-            // Get place TikTok videos (from place data)
-            let placeTikTokVideos = selectedPlaceVM.tiktokVideos
-            
-            // Get user TikTok videos (from external places)
-            let userTikTokVideos = await profileVM.getTikTokVideos(for: placeId)
-            
-            // Combine and deduplicate based on videoID or URL
-            var allVideos = placeTikTokVideos
-            
-            for userVideo in userTikTokVideos {
-                // Check if this video already exists (by videoID or URL)
-                let alreadyExists = allVideos.contains { existingVideo in
-                    existingVideo.videoID == userVideo.videoID || existingVideo.url == userVideo.url
-                }
-                
-                if !alreadyExists {
-                    allVideos.append(userVideo)
-                }
-            }
-            
-            videos = allVideos
-            isLoading = false
-        } catch let loadError {
-            error = loadError
-            isLoading = false
-            print("❌ Error loading TikTok videos: \(loadError)")
+
+    // MARK: - Data-Driven Methods
+
+    /// Sets the current place ID and resets video state.
+    func setPlaceId(_ placeId: String?) {
+        currentPlaceId = placeId
+        if placeId == nil {
+            videos = []
+            placeVideos = []
+            userVideos = []
         }
     }
-    
+
+    /// Sets the place-associated TikTok videos and combines with user videos.
+    func setPlaceVideos(_ videos: [TikTokVideo]) {
+        placeVideos = videos
+        combineAndDeduplicateVideos()
+    }
+
+    /// Sets the user's TikTok videos for the current place and combines with place videos.
+    func setUserVideos(_ videos: [TikTokVideo]) {
+        userVideos = videos
+        combineAndDeduplicateVideos()
+    }
+
+    // MARK: - Actions
+
+    /// Combines place and user videos, removing duplicates based on videoID or URL.
+    private func combineAndDeduplicateVideos() {
+        var allVideos = placeVideos
+
+        for userVideo in userVideos {
+            let alreadyExists = allVideos.contains { existingVideo in
+                existingVideo.videoID == userVideo.videoID || existingVideo.url == userVideo.url
+            }
+
+            if !alreadyExists {
+                allVideos.append(userVideo)
+            }
+        }
+
+        videos = allVideos
+    }
+
+    /// Deletes a TikTok video from a place, verifying ownership first.
     func deleteVideo(_ video: TikTokVideo, placeId: String, userId: String) async {
         do {
             // Security: Verify user owns this video before deletion
@@ -79,33 +90,34 @@ class TikTokVideosViewModel: ObservableObject {
                 )
                 return
             }
-            
+
             let videoUrl = video.url
             let externalPlaceId = video.externalPlaceId
-            
+
             try await tikTokService.deleteTikTokFromPlace(
                 placeId: placeId,
                 videoUrl: videoUrl,
                 userId: userId,
                 externalPlaceId: externalPlaceId
             )
-            
-            // Refresh TikTok videos for this place
-            await loadVideos(for: placeId)
-            
-            // Refresh the profile to update the UI
-            await profileVM.fetchUserExternalPlaces()
+
+            // Remove from local state
+            videos.removeAll { $0.url == video.url }
+            userVideos.removeAll { $0.url == video.url }
+
+            // Notify parent to refresh external places
+            onVideoDeleted?()
         } catch let deleteError {
             error = deleteError
             print("❌ Error deleting TikTok: \(deleteError)")
         }
     }
-    
+
     // MARK: - Computed Properties
     var hasVideos: Bool {
         !videos.isEmpty
     }
-    
+
     var videoCount: Int {
         videos.count
     }

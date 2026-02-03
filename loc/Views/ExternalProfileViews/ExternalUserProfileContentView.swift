@@ -13,8 +13,15 @@ struct ExternalUserProfileContentView: View {
     @EnvironmentObject var profileVM: ProfileViewModel
     @EnvironmentObject var userSession: UserSession
     @EnvironmentObject var detailPlaceVM: DetailPlaceViewModel
-    @EnvironmentObject var userProfileVM: UserProfileViewModel
+    @EnvironmentObject var userProfileNavigationVM: UserProfileNavigationViewModel
+    @EnvironmentObject var mapDisplayCoordinatorVM: MapDisplayCoordinatorViewModel
+    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
+    @EnvironmentObject var locationManager: LocationManager
+    @EnvironmentObject var dataManager: DataManager
     @Environment(\.presentationMode) var presentationMode
+
+    @State private var showFollowers = false
+    @State private var showFollowing = false
 
     var body: some View {
         ScrollView {
@@ -46,8 +53,13 @@ struct ExternalUserProfileContentView: View {
                         .fontWeight(.bold)
                         .foregroundColor(.black)
 
-                    // Clickable Followers/Following counts (uses Nested* views for nested navigation)
-                    NestedProfileFollowCountsView(viewModel: viewModel)
+                    // Clickable Followers/Following counts
+                    ProfileFollowCountsView(
+                        data: .external(followers: viewModel.followers, following: viewModel.followingCount),
+                        onFollowersTap: { showFollowers = true },
+                        onFollowingTap: { showFollowing = true },
+                        onMyPlacesTap: nil
+                    )
                 }
                 .padding(.top, -8)
                 .padding(.bottom, 16)
@@ -69,6 +81,39 @@ struct ExternalUserProfileContentView: View {
             }
         }
         .navigationBarTitleDisplayMode(.inline)
+        .background(
+            Group {
+                NavigationLink(
+                    destination: ProfileFollowersListView(viewModel: viewModel)
+                        .environmentObject(profileVM)
+                        .environmentObject(detailPlaceVM)
+                        .environmentObject(userSession)
+                        .environmentObject(selectedPlaceVM)
+                        .environmentObject(userProfileNavigationVM)
+                        .environmentObject(mapDisplayCoordinatorVM)
+                        .environmentObject(locationManager)
+                        .environmentObject(dataManager),
+                    isActive: $showFollowers
+                ) {
+                    EmptyView()
+                }
+
+                NavigationLink(
+                    destination: ProfileFollowingListView(viewModel: viewModel)
+                        .environmentObject(profileVM)
+                        .environmentObject(detailPlaceVM)
+                        .environmentObject(userSession)
+                        .environmentObject(selectedPlaceVM)
+                        .environmentObject(userProfileNavigationVM)
+                        .environmentObject(mapDisplayCoordinatorVM)
+                        .environmentObject(locationManager)
+                        .environmentObject(dataManager),
+                    isActive: $showFollowing
+                ) {
+                    EmptyView()
+                }
+            }
+        )
         .alert("Follow Error", isPresented: $viewModel.showFollowError) {
             Button("OK") {
                 viewModel.showFollowError = false
@@ -76,12 +121,15 @@ struct ExternalUserProfileContentView: View {
         } message: {
             Text(viewModel.followErrorMessage)
         }
-        .alert("Follow Error", isPresented: $profileVM.showFollowError) {
+        .alert("Follow Error", isPresented: Binding(
+            get: { profileVM.socialViewModel.showFollowError },
+            set: { profileVM.socialViewModel.showFollowError = $0 }
+        )) {
             Button("OK") {
-                profileVM.showFollowError = false
+                profileVM.socialViewModel.showFollowError = false
             }
         } message: {
-            Text(profileVM.followErrorMessage)
+            Text(profileVM.socialViewModel.followErrorMessage)
         }
     }
 }

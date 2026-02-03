@@ -32,7 +32,10 @@ struct DetailPlace: Codable, Identifiable, Equatable {
     var photoUrls: [String]? = []
     var menuUrl: String?
     var websiteUrl: String?
-    
+
+    // AI suggestion field - explains why AI recommended this place
+    var aiSuggestionReason: String?
+
     // Backend-specific fields (ignored by iOS but needed for decoding)
     var googlePlaceId: String?
     var source: String?
@@ -51,7 +54,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         case phone
         case rating
         case userRatingsTotal = "user_ratings_total"
-        case ratingCount  // Firestore uses "ratingCount"
+        case ratingCount  // Legacy field name "ratingCount"
         case openHours
         case description
         case priceLevel
@@ -65,12 +68,13 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         case menuUrl = "menu_url"
         case websiteUrl = "website"
         case googlePlaceId = "google_place_id"
-        case googlePlacesId  // Firestore uses "googlePlacesId" (with 's')
+        case googlePlacesId  // Legacy field name "googlePlacesId" (with 's')
         case source
         case createdAt = "created_at"
         case photoUrls
-        case thumbnailUrl  // Firestore uses "thumbnailUrl"
+        case thumbnailUrl  // Legacy field name "thumbnailUrl"
         case isCustom = "is_custom"
+        case aiSuggestionReason
     }
     
     // Custom decoding to handle backend's coordinates format
@@ -107,6 +111,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         self.source = nil
         self.createdAt = nil
         self.isCustom = nil
+        self.aiSuggestionReason = nil
 
         // Now decode all the optional properties
         try decodeBasicProperties(from: container)
@@ -123,7 +128,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         self.phone = try container.decodeIfPresent(String.self, forKey: .phone)
         self.rating = try container.decodeIfPresent(Double.self, forKey: .rating)
         
-        // Try both field names for rating count (backend uses user_ratings_total, Firestore uses ratingCount)
+        // Try both field names for rating count (backend uses user_ratings_total, legacy uses ratingCount)
         self.userRatingsTotal = try container.decodeIfPresent(Int.self, forKey: .userRatingsTotal) 
             ?? container.decodeIfPresent(Int.self, forKey: .ratingCount)
     }
@@ -132,7 +137,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         // Try to decode openHours as array of strings first (backend format)
         self.openHours = try? container.decodeIfPresent([String].self, forKey: .openHours)
         
-        // If that fails, try to decode as array of objects (Firestore format)
+        // If that fails, try to decode as array of objects (legacy format)
         if self.openHours == nil {
             if let openHoursObjects = try? container.decodeIfPresent([[String: String]].self, forKey: .openHours) {
                 // Convert from [{ day: "Monday", hours: "11 AM–11 PM" }] to ["Monday: 11 AM–11 PM"]
@@ -158,11 +163,11 @@ struct DetailPlace: Codable, Identifiable, Equatable {
     private mutating func decodeTikTokProperties(from container: KeyedDecodingContainer<CodingKeys>) throws {
         self.tikTokVideos = try container.decodeIfPresent([TikTokVideo].self, forKey: .tikTokVideos)
         
-        // Try both field names for Google Place ID (backend uses google_place_id, Firestore uses googlePlacesId)
+        // Try both field names for Google Place ID (backend uses google_place_id, legacy uses googlePlacesId)
         let googlePlaceIdBackend = try container.decodeIfPresent(String.self, forKey: .googlePlaceId)
-        let googlePlaceIdFirestore = try container.decodeIfPresent(String.self, forKey: .googlePlacesId)
-        
-        self.googlePlaceId = googlePlaceIdBackend ?? googlePlaceIdFirestore
+        let googlePlaceIdLegacy = try container.decodeIfPresent(String.self, forKey: .googlePlacesId)
+
+        self.googlePlaceId = googlePlaceIdBackend ?? googlePlaceIdLegacy
         
         self.source = try container.decodeIfPresent(String.self, forKey: .source)
         
@@ -185,6 +190,9 @@ struct DetailPlace: Codable, Identifiable, Equatable {
                 self.photoUrls = [thumbnailUrl]
             }
         }
+
+        // Decode AI suggestion reason (from AI search endpoint)
+        self.aiSuggestionReason = try container.decodeIfPresent(String.self, forKey: .aiSuggestionReason)
     }
     
     private static func decodeID(from container: KeyedDecodingContainer<CodingKeys>) throws -> UUID {
@@ -243,6 +251,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         try container.encodeIfPresent(createdAt, forKey: .createdAt)
         try container.encodeIfPresent(photoUrls, forKey: .photoUrls)
         try container.encodeIfPresent(isCustom, forKey: .isCustom)
+        try container.encodeIfPresent(aiSuggestionReason, forKey: .aiSuggestionReason)
     }
 
     // Existing initializers unchanged
@@ -273,6 +282,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         self.source = nil
         self.createdAt = nil
         self.isCustom = nil
+        self.aiSuggestionReason = nil
     }
 
     init(place: Place) {
@@ -302,6 +312,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         self.source = nil
         self.createdAt = nil
         self.isCustom = nil
+        self.aiSuggestionReason = nil
     }
 
     init(id: UUID, name: String, address: String?, city: String?) {
@@ -332,6 +343,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         self.source = nil
         self.createdAt = nil
         self.isCustom = nil
+        self.aiSuggestionReason = nil
     }
 
     // Removed MapboxSearch SearchResult initializer - now using Google Places API

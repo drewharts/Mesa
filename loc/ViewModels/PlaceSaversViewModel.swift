@@ -8,7 +8,7 @@
 //  Data Flow:
 //  1. setPlace() is called when PlaceDetailView appears
 //  2. Fetches savers from database in real-time (not relying on pre-loaded data)
-//  3. Updates placeSavers dictionary in DetailPlaceViewModel for consistency
+//  3. Exposes savers via @Published properties
 //  4. UI reacts to @Published property changes
 //
 
@@ -31,33 +31,32 @@ class PlaceSaversViewModel: ObservableObject {
     var savers: [ProfileData] {
         followedSavers + unfollowedSavers
     }
-    
-    // MARK: - Dependencies (Services, not other ViewModels)
+
+    // MARK: - Dependencies (Services only)
     private let userService: UserService
-    private let detailPlaceViewModel: DetailPlaceViewModel
     private let userSession: UserSession
-    
+
+    /// Callback for when savers are updated - allows parent to sync with DetailPlaceViewModel if needed
+    var onSaversUpdated: ((_ placeId: String, _ saverIds: [String]) -> Void)?
+
     // For user navigation (temporary coupling during migration)
-    private weak var userProfileViewModel: UserProfileViewModel?
-    
-    private var cancellables = Set<AnyCancellable>()
+    private weak var userProfileNavigationViewModel: UserProfileNavigationViewModel?
+
     private var currentPlaceId: String?
     private var fetchTask: Task<Void, Never>?
-    
+
     // MARK: - Initialization
     init(userService: UserService,
-         detailPlaceViewModel: DetailPlaceViewModel,
          userSession: UserSession) {
         self.userService = userService
-        self.detailPlaceViewModel = detailPlaceViewModel
         self.userSession = userSession
     }
     
     // MARK: - Configuration
     
-    /// Call this to set up the UserProfileViewModel reference for navigation
-    func configure(userProfileViewModel: UserProfileViewModel) {
-        self.userProfileViewModel = userProfileViewModel
+    /// Call this to set up the UserProfileNavigationViewModel reference for navigation
+    func configure(userProfileNavigationViewModel: UserProfileNavigationViewModel) {
+        self.userProfileNavigationViewModel = userProfileNavigationViewModel
     }
     
     // MARK: - Public Actions
@@ -83,7 +82,7 @@ class PlaceSaversViewModel: ObservableObject {
     /// Takes dismiss closure from View (View owns presentation state)
     func selectUser(_ user: ProfileData, dismiss: @escaping () -> Void) {
         guard let currentUserId = userSession.currentUserId,
-              let userProfileVM = userProfileViewModel else { return }
+              let userProfileNavVM = userProfileNavigationViewModel else { return }
 
         // Dismiss sheet first (View handles this)
         dismiss()
@@ -91,7 +90,7 @@ class PlaceSaversViewModel: ObservableObject {
         // Navigate after brief delay for smooth transition
         // Pass fromPlaceDetail: true so state can be restored when returning
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            userProfileVM.selectUser(user, currentUserId: currentUserId, fromPlaceDetail: true)
+            userProfileNavVM.selectUser(user, currentUserId: currentUserId, fromPlaceDetail: true)
         }
     }
     
@@ -192,10 +191,10 @@ class PlaceSaversViewModel: ObservableObject {
                 self.totalGlobalSaveCount = saverProfiles.count  // Now we have all savers
                 self.currentUserSaved = userSaved
 
-                // Update detailPlaceViewModel.placeSavers for consistency with map annotations
+                // Notify parent of savers update (for consistency with map annotations)
                 let saverIds = saverProfiles.map { $0.userId }
                 if !saverIds.isEmpty {
-                    self.detailPlaceViewModel.placeSavers[placeId] = saverIds
+                    self.onSaversUpdated?(placeId, saverIds)
                 }
 
                 self.error = nil

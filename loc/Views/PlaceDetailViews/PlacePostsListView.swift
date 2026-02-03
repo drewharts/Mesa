@@ -13,7 +13,7 @@ struct PlacePostsListView: View {
     let onPhotoTapped: ([UIImage], Int) -> Void
     let scrollProxy: ScrollViewProxy
     
-    @EnvironmentObject var userProfileViewModel: UserProfileViewModel
+    @EnvironmentObject var userProfileNavigationVM: UserProfileNavigationViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var userSession: UserSession
     

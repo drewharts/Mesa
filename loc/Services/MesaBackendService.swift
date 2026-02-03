@@ -130,13 +130,44 @@ struct MesaPlaceResult: PlaceResult {
     let additional_data: [String: String]
 }
 
+// MARK: - Mesa Backend Errors
+
+/// Errors that can occur when calling the Mesa backend.
+enum MesaBackendError: Error, LocalizedError {
+    case invalidURL
+    case invalidResponse
+    case invalidJSON
+    case invalidPlaceId
+    case serverError(statusCode: Int)
+    case noData
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidURL:
+            return "Invalid URL"
+        case .invalidResponse:
+            return "Invalid server response"
+        case .invalidJSON:
+            return "Invalid JSON structure"
+        case .invalidPlaceId:
+            return "Invalid place ID from backend"
+        case .serverError(let statusCode):
+            return "Server returned status code \(statusCode)"
+        case .noData:
+            return "No data received"
+        }
+    }
+}
+
 // MARK: - Mesa Backend Service
 
 /// Service class for the Mesa backend API
 class MesaBackendService {
+    static let shared = MesaBackendService()
+
     private let baseURL = "https://mesa-backend-staging.up.railway.app"
     private let session: URLSession
-    
+
     init() {
         // Create custom URLSession configuration to avoid connection pooling issues
         let configuration = URLSessionConfiguration.default
@@ -147,34 +178,86 @@ class MesaBackendService {
         configuration.waitsForConnectivity = true
         self.session = URLSession(configuration: configuration)
     }
-    
-    /// Fetch place suggestions from Mesa backend
-    func fetchSuggestions(
-        query: String,
-        limit: Int = 5,
-        provider: String = "google",
-        latitude: Double? = nil,
-        longitude: Double? = nil,
-        completion: @escaping (Result<[MesaPlaceSuggestion], Error>) -> Void
-    ) {
-        guard !query.isEmpty else {
-            completion(.success([]))
-            return
+
+    // MARK: - Async/Await API
+
+    /// Fetches place details using async/await - preferred method.
+    /// Backend checks Supabase cache first, then falls back to external APIs.
+    func fetchPlaceDetails(placeId: String, source: String = "google") async throws -> DetailPlace {
+        guard var urlComponents = URLComponents(string: "\(baseURL)/search/place-details") else {
+            throw MesaBackendError.invalidURL
         }
+
+        urlComponents.queryItems = [
+            URLQueryItem(name: "place_id", value: placeId),
+            URLQueryItem(name: "provider", value: source)
+        ]
+
+        guard let url = urlComponents.url else {
+            throw MesaBackendError.invalidURL
+        }
+
+        let (data, response) = try await session.data(from: url)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw MesaBackendError.invalidResponse
+        }
+
+        guard (200...299).contains(httpResponse.statusCode) else {
+            throw MesaBackendError.serverError(statusCode: httpResponse.statusCode)
+        }
+
+        return try parsePlaceDetailsResponse(data: data)
+    }
+
+    /// Fetches AI-powered place suggestions using async/await.
+    func fetchAISuggestions(query: String, latitude: Double, longitude: Double, limit: Int = 5) async throws -> [DetailPlace] {
+        guard !query.isEmpty else { return [] }
+
+        guard let url = URL(string: "\(baseURL)/search/ai-suggestions") else {
+            throw MesaBackendError.invalidURL
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let body: [String: Any] = [
+            "text": query,
+            "latitude": latitude,
+            "longitude": longitude,
+            "limit": limit
+        ]
+
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (data, response) = try await session.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw MesaBackendError.invalidResponse
+        }
+
+        guard (200...299).contains(httpResponse.statusCode) else {
+            throw MesaBackendError.serverError(statusCode: httpResponse.statusCode)
+        }
+
+        return try parseAISuggestionsResponse(data: data)
+    }
+
+    /// Fetches place suggestions using async/await.
+    func fetchSuggestions(query: String, limit: Int = 5, provider: String = "google", latitude: Double? = nil, longitude: Double? = nil) async throws -> [MesaPlaceSuggestion] {
+        guard !query.isEmpty else { return [] }
 
         guard var urlComponents = URLComponents(string: "\(baseURL)/search/suggestions") else {
-            completion(.failure(NSError(domain: "MesaBackend", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"])))
-            return
+            throw MesaBackendError.invalidURL
         }
 
-        // Add query parameters
         var queryItems = [
             URLQueryItem(name: "query", value: query),
             URLQueryItem(name: "limit", value: String(limit)),
             URLQueryItem(name: "provider", value: provider)
         ]
 
-        // Add location parameters if provided
         if let latitude = latitude {
             queryItems.append(URLQueryItem(name: "latitude", value: String(latitude)))
         }
@@ -183,153 +266,258 @@ class MesaBackendService {
         }
 
         urlComponents.queryItems = queryItems
-        
+
         guard let url = urlComponents.url else {
-            completion(.failure(NSError(domain: "MesaBackend", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"])))
-            return
+            throw MesaBackendError.invalidURL
         }
-        
-        let task = session.dataTask(with: url) { data, response, error in
-            if let error = error {
-                completion(.failure(error))
-                return
-            }
-            
-            guard let httpResponse = response as? HTTPURLResponse else {
-                completion(.failure(NSError(domain: "MesaBackend", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid server response"])))
-                return
-            }
-            
-            guard (200...299).contains(httpResponse.statusCode) else {
-                completion(.failure(NSError(domain: "MesaBackend", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: "Server returned status code \(httpResponse.statusCode)"])))
-                return
-            }
-            
-            guard let data = data else {
-                completion(.failure(NSError(domain: "MesaBackend", code: -1, userInfo: [NSLocalizedDescriptionKey: "No data received"])))
-                return
-            }
-            
+
+        let (data, response) = try await session.data(from: url)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw MesaBackendError.invalidResponse
+        }
+
+        guard (200...299).contains(httpResponse.statusCode) else {
+            throw MesaBackendError.serverError(statusCode: httpResponse.statusCode)
+        }
+
+        let suggestionsResponse = try JSONDecoder().decode(MesaSuggestionsResponse.self, from: data)
+
+        return suggestionsResponse.suggestions.map { suggestion in
+            MesaPlaceSuggestion(
+                id: suggestion.id,
+                name: suggestion.name,
+                address: suggestion.address,
+                coordinate: CLLocationCoordinate2D(
+                    latitude: suggestion.location.latitude,
+                    longitude: suggestion.location.longitude
+                ),
+                source: suggestion.source
+            )
+        }
+    }
+
+    // MARK: - Response Parsing
+
+    /// Parses place details response from backend.
+    private func parsePlaceDetailsResponse(data: Data) throws -> DetailPlace {
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let placeDict = json["place"] as? [String: Any] else {
+            throw MesaBackendError.invalidJSON
+        }
+
+        guard let idString = placeDict["id"] as? String,
+              let placeId = UUID(uuidString: idString) else {
+            throw MesaBackendError.invalidPlaceId
+        }
+
+        var detailPlace = DetailPlace()
+        detailPlace.id = placeId
+        detailPlace.name = placeDict["name"] as? String ?? ""
+        detailPlace.address = placeDict["address"] as? String
+        detailPlace.city = placeDict["city"] as? String
+        detailPlace.description = placeDict["description"] as? String
+        detailPlace.mapboxId = placeDict["mapboxId"] as? String
+        detailPlace.categories = placeDict["categories"] as? [String]
+        detailPlace.openHours = placeDict["openHours"] as? [String]
+        detailPlace.phone = placeDict["phone"] as? String
+        detailPlace.priceLevel = placeDict["priceLevel"] as? String
+        detailPlace.rating = placeDict["rating"] as? Double
+        detailPlace.userRatingsTotal = placeDict["ratingCount"] as? Int
+        detailPlace.reservable = placeDict["reservable"] as? Bool
+        detailPlace.servesBreakfast = placeDict["servesBreakfast"] as? Bool
+        detailPlace.serversLunch = placeDict["servesLunch"] as? Bool
+        detailPlace.serversDinner = placeDict["servesDinner"] as? Bool
+        detailPlace.Instagram = placeDict["instagram"] as? String
+        detailPlace.X = placeDict["twitter"] as? String
+        detailPlace.menuUrl = placeDict["menuUrl"] as? String
+        detailPlace.websiteUrl = placeDict["website"] as? String
+
+        // Extract thumbnail URL for photos
+        if let thumbnailUrl = placeDict["thumbnailUrl"] as? String {
+            detailPlace.photoUrls = [thumbnailUrl]
+        }
+
+        // Extract coordinates
+        let coordDict = placeDict["coordinate"] as? [String: Any] ?? placeDict["location"] as? [String: Any]
+        if let coordDict = coordDict,
+           let latitude = coordDict["latitude"] as? Double,
+           let longitude = coordDict["longitude"] as? Double {
+            detailPlace.coordinate = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+        }
+
+        return detailPlace
+    }
+    
+    // MARK: - Legacy Callback API (for backwards compatibility)
+
+    /// Fetch place suggestions from Mesa backend (callback version).
+    func fetchSuggestions(
+        query: String,
+        limit: Int = 5,
+        provider: String = "google",
+        latitude: Double? = nil,
+        longitude: Double? = nil,
+        completion: @escaping (Result<[MesaPlaceSuggestion], Error>) -> Void
+    ) {
+        Task {
             do {
-                let response = try JSONDecoder().decode(MesaSuggestionsResponse.self, from: data)
-                
-                let suggestions = response.suggestions.map { mesaSuggestion in
-                    return MesaPlaceSuggestion(
-                        id: mesaSuggestion.id,
-                        name: mesaSuggestion.name,
-                        address: mesaSuggestion.address,
-                        coordinate: CLLocationCoordinate2D(
-                            latitude: mesaSuggestion.location.latitude,
-                            longitude: mesaSuggestion.location.longitude
-                        ),
-                        source: mesaSuggestion.source
-                    )
-                }
-                
+                let suggestions = try await fetchSuggestions(
+                    query: query,
+                    limit: limit,
+                    provider: provider,
+                    latitude: latitude,
+                    longitude: longitude
+                )
                 completion(.success(suggestions))
             } catch {
                 completion(.failure(error))
             }
         }
-        
-        task.resume()
     }
 
-    /// Fetch place details from Mesa backend
+    /// Fetch place details from Mesa backend (callback version).
     func fetchPlaceDetails(
         placeId: String,
         source: String,
         completion: @escaping (Result<DetailPlace, Error>) -> Void
     ) {
-        guard var urlComponents = URLComponents(string: "\(baseURL)/search/place-details") else {
-            completion(.failure(NSError(domain: "MesaBackend", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"])))
-            return
-        }
-        
-        // Add query parameters
-        urlComponents.queryItems = [
-            URLQueryItem(name: "place_id", value: placeId),
-            URLQueryItem(name: "provider", value: source)
-        ]
-        
-        guard let url = urlComponents.url else {
-            completion(.failure(NSError(domain: "MesaBackend", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"])))
-            return
-        }
-        
-        let task = session.dataTask(with: url) { data, response, error in
-            if let error = error {
-                completion(.failure(error))
-                return
-            }
-            
-            guard let httpResponse = response as? HTTPURLResponse else {
-                completion(.failure(NSError(domain: "MesaBackend", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid server response"])))
-                return
-            }
-            
-            guard (200...299).contains(httpResponse.statusCode) else {
-                completion(.failure(NSError(domain: "MesaBackend", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: "Server returned status code \(httpResponse.statusCode)"])))
-                return
-            }
-            
-            guard let data = data else {
-                completion(.failure(NSError(domain: "MesaBackend", code: -1, userInfo: [NSLocalizedDescriptionKey: "No data received"])))
-                return
-            }
-            
+        Task {
             do {
-                // First parse the data into a dictionary
-                let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
-                
-                // Extract the "place" object
-                guard let placeDict = json?["place"] as? [String: Any] else {
-                    throw NSError(domain: "MesaBackend", code: -2, userInfo: [NSLocalizedDescriptionKey: "Invalid JSON structure"])
-                }
-                
-                // Create a DetailPlace object manually
-                var detailPlace = DetailPlace()
-                
-                // CRITICAL: Always use the backend's ID - never create a new one!
-                // Creating a new ID would orphan the place in the backend
-                guard let idString = placeDict["id"] as? String,
-                      let placeId = UUID(uuidString: idString) else {
-                    throw NSError(domain: "MesaBackend", code: -3, userInfo: [NSLocalizedDescriptionKey: "Invalid place ID from backend"])
-                }
-                detailPlace.id = placeId
-                detailPlace.name = placeDict["name"] as? String ?? ""
-                detailPlace.address = placeDict["address"] as? String
-                detailPlace.city = placeDict["city"] as? String
-                detailPlace.description = placeDict["description"] as? String
-                detailPlace.mapboxId = placeDict["mapboxId"] as? String
-                detailPlace.categories = placeDict["categories"] as? [String]
-                detailPlace.openHours = placeDict["openHours"] as? [String]
-                detailPlace.phone = placeDict["phone"] as? String
-                detailPlace.priceLevel = placeDict["priceLevel"] as? String
-                detailPlace.rating = placeDict["rating"] as? Double
-                detailPlace.userRatingsTotal = placeDict["ratingCount"] as? Int
-                detailPlace.reservable = placeDict["reservable"] as? Bool
-                detailPlace.servesBreakfast = placeDict["servesBreakfast"] as? Bool
-                detailPlace.serversLunch = placeDict["servesLunch"] as? Bool
-                detailPlace.serversDinner = placeDict["servesDinner"] as? Bool
-                detailPlace.Instagram = placeDict["instagram"] as? String
-                detailPlace.X = placeDict["twitter"] as? String
-                detailPlace.menuUrl = placeDict["menuUrl"] as? String
-                detailPlace.websiteUrl = placeDict["website"] as? String
-
-                // Manually extract coordinates and create CLLocationCoordinate2D
-                if let locationDict = placeDict["location"] as? [String: Any],
-                   let latitude = locationDict["latitude"] as? Double,
-                   let longitude = locationDict["longitude"] as? Double {
-                    detailPlace.coordinate = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
-                }
-                
-                completion(.success(detailPlace))
+                let place = try await fetchPlaceDetails(placeId: placeId, source: source)
+                completion(.success(place))
             } catch {
                 completion(.failure(error))
             }
         }
-        
-        task.resume()
+    }
+
+    /// Fetch AI-powered place suggestions from Mesa backend (callback version).
+    func fetchAISuggestions(
+        query: String,
+        latitude: Double,
+        longitude: Double,
+        limit: Int = 5,
+        completion: @escaping (Result<[DetailPlace], Error>) -> Void
+    ) {
+        Task {
+            do {
+                let places = try await fetchAISuggestions(
+                    query: query,
+                    latitude: latitude,
+                    longitude: longitude,
+                    limit: limit
+                )
+                completion(.success(places))
+            } catch {
+                completion(.failure(error))
+            }
+        }
+    }
+
+    // MARK: - Image Refresh API
+
+    /// Response model for image refresh endpoint.
+    struct ImageRefreshResponse: Codable {
+        let status: String
+        let reviews_queued: Int
+        let message: String?
+    }
+
+    /// Requests the backend to refresh stale external review images for a place.
+    /// Called when iOS detects 403 errors on Google CDN image URLs.
+    func requestImageRefresh(placeId: String, failedURLs: [String] = []) async throws -> Bool {
+        guard let url = URL(string: "\(baseURL)/search/refresh-review-images") else {
+            throw MesaBackendError.invalidURL
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let body: [String: Any] = [
+            "place_id": placeId,
+            "failed_urls": failedURLs
+        ]
+
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (data, response) = try await session.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw MesaBackendError.invalidResponse
+        }
+
+        // 429 = rate limited, treat as "no refresh needed right now"
+        if httpResponse.statusCode == 429 {
+            print("📸 [MesaBackendService] Image refresh rate limited for place \(placeId)")
+            return false
+        }
+
+        guard (200...299).contains(httpResponse.statusCode) else {
+            throw MesaBackendError.serverError(statusCode: httpResponse.statusCode)
+        }
+
+        let refreshResponse = try JSONDecoder().decode(ImageRefreshResponse.self, from: data)
+        let refreshInitiated = refreshResponse.status == "processing"
+
+        print("📸 [MesaBackendService] Image refresh response: \(refreshResponse.status), queued: \(refreshResponse.reviews_queued)")
+
+        return refreshInitiated
+    }
+
+    // MARK: - Private Response Parsing
+
+    /// Parses AI suggestions response into DetailPlace array.
+    private func parseAISuggestionsResponse(data: Data) throws -> [DetailPlace] {
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let suggestionsArray = json["suggestions"] as? [[String: Any]] else {
+            throw MesaBackendError.invalidJSON
+        }
+
+        return suggestionsArray.compactMap { suggestionDict -> DetailPlace? in
+            guard let idString = suggestionDict["id"] as? String,
+                  let placeId = UUID(uuidString: idString),
+                  let name = suggestionDict["name"] as? String else {
+                return nil
+            }
+
+            var detailPlace = DetailPlace()
+            detailPlace.id = placeId
+            detailPlace.name = name
+            detailPlace.address = suggestionDict["address"] as? String
+            detailPlace.city = suggestionDict["city"] as? String
+            detailPlace.description = suggestionDict["description"] as? String
+            detailPlace.mapboxId = suggestionDict["mapboxId"] as? String
+            detailPlace.categories = suggestionDict["categories"] as? [String]
+            detailPlace.openHours = suggestionDict["openHours"] as? [String]
+            detailPlace.phone = suggestionDict["phone"] as? String
+            detailPlace.priceLevel = suggestionDict["priceLevel"] as? String
+            detailPlace.rating = suggestionDict["rating"] as? Double
+            detailPlace.userRatingsTotal = suggestionDict["ratingCount"] as? Int
+            detailPlace.reservable = suggestionDict["reservable"] as? Bool
+            detailPlace.servesBreakfast = suggestionDict["servesBreakfast"] as? Bool
+            detailPlace.serversLunch = suggestionDict["servesLunch"] as? Bool
+            detailPlace.serversDinner = suggestionDict["servesDinner"] as? Bool
+            detailPlace.Instagram = suggestionDict["instagram"] as? String
+            detailPlace.X = suggestionDict["twitter"] as? String
+            detailPlace.menuUrl = suggestionDict["menuUrl"] as? String
+            detailPlace.websiteUrl = suggestionDict["website"] as? String
+            detailPlace.aiSuggestionReason = suggestionDict["aiSuggestionReason"] as? String
+
+            // Extract thumbnail URL for photos
+            if let thumbnailUrl = suggestionDict["thumbnailUrl"] as? String {
+                detailPlace.photoUrls = [thumbnailUrl]
+            }
+
+            // Extract coordinates
+            if let coordDict = suggestionDict["coordinate"] as? [String: Any],
+               let latitude = coordDict["latitude"] as? Double,
+               let longitude = coordDict["longitude"] as? Double {
+                detailPlace.coordinate = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+            }
+
+            return detailPlace
+        }
     }
 }

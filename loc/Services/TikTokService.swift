@@ -45,8 +45,8 @@ class TikTokService: ObservableObject {
         let request = await createRequest(url: requestURL, tikTokURL: url)
         
         do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-            
+            let (data, response) = try await NetworkSessionManager.shared.apiSession.data(for: request)
+
             if let error = validateResponse(response) {
                 print("❌ [TikTokService] Response validation failed")
                 return .failure(error)
@@ -144,12 +144,12 @@ class TikTokService: ObservableObject {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         
         do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-            
+            let (data, response) = try await NetworkSessionManager.shared.apiSession.data(for: request)
+
             guard let httpResponse = response as? HTTPURLResponse else {
                 return .failure(TikTokError.invalidResponse)
             }
-            
+
             guard httpResponse.statusCode == 200 else {
                 if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                    let errorMsg = json["error"] as? String {
@@ -158,16 +158,16 @@ class TikTokService: ObservableObject {
                 }
                 return .failure(TikTokError.serverError(httpResponse.statusCode))
             }
-            
+
             let oembedResponse = try JSONDecoder().decode(TikTokOEmbedResponse.self, from: data)
             return .success(oembedResponse)
-            
+
         } catch {
             print("❌ [TikTokService] oEmbed request failed: \(error.localizedDescription)")
             return .failure(error)
         }
     }
-    
+
     func refreshTikTokThumbnail(for url: String, userId: String?, externalPlaceId: String? = nil) async -> Result<String, Error> {
         guard let requestURL = URL(string: "\(baseURL)/refresh-thumbnail") else {
             return .failure(TikTokError.invalidURL)
@@ -192,12 +192,12 @@ class TikTokService: ObservableObject {
         request.httpBody = httpBody
         
         do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-            
+            let (data, _) = try await NetworkSessionManager.shared.apiSession.data(for: request)
+
             guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
                 return .failure(TikTokError.invalidResponse)
             }
-            
+
             if let thumbnailURL = json["thumbnailURL"] as? String {
                 return .success(thumbnailURL)
             } else if let errorMsg = json["error"] as? String {
@@ -209,7 +209,7 @@ class TikTokService: ObservableObject {
             return .failure(error)
         }
     }
-    
+
     private func createRequest(url: URL, tikTokURL: String) async -> URLRequest {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -416,7 +416,7 @@ class TikTokService: ObservableObject {
         return ""
     }
     
-    // NOTE: Frontend does NOT save to Firestore - backend handles all writes
+    // NOTE: Frontend does NOT save to database - backend handles all writes
     // Places are created/saved via backend API calls only
     
     private let foodCategories = [

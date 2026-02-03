@@ -129,9 +129,9 @@ class ImageService {
     
     /// Load image directly from URL (same approach as ProfileViewModel)
     private func loadImageFromURL(imageUrl: String) async -> UIImage? {
-        // Block Firebase Storage URLs (migrated to Supabase)
+        // Block legacy storage URLs that are no longer accessible
         if imageUrl.contains("firebasestorage.googleapis.com") {
-            print("🚫 [ImageService] Blocking Firebase Storage URL (migrated to Supabase): \(imageUrl)")
+            print("🚫 [ImageService] Blocking legacy storage URL: \(imageUrl)")
             return nil
         }
         

@@ -10,9 +10,12 @@ import PhotosUI
 
 struct ProfileContentView: View {
     @EnvironmentObject var profile: ProfileViewModel
+    @EnvironmentObject var userSession: UserSession
+    @EnvironmentObject var dataManager: DataManager
     @ObservedObject var photoImportVM: PhotoImportViewModel
     @Binding var navigationPath: NavigationPath
-    
+    @Environment(\.presentationMode) var presentationMode
+
     var body: some View {
         ZStack {
             ScrollView {
@@ -27,9 +30,34 @@ struct ProfileContentView: View {
                         .font(.title2)
                         .fontWeight(.bold)
                         .foregroundColor(.black)
-                    
+
                     // Follow Counts
-                    ProfileFollowCountsView(navigationPath: $navigationPath)
+                    ProfileFollowCountsView(
+                        data: .myProfile(
+                            followers: profile.socialViewModel.followersCount,
+                            following: profile.socialViewModel.followingCount,
+                            myPlaces: profile.myPlacesViewModel.myPlaces.count,
+                            isFollowersLoading: profile.socialViewModel.isFollowersLoading,
+                            isFollowingLoading: profile.socialViewModel.isFollowingLoading,
+                            isMyPlacesLoading: profile.myPlacesViewModel.isMyPlacesLoading
+                        ),
+                        onFollowersTap: {
+                            navigationPath.append(ProfileView.FollowListDestination.followers)
+                        },
+                        onFollowingTap: {
+                            navigationPath.append(ProfileView.FollowListDestination.following)
+                        },
+                        onMyPlacesTap: {
+                            profile.showMyPlacesOnMap = true
+                            presentationMode.wrappedValue.dismiss()
+                        }
+                    )
+                    .onAppear {
+                        let userId = userSession.currentUserId ?? ""
+                        Task.detached(priority: .userInitiated) { [dataManager] in
+                            await dataManager.loadProfileCounts(userId: userId)
+                        }
+                    }
 
                     Divider()
                         .padding(.top, 15)

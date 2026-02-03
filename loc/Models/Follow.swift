@@ -13,7 +13,7 @@ struct Follow: Codable, Identifiable {
     let followingId: String  // User being followed
     let followedAt: Date  // Timestamp when the follow happened
 
-    // Computed property for unique ID (Firestore document ID)
+    // Computed property for unique ID (document ID)
     var followId: String {
         return "\(followerId)_\(followingId)"
     }

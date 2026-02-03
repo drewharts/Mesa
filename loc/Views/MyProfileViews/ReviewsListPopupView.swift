@@ -3,7 +3,7 @@
 //  loc
 //
 //  Single Responsibility: Display paginated reviewed places in a popup grid
-//  MVVM: Delegates data loading and state to ProfileViewModel
+//  MVVM: Delegates data loading and state to ProfileReviewsViewModel
 //  DUMB Component: Uses PlaceListPopupView for consistent popup behavior
 
 import SwiftUI
@@ -13,18 +13,21 @@ struct ReviewsListPopupView: View {
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var mapViewModel: MapViewModel
 
+    /// Convenience accessor for reviews view model.
+    private var reviewsVM: ProfileReviewsViewModel { profile.reviewsViewModel }
+
     var body: some View {
         PlaceListPopupView(
             title: "Reviews",
-            count: profile.totalReviewedPlacesCount,
-            isLoading: profile.isLoadingReviewedPlaces,
-            isLoadingMore: profile.isLoadingMoreReviews,
-            places: profile.lightweightReviewedPlaces,
-            hasMore: profile.hasMoreReviews,
+            count: reviewsVM.totalReviewedPlacesCount,
+            isLoading: reviewsVM.isLoadingReviewedPlaces,
+            isLoadingMore: reviewsVM.isLoadingMoreReviews,
+            places: reviewsVM.lightweightReviewedPlaces,
+            hasMore: reviewsVM.hasMoreReviews,
             emptyIcon: "star.bubble",
             emptyTitle: "No Reviews Yet",
             emptyMessage: "Places you've reviewed will appear here",
-            loadMore: { await profile.loadMoreMyReviews() },
+            loadMore: { await reviewsVM.loadMoreMyReviews() },
             pendingPlaceNavigation: $mapViewModel.pendingPlaceNavigation,
             cardBuilder: { place, navigate in
                 PopupPlaceCard(

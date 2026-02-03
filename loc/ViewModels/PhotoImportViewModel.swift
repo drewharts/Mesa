@@ -241,7 +241,7 @@ class PhotoImportViewModel: ObservableObject {
         showPostCreation = true
     }
     
-    private func saveSelectedPlaceToFirestore(_ nearbyPlace: NearbyPlaceFeature) async {
+    private func saveSelectedPlaceToDatabase(_ nearbyPlace: NearbyPlaceFeature) async {
         guard let currentUserId = SupabaseAuthService.shared.currentUserId else {
             print("❌ No authenticated user found")
             return
@@ -307,14 +307,14 @@ class PhotoImportViewModel: ObservableObject {
             // Notify other components to refresh map annotations
             NotificationCenter.default.post(name: NSNotification.Name("RefreshMapAnnotations"), object: nil)
 
-            print("✅ Place '\(detailPlace.name)' successfully saved to Firestore")
+            print("✅ Place '\(detailPlace.name)' successfully saved to database")
 
             // Notify parent view that a place is successfully saved
             onPlaceSaved?()
             onPlaceSavedWithDetail?(detailPlace)
 
         } catch {
-            print("❌ Failed to save place to Firestore: \(error.localizedDescription)")
+            print("❌ Failed to save place to database: \(error.localizedDescription)")
         }
 
         isSavingPlace = false
@@ -352,6 +352,7 @@ class PhotoImportViewModel: ObservableObject {
             longitude: nearbyPlace.geometry.longitude
         )
         detailPlace.rating = nearbyPlace.properties.rating
+        detailPlace.userRatingsTotal = nearbyPlace.properties.userRatingsTotal
         detailPlace.categories = nearbyPlace.properties.types
         detailPlace.description = nearbyPlace.properties.description
 
@@ -390,7 +391,7 @@ class PhotoImportViewModel: ObservableObject {
         showPlaceSelection = false
     }
     
-    // Called when a review is submitted to save the place to Firestore
+    /// Saves the selected place to the database after a review is submitted.
     func saveSelectedPlaceAfterReview() async {
         guard let place = resolvedPlace else {
             print("❌ No resolved place to save")

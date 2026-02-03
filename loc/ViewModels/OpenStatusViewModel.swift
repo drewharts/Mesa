@@ -4,7 +4,7 @@
 //
 //  Created by Cursor on 12/14/24.
 //  ViewModel for managing place open/closed status display.
-//  Single Responsibility: Observes place changes and provides status for UI.
+//  Single Responsibility: Receives place data and provides status for UI.
 //
 
 import Foundation
@@ -12,41 +12,33 @@ import Combine
 
 @MainActor
 class OpenStatusViewModel: ObservableObject {
-    
+
     // MARK: - Published Properties
-    
+
     @Published private(set) var status: OpenStatus = .unknown
     @Published private(set) var displayText: String = ""
     @Published private(set) var isOpen: Bool = false
     @Published private(set) var shouldDisplay: Bool = false
-    
-    // MARK: - Dependencies
-    
-    private let selectedPlaceVM: SelectedPlaceViewModel
-    private var cancellables = Set<AnyCancellable>()
+
+    // MARK: - Private Properties
+
+    private var currentPlace: DetailPlace?
     private var refreshTimer: Timer?
-    
+
     // MARK: - Initialization
-    
-    init(selectedPlaceVM: SelectedPlaceViewModel) {
-        self.selectedPlaceVM = selectedPlaceVM
-        setupObservers()
-    }
-    
+
+    init() {}
+
     deinit {
         refreshTimer?.invalidate()
     }
-    
-    // MARK: - Setup
-    
-    private func setupObservers() {
-        // Observe selected place changes
-        selectedPlaceVM.$selectedPlace
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] place in
-                self?.updateStatus(for: place)
-            }
-            .store(in: &cancellables)
+
+    // MARK: - Public Methods
+
+    /// Sets the current place and updates the open status
+    func setPlace(_ place: DetailPlace?) {
+        currentPlace = place
+        updateStatus(for: place)
     }
     
     // MARK: - Status Updates
@@ -89,7 +81,7 @@ class OpenStatusViewModel: ObservableObject {
             refreshTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
                 Task { @MainActor [weak self] in
                     guard let self = self,
-                          let place = self.selectedPlaceVM.selectedPlace else { return }
+                          let place = self.currentPlace else { return }
                     self.updateStatus(for: place)
                 }
             }
@@ -97,11 +89,11 @@ class OpenStatusViewModel: ObservableObject {
             break
         }
     }
-    
+
     // MARK: - Manual Refresh
-    
+
     /// Force refresh the open status (useful for pull-to-refresh scenarios)
     func refresh() {
-        updateStatus(for: selectedPlaceVM.selectedPlace)
+        updateStatus(for: currentPlace)
     }
 }

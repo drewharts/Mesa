@@ -17,14 +17,14 @@ struct MapContainerView: View {
 
     @Binding var mapPosition: MapCameraPosition
     @Binding var recenterMap: Bool
-    @Binding var isSearchExpanded: Bool
     @Binding var isCreatePlacePopupActive: Bool
 
     let selectedPlaceViewModel: SelectedPlaceViewModel
     let detailPlaceViewModel: DetailPlaceViewModel
     let profileViewModel: ProfileViewModel
     let dataManager: DataManager
-    let userProfileViewModel: UserProfileViewModel
+    let userProfileNavigationViewModel: UserProfileNavigationViewModel
+    let mapDisplayCoordinatorViewModel: MapDisplayCoordinatorViewModel
     let serviceContainer: ServiceContainer
     let notificationManager: NotificationManager
     let onMapTap: () -> Void
@@ -32,27 +32,27 @@ struct MapContainerView: View {
     init(
         mapPosition: Binding<MapCameraPosition>,
         recenterMap: Binding<Bool>,
-        isSearchExpanded: Binding<Bool>,
         isCreatePlacePopupActive: Binding<Bool>,
         selectedPlaceViewModel: SelectedPlaceViewModel,
         detailPlaceViewModel: DetailPlaceViewModel,
         placeService: PlaceService,
         profileViewModel: ProfileViewModel,
         dataManager: DataManager,
-        userProfileViewModel: UserProfileViewModel,
+        userProfileNavigationViewModel: UserProfileNavigationViewModel,
+        mapDisplayCoordinatorViewModel: MapDisplayCoordinatorViewModel,
         serviceContainer: ServiceContainer,
         notificationManager: NotificationManager,
         onMapTap: @escaping () -> Void
     ) {
         self._mapPosition = mapPosition
         self._recenterMap = recenterMap
-        self._isSearchExpanded = isSearchExpanded
         self._isCreatePlacePopupActive = isCreatePlacePopupActive
         self.selectedPlaceViewModel = selectedPlaceViewModel
         self.detailPlaceViewModel = detailPlaceViewModel
         self.profileViewModel = profileViewModel
         self.dataManager = dataManager
-        self.userProfileViewModel = userProfileViewModel
+        self.userProfileNavigationViewModel = userProfileNavigationViewModel
+        self.mapDisplayCoordinatorViewModel = mapDisplayCoordinatorViewModel
         self.serviceContainer = serviceContainer
         self.notificationManager = notificationManager
         self.onMapTap = onMapTap
@@ -73,7 +73,7 @@ struct MapContainerView: View {
             .ignoresSafeArea()
             .edgesIgnoringSafeArea(.all)
             .modifier(ExternalProfileOnChangeModifiers(
-                userProfileViewModel: userProfileViewModel,
+                mapDisplayCoordinatorViewModel: mapDisplayCoordinatorViewModel,
                 selectedPlaceViewModel: selectedPlaceViewModel,
                 mapViewModel: mapViewModel,
                 appCoordinator: appCoordinator,
@@ -82,7 +82,7 @@ struct MapContainerView: View {
             ))
             .modifier(SheetOnChangeModifiers(
                 selectedPlaceViewModel: selectedPlaceViewModel,
-                userProfileViewModel: userProfileViewModel,
+                userProfileNavigationViewModel: userProfileNavigationViewModel,
                 mapViewModel: mapViewModel,
                 appCoordinator: appCoordinator,
                 userSession: userSession
@@ -100,7 +100,6 @@ struct MapContainerView: View {
             MapView(
                 recenterMap: $recenterMap,
                 mapPosition: $mapPosition,
-                isSearchBarMinimized: !isSearchExpanded,
                 isCreatePlacePopupActive: $isCreatePlacePopupActive,
                 onMapTap: onMapTap
             )
@@ -131,9 +130,9 @@ struct MapContainerView: View {
     /// Handles list selection changes from ProfileViewModel
     private func handleListSelectionChange(_ newValue: String?) {
         if let listId = newValue {
-            mapViewModel.selectList(listId, availableLists: profileViewModel.lightweightPlaceLists)
+            mapViewModel.selectList(listId, availableLists: profileViewModel.listsViewModel.lightweightPlaceLists)
 
-            if let listCenter = profileViewModel.lightweightPlaceLists
+            if let listCenter = profileViewModel.listsViewModel.lightweightPlaceLists
                 .first(where: { $0.list_id == listId })?.averageLocation {
                 mapPosition = .region(MKCoordinateRegion(
                     center: listCenter,
@@ -249,13 +248,19 @@ struct MapContainerView: View {
                 MyPlacesListView()
 
             case .externalReviews:
-                ExternalReviewsListPopupView(userProfileVM: userProfileViewModel)
+                ExternalReviewsListPopupView(
+                    mapDisplayCoordinatorVM: mapDisplayCoordinatorViewModel,
+                    userProfileNavigationVM: userProfileNavigationViewModel
+                )
 
             case .externalList(let listId):
                 externalListSheetContent(listId: listId)
 
             case .externalFavorites:
-                ExternalFavoritesListPopupView(userProfileVM: userProfileViewModel)
+                ExternalFavoritesListPopupView(
+                    mapDisplayCoordinatorVM: mapDisplayCoordinatorViewModel,
+                    userProfileNavigationVM: userProfileNavigationViewModel
+                )
 
             case .keywordResults(let keyword, let types):
                 KeywordResultsPopupView(keyword: keyword, types: types)
@@ -268,7 +273,8 @@ struct MapContainerView: View {
         .environmentObject(dataManager)
         .environmentObject(locationManager)
         .environmentObject(userSession)
-        .environmentObject(userProfileViewModel)
+        .environmentObject(userProfileNavigationViewModel)
+        .environmentObject(mapDisplayCoordinatorViewModel)
         .environmentObject(serviceContainer)
         .environmentObject(notificationManager)
         .presentationDetents([.height(300), .height(800)])
@@ -283,9 +289,9 @@ struct MapContainerView: View {
     /// Builds content for list sheet
     @ViewBuilder
     private func listSheetContent(listId: String) -> some View {
-        if let listIndex = profileViewModel.lightweightPlaceLists.firstIndex(where: { $0.id == listId }) {
+        if let listIndex = profileViewModel.listsViewModel.lightweightPlaceLists.firstIndex(where: { $0.id == listId }) {
             LightweightListPopupView(
-                lists: profileViewModel.lightweightPlaceLists,
+                lists: profileViewModel.listsViewModel.lightweightPlaceLists,
                 initialListIndex: listIndex
             )
             .id(listId)
@@ -297,13 +303,14 @@ struct MapContainerView: View {
     /// Builds content for external list sheet
     @ViewBuilder
     private func externalListSheetContent(listId: String) -> some View {
-        if let listIndex = userProfileViewModel.mapDisplayLists.firstIndex(where: { $0.list_id == listId }) {
-            ExternalUserLightweightListPopupView(
-                viewModel: userProfileViewModel,
-                lists: userProfileViewModel.mapDisplayLists,
+        if let listIndex = mapDisplayCoordinatorViewModel.mapDisplayLists.firstIndex(where: { $0.list_id == listId }) {
+            let popupViewModel = ExternalListPopupViewModel(
+                lists: mapDisplayCoordinatorViewModel.mapDisplayLists,
                 initialListIndex: listIndex,
-                placeColors: .constant([:]),
-                useMapDisplayPlaces: true,
+                preloadedPlaces: mapDisplayCoordinatorViewModel.mapDisplayListPlaces
+            )
+            ExternalUserLightweightListPopupView(
+                viewModel: popupViewModel,
                 showBackToProfileButton: true,
                 mapViewModel: mapViewModel
             )
@@ -344,7 +351,7 @@ struct MapContainerView: View {
 
 /// Extracted view modifier for external profile onChange handlers
 private struct ExternalProfileOnChangeModifiers: ViewModifier {
-    let userProfileViewModel: UserProfileViewModel
+    @ObservedObject var mapDisplayCoordinatorViewModel: MapDisplayCoordinatorViewModel
     let selectedPlaceViewModel: SelectedPlaceViewModel
     let mapViewModel: MapViewModel
     let appCoordinator: AppCoordinator
@@ -353,26 +360,26 @@ private struct ExternalProfileOnChangeModifiers: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .onChange(of: userProfileViewModel.showExternalReviewsOnMap) { _, shouldShow in
+            .onChange(of: mapDisplayCoordinatorViewModel.showExternalReviewsOnMap) { _, shouldShow in
                 handleExternalReviewsOnMap(shouldShow)
             }
-            .onChange(of: userProfileViewModel.showExternalListOnMap) { _, listId in
+            .onChange(of: mapDisplayCoordinatorViewModel.showExternalListOnMap) { _, listId in
                 handleExternalListOnMap(listId)
             }
-            .onChange(of: userProfileViewModel.showExternalFavoritesOnMap) { _, shouldShow in
+            .onChange(of: mapDisplayCoordinatorViewModel.showExternalFavoritesOnMap) { _, shouldShow in
                 handleExternalFavoritesOnMap(shouldShow)
             }
     }
 
     /// Handles external reviews on map
     private func handleExternalReviewsOnMap(_ shouldShow: Bool) {
-        if shouldShow, let userId = userProfileViewModel.mapDisplayUserId {
+        if shouldShow, let userId = mapDisplayCoordinatorViewModel.mapDisplayUserId {
             // Dismiss any competing sheets and present the external reviews sheet
             selectedPlaceViewModel.selectedPlace = nil
             selectedPlaceViewModel.isDetailSheetPresented = false
-            userProfileViewModel.showExternalReviewsOnMap = false
+            mapDisplayCoordinatorViewModel.showExternalReviewsOnMap = false
 
-            let photoUrl = userProfileViewModel.mapDisplayUserPhotoUrl.flatMap { URL(string: $0) }
+            let photoUrl = mapDisplayCoordinatorViewModel.mapDisplayUserPhotoUrl.flatMap { URL(string: $0) }
             mapViewModel.selectExternalReviews(userId: userId, userPhotoUrl: photoUrl)
 
             if let currentUserId = userSession.currentUserId {
@@ -388,16 +395,16 @@ private struct ExternalProfileOnChangeModifiers: ViewModifier {
 
     /// Handles external list on map
     private func handleExternalListOnMap(_ listId: String?) {
-        if let listId = listId, let userId = userProfileViewModel.mapDisplayUserId {
+        if let listId = listId, let userId = mapDisplayCoordinatorViewModel.mapDisplayUserId {
             // Dismiss any competing sheets and present the external list sheet
             selectedPlaceViewModel.selectedPlace = nil
             selectedPlaceViewModel.isDetailSheetPresented = false
-            userProfileViewModel.showExternalListOnMap = nil
+            mapDisplayCoordinatorViewModel.showExternalListOnMap = nil
 
-            let photoUrl = userProfileViewModel.mapDisplayUserPhotoUrl.flatMap { URL(string: $0) }
+            let photoUrl = mapDisplayCoordinatorViewModel.mapDisplayUserPhotoUrl.flatMap { URL(string: $0) }
             mapViewModel.selectExternalList(listId: listId, userId: userId, userPhotoUrl: photoUrl)
 
-            if let listCenter = userProfileViewModel.mapDisplayLists
+            if let listCenter = mapDisplayCoordinatorViewModel.mapDisplayLists
                 .first(where: { $0.list_id == listId })?.averageLocation {
                 mapPosition = .region(MKCoordinateRegion(
                     center: listCenter,
@@ -418,13 +425,13 @@ private struct ExternalProfileOnChangeModifiers: ViewModifier {
 
     /// Handles external favorites on map
     private func handleExternalFavoritesOnMap(_ shouldShow: Bool) {
-        if shouldShow, let userId = userProfileViewModel.mapDisplayUserId {
+        if shouldShow, let userId = mapDisplayCoordinatorViewModel.mapDisplayUserId {
             // Dismiss any competing sheets and present the external favorites sheet
             selectedPlaceViewModel.selectedPlace = nil
             selectedPlaceViewModel.isDetailSheetPresented = false
-            userProfileViewModel.showExternalFavoritesOnMap = false
+            mapDisplayCoordinatorViewModel.showExternalFavoritesOnMap = false
 
-            let photoUrl = userProfileViewModel.mapDisplayUserPhotoUrl.flatMap { URL(string: $0) }
+            let photoUrl = mapDisplayCoordinatorViewModel.mapDisplayUserPhotoUrl.flatMap { URL(string: $0) }
             mapViewModel.selectExternalFavorites(userId: userId, userPhotoUrl: photoUrl)
 
             if let currentUserId = userSession.currentUserId {
@@ -444,7 +451,7 @@ private struct ExternalProfileOnChangeModifiers: ViewModifier {
 /// Extracted view modifier for sheet-related onChange handlers
 private struct SheetOnChangeModifiers: ViewModifier {
     let selectedPlaceViewModel: SelectedPlaceViewModel
-    let userProfileViewModel: UserProfileViewModel
+    @ObservedObject var userProfileNavigationViewModel: UserProfileNavigationViewModel
     let mapViewModel: MapViewModel
     let appCoordinator: AppCoordinator
     let userSession: UserSession
@@ -454,7 +461,7 @@ private struct SheetOnChangeModifiers: ViewModifier {
             .onChange(of: selectedPlaceViewModel.isDetailSheetPresented) { oldValue, newValue in
                 // Monitor detail sheet presentation state for debugging if needed
             }
-            .onChange(of: userProfileViewModel.isUserDetailPresented) { _, isPresented in
+            .onChange(of: userProfileNavigationViewModel.isUserDetailPresented) { _, isPresented in
                 handleUserDetailPresented(isPresented)
             }
             .onChange(of: appCoordinator.showKeywordResultsPopup) { _, shouldShow in
@@ -465,7 +472,7 @@ private struct SheetOnChangeModifiers: ViewModifier {
     /// Handles user detail presentation
     private func handleUserDetailPresented(_ isPresented: Bool) {
         if isPresented {
-            if !userProfileViewModel.navigatedFromPlaceDetail {
+            if !userProfileNavigationViewModel.navigatedFromPlaceDetail {
                 selectedPlaceViewModel.selectedPlace = nil
             }
             if mapViewModel.activeSheet != nil {

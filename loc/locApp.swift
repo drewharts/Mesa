@@ -16,7 +16,8 @@ struct locApp: App {
     private let serviceContainer = ServiceContainer.shared
     private let selectedPlaceViewModel: SelectedPlaceViewModel
     private let profileViewModel: ProfileViewModel
-    private let userProfileViewModel: UserProfileViewModel
+    private let userProfileNavigationViewModel: UserProfileNavigationViewModel
+    private let mapDisplayCoordinatorViewModel: MapDisplayCoordinatorViewModel
     private let detailPlaceViewModel: DetailPlaceViewModel
     private let deepLinkViewModel: DeepLinkViewModel
     private let deepLinkManager: DeepLinkManager
@@ -97,43 +98,43 @@ struct locApp: App {
         // Set DataManager reference in DetailPlaceViewModel for lazy loading
         detailVM.dataManager = dataMgr
 
-        let userProfileVM = UserProfileViewModel(
-            dataManager: dataMgr, 
-            detailPlaceViewModel: detailVM,
-            placeService: services.placeService,
+        // Create navigation and map display ViewModels (replaces monolithic UserProfileViewModel)
+        let userProfileNavVM = UserProfileNavigationViewModel(
             userService: services.userService,
-            postService: services.postService,
             userSession: userSess
         )
-        
-        profileVM.userProfileViewModel = userProfileVM
-        
-        // Set UserProfileViewModel reference in DeepLinkManager for external user list navigation
-        deepLinkMgr.setUserProfileViewModel(userProfileVM)
-        
+
+        let mapDisplayCoordVM = MapDisplayCoordinatorViewModel()
+
+        profileVM.userProfileNavigationViewModel = userProfileNavVM
+
+        // Set UserProfileNavigationViewModel reference in DeepLinkManager for external user list navigation
+        deepLinkMgr.setUserProfileNavigationViewModel(userProfileNavVM)
+
         // Set UserSession reference in DeepLinkManager for accessing current user ID
         deepLinkMgr.setUserSession(userSess)
-        
+
         // Configure SessionCleanupService with non-singleton dependencies (SECURITY: for logout cache clearing)
         // Must be called after all ViewModels are created
         SessionCleanupService.shared.configure(
             detailPlaceViewModel: detailVM,
             selectedPlaceViewModel: selectedPlaceVM,
             profileViewModel: profileVM,
-            userProfileViewModel: userProfileVM
+            userProfileNavigationViewModel: userProfileNavVM,
+            mapDisplayCoordinatorViewModel: mapDisplayCoordVM
         )
-        
+
         // ✅ Create SearchViewModel ONCE at app level (staff engineer: no recreation overhead)
         let searchVM = SearchViewModel(
             placeService: services.placeService,
             userService: services.userService,
             locationManager: location
         )
-        
+
         // ✅ Create SearchCoordinator to handle search interactions (MVVM Coordinator Pattern)
         let searchCoord = SearchCoordinatorViewModel(
             selectedPlaceVM: selectedPlaceVM,
-            userProfileViewModel: userProfileVM,
+            userProfileNavigationViewModel: userProfileNavVM,
             userSession: userSess
         )
         
@@ -142,14 +143,18 @@ struct locApp: App {
         self._userSession = StateObject(wrappedValue: userSess)
         self.selectedPlaceViewModel = selectedPlaceVM
         self.profileViewModel = profileVM
-        self.userProfileViewModel = userProfileVM
+        self.userProfileNavigationViewModel = userProfileNavVM
+        self.mapDisplayCoordinatorViewModel = mapDisplayCoordVM
         self.detailPlaceViewModel = detailVM
         self.deepLinkViewModel = deepLinkVM
         self.deepLinkManager = deepLinkMgr
         self.dataManager = dataMgr
         self.searchViewModel = searchVM
         self.searchCoordinator = searchCoord
-        
+
+        // TODO: Remove after testing - resets suggested profiles popup
+        SuggestedProfilesViewModel.resetPopupSeenStatus()
+
         // Pass user service to AppDelegate
         appDelegate.userService = services.userService
         appDelegate.deepLinkViewModel = deepLinkVM
@@ -160,7 +165,8 @@ struct locApp: App {
             SplashScreenView(
                 selectedPlaceViewModel: selectedPlaceViewModel,
                 profileViewModel: profileViewModel,
-                userProfileViewModel: userProfileViewModel,
+                userProfileNavigationViewModel: userProfileNavigationViewModel,
+                mapDisplayCoordinatorViewModel: mapDisplayCoordinatorViewModel,
                 detailPlaceViewModel: detailPlaceViewModel,
                 deepLinkViewModel: deepLinkViewModel,
                 deepLinkManager: deepLinkManager,

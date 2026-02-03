@@ -14,7 +14,7 @@ struct PlacePostView: View {
     
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var profile: ProfileViewModel
-    @EnvironmentObject var userProfileViewModel: UserProfileViewModel
+    @EnvironmentObject var userProfileNavigationVM: UserProfileNavigationViewModel
     @EnvironmentObject var userSession: UserSession
     
     private var postPhotos: [UIImage] {
@@ -211,9 +211,9 @@ struct PlacePostView: View {
     
     private func navigateToProfile() {
         guard let currentUserId = userSession.currentUserId else { return }
-        
+
         if post.userId != currentUserId {
-            userProfileViewModel.fetchAndSelectUser(userId: post.userId, currentUserId: currentUserId)
+            userProfileNavigationVM.fetchAndSelectUser(userId: post.userId, currentUserId: currentUserId)
         }
     }
     

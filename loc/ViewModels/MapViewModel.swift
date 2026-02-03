@@ -2,7 +2,7 @@
 //  MapViewModel.swift
 //  loc
 //
-//  Created by Assistant on viewport-based loading implementation
+//  Coordinator ViewModel that composes child ViewModels for map functionality.
 //
 
 import Foundation
@@ -10,18 +10,17 @@ import MapKit
 import SwiftUI
 
 // MARK: - Sheet Type Enum
-/// Identifies which sheet is currently being presented on the map
-/// Using an enum with Identifiable allows SwiftUI to use a single .sheet(item:) modifier
+/// Identifies which sheet is currently being presented on the map.
 enum MapSheetType: Identifiable, Equatable {
-    case list(String)  // listId
+    case list(String)
     case tiktoks
     case reviews
-    case favorites  // Current user's favorites
-    case myPlaces  // Current user's created places
-    case externalReviews  // External user's reviews
-    case externalList(String)  // External user's list
-    case externalFavorites  // External user's favorites
-    case keywordResults(keyword: String, types: [String])  // Keyword search results
+    case favorites
+    case myPlaces
+    case externalReviews
+    case externalList(String)
+    case externalFavorites
+    case keywordResults(keyword: String, types: [String])
 
     var id: String {
         switch self {
@@ -40,36 +39,48 @@ enum MapSheetType: Identifiable, Equatable {
 
 @MainActor
 class MapViewModel: ObservableObject {
-    @Published var viewportAnnotations: [PlaceAnnotation] = [] // Place annotations in current viewport
-    @Published var communityMarkers: [CommunityPlaceMarker] = [] // Community places (from users you don't follow)
-    @Published var isLoadingViewportPlaces: Bool = false
-    @Published var followedUsersPhotos: [FollowedUserPhoto] = [] // Profile photos for custom annotations
-    @Published var annotationImages: [String: UIImage] = [:] // Combined profile images for annotations
-    @Published var userProfilePictures: [String: UIImage] = [:] // Cache of user profile pictures
-    
-    // Map filtering state
-    @Published var selectedListId: String? = nil // When set, only show annotations from this list
-    @Published var activeSheet: MapSheetType? = nil // Single sheet control - prevents multiple sheet conflicts
-    @Published var pendingPlaceNavigation: String? = nil // Place ID to navigate to when sheet is open
-    @Published var showingTikToksOnMap: Bool = false // When set, only show TikTok annotations
-    @Published var showingReviewsOnMap: Bool = false // When set, only show reviewed place annotations
-    @Published var showingFavoritesOnMap: Bool = false // When set, only show favorite place annotations
-    @Published var showingMyPlacesOnMap: Bool = false // When set, only show user's created place annotations
+    // MARK: - Child ViewModels
 
-    // External user filtering state
-    @Published var externalUserId: String? = nil // When set, filter by this external user's places
-    @Published var showingExternalReviewsOnMap: Bool = false // When set, show external user's reviewed places
-    @Published var showingExternalFavoritesOnMap: Bool = false // When set, show external user's favorite places
-    @Published var externalListId: String? = nil // When set, show external user's list places
+    let filteringViewModel: MapFilteringViewModel
+    let externalUserViewModel: MapExternalUserViewModel
+    let photoViewModel: MapPhotoViewModel
+    let viewportViewModel: MapViewportViewModel
+    let selectionViewModel: MapAnnotationSelectionViewModel
 
-    // Keyword results popup state
-    @Published var showingKeywordResultsPopup: Bool = false
-    @Published var keywordTypesFilter: [String]? = nil  // Types to filter by when showing keyword results
+    // MARK: - Sheet Coordination
 
-    // Preserved annotation for selected place (survives density culling during zoom out)
-    @Published var preservedSelectedAnnotation: PlaceAnnotation?
+    @Published var activeSheet: MapSheetType? = nil
 
-    // Computed properties for backwards compatibility with existing code
+    // MARK: - Proxy Properties for Backward Compatibility
+
+    var viewportAnnotations: [PlaceAnnotation] { viewportViewModel.viewportAnnotations }
+    var communityMarkers: [CommunityPlaceMarker] { viewportViewModel.communityMarkers }
+    var isLoadingViewportPlaces: Bool { viewportViewModel.isLoadingViewportPlaces }
+    var followedUsersPhotos: [FollowedUserPhoto] { photoViewModel.followedUsersPhotos }
+    var annotationImages: [String: UIImage] { photoViewModel.annotationImages }
+    var userProfilePictures: [String: UIImage] { photoViewModel.userProfilePictures }
+    var hasLoadedPhotos: Bool { photoViewModel.hasLoadedPhotos }
+
+    var selectedListId: String? { filteringViewModel.selectedListId }
+    var showingTikToksOnMap: Bool { filteringViewModel.showingTikToksOnMap }
+    var showingReviewsOnMap: Bool { filteringViewModel.showingReviewsOnMap }
+    var showingFavoritesOnMap: Bool { filteringViewModel.showingFavoritesOnMap }
+    var showingMyPlacesOnMap: Bool { filteringViewModel.showingMyPlacesOnMap }
+    var keywordTypesFilter: [String]? { filteringViewModel.keywordTypesFilter }
+
+    var externalUserId: String? { externalUserViewModel.externalUserId }
+    var showingExternalReviewsOnMap: Bool { externalUserViewModel.showingExternalReviewsOnMap }
+    var showingExternalFavoritesOnMap: Bool { externalUserViewModel.showingExternalFavoritesOnMap }
+    var externalListId: String? { externalUserViewModel.externalListId }
+
+    var preservedSelectedAnnotation: PlaceAnnotation? { selectionViewModel.preservedSelectedAnnotation }
+    var pendingPlaceNavigation: String? {
+        get { selectionViewModel.pendingPlaceNavigation }
+        set { selectionViewModel.pendingPlaceNavigation = newValue }
+    }
+
+    // MARK: - Computed Sheet Properties
+
     var showingListPopup: Bool { if case .list = activeSheet { return true } else { return false } }
     var showingTikToksPopup: Bool { activeSheet == .tiktoks }
     var showingReviewsPopup: Bool { activeSheet == .reviews }
@@ -80,683 +91,201 @@ class MapViewModel: ObservableObject {
     var showingMyPlacesPopup: Bool { activeSheet == .myPlaces }
     var showingKeywordPopup: Bool { if case .keywordResults = activeSheet { return true } else { return false } }
 
-    private var debounceTimer: Timer?
-    private let placeService: PlaceService
-    private let detailPlaceVM: DetailPlaceViewModel
-    private var lastLoadedRegion: MKCoordinateRegion?
-    private var placeDetailsCache: [String: DetailPlace] = [:] // Cache for full place details
-    private var currentLoadTask: Task<Void, Never>? // Track current loading task for cancellation
-    
-    // Photo loading state (for de-duplication)
-    private var isLoadingPhotos = false
-    private(set) var hasLoadedPhotos = false // Exposed for View to check
-    
-    // Minimum movement threshold to trigger reload (in degrees)
-    private let minMovementThreshold: Double = 0.01 // ~1km at equator
-    
+    // MARK: - Initialization
+
     init(placeService: PlaceService, detailPlaceVM: DetailPlaceViewModel) {
-        self.placeService = placeService
-        self.detailPlaceVM = detailPlaceVM
+        self.filteringViewModel = MapFilteringViewModel()
+        self.externalUserViewModel = MapExternalUserViewModel()
+        self.photoViewModel = MapPhotoViewModel(placeService: placeService)
+        self.viewportViewModel = MapViewportViewModel(placeService: placeService)
+        self.selectionViewModel = MapAnnotationSelectionViewModel()
+
+        setupCallbacks()
     }
-    
-    // MARK: - List Filtering
-    
-    /// Validates that a list exists and sets it as the selected list for filtering map annotations
-    /// MVVM: Business logic - validates list exists before updating state
+
+    /// Wires up callbacks between child ViewModels.
+    private func setupCallbacks() {
+        // When filtering changes, clear annotations and reset region for reload
+        filteringViewModel.onFilterChanged = { [weak self] in
+            self?.viewportViewModel.clearAnnotations()
+            self?.viewportViewModel.resetLastLoadedRegion()
+        }
+
+        // When external user filtering changes, clear annotations and reset region for reload
+        externalUserViewModel.onFilterChanged = { [weak self] in
+            self?.viewportViewModel.clearAnnotations()
+            self?.viewportViewModel.resetLastLoadedRegion()
+        }
+
+        // When external user is selected, load their profile photo
+        externalUserViewModel.onExternalUserSelected = { [weak self] userId, photoUrl in
+            guard let photoUrl = photoUrl else { return }
+            Task { [weak self] in
+                await self?.photoViewModel.loadExternalUserPhoto(userId: userId, photoUrl: photoUrl)
+                self?.photoViewModel.generateAnnotationImages(for: self?.viewportViewModel.viewportAnnotations ?? [])
+            }
+        }
+
+        // When annotations are loaded, regenerate annotation images
+        viewportViewModel.onAnnotationsLoaded = { [weak self] annotations in
+            self?.photoViewModel.generateAnnotationImages(for: annotations)
+        }
+    }
+
+    // MARK: - List Filtering (Coordinator Methods)
+
+    /// Validates that a list exists and sets it as the selected list for filtering.
     func selectList(_ listId: String, availableLists: [LightweightPlaceList]) {
-        // Only set list and show popup if list exists in available lists
-        guard availableLists.contains(where: { $0.id == listId }) else {
-            // List not found - don't show popup
-            return
-        }
-
-        selectedListId = listId
-        showingTikToksOnMap = false
-        showingReviewsOnMap = false
+        guard filteringViewModel.selectList(listId, availableLists: availableLists) else { return }
         activeSheet = .list(listId)
-        // Clear current annotations - they will be reloaded with list filter
-        viewportAnnotations = []
-        communityMarkers = []
-        // Reset last loaded region to force reload
-        lastLoadedRegion = nil
     }
 
-    /// Clears the list filter and restores all annotations
+    /// Clears the list filter and restores all annotations.
     func clearListFilter() {
-        selectedListId = nil
+        filteringViewModel.clearListFilter()
         activeSheet = nil
-        // Clear current annotations - they will be reloaded without filter
-        viewportAnnotations = []
-        communityMarkers = []
     }
 
-    /// Sets the map to show only TikTok places
+    /// Sets the map to show only TikTok places.
     func selectTikToks() {
-        showingTikToksOnMap = true
-        showingReviewsOnMap = false
-        showingFavoritesOnMap = false
-        showingMyPlacesOnMap = false
-        selectedListId = nil
+        filteringViewModel.selectTikToks()
         activeSheet = .tiktoks
-        // Clear current annotations - they will be reloaded with TikTok filter
-        viewportAnnotations = []
-        communityMarkers = []
-        lastLoadedRegion = nil
     }
 
-    /// Sets the map to show only reviewed places
+    /// Sets the map to show only reviewed places.
     func selectReviews() {
-        showingReviewsOnMap = true
-        showingTikToksOnMap = false
-        showingFavoritesOnMap = false
-        showingMyPlacesOnMap = false
-        selectedListId = nil
+        filteringViewModel.selectReviews()
         activeSheet = .reviews
-        // Clear current annotations - they will be reloaded with reviews filter
-        viewportAnnotations = []
-        communityMarkers = []
-        lastLoadedRegion = nil
     }
 
-    /// Sets the map to show only favorite places
+    /// Sets the map to show only favorite places.
     func selectFavorites() {
-        showingFavoritesOnMap = true
-        showingTikToksOnMap = false
-        showingReviewsOnMap = false
-        showingMyPlacesOnMap = false
-        selectedListId = nil
+        filteringViewModel.selectFavorites()
         activeSheet = .favorites
-        // Clear current annotations - they will be reloaded with favorites filter
-        viewportAnnotations = []
-        communityMarkers = []
-        lastLoadedRegion = nil
     }
 
-    /// Sets the map to show only user's created places
+    /// Sets the map to show only user's created places.
     func selectMyPlaces() {
-        showingMyPlacesOnMap = true
-        showingTikToksOnMap = false
-        showingReviewsOnMap = false
-        showingFavoritesOnMap = false
-        selectedListId = nil
+        filteringViewModel.selectMyPlaces()
         activeSheet = .myPlaces
-        // Clear current annotations - they will be reloaded with my places filter
-        viewportAnnotations = []
-        communityMarkers = []
-        lastLoadedRegion = nil
     }
 
-    /// Shows keyword search results on the map with filtered annotations
+    /// Shows keyword search results on the map.
     func selectKeywordResults(keyword: String, types: [String]) {
-        showingKeywordResultsPopup = true
-        keywordTypesFilter = types  // Store types for loadPlacesForViewport filtering
-        showingTikToksOnMap = false
-        showingReviewsOnMap = false
-        showingFavoritesOnMap = false
-        selectedListId = nil
+        filteringViewModel.selectKeywordResults(keyword: keyword, types: types)
         activeSheet = .keywordResults(keyword: keyword, types: types)
-        // Clear current annotations - they will be reloaded by onMapCameraSettled
-        viewportAnnotations = []
-        communityMarkers = []
-        lastLoadedRegion = nil
     }
 
-    /// Shows external user's reviews on the map with filtered annotations
+    // MARK: - External User Filtering (Coordinator Methods)
+
+    /// Shows external user's reviews on the map.
     func selectExternalReviews(userId: String, userPhotoUrl: URL?) {
-        externalUserId = userId
-        showingExternalReviewsOnMap = true
-        showingExternalFavoritesOnMap = false  // Reset favorites flag for consistency
-        showingReviewsOnMap = false
-        showingTikToksOnMap = false
-        selectedListId = nil
-        externalListId = nil
+        clearUserFilters()
+        externalUserViewModel.selectExternalReviews(userId: userId, userPhotoUrl: userPhotoUrl)
         activeSheet = .externalReviews
-        viewportAnnotations = []
-        communityMarkers = []
-        lastLoadedRegion = nil
-
-        // Load external user's photo
-        if let photoUrl = userPhotoUrl {
-            Task {
-                await loadExternalUserPhoto(userId: userId, photoUrl: photoUrl)
-            }
-        }
     }
 
-    /// Shows external user's list on the map with filtered annotations
+    /// Shows external user's list on the map.
     func selectExternalList(listId: String, userId: String, userPhotoUrl: URL?) {
-        externalUserId = userId
-        externalListId = listId
-        showingExternalReviewsOnMap = false
-        showingExternalFavoritesOnMap = false  // Reset favorites flag for consistency
-        showingReviewsOnMap = false
-        showingTikToksOnMap = false
-        selectedListId = nil
+        clearUserFilters()
+        externalUserViewModel.selectExternalList(listId: listId, userId: userId, userPhotoUrl: userPhotoUrl)
         activeSheet = .externalList(listId)
-        viewportAnnotations = []
-        communityMarkers = []
-        lastLoadedRegion = nil
-
-        // Load external user's photo
-        if let photoUrl = userPhotoUrl {
-            Task {
-                await loadExternalUserPhoto(userId: userId, photoUrl: photoUrl)
-            }
-        }
     }
 
-    /// Shows external user's favorites on the map with filtered annotations
+    /// Shows external user's favorites on the map.
     func selectExternalFavorites(userId: String, userPhotoUrl: URL?) {
-        externalUserId = userId
-        showingExternalFavoritesOnMap = true
-        showingExternalReviewsOnMap = false
-        showingReviewsOnMap = false
-        showingTikToksOnMap = false
-        selectedListId = nil
-        externalListId = nil
+        clearUserFilters()
+        externalUserViewModel.selectExternalFavorites(userId: userId, userPhotoUrl: userPhotoUrl)
         activeSheet = .externalFavorites
-        viewportAnnotations = []
-        communityMarkers = []
-        lastLoadedRegion = nil
-
-        // Load external user's photo
-        if let photoUrl = userPhotoUrl {
-            Task {
-                await loadExternalUserPhoto(userId: userId, photoUrl: photoUrl)
-            }
-        }
     }
 
-    /// Clears all special filters (list, TikToks, reviews, favorites, my places, external)
+    // MARK: - Clear Filters
+
+    /// Clears all special filters (list, TikToks, reviews, favorites, my places, external).
     func clearAllFilters() {
-        selectedListId = nil
-        showingTikToksOnMap = false
-        showingReviewsOnMap = false
-        showingFavoritesOnMap = false
-        showingMyPlacesOnMap = false
-        showingKeywordResultsPopup = false
-        keywordTypesFilter = nil
-        // Clear external user state
-        externalUserId = nil
-        showingExternalReviewsOnMap = false
-        showingExternalFavoritesOnMap = false
-        externalListId = nil
+        filteringViewModel.clearAllFilters()
+        externalUserViewModel.clearAllFilters()
+        viewportViewModel.clearAnnotations()
+        viewportViewModel.resetLastLoadedRegion()
         // Note: activeSheet is NOT cleared here - it's managed by the sheet presentation logic
-        // Clearing it here causes race conditions when switching between external user sheets
-        viewportAnnotations = []
-        communityMarkers = []
-        lastLoadedRegion = nil
     }
 
-    // MARK: - Selected Annotation Preservation
+    /// Clears only user filters (not external user filters).
+    private func clearUserFilters() {
+        filteringViewModel.clearAllFilters()
+    }
 
-    /// Sets a preserved annotation from a DetailPlace so it remains visible during zoom out
-    /// When density-based culling removes the selected annotation from viewportAnnotations,
-    /// the preserved annotation ensures it still displays on the map
-    /// - Parameter place: The currently selected DetailPlace (nil to clear)
+    // MARK: - Annotation Selection (Delegated)
+
+    /// Sets a preserved annotation from a DetailPlace so it remains visible during zoom out.
     func setPreservedAnnotation(for place: DetailPlace?) {
-        guard let place = place, let coord = place.coordinate else {
-            preservedSelectedAnnotation = nil
-            return
-        }
-        preservedSelectedAnnotation = PlaceAnnotation(
-            id: place.id.uuidString,
-            name: place.name,
-            coordinate: CLLocationCoordinate2D(latitude: coord.latitude, longitude: coord.longitude),
-            userIds: [],
-            placeType: place.categories?.first ?? "other"
-        )
+        selectionViewModel.setPreservedAnnotation(for: place)
     }
 
-    /// Clears the preserved annotation (call when deselecting a place)
+    /// Clears the preserved annotation.
     func clearPreservedAnnotation() {
-        preservedSelectedAnnotation = nil
+        selectionViewModel.clearPreservedAnnotation()
     }
 
-    // MARK: - Photo Loading (Called by View when profile is available)
-    
-    /// Load profile photos for followed users (for custom annotation views)
-    /// Called by View when user profile becomes available - View coordinates, ViewModel executes
-    /// - Parameters:
-    ///   - userId: The current user's profile ID
-    ///   - currentUserPhotoUrl: Optional URL for current user's profile photo
+    // MARK: - Photo Loading (Delegated)
+
+    /// Loads profile photos for followed users.
     func loadFollowedUsersPhotos(userId: String, currentUserPhotoUrl: URL?) async {
-        // Prevent duplicate/concurrent loads
-        guard !isLoadingPhotos else { return }
-        
-        isLoadingPhotos = true
-        defer { isLoadingPhotos = false }
-        
-        do {
-            var photos = try await placeService.fetchFollowedUsersPhotos(userId: userId)
-            
-            // Add current user's photo to the list
-            if let photoUrl = currentUserPhotoUrl {
-                let currentUserPhoto = FollowedUserPhoto(userId: userId, profilePhotoUrl: photoUrl.absoluteString)
-                photos.append(currentUserPhoto)
-            }
-            
-            self.followedUsersPhotos = photos
-            self.hasLoadedPhotos = true
-            
-            // Load profile pictures from URLs
-            await loadProfilePictures(from: photos)
-            
-            // Generate annotation images for current annotations
-            generateAnnotationImages()
-            
-        } catch {
-            print("❌ [MapViewModel] Error loading followed users' photos: \(error)")
-        }
-    }
-    
-    /// Load profile pictures from URLs
-    private func loadProfilePictures(from photos: [FollowedUserPhoto]) async {
-        await withTaskGroup(of: (String, UIImage?).self) { group in
-            for photo in photos {
-                guard let urlString = photo.profilePhotoUrl,
-                      let url = URL(string: urlString) else { continue }
-
-                group.addTask {
-                    do {
-                        let (data, _) = try await URLSession.shared.data(from: url)
-                        return (photo.userId, UIImage(data: data))
-                    } catch {
-                        print("⚠️ Failed to load image for user \(photo.userId)")
-                        return (photo.userId, nil)
-                    }
-                }
-            }
-
-            for await (userId, image) in group {
-                if let image = image {
-                    self.userProfilePictures[userId] = image
-                }
-            }
-        }
+        await photoViewModel.loadFollowedUsersPhotos(userId: userId, currentUserPhotoUrl: currentUserPhotoUrl)
+        photoViewModel.generateAnnotationImages(for: viewportViewModel.viewportAnnotations)
     }
 
-    /// Load a single external user's profile photo into the cache
-    private func loadExternalUserPhoto(userId: String, photoUrl: URL) async {
-        // Skip if already cached
-        guard userProfilePictures[userId] == nil else { return }
-
-        do {
-            let (data, _) = try await URLSession.shared.data(from: photoUrl)
-            if let image = UIImage(data: data) {
-                self.userProfilePictures[userId] = image
-                // Regenerate annotation images to use the new photo
-                generateAnnotationImages()
-            }
-        } catch {
-            print("Failed to load external user photo: \(error)")
-        }
-    }
-    
-    /// Generate combined annotation images for all annotations
+    /// Generates combined annotation images for all annotations.
     func generateAnnotationImages() {
-        for annotation in viewportAnnotations {
-            // Get up to 3 profile pictures for users who saved this place
-            let profilePictures = annotation.userIds.prefix(3).compactMap { userProfilePictures[$0] }
-
-            // Skip annotations without user photos - CustomPlaceAnnotationView will show emoji fallback
-            guard !profilePictures.isEmpty else {
-                continue
-            }
-
-            // Create combined image from user profile photos
-            let combinedImage: UIImage
-            switch profilePictures.count {
-            case 1:
-                combinedImage = combinedCircularImage(image1: profilePictures[0])
-            case 2:
-                combinedImage = combinedCircularImage(image1: profilePictures[0], image2: profilePictures[1])
-            case 3:
-                combinedImage = combinedCircularImage(image1: profilePictures[0], image2: profilePictures[1], image3: profilePictures[2])
-            default:
-                continue
-            }
-
-            annotationImages[annotation.id] = combinedImage
-        }
+        photoViewModel.generateAnnotationImages(for: viewportViewModel.viewportAnnotations)
     }
-    
-    /// Create combined circular image from profile pictures (matching existing implementation)
-    private func combinedCircularImage(image1: UIImage?, image2: UIImage? = nil, image3: UIImage? = nil) -> UIImage {
-        let totalSize = CGSize(width: 60, height: 30)
-        let singleCircleSize = CGSize(width: 30, height: 30)
-        let renderer = UIGraphicsImageRenderer(size: totalSize)
-       
-        return renderer.image { context in
-            let firstRect = CGRect(x: 0, y: 0, width: singleCircleSize.width, height: singleCircleSize.height)
-            let secondRect = CGRect(x: 11, y: 0, width: singleCircleSize.width, height: singleCircleSize.height)
-            let thirdRect = CGRect(x: 22, y: 0, width: singleCircleSize.width, height: singleCircleSize.height)
-           
-            func drawCircularImage(_ image: UIImage?, in rect: CGRect) {
-                guard let image = image else { return }
-                context.cgContext.saveGState()
-                let circlePath = UIBezierPath(ovalIn: rect)
-                circlePath.addClip()
-                image.draw(in: rect)
-                context.cgContext.setStrokeColor(UIColor.white.cgColor)
-                context.cgContext.setLineWidth(1.0)
-                context.cgContext.strokeEllipse(in: rect.insetBy(dx: 0.5, dy: 0.5))
-                context.cgContext.restoreGState()
-            }
-           
-            if image3 != nil { drawCircularImage(image3, in: thirdRect) }
-            if image2 != nil { drawCircularImage(image2, in: secondRect) }
-            if image1 != nil { drawCircularImage(image1, in: firstRect) }
-        }
-    }
-    
-    /// Load full place details on demand (when user taps an annotation)
+
+    // MARK: - Place Details (Delegated)
+
+    /// Loads full place details on demand when user taps an annotation.
     func loadPlaceDetails(for annotation: PlaceAnnotation) async -> DetailPlace? {
-        let placeId = annotation.id
-        
-        // Check cache first
-        if let cached = placeDetailsCache[placeId] {
-            return cached
-        }
-        
-        // Load from database
-        do {
-            let details = try await placeService.fetchPlaceDetails(placeId: placeId)
-            if let details = details {
-                placeDetailsCache[placeId] = details
-            }
-            return details
-        } catch {
-            print("❌ [MapViewModel] Error loading place details: \(error)")
-            return nil
-        }
+        return await viewportViewModel.loadPlaceDetails(for: annotation)
     }
-    
-    /// Load full place details for a community marker (when user taps a white dot)
+
+    /// Loads full place details for a community marker.
     func loadPlaceDetails(for marker: CommunityPlaceMarker) async -> DetailPlace? {
-        let placeId = marker.id
-        
-        // Check cache first
-        if let cached = placeDetailsCache[placeId] {
-            return cached
-        }
-        
-        // Load from database
-        do {
-            let details = try await placeService.fetchPlaceDetails(placeId: placeId)
-            if let details = details {
-                placeDetailsCache[placeId] = details
-            }
-            return details
-        } catch {
-            print("❌ [MapViewModel] Error loading community place details: \(error)")
-            return nil
-        }
+        return await viewportViewModel.loadPlaceDetails(for: marker)
     }
-    
-    // MARK: - Viewport Loading (Called by View with userId)
-    
-    /// Call this when the map camera has settled (using native iOS 17+ callback)
-    /// Apple handles debouncing automatically, so we don't need manual timers
-    /// - Parameters:
-    ///   - newRegion: The map region to load places for
-    ///   - userId: The current user's profile ID (passed by View from ProfileViewModel)
+
+    // MARK: - Viewport Loading (Delegated)
+
+    /// Called when the map camera has settled.
     func onMapCameraSettled(_ newRegion: MKCoordinateRegion, userId: String) async {
-        // Check if the region change is significant enough to warrant a reload
-        if let lastRegion = lastLoadedRegion, !shouldReloadForRegion(newRegion, lastRegion: lastRegion) {
-            return
-        }
-        
-        // Load places for the new viewport
-        await loadPlacesForViewport(newRegion, userId: userId)
+        let filterState = buildFilterState()
+        await viewportViewModel.onMapCameraSettled(newRegion, userId: userId, filterState: filterState)
     }
-    
-    /// Main method to load place annotations for a given viewport
-    /// Uses the optimized PostgreSQL function for ultra-fast loading
-    /// Implements task cancellation to avoid redundant loads
-    /// - Parameters:
-    ///   - region: The map region to load places for
-    ///   - userId: The current user's profile ID
-    private func loadPlacesForViewport(_ region: MKCoordinateRegion, userId: String) async {
-        // Cancel any previous loading task
-        currentLoadTask?.cancel()
-        
-        let task = Task { @MainActor in
-            // Check if cancelled before starting
-            guard !Task.isCancelled else {
-                return
-            }
-            
-            isLoadingViewportPlaces = true
-            
-            let bounds = getViewportBounds(from: region)
-            
-            do {
-                // Check if cancelled before network call
-                guard !Task.isCancelled else {
-                    isLoadingViewportPlaces = false
-                    return
-                }
-                
-                // Fetch annotations based on current filter (external user, list, TikToks, reviews, or all)
-                let annotations: [PlaceAnnotation]
-                if let extListId = externalListId, let extUserId = externalUserId {
-                    // External user's list - filter by their list
-                    print("🗺️ [MapViewModel] Fetching external list: listId=\(extListId), userId=\(extUserId)")
-                    print("   bounds: N:\(bounds.northLat), S:\(bounds.southLat), E:\(bounds.eastLng), W:\(bounds.westLng)")
-                    annotations = try await placeService.fetchListAnnotationsInViewport(
-                        northLat: bounds.northLat,
-                        southLat: bounds.southLat,
-                        eastLng: bounds.eastLng,
-                        westLng: bounds.westLng,
-                        userId: extUserId,
-                        listId: extListId
-                    )
-                    print("🗺️ [MapViewModel] Received \(annotations.count) external list annotations")
-                } else if showingExternalReviewsOnMap, let extUserId = externalUserId {
-                    // External user's reviews - filter by their reviewed places
-                    annotations = try await placeService.fetchReviewAnnotationsInViewport(
-                        northLat: bounds.northLat,
-                        southLat: bounds.southLat,
-                        eastLng: bounds.eastLng,
-                        westLng: bounds.westLng,
-                        userId: extUserId
-                    )
-                } else if showingExternalFavoritesOnMap, let extUserId = externalUserId {
-                    // External user's favorites - filter by their favorite places
-                    annotations = try await placeService.fetchFavoriteAnnotationsInViewport(
-                        northLat: bounds.northLat,
-                        southLat: bounds.southLat,
-                        eastLng: bounds.eastLng,
-                        westLng: bounds.westLng,
-                        userId: extUserId
-                    )
-                } else if let listId = selectedListId {
-                    // Current user's list - filter by list
-                    annotations = try await placeService.fetchListAnnotationsInViewport(
-                        northLat: bounds.northLat,
-                        southLat: bounds.southLat,
-                        eastLng: bounds.eastLng,
-                        westLng: bounds.westLng,
-                        userId: userId,
-                        listId: listId
-                    )
-                } else if showingTikToksOnMap {
-                    // Fetch annotations for TikTok places only
-                    annotations = try await placeService.fetchTikTokAnnotationsInViewport(
-                        northLat: bounds.northLat,
-                        southLat: bounds.southLat,
-                        eastLng: bounds.eastLng,
-                        westLng: bounds.westLng,
-                        userId: userId
-                    )
-                } else if showingReviewsOnMap {
-                    // Current user's reviewed places
-                    annotations = try await placeService.fetchReviewAnnotationsInViewport(
-                        northLat: bounds.northLat,
-                        southLat: bounds.southLat,
-                        eastLng: bounds.eastLng,
-                        westLng: bounds.westLng,
-                        userId: userId
-                    )
-                } else if showingFavoritesOnMap {
-                    // Current user's favorite places
-                    annotations = try await placeService.fetchFavoriteAnnotationsInViewport(
-                        northLat: bounds.northLat,
-                        southLat: bounds.southLat,
-                        eastLng: bounds.eastLng,
-                        westLng: bounds.westLng,
-                        userId: userId
-                    )
-                } else if showingMyPlacesOnMap {
-                    // Current user's created places
-                    annotations = try await placeService.fetchMyPlacesAnnotationsInViewport(
-                        northLat: bounds.northLat,
-                        southLat: bounds.southLat,
-                        eastLng: bounds.eastLng,
-                        westLng: bounds.westLng,
-                        userId: userId
-                    )
-                } else if showingKeywordResultsPopup, let types = keywordTypesFilter {
-                    // Keyword search results - filter by place types
-                    annotations = try await placeService.fetchKeywordAnnotationsInViewport(
-                        northLat: bounds.northLat,
-                        southLat: bounds.southLat,
-                        eastLng: bounds.eastLng,
-                        westLng: bounds.westLng,
-                        types: types
-                    )
-                } else {
-                    // Fetch all annotations (normal behavior)
-                    annotations = try await placeService.fetchPlacesInViewportWithUserId(
-                    northLat: bounds.northLat,
-                    southLat: bounds.southLat,
-                    eastLng: bounds.eastLng,
-                    westLng: bounds.westLng,
-                    userId: userId
-                )
-                }
 
-                // Only fetch community markers if no filter is active
-                let community: [CommunityPlaceMarker]
-                let hasActiveFilter = selectedListId != nil || showingTikToksOnMap || showingReviewsOnMap || showingFavoritesOnMap || showingMyPlacesOnMap || showingKeywordResultsPopup || externalUserId != nil
-                if !hasActiveFilter {
-                    community = try await placeService.fetchCommunityPlacesInViewportWithUserId(
-                    northLat: bounds.northLat,
-                    southLat: bounds.southLat,
-                    eastLng: bounds.eastLng,
-                    westLng: bounds.westLng,
-                    userId: userId
-                )
-                } else {
-                    // No community markers when filtering
-                    community = []
-                }
-                
-                // Check if cancelled after network call
-                guard !Task.isCancelled else {
-                    isLoadingViewportPlaces = false
-                    return
-                }
-                
-                self.viewportAnnotations = annotations
-                
-                // Filter out community markers that overlap with friends annotations
-                // This prevents duplicate markers on the map (O(n+m) with Set lookup)
-                let friendsPlaceIds = Set(annotations.map { $0.id })
-                let filteredCommunity = community.filter { !friendsPlaceIds.contains($0.id) }
-                
-                // Debug: Log any duplicates that were filtered
-                let duplicateCount = community.count - filteredCommunity.count
-                if duplicateCount > 0 {
-                    let duplicateIds = community.filter { friendsPlaceIds.contains($0.id) }.map { $0.id }
-                    print("🔍 [MapViewModel] Filtered \(duplicateCount) duplicate community markers: \(duplicateIds)")
-                }
-
-                self.communityMarkers = filteredCommunity
-                
-                self.lastLoadedRegion = region
-                
-                // Generate annotation images for new annotations
-                generateAnnotationImages()
-                
-            } catch {
-                // Don't log cancellation errors - they're expected when user pans/zooms quickly
-                let isCancelled = Task.isCancelled || error is CancellationError || (error as NSError).code == NSURLErrorCancelled
-                if !isCancelled {
-                    print("❌ [MapViewModel] Error loading viewport annotations: \(error.localizedDescription)")
-                }
-            }
-            
-            isLoadingViewportPlaces = false
-        }
-        
-        currentLoadTask = task
-        await task.value
-    }
-    
-    // loadAllPlaceAnnotations method removed - we now use viewport-based loading exclusively
-    
-    /// Filter annotations for current viewport (client-side filtering)
+    /// Filters annotations for current viewport.
     func getAnnotationsForViewport(_ region: MKCoordinateRegion) -> [PlaceAnnotation] {
-        let bounds = getViewportBounds(from: region)
-        
-        return viewportAnnotations.filter { annotation in
-            let lat = annotation.coordinate.latitude
-            let lng = annotation.coordinate.longitude
-            
-            return lat >= bounds.southLat && lat <= bounds.northLat &&
-                   lng >= bounds.westLng && lng <= bounds.eastLng
-        }
+        return viewportViewModel.getAnnotationsForViewport(region)
     }
-    
-    /// Convert map region to lat/lng bounds
-    private func getViewportBounds(from region: MKCoordinateRegion) -> (
-        northLat: Double,
-        southLat: Double,
-        eastLng: Double,
-        westLng: Double
-    ) {
-        let centerLat = region.center.latitude
-        let centerLng = region.center.longitude
-        let latDelta = region.span.latitudeDelta
-        let lngDelta = region.span.longitudeDelta
-        
-        return (
-            northLat: centerLat + (latDelta / 2),
-            southLat: centerLat - (latDelta / 2),
-            eastLng: centerLng + (lngDelta / 2),
-            westLng: centerLng - (lngDelta / 2)
-        )
-    }
-    
-    /// Check if region change is significant enough to reload
-    private func shouldReloadForRegion(_ newRegion: MKCoordinateRegion, lastRegion: MKCoordinateRegion) -> Bool {
-        // Calculate center movement (increased threshold for smoother UX)
-        let latDiff = abs(newRegion.center.latitude - lastRegion.center.latitude)
-        let lngDiff = abs(newRegion.center.longitude - lastRegion.center.longitude)
-        
-        // Only reload if moved at least 30% of the current viewport
-        let latMovementThreshold = lastRegion.span.latitudeDelta * 0.3
-        let lngMovementThreshold = lastRegion.span.longitudeDelta * 0.3
-        let centerMoved = latDiff > latMovementThreshold || lngDiff > lngMovementThreshold
-        
-        // Calculate zoom change (span change) - more conservative threshold
-        let latSpanChange = abs(newRegion.span.latitudeDelta - lastRegion.span.latitudeDelta)
-        let lngSpanChange = abs(newRegion.span.longitudeDelta - lastRegion.span.longitudeDelta)
-        let zoomChanged = latSpanChange > (lastRegion.span.latitudeDelta * 0.5) || 
-                          lngSpanChange > (lastRegion.span.longitudeDelta * 0.5)
-        
-        return centerMoved || zoomChanged
-    }
-    
-    /// Get all place annotations to display on map
+
+    /// Returns all place annotations to display on map.
     func getAllDisplayAnnotations() -> [PlaceAnnotation] {
-        return viewportAnnotations
+        return viewportViewModel.getAllDisplayAnnotations()
     }
-    
-    deinit {
-        debounceTimer?.invalidate()
+
+    // MARK: - Private Helpers
+
+    /// Builds the current filter state from child ViewModels.
+    private func buildFilterState() -> MapFilterState {
+        return MapFilterState(
+            selectedListId: filteringViewModel.selectedListId,
+            showingTikToksOnMap: filteringViewModel.showingTikToksOnMap,
+            showingReviewsOnMap: filteringViewModel.showingReviewsOnMap,
+            showingFavoritesOnMap: filteringViewModel.showingFavoritesOnMap,
+            showingMyPlacesOnMap: filteringViewModel.showingMyPlacesOnMap,
+            showingKeywordResultsPopup: filteringViewModel.showingKeywordResultsPopup,
+            keywordTypesFilter: filteringViewModel.keywordTypesFilter,
+            externalUserId: externalUserViewModel.externalUserId,
+            showingExternalReviewsOnMap: externalUserViewModel.showingExternalReviewsOnMap,
+            showingExternalFavoritesOnMap: externalUserViewModel.showingExternalFavoritesOnMap,
+            externalListId: externalUserViewModel.externalListId
+        )
     }
 }
-

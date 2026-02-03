@@ -35,7 +35,7 @@ struct LightweightListDescription: View {
 
     // Get total place count from the list (from SQL function)
     private var displayedPlaceCount: Int {
-        return profile.lightweightPlaceListCounts[list.list_id] ?? list.place_count
+        return profile.listsViewModel.lightweightPlaceListCounts[list.list_id] ?? list.place_count
     }
     
     private var ownerFirstName: String? {
@@ -102,7 +102,7 @@ struct ListSelectionRowView: View {
                 Spacer()
 
                 ZStack {
-                    if profile.userListsPlaces[list.id.uuidString]?.contains(place.id.uuidString) ?? false {
+                    if profile.listsViewModel.userListsPlaces[list.id.uuidString]?.contains(place.id.uuidString) ?? false {
                         Circle()
                             .fill(Color.primary)
                             .frame(width: 24, height: 24)
