@@ -12,7 +12,6 @@ import SwiftUI
 struct ExternalUserLightweightListPopupView: View {
     @StateObject var viewModel: ExternalListPopupViewModel
     let showBackToProfileButton: Bool
-    @ObservedObject var mapViewModel: MapViewModel
 
     // Environment objects needed to flow through to PlaceDetailViewInNavigation
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
@@ -22,6 +21,10 @@ struct ExternalUserLightweightListPopupView: View {
     @EnvironmentObject var userSession: UserSession
     @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
     @Environment(\.presentationMode) var presentationMode
+
+    /// Observed for pending place navigation when map annotation is tapped while sheet is open.
+    @ObservedObject private var presentationService = PresentationService.shared
+
     @State private var navigationPath = NavigationPath()
 
     var body: some View {
@@ -35,11 +38,11 @@ struct ExternalUserLightweightListPopupView: View {
                 PlaceDetailViewInNavigation(placeId: placeId, minSheetHeight: 250)
             }
         }
-        .onChange(of: mapViewModel.pendingPlaceNavigation) { oldValue, newValue in
+        .onChange(of: presentationService.pendingPlaceNavigation) { oldValue, newValue in
             // When map annotation is tapped while list sheet is open, navigate to that place
             if let placeId = newValue {
                 navigationPath.append(placeId)
-                mapViewModel.pendingPlaceNavigation = nil
+                presentationService.pendingPlaceNavigation = nil
             }
         }
         .onAppear {

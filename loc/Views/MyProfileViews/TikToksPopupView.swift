@@ -11,7 +11,6 @@ import SwiftUI
 struct TikToksPopupView: View {
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
-    @EnvironmentObject var mapViewModel: MapViewModel
 
     /// Convenience accessor for TikTok view model.
     private var tikTokVM: ProfileTikTokViewModel { profile.tikTokViewModel }
@@ -28,7 +27,6 @@ struct TikToksPopupView: View {
             emptyTitle: "No TikToks Yet",
             emptyMessage: "Places you add from TikTok videos will appear here",
             loadMore: { await tikTokVM.loadMoreExternalPlaces() },
-            pendingPlaceNavigation: $mapViewModel.pendingPlaceNavigation,
             cardBuilder: { place, navigate in
                 PopupPlaceCard(
                     place: place,

@@ -11,7 +11,6 @@ import SwiftUI
 struct ReviewsListPopupView: View {
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
-    @EnvironmentObject var mapViewModel: MapViewModel
 
     /// Convenience accessor for reviews view model.
     private var reviewsVM: ProfileReviewsViewModel { profile.reviewsViewModel }
@@ -28,7 +27,6 @@ struct ReviewsListPopupView: View {
             emptyTitle: "No Reviews Yet",
             emptyMessage: "Places you've reviewed will appear here",
             loadMore: { await reviewsVM.loadMoreMyReviews() },
-            pendingPlaceNavigation: $mapViewModel.pendingPlaceNavigation,
             cardBuilder: { place, navigate in
                 PopupPlaceCard(
                     place: place,

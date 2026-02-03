@@ -87,9 +87,6 @@ struct MapContainerView: View {
                 appCoordinator: appCoordinator,
                 userSession: userSession
             ))
-            .sheet(item: $mapViewModel.activeSheet) { sheetType in
-                sheetContent(for: sheetType)
-            }
     }
 
     // MARK: - Map Content with Profile Observers
@@ -225,126 +222,6 @@ struct MapContainerView: View {
         }
     }
 
-    // MARK: - Sheet Content
-
-    /// Builds the sheet content for a given sheet type
-    @ViewBuilder
-    private func sheetContent(for sheetType: MapSheetType) -> some View {
-        Group {
-            switch sheetType {
-            case .list(let listId):
-                listSheetContent(listId: listId)
-
-            case .tiktoks:
-                TikToksPopupView()
-
-            case .reviews:
-                ReviewsListPopupView()
-
-            case .favorites:
-                FavoritesPopupView()
-
-            case .myPlaces:
-                MyPlacesListView()
-
-            case .externalReviews:
-                ExternalReviewsListPopupView(
-                    mapDisplayCoordinatorVM: mapDisplayCoordinatorViewModel,
-                    userProfileNavigationVM: userProfileNavigationViewModel
-                )
-
-            case .externalList(let listId):
-                externalListSheetContent(listId: listId)
-
-            case .externalFavorites:
-                ExternalFavoritesListPopupView(
-                    mapDisplayCoordinatorVM: mapDisplayCoordinatorViewModel,
-                    userProfileNavigationVM: userProfileNavigationViewModel
-                )
-
-            case .keywordResults(let keyword, let types):
-                KeywordResultsPopupView(keyword: keyword, types: types)
-            }
-        }
-        .environmentObject(profileViewModel)
-        .environmentObject(selectedPlaceViewModel)
-        .environmentObject(detailPlaceViewModel)
-        .environmentObject(mapViewModel)
-        .environmentObject(dataManager)
-        .environmentObject(locationManager)
-        .environmentObject(userSession)
-        .environmentObject(userProfileNavigationViewModel)
-        .environmentObject(mapDisplayCoordinatorViewModel)
-        .environmentObject(serviceContainer)
-        .environmentObject(notificationManager)
-        .presentationDetents([.height(300), .height(800)])
-        .presentationDragIndicator(.visible)
-        .presentationBackground(Color.clear)
-        .presentationBackgroundInteraction(.enabled(upThrough: .height(800)))
-        .onDisappear {
-            handleSheetDisappear()
-        }
-    }
-
-    /// Builds content for list sheet
-    @ViewBuilder
-    private func listSheetContent(listId: String) -> some View {
-        if let listIndex = profileViewModel.listsViewModel.lightweightPlaceLists.firstIndex(where: { $0.id == listId }) {
-            LightweightListPopupView(
-                lists: profileViewModel.listsViewModel.lightweightPlaceLists,
-                initialListIndex: listIndex
-            )
-            .id(listId)
-        } else {
-            loadingListView
-        }
-    }
-
-    /// Builds content for external list sheet
-    @ViewBuilder
-    private func externalListSheetContent(listId: String) -> some View {
-        if let listIndex = mapDisplayCoordinatorViewModel.mapDisplayLists.firstIndex(where: { $0.list_id == listId }) {
-            let popupViewModel = ExternalListPopupViewModel(
-                lists: mapDisplayCoordinatorViewModel.mapDisplayLists,
-                initialListIndex: listIndex,
-                preloadedPlaces: mapDisplayCoordinatorViewModel.mapDisplayListPlaces
-            )
-            ExternalUserLightweightListPopupView(
-                viewModel: popupViewModel,
-                showBackToProfileButton: true,
-                mapViewModel: mapViewModel
-            )
-        } else {
-            loadingListView
-        }
-    }
-
-    /// Loading view for lists
-    private var loadingListView: some View {
-        VStack {
-            ProgressView()
-                .padding()
-            Text("Loading list...")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-
-    /// Handles sheet disappear
-    private func handleSheetDisappear() {
-        mapViewModel.clearAllFilters()
-        profileViewModel.selectedListIdForMap = nil
-
-        if let userId = userSession.currentUserId {
-            let currentRegion = appCoordinator.currentMapRegion
-            Task {
-                if let region = currentRegion {
-                    await mapViewModel.onMapCameraSettled(region, userId: userId)
-                }
-            }
-        }
-    }
 }
 
 // MARK: - External Profile onChange Modifiers
@@ -374,9 +251,9 @@ private struct ExternalProfileOnChangeModifiers: ViewModifier {
     /// Handles external reviews on map
     private func handleExternalReviewsOnMap(_ shouldShow: Bool) {
         if shouldShow, let userId = mapDisplayCoordinatorViewModel.mapDisplayUserId {
-            // Dismiss any competing sheets and present the external reviews sheet
+            // Dismiss any competing sheets via PresentationService
+            PresentationService.shared.dismiss()
             selectedPlaceViewModel.selectedPlace = nil
-            selectedPlaceViewModel.isDetailSheetPresented = false
             mapDisplayCoordinatorViewModel.showExternalReviewsOnMap = false
 
             let photoUrl = mapDisplayCoordinatorViewModel.mapDisplayUserPhotoUrl.flatMap { URL(string: $0) }
@@ -396,9 +273,9 @@ private struct ExternalProfileOnChangeModifiers: ViewModifier {
     /// Handles external list on map
     private func handleExternalListOnMap(_ listId: String?) {
         if let listId = listId, let userId = mapDisplayCoordinatorViewModel.mapDisplayUserId {
-            // Dismiss any competing sheets and present the external list sheet
+            // Dismiss any competing sheets via PresentationService
+            PresentationService.shared.dismiss()
             selectedPlaceViewModel.selectedPlace = nil
-            selectedPlaceViewModel.isDetailSheetPresented = false
             mapDisplayCoordinatorViewModel.showExternalListOnMap = nil
 
             let photoUrl = mapDisplayCoordinatorViewModel.mapDisplayUserPhotoUrl.flatMap { URL(string: $0) }
@@ -426,9 +303,9 @@ private struct ExternalProfileOnChangeModifiers: ViewModifier {
     /// Handles external favorites on map
     private func handleExternalFavoritesOnMap(_ shouldShow: Bool) {
         if shouldShow, let userId = mapDisplayCoordinatorViewModel.mapDisplayUserId {
-            // Dismiss any competing sheets and present the external favorites sheet
+            // Dismiss any competing sheets via PresentationService
+            PresentationService.shared.dismiss()
             selectedPlaceViewModel.selectedPlace = nil
-            selectedPlaceViewModel.isDetailSheetPresented = false
             mapDisplayCoordinatorViewModel.showExternalFavoritesOnMap = false
 
             let photoUrl = mapDisplayCoordinatorViewModel.mapDisplayUserPhotoUrl.flatMap { URL(string: $0) }
@@ -475,8 +352,9 @@ private struct SheetOnChangeModifiers: ViewModifier {
             if !userProfileNavigationViewModel.navigatedFromPlaceDetail {
                 selectedPlaceViewModel.selectedPlace = nil
             }
-            if mapViewModel.activeSheet != nil {
-                mapViewModel.activeSheet = nil
+            // Dismiss any map popup via PresentationService
+            if PresentationService.shared.isShowingMapPopup {
+                PresentationService.shared.dismiss()
             }
         }
     }

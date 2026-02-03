@@ -105,10 +105,18 @@ class SelectedPlaceViewModel: ObservableObject {
         set { selectionState.selectedPlace = newValue }
     }
 
-    /// Whether the detail sheet is presented.
+    /// Whether the detail sheet is presented (bridged to PresentationService).
     var isDetailSheetPresented: Bool {
-        get { selectionState.isDetailSheetPresented }
-        set { selectionState.isDetailSheetPresented = newValue }
+        get { PresentationService.shared.activeSheet == .placeDetail }
+        set {
+            if newValue {
+                PresentationService.shared.present(.placeDetail)
+            } else if PresentationService.shared.activeSheet == .placeDetail {
+                PresentationService.shared.dismiss()
+            }
+            // Also update child state for internal consistency
+            selectionState.isDetailSheetPresented = newValue
+        }
     }
 
     /// Whether to allow auto-presentation.

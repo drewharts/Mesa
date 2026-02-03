@@ -9,34 +9,6 @@ import Foundation
 import MapKit
 import SwiftUI
 
-// MARK: - Sheet Type Enum
-/// Identifies which sheet is currently being presented on the map.
-enum MapSheetType: Identifiable, Equatable {
-    case list(String)
-    case tiktoks
-    case reviews
-    case favorites
-    case myPlaces
-    case externalReviews
-    case externalList(String)
-    case externalFavorites
-    case keywordResults(keyword: String, types: [String])
-
-    var id: String {
-        switch self {
-        case .list(let listId): return "list-\(listId)"
-        case .tiktoks: return "tiktoks"
-        case .reviews: return "reviews"
-        case .favorites: return "favorites"
-        case .myPlaces: return "myPlaces"
-        case .externalReviews: return "externalReviews"
-        case .externalList(let listId): return "externalList-\(listId)"
-        case .externalFavorites: return "externalFavorites"
-        case .keywordResults(let keyword, _): return "keywordResults-\(keyword)"
-        }
-    }
-}
-
 @MainActor
 class MapViewModel: ObservableObject {
     // MARK: - Child ViewModels
@@ -46,10 +18,6 @@ class MapViewModel: ObservableObject {
     let photoViewModel: MapPhotoViewModel
     let viewportViewModel: MapViewportViewModel
     let selectionViewModel: MapAnnotationSelectionViewModel
-
-    // MARK: - Sheet Coordination
-
-    @Published var activeSheet: MapSheetType? = nil
 
     // MARK: - Proxy Properties for Backward Compatibility
 
@@ -74,22 +42,36 @@ class MapViewModel: ObservableObject {
     var externalListId: String? { externalUserViewModel.externalListId }
 
     var preservedSelectedAnnotation: PlaceAnnotation? { selectionViewModel.preservedSelectedAnnotation }
+
+    /// Pending place navigation - bridged to PresentationService for sheet views to observe.
     var pendingPlaceNavigation: String? {
-        get { selectionViewModel.pendingPlaceNavigation }
-        set { selectionViewModel.pendingPlaceNavigation = newValue }
+        get { PresentationService.shared.pendingPlaceNavigation }
+        set { PresentationService.shared.pendingPlaceNavigation = newValue }
     }
 
-    // MARK: - Computed Sheet Properties
+    // MARK: - Computed Sheet Properties (Read from PresentationService)
 
-    var showingListPopup: Bool { if case .list = activeSheet { return true } else { return false } }
-    var showingTikToksPopup: Bool { activeSheet == .tiktoks }
-    var showingReviewsPopup: Bool { activeSheet == .reviews }
-    var showingExternalReviewsPopup: Bool { activeSheet == .externalReviews }
-    var showingExternalListPopup: Bool { if case .externalList = activeSheet { return true } else { return false } }
-    var showingExternalFavoritesPopup: Bool { activeSheet == .externalFavorites }
-    var showingFavoritesPopup: Bool { activeSheet == .favorites }
-    var showingMyPlacesPopup: Bool { activeSheet == .myPlaces }
-    var showingKeywordPopup: Bool { if case .keywordResults = activeSheet { return true } else { return false } }
+    var showingListPopup: Bool {
+        guard let sheet = PresentationService.shared.activeSheet else { return false }
+        if case .list = sheet { return true }
+        return false
+    }
+    var showingTikToksPopup: Bool { PresentationService.shared.activeSheet == .tiktoks }
+    var showingReviewsPopup: Bool { PresentationService.shared.activeSheet == .reviews }
+    var showingExternalReviewsPopup: Bool { PresentationService.shared.activeSheet == .externalReviews }
+    var showingExternalListPopup: Bool {
+        guard let sheet = PresentationService.shared.activeSheet else { return false }
+        if case .externalList = sheet { return true }
+        return false
+    }
+    var showingExternalFavoritesPopup: Bool { PresentationService.shared.activeSheet == .externalFavorites }
+    var showingFavoritesPopup: Bool { PresentationService.shared.activeSheet == .favorites }
+    var showingMyPlacesPopup: Bool { PresentationService.shared.activeSheet == .myPlaces }
+    var showingKeywordPopup: Bool {
+        guard let sheet = PresentationService.shared.activeSheet else { return false }
+        if case .keywordResults = sheet { return true }
+        return false
+    }
 
     // MARK: - Initialization
 
@@ -137,43 +119,45 @@ class MapViewModel: ObservableObject {
     /// Validates that a list exists and sets it as the selected list for filtering.
     func selectList(_ listId: String, availableLists: [LightweightPlaceList]) {
         guard filteringViewModel.selectList(listId, availableLists: availableLists) else { return }
-        activeSheet = .list(listId)
+        PresentationService.shared.present(.list(listId: listId))
     }
 
     /// Clears the list filter and restores all annotations.
+    /// Note: Does NOT dismiss the sheet - that's handled by the sheet's own dismissal flow.
     func clearListFilter() {
         filteringViewModel.clearListFilter()
-        activeSheet = nil
+        // Don't call PresentationService.shared.dismiss() here - it creates a cycle
+        // when handleMapPopupDisappear() sets selectedListIdForMap = nil
     }
 
     /// Sets the map to show only TikTok places.
     func selectTikToks() {
         filteringViewModel.selectTikToks()
-        activeSheet = .tiktoks
+        PresentationService.shared.present(.tiktoks)
     }
 
     /// Sets the map to show only reviewed places.
     func selectReviews() {
         filteringViewModel.selectReviews()
-        activeSheet = .reviews
+        PresentationService.shared.present(.reviews)
     }
 
     /// Sets the map to show only favorite places.
     func selectFavorites() {
         filteringViewModel.selectFavorites()
-        activeSheet = .favorites
+        PresentationService.shared.present(.favorites)
     }
 
     /// Sets the map to show only user's created places.
     func selectMyPlaces() {
         filteringViewModel.selectMyPlaces()
-        activeSheet = .myPlaces
+        PresentationService.shared.present(.myPlaces)
     }
 
     /// Shows keyword search results on the map.
     func selectKeywordResults(keyword: String, types: [String]) {
         filteringViewModel.selectKeywordResults(keyword: keyword, types: types)
-        activeSheet = .keywordResults(keyword: keyword, types: types)
+        PresentationService.shared.present(.keywordResults(keyword: keyword, types: types))
     }
 
     // MARK: - External User Filtering (Coordinator Methods)
@@ -182,21 +166,21 @@ class MapViewModel: ObservableObject {
     func selectExternalReviews(userId: String, userPhotoUrl: URL?) {
         clearUserFilters()
         externalUserViewModel.selectExternalReviews(userId: userId, userPhotoUrl: userPhotoUrl)
-        activeSheet = .externalReviews
+        PresentationService.shared.present(.externalReviews)
     }
 
     /// Shows external user's list on the map.
     func selectExternalList(listId: String, userId: String, userPhotoUrl: URL?) {
         clearUserFilters()
         externalUserViewModel.selectExternalList(listId: listId, userId: userId, userPhotoUrl: userPhotoUrl)
-        activeSheet = .externalList(listId)
+        PresentationService.shared.present(.externalList(listId: listId))
     }
 
     /// Shows external user's favorites on the map.
     func selectExternalFavorites(userId: String, userPhotoUrl: URL?) {
         clearUserFilters()
         externalUserViewModel.selectExternalFavorites(userId: userId, userPhotoUrl: userPhotoUrl)
-        activeSheet = .externalFavorites
+        PresentationService.shared.present(.externalFavorites)
     }
 
     // MARK: - Clear Filters
