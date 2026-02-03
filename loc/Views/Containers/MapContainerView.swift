@@ -130,10 +130,6 @@ struct MapContainerView: View {
     /// Handles list selection changes from ProfileViewModel
     private func handleListSelectionChange(_ newValue: String?) {
         if let listId = newValue {
-            // Dismiss any competing sheets before presenting the list sheet
-            selectedPlaceViewModel.selectedPlace = nil
-            selectedPlaceViewModel.isDetailSheetPresented = false
-
             mapViewModel.selectList(listId, availableLists: profileViewModel.listsViewModel.lightweightPlaceLists)
 
             if let listCenter = profileViewModel.listsViewModel.lightweightPlaceLists
@@ -168,10 +164,6 @@ struct MapContainerView: View {
     /// Handles showing TikToks on map
     private func handleTikToksOnMap(_ newValue: Bool) {
         if newValue {
-            // Dismiss any competing sheets before presenting
-            selectedPlaceViewModel.selectedPlace = nil
-            selectedPlaceViewModel.isDetailSheetPresented = false
-
             mapViewModel.selectTikToks()
             profileViewModel.showTikToksOnMap = false
             if let userId = userSession.currentUserId {
@@ -188,10 +180,6 @@ struct MapContainerView: View {
     /// Handles showing reviews on map
     private func handleReviewsOnMap(_ newValue: Bool) {
         if newValue {
-            // Dismiss any competing sheets before presenting
-            selectedPlaceViewModel.selectedPlace = nil
-            selectedPlaceViewModel.isDetailSheetPresented = false
-
             mapViewModel.selectReviews()
             profileViewModel.showReviewsOnMap = false
             if let userId = userSession.currentUserId {
@@ -208,10 +196,6 @@ struct MapContainerView: View {
     /// Handles showing favorites on map
     private func handleFavoritesOnMap(_ newValue: Bool) {
         if newValue {
-            // Dismiss any competing sheets before presenting
-            selectedPlaceViewModel.selectedPlace = nil
-            selectedPlaceViewModel.isDetailSheetPresented = false
-
             mapViewModel.selectFavorites()
             profileViewModel.showFavoritesOnMap = false
             if let userId = userSession.currentUserId {
@@ -228,10 +212,6 @@ struct MapContainerView: View {
     /// Handles showing my places on map
     private func handleMyPlacesOnMap(_ newValue: Bool) {
         if newValue {
-            // Dismiss any competing sheets before presenting
-            selectedPlaceViewModel.selectedPlace = nil
-            selectedPlaceViewModel.isDetailSheetPresented = false
-
             mapViewModel.selectMyPlaces()
             profileViewModel.showMyPlacesOnMap = false
             if let userId = userSession.currentUserId {
