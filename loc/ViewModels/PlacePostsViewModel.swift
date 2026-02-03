@@ -17,17 +17,21 @@ class PlacePostsViewModel: ObservableObject {
     @Published var place: DetailPlace?
     @Published var highlightedPostId: String?
     @Published var isFavorited: Bool = false
-    
-    // MARK: - Dependencies
+
+    // MARK: - Dependencies (Services only)
     private let postService: PostService
     private let photosVM: PlacePhotosViewModel
-    private let selectedPlaceVM: SelectedPlaceViewModel
     private let notificationManager: NotificationManager
     private let userSession: UserSession
-    private let profileVM: ProfileViewModel
-    
+
     private var cancellables = Set<AnyCancellable>()
-    
+
+    // MARK: - Callbacks
+    /// Called when user toggles favorite status
+    var onToggleFavorite: ((DetailPlace, Bool) -> Void)?
+    /// Called when like statuses need to be checked
+    var onCheckLikeStatuses: ((String) -> Void)?
+
     // MARK: - Loading State
     enum LoadingState {
         case idle
@@ -35,59 +39,26 @@ class PlacePostsViewModel: ObservableObject {
         case loaded
         case error(Error)
     }
-    
+
     // MARK: - Initialization
-    init(postService: PostService,
-         photosViewModel: PlacePhotosViewModel,
-         selectedPlaceVM: SelectedPlaceViewModel,
+    /// Initializes the ViewModel with required services.
+    init(photosViewModel: PlacePhotosViewModel,
          notificationManager: NotificationManager,
-         userSession: UserSession,
-         profileVM: ProfileViewModel) {
-        self.postService = postService
+         userSession: UserSession) {
+        self.postService = ServiceContainer.shared.postService
         self.photosVM = photosViewModel
-        self.selectedPlaceVM = selectedPlaceVM
         self.notificationManager = notificationManager
         self.userSession = userSession
-        self.profileVM = profileVM
-        
+
         setupObservers()
     }
-    
+
     // MARK: - Setup
     private func setupObservers() {
-        observePlaceChanges()
-        observePostUpdates()
         observeHighlightedPost()
-        observeFavoriteStatus()
     }
-    
-    /// Observes when the selected place changes to load initial posts
-    private func observePlaceChanges() {
-        selectedPlaceVM.$selectedPlace
-            .sink { [weak self] place in
-                guard let self = self else { return }
-                self.place = place
-                self.posts = self.selectedPlaceVM.posts
-                
-                if let placeId = place?.id.uuidString {
-                    self.loadPosts(for: placeId)
-                }
-            }
-            .store(in: &cancellables)
-    }
-    
-    /// Observes when posts are added, modified, or deleted to refresh the feed
-    private func observePostUpdates() {
-        selectedPlaceVM.$postsUpdateCounter
-            .dropFirst() // Skip initial value to avoid redundant updates on setup
-            .sink { [weak self] _ in
-                guard let self = self else { return }
-                self.posts = self.selectedPlaceVM.posts
-            }
-            .store(in: &cancellables)
-    }
-    
-    /// Observes deep link notifications to highlight specific posts
+
+    /// Observes deep link notifications to highlight specific posts.
     private func observeHighlightedPost() {
         notificationManager.$highlightedReviewId
             .sink { [weak self] postId in
@@ -95,94 +66,91 @@ class PlacePostsViewModel: ObservableObject {
             }
             .store(in: &cancellables)
     }
-    
-    /// Observes favorite status changes for the current place.
-    /// Monitors both lightweightFavorites and userFavorites since isPlaceFavorite checks both.
-    private func observeFavoriteStatus() {
-        Publishers.CombineLatest3(
-            selectedPlaceVM.$selectedPlace,
-            profileVM.$lightweightFavorites,
-            profileVM.$userFavorites
-        )
-        .receive(on: RunLoop.main) // Ensure UI updates on main thread
-        .sink { [weak self] place, _, _ in
-            guard let self = self, let place = place else {
-                self?.isFavorited = false
-                return
-            }
-            let newFavoriteState = self.profileVM.isPlaceFavorite(placeId: place.id.uuidString)
-            if self.isFavorited != newFavoriteState {
-                print("⭐ [PlacePostsVM] Favorite status changed: \(self.isFavorited) → \(newFavoriteState)")
-                self.isFavorited = newFavoriteState
-            }
+
+    // MARK: - Data-Driven Methods
+
+    /// Sets the current place.
+    func setPlace(_ place: DetailPlace?) {
+        self.place = place
+        if place == nil {
+            posts = []
+            loadingState = .idle
         }
-        .store(in: &cancellables)
     }
-    
+
+    /// Sets the posts for the current place.
+    func setPosts(_ posts: [PlacePost]) {
+        self.posts = posts
+    }
+
+    /// Sets the loading state for posts.
+    func setLoadingState(_ state: LoadingState) {
+        self.loadingState = state
+    }
+
+    /// Sets the favorite status for the current place.
+    func setFavoriteStatus(_ isFavorited: Bool) {
+        if self.isFavorited != isFavorited {
+            print("⭐ [PlacePostsVM] Favorite status changed: \(self.isFavorited) → \(isFavorited)")
+            self.isFavorited = isFavorited
+        }
+    }
+
     // MARK: - Computed Properties
     var hasPosts: Bool {
         !posts.isEmpty
     }
-    
+
     var emptyStateMessage: String {
         "Be the first to share your experience!"
     }
-    
+
     var photosViewModel: PlacePhotosViewModel {
         photosVM
     }
-    
+
     // MARK: - Actions
-    func loadPosts(for placeId: String) {
-        let vmLoadingState = selectedPlaceVM.postLoadingState(forPlaceId: placeId)
-        
-        switch vmLoadingState {
-        case .idle:
-            loadingState = .idle
-        case .loading:
-            loadingState = .loading
-        case .loaded:
-            loadingState = .loaded
-        case .error(let error):
-            loadingState = .error(error)
-        }
-    }
-    
+
+    /// Requests like status check via callback.
     func checkLikeStatuses() {
         guard let userId = userSession.currentUserId else { return }
-        selectedPlaceVM.checkLikeStatuses(userId: userId)
+        onCheckLikeStatuses?(userId)
     }
-    
+
+    /// Toggles the favorite status for the current place via callback.
     func toggleFavorite() {
         guard let place = place else { return }
-        if isFavorited {
-            profileVM.removeFavoritePlace(place: place)
-        } else {
-            profileVM.addFavoritePlace(place: place)
-        }
+        onToggleFavorite?(place, !isFavorited)
     }
-    
+
     // MARK: - Photo Management
+
+    /// Returns the photo loading state for a specific post.
     func getPhotoLoadingState(for post: PlacePost) -> PlacePhotosViewModel.LoadingState {
         photosVM.photoLoadingState(forPostId: post.id)
     }
-    
+
+    /// Returns the loaded photos for a specific post.
     func getPhotos(for post: PlacePost) -> [UIImage] {
         photosVM.photos(forPostId: post.id)
     }
-    
+
+    /// Loads more photos for a specific post.
     func loadMorePhotos(for postId: String, allImageUrls: [String]) {
         photosVM.loadMorePostPhotos(for: postId, allImageUrls: allImageUrls)
     }
-    
+
+    /// Reloads all photos for a specific post.
     func reloadPhotos(for post: PlacePost) {
         photosVM.reloadPostPhotos(for: post)
     }
-    
+
+    /// Returns a post by its ID from the local posts array.
     func getPost(by id: String) -> PlacePost? {
-        selectedPlaceVM.getPost(by: id)
+        posts.first { $0.id == id }
     }
-    
+
+    /// Clears the highlighted post notification.
     func clearHighlightedPost() {
         notificationManager.clearHighlightedReview()
     }

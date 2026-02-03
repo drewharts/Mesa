@@ -2,7 +2,7 @@
 //  SupabaseManager.swift
 //  loc
 //
-//  Supabase client manager (replacement for FirebaseManager)
+//  Supabase client manager for database operations.
 //
 
 import Foundation

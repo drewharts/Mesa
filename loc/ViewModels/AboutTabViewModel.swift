@@ -23,51 +23,47 @@ class AboutTabViewModel: ObservableObject {
     let customPlaceCreatorViewModel: CustomPlaceCreatorViewModel
     let notesViewModel: NotesTabViewModel
 
-    // MARK: - Dependencies
-    private let selectedPlaceVM: SelectedPlaceViewModel
+    // MARK: - Dependencies (Services only)
     private let placeService: PlaceService
-    private var cancellables = Set<AnyCancellable>()
+
+    // MARK: - Callbacks
+    /// Called when a place description is fetched from polling
+    var onDescriptionUpdated: ((String) -> Void)?
+
+    // MARK: - Private State
     private var descriptionPollingTimer: Timer?
-    
+
     // MARK: - Initialization
+    /// Initializes the coordinator ViewModel with child ViewModels.
     init(tikTokVideosViewModel: TikTokVideosViewModel,
          placePhotosViewModel: PlacePhotosViewModel,
          customPlaceCreatorViewModel: CustomPlaceCreatorViewModel,
-         notesViewModel: NotesTabViewModel,
-         selectedPlaceVM: SelectedPlaceViewModel,
-         placeService: PlaceService = .shared) {
+         notesViewModel: NotesTabViewModel) {
         self.tikTokVideosViewModel = tikTokVideosViewModel
         self.placePhotosViewModel = placePhotosViewModel
         self.customPlaceCreatorViewModel = customPlaceCreatorViewModel
         self.notesViewModel = notesViewModel
-        self.selectedPlaceVM = selectedPlaceVM
-        self.placeService = placeService
-
-        setupObservers()
+        self.placeService = ServiceContainer.shared.placeService
     }
 
     deinit {
         descriptionPollingTimer?.invalidate()
     }
-    
-    // MARK: - Setup
-    private func setupObservers() {
-        // Observe place changes
-        selectedPlaceVM.$selectedPlace
-            .sink { [weak self] place in
-                self?.place = place
-                self?.placeId = place?.id.uuidString ?? ""
-                // Update custom place creator VM when place changes
-                self?.customPlaceCreatorViewModel.setPlace(place)
-                // Check if we need to poll for description
-                self?.checkDescriptionAndStartPolling(for: place)
-            }
-            .store(in: &cancellables)
+
+    // MARK: - Data-Driven Methods
+
+    /// Sets the current place and updates child ViewModels.
+    func setPlace(_ place: DetailPlace?) {
+        self.place = place
+        self.placeId = place?.id.uuidString ?? ""
+        tikTokVideosViewModel.setPlaceId(place?.id.uuidString)
+        customPlaceCreatorViewModel.setPlace(place)
+        checkDescriptionAndStartPolling(for: place)
     }
 
     // MARK: - Description Polling
 
-    /// Checks if the place needs a description and starts polling if so
+    /// Checks if the place needs a description and starts polling if so.
     private func checkDescriptionAndStartPolling(for place: DetailPlace?) {
         descriptionPollingTimer?.invalidate()
 
@@ -86,7 +82,7 @@ class AboutTabViewModel: ObservableObject {
         }
     }
 
-    /// Starts a timer to poll for the description every 3 seconds
+    /// Starts a timer to poll for the description every 3 seconds.
     private func startDescriptionPolling(placeId: String) {
         descriptionPollingTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
@@ -95,7 +91,7 @@ class AboutTabViewModel: ObservableObject {
         }
     }
 
-    /// Fetches the place from the backend and checks if description is ready
+    /// Fetches the place from the backend and checks if description is ready.
     private func pollForDescription(placeId: String) async {
         do {
             let updatedPlace = try await placeService.fetchPlace(withId: placeId)
@@ -103,8 +99,8 @@ class AboutTabViewModel: ObservableObject {
                 // Description is ready - update and stop polling
                 descriptionPollingTimer?.invalidate()
                 isDescriptionLoading = false
-                // Update the selected place with new description
-                selectedPlaceVM.updatePlaceDescription(description)
+                // Notify parent via callback
+                onDescriptionUpdated?(description)
             }
         } catch {
             print("❌ [AboutTabViewModel] Error polling for description: \(error)")

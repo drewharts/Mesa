@@ -40,7 +40,7 @@ struct NearbyPlaceGeometry: Codable {
 
 // MARK: - Properties
 struct NearbyPlaceProperties: Codable {
-    // Common fields (present in both Google Places and Firestore)
+    // Common fields (present in both Google Places and database)
     let address: String
     let distanceMeters: Double?  // Made optional to handle missing values
     let name: String
@@ -58,18 +58,18 @@ struct NearbyPlaceProperties: Codable {
     let updatedAt: String?
     let userRatingsTotal: Int?
     
-    // Firestore specific fields (optional)
+    // Database specific fields (optional)
     let description: String?
     let id: String?
     
-    // Place ID handling (Google has place_id, Firestore has id or null place_id)
+    // Place ID handling (Google has place_id, database has id or null place_id)
     let placeId: String?
     
     // Computed property to get the actual ID
     var actualId: String {
-        // For Firestore places, use the id field
-        if let firestoreId = id {
-            return firestoreId
+        // For database places, use the id field
+        if let databaseId = id {
+            return databaseId
         }
         // For Google Places, use place_id
         if let googlePlaceId = placeId {

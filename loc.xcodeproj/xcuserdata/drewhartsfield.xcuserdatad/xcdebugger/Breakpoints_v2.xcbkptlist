@@ -166,7 +166,7 @@
          BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
          <BreakpointContent
             uuid = "EF3A84AB-CA99-4FD1-BD80-76E92AA291D0"
-            shouldBeEnabled = "Yes"
+            shouldBeEnabled = "No"
             ignoreCount = "0"
             continueAfterRunningActions = "No"
             filePath = "loc/Services/MesaBackendService.swift"
@@ -174,7 +174,7 @@
             endingColumnNumber = "9223372036854775807"
             startingLineNumber = "267"
             endingLineNumber = "267"
-            landmarkName = "handleGooglePlaceDetails(_:)"
+            landmarkName = "fetchSuggestions(query:limit:provider:latitude:longitude:)"
             landmarkType = "7">
          </BreakpointContent>
       </BreakpointProxy>
@@ -206,7 +206,7 @@
             endingColumnNumber = "9223372036854775807"
             startingLineNumber = "384"
             endingLineNumber = "384"
-            landmarkName = "testLocationAwareSearch(query:completion:)"
+            landmarkName = "fetchPlaceDetails(placeId:source:completion:)"
             landmarkType = "7">
          </BreakpointContent>
       </BreakpointProxy>
@@ -222,7 +222,7 @@
             endingColumnNumber = "9223372036854775807"
             startingLineNumber = "385"
             endingLineNumber = "385"
-            landmarkName = "testLocationAwareSearch(query:completion:)"
+            landmarkName = "fetchPlaceDetails(placeId:source:completion:)"
             landmarkType = "7">
          </BreakpointContent>
       </BreakpointProxy>

@@ -105,45 +105,33 @@ struct AboutTabContent: View {
         deepLinkViewModel: nil
     )
     
-    // Create child ViewModels
-    let tikTokVM = TikTokVideosViewModel(
-        tikTokService: TikTokPlaceService.shared,
-        selectedPlaceVM: selectedPlaceVM,
-        profileVM: profileVM
-    )
-    
-    let photosVM = PlacePhotosViewModel(
-        postService: services.postService,
-        selectedPlaceVM: selectedPlaceVM
-    )
-    
+    // Create child ViewModels (all fully refactored - no ViewModel dependencies)
+    let tikTokVM = TikTokVideosViewModel()
+    let photosVM = PlacePhotosViewModel()
     let customPlaceCreatorVM = CustomPlaceCreatorViewModel(
         placeService: services.placeService
     )
-    
-    let notesVM = NotesTabViewModel(
-        userService: services.userService,
-        selectedPlaceVM: selectedPlaceVM,
-        profileVM: profileVM,
-        userSession: userSession
-    )
-    
-    // Create coordinator ViewModel
+    let notesVM = NotesTabViewModel(userSession: userSession)
+
+    // Create coordinator ViewModel (fully refactored - no ViewModel dependencies)
     let aboutVM = AboutTabViewModel(
         tikTokVideosViewModel: tikTokVM,
         placePhotosViewModel: photosVM,
         customPlaceCreatorViewModel: customPlaceCreatorVM,
-        notesViewModel: notesVM,
-        selectedPlaceVM: selectedPlaceVM
+        notesViewModel: notesVM
     )
-    
+
     var mockPlace = DetailPlace()
     mockPlace.name = "Sample Restaurant"
     mockPlace.description = "A cozy Italian restaurant."
     mockPlace.rating = 4.5
     mockPlace.userRatingsTotal = 234
-    selectedPlaceVM.selectedPlace = mockPlace
-    
+
+    // Set place data on refactored ViewModels
+    aboutVM.setPlace(mockPlace)
+    photosVM.setPlace(mockPlace)
+    notesVM.setPlace(mockPlace)
+
     return AboutTabContent(
         viewModel: aboutVM,
         onPhotoTapped: { photos, index in

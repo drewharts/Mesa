@@ -74,12 +74,18 @@ class TikTokMetadataCache: ObservableObject {
         return cache[url]
     }
     
-    /// Prefetch metadata for multiple URLs (useful for preloading)
+    /// Prefetch metadata for multiple URLs with concurrency limiting.
     func prefetchMetadata(for urls: [String]) async {
-        await withTaskGroup(of: Void.self) { group in
-            for url in urls {
-                group.addTask {
-                    _ = await self.getMetadata(for: url)
+        // Limit concurrent requests to avoid socket exhaustion
+        let maxConcurrent = 4
+
+        // Process in batches to limit concurrent network requests
+        for batch in urls.chunked(into: maxConcurrent) {
+            await withTaskGroup(of: Void.self) { group in
+                for url in batch {
+                    group.addTask {
+                        _ = await self.getMetadata(for: url)
+                    }
                 }
             }
         }

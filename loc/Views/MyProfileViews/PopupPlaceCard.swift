@@ -28,6 +28,8 @@ struct PopupPlaceCard: View {
     /// Custom navigation callback - when provided, bypasses default navigation
     /// Use this for external profile views that need to dismiss the profile sheet first
     var onNavigate: ((String) -> Void)? = nil
+    /// Show "Added by [name]" indicator for collaborative lists
+    var showAddedBy: Bool = false
 
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @Environment(\.presentationMode) var presentationMode
@@ -102,12 +104,20 @@ struct PopupPlaceCard: View {
     // MARK: - Place Info Overlay
     
     private var placeInfoOverlay: some View {
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: 4) {
             Text(place.name)
                 .font(.headline)
                 .foregroundColor(.white)
                 .lineLimit(1)
                 .multilineTextAlignment(.leading)
+
+            // Show "Added by" indicator for collaborative lists
+            if showAddedBy, let addedByName = place.added_by_name {
+                AddedByIndicator(
+                    name: addedByName,
+                    photoUrl: place.added_by_photo_url
+                )
+            }
         }
         .padding(.horizontal, 12)
         .padding(.bottom, 8)

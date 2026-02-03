@@ -4,34 +4,36 @@
 //
 //  Created by Andrew Hartsfield II on 5/29/25.
 //
+
 import SwiftUI
 
+/// User row for profile navigation from the current user's followers/following lists.
+/// Uses ExternalUserProfileViewWrapper which creates its own @StateObject ViewModel,
+/// enabling Instagram-style nested navigation where each profile maintains independent state.
 struct UserRow: View {
     let user: ProfileData
-    
+
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var detailPlaceVM: DetailPlaceViewModel
     @EnvironmentObject var userSession: UserSession
-    @EnvironmentObject var userProfileVM: UserProfileViewModel
-    
+    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
+    @EnvironmentObject var userProfileNavigationVM: UserProfileNavigationViewModel
+    @EnvironmentObject var mapDisplayCoordinatorVM: MapDisplayCoordinatorViewModel
+    @EnvironmentObject var locationManager: LocationManager
+    @EnvironmentObject var dataManager: DataManager
+
     var body: some View {
         NavigationLink(destination: {
-            UserProfileView(
-                userId: user.id,
-                UserProfileVM: userProfileVM
-            )
-            .id(user.id)  // Force new view identity when user changes
-            .environmentObject(profile)
-            .environmentObject(detailPlaceVM)
-            .environmentObject(userSession) // Add userSession for currentUserId
-            .task {
-                // Set up user in ViewModel when profile view appears
-                // MVVM: ViewModel manages user data state
-                // Using .task instead of .onAppear ensures this runs before view renders
-                // NOTE: Pass shouldPresent: false to prevent double navigation since NavigationLink handles it
-                guard let currentUserId = userSession.currentUserId else { return }
-                userProfileVM.selectUser(user, currentUserId: currentUserId, shouldPresent: false)
-            }
+            ExternalUserProfileViewWrapper(user: user)
+                .id(user.id)  // Force new view identity when user changes
+                .environmentObject(profile)
+                .environmentObject(detailPlaceVM)
+                .environmentObject(userSession)
+                .environmentObject(selectedPlaceVM)
+                .environmentObject(userProfileNavigationVM)
+                .environmentObject(mapDisplayCoordinatorVM)
+                .environmentObject(locationManager)
+                .environmentObject(dataManager)
         }) {
             HStack(spacing: 12) {
                 // User profile photo
@@ -50,20 +52,16 @@ struct UserRow: View {
                                 .foregroundColor(.gray)
                         )
                 }
-                
+
                 // User name
                 VStack(alignment: .leading, spacing: 4) {
                     Text(user.fullName)
                         .font(.body)
                         .fontWeight(.medium)
                         .foregroundColor(.primary)
-                    
-                    // Additional user info could go here in the future
                 }
-                
+
                 Spacer()
-                
-                // Removed manual chevron - NavigationLink provides one automatically
             }
             .padding(.vertical, 8)
         }

@@ -1,12 +1,26 @@
+//
+//  FloatingActionButtons.swift
+//  loc
+//
+//  Floating action buttons for search and profile navigation
+//
+
 import SwiftUI
 
+/// Floating action buttons for map view
+/// Single Responsibility: Display search and profile FABs
 struct FloatingActionButtons: View {
+    // MARK: - Dependencies
+
     @EnvironmentObject var profileViewModel: ProfileViewModel
-    let searchCoordinator: SearchCoordinatorViewModel
-    @Binding var isSearchBarMinimized: Bool
-    @Binding var sheetHeight: CGFloat
+
+    // MARK: - Bindings
+
+    @Binding var showSearchPage: Bool
     @Binding var shouldNavigateToProfile: Bool
-    
+
+    // MARK: - Body
+
     var body: some View {
         VStack {
             Spacer()
@@ -21,14 +35,12 @@ struct FloatingActionButtons: View {
             }
         }
     }
-    
+
+    // MARK: - Search Button
+
     private var searchButton: some View {
         Button(action: {
-            // ✅ No animation for instant response
-            sheetHeight = searchCoordinator.calculateCollapsedHeight(currentHeight: sheetHeight)
-            isSearchBarMinimized = false
-            
-            // ✅ Focus handled by SearchContainerView.onChange
+            showSearchPage = true
         }) {
             Image(systemName: "magnifyingglass")
                 .foregroundColor(.secondary)
@@ -39,7 +51,9 @@ struct FloatingActionButtons: View {
                 .shadow(radius: 4)
         }
     }
-    
+
+    // MARK: - Profile Button
+
     private var profileButton: some View {
         Group {
             if let profilePhoto = profileViewModel.userPicture {
@@ -61,14 +75,13 @@ struct FloatingActionButtons: View {
                     .shadow(radius: 4)
             }
         }
-        .contentShape(Circle()) // Make entire circle tappable
+        .contentShape(Circle())
         .gesture(
             TapGesture()
                 .onEnded { _ in
-                    // Exclusive gesture - takes priority over map tap
                     shouldNavigateToProfile = true
                 },
-            including: .all // This gesture blocks all lower-priority gestures
+            including: .all
         )
     }
-} 
+}

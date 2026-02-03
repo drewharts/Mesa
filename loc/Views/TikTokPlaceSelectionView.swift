@@ -9,12 +9,15 @@ struct TikTokPlaceSelectionView: View {
     @State private var selectedPlaceForList: DetailPlace?
     @State private var showingListSelection = false
     @State private var listSelectionViewModel: PlaceListSelectionViewModel?
-    
+
+    /// Convenience accessor for TikTok view model.
+    private var tikTokVM: ProfileTikTokViewModel { profile.tikTokViewModel }
+
     var body: some View {
         NavigationView {
             VStack(spacing: 0) {
                 // TikTok Thumbnail Header
-                if let firstPlace = profile.importedPlaces.first,
+                if let firstPlace = tikTokVM.importedPlaces.first,
                    let firstTikTokVideo = firstPlace.tikTokVideos?.first,
                    !firstTikTokVideo.thumbnailURL.isEmpty {
                     
@@ -23,7 +26,7 @@ struct TikTokPlaceSelectionView: View {
                             .font(.headline)
                             .padding(.top, 16)
                         
-                        Text("Found \(profile.importedPlaces.count) place\(profile.importedPlaces.count == 1 ? "" : "s")")
+                        Text("Found \(tikTokVM.importedPlaces.count) place\(tikTokVM.importedPlaces.count == 1 ? "" : "s")")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                         
@@ -58,7 +61,7 @@ struct TikTokPlaceSelectionView: View {
                 // Places List
                 ScrollView {
                     LazyVStack(spacing: 12) {
-                        ForEach(profile.importedPlaces, id: \.id) { place in
+                        ForEach(tikTokVM.importedPlaces, id: \.id) { place in
                             PlaceRowView(
                                 place: place,
                                 onBookmarkTapped: {
@@ -67,7 +70,7 @@ struct TikTokPlaceSelectionView: View {
                                     profile.ensureListsLoaded()
 
                                     // Now, trigger the sheet.
-                                    print("   - Current userLists count: \(profile.userLists.count)")
+                                    print("   - Current userLists count: \(profile.listsViewModel.userLists.count)")
                                     print("   - Current isLoading state: \(profile.isLoading)")
                                     selectedPlaceForList = place
                                     showingListSelection = true
@@ -231,7 +234,7 @@ struct PlaceRowView: View {
         }
         // ✅ SRP: View observes ViewModel's published state (proper MVVM)
         // Update when list membership changes (reactive to ViewModel state)
-        .onChange(of: profile.lightweightPlaceListPlaces) { _ in
+        .onChange(of: profile.listsViewModel.lightweightPlaceListPlaces) { _ in
             Task {
                 isInList = await profile.isPlaceInAnyList(placeId: place.id.uuidString)
             }

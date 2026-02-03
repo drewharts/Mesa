@@ -18,6 +18,7 @@ struct UserProfileProfilePictureView: View {
     private let profileSize: CGFloat = 120
     
     @State private var showingPlacesCount = false
+    @State private var showingFullScreen = false
     
     // MARK: - Subtle Places Count Badge (matches own profile style)
     private var placesCountBadge: some View {
@@ -53,7 +54,12 @@ struct UserProfileProfilePictureView: View {
                     .frame(width: profileSize, height: profileSize)
                     .clipShape(Circle())
                     .shadow(radius: 4)
-                
+                    .onTapGesture {
+                        if profilePhotoURL != nil {
+                            showingFullScreen = true
+                        }
+                    }
+
                 // Places count badge - subtle style matching own profile
                 if totalPlacesCount > 0 {
                     placesCountBadge
@@ -77,6 +83,37 @@ struct UserProfileProfilePictureView: View {
             Button("OK", role: .cancel) { }
         } message: {
             Text("\(userName) has \(totalPlacesCount) places saved across all their lists, favorites, and reviews.")
+        }
+        .fullScreenCover(isPresented: $showingFullScreen) {
+            if let url = profilePhotoURL {
+                ZStack {
+                    Color.black.edgesIgnoringSafeArea(.all)
+
+                    AsyncImage(url: url) { image in
+                        image
+                            .resizable()
+                            .scaledToFit()
+                            .padding()
+                    } placeholder: {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                    }
+
+                    VStack {
+                        HStack {
+                            Spacer()
+                            Button {
+                                showingFullScreen = false
+                            } label: {
+                                Image(systemName: "xmark")
+                                    .foregroundColor(.white)
+                                    .padding()
+                            }
+                        }
+                        Spacer()
+                    }
+                }
+            }
         }
     }
     

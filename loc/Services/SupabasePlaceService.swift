@@ -2,7 +2,7 @@
 //  SupabasePlaceService.swift
 //  loc
 //
-//  Place service using Supabase (replacement for Firebase PlaceService)
+//  Place service using Supabase for place data operations.
 //
 
 import Foundation
@@ -182,7 +182,7 @@ class SupabasePlaceService: ObservableObject {
         let distance_meters: Double? // Distance from user location (when sorted by proximity)
     }
     
-    // MARK: - Fetch Places (matching Firebase PlaceService interface)
+    // MARK: - Fetch Places
     
     func fetchAllPlaces() async throws -> [DetailPlace] {
         return try await withCheckedThrowingContinuation { continuation in
@@ -712,8 +712,53 @@ class SupabasePlaceService: ObservableObject {
         }
     }
     
+    // MARK: - Coordinate Fetching
+
+    /// Fetches coordinates for multiple places by their IDs.
+    /// Returns a dictionary mapping place IDs to their coordinates.
+    func fetchPlaceCoordinates(placeIds: [String]) async throws -> [String: CLLocationCoordinate2D] {
+        guard !placeIds.isEmpty else { return [:] }
+
+        do {
+            struct PlaceCoordinate: Decodable {
+                let id: String
+                let location: LocationPoint?
+
+                struct LocationPoint: Decodable {
+                    let type: String
+                    let coordinates: [Double]
+                }
+            }
+
+            let places: [PlaceCoordinate] = try await supabase.client
+                .from("places")
+                .select("id, location")
+                .in("id", values: placeIds)
+                .execute()
+                .value
+
+            var coordinates: [String: CLLocationCoordinate2D] = [:]
+            for place in places {
+                if let location = place.location,
+                   location.coordinates.count >= 2 {
+                    // PostGIS stores as [longitude, latitude]
+                    let coordinate = CLLocationCoordinate2D(
+                        latitude: location.coordinates[1],
+                        longitude: location.coordinates[0]
+                    )
+                    coordinates[place.id] = coordinate
+                }
+            }
+
+            return coordinates
+        } catch {
+            print("❌ [SupabasePlaceService] Error fetching place coordinates: \(error)")
+            throw error
+        }
+    }
+
     // MARK: - Viewport Queries
-    
+
     /// Fetch place annotations for map markers within a geographic viewport
     /// Uses the optimized PostgreSQL function with user tracking
     func fetchPlacesInViewport(northLat: Double, southLat: Double, eastLng: Double, westLng: Double, userId: String) async throws -> [PlaceAnnotation] {
@@ -891,6 +936,39 @@ class SupabasePlaceService: ObservableObject {
         } catch {
             if !Task.isCancelled && !(error is CancellationError) && (error as NSError).code != NSURLErrorCancelled {
                 print("❌ [Supabase] Error fetching favorite annotations: \(error)")
+            }
+            throw error
+        }
+    }
+
+    /// Fetches map annotations for user's created places (my_places) within viewport
+    func fetchMyPlacesAnnotationsInViewport(northLat: Double, southLat: Double, eastLng: Double, westLng: Double, userId: String) async throws -> [PlaceAnnotation] {
+        do {
+            struct ViewportParams: Encodable {
+                let p_user_id: String
+                let p_min_lon: Double
+                let p_min_lat: Double
+                let p_max_lon: Double
+                let p_max_lat: Double
+            }
+
+            let params = ViewportParams(
+                p_user_id: userId,
+                p_min_lon: westLng,
+                p_min_lat: southLat,
+                p_max_lon: eastLng,
+                p_max_lat: northLat
+            )
+
+            let response: [PlaceAnnotation] = try await supabase.client
+                .rpc("get_my_places_annotations_with_users", params: params)
+                .execute()
+                .value
+
+            return response
+        } catch {
+            if !Task.isCancelled && !(error is CancellationError) && (error as NSError).code != NSURLErrorCancelled {
+                print("❌ [Supabase] Error fetching my places annotations: \(error)")
             }
             throw error
         }

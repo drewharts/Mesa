@@ -27,7 +27,7 @@ struct ProfileListDescription: View {
                     .foregroundColor(.black)
                     .padding(.leading, 20)
                 
-                Text("\(profile.placeListCounts[list.id] ?? 0) \(profile.placeListCounts[list.id] == 1 ? "place" : "places")")
+                Text("\(profile.listsViewModel.placeListCounts[list.id] ?? 0) \(profile.listsViewModel.placeListCounts[list.id] == 1 ? "place" : "places")")
                     .font(.caption)
                     .foregroundStyle(.black)
                 

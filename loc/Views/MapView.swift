@@ -18,7 +18,6 @@ struct MapView: View {
 
     @Binding var recenterMap: Bool
     @Binding var mapPosition: MapCameraPosition
-    var isSearchBarMinimized: Bool = true
     @Binding var isCreatePlacePopupActive: Bool
 
     private let defaultCenter = CLLocationCoordinate2D(latitude: 39.5, longitude: -98.0)
@@ -159,8 +158,9 @@ struct MapView: View {
                 await MainActor.run {
                     // Preserve the annotation so it survives zoom-out density culling
                     mapViewModel.setPreservedAnnotation(for: place)
+                    // Use selectPlace since data is already complete from backend
                     // Don't animate map when tapping marker - user is already looking at it
-                    selectedPlaceVM.selectPlaceAndFetchDetails(place, shouldAnimateMap: false)
+                    selectedPlaceVM.selectPlace(place, shouldAnimateMap: false)
                     selectedPlaceVM.isDetailSheetPresented = true
                 }
             }
@@ -209,7 +209,8 @@ struct MapView: View {
                         mapViewModel.pendingPlaceNavigation = place.id.uuidString
                     } else {
                         // Normal behavior: show place detail sheet
-                        selectedPlaceVM.selectPlaceAndFetchDetails(place, shouldAnimateMap: false)
+                        // Use selectPlace since data is already complete from backend
+                        selectedPlaceVM.selectPlace(place, shouldAnimateMap: false)
                         selectedPlaceVM.isDetailSheetPresented = true
                     }
                 }
@@ -297,33 +298,31 @@ struct MapView: View {
                 isCreatePlacePopupActive = newValue
             }
             
-            // Visible Places Button - only show when search is minimized
-            if isSearchBarMinimized {
-                VStack {
-                    HStack {
-                        Button(action: {
-                            showVisiblePlacesPopup = true
-                        }) {
-                            HStack(spacing: 6) {
-                                Image(systemName: "map")
-                                    .font(.system(size: 14, weight: .medium))
-                                Text("View")
-                                    .font(.system(size: 14, weight: .medium))
-                            }
-                            .foregroundColor(.secondary)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .background(.ultraThinMaterial)
-                            .clipShape(RoundedRectangle(cornerRadius: 20))
-                            .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.gray.opacity(0.3), lineWidth: 1))
-                            .shadow(radius: 4)
+            // Visible Places Button
+            VStack {
+                HStack {
+                    Button(action: {
+                        showVisiblePlacesPopup = true
+                    }) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "map")
+                                .font(.system(size: 14, weight: .medium))
+                            Text("View")
+                                .font(.system(size: 14, weight: .medium))
                         }
-                        .padding(.leading, 20)
-                        .padding(.top, 70) // Position below top safe area
-                        Spacer()
+                        .foregroundColor(.secondary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(.ultraThinMaterial)
+                        .clipShape(RoundedRectangle(cornerRadius: 20))
+                        .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.gray.opacity(0.3), lineWidth: 1))
+                        .shadow(radius: 4)
                     }
+                    .padding(.leading, 20)
+                    .padding(.top, 70) // Position below top safe area
                     Spacer()
                 }
+                Spacer()
             }
             
             // Show the create place popup if needed
@@ -457,9 +456,13 @@ struct MapView: View {
                 .presentationDragIndicator(.visible)
         }
         .onChange(of: selectedPlaceVM.selectedPlace?.id) { oldValue, newValue in
-            // Clear preserved annotation when place is deselected
             if newValue == nil {
+                // Clear preserved annotation when place is deselected
                 mapViewModel.clearPreservedAnnotation()
+            } else if oldValue != newValue, let place = selectedPlaceVM.selectedPlace {
+                // Set preserved annotation when a new place is selected (e.g., from search)
+                // This ensures a pin appears on the map even if the place isn't in viewportAnnotations
+                mapViewModel.setPreservedAnnotation(for: place)
             }
         }
     }

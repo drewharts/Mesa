@@ -16,7 +16,8 @@ struct SplashScreenView: View {
     // ViewModels passed as props, not environment objects
     let selectedPlaceViewModel: SelectedPlaceViewModel
     let profileViewModel: ProfileViewModel
-    let userProfileViewModel: UserProfileViewModel
+    let userProfileNavigationViewModel: UserProfileNavigationViewModel
+    let mapDisplayCoordinatorViewModel: MapDisplayCoordinatorViewModel
     let detailPlaceViewModel: DetailPlaceViewModel
     let deepLinkViewModel: DeepLinkViewModel
     let deepLinkManager: DeepLinkManager
@@ -32,7 +33,8 @@ struct SplashScreenView: View {
                 ContentView(
                     selectedPlaceViewModel: selectedPlaceViewModel,
                     profileViewModel: profileViewModel,
-                    userProfileViewModel: userProfileViewModel,
+                    userProfileNavigationViewModel: userProfileNavigationViewModel,
+                    mapDisplayCoordinatorViewModel: mapDisplayCoordinatorViewModel,
                     detailPlaceViewModel: detailPlaceViewModel,
                     deepLinkViewModel: deepLinkViewModel,
                     deepLinkManager: deepLinkManager,

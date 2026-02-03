@@ -3,30 +3,31 @@
 //  loc
 //
 //  Single Responsibility: Display paginated reviewed places for an external user in a popup grid
-//  MVVM: Delegates data loading and state to UserProfileViewModel
+//  MVVM: Delegates data loading and state to MapDisplayCoordinatorViewModel
 //  Now presented from MapContainerView with all environment objects available
 //
 
 import SwiftUI
 
 struct ExternalReviewsListPopupView: View {
-    @ObservedObject var userProfileVM: UserProfileViewModel
+    @ObservedObject var mapDisplayCoordinatorVM: MapDisplayCoordinatorViewModel
+    @ObservedObject var userProfileNavigationVM: UserProfileNavigationViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
 
     var body: some View {
         PlaceListPopupView(
-            title: "\(userProfileVM.selectedUser?.firstName ?? "User")'s Reviews",
-            count: userProfileVM.totalReviewedPlacesCount,
-            isLoading: userProfileVM.isLoadingReviewedPlaces,
-            isLoadingMore: userProfileVM.isLoadingMoreReviews,
-            places: userProfileVM.lightweightReviewedPlaces,
-            hasMore: userProfileVM.hasMoreReviews,
+            title: "\(mapDisplayCoordinatorVM.mapDisplayUserName ?? "User")'s Reviews",
+            count: mapDisplayCoordinatorVM.mapDisplayReviewsCount,
+            isLoading: false, // Data is already loaded when triggering map display
+            isLoadingMore: false, // No pagination in map display mode
+            places: mapDisplayCoordinatorVM.mapDisplayReviews,
+            hasMore: false, // No pagination in map display mode
             emptyIcon: "star.bubble",
             emptyTitle: "No Reviews Yet",
             emptyMessage: "This user hasn't reviewed any places yet",
-            loadMore: { await userProfileVM.loadMoreReviews() },
+            loadMore: { }, // No pagination in map display mode
             onBackToProfile: {
-                userProfileVM.isUserDetailPresented = true
+                userProfileNavigationVM.isUserDetailPresented = true
             },
             cardBuilder: { place, navigate in
                 PopupPlaceCard(
@@ -37,12 +38,5 @@ struct ExternalReviewsListPopupView: View {
                 )
             }
         )
-        .onAppear {
-            if userProfileVM.lightweightReviewedPlaces.isEmpty {
-                Task {
-                    await userProfileVM.loadUserReviewedPlacesWithPagination()
-                }
-            }
-        }
     }
 }

@@ -4,6 +4,7 @@
 //
 //  Created by Cursor on 1/22/25.
 //  ViewModel for managing place photos and external review photos
+//  Data-Driven: Receives place/posts data via setPlace()/setPosts() instead of observing ViewModels
 //
 
 import Foundation
@@ -19,23 +20,23 @@ class PlacePhotosViewModel: ObservableObject {
     @Published private var photoPageLimit = 9
     @Published private var lastPhotoDocument: Any? // Replaced DocumentSnapshot for Supabase migration
     @Published private var allPhotosLoaded = false
-    
+
     // MARK: - Review Photos State
     @Published private var reviewPhotos: [String: [UIImage]] = [:] // Cache for review photos by reviewId
     @Published private var reviewPhotoLoadingStates: [String: LoadingState] = [:] // Loading states for review photos
-    
+
     // External review photos
     @Published private var externalReviewPhotosByPlace: [String: [UIImage]] = [:] // Cache for external review photos by placeId
     @Published private var externalReviewPhotoLoadingStates: [String: LoadingState] = [:] // Loading states for external review photos
     @Published private var externalReviewPhotosAllLoadedByPlace: [String: Bool] = [:] // Track completion of external photo loading per place
-    
+
     // Profile photos
     @Published private var userProfilePhotos: [String: UIImage] = [:] // Cache for profile photos by userId
     @Published private var profilePhotoLoadingStates: [String: LoadingState] = [:] // Loading states for profile photos
-    
+
     @Published var place: DetailPlace?
     @Published var placeId: String = ""
-    
+
     // MARK: - Private Properties
     private var externalReviewImageURLCache: [String: [String]] = [:] // placeId -> photo URLs
     private var externalReviewReviewOffsets: [String: Int] = [:] // placeId -> offset into external reviews
@@ -46,25 +47,34 @@ class PlacePhotosViewModel: ObservableObject {
     private let externalReviewPhotoBatchSize = 5
     private let maxExternalReviewRetries = 3 // Maximum retry attempts for external reviews
     private let externalReviewRetryDelay: TimeInterval = 2.0 // Delay between retries in seconds
-    
+
     // MARK: - Deduplication Tracking
     // Tracks URLs that have already been loaded to prevent duplicates
     private var loadedPlacePhotoURLs: [String: Set<String>] = [:]      // placeId -> loaded internal photo URLs
     private var loadedExternalPhotoURLs: [String: Set<String>] = [:]   // placeId -> loaded external photo URLs
     private var externalSeenURLs: [String: Set<String>] = [:]          // placeId -> seen external URLs (for URL cache dedup)
-    
-    // MARK: - Dependencies
+
+    // MARK: - 403 Error Tracking for Image Refresh
+    // Tracks failed Google CDN URLs that returned 403 (expired)
+    private var failedExternalURLs: [String: Set<String>] = [:]        // placeId -> failed URLs
+    private var refreshRequestedForPlace: Set<String> = []              // Places that have already requested refresh this session
+
+    // MARK: - Image Refresh State
+    @Published private var isRefreshingImagesByPlace: [String: Bool] = [:] // Tracks active refresh operations per place
+
+    // MARK: - Dependencies (Services only)
     private let postService: PostService
-    private let selectedPlaceVM: SelectedPlaceViewModel  // Temporary until fully refactored
-    private var cancellables = Set<AnyCancellable>()
-    
+
+    // Store current posts for photo loading
+    private var currentPosts: [PlacePost] = []
+
     // MARK: - Loading State Enum
     enum LoadingState: Equatable {
         case idle
         case loading
         case loaded
         case error(Error)
-        
+
         static func == (lhs: LoadingState, rhs: LoadingState) -> Bool {
             switch (lhs, rhs) {
             case (.idle, .idle), (.loading, .loading), (.loaded, .loaded):
@@ -76,57 +86,39 @@ class PlacePhotosViewModel: ObservableObject {
             }
         }
     }
-    
+
     // MARK: - Initialization
-    init(postService: PostService, selectedPlaceVM: SelectedPlaceViewModel) {
-        self.postService = postService
-        self.selectedPlaceVM = selectedPlaceVM
-        
-        setupObservers()
+    init() {
+        self.postService = ServiceContainer.shared.postService
     }
-    
-    // MARK: - Setup
-    private func setupObservers() {
-        // Observe place changes - reset state when place changes
-        selectedPlaceVM.$selectedPlace
-            .sink { [weak self] place in
-                guard let self = self else { return }
-                self.place = place
-                self.placeId = place?.id.uuidString ?? ""
-                
-                if let place = place {
-                    self.resetPhotoLoading()
-                    self.loadExternalReviewPhotos(for: place, reset: true)
-                }
-            }
-            .store(in: &cancellables)
-        
-        // Observe when posts are initially loaded (debounced to wait for posts to arrive)
-        selectedPlaceVM.$selectedPlace
-            .debounce(for: .milliseconds(500), scheduler: DispatchQueue.main)
-            .sink { [weak self] place in
-                guard let self = self, let place = place else { return }
-                self.loadPhotosForCurrentPosts(place: place)
-            }
-            .store(in: &cancellables)
-        
-        // Observe when posts are added/modified (e.g., after submitting a new post)
-        selectedPlaceVM.$postsUpdateCounter
-            .dropFirst() // Skip initial value
-            .sink { [weak self] _ in
-                guard let self = self, let place = self.place else { return }
-                self.loadPhotosForCurrentPosts(place: place)
-            }
-            .store(in: &cancellables)
+
+    // MARK: - Data-Driven Updates
+
+    /// Called by parent when the selected place changes
+    func setPlace(_ place: DetailPlace?) {
+        self.place = place
+        self.placeId = place?.id.uuidString ?? ""
+
+        if let place = place {
+            print("📸 [PlacePhotosViewModel] setPlace called for: \(place.id.uuidString)")
+            resetPhotoLoading()
+            loadExternalReviewPhotos(for: place, reset: true)
+        }
     }
-    
+
+    /// Called by parent when posts are loaded or updated
+    func setPosts(_ posts: [PlacePost]) {
+        self.currentPosts = posts
+        guard let place = place else { return }
+        loadPhotosForCurrentPosts(place: place, posts: posts)
+    }
+
     /// Loads photos for all current posts - called when posts are loaded or updated
-    private func loadPhotosForCurrentPosts(place: DetailPlace) {
+    private func loadPhotosForCurrentPosts(place: DetailPlace, posts: [PlacePost]) {
         // Load place-level photo gallery from post images
         getPlacePhotos(for: place, loadMore: false)
-        
+
         // Load individual post photos and profile photos
-        let posts = selectedPlaceVM.posts
         for post in posts {
             loadPostPhotos(for: post)
             loadProfilePhotoFromURL(userId: post.userId, photoUrl: post.profilePhotoUrl)
@@ -157,6 +149,12 @@ class PlacePhotosViewModel: ObservableObject {
     var externalReviewPhotosFullyLoaded: Bool {
         guard let placeId = place?.id.uuidString else { return true }
         return externalReviewPhotosAllLoadedByPlace[placeId] ?? false
+    }
+
+    /// Indicates whether external review images are currently being refreshed after 403 errors.
+    var isRefreshingImages: Bool {
+        guard let placeId = place?.id.uuidString else { return false }
+        return isRefreshingImagesByPlace[placeId] ?? false
     }
 
     /// Combined photos from both internal reviews and external sources
@@ -224,7 +222,7 @@ class PlacePhotosViewModel: ObservableObject {
     /// Resets all photo caches and loading states when switching to a new place
     private func resetPhotoLoading() {
         guard let placeId = place?.id.uuidString else { return }
-        
+
         // Reset place-level photo gallery
         placePhotos[placeId]?.removeAll()
         photoLoadingStates[placeId] = .idle
@@ -281,11 +279,11 @@ class PlacePhotosViewModel: ObservableObject {
     }
     
     // MARK: - Photo Deduplication Helpers
-    
+
     /// Collects unique photo URLs from posts, excluding already-loaded URLs
     /// Single Responsibility: URL collection and deduplication
     private func collectUniquePhotoURLs(for placeId: String) -> [String] {
-        let posts = selectedPlaceVM.posts
+        let posts = currentPosts
         let loadedURLs = loadedPlacePhotoURLs[placeId] ?? []
         
         // Use ordered set approach to maintain order while deduplicating
@@ -333,10 +331,14 @@ class PlacePhotosViewModel: ObservableObject {
     /// Single Responsibility: Parallel image loading
     private func loadImagesInParallel(from urls: [String]) async -> [UIImage] {
         guard !urls.isEmpty else { return [] }
-        
+
+        if let firstUrl = urls.first {
+            print("📸 [PlacePhotosViewModel] First URL to load: \(firstUrl.prefix(80))...")
+        }
+
         // Use dictionary to maintain URL -> Image mapping for order preservation
         var urlToImage: [String: UIImage] = [:]
-        
+
         await withTaskGroup(of: (String, UIImage?).self) { group in
             for url in urls {
                 group.addTask {
@@ -344,14 +346,16 @@ class PlacePhotosViewModel: ObservableObject {
                     return (url, image)
                 }
             }
-            
+
             for await (url, image) in group {
                 if let image = image {
                     urlToImage[url] = image
+                } else {
+                    print("📸 [PlacePhotosViewModel] Failed to load image from: \(url.prefix(60))...")
                 }
             }
         }
-        
+
         // Return images in original URL order
         return urls.compactMap { urlToImage[$0] }
     }
@@ -398,15 +402,18 @@ class PlacePhotosViewModel: ObservableObject {
     
     private func loadExternalReviewPhotos(for place: DetailPlace, reset: Bool) {
         let placeId = place.id.uuidString
-        
+
         // Check AND set loading state BEFORE creating Task to prevent race conditions
         if externalReviewPhotoLoadingStates[placeId] == .loading {
+            print("📸 [PlacePhotosViewModel] Skipping loadExternalReviewPhotos - already loading for \(placeId)")
             return
         }
-        
+
+        print("📸 [PlacePhotosViewModel] Starting loadExternalReviewPhotos for \(placeId), reset=\(reset)")
+
         // Set loading state immediately to prevent duplicate requests
         externalReviewPhotoLoadingStates[placeId] = .loading
-        
+
         Task {
             await loadExternalReviewPhotosInternal(for: place, placeId: placeId, reset: reset)
         }
@@ -417,20 +424,23 @@ class PlacePhotosViewModel: ObservableObject {
         if reset {
             self.externalReviewRetryAttempts[placeId] = 0
         }
-        
+
         var state = externalReviewPaginationState(for: placeId, reset: reset)
-        
+
         do {
             try await extendExternalReviewURLs(placeId: placeId, state: &state)
+            print("📸 [PlacePhotosViewModel] After extendExternalReviewURLs: cachedURLs=\(state.cachedURLs.count), hasMore=\(state.hasMoreReviews)")
         } catch {
+            print("📸 [PlacePhotosViewModel] Error extending URLs: \(error)")
             self.externalReviewPhotoLoadingStates[placeId] = .error(error)
             return
         }
-        
+
         // Get URLs to load, filtering out already-loaded ones
         let candidateURLs = Array(state.cachedURLs.dropFirst(state.photoCursor).prefix(externalReviewPhotoBatchSize))
         let loadedURLs = loadedExternalPhotoURLs[placeId] ?? []
         let urlsToLoad = candidateURLs.filter { !loadedURLs.contains($0) }
+        print("📸 [PlacePhotosViewModel] candidateURLs=\(candidateURLs.count), urlsToLoad=\(urlsToLoad.count)")
         
         // If no reviews found and we're still within retry limit, retry
         if urlsToLoad.isEmpty && state.cachedURLs.isEmpty && !state.hasMoreReviews {
@@ -452,18 +462,101 @@ class PlacePhotosViewModel: ObservableObject {
             // Still advance cursor even if all URLs were already loaded
             state.photoCursor += candidateURLs.count
             updateExternalReviewPaginationState(state, newImages: [], loadingState: .loaded)
+            print("📸 [PlacePhotosViewModel] No URLs to load, marked as loaded")
         } else {
+            print("📸 [PlacePhotosViewModel] Loading \(urlsToLoad.count) images in parallel...")
             let loadedImages = await loadImagesInParallel(from: urlsToLoad)
+            print("📸 [PlacePhotosViewModel] Successfully loaded \(loadedImages.count) images")
             state.photoCursor += candidateURLs.count
-            
+
             // Track loaded URLs to prevent future duplicates
             markURLsAsLoaded(urlsToLoad, for: placeId, isExternal: true)
-            
+
             // Reset retry count on success
             self.externalReviewRetryAttempts[placeId] = 0
-            
+
             updateExternalReviewPaginationState(state, newImages: loadedImages, loadingState: .loaded)
+            print("📸 [PlacePhotosViewModel] Updated pagination state, total external photos: \(externalReviewPhotosByPlace[state.placeId]?.count ?? 0)")
+
+            // Check if we had significant 403 failures and should request image refresh
+            let failedCount = failedExternalURLs[placeId]?.count ?? 0
+            let totalAttempted = urlsToLoad.count
+            let successCount = loadedImages.count
+
+            // If more than half the images failed and we have 403 errors, request refresh
+            if failedCount > 0 && successCount < totalAttempted / 2 {
+                await requestImageRefreshIfNeeded(for: placeId)
+            }
         }
+    }
+
+    /// Requests the backend to refresh stale external review images if needed.
+    private func requestImageRefreshIfNeeded(for placeId: String) async {
+        // Check if we have failed URLs for this place
+        guard let failedURLs = failedExternalURLs[placeId], !failedURLs.isEmpty else {
+            return
+        }
+
+        // Rate limit: only request once per place per session
+        guard !refreshRequestedForPlace.contains(placeId) else {
+            print("📸 [PlacePhotosViewModel] Already requested refresh for place \(placeId) this session")
+            return
+        }
+
+        refreshRequestedForPlace.insert(placeId)
+
+        // Show refresh indicator immediately so users know images are being refreshed
+        isRefreshingImagesByPlace[placeId] = true
+
+        print("📸 [PlacePhotosViewModel] Requesting image refresh for place \(placeId) with \(failedURLs.count) failed URLs")
+
+        do {
+            let mesaBackendService = MesaBackendService.shared
+            let refreshInitiated = try await mesaBackendService.requestImageRefresh(
+                placeId: placeId,
+                failedURLs: Array(failedURLs)
+            )
+
+            if refreshInitiated {
+                print("📸 [PlacePhotosViewModel] Refresh initiated, waiting 3s before retrying...")
+
+                // Shorter delay since we're showing existing images with a refresh indicator
+                try? await Task.sleep(nanoseconds: 3_000_000_000) // 3 seconds
+
+                // Clear only failed URLs, keep successful images visible
+                failedExternalURLs[placeId]?.removeAll()
+
+                // Retry loading external photos (appends new images to existing ones)
+                await retryExternalPhotosAfterRefresh(for: placeId)
+            } else {
+                print("📸 [PlacePhotosViewModel] No refresh needed or rate limited")
+            }
+        } catch {
+            print("📸 [PlacePhotosViewModel] Failed to request image refresh: \(error)")
+        }
+
+        // Hide refresh indicator when done
+        isRefreshingImagesByPlace[placeId] = false
+    }
+
+    /// Retries loading external photos after backend has refreshed the image URLs.
+    private func retryExternalPhotosAfterRefresh(for placeId: String) async {
+        guard let place = place, place.id.uuidString == placeId else { return }
+
+        print("📸 [PlacePhotosViewModel] Retrying external photos after refresh for \(placeId)")
+
+        // Keep existing successful photos - don't clear externalReviewPhotosByPlace[placeId]
+        // Only reset URL caches to fetch fresh URLs from the database
+        externalReviewImageURLCache[placeId] = []
+        externalReviewReviewOffsets[placeId] = 0
+        externalReviewPhotoCursor[placeId] = 0
+        externalReviewReviewHasMore[placeId] = true
+        externalReviewPhotosAllLoadedByPlace[placeId] = false
+        loadedExternalPhotoURLs[placeId]?.removeAll()
+        externalSeenURLs[placeId]?.removeAll()
+
+        // Reload - new images will be appended to existing successful ones
+        await loadExternalReviewPhotosInternal(for: place, placeId: placeId, reset: false)
     }
     
     private func externalReviewPaginationState(for placeId: String, reset: Bool) -> ExternalReviewPaginationState {
@@ -534,8 +627,9 @@ class PlacePhotosViewModel: ObservableObject {
 
     /// Load image directly from URL
     private func loadImageFromURL(imageUrl: String) async -> UIImage? {
-        // Block Firebase Storage URLs (migrated to Supabase)
+        // Block legacy storage URLs that are no longer accessible
         if imageUrl.contains("firebasestorage.googleapis.com") {
+            print("📸 [PlacePhotosViewModel] Blocked Firebase URL: \(imageUrl.prefix(50))...")
             return nil
         }
 
@@ -543,22 +637,49 @@ class PlacePhotosViewModel: ObservableObject {
         let highResUrl = getHighResGoogleURL(imageUrl, maxSize: 1600)
 
         guard let url = URL(string: highResUrl) else {
+            print("📸 [PlacePhotosViewModel] Invalid URL string: \(highResUrl.prefix(50))...")
             return nil
         }
-        
+
         do {
             // ✅ Use background queue and shorter timeout
             let config = URLSessionConfiguration.default
             config.timeoutIntervalForRequest = 5.0
             config.timeoutIntervalForResource = 10.0
             let session = URLSession(configuration: config)
-            
-            let (data, _) = try await session.data(from: url)
-            return UIImage(data: data)
+
+            let (data, response) = try await session.data(from: url)
+            if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode != 200 {
+                print("📸 [PlacePhotosViewModel] HTTP \(httpResponse.statusCode) for URL: \(imageUrl.prefix(50))...")
+
+                // Track 403 errors on Google CDN URLs for potential refresh
+                if httpResponse.statusCode == 403 && imageUrl.contains("googleusercontent.com") {
+                    trackFailed403URL(imageUrl)
+                }
+
+                return nil
+            }
+            guard let image = UIImage(data: data) else {
+                print("📸 [PlacePhotosViewModel] Could not create UIImage from data (\(data.count) bytes)")
+                return nil
+            }
+            return image
         } catch {
-            print("Error loading image from URL: \(error.localizedDescription)")
+            print("📸 [PlacePhotosViewModel] Error loading image: \(error.localizedDescription)")
             return nil
         }
+    }
+
+    /// Tracks a URL that returned 403 Forbidden (expired Google CDN URL)
+    private func trackFailed403URL(_ url: String) {
+        guard let currentPlaceId = place?.id.uuidString else { return }
+
+        if failedExternalURLs[currentPlaceId] == nil {
+            failedExternalURLs[currentPlaceId] = []
+        }
+        failedExternalURLs[currentPlaceId]?.insert(url)
+
+        print("📸 [PlacePhotosViewModel] Tracked 403 error for URL (place: \(currentPlaceId)): \(url.prefix(60))...")
     }
     
     // MARK: - Post Photos

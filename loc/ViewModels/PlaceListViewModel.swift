@@ -36,7 +36,7 @@ class PlaceListViewModel: ObservableObject, Identifiable {
         return image
     }
 
-    // Load the place lists from Firestore.
+    /// Loads the place list from the database.
     func loadPlaceLists() {
         print("📋 Loading place list: \(placeList.name) for user: \(userId)")
         placeService.fetchList(userId: userId, listId: placeList.id.uuidString) { [weak self] result in
@@ -87,7 +87,7 @@ class PlaceListViewModel: ObservableObject, Identifiable {
     func addPhotoToList(image: UIImage) {
         self.image = image // Set the image in the view model
 
-        // Upload image to Firestore
+        // Upload image to storage
         imageService.uploadImageAndUpdatePlaceList(userId: userId, placeList: placeList, image: image) { [weak self] error in
             if let error = error {
                 print("Error adding photo to list: \(error.localizedDescription)")

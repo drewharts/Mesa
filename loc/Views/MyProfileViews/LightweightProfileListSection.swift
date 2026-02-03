@@ -201,8 +201,11 @@ struct CollagePhotoView: View {
                 case .empty:
                     Color.gray.opacity(0.3)
                         .onAppear {
-                            Task {
-                                _ = await TikTokMetadataCache.shared.getMetadata(for: tiktokUrl)
+                            // Only fetch if not already cached
+                            if TikTokMetadataCache.shared.getCachedMetadata(for: tiktokUrl) == nil {
+                                Task {
+                                    _ = await TikTokMetadataCache.shared.getMetadata(for: tiktokUrl)
+                                }
                             }
                         }
                 @unknown default:
@@ -228,8 +231,11 @@ struct CollagePhotoView: View {
             // No cached thumbnail yet - show placeholder while fetching
             Color.gray.opacity(0.3)
                 .onAppear {
-                    Task {
-                        _ = await TikTokMetadataCache.shared.getMetadata(for: tiktokUrl)
+                    // Only fetch if not already cached
+                    if TikTokMetadataCache.shared.getCachedMetadata(for: tiktokUrl) == nil {
+                        Task {
+                            _ = await TikTokMetadataCache.shared.getMetadata(for: tiktokUrl)
+                        }
                     }
                 }
         }
@@ -318,8 +324,11 @@ struct LightweightPlacePreviewCard: View {
                 case .empty:
                     Color.gray.opacity(0.3)
                         .onAppear {
-                            Task {
-                                _ = await TikTokMetadataCache.shared.getMetadata(for: tiktokUrl)
+                            // Only fetch if not already cached
+                            if TikTokMetadataCache.shared.getCachedMetadata(for: tiktokUrl) == nil {
+                                Task {
+                                    _ = await TikTokMetadataCache.shared.getMetadata(for: tiktokUrl)
+                                }
                             }
                         }
                 @unknown default:
@@ -347,8 +356,11 @@ struct LightweightPlacePreviewCard: View {
             // No cached thumbnail yet - show placeholder while fetching
             Color.gray.opacity(0.3)
                 .onAppear {
-                    Task {
-                        _ = await TikTokMetadataCache.shared.getMetadata(for: tiktokUrl)
+                    // Only fetch if not already cached
+                    if TikTokMetadataCache.shared.getCachedMetadata(for: tiktokUrl) == nil {
+                        Task {
+                            _ = await TikTokMetadataCache.shared.getMetadata(for: tiktokUrl)
+                        }
                     }
                 }
         }

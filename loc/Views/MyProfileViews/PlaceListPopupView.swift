@@ -40,6 +40,9 @@ struct PlaceListPopupView<CardView: View>: View {
 
     @Environment(\.presentationMode) var presentationMode
 
+    /// Observed for pending place navigation when map annotation is tapped while sheet is open.
+    @ObservedObject private var presentationService = PresentationService.shared
+
     // Default initializer with optional onBackToProfile
     init(
         title: String,
@@ -91,6 +94,13 @@ struct PlaceListPopupView<CardView: View>: View {
             .navigationBarHidden(true)
             .navigationDestination(for: String.self) { placeId in
                 PlaceDetailViewInNavigation(placeId: placeId, minSheetHeight: 250)
+            }
+        }
+        .onChange(of: presentationService.pendingPlaceNavigation) { oldValue, newValue in
+            // When map annotation is tapped while sheet is open, navigate to that place
+            if let placeId = newValue {
+                navigationPath.append(placeId)
+                presentationService.pendingPlaceNavigation = nil
             }
         }
     }

@@ -4,6 +4,7 @@
 //
 //  Created by Cursor on 1/22/25.
 //  Proper MVVM implementation - One View, One ViewModel
+//  Uses data-driven approach: View calls setPlace/setPosts instead of ViewModel observing other ViewModels
 //
 
 import Foundation
@@ -19,28 +20,29 @@ enum DetailTab {
 
 @MainActor
 class PlaceDetailTabsViewModel: ObservableObject {
-    // MARK: - Dependencies (Services, not other ViewModels)
+    // MARK: - Dependencies (Services from ServiceContainer)
     private let placeService: PlaceService
     private let postService: PostService
     private let userService: UserService
     private let notificationManager: NotificationManager
     private let placeShareService: PlaceShareService
-    
-    // Reference to shared state (temporary until fully refactored)
-    private let selectedPlaceVM: SelectedPlaceViewModel
-    private let profileVM: ProfileViewModel
-    private let detailPlaceViewModel: DetailPlaceViewModel
     private let userSession: UserSession
     private let placeListService = PlaceListService.shared
-    
+    private let postsCacheService = ServiceContainer.shared.postsCacheService
+
+    // MARK: - Callbacks (replaces ViewModel observations)
+    /// Called when max favorites alert should be dismissed in ProfileViewModel
+    var onDismissMaxFavoritesAlert: (() -> Void)?
+
     // MARK: - Child ViewModels
     let aboutTabViewModel: AboutTabViewModel
     let notesTabViewModel: NotesTabViewModel
     let postsViewModel: PlacePostsViewModel
+    let placePhotosViewModel: PlacePhotosViewModel  // Exposed for data-driven updates
     let travelTimeViewModel: TravelTimeViewModel
     let openStatusViewModel: OpenStatusViewModel
     var placeSaversViewModel: PlaceSaversViewModel
-    
+
     // MARK: - Published Properties (What the View Needs)
     @Published var placeName: String = "Loading..."
     @Published var restaurantType: String?
@@ -51,118 +53,119 @@ class PlaceDetailTabsViewModel: ObservableObject {
     @Published var selectedTab: DetailTab = .about
     @Published var showMaxFavoritesAlert: Bool = false
     @Published var currentPlace: DetailPlace?
-    
+
     // Forwarded from PlaceSaversViewModel (enables view re-render when savers change)
     @Published var showSaversIndicator: Bool = false
     @Published var saverCount: Int = 0
-    
+
     // Forwarded from OpenStatusViewModel (enables view re-render when status changes)
     @Published var openStatus: OpenStatus = .unknown
-    
+
     // MARK: - Place Actions State
     /// Whether the current place is saved in any of the user's lists
     @Published var isPlaceInList: Bool = false
-    
+
     private var cancellables = Set<AnyCancellable>()
-    
-    // MARK: - Initialization
-    init(placeService: PlaceService,
-         postService: PostService,
-         userService: UserService,
-         notificationManager: NotificationManager,
-         placeShareService: PlaceShareService,
-         selectedPlaceVM: SelectedPlaceViewModel,
+
+    // MARK: - Initialization (Data-Driven - No ViewModel Dependencies in Child ViewModels)
+    /// Creates PlaceDetailTabsViewModel with minimal ViewModel dependencies
+    /// Child ViewModels are fully refactored with data-driven approach
+    init(userSession: UserSession,
          profileVM: ProfileViewModel,
-         userSession: UserSession,
-         detailPlaceViewModel: DetailPlaceViewModel) {
-        self.placeService = placeService
-        self.postService = postService
-        self.userService = userService
-        self.notificationManager = notificationManager
-        self.placeShareService = placeShareService
-        self.selectedPlaceVM = selectedPlaceVM
-        self.profileVM = profileVM
-        self.detailPlaceViewModel = detailPlaceViewModel
+         detailPlaceViewModel: DetailPlaceViewModel,
+         selectedPlaceVM: SelectedPlaceViewModel) {
+        // Get services from ServiceContainer
+        self.placeService = ServiceContainer.shared.placeService
+        self.postService = ServiceContainer.shared.postService
+        self.userService = ServiceContainer.shared.userService
+        self.notificationManager = ServiceContainer.shared.notificationManager
+        self.placeShareService = ServiceContainer.shared.placeShareService
         self.userSession = userSession
-        
-        // Create child ViewModels
-        let tikTokVM = TikTokVideosViewModel(
-            tikTokService: TikTokPlaceService.shared,
-            selectedPlaceVM: selectedPlaceVM,
-            profileVM: profileVM
-        )
-        
-        let photosVM = PlacePhotosViewModel(
-            postService: postService,
-            selectedPlaceVM: selectedPlaceVM
-        )
-        
+
+        // Create child ViewModels (all fully refactored - no ViewModel dependencies)
+        let tikTokVM = TikTokVideosViewModel()
+
+        // Wire up TikTok callback to refresh external places when video is deleted
+        tikTokVM.onVideoDeleted = { [weak profileVM] in
+            Task {
+                await profileVM?.fetchUserExternalPlaces()
+            }
+        }
+
+        // PlacePhotosViewModel - fully refactored (no ViewModel dependencies)
+        let photosVM = PlacePhotosViewModel()
+
         let customPlaceCreatorVM = CustomPlaceCreatorViewModel(
-            placeService: placeService
+            placeService: ServiceContainer.shared.placeService
         )
-        
-        self.notesTabViewModel = NotesTabViewModel(
-            userService: userService,
-            selectedPlaceVM: selectedPlaceVM,
-            profileVM: profileVM,
-            userSession: userSession
-        )
-        
+
+        // NotesTabViewModel - fully refactored (no ViewModel dependencies)
+        self.notesTabViewModel = NotesTabViewModel(userSession: userSession)
+
+        // Wire up notes callbacks to sync with ProfileViewModel
+        self.notesTabViewModel.onNoteSaved = { [weak profileVM] placeId, note in
+            profileVM?.placeNotes[placeId] = note
+        }
+        self.notesTabViewModel.onNoteDeleted = { [weak profileVM] placeId in
+            profileVM?.placeNotes.removeValue(forKey: placeId)
+        }
+
+        // Store photosVM for data-driven updates
+        self.placePhotosViewModel = photosVM
+
+        // AboutTabViewModel - fully refactored (no ViewModel dependencies)
         self.aboutTabViewModel = AboutTabViewModel(
             tikTokVideosViewModel: tikTokVM,
             placePhotosViewModel: photosVM,
             customPlaceCreatorViewModel: customPlaceCreatorVM,
-            notesViewModel: self.notesTabViewModel,
-            selectedPlaceVM: selectedPlaceVM
+            notesViewModel: self.notesTabViewModel
         )
-        
+
+        // Wire up description callback to update selected place
+        self.aboutTabViewModel.onDescriptionUpdated = { [weak selectedPlaceVM] description in
+            selectedPlaceVM?.updatePlaceDescription(description)
+        }
+
+        // PlacePostsViewModel - fully refactored (no ViewModel dependencies)
         self.postsViewModel = PlacePostsViewModel(
-            postService: postService,
             photosViewModel: photosVM,
-            selectedPlaceVM: selectedPlaceVM,
-            notificationManager: notificationManager,
-            userSession: userSession,
-            profileVM: profileVM
-        )
-        
-        self.travelTimeViewModel = TravelTimeViewModel(
-            selectedPlaceVM: selectedPlaceVM
-        )
-        
-        self.openStatusViewModel = OpenStatusViewModel(
-            selectedPlaceVM: selectedPlaceVM
-        )
-        
-        self.placeSaversViewModel = PlaceSaversViewModel(
-            userService: userService,
-            detailPlaceViewModel: detailPlaceViewModel,
+            notificationManager: ServiceContainer.shared.notificationManager,
             userSession: userSession
         )
-        
+
+        // Wire up posts callbacks
+        self.postsViewModel.onToggleFavorite = { [weak profileVM] place, shouldFavorite in
+            if shouldFavorite {
+                profileVM?.addFavoritePlace(place: place)
+            } else {
+                profileVM?.removeFavoritePlace(place: place)
+            }
+        }
+        self.postsViewModel.onCheckLikeStatuses = { [weak selectedPlaceVM] userId in
+            selectedPlaceVM?.checkLikeStatuses(userId: userId)
+        }
+
+        // Child VMs with no ViewModel dependencies (fully refactored)
+        self.travelTimeViewModel = TravelTimeViewModel()
+        self.openStatusViewModel = OpenStatusViewModel()
+
+        self.placeSaversViewModel = PlaceSaversViewModel(
+            userService: ServiceContainer.shared.userService,
+            userSession: userSession
+        )
+
+        // Wire up savers callback to sync with DetailPlaceViewModel
+        self.placeSaversViewModel.onSaversUpdated = { [weak detailPlaceViewModel] placeId, saverIds in
+            detailPlaceViewModel?.placeSavers[placeId] = saverIds
+        }
+
         setupObservers()
+        setupPostsCacheObserver()
     }
-    
+
     // MARK: - Setup
     private func setupObservers() {
-        // Observe selected place changes
-        selectedPlaceVM.$selectedPlace
-            .sink { [weak self] place in
-                self?.handlePlaceChanged(place)
-            }
-            .store(in: &cancellables)
-        
-        // Observe posts changes
-        selectedPlaceVM.$selectedPlace
-            .combineLatest(selectedPlaceVM.$placeRating)
-            .sink { [weak self] place, rating in
-                guard let self = self else { return }
-                self.placeRating = rating
-                self.hasPosts = !self.selectedPlaceVM.posts.isEmpty
-                self.postCount = self.selectedPlaceVM.posts.count
-            }
-            .store(in: &cancellables)
-        
-        // Observe notification highlights
+        // Observe notification highlights (this is a service, not a ViewModel)
         notificationManager.$highlightedReviewId
             .sink { [weak self] postId in
                 if postId != nil {
@@ -170,19 +173,9 @@ class PlaceDetailTabsViewModel: ObservableObject {
                 }
             }
             .store(in: &cancellables)
-        
-        // Observe favorites alert - only forward when becoming true to avoid loops
-        profileVM.$showMaxFavoritesAlert
-            .filter { $0 == true }
-            .sink { [weak self] _ in
-                self?.showMaxFavoritesAlert = true
-            }
-            .store(in: &cancellables)
-        
+
         // Forward PlaceSaversViewModel state to trigger view updates
-        // IMPORTANT: Set up this observer BEFORE the place observer so state is forwarded correctly
         // This is necessary because child VM changes don't automatically trigger parent view re-render
-        // Observe both totalGlobalSaveCount and currentUserSaved to compute correct indicator visibility
         Publishers.CombineLatest(
             placeSaversViewModel.$totalGlobalSaveCount,
             placeSaversViewModel.$currentUserSaved
@@ -194,33 +187,148 @@ class PlaceDetailTabsViewModel: ObservableObject {
             self?.showSaversIndicator = currentUserSaved ? globalCount > 1 : globalCount > 0
         }
         .store(in: &cancellables)
-        
+
         // Forward OpenStatusViewModel state to trigger view updates
-        // This is necessary because child VM changes don't automatically trigger parent view re-render
         openStatusViewModel.$status
             .sink { [weak self] status in
                 self?.openStatus = status
             }
             .store(in: &cancellables)
-        
-        // Update placeSaversViewModel when place changes
-        // This fires immediately with current value, so saver count observer above must be set up first
-        selectedPlaceVM.$selectedPlace
-            .sink { [weak self] place in
-                self?.placeSaversViewModel.setPlace(place?.id.uuidString)
-            }
-            .store(in: &cancellables)
-        
-        // Check place list membership when place changes (database source of truth)
-        // SQL function only checks place_list_items, not external_places (TikToks)
-        selectedPlaceVM.$selectedPlace
-            .sink { [weak self] place in
-                guard let self = self else { return }
-                Task {
-                    await self.checkPlaceListMembership(place: place)
-                }
-            }
-            .store(in: &cancellables)
+    }
+
+    /// Sets up reactive subscription to posts cache - triggers when posts for current place change.
+    private func setupPostsCacheObserver() {
+        // Combine currentPlace with postsCache - fires when either changes
+        // This is the proper reactive pattern: subscribe to actual data, not manual triggers
+        Publishers.CombineLatest3(
+            $currentPlace.map { $0?.id.uuidString },
+            postsCacheService.$postsCache,
+            postsCacheService.$loadingStates
+        )
+        .receive(on: RunLoop.main)
+        .sink { [weak self] placeId, postsCache, loadingStates in
+            self?.handlePostsDataChanged(
+                placeId: placeId,
+                postsCache: postsCache,
+                loadingStates: loadingStates
+            )
+        }
+        .store(in: &cancellables)
+
+        // Separate subscription for TikToks cache
+        Publishers.CombineLatest(
+            $currentPlace.map { $0?.id.uuidString },
+            postsCacheService.$tiktoksCache
+        )
+        .receive(on: RunLoop.main)
+        .sink { [weak self] placeId, tiktoksCache in
+            guard let placeId = placeId else { return }
+            let tiktoks = tiktoksCache[placeId] ?? []
+            self?.aboutTabViewModel.tikTokVideosViewModel.setPlaceVideos(tiktoks)
+        }
+        .store(in: &cancellables)
+    }
+
+    /// Handles posts data changes from the reactive subscription.
+    private func handlePostsDataChanged(
+        placeId: String?,
+        postsCache: [String: [PlacePost]],
+        loadingStates: [String: PlacePostsCacheService.LoadingState]
+    ) {
+        guard let placeId = placeId else { return }
+
+        let posts = postsCache[placeId] ?? []
+        let loadingState = loadingStates[placeId] ?? .idle
+
+        self.hasPosts = !posts.isEmpty
+        self.postCount = posts.count
+
+        placePhotosViewModel.setPosts(posts)
+        postsViewModel.setPosts(posts)
+        postsViewModel.setLoadingState(mapLoadingState(loadingState))
+
+        if posts.isEmpty && selectedTab == .reviews {
+            selectedTab = .about
+        }
+    }
+
+    /// Maps PlacePostsCacheService loading state to PlacePostsViewModel loading state.
+    private func mapLoadingState(_ state: PlacePostsCacheService.LoadingState) -> PlacePostsViewModel.LoadingState {
+        switch state {
+        case .idle:
+            return .idle
+        case .loading:
+            return .loading
+        case .loaded:
+            return .loaded
+        case .error(let error):
+            return .error(error)
+        }
+    }
+
+    // MARK: - Data-Driven Updates (Called by View via .onChange)
+
+    /// Called by View when selected place changes.
+    func setPlace(_ place: DetailPlace?) {
+        // Setting currentPlace triggers the reactive subscription automatically
+        handlePlaceChanged(place)
+
+        // Update all child ViewModels with new place
+        travelTimeViewModel.setPlace(place)
+        openStatusViewModel.setPlace(place)
+        placeSaversViewModel.setPlace(place?.id.uuidString)
+        notesTabViewModel.setPlace(place)
+        placePhotosViewModel.setPlace(place)
+        aboutTabViewModel.setPlace(place)
+        postsViewModel.setPlace(place)
+
+        // Check place list membership
+        Task {
+            await checkPlaceListMembership(place: place)
+        }
+    }
+
+    /// Called by View when posts/rating change (legacy method for backward compatibility).
+    /// Posts are now primarily synced via PlacePostsCacheService subscription.
+    func setPosts(_ posts: [PlacePost], rating: Double) {
+        self.placeRating = rating
+        self.hasPosts = !posts.isEmpty
+        self.postCount = posts.count
+
+        // Update child ViewModels with posts data
+        placePhotosViewModel.setPosts(posts)
+        postsViewModel.setPosts(posts)
+
+        // Set default tab based on posts
+        if posts.isEmpty && selectedTab == .reviews {
+            selectedTab = .about
+        }
+    }
+
+    /// Called when the place rating changes.
+    func setRating(_ rating: Double) {
+        self.placeRating = rating
+    }
+
+    /// Called by View when favorite status changes.
+    func setFavoriteStatus(_ isFavorited: Bool) {
+        postsViewModel.setFavoriteStatus(isFavorited)
+    }
+
+    /// Called by View when TikTok videos change.
+    func setTikTokVideos(placeVideos: [TikTokVideo], userVideos: [TikTokVideo]) {
+        aboutTabViewModel.tikTokVideosViewModel.setPlaceVideos(placeVideos)
+        aboutTabViewModel.tikTokVideosViewModel.setUserVideos(userVideos)
+    }
+
+    /// Called by View when post loading state changes.
+    func setPostLoadingState(_ state: PlacePostsViewModel.LoadingState) {
+        postsViewModel.setLoadingState(state)
+    }
+
+    /// Called by View when max favorites alert should be shown
+    func handleMaxFavoritesAlert() {
+        showMaxFavoritesAlert = true
     }
     
     /// Check if the current place is saved in any of the user's lists (database call)
@@ -247,31 +355,26 @@ class PlaceDetailTabsViewModel: ObservableObject {
     /// Public method to refresh list membership state (call after saving to list)
     func refreshPlaceListMembership() {
         Task {
-            await checkPlaceListMembership(place: selectedPlaceVM.selectedPlace)
+            await checkPlaceListMembership(place: currentPlace)
         }
     }
 
     /// Configure savers VM with navigation dependency (call from View)
-    func configureSaversViewModel(userProfileViewModel: UserProfileViewModel) {
-        placeSaversViewModel.configure(userProfileViewModel: userProfileViewModel)
+    func configureSaversViewModel(userProfileNavigationViewModel: UserProfileNavigationViewModel) {
+        placeSaversViewModel.configure(userProfileNavigationViewModel: userProfileNavigationViewModel)
     }
     
     private func handlePlaceChanged(_ place: DetailPlace?) {
         currentPlace = place
         placeName = place?.name ?? "Loading..."
         isCustomPlace = place?.isCustom == true
-        
+
         if let place = place {
             // For custom places, view shows "Created by [photo]" instead of type
             // Still compute type in case we want to show both in the future
             restaurantType = getRestaurantType(for: place)
         } else {
             restaurantType = nil
-        }
-        
-        // Set default tab based on posts
-        if selectedPlaceVM.posts.isEmpty {
-            selectedTab = .about
         }
     }
     
@@ -287,10 +390,10 @@ class PlaceDetailTabsViewModel: ObservableObject {
         placeShareService.sharePlace(place)
     }
     
-    /// Resets the max favorites alert state in both this ViewModel and the source ProfileViewModel
+    /// Resets the max favorites alert state in both this ViewModel and calls callback to notify parent
     func dismissMaxFavoritesAlert() {
         showMaxFavoritesAlert = false
-        profileVM.showMaxFavoritesAlert = false
+        onDismissMaxFavoritesAlert?()
     }
     
     func openGoogleMaps() {

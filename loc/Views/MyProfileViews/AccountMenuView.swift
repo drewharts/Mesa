@@ -34,7 +34,7 @@ struct AccountMenuView: View {
     
     private var deleteAccountButton: some View {
         Button(role: .destructive) {
-            profile.showDeleteWarning()
+            profile.accountViewModel.showDeleteWarning()
         } label: {
             Label("Delete Account", systemImage: "trash")
         }

@@ -13,14 +13,12 @@ import SwiftUI
 struct PlaceDetailViewInNavigation: View {
     let placeId: String
     let minSheetHeight: CGFloat
-    
+
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var locationManager: LocationManager
-    @EnvironmentObject var userProfileViewModel: UserProfileViewModel
+    @EnvironmentObject var userProfileNavigationVM: UserProfileNavigationViewModel
     @EnvironmentObject var userSession: UserSession
-    @EnvironmentObject var serviceContainer: ServiceContainer
-    @EnvironmentObject var dataManager: DataManager
     @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
     
     @State private var isLoading = true
@@ -47,10 +45,8 @@ struct PlaceDetailViewInNavigation: View {
                     .environmentObject(selectedPlaceVM)
                     .environmentObject(profile)
                     .environmentObject(locationManager)
-                    .environmentObject(userProfileViewModel)
+                    .environmentObject(userProfileNavigationVM)
                     .environmentObject(userSession)
-                    .environmentObject(serviceContainer)
-                    .environmentObject(dataManager)
                     .environmentObject(detailPlaceViewModel)
             }
         }
@@ -106,9 +102,10 @@ struct PlaceDetailViewInNavigation: View {
 
 /// Content view extracted from PlaceDetailView to work without NavigationView wrapper
 /// Single Responsibility: Display place detail content (reusable in both sheet and navigation contexts)
+/// Data-Driven: Drives ViewModel updates via .onChange() instead of ViewModel observing other ViewModels
 struct PlaceDetailViewContent: View {
     let minSheetHeight: CGFloat
-    
+
     @State private var selectedImageIndex: Int?
     @State private var showPhotoGallery = false
     @State private var galleryPhotos: [UIImage] = []
@@ -117,18 +114,16 @@ struct PlaceDetailViewContent: View {
     @State private var showListSelection = false
     @State private var showCreatePost = false
     @State private var listSelectionViewModel: PlaceListSelectionViewModel?
-    
+
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var locationManager: LocationManager
-    @EnvironmentObject var userProfileViewModel: UserProfileViewModel
+    @EnvironmentObject var userProfileNavigationVM: UserProfileNavigationViewModel
     @EnvironmentObject var userSession: UserSession
-    @EnvironmentObject var serviceContainer: ServiceContainer
-    @EnvironmentObject var dataManager: DataManager
     @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
-    
+
     @State private var tabsViewModel: PlaceDetailTabsViewModel?
-    
+
     var body: some View {
         ZStack {
             VStack(spacing: 16) {
@@ -151,36 +146,14 @@ struct PlaceDetailViewContent: View {
                             selectedPlaceVM.navigateToPlace(placeId: newPlaceId)
                         }
                     )
-                    .environmentObject(userProfileViewModel)
+                    .environmentObject(userProfileNavigationVM)
                     .environmentObject(detailPlaceViewModel)
                 }
             }
             .frame(maxWidth: .infinity)
             .ignoresSafeArea(edges: [.bottom, .horizontal])
             .onAppear {
-                // Initialize the ViewModel when the view appears
-                if tabsViewModel == nil {
-                    tabsViewModel = PlaceDetailTabsViewModel(
-                        placeService: serviceContainer.placeService,
-                        postService: serviceContainer.postService,
-                        userService: serviceContainer.userService,
-                        notificationManager: serviceContainer.notificationManager,
-                        placeShareService: serviceContainer.placeShareService,
-                        selectedPlaceVM: selectedPlaceVM,
-                        profileVM: profile,
-                        userSession: userSession,
-                        detailPlaceViewModel: detailPlaceViewModel
-                    )
-                    
-                    // Configure savers VM for navigation
-                    tabsViewModel?.configureSaversViewModel(userProfileViewModel: userProfileViewModel)
-                    
-                    // Calculate travel time now that ViewModel is created
-                    if let place = selectedPlaceVM.selectedPlace,
-                       let currentLocation = locationManager.currentLocation {
-                        tabsViewModel?.travelTimeViewModel.updateTravelTime(for: place, from: currentLocation.coordinate)
-                    }
-                }
+                initializeViewModelIfNeeded()
             }
             .alert(isPresented: $showNoPhoneNumberAlert) {
                 Alert(
@@ -230,23 +203,27 @@ struct PlaceDetailViewContent: View {
                 }
             }
             .onAppear {
-                if let place = selectedPlaceVM.selectedPlace,
-                   let currentLocation = locationManager.currentLocation,
-                   let tabsVM = tabsViewModel {
-                    tabsVM.travelTimeViewModel.updateTravelTime(for: place, from: currentLocation.coordinate)
-                }
-                
                 // Refresh TikTok places when place detail view appears
                 profile.refreshTikTokPlacesAfterImport()
             }
-            .onChange(of: selectedPlaceVM.selectedPlace) { _, newPlace in
-                if let place = newPlace,
-                   let currentLocation = locationManager.currentLocation?.coordinate,
-                   let tabsVM = tabsViewModel {
-                    tabsVM.travelTimeViewModel.updateTravelTime(for: place, from: currentLocation)
-                }
-            }
-            
+            // MARK: - Data-Driven Updates (View drives ViewModel state via modifiers)
+            .modifier(PlaceChangeHandler(
+                tabsViewModel: $tabsViewModel,
+                selectedPlaceVM: selectedPlaceVM,
+                profile: profile,
+                locationManager: locationManager
+            ))
+            .modifier(FavoritesChangeHandler(
+                tabsViewModel: $tabsViewModel,
+                selectedPlaceVM: selectedPlaceVM,
+                profile: profile
+            ))
+            .modifier(TikTokChangeHandler(
+                tabsViewModel: $tabsViewModel,
+                selectedPlaceVM: selectedPlaceVM,
+                profile: profile
+            ))
+
             // Photo Gallery Overlay (Pinterest-style) - fills entire sheet
             if showPhotoGallery, let selectedIndex = selectedImageIndex {
                 PinterestPhotoGalleryView(
@@ -261,5 +238,67 @@ struct PlaceDetailViewContent: View {
             }
         }
         .navigationBarHidden(showPhotoGallery)
+    }
+
+    // MARK: - Private Methods
+
+    /// Initializes the ViewModel with data-driven callbacks.
+    private func initializeViewModelIfNeeded() {
+        guard tabsViewModel == nil else { return }
+
+        // Create ViewModel - all child VMs are now fully refactored with data-driven approach
+        let vm = PlaceDetailTabsViewModel(
+            userSession: userSession,
+            profileVM: profile,
+            detailPlaceViewModel: detailPlaceViewModel,
+            selectedPlaceVM: selectedPlaceVM
+        )
+
+        // Wire up callback to dismiss max favorites alert in ProfileViewModel
+        vm.onDismissMaxFavoritesAlert = { [weak profile] in
+            profile?.favoritesViewModel.showMaxFavoritesAlert = false
+        }
+
+        // Configure savers VM for navigation
+        vm.configureSaversViewModel(userProfileNavigationViewModel: userProfileNavigationVM)
+
+        // Set initial data
+        if let place = selectedPlaceVM.selectedPlace {
+            vm.setPlace(place)
+            vm.setPosts(selectedPlaceVM.posts, rating: selectedPlaceVM.placeRating)
+
+            // Set favorite status
+            let isFavorited = profile.isPlaceFavorite(placeId: place.id.uuidString)
+            vm.setFavoriteStatus(isFavorited)
+
+            // Set TikTok videos
+            let userVideos = profile.getTikTokVideosSync(for: place.id.uuidString)
+            vm.setTikTokVideos(placeVideos: selectedPlaceVM.tiktokVideos, userVideos: userVideos)
+
+            // Set post loading state
+            let loadingState = selectedPlaceVM.postLoadingState(forPlaceId: place.id.uuidString)
+            vm.setPostLoadingState(mapLoadingState(loadingState))
+
+            // Calculate travel time
+            if let currentLocation = locationManager.currentLocation {
+                vm.travelTimeViewModel.updateTravelTime(for: place, from: currentLocation.coordinate)
+            }
+        }
+
+        tabsViewModel = vm
+    }
+
+    /// Maps PlacePostsCacheService loading state to PlacePostsViewModel loading state.
+    private func mapLoadingState(_ state: PlacePostsCacheService.LoadingState) -> PlacePostsViewModel.LoadingState {
+        switch state {
+        case .idle:
+            return .idle
+        case .loading:
+            return .loading
+        case .loaded:
+            return .loaded
+        case .error(let error):
+            return .error(error)
+        }
     }
 }

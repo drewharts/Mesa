@@ -106,17 +106,12 @@ struct PlaceNoteDisplayView: View {
         deepLinkViewModel: nil
     )
     
-    let notesVM = NotesTabViewModel(
-        userService: services.userService,
-        selectedPlaceVM: selectedPlaceVM,
-        profileVM: profileVM,
-        userSession: userSession
-    )
-    
+    let notesVM = NotesTabViewModel(userSession: userSession)
+
     // Simulate a note existing
     notesVM.noteText = "Great food but parking is tricky. Ask for the corner booth!"
     notesVM.linkText = "https://example.com/reservation"
-    
+
     return PlaceNoteDisplayView(viewModel: notesVM, onEditTapped: {})
         .padding()
 }

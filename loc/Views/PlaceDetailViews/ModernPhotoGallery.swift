@@ -108,104 +108,122 @@ struct ModernPhotoGallery: View {
                 .padding(.vertical, 40)
             } else {
                 // Photo gallery
-                ScrollView {
-                    VStack(spacing: gridSpacing) {
-                        // Hero image (first photo, if available)
-                        if let firstImage = images.first {
-                            GeometryReader { geo in
-                                Image(uiImage: firstImage)
-                                    .resizable()
-                                    .scaledToFill()
-                                    .frame(width: geo.size.width, height: heroImageHeight)
-                                    .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
-                                    .contentShape(RoundedRectangle(cornerRadius: cornerRadius))
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: cornerRadius)
-                                            .stroke(Color.gray.opacity(0.1), lineWidth: 0.5)
-                                    )
-                                    .overlay(overflowOverlay(at: 0))
-                                    .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 4)
-                            }
-                            .frame(height: heroImageHeight)
-                            .onTapGesture {
-                                onImageTapped(0)
-                            }
-                            .transition(.opacity.combined(with: .scale))
-                        }
-
-                        // Staggered grid layout: 2 photos, then 1, then 2, then 1, etc.
-                        ForEach(staggeredLayoutItems) { item in
-                            switch item {
-                            case .single(let actualIndex):
-                                // Single photo row
+                ZStack(alignment: .bottom) {
+                    ScrollView {
+                        VStack(spacing: gridSpacing) {
+                            // Hero image (first photo, if available)
+                            if let firstImage = images.first {
                                 GeometryReader { geo in
-                                    Image(uiImage: images[actualIndex])
+                                    Image(uiImage: firstImage)
                                         .resizable()
                                         .scaledToFill()
-                                        .frame(width: geo.size.width, height: geo.size.width * 0.6)
+                                        .frame(width: geo.size.width, height: heroImageHeight)
                                         .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
                                         .contentShape(RoundedRectangle(cornerRadius: cornerRadius))
                                         .overlay(
                                             RoundedRectangle(cornerRadius: cornerRadius)
                                                 .stroke(Color.gray.opacity(0.1), lineWidth: 0.5)
                                         )
-                                        .overlay(overflowOverlay(at: actualIndex))
-                                        .shadow(color: Color.black.opacity(0.08), radius: 6, x: 0, y: 2)
+                                        .overlay(overflowOverlay(at: 0))
+                                        .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 4)
                                 }
-                                .aspectRatio(5/3, contentMode: .fill)
+                                .frame(height: heroImageHeight)
                                 .onTapGesture {
-                                    onImageTapped(actualIndex)
+                                    onImageTapped(0)
                                 }
-                                .onAppear {
-                                    // Load more photos when nearing the end
-                                    if actualIndex == images.count - 3 && !photosViewModel.allPhotosLoadedForCurrentPlace {
-                                        photosViewModel.loadMorePhotos()
-                                    }
-                                }
-                                .transition(.opacity.combined(with: .scale(scale: 0.9)))
+                                .transition(.opacity.combined(with: .scale))
+                            }
 
-                            case .double(let indices):
-                                // Two photo row
-                                HStack(spacing: gridSpacing) {
-                                    ForEach(indices, id: \.self) { actualIndex in
-                                        GeometryReader { geo in
-                                            Image(uiImage: images[actualIndex])
-                                                .resizable()
-                                                .scaledToFill()
-                                                .frame(width: geo.size.width, height: geo.size.width * 0.8)
-                                                .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
-                                                .contentShape(RoundedRectangle(cornerRadius: cornerRadius))
-                                                .overlay(
-                                                    RoundedRectangle(cornerRadius: cornerRadius)
-                                                        .stroke(Color.gray.opacity(0.1), lineWidth: 0.5)
-                                                )
-                                                .overlay(overflowOverlay(at: actualIndex))
-                                                .shadow(color: Color.black.opacity(0.08), radius: 6, x: 0, y: 2)
+                            // Staggered grid layout: 2 photos, then 1, then 2, then 1, etc.
+                            ForEach(staggeredLayoutItems) { item in
+                                switch item {
+                                case .single(let actualIndex):
+                                    // Single photo row
+                                    GeometryReader { geo in
+                                        Image(uiImage: images[actualIndex])
+                                            .resizable()
+                                            .scaledToFill()
+                                            .frame(width: geo.size.width, height: geo.size.width * 0.6)
+                                            .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+                                            .contentShape(RoundedRectangle(cornerRadius: cornerRadius))
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: cornerRadius)
+                                                    .stroke(Color.gray.opacity(0.1), lineWidth: 0.5)
+                                            )
+                                            .overlay(overflowOverlay(at: actualIndex))
+                                            .shadow(color: Color.black.opacity(0.08), radius: 6, x: 0, y: 2)
+                                    }
+                                    .aspectRatio(5/3, contentMode: .fill)
+                                    .onTapGesture {
+                                        onImageTapped(actualIndex)
+                                    }
+                                    .onAppear {
+                                        // Load more photos when nearing the end
+                                        if actualIndex == images.count - 3 && !photosViewModel.allPhotosLoadedForCurrentPlace {
+                                            photosViewModel.loadMorePhotos()
                                         }
-                                        .aspectRatio(5/4, contentMode: .fill)
-                                        .onTapGesture {
-                                            onImageTapped(actualIndex)
+                                    }
+                                    .transition(.opacity.combined(with: .scale(scale: 0.9)))
+
+                                case .double(let indices):
+                                    // Two photo row
+                                    HStack(spacing: gridSpacing) {
+                                        ForEach(indices, id: \.self) { actualIndex in
+                                            GeometryReader { geo in
+                                                Image(uiImage: images[actualIndex])
+                                                    .resizable()
+                                                    .scaledToFill()
+                                                    .frame(width: geo.size.width, height: geo.size.width * 0.8)
+                                                    .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+                                                    .contentShape(RoundedRectangle(cornerRadius: cornerRadius))
+                                                    .overlay(
+                                                        RoundedRectangle(cornerRadius: cornerRadius)
+                                                            .stroke(Color.gray.opacity(0.1), lineWidth: 0.5)
+                                                    )
+                                                    .overlay(overflowOverlay(at: actualIndex))
+                                                    .shadow(color: Color.black.opacity(0.08), radius: 6, x: 0, y: 2)
+                                            }
+                                            .aspectRatio(5/4, contentMode: .fill)
+                                            .onTapGesture {
+                                                onImageTapped(actualIndex)
+                                            }
+                                            .transition(.opacity.combined(with: .scale(scale: 0.9)))
                                         }
-                                        .transition(.opacity.combined(with: .scale(scale: 0.9)))
                                     }
                                 }
                             }
-                        }
 
-                        // Loading indicator
-                        if photosViewModel.photoLoadingState == .loading && !images.isEmpty {
-                            HStack {
-                                Spacer()
-                                ProgressView()
-                                    .padding(.vertical, 20)
-                                Spacer()
+                            // Loading indicator
+                            if photosViewModel.photoLoadingState == .loading && !images.isEmpty {
+                                HStack {
+                                    Spacer()
+                                    ProgressView()
+                                        .padding(.vertical, 20)
+                                    Spacer()
+                                }
                             }
-                        }
 
-                        // Bottom spacing
-                        Color.clear.frame(height: 20)
+                            // Bottom spacing
+                            Color.clear.frame(height: 20)
+                        }
+                        .animation(.easeOut(duration: 0.3), value: images.count)
                     }
-                    .animation(.easeOut(duration: 0.3), value: images.count)
+
+                    // Refresh indicator overlay when refreshing stale images
+                    if photosViewModel.isRefreshingImages {
+                        HStack(spacing: 6) {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                            Text("Refreshing photos...")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(.ultraThinMaterial)
+                        .cornerRadius(8)
+                        .padding(.bottom, 8)
+                    }
                 }
             }
         }
@@ -223,11 +241,8 @@ struct ModernPhotoGallery: View {
         imageService: services.imageService
     )
     
-    let photosViewModel = PlacePhotosViewModel(
-        postService: services.postService,
-        selectedPlaceVM: selectedPlaceVM
-    )
-    
+    let photosViewModel = PlacePhotosViewModel()
+
     let sampleImages = [
         UIImage(systemName: "photo")!,
         UIImage(systemName: "photo.fill")!,

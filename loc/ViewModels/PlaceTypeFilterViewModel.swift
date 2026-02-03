@@ -50,18 +50,18 @@ class PlaceTypeFilterViewModel: ObservableObject {
             .store(in: &cancellables)
         
         // Watch for changes to user favorites
-        profileVM.$userFavorites
+        profileVM.favoritesViewModel.$userFavorites
             .dropFirst() // Skip initial empty value
-            .sink { [weak self] favorites in
+            .sink { [weak self] _ in
                 self?.calculateMostFrequentTypes()
                 self?.updateFilteredPlaces()
             }
             .store(in: &cancellables)
-        
+
         // Watch for changes to user lists places
-        profileVM.$userListsPlaces
+        profileVM.listsViewModel.dataViewModel.$userListsPlaces
             .dropFirst() // Skip initial empty value
-            .sink { [weak self] listsPlaces in
+            .sink { [weak self] _ in
                 self?.calculateMostFrequentTypes()
                 self?.updateFilteredPlaces()
             }
@@ -88,14 +88,14 @@ class PlaceTypeFilterViewModel: ObservableObject {
     
     /// Setup observer for MapViewModel viewport changes
     func observeMapViewModel() {
-        guard let mapVM = mapViewModel else { 
+        guard let mapVM = mapViewModel else {
             print("⚠️ [PlaceTypeFilterVM] No MapViewModel available for observation")
-            return 
+            return
         }
-        
+
         print("✅ [PlaceTypeFilterVM] Setting up observer for MapViewModel viewport changes")
-        
-        mapVM.$viewportAnnotations
+
+        mapVM.viewportViewModel.$viewportAnnotations
             .sink { [weak self] _ in
                 self?.updateFilteredPlaces()
             }
@@ -205,12 +205,12 @@ class PlaceTypeFilterViewModel: ObservableObject {
     }
     
     private func getAllUserPlaceIds() -> [String] {
-        var allPlaceIds = Set(profileVM.userFavorites)
-        
-        for listPlaces in profileVM.userListsPlaces.values {
+        var allPlaceIds = Set(profileVM.favoritesViewModel.userFavorites)
+
+        for listPlaces in profileVM.listsViewModel.userListsPlaces.values {
             allPlaceIds.formUnion(listPlaces)
         }
-        
+
         return Array(allPlaceIds)
     }
     

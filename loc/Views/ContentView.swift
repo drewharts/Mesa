@@ -12,20 +12,21 @@ struct ContentView: View {
     @EnvironmentObject var userSession: UserSession
     @EnvironmentObject var locationManager: LocationManager
     @EnvironmentObject var appCoordinator: AppCoordinator
-    
+
     // ViewModels passed as props, not environment objects
     let selectedPlaceViewModel: SelectedPlaceViewModel
     let profileViewModel: ProfileViewModel
-    let userProfileViewModel: UserProfileViewModel
+    let userProfileNavigationViewModel: UserProfileNavigationViewModel
+    let mapDisplayCoordinatorViewModel: MapDisplayCoordinatorViewModel
     let detailPlaceViewModel: DetailPlaceViewModel
     let deepLinkViewModel: DeepLinkViewModel
     let deepLinkManager: DeepLinkManager
     let notificationManager: NotificationManager
     let dataManager: DataManager
     let serviceContainer: ServiceContainer
-    let searchViewModel: SearchViewModel  // ✅ Accept from parent
-    let searchCoordinator: SearchCoordinatorViewModel  // ✅ Search coordinator
-    
+    let searchViewModel: SearchViewModel
+    let searchCoordinator: SearchCoordinatorViewModel
+
     @State private var showNavigationError = false
     @State private var navigationErrorMessage = ""
 
@@ -36,7 +37,8 @@ struct ContentView: View {
             MainView(
                 selectedPlaceVM: selectedPlaceViewModel,
                 profileViewModel: profileViewModel,
-                userProfileViewModel: userProfileViewModel,
+                userProfileNavigationViewModel: userProfileNavigationViewModel,
+                mapDisplayCoordinatorViewModel: mapDisplayCoordinatorViewModel,
                 detailPlaceViewModel: detailPlaceViewModel,
                 deepLinkViewModel: deepLinkViewModel,
                 notificationManager: notificationManager,
@@ -67,6 +69,14 @@ struct ContentView: View {
             Button("OK") { }
         } message: {
             Text(navigationErrorMessage)
+        }
+        .onChange(of: userSession.isUserLoggedIn) { oldValue, newValue in
+            // Show suggested profiles popup on first login via PresentationService
+            if !oldValue && newValue && SuggestedProfilesViewModel.shouldShowPopup {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    PresentationService.shared.present(.suggestedProfiles)
+                }
+            }
         }
     }
     

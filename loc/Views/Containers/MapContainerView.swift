@@ -14,49 +14,49 @@ struct MapContainerView: View {
     @EnvironmentObject var locationManager: LocationManager
     @EnvironmentObject var userSession: UserSession
     @EnvironmentObject var appCoordinator: AppCoordinator
-    
+
     @Binding var mapPosition: MapCameraPosition
     @Binding var recenterMap: Bool
-    @Binding var isSearchExpanded: Bool
     @Binding var isCreatePlacePopupActive: Bool
-    
+
     let selectedPlaceViewModel: SelectedPlaceViewModel
     let detailPlaceViewModel: DetailPlaceViewModel
     let profileViewModel: ProfileViewModel
     let dataManager: DataManager
-    let userProfileViewModel: UserProfileViewModel
+    let userProfileNavigationViewModel: UserProfileNavigationViewModel
+    let mapDisplayCoordinatorViewModel: MapDisplayCoordinatorViewModel
     let serviceContainer: ServiceContainer
     let notificationManager: NotificationManager
     let onMapTap: () -> Void
-    
+
     init(
         mapPosition: Binding<MapCameraPosition>,
         recenterMap: Binding<Bool>,
-        isSearchExpanded: Binding<Bool>,
         isCreatePlacePopupActive: Binding<Bool>,
         selectedPlaceViewModel: SelectedPlaceViewModel,
         detailPlaceViewModel: DetailPlaceViewModel,
         placeService: PlaceService,
         profileViewModel: ProfileViewModel,
         dataManager: DataManager,
-        userProfileViewModel: UserProfileViewModel,
+        userProfileNavigationViewModel: UserProfileNavigationViewModel,
+        mapDisplayCoordinatorViewModel: MapDisplayCoordinatorViewModel,
         serviceContainer: ServiceContainer,
         notificationManager: NotificationManager,
         onMapTap: @escaping () -> Void
     ) {
         self._mapPosition = mapPosition
         self._recenterMap = recenterMap
-        self._isSearchExpanded = isSearchExpanded
         self._isCreatePlacePopupActive = isCreatePlacePopupActive
         self.selectedPlaceViewModel = selectedPlaceViewModel
         self.detailPlaceViewModel = detailPlaceViewModel
         self.profileViewModel = profileViewModel
         self.dataManager = dataManager
-        self.userProfileViewModel = userProfileViewModel
+        self.userProfileNavigationViewModel = userProfileNavigationViewModel
+        self.mapDisplayCoordinatorViewModel = mapDisplayCoordinatorViewModel
         self.serviceContainer = serviceContainer
         self.notificationManager = notificationManager
         self.onMapTap = onMapTap
-        
+
         // Create MapViewModel scoped to this container
         // Note: MapViewModel no longer observes ProfileViewModel directly
         // The View layer coordinates data flow between ViewModels (SRP pattern)
@@ -64,305 +64,258 @@ struct MapContainerView: View {
             placeService: placeService,
             detailPlaceVM: detailPlaceViewModel
         )
-        
+
         self._mapViewModel = StateObject(wrappedValue: mapVM)
     }
-    
+
     var body: some View {
+        mapContent
+            .ignoresSafeArea()
+            .edgesIgnoringSafeArea(.all)
+            .modifier(ExternalProfileOnChangeModifiers(
+                mapDisplayCoordinatorViewModel: mapDisplayCoordinatorViewModel,
+                selectedPlaceViewModel: selectedPlaceViewModel,
+                mapViewModel: mapViewModel,
+                appCoordinator: appCoordinator,
+                userSession: userSession,
+                mapPosition: $mapPosition
+            ))
+            .modifier(SheetOnChangeModifiers(
+                selectedPlaceViewModel: selectedPlaceViewModel,
+                userProfileNavigationViewModel: userProfileNavigationViewModel,
+                mapViewModel: mapViewModel,
+                appCoordinator: appCoordinator,
+                userSession: userSession
+            ))
+    }
+
+    // MARK: - Map Content with Profile Observers
+
+    /// The main map view with profile-related onChange handlers
+    private var mapContent: some View {
         ZStack {
-        MapView(
-            recenterMap: $recenterMap,
-            mapPosition: $mapPosition,
-            isSearchBarMinimized: !isSearchExpanded,
-            isCreatePlacePopupActive: $isCreatePlacePopupActive,
-            onMapTap: onMapTap
-        )
-        .environmentObject(mapViewModel)
-        .environmentObject(selectedPlaceViewModel)
-        .environmentObject(detailPlaceViewModel)
-        .environmentObject(profileViewModel)
-            .onChange(of: profileViewModel.selectedListIdForMap) { oldValue, newValue in
-                // Sync ProfileViewModel list selection with MapViewModel
-                // MVVM: View coordinates data flow between ViewModels
-                if let listId = newValue {
-                    // Validate list exists before showing sheet (prevents competing views)
-                    mapViewModel.selectList(listId, availableLists: profileViewModel.lightweightPlaceLists)
-
-                    // Navigate map to list's location if available
-                    if let listCenter = profileViewModel.lightweightPlaceLists
-                        .first(where: { $0.list_id == listId })?.averageLocation {
-                        mapPosition = .region(MKCoordinateRegion(
-                            center: listCenter,
-                            span: MKCoordinateSpan(latitudeDelta: 0.08, longitudeDelta: 0.08)
-                        ))
-                    }
-
-                    // Trigger reload after map moves (delay for animation)
-                    if let userId = userSession.currentUserId {
-                        Task {
-                            try? await Task.sleep(nanoseconds: 300_000_000) // 0.3s
-                            if let region = appCoordinator.currentMapRegion {
-                                await mapViewModel.onMapCameraSettled(region, userId: userId)
-                            }
-                        }
-                    }
-                } else {
-                    mapViewModel.clearListFilter()
-                    // Trigger reload to show all annotations
-                    if let userId = userSession.currentUserId {
-                        let currentRegion = appCoordinator.currentMapRegion
-                        Task {
-                            if let region = currentRegion {
-                                await mapViewModel.onMapCameraSettled(region, userId: userId)
-                            }
-                        }
-                    }
-                }
-            }
-            .onChange(of: profileViewModel.showTikToksOnMap) { _, newValue in
-                // Navigate to map showing TikTok places
-                if newValue {
-                    mapViewModel.selectTikToks()
-                    profileViewModel.showTikToksOnMap = false // Reset trigger
-                    // Trigger reload with TikTok filter
-                    if let userId = userSession.currentUserId {
-                        let currentRegion = appCoordinator.currentMapRegion
-                        Task {
-                            if let region = currentRegion {
-                                await mapViewModel.onMapCameraSettled(region, userId: userId)
-                            }
-                        }
-                    }
-                }
-            }
-            .onChange(of: profileViewModel.showReviewsOnMap) { _, newValue in
-                // Navigate to map showing reviewed places
-                if newValue {
-                    mapViewModel.selectReviews()
-                    profileViewModel.showReviewsOnMap = false // Reset trigger
-                    // Trigger reload with reviews filter
-                    if let userId = userSession.currentUserId {
-                        let currentRegion = appCoordinator.currentMapRegion
-                        Task {
-                            if let region = currentRegion {
-                                await mapViewModel.onMapCameraSettled(region, userId: userId)
-                            }
-                        }
-                    }
-                }
-            }
-            .onChange(of: profileViewModel.showFavoritesOnMap) { _, newValue in
-                // Navigate to map showing favorite places
-                if newValue {
-                    mapViewModel.selectFavorites()
-                    profileViewModel.showFavoritesOnMap = false // Reset trigger
-                    // Trigger reload with favorites filter
-                    if let userId = userSession.currentUserId {
-                        let currentRegion = appCoordinator.currentMapRegion
-                        Task {
-                            if let region = currentRegion {
-                                await mapViewModel.onMapCameraSettled(region, userId: userId)
-                            }
-                        }
-                    }
-                }
-            }
-
-        }
-        .ignoresSafeArea()
-        .edgesIgnoringSafeArea(.all)
-        // Native SwiftUI sheet for list popup (replaces custom BottomSheetView)
-        // Single Responsibility: Present list popup sheet using native iOS sheet behavior
-        // MVVM: Uses ViewModel state to control presentation
-        .onChange(of: selectedPlaceViewModel.isDetailSheetPresented) { oldValue, newValue in
-            // Monitor detail sheet presentation state for debugging if needed
-        }
-        .onChange(of: userProfileViewModel.isUserDetailPresented) { _, isPresented in
-            // Dismiss popup sheets when navigating to user profile from within nested PlaceDetailView
-            // MVVM: View observes ViewModel state changes and coordinates sheet dismissal
-            if isPresented {
-                // Only clear selected place if NOT navigating from place detail
-                // (we want to preserve it for restoration when coming back)
-                if !userProfileViewModel.navigatedFromPlaceDetail {
-                    selectedPlaceViewModel.selectedPlace = nil
-                }
-                if mapViewModel.activeSheet != nil {
-                    mapViewModel.activeSheet = nil
-                }
-            }
-        }
-        .onChange(of: userProfileViewModel.showExternalReviewsOnMap) { _, shouldShow in
-            // Show external user's reviews on map with filtered annotations
-            if shouldShow, let userId = userProfileViewModel.selectedUser?.id {
-                mapViewModel.selectExternalReviews(userId: userId, userPhotoUrl: userProfileViewModel.selectedUser?.profilePhotoURL)
-                userProfileViewModel.showExternalReviewsOnMap = false  // Reset trigger
-                // Trigger reload to show external user's reviewed places
-                if let currentUserId = userSession.currentUserId {
-                    let currentRegion = appCoordinator.currentMapRegion
-                    Task {
-                        if let region = currentRegion {
-                            await mapViewModel.onMapCameraSettled(region, userId: currentUserId)
-                        }
-                    }
-                }
-            }
-        }
-        .onChange(of: userProfileViewModel.showExternalListOnMap) { _, listId in
-            // Show external user's list on map with filtered annotations
-            if let listId = listId, let userId = userProfileViewModel.selectedUser?.id {
-                print("📍 [MapContainer] External list selected: \(listId)")
-                if let listCenter = userProfileViewModel.userLists.first(where: { $0.list_id == listId })?.averageLocation {
-                    print("   listCenter: \(listCenter.latitude), \(listCenter.longitude)")
-                }
-
-                mapViewModel.selectExternalList(listId: listId, userId: userId, userPhotoUrl: userProfileViewModel.selectedUser?.profilePhotoURL)
-                userProfileViewModel.showExternalListOnMap = nil  // Reset trigger
-
-                // Center map on list's location before triggering annotation reload
-                if let listCenter = userProfileViewModel.userLists
-                    .first(where: { $0.list_id == listId })?.averageLocation {
-                    // Move map to list's center
-                    mapPosition = .region(MKCoordinateRegion(
-                        center: listCenter,
-                        span: MKCoordinateSpan(latitudeDelta: 0.08, longitudeDelta: 0.08)
-                    ))
-                }
-
-                // Trigger reload after map moves (using slight delay to let map settle)
-                if let currentUserId = userSession.currentUserId {
-                    Task {
-                        try? await Task.sleep(nanoseconds: 300_000_000) // 0.3s for map animation
-                        print("📍 [MapContainer] After delay, region: \(String(describing: appCoordinator.currentMapRegion))")
-                        if let newRegion = appCoordinator.currentMapRegion {
-                            await mapViewModel.onMapCameraSettled(newRegion, userId: currentUserId)
-                        }
-                    }
-                }
-            }
-        }
-        .onChange(of: userProfileViewModel.showExternalFavoritesOnMap) { _, shouldShow in
-            // Show external user's favorites on map with filtered annotations
-            if shouldShow, let userId = userProfileViewModel.selectedUser?.id {
-                mapViewModel.selectExternalFavorites(userId: userId, userPhotoUrl: userProfileViewModel.selectedUser?.profilePhotoURL)
-                userProfileViewModel.showExternalFavoritesOnMap = false  // Reset trigger
-                // Trigger reload to show external user's favorite places
-                if let currentUserId = userSession.currentUserId {
-                    let currentRegion = appCoordinator.currentMapRegion
-                    Task {
-                        if let region = currentRegion {
-                            await mapViewModel.onMapCameraSettled(region, userId: currentUserId)
-                        }
-                    }
-                }
-            }
-        }
-        .onChange(of: appCoordinator.showKeywordResultsPopup) { _, shouldShow in
-            // Show keyword search results as full list popup with map annotations
-            if shouldShow, let keyword = appCoordinator.keywordForPopup {
-                mapViewModel.selectKeywordResults(
-                    keyword: keyword,
-                    types: appCoordinator.keywordTypesForPopup
-                )
-                appCoordinator.showKeywordResultsPopup = false  // Reset trigger
-                // Trigger reload to show keyword-matching places on map
-                if let userId = userSession.currentUserId {
-                    let currentRegion = appCoordinator.currentMapRegion
-                    Task {
-                        if let region = currentRegion {
-                            await mapViewModel.onMapCameraSettled(region, userId: userId)
-                        }
-                    }
-                }
-            }
-        }
-        // Single sheet using item binding - prevents "only presenting a single sheet" warning
-        .sheet(item: $mapViewModel.activeSheet) { sheetType in
-            Group {
-                switch sheetType {
-                case .list(let listId):
-                    if let listIndex = profileViewModel.lightweightPlaceLists.firstIndex(where: { $0.id == listId }) {
-                        LightweightListPopupView(
-                            lists: profileViewModel.lightweightPlaceLists,
-                            initialListIndex: listIndex
-                        )
-                        .id(listId)
-                    } else {
-                        // Loading state while list is being validated
-                        VStack {
-                            ProgressView()
-                                .padding()
-                            Text("Loading list...")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                        }
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    }
-
-                case .tiktoks:
-                    TikToksPopupView()
-
-                case .reviews:
-                    ReviewsListPopupView()
-
-                case .favorites:
-                    FavoritesPopupView()
-
-                case .externalReviews:
-                    ExternalReviewsListPopupView(userProfileVM: userProfileViewModel)
-
-                case .externalList(let listId):
-                    if let listIndex = userProfileViewModel.userLists.firstIndex(where: { $0.list_id == listId }) {
-                        ExternalUserLightweightListPopupView(
-                            viewModel: userProfileViewModel,
-                            lists: userProfileViewModel.userLists,
-                            initialListIndex: listIndex,
-                            placeColors: .constant([:])
-                        )
-                    } else {
-                        // Loading state while list is being validated
-                        VStack {
-                            ProgressView()
-                                .padding()
-                            Text("Loading list...")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                        }
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    }
-
-                case .externalFavorites:
-                    ExternalFavoritesListPopupView(userProfileVM: userProfileViewModel)
-
-                case .keywordResults(let keyword, let types):
-                    KeywordResultsPopupView(keyword: keyword, types: types)
-                }
-            }
-            .environmentObject(profileViewModel)
+            MapView(
+                recenterMap: $recenterMap,
+                mapPosition: $mapPosition,
+                isCreatePlacePopupActive: $isCreatePlacePopupActive,
+                onMapTap: onMapTap
+            )
+            .environmentObject(mapViewModel)
             .environmentObject(selectedPlaceViewModel)
             .environmentObject(detailPlaceViewModel)
-            .environmentObject(mapViewModel)
-            .environmentObject(dataManager)
-            .environmentObject(locationManager)
-            .environmentObject(userSession)
-            .environmentObject(userProfileViewModel)
-            .environmentObject(serviceContainer)
-            .environmentObject(notificationManager)
-            .presentationDetents([.height(300), .height(800)])
-            .presentationDragIndicator(.visible)
-            .presentationBackground(Color.clear)
-            .presentationBackgroundInteraction(.enabled(upThrough: .height(800)))
-            .onDisappear {
-                // Clear all filters when any sheet is dismissed
-                mapViewModel.clearAllFilters()
-                profileViewModel.selectedListIdForMap = nil
+            .environmentObject(profileViewModel)
+            .onChange(of: profileViewModel.selectedListIdForMap) { oldValue, newValue in
+                handleListSelectionChange(newValue)
+            }
+            .onChange(of: profileViewModel.showTikToksOnMap) { _, newValue in
+                handleTikToksOnMap(newValue)
+            }
+            .onChange(of: profileViewModel.showReviewsOnMap) { _, newValue in
+                handleReviewsOnMap(newValue)
+            }
+            .onChange(of: profileViewModel.showFavoritesOnMap) { _, newValue in
+                handleFavoritesOnMap(newValue)
+            }
+            .onChange(of: profileViewModel.showMyPlacesOnMap) { _, newValue in
+                handleMyPlacesOnMap(newValue)
+            }
+        }
+    }
 
-                // Trigger map annotation reload to show all annotations
-                if let userId = userSession.currentUserId {
-                    let currentRegion = appCoordinator.currentMapRegion
-                    Task {
-                        if let region = currentRegion {
-                            await mapViewModel.onMapCameraSettled(region, userId: userId)
-                        }
+    // MARK: - Profile onChange Handlers
+
+    /// Handles list selection changes from ProfileViewModel
+    private func handleListSelectionChange(_ newValue: String?) {
+        if let listId = newValue {
+            mapViewModel.selectList(listId, availableLists: profileViewModel.listsViewModel.lightweightPlaceLists)
+
+            if let listCenter = profileViewModel.listsViewModel.lightweightPlaceLists
+                .first(where: { $0.list_id == listId })?.averageLocation {
+                mapPosition = .region(MKCoordinateRegion(
+                    center: listCenter,
+                    span: MKCoordinateSpan(latitudeDelta: 0.08, longitudeDelta: 0.08)
+                ))
+            }
+
+            if let userId = userSession.currentUserId {
+                Task {
+                    try? await Task.sleep(nanoseconds: 300_000_000)
+                    if let region = appCoordinator.currentMapRegion {
+                        await mapViewModel.onMapCameraSettled(region, userId: userId)
+                    }
+                }
+            }
+        } else {
+            mapViewModel.clearListFilter()
+            if let userId = userSession.currentUserId {
+                let currentRegion = appCoordinator.currentMapRegion
+                Task {
+                    if let region = currentRegion {
+                        await mapViewModel.onMapCameraSettled(region, userId: userId)
+                    }
+                }
+            }
+        }
+    }
+
+    /// Handles showing TikToks on map
+    private func handleTikToksOnMap(_ newValue: Bool) {
+        if newValue {
+            mapViewModel.selectTikToks()
+            profileViewModel.showTikToksOnMap = false
+            if let userId = userSession.currentUserId {
+                let currentRegion = appCoordinator.currentMapRegion
+                Task {
+                    if let region = currentRegion {
+                        await mapViewModel.onMapCameraSettled(region, userId: userId)
+                    }
+                }
+            }
+        }
+    }
+
+    /// Handles showing reviews on map
+    private func handleReviewsOnMap(_ newValue: Bool) {
+        if newValue {
+            mapViewModel.selectReviews()
+            profileViewModel.showReviewsOnMap = false
+            if let userId = userSession.currentUserId {
+                let currentRegion = appCoordinator.currentMapRegion
+                Task {
+                    if let region = currentRegion {
+                        await mapViewModel.onMapCameraSettled(region, userId: userId)
+                    }
+                }
+            }
+        }
+    }
+
+    /// Handles showing favorites on map
+    private func handleFavoritesOnMap(_ newValue: Bool) {
+        if newValue {
+            mapViewModel.selectFavorites()
+            profileViewModel.showFavoritesOnMap = false
+            if let userId = userSession.currentUserId {
+                let currentRegion = appCoordinator.currentMapRegion
+                Task {
+                    if let region = currentRegion {
+                        await mapViewModel.onMapCameraSettled(region, userId: userId)
+                    }
+                }
+            }
+        }
+    }
+
+    /// Handles showing my places on map
+    private func handleMyPlacesOnMap(_ newValue: Bool) {
+        if newValue {
+            mapViewModel.selectMyPlaces()
+            profileViewModel.showMyPlacesOnMap = false
+            if let userId = userSession.currentUserId {
+                let currentRegion = appCoordinator.currentMapRegion
+                Task {
+                    if let region = currentRegion {
+                        await mapViewModel.onMapCameraSettled(region, userId: userId)
+                    }
+                }
+            }
+        }
+    }
+
+}
+
+// MARK: - External Profile onChange Modifiers
+
+/// Extracted view modifier for external profile onChange handlers
+private struct ExternalProfileOnChangeModifiers: ViewModifier {
+    @ObservedObject var mapDisplayCoordinatorViewModel: MapDisplayCoordinatorViewModel
+    let selectedPlaceViewModel: SelectedPlaceViewModel
+    let mapViewModel: MapViewModel
+    let appCoordinator: AppCoordinator
+    let userSession: UserSession
+    @Binding var mapPosition: MapCameraPosition
+
+    func body(content: Content) -> some View {
+        content
+            .onChange(of: mapDisplayCoordinatorViewModel.showExternalReviewsOnMap) { _, shouldShow in
+                handleExternalReviewsOnMap(shouldShow)
+            }
+            .onChange(of: mapDisplayCoordinatorViewModel.showExternalListOnMap) { _, listId in
+                handleExternalListOnMap(listId)
+            }
+            .onChange(of: mapDisplayCoordinatorViewModel.showExternalFavoritesOnMap) { _, shouldShow in
+                handleExternalFavoritesOnMap(shouldShow)
+            }
+    }
+
+    /// Handles external reviews on map
+    private func handleExternalReviewsOnMap(_ shouldShow: Bool) {
+        if shouldShow, let userId = mapDisplayCoordinatorViewModel.mapDisplayUserId {
+            // Dismiss any competing sheets via PresentationService
+            PresentationService.shared.dismiss()
+            selectedPlaceViewModel.selectedPlace = nil
+            mapDisplayCoordinatorViewModel.showExternalReviewsOnMap = false
+
+            let photoUrl = mapDisplayCoordinatorViewModel.mapDisplayUserPhotoUrl.flatMap { URL(string: $0) }
+            mapViewModel.selectExternalReviews(userId: userId, userPhotoUrl: photoUrl)
+
+            if let currentUserId = userSession.currentUserId {
+                let currentRegion = appCoordinator.currentMapRegion
+                Task {
+                    if let region = currentRegion {
+                        await mapViewModel.onMapCameraSettled(region, userId: currentUserId)
+                    }
+                }
+            }
+        }
+    }
+
+    /// Handles external list on map
+    private func handleExternalListOnMap(_ listId: String?) {
+        if let listId = listId, let userId = mapDisplayCoordinatorViewModel.mapDisplayUserId {
+            // Dismiss any competing sheets via PresentationService
+            PresentationService.shared.dismiss()
+            selectedPlaceViewModel.selectedPlace = nil
+            mapDisplayCoordinatorViewModel.showExternalListOnMap = nil
+
+            let photoUrl = mapDisplayCoordinatorViewModel.mapDisplayUserPhotoUrl.flatMap { URL(string: $0) }
+            mapViewModel.selectExternalList(listId: listId, userId: userId, userPhotoUrl: photoUrl)
+
+            if let listCenter = mapDisplayCoordinatorViewModel.mapDisplayLists
+                .first(where: { $0.list_id == listId })?.averageLocation {
+                mapPosition = .region(MKCoordinateRegion(
+                    center: listCenter,
+                    span: MKCoordinateSpan(latitudeDelta: 0.08, longitudeDelta: 0.08)
+                ))
+            }
+
+            if let currentUserId = userSession.currentUserId {
+                Task {
+                    try? await Task.sleep(nanoseconds: 300_000_000)
+                    if let newRegion = appCoordinator.currentMapRegion {
+                        await mapViewModel.onMapCameraSettled(newRegion, userId: currentUserId)
+                    }
+                }
+            }
+        }
+    }
+
+    /// Handles external favorites on map
+    private func handleExternalFavoritesOnMap(_ shouldShow: Bool) {
+        if shouldShow, let userId = mapDisplayCoordinatorViewModel.mapDisplayUserId {
+            // Dismiss any competing sheets via PresentationService
+            PresentationService.shared.dismiss()
+            selectedPlaceViewModel.selectedPlace = nil
+            mapDisplayCoordinatorViewModel.showExternalFavoritesOnMap = false
+
+            let photoUrl = mapDisplayCoordinatorViewModel.mapDisplayUserPhotoUrl.flatMap { URL(string: $0) }
+            mapViewModel.selectExternalFavorites(userId: userId, userPhotoUrl: photoUrl)
+
+            if let currentUserId = userSession.currentUserId {
+                let currentRegion = appCoordinator.currentMapRegion
+                Task {
+                    if let region = currentRegion {
+                        await mapViewModel.onMapCameraSettled(region, userId: currentUserId)
                     }
                 }
             }
@@ -370,3 +323,59 @@ struct MapContainerView: View {
     }
 }
 
+// MARK: - Sheet onChange Modifiers
+
+/// Extracted view modifier for sheet-related onChange handlers
+private struct SheetOnChangeModifiers: ViewModifier {
+    let selectedPlaceViewModel: SelectedPlaceViewModel
+    @ObservedObject var userProfileNavigationViewModel: UserProfileNavigationViewModel
+    let mapViewModel: MapViewModel
+    let appCoordinator: AppCoordinator
+    let userSession: UserSession
+
+    func body(content: Content) -> some View {
+        content
+            .onChange(of: selectedPlaceViewModel.isDetailSheetPresented) { oldValue, newValue in
+                // Monitor detail sheet presentation state for debugging if needed
+            }
+            .onChange(of: userProfileNavigationViewModel.isUserDetailPresented) { _, isPresented in
+                handleUserDetailPresented(isPresented)
+            }
+            .onChange(of: appCoordinator.showKeywordResultsPopup) { _, shouldShow in
+                handleKeywordResultsPopup(shouldShow)
+            }
+    }
+
+    /// Handles user detail presentation
+    private func handleUserDetailPresented(_ isPresented: Bool) {
+        if isPresented {
+            if !userProfileNavigationViewModel.navigatedFromPlaceDetail {
+                selectedPlaceViewModel.selectedPlace = nil
+            }
+            // Dismiss any map popup via PresentationService
+            if PresentationService.shared.isShowingMapPopup {
+                PresentationService.shared.dismiss()
+            }
+        }
+    }
+
+    /// Handles keyword results popup
+    private func handleKeywordResultsPopup(_ shouldShow: Bool) {
+        if shouldShow, let keyword = appCoordinator.keywordForPopup {
+            mapViewModel.selectKeywordResults(
+                keyword: keyword,
+                types: appCoordinator.keywordTypesForPopup
+            )
+            appCoordinator.showKeywordResultsPopup = false
+
+            if let userId = userSession.currentUserId {
+                let currentRegion = appCoordinator.currentMapRegion
+                Task {
+                    if let region = currentRegion {
+                        await mapViewModel.onMapCameraSettled(region, userId: userId)
+                    }
+                }
+            }
+        }
+    }
+}

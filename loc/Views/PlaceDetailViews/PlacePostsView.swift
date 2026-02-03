@@ -13,7 +13,7 @@ struct PlacePostsView: View {
     let onAddPost: () -> Void
     
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
-    @EnvironmentObject var userProfileViewModel: UserProfileViewModel
+    @EnvironmentObject var userProfileNavigationVM: UserProfileNavigationViewModel
 
     var body: some View {
         ScrollViewReader { scrollProxy in
