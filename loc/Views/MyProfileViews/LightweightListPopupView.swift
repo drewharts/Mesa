@@ -435,7 +435,8 @@ struct ListContentView: View {
                             place: place,
                             preferTikTokThumbnail: true,
                             allowDelete: false,
-                            onNavigate: onNavigateToPlace
+                            onNavigate: onNavigateToPlace,
+                            showAddedBy: list.isCollaborative
                         )
                         .onAppear {
                             // Load more when user scrolls to 3rd-to-last item in FILTERED results
