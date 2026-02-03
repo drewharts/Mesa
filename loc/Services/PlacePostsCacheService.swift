@@ -28,6 +28,10 @@ class PlacePostsCacheService: ObservableObject {
     /// Set of liked post IDs - published so subscribers get updates.
     @Published private(set) var likedPostIds: Set<String> = []
 
+    /// Signals when a new post is created - subscribers can refresh their data.
+    /// Contains the placeId of the place where the post was created.
+    @Published private(set) var lastCreatedPostPlaceId: String?
+
     // MARK: - Dependencies
 
     private var postService: PostService { ServiceContainer.shared.postService }
@@ -135,11 +139,14 @@ class PlacePostsCacheService: ObservableObject {
 
     // MARK: - Mutation Methods
 
-    /// Adds a new post to a place's cache.
+    /// Adds a new post to a place's cache and signals post creation.
     func addPost(_ post: PlacePost, forPlaceId placeId: String) {
         var currentPosts = postsCache[placeId] ?? []
         currentPosts.insert(post, at: 0)
         updateCache(placeId: placeId, posts: currentPosts)
+
+        // Signal that a new post was created (subscribers can refresh their data)
+        lastCreatedPostPlaceId = placeId
     }
 
     /// Deletes a post from cache and database.
@@ -224,5 +231,6 @@ class PlacePostsCacheService: ObservableObject {
         tiktoksCache.removeAll()
         loadingStates.removeAll()
         likedPostIds.removeAll()
+        lastCreatedPostPlaceId = nil
     }
 }
