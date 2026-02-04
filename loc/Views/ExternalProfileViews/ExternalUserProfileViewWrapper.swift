@@ -46,6 +46,8 @@ struct ExternalUserProfileViewWrapper: View {
             .environmentObject(dataManager)
             .task {
                 guard let currentUserId = userSession.currentUserId else { return }
+                // Set location manager for proximity-based list sorting
+                viewModel.setLocationManager(locationManager)
                 await viewModel.loadInitialData(currentUserId: currentUserId)
             }
     }
