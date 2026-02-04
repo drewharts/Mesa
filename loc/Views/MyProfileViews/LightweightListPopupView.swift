@@ -26,6 +26,7 @@ struct LightweightListPopupView: View {
     @State private var currentPage: Int = 1
     @State private var showCollaboratorsSheet: Bool = false
     @State private var showSettingsSheet: Bool = false
+    @State private var showAddPlaceSheet: Bool = false
     @State private var cachedTabViewHeight: CGFloat = 300 // Cached height to prevent layout shift
     @State private var navigationPath = NavigationPath() // Navigation path for place detail navigation
 
@@ -135,6 +136,19 @@ struct LightweightListPopupView: View {
             )
             .presentationDetents([.height(200)])
         }
+        .sheet(isPresented: $showAddPlaceSheet) {
+            if let userId = profile.user?.id {
+                AddPlaceToListSheet(
+                    listId: currentList.list_id,
+                    listName: currentList.name,
+                    userId: userId,
+                    onPlaceAdded: { _ in
+                        // Refresh the list places when a new place is added
+                        loadPlacesForCurrentList()
+                    }
+                )
+            }
+        }
     }
 
     // MARK: - View Components
@@ -159,28 +173,28 @@ struct LightweightListPopupView: View {
                 
                 Spacer()
                 
-                // Collaborators button with profile avatars + Share buttons
+                // Action buttons: unified "+" menu, share, and settings
                 if let userId = profile.user?.id {
                     HStack(alignment: .center, spacing: 12) {
-                        // Collaborators button
-                        Button {
-                            showCollaboratorsSheet = true
-                        } label: {
-                            // Show profile picture avatars for collaborators (like map annotations)
-                            if currentList.hasCollaborators || currentList.isSharedWithMe {
-                                CollaboratorAvatarsButton(
-                                    isSharedWithMe: currentList.isSharedWithMe,
-                                    ownerPhotoUrl: currentList.owner_photo_url,
-                                    collaboratorPhotos: currentList.collaborator_photos
-                                )
-                            } else {
-                                // Just show person.2 icon when no collaborators (for adding)
-                                Image(systemName: "person.2")
-                                    .font(.system(size: 20, weight: .regular))
-                                    .foregroundColor(.primary)
+                        // Unified "+" menu for adding places or collaborators
+                        Menu {
+                            Button {
+                                showAddPlaceSheet = true
+                            } label: {
+                                Label("Add Place", systemImage: "mappin.and.ellipse")
                             }
+
+                            Button {
+                                showCollaboratorsSheet = true
+                            } label: {
+                                Label("Add Collaborator", systemImage: "person.badge.plus")
+                            }
+                        } label: {
+                            Image(systemName: "plus")
+                                .font(.system(size: 20, weight: .regular))
+                                .foregroundColor(.primary)
                         }
-                        .frame(minWidth: 44, minHeight: 44) // Tap target
+                        .frame(minWidth: 44, minHeight: 44)
 
                         // Unified share button with menu for link sharing and story cards
                         ListShareMenuButton(
