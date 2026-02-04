@@ -157,19 +157,13 @@ struct ExternalUserProfileListsView: View {
             viewModel.loadPlacesForList(list)
         }
 
-        // Fetch more lists from backend when approaching the end
-        if isNearEndOfLists(list) {
+        // Use child ViewModel's shouldLoadMoreLists check (triggers at last 5 items)
+        if viewModel.listsLoadingViewModel.shouldLoadMoreLists(
+            currentItem: list,
+            allLists: placeLists
+        ) {
             viewModel.fetchMoreLists()
         }
-    }
-
-    /// Returns true if this list is near the end, triggering pagination.
-    private func isNearEndOfLists(_ list: LightweightPlaceList) -> Bool {
-        guard placeLists.count >= 3 else { return false }
-        guard let currentIndex = placeLists.firstIndex(where: { $0.id == list.id }) else { return false }
-
-        let threshold = placeLists.count - 3
-        return currentIndex >= threshold
     }
 }
 
@@ -209,7 +203,7 @@ struct ExternalUserListPopupView: View {
             return lists.first ?? LightweightPlaceList(
                 list_id: "",
                 name: "Unknown",
-                is_public: false,
+                is_public: true,
                 image: nil,
                 created_at: nil,
                 updated_at: nil,

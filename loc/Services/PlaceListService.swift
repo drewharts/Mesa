@@ -219,12 +219,27 @@ class PlaceListService {
     }
     
     // MARK: - Delete Place List
-    
+
     /// Deletes a place list and all its associated items from the database
     func deleteList(listId: String) async throws {
         try await supabase.client
             .from("place_lists")
             .delete()
+            .eq("id", value: listId)
+            .execute()
+    }
+
+    // MARK: - Update List Privacy
+
+    /// Updates the privacy setting for a place list.
+    func updateListPrivacy(listId: String, isPublic: Bool) async throws {
+        struct UpdateData: Encodable {
+            let is_public: Bool
+        }
+
+        try await supabase.client
+            .from("place_lists")
+            .update(UpdateData(is_public: isPublic))
             .eq("id", value: listId)
             .execute()
     }

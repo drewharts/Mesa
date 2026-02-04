@@ -11,6 +11,7 @@ import MapKit
 /// Container that owns MapViewModel and handles all map-related logic
 struct MapContainerView: View {
     @StateObject private var mapViewModel: MapViewModel
+    @ObservedObject private var presentationService = PresentationService.shared
     @EnvironmentObject var locationManager: LocationManager
     @EnvironmentObject var userSession: UserSession
     @EnvironmentObject var appCoordinator: AppCoordinator
@@ -118,6 +119,21 @@ struct MapContainerView: View {
             }
             .onChange(of: profileViewModel.showMyPlacesOnMap) { _, newValue in
                 handleMyPlacesOnMap(newValue)
+            }
+            .onChange(of: presentationService.activeSheet) { oldSheet, newSheet in
+                // Clear filters when a filter-related sheet is dismissed
+                guard newSheet == nil,
+                      let oldSheet = oldSheet,
+                      mapViewModel.isFilterRelatedSheet(oldSheet) else { return }
+
+                mapViewModel.clearAllFilters()
+
+                if let userId = userSession.currentUserId,
+                   let region = appCoordinator.currentMapRegion {
+                    Task {
+                        await mapViewModel.onMapCameraSettled(region, userId: userId)
+                    }
+                }
             }
         }
     }

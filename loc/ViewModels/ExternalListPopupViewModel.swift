@@ -34,7 +34,7 @@ class ExternalListPopupViewModel: ObservableObject {
             return lists.first ?? LightweightPlaceList(
                 list_id: "",
                 name: "Unknown",
-                is_public: false,
+                is_public: true,
                 image: nil,
                 created_at: nil,
                 updated_at: nil,
