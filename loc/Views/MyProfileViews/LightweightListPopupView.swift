@@ -15,19 +15,17 @@ struct LightweightListPopupView: View {
     /// Observed for pending place navigation when map annotation is tapped while sheet is open.
     @ObservedObject private var presentationService = PresentationService.shared
 
+    /// Per-list pagination state management.
+    @StateObject private var paginationVM = ListPopupPaginationViewModel()
+
     let lists: [LightweightPlaceList]
     let initialListIndex: Int
 
     @State private var currentListIndex: Int
     @State private var showOnlyUnvisited: Bool = false
-    @State private var isLoadingMore: Bool = false
-    @State private var pendingLoadRequest: Bool = false  // Track if load was requested while already loading
-    @State private var hasMorePlaces: Bool = true
-    @State private var currentPage: Int = 1
     @State private var showCollaboratorsSheet: Bool = false
     @State private var showSettingsSheet: Bool = false
     @State private var showAddPlaceSheet: Bool = false
-    @State private var cachedTabViewHeight: CGFloat = 300 // Cached height to prevent layout shift
     @State private var navigationPath = NavigationPath() // Navigation path for place detail navigation
 
     /// Convenience accessor for reviews view model.
@@ -75,9 +73,12 @@ struct LightweightListPopupView: View {
     
     var body: some View {
         NavigationStack(path: $navigationPath) {
-            ScrollView {
-                VStack(spacing: 0) {
-                    headerSection
+            VStack(spacing: 0) {
+                // Header fixed at top, not scrollable
+                headerSection
+
+                // Content scrolls vertically
+                ScrollView {
                     contentSection
                 }
             }
@@ -103,23 +104,23 @@ struct LightweightListPopupView: View {
             // MVVM: View manages its own navigation state - reset on each presentation
             // Best Practice: Clear in onAppear rather than onDisappear for reliability
             navigationPath = NavigationPath()
-            
+
+            // Set dependencies for pagination ViewModel
+            paginationVM.setDependencies(listsVM: listsVM, reviewsVM: reviewsVM)
+
             // Load places for the current list
             loadPlacesForCurrentList()
-            // Load reviewed place IDs from database via ViewModel for accurate filtering
-            loadReviewedPlaceIdsViaViewModel()
-            // Calculate initial TabView height
-            updateTabViewHeight()
+
+            // Initialize pagination state and load reviewed IDs via ViewModel
+            Task {
+                await paginationVM.onListChanged(to: currentList.list_id)
+            }
         }
         .onChange(of: allPlaces) { oldValue, newValue in
             // Reload reviewed IDs when places change via ViewModel
-            loadReviewedPlaceIdsViaViewModel()
-            // Recalculate height when places load (prevents layout shift)
-            updateTabViewHeight()
-        }
-        .onChange(of: showOnlyUnvisited) { oldValue, newValue in
-            // Recalculate height when filter changes
-            updateTabViewHeight()
+            Task {
+                await paginationVM.onListChanged(to: currentList.list_id)
+            }
         }
         .sheet(isPresented: $showCollaboratorsSheet) {
             if let userId = profile.user?.id {
@@ -242,74 +243,18 @@ struct LightweightListPopupView: View {
         .padding(.bottom, 12)
     }
     
-    /// Content section with list places (TabView for multiple lists, single view for one list)
-    /// Single Responsibility: Display list content based on number of lists
+    /// Content section displaying the current list's places.
+    /// Single Responsibility: Display list content without horizontal swiping.
     private var contentSection: some View {
-        Group {
-            if lists.count > 1 {
-                multipleListsContent
-            } else {
-                singleListContent
-            }
-        }
-    }
-    
-    /// Multiple lists content with TabView
-    /// Single Responsibility: Display swipable TabView for multiple lists
-    private var multipleListsContent: some View {
-        TabView(selection: $currentListIndex) {
-            ForEach(lists.indices, id: \.self) { index in
-                VStack(alignment: .leading, spacing: 0) {
-                    ListContentView(
-                        list: lists[index],
-                        showOnlyUnvisited: $showOnlyUnvisited,
-                        isLoadingMore: $isLoadingMore,
-                        hasMorePlaces: $hasMorePlaces,
-                        currentPage: $currentPage,
-                        onLoadMore: loadMoreIfNeeded,
-                        onNavigateToPlace: { placeId in
-                            navigationPath.append(placeId)
-                        }
-                    )
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                .tag(index)
-            }
-        }
-        .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
-        .frame(height: cachedTabViewHeight, alignment: .top)
-        .clipped()
-        .contentShape(Rectangle())
-        .onChange(of: currentListIndex) { _, newIndex in
-            // Reset pagination state when switching lists
-            isLoadingMore = false
-            hasMorePlaces = true
-            currentPage = 1
-            
-            // Reload reviewed IDs for new list's places via ViewModel
-            loadReviewedPlaceIdsViaViewModel()
-            
-            // Recalculate height for new list
-            updateTabViewHeight()
-            
-            // Load more lists when approaching the end (only if using full list, not filtered)
-            if newIndex >= lists.count - 3 && lists.count == listsVM.lightweightPlaceLists.count {
-                loadMoreListsIfNeeded()
-            }
-        }
-    }
-    
-    /// Single list content
-    /// Single Responsibility: Display single list without TabView
-    private var singleListContent: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        let listId = currentList.list_id
+        let paginationState = paginationVM.state(for: listId)
+        return VStack(alignment: .leading, spacing: 0) {
             ListContentView(
                 list: currentList,
                 showOnlyUnvisited: $showOnlyUnvisited,
-                isLoadingMore: $isLoadingMore,
-                hasMorePlaces: $hasMorePlaces,
-                currentPage: $currentPage,
-                onLoadMore: loadMoreIfNeeded,
+                isLoadingMore: paginationState.isLoadingMore,
+                hasMorePlaces: paginationState.hasMorePlaces,
+                onLoadMore: { paginationVM.loadMoreIfNeeded(for: listId) },
                 onNavigateToPlace: { placeId in
                     navigationPath.append(placeId)
                 }
@@ -320,99 +265,13 @@ struct LightweightListPopupView: View {
     
     // MARK: - Helper Methods
     
+    /// Loads places for the current list if not already cached.
     private func loadPlacesForCurrentList() {
-        // Load places for the current list if not already loaded
         if listsVM.lightweightPlaceListPlaces[currentList.list_id] == nil {
             Task {
                 await listsVM.loadPlacesForList(listId: currentList.list_id)
             }
         }
-    }
-
-    private func loadMoreIfNeeded() {
-        guard hasMorePlaces else { return }
-
-        // If already loading, mark that we have a pending request
-        if isLoadingMore {
-            pendingLoadRequest = true
-            return
-        }
-
-        isLoadingMore = true
-        pendingLoadRequest = false  // Clear any pending request since we're now loading
-        let nextPage = currentPage + 1
-
-        Task {
-            do {
-                // Load more places and update ViewModel state
-                let morePlaces = try await listsVM.loadMorePlacesForList(
-                    listId: currentList.list_id,
-                    page: nextPage,
-                    pageSize: 6
-                )
-
-                // Append places to ViewModel
-                listsVM.appendPlacesForList(listId: currentList.list_id, newPlaces: morePlaces)
-
-                await MainActor.run {
-                    currentPage = nextPage
-                    // Keep loading if we got 6 or more places, stop if we got fewer than 6
-                    hasMorePlaces = morePlaces.count >= 6
-                    isLoadingMore = false
-
-                    // If there was a pending request (user scrolled while loading), process it now
-                    if pendingLoadRequest && hasMorePlaces {
-                        loadMoreIfNeeded()
-                    }
-                }
-            } catch {
-                await MainActor.run {
-                    isLoadingMore = false
-                }
-                print("❌ [LightweightListPopupView] Error loading more places: \(error.localizedDescription)")
-            }
-        }
-    }
-    
-    private func loadMoreListsIfNeeded() {
-        // Check if we have more lists to load and not currently loading
-        guard listsVM.hasMorePlaceLists && !listsVM.isLoadingMorePlaceLists else { return }
-
-        Task {
-            await listsVM.loadMoreLists()
-        }
-    }
-    
-    /// Delegate to ViewModel to load reviewed place IDs (no business logic here)
-    private func loadReviewedPlaceIdsViaViewModel() {
-        let placeIds = allPlaces.map { $0.place_id }
-        Task {
-            await reviewsVM.loadVerifiedReviewedPlaceIds(for: placeIds)
-        }
-    }
-    
-    /// Updates the cached TabView height to prevent layout shifts during async data loading
-    /// MVVM: Pure function - updates state based on current content
-    /// Staff Engineer: Caches height to prevent visual jumps when data loads asynchronously
-    private func updateTabViewHeight() {
-        cachedTabViewHeight = calculateTabViewHeight()
-    }
-    
-    /// Single Responsibility: Calculate TabView height based on actual content
-    /// MVVM: Pure function - calculates based on current list's place count
-    /// Staff Engineer: Uses actual filtered places count for accurate height calculation
-    private func calculateTabViewHeight() -> CGFloat {
-        // Calculate based on filtered places (respects showOnlyUnvisited filter)
-        let filteredCount = showOnlyUnvisited ?
-            allPlaces.filter { !reviewsVM.hasVerifiedReviewedPlace(placeId: $0.place_id) }.count :
-            allPlaces.count
-
-        // Each row has 2 places, approximate row height is 200
-        let rows = ceil(Double(filteredCount) / 2.0)
-        let estimatedHeight = rows * 200 + 100 // Row height + padding
-
-        // Ensure minimum height for empty/loading states, cap at reasonable max
-        return max(300, min(estimatedHeight, 2000))
     }
 }
 
@@ -422,11 +281,10 @@ struct LightweightListPopupView: View {
 struct ListContentView: View {
     let list: LightweightPlaceList
     @Binding var showOnlyUnvisited: Bool
-    @Binding var isLoadingMore: Bool
-    @Binding var hasMorePlaces: Bool
-    @Binding var currentPage: Int
+    let isLoadingMore: Bool
+    let hasMorePlaces: Bool
     let onLoadMore: () -> Void
-    let onNavigateToPlace: ((String) -> Void)? // Navigation callback for NavigationStack
+    let onNavigateToPlace: ((String) -> Void)?
 
     @EnvironmentObject var profile: ProfileViewModel
 
@@ -442,12 +300,12 @@ struct ListContentView: View {
         GridItem(.flexible(), spacing: 12)
     ]
 
-    // Get all places for this list (from profile state)
+    /// Returns all places for this list from profile state.
     var allPlaces: [LightweightPlace] {
         return listsVM.lightweightPlaceListPlaces[list.list_id] ?? []
     }
 
-    // Filtered places based on visited status (uses ViewModel's database-verified reviewed IDs)
+    /// Returns filtered and deduplicated places based on visited status.
     var filteredPlaces: [LightweightPlace] {
         let toFilter = showOnlyUnvisited ?
             allPlaces.filter { !reviewsVM.hasVerifiedReviewedPlace(placeId: $0.place_id) } :
@@ -461,38 +319,35 @@ struct ListContentView: View {
             return true
         }
     }
-    
+
     var body: some View {
         if !filteredPlaces.isEmpty {
-            // Removed ScrollView wrapper - parent now handles scrolling
-                LazyVGrid(columns: columns, spacing: 16) {
-                    ForEach(Array(filteredPlaces.enumerated()), id: \.element.id) { index, place in
-                        PopupPlaceCard(
-                            place: place,
-                            preferTikTokThumbnail: true,
-                            allowDelete: false,
-                            onNavigate: onNavigateToPlace,
-                            showAddedBy: list.isCollaborative
-                        )
-                        .onAppear {
-                            // Load more when user scrolls to 3rd-to-last item in FILTERED results
-                            if index == filteredPlaces.count - 3 {
-                                onLoadMore()
-                            }
+            LazyVGrid(columns: columns, spacing: 16) {
+                ForEach(Array(filteredPlaces.enumerated()), id: \.element.id) { index, place in
+                    PopupPlaceCard(
+                        place: place,
+                        preferTikTokThumbnail: true,
+                        allowDelete: false,
+                        onNavigate: onNavigateToPlace,
+                        showAddedBy: list.isCollaborative
+                    )
+                    .onAppear {
+                        // Load more when user scrolls to 3rd-to-last item
+                        if index == filteredPlaces.count - 3 {
+                            onLoadMore()
                         }
                     }
                 }
-                .padding(.horizontal, 16)
-            .padding(.top, 0)
-            .padding(.bottom, 0)
-                
-                // Loading indicator at bottom
-                if isLoadingMore {
-                    HStack {
-                        Spacer()
-                        ProgressView()
-                            .padding()
-                        Spacer()
+            }
+            .padding(.horizontal, 16)
+
+            // Loading indicator at bottom
+            if isLoadingMore {
+                HStack {
+                    Spacer()
+                    ProgressView()
+                        .padding()
+                    Spacer()
                 }
             }
         } else {
