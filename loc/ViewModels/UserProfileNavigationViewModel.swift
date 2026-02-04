@@ -24,6 +24,9 @@ class UserProfileNavigationViewModel: ObservableObject {
     /// Tracks if navigation originated from place detail (for state restoration)
     @Published var navigatedFromPlaceDetail: Bool = false
 
+    /// Controls whether to navigate to the user's own profile (instead of external profile)
+    @Published var shouldNavigateToOwnProfile = false
+
     // MARK: - Deep Link List Popup State
 
     /// The list ID to auto-open after navigating to profile (for deep links)
@@ -77,11 +80,23 @@ class UserProfileNavigationViewModel: ObservableObject {
     ///     Set to false when NavigationLink is handling navigation to prevent double navigation.
     ///   - fromPlaceDetail: If true, indicates navigation originated from place detail (for state restoration)
     func selectUser(_ user: ProfileData, currentUserId: String, shouldPresent: Bool = true, fromPlaceDetail: Bool = false) {
+        // Navigate to own profile if user taps themselves
+        if user.id == currentUserId {
+            self.shouldNavigateToOwnProfile = true
+            return
+        }
+
+        // Existing external profile navigation
         self.selectedUser = user
         self.navigatedFromPlaceDetail = fromPlaceDetail
         if shouldPresent {
             self.isUserDetailPresented = true
         }
+    }
+
+    /// Clears the own profile navigation state after navigation is triggered.
+    func clearOwnProfileNavigation() {
+        shouldNavigateToOwnProfile = false
     }
 
     /// Fetches a user by ID and navigates to their profile.
@@ -131,6 +146,7 @@ class UserProfileNavigationViewModel: ObservableObject {
     func clearAllUserData() {
         print("🗑️ [UserProfileNavigationViewModel] Clearing all user data for security")
         clearSelection()
+        shouldNavigateToOwnProfile = false
         print("✅ [UserProfileNavigationViewModel] All user data cleared")
     }
 }

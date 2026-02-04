@@ -176,6 +176,12 @@ struct MainView: View {
                 }
             }
         }
+        .onChange(of: userProfileNavigationViewModel.shouldNavigateToOwnProfile) { _, newValue in
+            if newValue {
+                shouldNavigateToProfile = true
+                userProfileNavigationViewModel.clearOwnProfileNavigation()
+            }
+        }
     }
 
     // MARK: - Unified Sheet Content Builder
