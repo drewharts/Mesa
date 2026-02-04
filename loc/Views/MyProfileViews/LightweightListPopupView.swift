@@ -25,6 +25,7 @@ struct LightweightListPopupView: View {
     @State private var hasMorePlaces: Bool = true
     @State private var currentPage: Int = 1
     @State private var showCollaboratorsSheet: Bool = false
+    @State private var showSettingsSheet: Bool = false
     @State private var cachedTabViewHeight: CGFloat = 300 // Cached height to prevent layout shift
     @State private var navigationPath = NavigationPath() // Navigation path for place detail navigation
 
@@ -127,8 +128,15 @@ struct LightweightListPopupView: View {
                 )
             }
         }
+        .sheet(isPresented: $showSettingsSheet) {
+            ListSettingsSheet(
+                listId: currentList.list_id,
+                initialIsPublic: currentList.is_public
+            )
+            .presentationDetents([.height(200)])
+        }
     }
-    
+
     // MARK: - View Components
     
     /// Header section with list name, controls, and filter toggle
@@ -180,6 +188,18 @@ struct LightweightListPopupView: View {
                             places: allPlaces,
                             userId: userId
                         )
+
+                        // Settings button (only show if user is owner)
+                        if currentList.user_role == "owner" || !currentList.isSharedWithMe {
+                            Button {
+                                showSettingsSheet = true
+                            } label: {
+                                Image(systemName: "gearshape")
+                                    .font(.system(size: 20, weight: .regular))
+                                    .foregroundColor(.primary)
+                            }
+                            .frame(minWidth: 44, minHeight: 44)
+                        }
                     }
                 }
             }
