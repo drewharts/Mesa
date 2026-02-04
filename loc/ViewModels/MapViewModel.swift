@@ -185,6 +185,18 @@ class MapViewModel: ObservableObject {
 
     // MARK: - Clear Filters
 
+    /// Returns true if the given sheet type requires clearing map filters when dismissed.
+    func isFilterRelatedSheet(_ sheet: AppSheetType) -> Bool {
+        switch sheet {
+        case .list, .tiktoks, .reviews, .favorites, .myPlaces,
+             .externalReviews, .externalList, .externalFavorites,
+             .keywordResults:
+            return true
+        default:
+            return false
+        }
+    }
+
     /// Clears all special filters (list, TikToks, reviews, favorites, my places, external).
     func clearAllFilters() {
         filteringViewModel.clearAllFilters()

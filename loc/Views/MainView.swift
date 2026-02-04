@@ -176,6 +176,12 @@ struct MainView: View {
                 }
             }
         }
+        .onChange(of: userProfileNavigationViewModel.shouldNavigateToOwnProfile) { _, newValue in
+            if newValue {
+                shouldNavigateToProfile = true
+                userProfileNavigationViewModel.clearOwnProfileNavigation()
+            }
+        }
     }
 
     // MARK: - Unified Sheet Content Builder
@@ -415,7 +421,7 @@ struct MainView: View {
         // This prevents clearing state during fullScreenCover transitions
         guard presentationService.activeSheet == nil else { return }
         profileViewModel.selectedListIdForMap = nil
-        // Note: Map filter clearing is handled by MapViewModel when sheet coordinator notifies it
+        // Note: Map filter clearing is now handled by MapContainerView's onChange of activeSheet
     }
 
     // MARK: - UI Overlay Layer

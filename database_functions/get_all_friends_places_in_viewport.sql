@@ -39,7 +39,7 @@ BEGIN
         FROM get_external_places_annotations(v_user_friends, v_bbox) ann
         UNION ALL
         SELECT ann.id, ann.name, ann.coordinate, ann.user_ids, ann.place_type
-        FROM get_list_places_annotations(v_user_friends, v_bbox) ann
+        FROM get_list_places_annotations(v_user_friends, v_bbox, p_user_id) ann
         UNION ALL
         SELECT ann.id, ann.name, ann.coordinate, ann.user_ids, ann.place_type
         FROM get_reviewed_places_annotations(v_user_friends, v_bbox) ann

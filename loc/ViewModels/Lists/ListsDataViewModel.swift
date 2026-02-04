@@ -98,7 +98,7 @@ class ListsDataViewModel: ObservableObject {
             let lightweightList = LightweightPlaceList(
                 list_id: createdList.id.uuidString,
                 name: createdList.name,
-                is_public: false,
+                is_public: true,
                 image: createdList.image,
                 created_at: ISO8601DateFormatter().string(from: Date()),
                 updated_at: ISO8601DateFormatter().string(from: Date()),

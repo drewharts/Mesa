@@ -8,6 +8,7 @@
 
 import Foundation
 import SwiftUI
+import Combine
 
 /// ViewModel for external user profiles that is instantiated per-view using @StateObject.
 /// This enables Instagram-style nested navigation where each profile maintains its own state.
@@ -17,11 +18,38 @@ class ExternalUserProfileViewModel: ObservableObject {
     let userId: String
     @Published var user: ProfileData
 
+    // MARK: - Child ViewModels for Lists
+    let listsDataViewModel: ExternalListsDataViewModel
+    let listsLoadingViewModel: ExternalListsLoadingViewModel
+
+    // MARK: - Combine Subscriptions
+    private var cancellables = Set<AnyCancellable>()
+
     // MARK: - Profile Data
     @Published var userFavorites: [FavoritePlace] = []
-    @Published var userLists: [LightweightPlaceList] = []
-    @Published var placeListPlaces: [String: [LightweightPlace]] = [:]
     @Published var lightweightReviewedPlaces: [LightweightPlace] = []
+
+    // MARK: - Proxy Properties for Lists (delegate to child ViewModels)
+
+    /// User's place lists (proxied from listsDataViewModel).
+    var userLists: [LightweightPlaceList] {
+        listsDataViewModel.userLists
+    }
+
+    /// Places in each list by list ID (proxied from listsDataViewModel).
+    var placeListPlaces: [String: [LightweightPlace]] {
+        listsDataViewModel.placeListPlaces
+    }
+
+    /// Whether there are more lists to load (proxied from listsDataViewModel).
+    var hasMoreLists: Bool {
+        listsDataViewModel.hasMoreLists
+    }
+
+    /// Loading more lists (proxied from listsLoadingViewModel).
+    var isLoadingMoreLists: Bool {
+        listsLoadingViewModel.isLoadingMoreLists
+    }
 
     // MARK: - Social State
     @Published var isFollowing: Bool = false
@@ -43,14 +71,6 @@ class ExternalUserProfileViewModel: ObservableObject {
     @Published var hasMoreExternalFollowing = true
     @Published var hasMoreReviews = true
     @Published var totalReviewedPlacesCount: Int = 0
-
-    // MARK: - List Pagination State
-    @Published var isLoadingMoreLists = false
-    private var currentListPage: Int = 1
-    private var hasMoreLists: Bool = true
-    private let listsPerPage: Int = 6
-    private var loadedListIds: Set<String> = []
-    private var loadingListIds: Set<String> = []
 
     // MARK: - Deep Link List Popup State
     @Published var shouldShowListPopup = false
@@ -99,6 +119,38 @@ class ExternalUserProfileViewModel: ObservableObject {
         self.userService = ServiceContainer.shared.userService
         self.placeService = ServiceContainer.shared.placeService
         self.postService = ServiceContainer.shared.postService
+
+        // Initialize child ViewModels for lists
+        let dataVM = ExternalListsDataViewModel()
+        self.listsDataViewModel = dataVM
+        self.listsLoadingViewModel = ExternalListsLoadingViewModel(
+            userId: user.id,
+            userService: self.userService,
+            dataViewModel: dataVM
+        )
+
+        // Set up Combine subscriptions for change propagation
+        setupListsViewModelObservers()
+    }
+
+    // MARK: - Child ViewModel Change Propagation
+
+    /// Subscribes to child ViewModels and forwards their changes to trigger parent updates.
+    private func setupListsViewModelObservers() {
+        listsDataViewModel.objectWillChange
+            .sink { [weak self] _ in self?.objectWillChange.send() }
+            .store(in: &cancellables)
+
+        listsLoadingViewModel.objectWillChange
+            .sink { [weak self] _ in self?.objectWillChange.send() }
+            .store(in: &cancellables)
+    }
+
+    // MARK: - Dependency Injection
+
+    /// Sets the location manager for proximity-based list sorting.
+    func setLocationManager(_ locationManager: LocationManager) {
+        listsLoadingViewModel.setLocationManager(locationManager)
     }
 
     // MARK: - Initial Data Loading
@@ -196,29 +248,12 @@ class ExternalUserProfileViewModel: ObservableObject {
         }
     }
 
+    /// Delegates list fetching to child ViewModel.
     private func fetchLists() async {
-        do {
-            let lists = try await userService.fetchPlaceListsWithoutLocation(
-                userId: userId,
-                page: 1,
-                pageSize: listsPerPage
-            )
+        await listsLoadingViewModel.loadInitialLists()
 
-            self.userLists = lists
-            self.currentListPage = 1
-            self.hasMoreLists = lists.count >= self.listsPerPage
-
-            // Check if there's a pending list to open (for deep links)
-            await checkAndShowPendingList(lists: lists)
-
-            // Preload places for first few visible lists
-            await preloadPlacesForLists(Array(lists.prefix(3)))
-        } catch {
-            print("ExternalUserProfileViewModel Error fetching lists: \(error)")
-            self.userLists = []
-            self.hasMoreLists = false
-            clearPendingListState()
-        }
+        // Check for pending deep link list
+        await checkAndShowPendingList(lists: listsDataViewModel.userLists)
     }
 
     /// Checks if there's a pending list to open and triggers popup if found.
@@ -252,12 +287,10 @@ class ExternalUserProfileViewModel: ObservableObject {
 
             await MainActor.run {
                 // Insert at the beginning so it appears first
-                if !self.userLists.contains(where: { $0.list_id == listId }) {
-                    self.userLists.insert(list, at: 0)
-                }
+                self.listsDataViewModel.insertListAtBeginning(list)
 
                 // Now find the index and show popup
-                if let index = self.userLists.firstIndex(where: { $0.list_id == listId }) {
+                if let index = self.listsDataViewModel.userLists.firstIndex(where: { $0.list_id == listId }) {
                     self.pendingListIndex = index
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                         self.shouldShowListPopup = true
@@ -445,103 +478,25 @@ class ExternalUserProfileViewModel: ObservableObject {
 
     // MARK: - List Pagination
 
+    /// Delegates list pagination to child ViewModel.
     func fetchMoreLists() {
-        guard hasMoreLists, !isLoadingMoreLists else { return }
-
-        isLoadingMoreLists = true
-        let nextPage = currentListPage + 1
-
         Task {
-            do {
-                let newLists = try await userService.fetchPlaceListsWithoutLocation(
-                    userId: userId,
-                    page: nextPage,
-                    pageSize: listsPerPage
-                )
-
-                self.userLists.append(contentsOf: newLists)
-                self.currentListPage = nextPage
-                self.hasMoreLists = newLists.count >= self.listsPerPage
-                self.isLoadingMoreLists = false
-
-                await preloadPlacesForLists(Array(newLists.prefix(3)))
-            } catch {
-                print("ExternalUserProfileViewModel Error fetching more lists: \(error)")
-                self.isLoadingMoreLists = false
-            }
+            await listsLoadingViewModel.loadMoreLists()
         }
     }
 
-    private func preloadPlacesForLists(_ lists: [LightweightPlaceList]) async {
-        for list in lists {
-            await loadPlacesForListAsync(listId: list.list_id)
-        }
-    }
-
-    private func loadPlacesForListAsync(listId: String) async {
-        guard placeListPlaces[listId] == nil else { return }
-
-        do {
-            let places = try await userService.fetchPlacesForPlaceList(
-                listId: listId,
-                page: 1,
-                pageSize: 6
-            )
-
-            self.placeListPlaces[listId] = places
-            self.loadedListIds.insert(listId)
-        } catch {
-            print("ExternalUserProfileViewModel Error loading places for list \(listId): \(error)")
-        }
-    }
-
+    /// Delegates place loading for a single list to child ViewModel.
     func loadPlacesForList(_ list: LightweightPlaceList) {
         Task {
-            await loadPlacesForListAsync(listId: list.list_id)
+            await listsLoadingViewModel.loadPlacesForList(list)
         }
     }
 
+    /// Loads more places for a list with pagination via child ViewModel.
     func loadMorePlacesForList(_ list: LightweightPlaceList, page: Int, completion: @escaping ([LightweightPlace]) -> Void) {
         Task {
-            do {
-                let morePlaces = try await userService.fetchPlacesForPlaceList(
-                    listId: list.list_id,
-                    page: page,
-                    pageSize: 6
-                )
-
-                var existingPlaces = self.placeListPlaces[list.list_id] ?? []
-                let existingIds = Set(existingPlaces.map { $0.id })
-                let newUniquePlaces = morePlaces.filter { !existingIds.contains($0.id) }
-                existingPlaces.append(contentsOf: newUniquePlaces)
-                self.placeListPlaces[list.list_id] = existingPlaces
-
-                completion(morePlaces)
-            } catch {
-                print("ExternalUserProfileViewModel Error loading more places for list: \(error)")
-                completion([])
-            }
-        }
-    }
-
-    func preloadPlacesForVisibleLists() {
-        let unloadedLists = userLists.filter {
-            !loadedListIds.contains($0.list_id) && !loadingListIds.contains($0.list_id)
-        }
-        let listsToLoad = Array(unloadedLists.prefix(3))
-
-        guard !listsToLoad.isEmpty else { return }
-
-        Task {
-            for list in listsToLoad {
-                self.loadingListIds.insert(list.list_id)
-            }
-
-            await preloadPlacesForLists(listsToLoad)
-
-            for list in listsToLoad {
-                self.loadingListIds.remove(list.list_id)
-            }
+            let places = await listsLoadingViewModel.loadMorePlacesForList(listId: list.list_id, page: page)
+            completion(places)
         }
     }
 
