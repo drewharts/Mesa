@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		B004E8102ED66B28008E26EF /* MesaShare.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = B0667A9F2EB309CA00879683 /* MesaShare.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		B02D1F8D2F33A54F00BEE4BC /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = B02D1F8C2F33A54F00BEE4BC /* GoogleService-Info.plist */; };
 		B054DC612C42F5DA00C98088 /* locApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B054DC602C42F5DA00C98088 /* locApp.swift */; };
 		B054DC652C42F5DB00C98088 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B054DC642C42F5DB00C98088 /* Assets.xcassets */; };
 		B054DC682C42F5DB00C98088 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B054DC672C42F5DB00C98088 /* Preview Assets.xcassets */; };
@@ -75,6 +76,7 @@
 
 /* Begin PBXFileReference section */
 		B021AF4B2CED816500642586 /* loc copy-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = "loc copy-Info.plist"; path = "/Users/drewhartsfield/Desktop/loc/loc copy-Info.plist"; sourceTree = "<absolute>"; };
+		B02D1F8C2F33A54F00BEE4BC /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		B054DC5D2C42F5DA00C98088 /* loc.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = loc.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B054DC602C42F5DA00C98088 /* locApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = locApp.swift; sourceTree = "<group>"; };
 		B054DC642C42F5DB00C98088 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -194,6 +196,7 @@
 				B061F1E22C581A3A00042CB0 /* Info.plist */,
 				B054DC602C42F5DA00C98088 /* locApp.swift */,
 				B054DC642C42F5DB00C98088 /* Assets.xcassets */,
+				B02D1F8C2F33A54F00BEE4BC /* GoogleService-Info.plist */,
 				B054DC662C42F5DB00C98088 /* Preview Content */,
 				B0C31A872D94CB6400E481F4 /* loc.entitlements */,
 			);
@@ -394,6 +397,7 @@
 			files = (
 				B054DC682C42F5DB00C98088 /* Preview Assets.xcassets in Resources */,
 				B054DC652C42F5DB00C98088 /* Assets.xcassets in Resources */,
+				B02D1F8D2F33A54F00BEE4BC /* GoogleService-Info.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -9,7 +9,7 @@
 import SwiftUI
 
 struct SuggestedProfilesPopupView: View {
-    @ObservedObject var viewModel: SuggestedProfilesViewModel
+    @StateObject private var viewModel = SuggestedProfilesViewModel()
     @Binding var isPresented: Bool
 
     @State private var navigationPath = NavigationPath()
@@ -131,8 +131,5 @@ struct SuggestedProfilesPopupView: View {
 }
 
 #Preview {
-    SuggestedProfilesPopupView(
-        viewModel: SuggestedProfilesViewModel(),
-        isPresented: .constant(true)
-    )
+    SuggestedProfilesPopupView(isPresented: .constant(true))
 }

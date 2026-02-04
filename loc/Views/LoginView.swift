@@ -26,7 +26,7 @@ struct LoginView: View {
                 .ignoresSafeArea()
             
             // Mesa logo centered
-            Image("SplashScreen")
+            Image("LoginImage")
                 .resizable()
                 .scaledToFill()
                 .ignoresSafeArea()

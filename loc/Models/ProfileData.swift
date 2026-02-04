@@ -14,8 +14,8 @@ struct ProfileData: Codable, Identifiable, Hashable {
     var lastName: String
     var email: String
     var profilePhotoURL: URL?
-    var phoneNumber: String
-    var fullNameLower: String
+    var phoneNumber: String?
+    var fullNameLower: String?
     var fullName: String
     var fcmToken: String?
     var firebaseUid: String?

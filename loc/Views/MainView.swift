@@ -384,7 +384,6 @@ struct MainView: View {
     /// Suggested profiles popup sheet content.
     private var suggestedProfilesSheet: some View {
         SuggestedProfilesPopupView(
-            viewModel: SuggestedProfilesViewModel(),
             isPresented: Binding(
                 get: { PresentationService.shared.activeSheet == .suggestedProfiles },
                 set: { if !$0 { PresentationService.shared.dismiss() } }
