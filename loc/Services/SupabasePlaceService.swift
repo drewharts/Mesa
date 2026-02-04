@@ -1869,9 +1869,9 @@ class SupabasePlaceService: ObservableObject {
             name: name,
             description: nil,
             image: image.isEmpty ? nil : image,
-            is_public: false
+            is_public: true
         )
-        
+
         // Insert the new list
         let response: [PlaceListRecord] = try await supabase.client
             .from("place_lists")

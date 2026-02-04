@@ -132,7 +132,7 @@ CREATE TABLE place_lists (
     name TEXT NOT NULL,
     description TEXT,
     cover_image_url TEXT,
-    is_public BOOLEAN DEFAULT false,
+    is_public BOOLEAN DEFAULT true,
     sort_order INTEGER DEFAULT 0,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
