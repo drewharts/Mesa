@@ -243,34 +243,24 @@ struct TikTokNoPlacesFoundView: View {
         }
         
         isSubmitting = true
-        
-        // Create a DetailPlace from the suggestion
-        let detailPlace = createDetailPlaceFromSuggestion(suggestion)
-        
+
+        // Create DetailPlace from suggestion using Model initializer
+        let detailPlace = DetailPlace(
+            googlePlaceId: suggestion.id,
+            name: suggestion.name,
+            address: suggestion.address,
+            coordinate: suggestion.coordinate,
+            source: suggestion.source
+        )
+
         // Add place to places dictionary so it's available for the map/UI
         detailPlaceViewModel.places[detailPlace.id.uuidString] = detailPlace
-        
-        // Note: external_place entry creation is handled by the backend
-        // The frontend no longer directly inserts into the external_places table
-        
+
         isSubmitting = false
-        
+
         // Refresh TikTok places list
         profile.refreshTikTokPlacesAfterImport()
         showingSuccessAlert = true
-    }
-    
-    private func createDetailPlaceFromSuggestion(_ suggestion: MesaPlaceSuggestion) -> DetailPlace {
-        var detailPlace = DetailPlace()
-        detailPlace.id = UUID(uuidString: suggestion.id) ?? UUID()
-        detailPlace.name = suggestion.name
-        detailPlace.address = suggestion.address
-        detailPlace.coordinate = CLLocationCoordinate2D(
-            latitude: suggestion.coordinate.latitude,
-            longitude: suggestion.coordinate.longitude
-        )
-        detailPlace.createdAt = ISO8601DateFormatter().string(from: Date())
-        return detailPlace
     }
     
     private func submitFlag() {

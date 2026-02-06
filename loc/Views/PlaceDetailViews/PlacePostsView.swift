@@ -9,7 +9,7 @@ import SwiftUI
 
 struct PlacePostsView: View {
     @ObservedObject var viewModel: PlacePostsViewModel
-    let onPhotoTapped: ([UIImage], Int) -> Void
+    let onPhotoTapped: ([String], Int) -> Void  // URLs instead of UIImages
     let onAddPost: () -> Void
     
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel

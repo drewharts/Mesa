@@ -268,6 +268,21 @@ class PlaceDetailTabsViewModel: ObservableObject {
 
     // MARK: - Data-Driven Updates (Called by View via .onChange)
 
+    /// Updates place metadata without resetting child ViewModel state.
+    /// Called when the same place gets updated with fresh backend data (e.g. placeholder → real UUID).
+    func refreshPlaceData(_ place: DetailPlace?) {
+        handlePlaceChanged(place)
+        openStatusViewModel.setPlace(place)
+        aboutTabViewModel.setPlace(place)
+
+        // If photos weren't loaded yet (placeholder UUID was skipped), load now with the real UUID
+        if let place = place, placePhotosViewModel.externalPhotoItems.isEmpty,
+           !place.hasPlaceholderID {
+            placePhotosViewModel.setPlace(place)
+            placeSaversViewModel.setPlace(place.id.uuidString)
+        }
+    }
+
     /// Called by View when selected place changes.
     func setPlace(_ place: DetailPlace?) {
         // Setting currentPlace triggers the reactive subscription automatically

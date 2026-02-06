@@ -9,6 +9,12 @@ import Foundation
 import CoreLocation
 
 struct DetailPlace: Codable, Identifiable, Equatable {
+    /// Sentinel UUID used when a real Supabase UUID is not yet known.
+    static let placeholderUUID = UUID(uuidString: "00000000-0000-0000-0000-000000000000")!
+
+    /// Returns true if this place has a temporary placeholder ID (not yet resolved from backend).
+    var hasPlaceholderID: Bool { id == Self.placeholderUUID }
+
     var id: UUID = UUID()
     var name: String
     var address: String?
@@ -346,6 +352,45 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         self.aiSuggestionReason = nil
     }
 
+    /// Creates a minimal DetailPlace for immediate navigation from search suggestions.
+    /// Full details are fetched in background via selectPlaceAndFetchDetails.
+    init(
+        googlePlaceId: String,
+        name: String,
+        address: String?,
+        coordinate: CLLocationCoordinate2D,
+        source: String
+    ) {
+        self.id = Self.placeholderUUID
+        self.name = name
+        self.address = address
+        self.city = nil
+        self.mapboxId = nil
+        self.coordinate = coordinate
+        self.categories = nil
+        self.phone = nil
+        self.rating = nil
+        self.userRatingsTotal = nil
+        self.openHours = nil
+        self.description = nil
+        self.priceLevel = nil
+        self.reservable = nil
+        self.servesBreakfast = nil
+        self.serversLunch = nil
+        self.serversDinner = nil
+        self.Instagram = nil
+        self.X = nil
+        self.tikTokVideos = nil
+        self.photoUrls = nil
+        self.menuUrl = nil
+        self.websiteUrl = nil
+        self.googlePlaceId = googlePlaceId
+        self.source = source
+        self.createdAt = nil
+        self.isCustom = nil
+        self.aiSuggestionReason = nil
+    }
+
     // Removed MapboxSearch SearchResult initializer - now using Google Places API
 
     // MARK: - Conversion Methods
@@ -371,5 +416,15 @@ extension DetailPlace {
             name: name,
             latest_review_photo: photoUrls?.first
         )
+    }
+}
+
+// MARK: - Coordinate Validation
+
+extension CLLocationCoordinate2D {
+    /// Returns true if coordinates are valid for map navigation.
+    /// Coordinates at (0,0) are in the middle of the Atlantic Ocean and indicate missing data.
+    var isValidForNavigation: Bool {
+        return !(latitude == 0 && longitude == 0)
     }
 }

@@ -465,6 +465,13 @@ struct MapView: View {
                 mapViewModel.setPreservedAnnotation(for: place)
             }
         }
+        // Re-set annotation when valid coordinates arrive for a place that had invalid coords.
+        // MainView handles camera animation; here we ensure the emoji annotation is created.
+        .onChange(of: selectedPlaceVM.shouldAnimateMapToPlace) { _, shouldAnimate in
+            if shouldAnimate, let place = selectedPlaceVM.selectedPlace {
+                mapViewModel.setPreservedAnnotation(for: place)
+            }
+        }
     }
     
     // MARK: - Private Methods

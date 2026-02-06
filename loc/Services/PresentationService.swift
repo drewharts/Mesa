@@ -38,6 +38,15 @@ class PresentationService: ObservableObject {
         activeSheet = sheet
     }
 
+    /// Presents a sheet immediately with minimal animation.
+    func presentImmediately(_ sheet: AppSheetType) {
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            activeSheet = sheet
+        }
+    }
+
     /// Dismisses the currently active sheet.
     func dismiss() {
         activeSheet = nil

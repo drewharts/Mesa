@@ -148,8 +148,11 @@ struct MainView: View {
                     .environmentObject(dataManager)
                     .environmentObject(serviceContainer)
             }
-            .fullScreenCover(isPresented: $showSearchPage) {
+            .sheet(isPresented: $showSearchPage) {
                 searchPageView
+                    .presentationDetents([.large])
+                    .presentationDragIndicator(.hidden)
+                    .interactiveDismissDisabled()
             }
             .alert("No Location Found", isPresented: $deepLinkViewModel.showNoLocationAlert) {
                 Button("OK") {
@@ -164,16 +167,17 @@ struct MainView: View {
             // ViewModels now call PresentationService.shared directly - no wiring needed
         }
         .onChange(of: selectedPlaceVM.shouldAnimateMapToPlace) { _, newValue in
-            if newValue, let place = selectedPlaceVM.selectedPlace, let coordinate = place.coordinate {
-                withAnimation(.easeInOut(duration: 0.6)) {
+            if newValue,
+               let place = selectedPlaceVM.selectedPlace,
+               let coordinate = place.coordinate,
+               coordinate.isValidForNavigation {
+                withAnimation(.easeOut(duration: 0.25)) {
                     mapPosition = .region(MKCoordinateRegion(
                         center: coordinate,
                         span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
                     ))
                 }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    selectedPlaceVM.shouldAnimateMapToPlace = false
-                }
+                selectedPlaceVM.shouldAnimateMapToPlace = false
             }
         }
         .onChange(of: userProfileNavigationViewModel.shouldNavigateToOwnProfile) { _, newValue in

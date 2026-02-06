@@ -14,7 +14,7 @@ struct PlaceDetailView: View {
 
     @State private var selectedImageIndex: Int?
     @State private var showPhotoGallery = false
-    @State private var galleryPhotos: [UIImage] = []
+    @State private var galleryPhotoURLs: [String] = []
     @State private var galleryPresentationCount = 0
     @State private var showNoPhoneNumberAlert = false
     @State private var showListSelection = false
@@ -194,7 +194,7 @@ struct PlaceDetailView: View {
     private var photoGalleryOverlay: some View {
         if showPhotoGallery, let selectedIndex = selectedImageIndex {
             PinterestPhotoGalleryView(
-                photos: galleryPhotos,
+                photoURLs: galleryPhotoURLs,
                 initialIndex: selectedIndex,
                 isPresented: $showPhotoGallery
             )
@@ -274,8 +274,8 @@ struct PlaceDetailView: View {
     }
 
     /// Handles photo tap to show fullscreen gallery.
-    private func handlePhotoTapped(photos: [UIImage], index: Int) {
-        galleryPhotos = photos
+    private func handlePhotoTapped(photoURLs: [String], index: Int) {
+        galleryPhotoURLs = photoURLs
         selectedImageIndex = index
         galleryPresentationCount += 1
         showPhotoGallery = true

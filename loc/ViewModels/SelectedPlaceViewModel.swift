@@ -359,7 +359,8 @@ class SelectedPlaceViewModel: ObservableObject {
 
     /// Fetches complete place details when missing.
     private func fetchCompletePlaceDetails(for place: DetailPlace, currentLocation: CLLocationCoordinate2D?) {
-        let placeId = place.id.uuidString
+        // Use googlePlaceId for external places, fall back to UUID for custom places
+        let placeId = place.googlePlaceId ?? place.id.uuidString
 
         mesaBackendService.fetchPlaceDetails(placeId: placeId, source: "google") { [weak self] result in
             guard let self = self else { return }
@@ -381,7 +382,8 @@ class SelectedPlaceViewModel: ObservableObject {
 
     /// Fetches fresh details in background.
     private func fetchFreshDetailsInBackground(for place: DetailPlace) {
-        let placeId = place.id.uuidString
+        // Use googlePlaceId for external places, fall back to UUID for custom places
+        let placeId = place.googlePlaceId ?? place.id.uuidString
 
         Task {
             do {
@@ -394,6 +396,13 @@ class SelectedPlaceViewModel: ObservableObject {
 
                     let mergedPlace = self.mergePlaceData(original: place, fresh: freshPlace)
                     self.selectionState.updatePlaceDetails(mergedPlace)
+
+                    // If original had invalid coordinates but fresh has valid ones, animate now
+                    let originalWasInvalid = place.coordinate == nil || !place.coordinate!.isValidForNavigation
+                    let freshIsValid = mergedPlace.coordinate?.isValidForNavigation == true
+                    if originalWasInvalid && freshIsValid {
+                        self.selectionState.shouldAnimateMapToPlace = true
+                    }
 
                     // Update database in background
                     self.updatePlaceInDatabase(mergedPlace)
@@ -410,11 +419,20 @@ class SelectedPlaceViewModel: ObservableObject {
     }
 
     /// Merges fresh backend data with original place, preserving local-only properties.
+    /// Uses fresh.id (the Supabase UUID from the backend) instead of original.id,
+    /// because places created from search have a locally-generated random UUID that
+    /// won't match the Supabase UUID used to store external reviews.
     private func mergePlaceData(original: DetailPlace, fresh: DetailPlace) -> DetailPlace {
         var merged = fresh
-        merged.id = original.id
+        // Keep fresh.id — it's the authoritative Supabase UUID from the backend.
+        // original.id may be a random UUID (generated when googlePlaceId fails UUID parsing).
         merged.isCustom = original.isCustom
-        merged.coordinate = original.coordinate
+
+        // Use original coordinate only if valid; otherwise use fresh coordinate
+        if let originalCoord = original.coordinate, originalCoord.isValidForNavigation {
+            merged.coordinate = original.coordinate
+        }
+        // If original is invalid/nil, keep fresh.coordinate (already in merged)
 
         if merged.openHours == nil || merged.openHours?.isEmpty == true {
             merged.openHours = original.openHours

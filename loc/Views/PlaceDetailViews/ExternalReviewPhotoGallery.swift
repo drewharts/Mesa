@@ -1,56 +1,55 @@
 import SwiftUI
-import UIKit
 
 struct ExternalReviewPhotoGallery: View {
-    let onPhotoTapped: ([UIImage], Int) -> Void
+    let onPhotoTapped: ([String], Int) -> Void  // URLs instead of UIImages
     @ObservedObject var photosViewModel: PlacePhotosViewModel
-    
+
     private let heroImageHeight: CGFloat = 200
     private let gridSpacing: CGFloat = 8
     private let cornerRadius: CGFloat = 12
-    
-    private var photos: [UIImage] {
-        photosViewModel.externalReviewPhotos
+
+    private var photoItems: [PhotoItem] {
+        photosViewModel.externalPhotoItems
     }
-    
+
     private var staggeredLayoutItems: [StaggeredItem] {
-        guard photos.count > 1 else { return [] }
-        
+        guard photoItems.count > 1 else { return [] }
+
         var items: [StaggeredItem] = []
-        let remainingPhotos = Array(photos.dropFirst())
+        let remainingPhotos = Array(photoItems.dropFirst())
         var currentIndex = 0
         var rowIndex = 0
-        
+
         while currentIndex < remainingPhotos.count {
             let isSinglePhotoRow = rowIndex % 2 == 1
-            
+
             if isSinglePhotoRow {
                 let actualIndex = currentIndex + 1
-                if actualIndex < photos.count {
+                if actualIndex < photoItems.count {
                     items.append(.single(actualIndex))
                 }
                 currentIndex += 1
             } else {
                 let indices = (0..<2).compactMap { offset -> Int? in
                     let actualIndex = currentIndex + offset + 1
-                    return actualIndex < photos.count ? actualIndex : nil
+                    return actualIndex < photoItems.count ? actualIndex : nil
                 }
                 if !indices.isEmpty {
                     items.append(.double(indices))
                 }
                 currentIndex += indices.count
             }
-            
+
             rowIndex += 1
         }
-        
+
         return items
     }
-    
+
     private enum StaggeredItem: Identifiable {
         case single(Int)
         case double([Int])
-        
+
         var id: String {
             switch self {
             case .single(let index):
@@ -60,23 +59,23 @@ struct ExternalReviewPhotoGallery: View {
             }
         }
     }
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text("More Photos")
                     .font(.headline)
                     .fontWeight(.bold)
-                
+
                 Spacer()
             }
-            
+
             let loadingState = photosViewModel.externalReviewPhotoLoadingState
-            
-            if photos.isEmpty {
+
+            if photoItems.isEmpty {
                 switch loadingState {
                 case .loading, .idle:
-                    ProgressView("Loading external photos…")
+                    ProgressView("Loading external photos...")
                         .frame(maxWidth: .infinity)
                 case .error(let error):
                     Text("We couldn't load external photos right now. \(error.localizedDescription)")
@@ -90,93 +89,17 @@ struct ExternalReviewPhotoGallery: View {
             } else {
                 ZStack(alignment: .bottom) {
                     VStack(spacing: gridSpacing) {
-                        if let firstImage = photos.first {
-                            GeometryReader { geo in
-                                Image(uiImage: firstImage)
-                                    .resizable()
-                                    .scaledToFill()
-                                    .frame(width: geo.size.width, height: heroImageHeight)
-                                    .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
-                                    .contentShape(RoundedRectangle(cornerRadius: cornerRadius))
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: cornerRadius)
-                                            .stroke(Color.gray.opacity(0.1), lineWidth: 0.5)
-                                    )
-                                    .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 4)
-                            }
-                            .frame(height: heroImageHeight)
-                            .onTapGesture {
-                                onPhotoTapped(photos, 0)
-                            }
+                        if let firstItem = photoItems.first {
+                            heroPhotoView(item: firstItem, index: 0)
                         }
 
                         ForEach(staggeredLayoutItems) { item in
-                            switch item {
-                            case .single(let actualIndex):
-                                GeometryReader { geo in
-                                    Image(uiImage: photos[actualIndex])
-                                        .resizable()
-                                        .scaledToFill()
-                                        .frame(width: geo.size.width, height: geo.size.width * 0.6)
-                                        .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
-                                        .contentShape(RoundedRectangle(cornerRadius: cornerRadius))
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: cornerRadius)
-                                                .stroke(Color.gray.opacity(0.1), lineWidth: 0.5)
-                                        )
-                                        .shadow(color: Color.black.opacity(0.08), radius: 6, x: 0, y: 2)
-                                }
-                                .aspectRatio(5/3, contentMode: .fill)
-                                .onTapGesture {
-                                    onPhotoTapped(photos, actualIndex)
-                                }
-                                .onAppear {
-                                    photosViewModel.loadMoreExternalReviewPhotosIfNeeded(currentIndex: actualIndex)
-                                }
-
-                            case .double(let indices):
-                                HStack(spacing: gridSpacing) {
-                                    ForEach(indices, id: \.self) { actualIndex in
-                                        GeometryReader { geo in
-                                            Image(uiImage: photos[actualIndex])
-                                                .resizable()
-                                                .scaledToFill()
-                                                .frame(width: geo.size.width, height: geo.size.width * 0.8)
-                                                .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
-                                                .contentShape(RoundedRectangle(cornerRadius: cornerRadius))
-                                                .overlay(
-                                                    RoundedRectangle(cornerRadius: cornerRadius)
-                                                        .stroke(Color.gray.opacity(0.1), lineWidth: 0.5)
-                                                )
-                                                .shadow(color: Color.black.opacity(0.08), radius: 6, x: 0, y: 2)
-                                        }
-                                        .aspectRatio(5/4, contentMode: .fill)
-                                        .onTapGesture {
-                                            onPhotoTapped(photos, actualIndex)
-                                        }
-                                        .onAppear {
-                                            photosViewModel.loadMoreExternalReviewPhotosIfNeeded(currentIndex: actualIndex)
-                                        }
-                                    }
-                                }
-                            }
+                            staggeredItemView(item)
                         }
                     }
 
-                    // Refresh indicator overlay when refreshing stale images
                     if photosViewModel.isRefreshingImages {
-                        HStack(spacing: 6) {
-                            ProgressView()
-                                .scaleEffect(0.8)
-                            Text("Refreshing photos...")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .background(.ultraThinMaterial)
-                        .cornerRadius(8)
-                        .padding(.bottom, 8)
+                        refreshIndicator
                     }
                 }
 
@@ -195,5 +118,98 @@ struct ExternalReviewPhotoGallery: View {
             photosViewModel.loadInitialExternalReviewPhotos()
         }
     }
-}
 
+    // MARK: - Hero Photo
+
+    /// Displays the hero photo at the top of the gallery.
+    private func heroPhotoView(item: PhotoItem, index: Int) -> some View {
+        GeometryReader { geo in
+            AsyncPhotoItemView(
+                item: item,
+                width: geo.size.width,
+                height: heroImageHeight,
+                cornerRadius: cornerRadius
+            )
+            .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 4)
+        }
+        .frame(height: heroImageHeight)
+        .onTapGesture {
+            onPhotoTapped(photoItems.map { $0.url }, index)
+        }
+    }
+
+    // MARK: - Staggered Item View
+
+    /// Routes a staggered item to the appropriate single or double row view.
+    @ViewBuilder
+    private func staggeredItemView(_ item: StaggeredItem) -> some View {
+        switch item {
+        case .single(let actualIndex):
+            singlePhotoRow(at: actualIndex)
+
+        case .double(let indices):
+            doublePhotoRow(indices: indices)
+        }
+    }
+
+    /// Displays a single photo row in the staggered layout.
+    private func singlePhotoRow(at actualIndex: Int) -> some View {
+        GeometryReader { geo in
+            AsyncPhotoItemView(
+                item: photoItems[actualIndex],
+                width: geo.size.width,
+                height: geo.size.width * 0.6,
+                cornerRadius: cornerRadius
+            )
+            .shadow(color: Color.black.opacity(0.08), radius: 6, x: 0, y: 2)
+        }
+        .aspectRatio(5/3, contentMode: .fill)
+        .onTapGesture {
+            onPhotoTapped(photoItems.map { $0.url }, actualIndex)
+        }
+        .onAppear {
+            photosViewModel.loadMoreExternalReviewPhotosIfNeeded(currentIndex: actualIndex)
+        }
+    }
+
+    /// Displays a double photo row in the staggered layout.
+    private func doublePhotoRow(indices: [Int]) -> some View {
+        HStack(spacing: gridSpacing) {
+            ForEach(indices, id: \.self) { actualIndex in
+                GeometryReader { geo in
+                    AsyncPhotoItemView(
+                        item: photoItems[actualIndex],
+                        width: geo.size.width,
+                        height: geo.size.width * 0.8,
+                        cornerRadius: cornerRadius
+                    )
+                    .shadow(color: Color.black.opacity(0.08), radius: 6, x: 0, y: 2)
+                }
+                .aspectRatio(5/4, contentMode: .fill)
+                .onTapGesture {
+                    onPhotoTapped(photoItems.map { $0.url }, actualIndex)
+                }
+                .onAppear {
+                    photosViewModel.loadMoreExternalReviewPhotosIfNeeded(currentIndex: actualIndex)
+                }
+            }
+        }
+    }
+
+    // MARK: - Refresh Indicator
+
+    private var refreshIndicator: some View {
+        HStack(spacing: 6) {
+            ProgressView()
+                .scaleEffect(0.8)
+            Text("Refreshing photos...")
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(.ultraThinMaterial)
+        .cornerRadius(8)
+        .padding(.bottom, 8)
+    }
+}

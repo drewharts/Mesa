@@ -22,7 +22,7 @@ struct PlaceDetailTabsView: View {
     @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
 
     @Binding var showNoPhoneNumberAlert: Bool
-    let onPhotoTapped: ([UIImage], Int) -> Void
+    let onPhotoTapped: ([String], Int) -> Void  // URLs instead of UIImages
     
     // MARK: - Action Callbacks (passed from parent)
     let onAddToList: () -> Void
