@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Combine
 import MapKit
 
 /// ViewModel for the full-screen search page
@@ -27,6 +28,7 @@ class SearchPageViewModel: ObservableObject {
 
     private weak var userSession: UserSession?
     private weak var userProfileNavigationViewModel: UserProfileNavigationViewModel?
+    private var cancellables = Set<AnyCancellable>()
 
     // MARK: - Initialization
 
@@ -40,9 +42,19 @@ class SearchPageViewModel: ObservableObject {
         self.userProfileNavigationViewModel = userProfileNavigationViewModel
 
         setupSearchViewModelCallbacks()
+        forwardChildChanges()
     }
 
     // MARK: - Setup
+
+    /// Forward objectWillChange from child SearchViewModel so parent view re-renders
+    private func forwardChildChanges() {
+        searchViewModel.objectWillChange
+            .sink { [weak self] _ in
+                self?.objectWillChange.send()
+            }
+            .store(in: &cancellables)
+    }
 
     /// Configure SearchViewModel callbacks for place selection
     private func setupSearchViewModelCallbacks() {
