@@ -367,6 +367,18 @@ class PlaceDetailTabsViewModel: ObservableObject {
         }
     }
 
+    /// Manually refreshes all place data (posts, photos, savers, list membership).
+    func manualRefresh() {
+        guard let place = currentPlace else { return }
+        let placeId = place.id.uuidString
+        postsCacheService.loadPosts(forPlaceId: placeId)
+        placePhotosViewModel.setPlace(place)
+        placeSaversViewModel.setPlace(placeId)
+        Task {
+            await checkPlaceListMembership(place: place)
+        }
+    }
+
     /// Public method to refresh list membership state (call after saving to list)
     func refreshPlaceListMembership() {
         Task {

@@ -128,7 +128,7 @@ struct PlaceDetailTabsView: View {
                     .foregroundColor(.gray)
                     .frame(width: 32, height: 32)
             }
-            
+
             Button(action: viewModel.sharePlace) {
                 Image(systemName: "square.and.arrow.up")
                     .font(.title3)
@@ -243,7 +243,8 @@ struct PlaceDetailTabsView: View {
             AboutTabContent(
                 viewModel: viewModel.aboutTabViewModel,
                 onPhotoTapped: onPhotoTapped,
-                onPlaceChanged: onPlaceChanged
+                onPlaceChanged: onPlaceChanged,
+                onRefresh: viewModel.manualRefresh
             )
             .environmentObject(profile)
             .environmentObject(userSession)
