@@ -179,6 +179,11 @@ class PlacePhotosViewModel: ObservableObject {
         externalReviewPhotosVM.loadMoreExternalReviewPhotosIfNeeded(currentIndex: currentIndex)
     }
 
+    /// Reports a failed external image load to trigger batched refresh.
+    func reportExternalImageLoadFailure(url: String) {
+        externalReviewPhotosVM.reportImageLoadFailure(url: url)
+    }
+
     // MARK: - Post & Profile Photo Accessors (Delegated to PostPhotosVM)
 
     /// Loads photos for a specific post.

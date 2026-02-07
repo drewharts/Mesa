@@ -73,18 +73,29 @@ struct ExternalReviewPhotoGallery: View {
             let loadingState = photosViewModel.externalReviewPhotoLoadingState
 
             if photoItems.isEmpty {
-                switch loadingState {
-                case .loading, .idle:
-                    ProgressView("Loading external photos...")
-                        .frame(maxWidth: .infinity)
-                case .error(let error):
-                    Text("We couldn't load external photos right now. \(error.localizedDescription)")
-                        .foregroundColor(.red)
-                        .font(.footnote)
-                case .loaded:
-                    Text("No external photos yet.")
-                        .foregroundColor(.gray)
-                        .font(.footnote)
+                if photosViewModel.isRefreshingImages {
+                    VStack(spacing: 8) {
+                        ProgressView()
+                        Text("Refreshing photos...")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 20)
+                } else {
+                    switch loadingState {
+                    case .loading, .idle:
+                        ProgressView("Loading external photos...")
+                            .frame(maxWidth: .infinity)
+                    case .error(let error):
+                        Text("We couldn't load external photos right now. \(error.localizedDescription)")
+                            .foregroundColor(.red)
+                            .font(.footnote)
+                    case .loaded:
+                        Text("No external photos yet.")
+                            .foregroundColor(.gray)
+                            .font(.footnote)
+                    }
                 }
             } else {
                 ZStack(alignment: .bottom) {
@@ -128,7 +139,10 @@ struct ExternalReviewPhotoGallery: View {
                 item: item,
                 width: geo.size.width,
                 height: heroImageHeight,
-                cornerRadius: cornerRadius
+                cornerRadius: cornerRadius,
+                onLoadFailed: { url in
+                    photosViewModel.reportExternalImageLoadFailure(url: url)
+                }
             )
             .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 4)
         }
@@ -159,7 +173,10 @@ struct ExternalReviewPhotoGallery: View {
                 item: photoItems[actualIndex],
                 width: geo.size.width,
                 height: geo.size.width * 0.6,
-                cornerRadius: cornerRadius
+                cornerRadius: cornerRadius,
+                onLoadFailed: { url in
+                    photosViewModel.reportExternalImageLoadFailure(url: url)
+                }
             )
             .shadow(color: Color.black.opacity(0.08), radius: 6, x: 0, y: 2)
         }
@@ -181,7 +198,10 @@ struct ExternalReviewPhotoGallery: View {
                         item: photoItems[actualIndex],
                         width: geo.size.width,
                         height: geo.size.width * 0.8,
-                        cornerRadius: cornerRadius
+                        cornerRadius: cornerRadius,
+                        onLoadFailed: { url in
+                            photosViewModel.reportExternalImageLoadFailure(url: url)
+                        }
                     )
                     .shadow(color: Color.black.opacity(0.08), radius: 6, x: 0, y: 2)
                 }

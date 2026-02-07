@@ -30,8 +30,7 @@ struct ReviewsListPopupView: View {
             cardBuilder: { place, navigate in
                 PopupPlaceCard(
                     place: place,
-                    preferTikTokThumbnail: false,  // Reviews prioritize review photos
-                    allowDelete: false,
+                    preferTikTokThumbnail: false,
                     onNavigate: navigate
                 )
             }

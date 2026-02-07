@@ -130,7 +130,6 @@ struct ProfileFavoritesPopupView: View {
                 PopupPlaceCard(
                     place: place,
                     preferTikTokThumbnail: false,
-                    allowDelete: false,
                     onNavigate: { placeId in
                         navigationPath.append(placeId)
                     }

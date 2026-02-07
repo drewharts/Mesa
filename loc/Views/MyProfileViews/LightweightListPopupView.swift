@@ -257,6 +257,9 @@ struct LightweightListPopupView: View {
                 onLoadMore: { paginationVM.loadMoreIfNeeded(for: listId) },
                 onNavigateToPlace: { placeId in
                     navigationPath.append(placeId)
+                },
+                onRemovePlace: { placeId in
+                    profile.removePlaceFromLightweightList(listId: listId, placeId: placeId)
                 }
             )
         }
@@ -285,6 +288,7 @@ struct ListContentView: View {
     let hasMorePlaces: Bool
     let onLoadMore: () -> Void
     let onNavigateToPlace: ((String) -> Void)?
+    let onRemovePlace: ((String) -> Void)?
 
     @EnvironmentObject var profile: ProfileViewModel
 
@@ -327,10 +331,18 @@ struct ListContentView: View {
                     PopupPlaceCard(
                         place: place,
                         preferTikTokThumbnail: true,
-                        allowDelete: false,
                         onNavigate: onNavigateToPlace,
                         showAddedBy: list.isCollaborative
                     )
+                    .contextMenu {
+                        if let onRemovePlace {
+                            Button(role: .destructive) {
+                                onRemovePlace(place.place_id)
+                            } label: {
+                                Label("Remove from list", systemImage: "trash")
+                            }
+                        }
+                    }
                     .onAppear {
                         // Load more when user scrolls to 3rd-to-last item
                         if index == filteredPlaces.count - 3 {

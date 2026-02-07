@@ -373,9 +373,14 @@ class ProfileListsViewModel: ObservableObject {
         mutationsViewModel.addPlaceToList(listId: listId, place: place)
     }
 
-    /// Remove a place from a lightweight list.
+    /// Remove a place from a lightweight list using a DetailPlace reference.
     func removePlaceFromLightweightList(listId: String, place: DetailPlace, updatedCount: Int? = nil) {
         mutationsViewModel.removePlaceFromLightweightList(listId: listId, place: place, updatedCount: updatedCount)
+    }
+
+    /// Remove a place from a lightweight list by place ID.
+    func removePlaceFromLightweightList(listId: String, placeId: String) {
+        mutationsViewModel.removePlaceFromLightweightList(listId: listId, placeId: placeId)
     }
 
     /// Remove a place from a list (old UUID-based format).
