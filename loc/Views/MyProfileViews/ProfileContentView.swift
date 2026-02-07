@@ -25,8 +25,14 @@ struct ProfileContentView: View {
         ZStack {
             ScrollView {
                 VStack(spacing: 12) {
-                    // Profile Picture
-                    ProfilePictureView()
+                    // Profile Picture + Social Links
+                    HStack(alignment: .center, spacing: 10) {
+                        ProfilePictureView()
+                        SocialLinksColumn(
+                            instagramUsername: profile.user?.instagramUsername,
+                            tiktokUsername: profile.user?.tiktokUsername
+                        )
+                    }
 
                     // Name
                     let firstName = profile.user?.firstName ?? ""

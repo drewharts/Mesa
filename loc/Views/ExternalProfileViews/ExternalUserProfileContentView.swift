@@ -28,24 +28,30 @@ struct ExternalUserProfileContentView: View {
             VStack(spacing: 0) {
                 // Profile Picture, Name, Followers
                 VStack(spacing: 16) {
-                    // Profile Picture
-                    UserProfileProfilePictureView(
-                        profilePhotoURL: viewModel.user.profilePhotoURL,
-                        isFollowing: viewModel.isFollowing,
-                        onToggleFollow: {
-                            guard let currentUserId = userSession.currentUserId else { return }
-                            viewModel.toggleFollowUser(currentUserId: currentUserId) { success, newFollowingState in
-                                if success {
-                                    profileVM.updateFollowingState(
-                                        userId: viewModel.userId,
-                                        isFollowing: newFollowingState
-                                    )
+                    // Profile Picture + Social Links
+                    HStack(alignment: .center, spacing: 10) {
+                        UserProfileProfilePictureView(
+                            profilePhotoURL: viewModel.user.profilePhotoURL,
+                            isFollowing: viewModel.isFollowing,
+                            onToggleFollow: {
+                                guard let currentUserId = userSession.currentUserId else { return }
+                                viewModel.toggleFollowUser(currentUserId: currentUserId) { success, newFollowingState in
+                                    if success {
+                                        profileVM.updateFollowingState(
+                                            userId: viewModel.userId,
+                                            isFollowing: newFollowingState
+                                        )
+                                    }
                                 }
-                            }
-                        },
-                        totalPlacesCount: viewModel.totalPlacesCount,
-                        userName: viewModel.user.firstName ?? viewModel.user.fullName
-                    )
+                            },
+                            totalPlacesCount: viewModel.totalPlacesCount,
+                            userName: viewModel.user.firstName ?? viewModel.user.fullName
+                        )
+                        SocialLinksColumn(
+                            instagramUsername: viewModel.user.instagramUsername,
+                            tiktokUsername: viewModel.user.tiktokUsername
+                        )
+                    }
 
                     // Name
                     Text(viewModel.user.fullName)
