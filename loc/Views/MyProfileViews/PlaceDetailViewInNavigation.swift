@@ -172,6 +172,7 @@ struct PlaceDetailViewContent: View {
                     ListSelectionSheet(
                         viewModel: viewModel,
                         place: selectedPlace,
+                        listsVM: profile.listsViewModel,
                         isPresented: $showListSelection
                     )
                 } else {
@@ -216,12 +217,14 @@ struct PlaceDetailViewContent: View {
             .modifier(FavoritesChangeHandler(
                 tabsViewModel: $tabsViewModel,
                 selectedPlaceVM: selectedPlaceVM,
-                profile: profile
+                profile: profile,
+                favoritesVM: profile.favoritesViewModel
             ))
             .modifier(TikTokChangeHandler(
                 tabsViewModel: $tabsViewModel,
                 selectedPlaceVM: selectedPlaceVM,
-                profile: profile
+                profile: profile,
+                tikTokVM: profile.tikTokViewModel
             ))
 
             // Photo Gallery Overlay (Pinterest-style) - fills entire sheet

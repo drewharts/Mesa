@@ -12,6 +12,9 @@ struct ProfileFavoritesTikToksView: View {
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var places: DetailPlaceViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
+    @ObservedObject var favoritesVM: ProfileFavoritesViewModel
+    @ObservedObject var tikTokVM: ProfileTikTokViewModel
+    @ObservedObject var reviewsVM: ProfileReviewsViewModel
     @Environment(\.presentationMode) var presentationMode
 
     @State private var showingTikToksPopup = false
@@ -23,11 +26,11 @@ struct ProfileFavoritesTikToksView: View {
     /// Data source for the shared section component.
     private var sectionData: ProfileFavoritesReviewsSectionData {
         ProfileFavoritesReviewsSectionData(
-            favorites: profile.favoritesViewModel.lightweightFavorites,
-            tiktokPlaces: profile.tikTokViewModel.lightweightExternalPlaces,
-            reviewedPlaces: profile.reviewsViewModel.lightweightReviewedPlaces,
-            isLoadingTikToks: profile.tikTokViewModel.isLoadingTikTokPlaces,
-            isLoadingReviews: profile.reviewsViewModel.isLoadingReviewedPlaces
+            favorites: favoritesVM.lightweightFavorites,
+            tiktokPlaces: tikTokVM.lightweightExternalPlaces,
+            reviewedPlaces: reviewsVM.lightweightReviewedPlaces,
+            isLoadingTikToks: tikTokVM.isLoadingTikTokPlaces,
+            isLoadingReviews: reviewsVM.isLoadingReviewedPlaces
         )
     }
 
@@ -43,10 +46,10 @@ struct ProfileFavoritesTikToksView: View {
             onTikTokHelpTap: { showingHelpSheet = true }
         )
         .sheet(isPresented: $showingTikToksPopup) {
-            TikToksPopupView()
+            TikToksPopupView(tikTokVM: tikTokVM)
         }
         .sheet(isPresented: $showingReviewsPopup) {
-            ReviewsListPopupView()
+            ReviewsListPopupView(reviewsVM: reviewsVM)
         }
         .sheet(isPresented: $showingHelpSheet) {
             TikTokImportHelpView()

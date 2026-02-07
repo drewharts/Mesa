@@ -22,10 +22,8 @@ struct ProfileViewListsView: View {
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
     @EnvironmentObject var deepLinkManager: DeepLinkManager
+    @ObservedObject var listsVM: ProfileListsViewModel
     @Environment(\.presentationMode) private var presentationMode
-
-    /// Convenience accessor for lists view model.
-    private var listsVM: ProfileListsViewModel { profile.listsViewModel }
 
     @State private var showingImagePicker = false
     @State private var inputImage: [UIImage] = []
@@ -73,7 +71,9 @@ struct ProfileViewListsView: View {
                 SwipeableListPopupView(
                     lists: pendingList.lists,
                     initialListIndex: pendingList.initialIndex,
-                    placeColors: $placeColors
+                    placeColors: $placeColors,
+                    listsVM: listsVM,
+                    reviewsVM: profile.reviewsViewModel
                 )
             }
         }
@@ -109,8 +109,8 @@ struct ProfileViewListsView: View {
     private var headerView: some View {
         ListHeaderView(
             showOnlyShared: listsVM.showOnlySharedLists,
-            hasSharedLists: profile.hasSharedLists,
-            isFilterEnabled: profile.canInteractWithSharedFilter,
+            hasSharedLists: listsVM.hasSharedLists,
+            isFilterEnabled: listsVM.canInteractWithSharedFilter,
             isSearching: listsVM.isSearchingLists,
             onToggleFilter: {
                 listsVM.showOnlySharedLists.toggle()
@@ -169,7 +169,7 @@ struct ProfileViewListsView: View {
         if listsVM.isLoadingInitialLists {
             // Initial loading state
             initialLoadingView
-        } else if !profile.filteredPlaceLists.isEmpty {
+        } else if !listsVM.filteredPlaceLists.isEmpty {
             // Lists available
             listView
         } else {
@@ -201,11 +201,11 @@ struct ProfileViewListsView: View {
     
     private var listView: some View {
         LazyVGrid(columns: listColumns, spacing: 16) {
-            ForEach(Array(profile.filteredPlaceLists.enumerated()), id: \.element.id) { index, list in
+            ForEach(Array(listsVM.filteredPlaceLists.enumerated()), id: \.element.id) { index, list in
                 LightweightProfileListSection(
                     list: list,
                     places: listsVM.lightweightPlaceListPlaces[list.list_id] ?? [],
-                    allLists: profile.filteredPlaceLists,
+                    allLists: listsVM.filteredPlaceLists,
                     currentIndex: index,
                     placeColors: $placeColors
                 )
@@ -299,7 +299,7 @@ struct ProfileViewListsView: View {
 
         if listsVM.shouldLoadMoreLists(
             currentItem: list,
-            filteredLists: profile.filteredPlaceLists,
+            filteredLists: listsVM.filteredPlaceLists,
             isSearching: listsVM.isSearchingLists
         ) {
             Task {

@@ -232,7 +232,12 @@ class ListsDataViewModel: ObservableObject {
         }
 
         lightweightPlaceListPlaces[listId] = uniquePlaces
-        lightweightPlaceListCounts[listId] = uniquePlaces.count
+        // Only set count if we don't already have one from list metadata (which has the true total).
+        // The places array here is paginated (e.g. page size 6), so using its count would
+        // overwrite the correct total with a capped value.
+        if lightweightPlaceListCounts[listId] == nil {
+            lightweightPlaceListCounts[listId] = uniquePlaces.count
+        }
     }
 
     /// Appends places for a list with deduplication.

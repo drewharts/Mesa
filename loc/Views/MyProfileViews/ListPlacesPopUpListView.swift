@@ -11,15 +11,14 @@ import SwiftUI
 struct ListPlacesPopUpListView: View {
     let list: PlaceList
 
-    @EnvironmentObject var profile: ProfileViewModel
+    @ObservedObject var listsVM: ProfileListsViewModel
+    @ObservedObject var reviewsVM: ProfileReviewsViewModel
+
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
     @Environment(\.presentationMode) var presentationMode
 
     @State private var showOnlyUnvisited: Bool = false
-
-    /// Convenience accessor for reviews view model.
-    private var reviewsVM: ProfileReviewsViewModel { profile.reviewsViewModel }
 
     // Reduced width to create more space between cards
     private let cardWidth: CGFloat = UIScreen.main.bounds.width / 2 - 35 // Increased spacing from edges
@@ -29,9 +28,6 @@ struct ListPlacesPopUpListView: View {
         GridItem(.flexible(), spacing: 15),
         GridItem(.flexible(), spacing: 15)
     ]
-
-    /// Convenience accessor for lists view model.
-    private var listsVM: ProfileListsViewModel { profile.listsViewModel }
 
     // Precompute places
     var places: [DetailPlace] {
