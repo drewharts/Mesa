@@ -25,14 +25,8 @@ struct ProfileContentView: View {
         ZStack {
             ScrollView {
                 VStack(spacing: 12) {
-                    // Profile Picture + Social Links
-                    HStack(alignment: .center, spacing: 10) {
-                        ProfilePictureView()
-                        SocialLinksColumn(
-                            instagramUsername: profile.user?.instagramUsername,
-                            tiktokUsername: profile.user?.tiktokUsername
-                        )
-                    }
+                    // Profile Picture
+                    ProfilePictureView()
 
                     // Name
                     let firstName = profile.user?.firstName ?? ""
@@ -42,25 +36,21 @@ struct ProfileContentView: View {
                         .fontWeight(.bold)
                         .foregroundColor(.black)
 
-                    // Follow Counts
+                    // Follow Counts & Social Links
                     ProfileFollowCountsView(
                         data: .myProfile(
                             followers: socialVM.followersCount,
                             following: socialVM.followingCount,
-                            myPlaces: myPlacesVM.myPlaces.count,
                             isFollowersLoading: socialVM.isFollowersLoading,
                             isFollowingLoading: socialVM.isFollowingLoading,
-                            isMyPlacesLoading: myPlacesVM.isMyPlacesLoading
+                            instagramUsername: profile.user?.instagramUsername,
+                            tiktokUsername: profile.user?.tiktokUsername
                         ),
                         onFollowersTap: {
                             navigationPath.append(ProfileView.FollowListDestination.followers)
                         },
                         onFollowingTap: {
                             navigationPath.append(ProfileView.FollowListDestination.following)
-                        },
-                        onMyPlacesTap: {
-                            profile.showMyPlacesOnMap = true
-                            presentationMode.wrappedValue.dismiss()
                         }
                     )
                     .onAppear {
@@ -77,7 +67,8 @@ struct ProfileContentView: View {
                     ProfileFavoritesTikToksView(
                         favoritesVM: favoritesVM,
                         tikTokVM: tikTokVM,
-                        reviewsVM: reviewsVM
+                        reviewsVM: reviewsVM,
+                        myPlacesVM: myPlacesVM
                     )
                     ProfileViewListsView(listsVM: listsVM)
 

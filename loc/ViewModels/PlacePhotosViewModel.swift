@@ -22,6 +22,7 @@ class PlacePhotosViewModel: ObservableObject {
     @Published private var photoLoadingStates: [String: LoadingState] = [:]
     @Published private var photoPageLimit = 9
     @Published private var allPhotosLoaded = false
+    @Published private var postsLoadingFinished: Bool = false
 
     @Published var place: DetailPlace?
     @Published var placeId: String = ""
@@ -79,8 +80,14 @@ class PlacePhotosViewModel: ObservableObject {
         guard let place = place, !place.hasPlaceholderID else { return }
 
         print("📸 [PlacePhotosVM] setPlace called for: \(place.id.uuidString)")
+        postsLoadingFinished = false
         resetPlaceGallery()
         externalReviewPhotosVM.setPlace(place)
+    }
+
+    /// Updates whether posts have finished loading from PlacePostsCacheService.
+    func setPostsLoadingFinished(_ finished: Bool) {
+        postsLoadingFinished = finished
     }
 
     /// Called by parent when posts are loaded or updated.
@@ -149,11 +156,11 @@ class PlacePhotosViewModel: ObservableObject {
         return photoItems.count + externalPhotoItems.count
     }
 
-    /// Whether any photo loading is in progress.
+    /// Whether any photo loading is in progress (includes waiting for posts to finish loading).
     var isAnyPhotosLoading: Bool {
-        let internalLoading = photoLoadingState == .loading
+        let galleryLoading = photoLoadingState == .loading
         let externalLoading = externalReviewPhotoLoadingState == .loading
-        return internalLoading || externalLoading
+        return galleryLoading || externalLoading || !postsLoadingFinished
     }
 
     /// Whether all place gallery photos have been loaded.

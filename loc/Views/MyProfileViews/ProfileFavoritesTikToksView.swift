@@ -15,6 +15,7 @@ struct ProfileFavoritesTikToksView: View {
     @ObservedObject var favoritesVM: ProfileFavoritesViewModel
     @ObservedObject var tikTokVM: ProfileTikTokViewModel
     @ObservedObject var reviewsVM: ProfileReviewsViewModel
+    @ObservedObject var myPlacesVM: ProfileMyPlacesViewModel
     @Environment(\.presentationMode) var presentationMode
 
     @State private var showingTikToksPopup = false
@@ -29,8 +30,10 @@ struct ProfileFavoritesTikToksView: View {
             favorites: favoritesVM.lightweightFavorites,
             tiktokPlaces: tikTokVM.lightweightExternalPlaces,
             reviewedPlaces: reviewsVM.lightweightReviewedPlaces,
+            myPlaces: myPlacesVM.lightweightMyPlaces,
             isLoadingTikToks: tikTokVM.isLoadingTikTokPlaces,
-            isLoadingReviews: reviewsVM.isLoadingReviewedPlaces
+            isLoadingReviews: reviewsVM.isLoadingReviewedPlaces,
+            isLoadingMyPlaces: myPlacesVM.isMyPlacesLoading
         )
     }
 
@@ -43,6 +46,7 @@ struct ProfileFavoritesTikToksView: View {
             onFavoritesTap: handleFavoritesTap,
             onTikToksTap: handleTikToksTap,
             onReviewsTap: handleReviewsTap,
+            onMyPlacesTap: handleMyPlacesTap,
             onTikTokHelpTap: { showingHelpSheet = true }
         )
         .sheet(isPresented: $showingTikToksPopup) {
@@ -73,6 +77,12 @@ struct ProfileFavoritesTikToksView: View {
     /// Handles tap on reviews section - navigates to map.
     private func handleReviewsTap() {
         profile.showReviewsOnMap = true
+        presentationMode.wrappedValue.dismiss()
+    }
+
+    /// Handles tap on My Places section - navigates to map.
+    private func handleMyPlacesTap() {
+        profile.showMyPlacesOnMap = true
         presentationMode.wrappedValue.dismiss()
     }
 }

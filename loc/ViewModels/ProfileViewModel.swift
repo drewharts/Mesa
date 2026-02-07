@@ -479,9 +479,10 @@ class ProfileViewModel: ObservableObject {
                 Task {
                     async let tikToksLoad: () = self.loadInitialExternalPlaces()
                     async let reviewsLoad: () = self.loadMyReviewedPlacesWithPagination()
+                    async let myPlacesLoad: () = self.loadInitialMyPlaces()
 
                     // Run in parallel for efficiency
-                    _ = await (tikToksLoad, reviewsLoad)
+                    _ = await (tikToksLoad, reviewsLoad, myPlacesLoad)
                 }
             }
             .store(in: &cancellables)

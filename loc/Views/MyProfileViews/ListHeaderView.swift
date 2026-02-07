@@ -55,6 +55,7 @@ struct ListHeaderView: View {
                     .foregroundColor(.gray)
                         .frame(width: 32, height: 32)
                         .background(Circle().fill(Color(.systemGray5)))
+                        .contentShape(Circle())
                 }
             }
         }
@@ -89,6 +90,7 @@ struct ListHeaderView: View {
                 Capsule()
                     .fill(buttonBackgroundColor)
             )
+            .contentShape(Capsule())
         }
         .disabled(!isFilterEnabled)
     }
@@ -102,6 +104,7 @@ struct ListHeaderView: View {
                 .foregroundColor(isSearching ? .white : .gray)
                 .frame(width: 32, height: 32)
                 .background(Circle().fill(isSearching ? Color.primary : Color(.systemGray5)))
+                .contentShape(Circle())
         }
     }
     

@@ -36,8 +36,10 @@ struct ExternalUserProfileFavoritesReviewsView: View {
             favorites: viewModel.userFavorites,
             tiktokPlaces: [],  // External profiles don't show TikToks tab
             reviewedPlaces: viewModel.lightweightReviewedPlaces,
+            myPlaces: [],  // External profiles don't show My Places tab
             isLoadingTikToks: false,
-            isLoadingReviews: viewModel.isLoadingReviewedPlaces
+            isLoadingReviews: viewModel.isLoadingReviewedPlaces,
+            isLoadingMyPlaces: false
         )
     }
 
@@ -55,6 +57,7 @@ struct ExternalUserProfileFavoritesReviewsView: View {
             onFavoritesTap: { showFavoritesPopup = true },
             onTikToksTap: nil,  // No TikToks tab for external profiles
             onReviewsTap: { showReviewsPopup = true },
+            onMyPlacesTap: nil,  // No My Places tab for external profiles
             onTikTokHelpTap: nil
         )
         .sheet(isPresented: $showFavoritesPopup) {

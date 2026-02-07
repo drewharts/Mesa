@@ -18,6 +18,7 @@ struct ProfilePlacesPreviewGridConfig {
     static let favorites = ProfilePlacesPreviewGridConfig(preferTikTokThumbnail: false, maxItems: 6)
     static let tiktoks = ProfilePlacesPreviewGridConfig(preferTikTokThumbnail: true, maxItems: 6)
     static let reviews = ProfilePlacesPreviewGridConfig(preferTikTokThumbnail: false, maxItems: 6)
+    static let myPlaces = ProfilePlacesPreviewGridConfig(preferTikTokThumbnail: false, maxItems: 6)
 }
 
 /// Shared 3x2 grid for profile preview sections.
@@ -78,6 +79,13 @@ extension ProfilePlacesPreviewGrid where Item == LightweightPlace {
     init(reviewedPlaces: [LightweightPlace]) {
         self.items = reviewedPlaces
         self.config = .reviews
+        self.cardBuilder = { ProfileGridPlaceCard(place: $0, preferTikTokThumbnail: false) }
+    }
+
+    /// Creates a grid for LightweightPlace items showing user-created places.
+    init(myPlaces: [LightweightPlace]) {
+        self.items = myPlaces
+        self.config = .myPlaces
         self.cardBuilder = { ProfileGridPlaceCard(place: $0, preferTikTokThumbnail: false) }
     }
 }

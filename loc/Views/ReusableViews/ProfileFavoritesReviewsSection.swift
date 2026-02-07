@@ -13,11 +13,13 @@ import SwiftUI
 /// Configuration for the profile favorites/reviews section.
 struct ProfileFavoritesReviewsSectionConfig {
     let showTikToksTab: Bool       // true for MyProfile, false for External
+    let showMyPlacesTab: Bool      // true for MyProfile, false for External
     let ownerName: String?         // nil for MyProfile, user's name for External
     let isMyProfile: Bool          // Affects empty state messaging
 
     static let myProfile = ProfileFavoritesReviewsSectionConfig(
         showTikToksTab: true,
+        showMyPlacesTab: true,
         ownerName: nil,
         isMyProfile: true
     )
@@ -25,6 +27,7 @@ struct ProfileFavoritesReviewsSectionConfig {
     static func external(ownerName: String) -> ProfileFavoritesReviewsSectionConfig {
         ProfileFavoritesReviewsSectionConfig(
             showTikToksTab: false,
+            showMyPlacesTab: false,
             ownerName: ownerName,
             isMyProfile: false
         )
@@ -36,8 +39,10 @@ struct ProfileFavoritesReviewsSectionData {
     let favorites: [FavoritePlace]
     let tiktokPlaces: [LightweightPlace]
     let reviewedPlaces: [LightweightPlace]
+    let myPlaces: [LightweightPlace]
     let isLoadingTikToks: Bool
     let isLoadingReviews: Bool
+    let isLoadingMyPlaces: Bool
 }
 
 /// Unified tab section for Favorites, TikToks, and Reviews.
@@ -49,6 +54,7 @@ struct ProfileFavoritesReviewsSection: View {
     let onFavoritesTap: () -> Void
     let onTikToksTap: (() -> Void)?
     let onReviewsTap: () -> Void
+    let onMyPlacesTap: (() -> Void)?
     let onTikTokHelpTap: (() -> Void)?
 
     @State private var selectedTabId: String = "favorites"
@@ -61,6 +67,9 @@ struct ProfileFavoritesReviewsSection: View {
             result.append(.tiktoks)
         }
         result.append(.reviews)
+        if config.showMyPlacesTab {
+            result.append(.myPlaces)
+        }
         return result
     }
 
@@ -83,16 +92,29 @@ struct ProfileFavoritesReviewsSection: View {
 
     @ViewBuilder
     private var contentGrid: some View {
-        Group {
-            switch selectedTabId {
-            case "favorites":
-                favoritesContent
-            case "tiktoks":
+        ZStack(alignment: .top) {
+            favoritesContent
+                .opacity(selectedTabId == "favorites" ? 1 : 0)
+                .allowsHitTesting(selectedTabId == "favorites")
+                .accessibilityHidden(selectedTabId != "favorites")
+
+            if config.showTikToksTab {
                 tiktoksContent
-            case "reviews":
-                reviewsContent
-            default:
-                favoritesContent
+                    .opacity(selectedTabId == "tiktoks" ? 1 : 0)
+                    .allowsHitTesting(selectedTabId == "tiktoks")
+                    .accessibilityHidden(selectedTabId != "tiktoks")
+            }
+
+            reviewsContent
+                .opacity(selectedTabId == "reviews" ? 1 : 0)
+                .allowsHitTesting(selectedTabId == "reviews")
+                .accessibilityHidden(selectedTabId != "reviews")
+
+            if config.showMyPlacesTab {
+                myPlacesContent
+                    .opacity(selectedTabId == "myPlaces" ? 1 : 0)
+                    .allowsHitTesting(selectedTabId == "myPlaces")
+                    .accessibilityHidden(selectedTabId != "myPlaces")
             }
         }
         .padding(.horizontal, 16)
@@ -178,6 +200,35 @@ struct ProfileFavoritesReviewsSection: View {
             message: config.isMyProfile
                 ? "Places you've reviewed will appear here"
                 : "This user hasn't reviewed any places yet"
+        )
+    }
+
+    // MARK: - My Places Content
+
+    /// Displays My Places grid with loading and empty states.
+    @ViewBuilder
+    private var myPlacesContent: some View {
+        Group {
+            if data.isLoadingMyPlaces {
+                loadingState(text: "Loading My Places...")
+            } else if data.myPlaces.isEmpty {
+                emptyMyPlacesState
+            } else {
+                ProfilePlacesPreviewGrid(myPlaces: data.myPlaces)
+            }
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            onMyPlacesTap?()
+        }
+    }
+
+    /// Empty state shown when the user has no created places.
+    private var emptyMyPlacesState: some View {
+        ProfileEmptyState(
+            icon: "mappin.and.ellipse",
+            title: "No places yet",
+            message: "Press and hold on the map to create a place"
         )
     }
 
