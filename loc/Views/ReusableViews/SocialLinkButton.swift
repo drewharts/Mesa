@@ -34,7 +34,7 @@ struct SocialLinkButton: View {
                     Image(systemName: systemFallback)
                 }
             }
-            .frame(width: 24, height: 24)
+            .frame(width: 18, height: 18)
         }
     }
 }

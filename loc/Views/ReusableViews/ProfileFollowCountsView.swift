@@ -134,10 +134,10 @@ struct ProfileFollowCountsView: View {
 
     /// Displays Instagram and TikTok social link icon buttons.
     private var socialLinksSection: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 28) {
             if hasInstagram, let handle = data.instagramUsername {
                 SocialLinkButton(
-                    imageName: "instagram_icon",
+                    imageName: "Instagram_Glyph_Black",
                     systemFallback: "camera",
                     appURL: "instagram://user?username=\(handle)",
                     webURL: "https://instagram.com/\(handle)"
@@ -145,7 +145,7 @@ struct ProfileFollowCountsView: View {
             }
             if hasTikTok, let handle = data.tiktokUsername {
                 SocialLinkButton(
-                    imageName: "tiktok_icon",
+                    imageName: "tiktok",
                     systemFallback: "music.note",
                     appURL: "tiktok://user?username=\(handle)",
                     webURL: "https://tiktok.com/@\(handle)"
