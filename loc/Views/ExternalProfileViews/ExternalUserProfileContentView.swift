@@ -53,12 +53,16 @@ struct ExternalUserProfileContentView: View {
                         .fontWeight(.bold)
                         .foregroundColor(.black)
 
-                    // Clickable Followers/Following counts
+                    // Clickable Followers/Following counts & Social Links
                     ProfileFollowCountsView(
-                        data: .external(followers: viewModel.followers, following: viewModel.followingCount),
+                        data: .external(
+                            followers: viewModel.followers,
+                            following: viewModel.followingCount,
+                            instagramUsername: viewModel.user.instagramUsername,
+                            tiktokUsername: viewModel.user.tiktokUsername
+                        ),
                         onFollowersTap: { showFollowers = true },
-                        onFollowingTap: { showFollowing = true },
-                        onMyPlacesTap: nil
+                        onFollowingTap: { showFollowing = true }
                     )
                 }
                 .padding(.top, -8)

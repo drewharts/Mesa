@@ -290,7 +290,9 @@ struct MainView: View {
             if let listIndex = profileViewModel.listsViewModel.lightweightPlaceLists.firstIndex(where: { $0.id == listId }) {
                 LightweightListPopupView(
                     lists: profileViewModel.listsViewModel.lightweightPlaceLists,
-                    initialListIndex: listIndex
+                    initialListIndex: listIndex,
+                    listsVM: profileViewModel.listsViewModel,
+                    reviewsVM: profileViewModel.reviewsViewModel
                 )
                 .id(listId)
             } else {
@@ -304,7 +306,7 @@ struct MainView: View {
 
     /// TikToks popup sheet content.
     private var tiktoksSheet: some View {
-        TikToksPopupView()
+        TikToksPopupView(tikTokVM: profileViewModel.tikTokViewModel)
             .applyMapPopupEnvironment(from: self)
             .applyMapPopupPresentation()
             .onDisappear { handleMapPopupDisappear() }
@@ -312,7 +314,7 @@ struct MainView: View {
 
     /// Reviews popup sheet content.
     private var reviewsSheet: some View {
-        ReviewsListPopupView()
+        ReviewsListPopupView(reviewsVM: profileViewModel.reviewsViewModel)
             .applyMapPopupEnvironment(from: self)
             .applyMapPopupPresentation()
             .onDisappear { handleMapPopupDisappear() }
@@ -320,7 +322,7 @@ struct MainView: View {
 
     /// Favorites popup sheet content.
     private var favoritesSheet: some View {
-        FavoritesPopupView()
+        FavoritesPopupView(favoritesVM: profileViewModel.favoritesViewModel)
             .applyMapPopupEnvironment(from: self)
             .applyMapPopupPresentation()
             .onDisappear { handleMapPopupDisappear() }
@@ -328,7 +330,7 @@ struct MainView: View {
 
     /// My places popup sheet content.
     private var myPlacesSheet: some View {
-        MyPlacesListView()
+        MyPlacesListView(myPlacesVM: profileViewModel.myPlacesViewModel)
             .applyMapPopupEnvironment(from: self)
             .applyMapPopupPresentation()
             .onDisappear { handleMapPopupDisappear() }

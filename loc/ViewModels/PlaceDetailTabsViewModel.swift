@@ -243,6 +243,14 @@ class PlaceDetailTabsViewModel: ObservableObject {
         self.hasPosts = !posts.isEmpty
         self.postCount = posts.count
 
+        let postsFinished: Bool
+        switch loadingState {
+        case .loaded, .error:
+            postsFinished = true
+        default:
+            postsFinished = false
+        }
+        placePhotosViewModel.setPostsLoadingFinished(postsFinished)
         placePhotosViewModel.setPosts(posts)
         postsViewModel.setPosts(posts)
         postsViewModel.setLoadingState(mapLoadingState(loadingState))

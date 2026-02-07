@@ -29,6 +29,7 @@ struct ProfileTab: Identifiable, Equatable {
     static let favorites = ProfileTab(id: "favorites", title: "Favorites")
     static let tiktoks = ProfileTab(id: "tiktoks", title: "TikToks", showHelpButton: true)
     static let reviews = ProfileTab(id: "reviews", title: "Reviews")
+    static let myPlaces = ProfileTab(id: "myPlaces", title: "My Places")
 }
 
 /// Reusable tab header for profile sections.
@@ -38,7 +39,7 @@ struct ProfileTabHeader: View {
     var onHelpTap: (() -> Void)? = nil
 
     var body: some View {
-        HStack(spacing: 16) {
+        HStack(spacing: 12) {
             ForEach(tabs) { tab in
                 tabButton(for: tab)
             }
@@ -61,6 +62,8 @@ struct ProfileTabHeader: View {
                     .font(.headline)
                     .fontWeight(selectedTabId == tab.id ? .semibold : .regular)
                     .foregroundColor(selectedTabId == tab.id ? .primary : .gray)
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
 
                 // Help button shown only when tab is selected and has showHelpButton enabled
                 if tab.showHelpButton && selectedTabId == tab.id {

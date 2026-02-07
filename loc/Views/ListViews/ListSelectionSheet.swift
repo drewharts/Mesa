@@ -31,11 +31,12 @@ struct ListDescription: View {
 // DUMB Component: Displays list name and place count (or shared info)
 struct LightweightListDescription: View {
     @EnvironmentObject var profile: ProfileViewModel
+    @ObservedObject var listsVM: ProfileListsViewModel
     let list: LightweightPlaceList
 
     // Get total place count from the list (from SQL function)
     private var displayedPlaceCount: Int {
-        return profile.listsViewModel.lightweightPlaceListCounts[list.list_id] ?? list.place_count
+        return listsVM.lightweightPlaceListCounts[list.list_id] ?? list.place_count
     }
     
     private var ownerFirstName: String? {
@@ -72,6 +73,7 @@ struct LightweightListDescription: View {
 struct ListSelectionRowView: View {
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
+    @ObservedObject var listsVM: ProfileListsViewModel
     let list: PlaceList
     let place: DetailPlace
     @State private var backgroundColor: Color = Color(.systemGray5)
@@ -102,7 +104,7 @@ struct ListSelectionRowView: View {
                 Spacer()
 
                 ZStack {
-                    if profile.listsViewModel.userListsPlaces[list.id.uuidString]?.contains(place.id.uuidString) ?? false {
+                    if listsVM.userListsPlaces[list.id.uuidString]?.contains(place.id.uuidString) ?? false {
                         Circle()
                             .fill(Color.primary)
                             .frame(width: 24, height: 24)
@@ -135,12 +137,13 @@ struct LightweightListSelectionRowView: View {
     let place: DetailPlace
     let isInList: Bool
     let onToggle: () -> Void
+    @ObservedObject var listsVM: ProfileListsViewModel
 
     var body: some View {
         Button(action: onToggle) {
             HStack(spacing: 12) {
                 // List info on the left
-                LightweightListDescription(list: list)
+                LightweightListDescription(listsVM: listsVM, list: list)
 
                 Spacer()
 
@@ -245,6 +248,7 @@ private struct InlineCollaboratorAvatars: View {
 struct ListsInSelectionSheet: View {
     @ObservedObject var viewModel: PlaceListSelectionViewModel
     let place: DetailPlace
+    @ObservedObject var listsVM: ProfileListsViewModel
 
     var body: some View {
         ScrollView {
@@ -280,7 +284,8 @@ struct ListsInSelectionSheet: View {
                         isInList: viewModel.isPlace(place, in: list),
                         onToggle: {
                             viewModel.toggle(place: place, in: list)
-                        }
+                        },
+                        listsVM: listsVM
                     )
                         .onAppear {
                             Task {
@@ -328,6 +333,7 @@ struct ListsInSelectionSheet: View {
 struct ListSelectionSheet: View {
     @ObservedObject var viewModel: PlaceListSelectionViewModel
     let place: DetailPlace
+    @ObservedObject var listsVM: ProfileListsViewModel
     @Binding var isPresented: Bool
     @State private var showNewListSheet = false
     @State private var errorMessage: String?
@@ -343,7 +349,7 @@ struct ListSelectionSheet: View {
                 .frame(height: 16)
             
             // List content
-            ListsInSelectionSheet(viewModel: viewModel, place: place)
+            ListsInSelectionSheet(viewModel: viewModel, place: place, listsVM: listsVM)
         }
         .task {
             await viewModel.loadInitialLists(for: place)

@@ -11,9 +11,7 @@ import SwiftUI
 struct TikToksPopupView: View {
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
-
-    /// Convenience accessor for TikTok view model.
-    private var tikTokVM: ProfileTikTokViewModel { profile.tikTokViewModel }
+    @ObservedObject var tikTokVM: ProfileTikTokViewModel
 
     var body: some View {
         PlaceListPopupView(

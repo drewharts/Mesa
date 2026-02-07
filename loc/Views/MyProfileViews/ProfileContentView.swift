@@ -11,7 +11,12 @@ import PhotosUI
 struct ProfileContentView: View {
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var userSession: UserSession
-    @EnvironmentObject var dataManager: DataManager
+    @ObservedObject var socialVM: ProfileSocialViewModel
+    @ObservedObject var myPlacesVM: ProfileMyPlacesViewModel
+    @ObservedObject var favoritesVM: ProfileFavoritesViewModel
+    @ObservedObject var tikTokVM: ProfileTikTokViewModel
+    @ObservedObject var reviewsVM: ProfileReviewsViewModel
+    @ObservedObject var listsVM: ProfileListsViewModel
     @ObservedObject var photoImportVM: PhotoImportViewModel
     @Binding var navigationPath: NavigationPath
     @Environment(\.presentationMode) var presentationMode
@@ -31,31 +36,26 @@ struct ProfileContentView: View {
                         .fontWeight(.bold)
                         .foregroundColor(.black)
 
-                    // Follow Counts
+                    // Follow Counts & Social Links
                     ProfileFollowCountsView(
                         data: .myProfile(
-                            followers: profile.socialViewModel.followersCount,
-                            following: profile.socialViewModel.followingCount,
-                            myPlaces: profile.myPlacesViewModel.myPlaces.count,
-                            isFollowersLoading: profile.socialViewModel.isFollowersLoading,
-                            isFollowingLoading: profile.socialViewModel.isFollowingLoading,
-                            isMyPlacesLoading: profile.myPlacesViewModel.isMyPlacesLoading
+                            followers: socialVM.followersCount,
+                            following: socialVM.followingCount,
+                            isFollowersLoading: socialVM.isFollowersLoading,
+                            isFollowingLoading: socialVM.isFollowingLoading,
+                            instagramUsername: profile.user?.instagramUsername,
+                            tiktokUsername: profile.user?.tiktokUsername
                         ),
                         onFollowersTap: {
                             navigationPath.append(ProfileView.FollowListDestination.followers)
                         },
                         onFollowingTap: {
                             navigationPath.append(ProfileView.FollowListDestination.following)
-                        },
-                        onMyPlacesTap: {
-                            profile.showMyPlacesOnMap = true
-                            presentationMode.wrappedValue.dismiss()
                         }
                     )
                     .onAppear {
-                        let userId = userSession.currentUserId ?? ""
-                        Task.detached(priority: .userInitiated) { [dataManager] in
-                            await dataManager.loadProfileCounts(userId: userId)
+                        Task {
+                            await profile.loadProfileCounts()
                         }
                     }
 
@@ -64,8 +64,13 @@ struct ProfileContentView: View {
                         .padding(.horizontal, 20)
                     
                     // Favorites/TikToks (tabbed) & Lists
-                    ProfileFavoritesTikToksView()
-                    ProfileViewListsView()
+                    ProfileFavoritesTikToksView(
+                        favoritesVM: favoritesVM,
+                        tikTokVM: tikTokVM,
+                        reviewsVM: reviewsVM,
+                        myPlacesVM: myPlacesVM
+                    )
+                    ProfileViewListsView(listsVM: listsVM)
 
                     // No Location Data Error
                     if photoImportVM.noLocationDataError {

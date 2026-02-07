@@ -11,6 +11,14 @@ import UIKit
 import CoreLocation
 
 
+// MARK: - Profile Data Loading State
+enum ProfileDataLoadingState {
+    case idle
+    case loading
+    case loaded
+    case error
+}
+
 // MARK: - List Place Pagination Model
 struct ListPlacePagination {
     var allPlaceIds: [String] = []
@@ -188,6 +196,7 @@ class ProfileViewModel: ObservableObject {
 
      @Published var isLoading: Bool = true
      @Published var isUploadingProfilePhoto: Bool = false
+     @Published var profileCountsLoadingState: ProfileDataLoadingState = .idle
 
      /// Total list count - proxies to listsViewModel
      var totalListCount: Int {
@@ -470,46 +479,30 @@ class ProfileViewModel: ObservableObject {
                 Task {
                     async let tikToksLoad: () = self.loadInitialExternalPlaces()
                     async let reviewsLoad: () = self.loadMyReviewedPlacesWithPagination()
+                    async let myPlacesLoad: () = self.loadInitialMyPlaces()
 
                     // Run in parallel for efficiency
-                    _ = await (tikToksLoad, reviewsLoad)
+                    _ = await (tikToksLoad, reviewsLoad, myPlacesLoad)
                 }
             }
             .store(in: &cancellables)
     }
 
     /// Forwards child ViewModel objectWillChange to parent for SwiftUI observation.
-    /// Required because SwiftUI doesn't automatically observe nested ObservableObjects.
+    /// Only forwards VMs not directly observed by views via @ObservedObject.
+    /// tikTokViewModel is forwarded because ProfileView (profile coordinator) accesses it
+    /// via convenience accessor and receives profile as @EnvironmentObject (not init-injected).
+    /// tikTokVM changes are rare (user-initiated TikTok import) so impact is minimal.
     private func setupChildViewModelObservers() {
-        socialViewModel.objectWillChange.sink { [weak self] _ in
-            self?.objectWillChange.send()
-        }.store(in: &cancellables)
-
         accountViewModel.objectWillChange.sink { [weak self] _ in
             self?.objectWillChange.send()
         }.store(in: &cancellables)
 
-        favoritesViewModel.objectWillChange.sink { [weak self] _ in
-            self?.objectWillChange.send()
-        }.store(in: &cancellables)
-
-        myPlacesViewModel.objectWillChange.sink { [weak self] _ in
-            self?.objectWillChange.send()
-        }.store(in: &cancellables)
-
-        reviewsViewModel.objectWillChange.sink { [weak self] _ in
+        notesViewModel.objectWillChange.sink { [weak self] _ in
             self?.objectWillChange.send()
         }.store(in: &cancellables)
 
         tikTokViewModel.objectWillChange.sink { [weak self] _ in
-            self?.objectWillChange.send()
-        }.store(in: &cancellables)
-
-        listsViewModel.objectWillChange.sink { [weak self] _ in
-            self?.objectWillChange.send()
-        }.store(in: &cancellables)
-
-        notesViewModel.objectWillChange.sink { [weak self] _ in
             self?.objectWillChange.send()
         }.store(in: &cancellables)
     }
@@ -1058,9 +1051,68 @@ class ProfileViewModel: ObservableObject {
         // Note: showFollowError and followErrorMessage are reset via socialViewModel.resetAllData() above
         // Note: showMaxFavoritesAlert is reset via favoritesViewModel.resetAllData() above
 
+        // Reset profile counts loading state
+        profileCountsLoadingState = .idle
+
         print("✅ [ProfileViewModel] All user data cleared")
     }
-    
+
+    // MARK: - Profile Counts Loading
+
+    /// Loads all profile counts, favorites, and place lists in parallel.
+    /// Guards against redundant loads — only fires when state is .idle.
+    func loadProfileCounts() async {
+        guard profileCountsLoadingState == .idle else { return }
+        guard let userId = user?.id ?? userSession.currentUserId else { return }
+
+        profileCountsLoadingState = .loading
+
+        socialViewModel.isFollowersLoading = true
+        socialViewModel.isFollowingLoading = true
+        myPlacesViewModel.isMyPlacesLoading = true
+
+        async let followers: Int = (try? await userService.getNumberFollowers(forUserId: userId)) ?? 0
+        async let following: Int = (try? await userService.getNumberFollowing(forUserId: userId)) ?? 0
+        async let myPlaces: Int = (try? await userService.getNumberMyPlaces(forUserId: userId)) ?? 0
+        async let totalLists: Int = (try? await userService.getTotalListCount(forUserId: userId)) ?? 0
+        async let favorites: [FavoritePlace] = (try? await userService.fetchUserFavorites(userId: userId)) ?? []
+        async let totalUniquePlaces: Int = (try? await userService.getTotalPlacesCount(forUserId: userId)) ?? 0
+
+        let (followersCount, followingCount, myPlacesCount, totalListCount, favoritePlaces, uniquePlacesCount) = await (followers, following, myPlaces, totalLists, favorites, totalUniquePlaces)
+
+        socialViewModel.followersCount = followersCount
+        socialViewModel.followingCount = followingCount
+        listsViewModel.totalListCount = totalListCount
+        totalUniquePlacesCount = uniquePlacesCount
+        myPlacesViewModel.myPlaces = Array(repeating: "", count: myPlacesCount)
+        favoritesViewModel.lightweightFavorites = favoritePlaces
+        socialViewModel.isFollowersLoading = false
+        socialViewModel.isFollowingLoading = false
+        myPlacesViewModel.isMyPlacesLoading = false
+
+        // Update placeSavers for favorites so "Saved By" feature works
+        for favorite in favoritePlaces {
+            let placeId = favorite.place_id
+            if detailPlaceViewModel.placeSavers[placeId] == nil {
+                detailPlaceViewModel.placeSavers[placeId] = [userId]
+            } else if !detailPlaceViewModel.placeSavers[placeId]!.contains(userId) {
+                detailPlaceViewModel.placeSavers[placeId]!.append(userId)
+            }
+        }
+
+        profileCountsLoadingState = .loaded
+
+        // Load lists in background — don't block profile display
+        Task.detached(priority: .userInitiated) { [weak self] in
+            await self?.listsViewModel.loadInitialLists()
+        }
+    }
+
+    /// Resets profile counts loading state to allow a fresh fetch (e.g. pull-to-refresh).
+    func invalidateProfileCounts() {
+        profileCountsLoadingState = .idle
+    }
+
     /// Handles a TikTok notification by processing the URL - delegates to tikTokViewModel.
     func handleTikTokNotification(
         url: String,

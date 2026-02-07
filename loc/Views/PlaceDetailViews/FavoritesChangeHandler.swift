@@ -14,9 +14,7 @@ struct FavoritesChangeHandler: ViewModifier {
 
     @ObservedObject var selectedPlaceVM: SelectedPlaceViewModel
     @ObservedObject var profile: ProfileViewModel
-
-    /// Convenience accessor for favorites view model
-    private var favoritesVM: ProfileFavoritesViewModel { profile.favoritesViewModel }
+    @ObservedObject var favoritesVM: ProfileFavoritesViewModel
 
     func body(content: Content) -> some View {
         content

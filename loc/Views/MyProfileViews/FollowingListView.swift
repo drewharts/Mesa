@@ -14,9 +14,7 @@ struct FollowingListView: View {
     @EnvironmentObject var userSession: UserSession
     @EnvironmentObject var detailPlaceVM: DetailPlaceViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
-
-    /// Convenience accessor for social view model
-    private var socialVM: ProfileSocialViewModel { profile.socialViewModel }
+    @ObservedObject var socialVM: ProfileSocialViewModel
 
     var body: some View {
         VStack {

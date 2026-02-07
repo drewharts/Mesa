@@ -66,12 +66,7 @@ struct TikTokPlaceSelectionView: View {
                                 place: place,
                                 onBookmarkTapped: {
                                     print("🔍 [TikTokPlaceSelectionView] Bookmark tapped for place: \(place.name)")
-                                    // First, ensure the lists are loaded and the loading state is correct.
                                     profile.ensureListsLoaded()
-
-                                    // Now, trigger the sheet.
-                                    print("   - Current userLists count: \(profile.listsViewModel.userLists.count)")
-                                    print("   - Current isLoading state: \(profile.isLoading)")
                                     selectedPlaceForList = place
                                     showingListSelection = true
                                 },
@@ -87,7 +82,8 @@ struct TikTokPlaceSelectionView: View {
                                         selectedPlaceVM.selectPlaceAndFetchDetails(place, shouldAnimateMap: true)
                                         selectedPlaceVM.isDetailSheetPresented = true
                                     }
-                                }
+                                },
+                                listsVM: profile.listsViewModel
                             )
                         }
                     }
@@ -128,6 +124,7 @@ struct TikTokPlaceSelectionView: View {
                 ListSelectionSheet(
                     viewModel: viewModel,
                     place: place,
+                    listsVM: profile.listsViewModel,
                     isPresented: $showingListSelection
                 )
                 .onDisappear {
@@ -153,6 +150,7 @@ struct PlaceRowView: View {
     let onBookmarkTapped: () -> Void
     let onPlaceTapped: () -> Void
     @EnvironmentObject var profile: ProfileViewModel
+    @ObservedObject var listsVM: ProfileListsViewModel
     @State private var isInList: Bool = false
 
     var body: some View {
@@ -234,7 +232,7 @@ struct PlaceRowView: View {
         }
         // ✅ SRP: View observes ViewModel's published state (proper MVVM)
         // Update when list membership changes (reactive to ViewModel state)
-        .onChange(of: profile.listsViewModel.lightweightPlaceListPlaces) { _ in
+        .onChange(of: listsVM.lightweightPlaceListPlaces) { _ in
             Task {
                 isInList = await profile.isPlaceInAnyList(placeId: place.id.uuidString)
             }

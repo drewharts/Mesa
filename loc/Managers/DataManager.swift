@@ -317,14 +317,17 @@ class DataManager: ObservableObject {
                 }
             }
 
-            // Store lightweight places in ProfileViewModel
+            // Store lightweight places in ProfileViewModel (deduplicate by place_id)
             await MainActor.run {
                 if offset == 0 {
-                    // Initial load - replace existing
-                    self.profileViewModel.tikTokViewModel.lightweightExternalPlaces = lightweightPlaces
+                    // Initial load - replace existing, dedup by place_id
+                    var seenIds = Set<String>()
+                    self.profileViewModel.tikTokViewModel.lightweightExternalPlaces = lightweightPlaces.filter { seenIds.insert($0.place_id).inserted }
                 } else {
-                    // Pagination - append new places
-                    self.profileViewModel.tikTokViewModel.lightweightExternalPlaces.append(contentsOf: lightweightPlaces)
+                    // Pagination - append only places not already present
+                    let existingIds = Set(self.profileViewModel.tikTokViewModel.lightweightExternalPlaces.map { $0.place_id })
+                    let newPlaces = lightweightPlaces.filter { !existingIds.contains($0.place_id) }
+                    self.profileViewModel.tikTokViewModel.lightweightExternalPlaces.append(contentsOf: newPlaces)
                 }
 
                 // Update hasMore flag: false if empty or if we got less than a full page
@@ -747,58 +750,6 @@ class DataManager: ObservableObject {
         } catch {
             print("❌ [DataManager] Error loading follower profiles: \(error.localizedDescription)")
             profileViewModel.socialViewModel.isFollowersListLoading = false
-        }
-    }
-    
-    /// FAST: Load all profile counts, favorites, and place lists in parallel (~20-50ms total!)
-    /// Called when profile view appears
-    func loadProfileCounts(userId: String) async {
-
-        profileViewModel.socialViewModel.isFollowersLoading = true
-        profileViewModel.socialViewModel.isFollowingLoading = true
-        profileViewModel.myPlacesViewModel.isMyPlacesLoading = true
-
-        // Get user location for proximity-based list sorting
-        let userLocation = locationManager.currentLocation?.coordinate
-
-        // Run all queries in parallel
-        async let followers: Int = (try? await userService.getNumberFollowers(forUserId: userId)) ?? 0
-        async let following: Int = (try? await userService.getNumberFollowing(forUserId: userId)) ?? 0
-        async let myPlaces: Int = (try? await userService.getNumberMyPlaces(forUserId: userId)) ?? 0
-        async let totalLists: Int = (try? await userService.getTotalListCount(forUserId: userId)) ?? 0
-        async let favorites: [FavoritePlace] = (try? await userService.fetchUserFavorites(userId: userId)) ?? []
-        async let totalUniquePlaces: Int = (try? await userService.getTotalPlacesCount(forUserId: userId)) ?? 0
-
-        let (followersCount, followingCount, myPlacesCount, totalListCount, favoritePlaces, totalUniquePlacesCount) = await (followers, following, myPlaces, totalLists, favorites, totalUniquePlaces)
-
-        // Update counts and favorites immediately - don't wait for place lists
-        await MainActor.run {
-            profileViewModel.socialViewModel.followersCount = followersCount
-            profileViewModel.socialViewModel.followingCount = followingCount
-            profileViewModel.listsViewModel.totalListCount = totalListCount
-            profileViewModel.totalUniquePlacesCount = totalUniquePlacesCount
-            // Update my places count - we'll store this as the count of myPlaces array
-            profileViewModel.myPlacesViewModel.myPlaces = Array(repeating: "", count: myPlacesCount) // Placeholder IDs
-            profileViewModel.favoritesViewModel.lightweightFavorites = favoritePlaces
-            profileViewModel.socialViewModel.isFollowersLoading = false
-            profileViewModel.socialViewModel.isFollowingLoading = false
-            profileViewModel.myPlacesViewModel.isMyPlacesLoading = false
-
-            // Update placeSavers for favorites so "Saved By" feature works
-            for favorite in favoritePlaces {
-                let placeId = favorite.place_id
-                if self.detailPlaceViewModel.placeSavers[placeId] == nil {
-                    self.detailPlaceViewModel.placeSavers[placeId] = [userId]
-                } else if !self.detailPlaceViewModel.placeSavers[placeId]!.contains(userId) {
-                    self.detailPlaceViewModel.placeSavers[placeId]!.append(userId)
-                }
-            }
-        }
-        
-        // Delegate list loading to ProfileListsViewModel (MVVM: ViewModel owns its data loading)
-        // Run in background to not block UI
-        Task.detached(priority: .userInitiated) { [weak self] in
-            await self?.profileViewModel.listsViewModel.loadInitialLists()
         }
     }
     

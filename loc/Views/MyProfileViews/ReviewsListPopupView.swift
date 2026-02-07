@@ -11,9 +11,7 @@ import SwiftUI
 struct ReviewsListPopupView: View {
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
-
-    /// Convenience accessor for reviews view model.
-    private var reviewsVM: ProfileReviewsViewModel { profile.reviewsViewModel }
+    @ObservedObject var reviewsVM: ProfileReviewsViewModel
 
     var body: some View {
         PlaceListPopupView(
@@ -35,7 +33,5 @@ struct ReviewsListPopupView: View {
                 )
             }
         )
-        // ✅ MVVM + SRP: ViewModel automatically loads data when user is set
-        // No manual loading needed - reactive observer handles it
     }
 }
