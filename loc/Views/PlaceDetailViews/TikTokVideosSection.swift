@@ -17,7 +17,7 @@ struct TikTokVideosSection: View {
     let selectedPlace: DetailPlace?
 
     /// Callback when user changes the place association - parent should navigate to new place
-    var onPlaceChanged: ((String) -> Void)?
+    var onPlaceChanged: ((DetailPlace) -> Void)?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -68,9 +68,13 @@ struct TikTokVideosSection: View {
                 
                 // TikTok Place Flagging - shown when TikTok videos are visible
                 if let place = selectedPlace {
-                    TikTokPlaceFlaggingView(place: place, onPlaceChanged: onPlaceChanged)
-                        .environmentObject(profile)
-                        .padding(.top, 15)
+                    TikTokPlaceFlaggingView(
+                        place: place,
+                        externalPlaceId: viewModel.videos.first?.externalPlaceId,
+                        onPlaceChanged: onPlaceChanged
+                    )
+                    .environmentObject(profile)
+                    .padding(.top, 15)
                 }
             }
         }

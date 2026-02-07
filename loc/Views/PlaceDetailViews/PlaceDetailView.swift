@@ -282,8 +282,8 @@ struct PlaceDetailView: View {
     }
 
     /// Handles navigation to a different place (e.g., after TikTok association change).
-    private func handlePlaceNavigation(newPlaceId: String) {
-        selectedPlaceVM.navigateToPlace(placeId: newPlaceId)
+    private func handlePlaceNavigation(_ newPlace: DetailPlace) {
+        selectedPlaceVM.selectPlaceAndFetchDetails(newPlace, shouldAnimateMap: true)
     }
 
     /// Handles list selection sheet dismissal.

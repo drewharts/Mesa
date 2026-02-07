@@ -29,7 +29,7 @@ struct PlaceDetailTabsView: View {
     let onAddReview: () -> Void
 
     /// Callback when user changes a TikTok's place association - parent should navigate to new place
-    var onPlaceChanged: ((String) -> Void)?
+    var onPlaceChanged: ((DetailPlace) -> Void)?
     
     // MARK: - View-Owned Presentation State (Enterprise Pattern)
     // Sheet presentation is a UI concern, owned by View not ViewModel

@@ -141,9 +141,9 @@ struct PlaceDetailViewContent: View {
                         },
                         onAddToList: { showListSelection = true },
                         onAddReview: { showCreatePost = true },
-                        onPlaceChanged: { newPlaceId in
+                        onPlaceChanged: { newPlace in
                             // Navigate to the new place after TikTok association change
-                            selectedPlaceVM.navigateToPlace(placeId: newPlaceId)
+                            selectedPlaceVM.selectPlaceAndFetchDetails(newPlace, shouldAnimateMap: true)
                         }
                     )
                     .environmentObject(userProfileNavigationVM)
