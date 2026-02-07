@@ -385,18 +385,23 @@ class SearchViewModel: ObservableObject {
     
     // MARK: - Public Methods
     
-    /// Handle selection of a place suggestion
+    /// Handles selection of a place suggestion with immediate navigation.
     func selectSuggestion(_ suggestion: MesaPlaceSuggestion) {
-        // Save place to recent selections
         recentSearchesService.savePlace(
             id: suggestion.id,
             name: suggestion.name,
             address: suggestion.address
         )
-        
-        searchService.selectSuggestion(suggestion) { [weak self] result in
-            self?.onPlaceSelected?(result)
-        }
+
+        // Navigate immediately with minimal data - full details fetched in background
+        let minimalPlace = DetailPlace(
+            googlePlaceId: suggestion.id,
+            name: suggestion.name,
+            address: suggestion.address,
+            coordinate: suggestion.coordinate,
+            source: suggestion.source
+        )
+        onPlaceSelected?(minimalPlace)
     }
     
     /// Save a user selection to recent history

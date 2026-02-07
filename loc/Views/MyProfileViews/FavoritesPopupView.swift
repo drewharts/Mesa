@@ -26,8 +26,7 @@ struct FavoritesPopupView: View {
             cardBuilder: { place, navigate in
                 PopupPlaceCard(
                     place: place,
-                    preferTikTokThumbnail: false, // Favorites use review photos
-                    allowDelete: false, // Handled elsewhere
+                    preferTikTokThumbnail: false,
                     onNavigate: navigate
                 )
             }

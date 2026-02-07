@@ -10,9 +10,9 @@ import CoreLocation
 
 struct PlacePhotosView: View {
     @ObservedObject var viewModel: PlacePhotosViewModel
-    
-    let onPhotoTapped: ([UIImage], Int) -> Void
-    
+
+    let onPhotoTapped: ([String], Int) -> Void  // Now passes URLs instead of UIImages
+
     var body: some View {
         VStack(spacing: 16) {
             ScrollView {
@@ -20,41 +20,11 @@ struct PlacePhotosView: View {
                     if viewModel.place != nil {
                         switch viewModel.photoLoadingState {
                         case .idle, .loading:
-                            ProgressView("Loading Photos...")
-                                .frame(maxWidth: .infinity)
-                                .padding()
-                            
+                            photoGalleryContent
+
                         case .loaded:
-                            let allPhotos = viewModel.combinedPhotos
-                            let displayPhotos = Array(allPhotos.prefix(10))
-                            let overflowCount = max(0, allPhotos.count - 10)
+                            photoGalleryContent
 
-                            if !displayPhotos.isEmpty {
-                                ModernPhotoGallery(
-                                    images: displayPhotos,
-                                    onImageTapped: { index in
-                                        // When tapping "+X more" photo, pass all photos to viewer
-                                        onPhotoTapped(allPhotos, index)
-                                    },
-                                    overflowCount: overflowCount,
-                                    allPhotosForViewer: allPhotos,
-                                    photosViewModel: viewModel
-                                )
-                            } else {
-                                // Show empty state when no photos available
-                                VStack(spacing: 16) {
-                                    Image(systemName: "photo.on.rectangle.angled")
-                                        .font(.system(size: 48))
-                                        .foregroundColor(.gray.opacity(0.5))
-
-                                    Text("No photos yet")
-                                        .font(.subheadline)
-                                        .foregroundColor(.gray)
-                                }
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 40)
-                            }
-                            
                         case .error(let error):
                             Text("Failed to load photos: \(error.localizedDescription)")
                                 .frame(maxWidth: .infinity)
@@ -74,19 +44,53 @@ struct PlacePhotosView: View {
             viewModel.loadInitialExternalReviewPhotos()
         }
     }
+
+    // MARK: - Photo Gallery Content
+
+    @ViewBuilder
+    private var photoGalleryContent: some View {
+        let allItems = viewModel.combinedPhotoItems
+        let displayItems = Array(allItems.prefix(10))
+        let overflowCount = max(0, allItems.count - 10)
+
+        if !displayItems.isEmpty {
+            ModernPhotoGallery(
+                items: displayItems,
+                onImageTapped: { index in
+                    let allURLs = viewModel.combinedPhotoURLs
+                    onPhotoTapped(allURLs, index)
+                },
+                overflowCount: overflowCount,
+                photosViewModel: viewModel
+            )
+        } else if viewModel.isAnyPhotosLoading {
+            ProgressView("Loading Photos...")
+                .frame(maxWidth: .infinity)
+                .padding()
+        } else {
+            emptyStateView
+        }
+    }
+
+    // MARK: - Empty State View
+
+    private var emptyStateView: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "photo.on.rectangle.angled")
+                .font(.system(size: 48))
+                .foregroundColor(.gray.opacity(0.5))
+
+            Text("No photos yet")
+                .font(.subheadline)
+                .foregroundColor(.gray)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 40)
+    }
 }
 
 // MARK: - Preview
 #Preview {
-    let services = ServiceContainer.shared
-    let selectedPlaceVM = SelectedPlaceViewModel(
-        locationManager: LocationManager(),
-        postService: services.postService,
-        placeService: services.placeService,
-        userService: services.userService,
-        imageService: services.imageService
-    )
-    
     let photosViewModel = PlacePhotosViewModel()
 
     // Create a mock place with all properties
@@ -103,7 +107,7 @@ struct PlacePhotosView: View {
 
     return PlacePhotosView(
         viewModel: photosViewModel,
-        onPhotoTapped: { photos, index in
+        onPhotoTapped: { urls, index in
             print("Tapped photo at index: \(index)")
         }
     )

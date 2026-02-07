@@ -109,8 +109,6 @@ class ListsLoadingViewModel: ObservableObject {
         // Merge: owned (paginated) + collaborative owned (not in page 1) + shared with me
         let allLists = ownedLists + additionalCollaborativeLists + sharedAsLightweight
 
-        print("📋 [ListsLoadingViewModel] Loaded \(ownedLists.count) owned lists + \(additionalCollaborativeLists.count) additional collaborative owned + \(sharedLists.count) shared lists")
-
         // Update state
         dataVM.lightweightPlaceLists = allLists
         dataVM.placeListsCurrentPage = 1
@@ -126,19 +124,9 @@ class ListsLoadingViewModel: ObservableObject {
     func loadMoreLists() async {
         guard let userId = userSession?.currentUserId,
               let dataVM = dataViewModel else { return }
-        guard !isLoadingMorePlaceLists else {
-            print("⚠️ [ListsLoadingViewModel] Already loading more place lists, skipping")
-            return
-        }
-        guard dataVM.hasMorePlaceLists else {
-            print("ℹ️ [ListsLoadingViewModel] No more place lists to load")
-            return
-        }
-
-        guard let location = locationManager?.currentLocation?.coordinate else {
-            print("⚠️ [ListsLoadingViewModel] No location available for loading more place lists")
-            return
-        }
+        guard !isLoadingMorePlaceLists else { return }
+        guard dataVM.hasMorePlaceLists else { return }
+        guard let location = locationManager?.currentLocation?.coordinate else { return }
 
         isLoadingMorePlaceLists = true
         defer { isLoadingMorePlaceLists = false }
@@ -203,7 +191,6 @@ class ListsLoadingViewModel: ObservableObject {
                 page: 1,
                 pageSize: pageSize
             )
-            print("✅ [ListsLoadingViewModel] Fetched \(lists.count) lists without proximity sorting")
             return lists
         } catch {
             print("❌ [ListsLoadingViewModel] Error fetching lists without location: \(error)")
@@ -265,7 +252,6 @@ class ListsLoadingViewModel: ObservableObject {
             }
         }
 
-        print("📍 [ListsLoadingViewModel] Updated places for \(allPlaces.count) lists")
     }
 
     /// Loads places for a single list.

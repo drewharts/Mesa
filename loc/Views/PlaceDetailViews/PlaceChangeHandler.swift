@@ -3,6 +3,7 @@
 //  loc
 //
 //  ViewModifier that handles place selection changes.
+//  Distinguishes between a new place selection and a data refresh of the same place.
 //  Posts sync is now handled by PlacePostsCacheService subscription in PlaceDetailTabsViewModel.
 //
 
@@ -18,15 +19,28 @@ struct PlaceChangeHandler: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .onChange(of: selectedPlaceVM.selectedPlace) { _, newPlace in
-                handlePlaceChanged(newPlace)
+            .onChange(of: selectedPlaceVM.selectedPlace) { oldPlace, newPlace in
+                if isSamePlaceRefresh(old: oldPlace, new: newPlace) {
+                    tabsViewModel?.refreshPlaceData(newPlace)
+                } else {
+                    handleNewPlaceSelected(newPlace)
+                }
             }
     }
 
     // MARK: - Handler Methods
 
-    /// Handles place selection changes by updating all dependent state.
-    private func handlePlaceChanged(_ newPlace: DetailPlace?) {
+    /// Returns true when the same place is being updated with fresh data (not a new selection).
+    private func isSamePlaceRefresh(old: DetailPlace?, new: DetailPlace?) -> Bool {
+        guard let old = old, let new = new else { return false }
+        if let oldGoogleId = old.googlePlaceId, let newGoogleId = new.googlePlaceId {
+            return oldGoogleId == newGoogleId
+        }
+        return old.id == new.id
+    }
+
+    /// Handles a genuinely new place selection by resetting all dependent state.
+    private func handleNewPlaceSelected(_ newPlace: DetailPlace?) {
         tabsViewModel?.setPlace(newPlace)
 
         guard let place = newPlace else { return }

@@ -54,9 +54,10 @@ class SearchCoordinatorViewModel {
         selectedPlaceVM?.selectPlaceAndFetchDetails(detailPlace, shouldAnimateMap: true)
     }
 
-    /// Presents the place detail sheet (call after dismiss animation starts).
+    /// Presents the place detail sheet immediately with minimal animation.
     func presentPlaceDetail() {
-        selectedPlaceVM?.isDetailSheetPresented = true
+        PresentationService.shared.presentImmediately(.placeDetail)
+        selectedPlaceVM?.selectionState.isDetailSheetPresented = true
     }
     
     /// Handle user selection from search

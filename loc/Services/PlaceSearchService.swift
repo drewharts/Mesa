@@ -57,12 +57,14 @@ class PlaceSearchService {
         }
     }
     
-    /// Select a suggestion to get more details
+    /// Select a suggestion to get full place details
     /// - Parameters:
     ///   - suggestion: The selected suggestion
+    ///   - onError: Optional callback for error handling
     ///   - onResultResolved: Callback with detailed result
     func selectSuggestion(
         _ suggestion: MesaPlaceSuggestion,
+        onError: ErrorCallback? = nil,
         onResultResolved: @escaping DetailCallback
     ) {
         mesaBackendService.fetchPlaceDetails(placeId: suggestion.id, source: suggestion.source) { result in
@@ -73,8 +75,9 @@ class PlaceSearchService {
                 }
             case .failure(let error):
                 print("❌ [PlaceSearchService] fetchPlaceDetails failed: \(error.localizedDescription)")
-                // Error fetching place details - silently handle
-                break
+                DispatchQueue.main.async {
+                    onError?(error.localizedDescription)
+                }
             }
         }
     }

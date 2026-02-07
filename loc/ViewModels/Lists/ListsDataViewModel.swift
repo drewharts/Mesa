@@ -212,11 +212,6 @@ class ListsDataViewModel: ObservableObject {
         let existingIds = Set(lightweightPlaceLists.map { $0.list_id })
         let uniqueNewLists = newLists.filter { !existingIds.contains($0.list_id) }
 
-        let duplicateCount = newLists.count - uniqueNewLists.count
-        if duplicateCount > 0 {
-            print("⚠️ [ListsDataViewModel] Filtered \(duplicateCount) duplicate place lists")
-        }
-
         if !uniqueNewLists.isEmpty {
             lightweightPlaceLists.append(contentsOf: uniqueNewLists)
             placeListsCurrentPage = nextPage

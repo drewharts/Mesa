@@ -15,7 +15,7 @@ CREATE OR REPLACE FUNCTION search_user_place_lists(
 RETURNS TABLE(
     list_id TEXT,
     name TEXT,
-    average_location geometry,
+    average_location TEXT,
     is_public BOOLEAN,
     image TEXT,
     created_at TIMESTAMP WITHOUT TIME ZONE,
@@ -30,10 +30,10 @@ SECURITY DEFINER
 AS $function$
 BEGIN
     RETURN QUERY
-    SELECT 
+    SELECT
         pl.id::TEXT AS list_id,
         pl.name,
-        pl.average_location,
+        ST_AsText(pl.average_location) AS average_location,
         pl.is_public,
         pl.image,
         pl.created_at,

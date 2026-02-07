@@ -12,8 +12,8 @@ struct TikTokPlaceCorrectionSheet: View {
     let placeName: String
     let externalPlaceId: String?
 
-    /// Callback when place is successfully changed - passes new place ID
-    var onPlaceChanged: ((String) -> Void)?
+    /// Callback when place is successfully changed - passes the resolved DetailPlace
+    var onPlaceChanged: ((DetailPlace) -> Void)?
 
     @EnvironmentObject var profile: ProfileViewModel
     @Environment(\.dismiss) var dismiss
@@ -221,6 +221,7 @@ struct TikTokPlaceCorrectionSheet: View {
         )
     }
 
+    /// Selects a suggestion, ensures the place exists in the DB, then updates the TikTok association
     private func selectPlace(_ suggestion: MesaPlaceSuggestion) {
         guard let extPlaceId = externalPlaceId else {
             errorMessage = "Cannot update: missing external place reference"
@@ -231,19 +232,34 @@ struct TikTokPlaceCorrectionSheet: View {
         errorMessage = nil
 
         // Get full place details first
-        searchService.selectSuggestion(suggestion) { detailPlace in
+        searchService.selectSuggestion(
+            suggestion,
+            onError: { error in
+                self.isUpdating = false
+                self.errorMessage = "Failed to load place details: \(error)"
+            }
+        ) { detailPlace in
             Task {
-                let newPlaceId = detailPlace.id.uuidString
-                await profile.updateTikTokPlaceById(
-                    externalPlaceId: extPlaceId,
-                    newPlaceId: newPlaceId,
-                    newPlaceName: detailPlace.name
-                )
-                await MainActor.run {
-                    isUpdating = false
-                    dismiss()
-                    // Notify parent to navigate to the new place
-                    onPlaceChanged?(newPlaceId)
+                do {
+                    // Upsert into places table so the FK constraint is satisfied
+                    try await SupabasePlaceService.shared.ensurePlaceExists(place: detailPlace)
+
+                    let newPlaceId = detailPlace.id.uuidString
+                    await profile.updateTikTokPlaceById(
+                        externalPlaceId: extPlaceId,
+                        newPlaceId: newPlaceId,
+                        newPlaceName: detailPlace.name
+                    )
+                    await MainActor.run {
+                        isUpdating = false
+                        dismiss()
+                        onPlaceChanged?(detailPlace)
+                    }
+                } catch {
+                    await MainActor.run {
+                        isUpdating = false
+                        errorMessage = "Failed to save place: \(error.localizedDescription)"
+                    }
                 }
             }
         }

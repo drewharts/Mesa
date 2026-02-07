@@ -180,7 +180,6 @@ struct ExternalUserLightweightListContentScrollView: View {
                     PopupPlaceCard(
                         place: place,
                         preferTikTokThumbnail: true,
-                        allowDelete: false,
                         onNavigate: onNavigateToPlace
                     )
                 }

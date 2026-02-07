@@ -31,8 +31,7 @@ struct ExternalFavoritesListPopupView: View {
             cardBuilder: { place, navigate in
                 PopupPlaceCard(
                     place: place,
-                    preferTikTokThumbnail: false, // Favorites use review photos
-                    allowDelete: false, // Can't delete other user's favorites
+                    preferTikTokThumbnail: false,
                     onNavigate: navigate
                 )
             }

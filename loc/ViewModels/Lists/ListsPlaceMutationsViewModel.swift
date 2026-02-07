@@ -193,8 +193,13 @@ class ListsPlaceMutationsViewModel: ObservableObject {
 
     // MARK: - Remove Place from List
 
-    /// Remove a place from a lightweight list.
+    /// Remove a place from a lightweight list using a DetailPlace reference.
     func removePlaceFromLightweightList(listId: String, place: DetailPlace, updatedCount: Int? = nil) {
+        removePlaceFromLightweightList(listId: listId, placeId: place.id.uuidString, updatedCount: updatedCount)
+    }
+
+    /// Remove a place from a lightweight list by place ID.
+    func removePlaceFromLightweightList(listId: String, placeId: String, updatedCount: Int? = nil) {
         guard let userId = userSession?.currentUserId,
               let dataVM = dataViewModel else { return }
 
@@ -203,7 +208,7 @@ class ListsPlaceMutationsViewModel: ObservableObject {
         // Update local lightweightPlaceListPlaces
         if var places = dataVM.lightweightPlaceListPlaces[listId] {
             let originalCount = places.count
-            places.removeAll { $0.place_id == place.id.uuidString }
+            places.removeAll { $0.place_id == placeId }
             if places.count != originalCount {
                 didRemove = true
             }
@@ -222,7 +227,7 @@ class ListsPlaceMutationsViewModel: ObservableObject {
         }
 
         // Remove current user as saver
-        onPlaceSaversUpdate?(place.id.uuidString, userId, false)
+        onPlaceSaversUpdate?(placeId, userId, false)
 
         // Recalculate map annotations
         onAnnotationPlacesRecalculate?()
@@ -230,7 +235,7 @@ class ListsPlaceMutationsViewModel: ObservableObject {
         // Persist to Supabase
         Task {
             do {
-                try await SupabaseUserService.shared.removePlaceFromList(listId: listId, placeId: place.id.uuidString)
+                try await SupabaseUserService.shared.removePlaceFromList(listId: listId, placeId: placeId)
             } catch {
                 print("❌ [ListsPlaceMutationsViewModel] Failed to remove place from lightweight list: \(error)")
             }

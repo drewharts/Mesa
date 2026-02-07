@@ -375,7 +375,6 @@ struct ExternalUserListContentScrollView: View {
                         PopupPlaceCard(
                             place: place,
                             preferTikTokThumbnail: true,
-                            allowDelete: false,
                             onNavigate: { placeId in
                                 onNavigateToPlace?(placeId)
                             }

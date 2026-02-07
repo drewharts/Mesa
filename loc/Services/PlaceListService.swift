@@ -55,7 +55,6 @@ class PlaceListService {
                 .execute()
                 .value
             
-            print("✅ [PlaceListService] Fetched \(lists.count) lists (page \(page))")
             return lists
         } catch {
             print("❌ [PlaceListService] Error fetching lists: \(error)")

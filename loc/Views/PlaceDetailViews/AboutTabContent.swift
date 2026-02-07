@@ -17,10 +17,13 @@ struct AboutTabContent: View {
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var userSession: UserSession
     
-    let onPhotoTapped: ([UIImage], Int) -> Void
+    let onPhotoTapped: ([String], Int) -> Void  // URLs instead of UIImages
 
     /// Callback when user changes a TikTok's place association - parent should navigate to new place
-    var onPlaceChanged: ((String) -> Void)?
+    var onPlaceChanged: ((DetailPlace) -> Void)?
+
+    /// Callback to manually refresh place data
+    var onRefresh: (() -> Void)? = nil
 
     // MARK: - View-Owned Presentation State
     @State private var showingNoteSheet = false
@@ -33,7 +36,8 @@ struct AboutTabContent: View {
             if let place = viewModel.place {
                 PlaceInfoSection(
                     place: place,
-                    isDescriptionLoading: viewModel.isDescriptionLoading
+                    isDescriptionLoading: viewModel.isDescriptionLoading,
+                    onRefresh: onRefresh
                 )
             }
             

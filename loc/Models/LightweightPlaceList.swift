@@ -13,8 +13,8 @@ struct LightweightPlaceList: Identifiable {
     let city: String?
 
     // MARK: - Location Field
-    // Raw PostGIS geometry - may be WKT string, hex WKB, or GeoJSON object
-    // Stored as String? but safely decoded to handle non-string types
+    // WKT string from ST_AsText() e.g. "POINT(-73.98 40.76)"
+    // Decoder includes GeoJSON fallback for external API boundary safety
     private let average_location_raw: String?
 
     /// Computed property to parse PostGIS geometry to CLLocationCoordinate2D
@@ -67,8 +67,7 @@ struct LightweightPlaceList: Identifiable {
         return CLLocationCoordinate2D(latitude: lat, longitude: lon)
     }
     
-    // MARK: - Custom Initializer with Defaults
-    // Provides backward compatibility for existing code
+    // MARK: - Memberwise Initializer
     init(
         list_id: String,
         name: String,
@@ -144,10 +143,19 @@ extension LightweightPlaceList: Codable {
         distance_meters = try container.decodeIfPresent(Double.self, forKey: .distance_meters)
         city = try container.decodeIfPresent(String.self, forKey: .city)
 
-        // Safely try to decode average_location as String
-        // PostGIS may return WKT string, hex WKB, or GeoJSON object
-        // Using try? silently returns nil if it's not a decodable String
-        average_location_raw = try? container.decodeIfPresent(String.self, forKey: .average_location)
+        // All RPCs return average_location as WKT text via ST_AsText().
+        // GeoJSON fallback guards against PostgREST returning raw geometry if an RPC omits ST_AsText().
+        do {
+            average_location_raw = try container.decodeIfPresent(String.self, forKey: .average_location)
+        } catch {
+            // Fallback: parse GeoJSON dictionary and convert to WKT
+            if let geoJSON = try? container.decodeIfPresent(GeoJSONPoint.self, forKey: .average_location),
+               geoJSON.coordinates.count >= 2 {
+                average_location_raw = "POINT(\(geoJSON.coordinates[0]) \(geoJSON.coordinates[1]))"
+            } else {
+                average_location_raw = nil
+            }
+        }
 
         // Collaboration fields
         collaborator_count = try container.decodeIfPresent(Int.self, forKey: .collaborator_count)
@@ -156,6 +164,12 @@ extension LightweightPlaceList: Codable {
         owner_photo_url = try container.decodeIfPresent(String.self, forKey: .owner_photo_url)
         user_role = try container.decodeIfPresent(String.self, forKey: .user_role)
         collaborator_photos = try container.decodeIfPresent([String].self, forKey: .collaborator_photos)
+    }
+
+    /// Small Decodable for parsing PostGIS GeoJSON format: {"type":"Point","coordinates":[lon,lat]}
+    private struct GeoJSONPoint: Decodable {
+        let type: String
+        let coordinates: [Double]
     }
 
     func encode(to encoder: Encoder) throws {

@@ -777,7 +777,6 @@ class DataManager: ObservableObject {
             profileViewModel.socialViewModel.followingCount = followingCount
             profileViewModel.listsViewModel.totalListCount = totalListCount
             profileViewModel.totalUniquePlacesCount = totalUniquePlacesCount
-            print("🔢 [DataManager] Set totalUniquePlacesCount = \(totalUniquePlacesCount)")
             // Update my places count - we'll store this as the count of myPlaces array
             profileViewModel.myPlacesViewModel.myPlaces = Array(repeating: "", count: myPlacesCount) // Placeholder IDs
             profileViewModel.favoritesViewModel.lightweightFavorites = favoritePlaces
@@ -794,7 +793,6 @@ class DataManager: ObservableObject {
                     self.detailPlaceViewModel.placeSavers[placeId]!.append(userId)
                 }
             }
-            print("📍 [DataManager] Updated placeSavers with \(favoritePlaces.count) favorites")
         }
         
         // Delegate list loading to ProfileListsViewModel (MVVM: ViewModel owns its data loading)

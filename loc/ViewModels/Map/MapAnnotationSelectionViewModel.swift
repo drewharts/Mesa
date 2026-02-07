@@ -16,8 +16,13 @@ class MapAnnotationSelectionViewModel: ObservableObject {
     // MARK: - Annotation Preservation
 
     /// Sets a preserved annotation from a DetailPlace so it remains visible during zoom out.
+    /// Clears the annotation if the place has no valid coordinates (nil or 0,0).
+    /// Valid coordinates may arrive later via a fresh details fetch, at which point
+    /// the shouldAnimateMapToPlace observer will re-call this method.
     func setPreservedAnnotation(for place: DetailPlace?) {
-        guard let place = place, let coord = place.coordinate else {
+        guard let place = place,
+              let coord = place.coordinate,
+              coord.isValidForNavigation else {
             preservedSelectedAnnotation = nil
             return
         }

@@ -533,7 +533,6 @@ class SupabaseUserService: ObservableObject {
         // Convert lat/lng to PostGIS POINT geometry in EWKT format with SRID
         // Use SRID 4326 (WGS84) for GPS coordinates
         let userLocation = "SRID=4326;POINT(\(userLongitude) \(userLatitude))"
-        print("📍 [Supabase] Using PostGIS POINT: \(userLocation)")
         
         let params = Params(
             p_user_id: userId,
@@ -548,17 +547,9 @@ class SupabaseUserService: ObservableObject {
                 .execute()
                 .value
             
-            print("✅ [Supabase] Fetched \(lists.count) place lists")
-            if lists.count > 0 {
-                print("   First list: \(lists[0].name) (ID: \(lists[0].list_id), distance: \(lists[0].distance_meters ?? 0)m)")
-            } else {
-                print("⚠️ [Supabase] No place lists found for user \(userId)")
-            }
-            
             return lists
         } catch {
-            print("❌ [Supabase] Error fetching place lists: \(error)")
-            print("   Error details: \(error.localizedDescription)")
+            print("❌ [Supabase] Error fetching place lists: \(error.localizedDescription)")
             throw error
         }
     }
@@ -578,7 +569,6 @@ class SupabaseUserService: ObservableObject {
                 .execute()
                 .value
             
-            print("✅ [Supabase] Fetched place list by ID: \(listId), found: \(lists.first?.name ?? "nil")")
             return lists.first
         } catch {
             print("❌ [Supabase] Error fetching place list by ID: \(error)")
@@ -601,6 +591,7 @@ class SupabaseUserService: ObservableObject {
             let image: String?
             let created_at: String?
             let updated_at: String?
+            let average_location: String?
             let place_list_items: [PlaceListItemCount]
         }
 
@@ -614,6 +605,7 @@ class SupabaseUserService: ObservableObject {
                 image,
                 created_at,
                 updated_at,
+                average_location::text,
                 place_list_items(count)
             """)
             .eq("user_id", value: userId)
@@ -621,8 +613,6 @@ class SupabaseUserService: ObservableObject {
             .range(from: (page - 1) * pageSize, to: page * pageSize - 1)
             .execute()
             .value
-
-        print("✅ [Supabase] Fetched \(response.count) lists without proximity sorting")
 
         return response.map { record in
             LightweightPlaceList(
@@ -634,11 +624,12 @@ class SupabaseUserService: ObservableObject {
                 updated_at: record.updated_at,
                 distance_meters: nil,
                 place_count: record.place_list_items.first?.count ?? 0,
-                city: nil
+                city: nil,
+                average_location_raw: record.average_location
             )
         }
     }
-    
+
     /// Search place lists by name with pagination (server-side filtering)
     func searchPlaceLists(userId: String, query: String, page: Int = 1, pageSize: Int = 20) async throws -> [LightweightPlaceList] {
         struct SearchListRecord: Codable {
@@ -648,12 +639,13 @@ class SupabaseUserService: ObservableObject {
             let image: String?
             let created_at: String?
             let updated_at: String?
+            let average_location: String?
         }
-        
+
         // Fetch matching lists from database
         let response: [SearchListRecord] = try await supabase.client
             .from("place_lists")
-            .select("id, name, is_public, image, created_at, updated_at")
+            .select("id, name, is_public, image, created_at, updated_at, average_location::text")
             .eq("user_id", value: userId)
             .ilike("name", pattern: "%\(query)%")
             .order("name", ascending: true)
@@ -672,7 +664,8 @@ class SupabaseUserService: ObservableObject {
                 updated_at: record.updated_at ?? ISO8601DateFormatter().string(from: Date()),
                 distance_meters: nil,
                 place_count: 0,
-                city: nil
+                city: nil,
+                average_location_raw: record.average_location
             )
         }
     }

@@ -105,12 +105,6 @@ struct ProfilePictureView: View {
                 placesCountBadge
             }
         }
-        .onAppear {
-            print("🔢 [ProfilePictureView] totalUniquePlacesCount = \(profile.totalUniquePlacesCount)")
-        }
-        .onChange(of: profile.totalUniquePlacesCount) { oldValue, newValue in
-            print("🔢 [ProfilePictureView] totalUniquePlacesCount changed: \(oldValue) -> \(newValue)")
-        }
         .sheet(isPresented: $showingImagePicker) {
             ImagePicker(images: $inputImage, selectionLimit: 1)
         }

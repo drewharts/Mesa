@@ -31,11 +31,15 @@ struct TikToksPopupView: View {
                 PopupPlaceCard(
                     place: place,
                     preferTikTokThumbnail: true,
-                    allowDelete: true,
-                    deleteTitle: "Delete TikTok Place",
-                    onDelete: { profile.deleteTikTokPlace(place) },
                     onNavigate: navigate
                 )
+                .contextMenu {
+                    Button(role: .destructive) {
+                        profile.deleteTikTokPlace(place)
+                    } label: {
+                        Label("Delete TikTok Place", systemImage: "trash")
+                    }
+                }
             }
         )
         .onAppear {
