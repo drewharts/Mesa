@@ -601,6 +601,7 @@ class SupabaseUserService: ObservableObject {
             let image: String?
             let created_at: String?
             let updated_at: String?
+            let average_location: String?
             let place_list_items: [PlaceListItemCount]
         }
 
@@ -614,6 +615,7 @@ class SupabaseUserService: ObservableObject {
                 image,
                 created_at,
                 updated_at,
+                average_location::text,
                 place_list_items(count)
             """)
             .eq("user_id", value: userId)
@@ -634,11 +636,12 @@ class SupabaseUserService: ObservableObject {
                 updated_at: record.updated_at,
                 distance_meters: nil,
                 place_count: record.place_list_items.first?.count ?? 0,
-                city: nil
+                city: nil,
+                average_location_raw: record.average_location
             )
         }
     }
-    
+
     /// Search place lists by name with pagination (server-side filtering)
     func searchPlaceLists(userId: String, query: String, page: Int = 1, pageSize: Int = 20) async throws -> [LightweightPlaceList] {
         struct SearchListRecord: Codable {
@@ -648,12 +651,13 @@ class SupabaseUserService: ObservableObject {
             let image: String?
             let created_at: String?
             let updated_at: String?
+            let average_location: String?
         }
-        
+
         // Fetch matching lists from database
         let response: [SearchListRecord] = try await supabase.client
             .from("place_lists")
-            .select("id, name, is_public, image, created_at, updated_at")
+            .select("id, name, is_public, image, created_at, updated_at, average_location::text")
             .eq("user_id", value: userId)
             .ilike("name", pattern: "%\(query)%")
             .order("name", ascending: true)
@@ -672,7 +676,8 @@ class SupabaseUserService: ObservableObject {
                 updated_at: record.updated_at ?? ISO8601DateFormatter().string(from: Date()),
                 distance_meters: nil,
                 place_count: 0,
-                city: nil
+                city: nil,
+                average_location_raw: record.average_location
             )
         }
     }
