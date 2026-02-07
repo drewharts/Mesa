@@ -10,7 +10,7 @@ import SwiftUI
 struct PlacePostView: View {
     let post: PlacePost
     @ObservedObject var viewModel: PlacePostsViewModel
-    let onPhotoTapped: ([UIImage], Int) -> Void
+    let onPhotoTapped: ([String], Int) -> Void  // URLs instead of UIImages
     
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var profile: ProfileViewModel
@@ -163,7 +163,7 @@ struct PlacePostView: View {
                                 .clipShape(RoundedRectangle(cornerRadius: 10))
                                 .shadow(radius: 2)
                                 .onTapGesture {
-                                    onPhotoTapped(postPhotos, index)
+                                    onPhotoTapped(post.images, index)
                                 }
                                 .onAppear {
                                     if index == postPhotos.count - 1 {

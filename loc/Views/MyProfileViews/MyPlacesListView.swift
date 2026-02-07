@@ -29,12 +29,16 @@ struct MyPlacesListView: View {
             cardBuilder: { place, navigate in
                 PopupPlaceCard(
                     place: place,
-                    preferTikTokThumbnail: true,  // Prefer TikTok thumbnail for visual consistency
-                    allowDelete: true,
-                    deleteTitle: "Delete Place",
-                    onDelete: { profile.deleteMyPlace(place) },
+                    preferTikTokThumbnail: true,
                     onNavigate: navigate
                 )
+                .contextMenu {
+                    Button(role: .destructive) {
+                        profile.deleteMyPlace(place)
+                    } label: {
+                        Label("Delete Place", systemImage: "trash")
+                    }
+                }
             }
         )
         .onAppear {

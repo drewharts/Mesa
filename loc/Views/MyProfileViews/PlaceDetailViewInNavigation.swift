@@ -108,7 +108,7 @@ struct PlaceDetailViewContent: View {
 
     @State private var selectedImageIndex: Int?
     @State private var showPhotoGallery = false
-    @State private var galleryPhotos: [UIImage] = []
+    @State private var galleryPhotoURLs: [String] = []
     @State private var galleryPresentationCount = 0
     @State private var showNoPhoneNumberAlert = false
     @State private var showListSelection = false
@@ -133,17 +133,17 @@ struct PlaceDetailViewContent: View {
                     PlaceDetailTabsView(
                         viewModel: tabsViewModel,
                         showNoPhoneNumberAlert: $showNoPhoneNumberAlert,
-                        onPhotoTapped: { photos, index in
-                            galleryPhotos = photos
+                        onPhotoTapped: { photoURLs, index in
+                            galleryPhotoURLs = photoURLs
                             selectedImageIndex = index
                             galleryPresentationCount += 1
                             showPhotoGallery = true
                         },
                         onAddToList: { showListSelection = true },
                         onAddReview: { showCreatePost = true },
-                        onPlaceChanged: { newPlaceId in
+                        onPlaceChanged: { newPlace in
                             // Navigate to the new place after TikTok association change
-                            selectedPlaceVM.navigateToPlace(placeId: newPlaceId)
+                            selectedPlaceVM.selectPlaceAndFetchDetails(newPlace, shouldAnimateMap: true)
                         }
                     )
                     .environmentObject(userProfileNavigationVM)
@@ -227,7 +227,7 @@ struct PlaceDetailViewContent: View {
             // Photo Gallery Overlay (Pinterest-style) - fills entire sheet
             if showPhotoGallery, let selectedIndex = selectedImageIndex {
                 PinterestPhotoGalleryView(
-                    photos: galleryPhotos,
+                    photoURLs: galleryPhotoURLs,
                     initialIndex: selectedIndex,
                     isPresented: $showPhotoGallery
                 )

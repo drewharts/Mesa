@@ -51,7 +51,7 @@ class SupabaseAuthService: ObservableObject {
             case .tokenRefreshed:
                 if let session = state.session {
                     self.session = session
-                    print("🔄 [SupabaseAuth] Token refreshed")
+                    // Token refreshed silently
                 }
                 
             default:

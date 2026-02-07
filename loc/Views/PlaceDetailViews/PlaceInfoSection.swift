@@ -11,6 +11,7 @@ import SwiftUI
 struct PlaceInfoSection: View {
     let place: DetailPlace
     let isDescriptionLoading: Bool
+    var onRefresh: (() -> Void)? = nil
 
     @State private var showingMenu = false
     @State private var showingWebsite = false
@@ -63,6 +64,15 @@ struct PlaceInfoSection: View {
                             Text("(\(count.formatted()) reviews)")
                                 .font(.subheadline)
                                 .foregroundColor(.gray)
+                        }
+
+                        if let onRefresh {
+                            Button(action: onRefresh) {
+                                Image(systemName: "arrow.clockwise")
+                                    .font(.caption)
+                                    .foregroundColor(.gray.opacity(0.5))
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
                 }

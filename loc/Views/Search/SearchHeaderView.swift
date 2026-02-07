@@ -44,16 +44,19 @@ struct SearchHeaderView: View {
                 .focused($isFocused)
 
             if !searchText.isEmpty {
-                Button(action: { searchText = "" }) {
+                Button {
+                    searchText = ""
+                } label: {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundColor(.gray)
-                        .font(.system(size: 16))
+                        .font(.system(size: 16, weight: .medium))
                 }
+                .buttonStyle(.plain)
             }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
-        .background(Color(UIColor.systemGray6))
+        .background(Color(.systemGray6))
         .cornerRadius(12)
     }
 

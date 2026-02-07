@@ -151,7 +151,6 @@ class ImageService {
             if let image = UIImage(data: data) {
                 return image
             } else {
-                print("⚠️ [ImageService] Failed to create UIImage from data for \(imageUrl)")
                 return nil
             }
         } catch {

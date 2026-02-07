@@ -22,14 +22,14 @@ struct PlaceDetailTabsView: View {
     @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
 
     @Binding var showNoPhoneNumberAlert: Bool
-    let onPhotoTapped: ([UIImage], Int) -> Void
+    let onPhotoTapped: ([String], Int) -> Void  // URLs instead of UIImages
     
     // MARK: - Action Callbacks (passed from parent)
     let onAddToList: () -> Void
     let onAddReview: () -> Void
 
     /// Callback when user changes a TikTok's place association - parent should navigate to new place
-    var onPlaceChanged: ((String) -> Void)?
+    var onPlaceChanged: ((DetailPlace) -> Void)?
     
     // MARK: - View-Owned Presentation State (Enterprise Pattern)
     // Sheet presentation is a UI concern, owned by View not ViewModel
@@ -128,7 +128,7 @@ struct PlaceDetailTabsView: View {
                     .foregroundColor(.gray)
                     .frame(width: 32, height: 32)
             }
-            
+
             Button(action: viewModel.sharePlace) {
                 Image(systemName: "square.and.arrow.up")
                     .font(.title3)
@@ -243,7 +243,8 @@ struct PlaceDetailTabsView: View {
             AboutTabContent(
                 viewModel: viewModel.aboutTabViewModel,
                 onPhotoTapped: onPhotoTapped,
-                onPlaceChanged: onPlaceChanged
+                onPlaceChanged: onPlaceChanged,
+                onRefresh: viewModel.manualRefresh
             )
             .environmentObject(profile)
             .environmentObject(userSession)

@@ -268,6 +268,21 @@ class PlaceDetailTabsViewModel: ObservableObject {
 
     // MARK: - Data-Driven Updates (Called by View via .onChange)
 
+    /// Updates place metadata without resetting child ViewModel state.
+    /// Called when the same place gets updated with fresh backend data (e.g. placeholder → real UUID).
+    func refreshPlaceData(_ place: DetailPlace?) {
+        handlePlaceChanged(place)
+        openStatusViewModel.setPlace(place)
+        aboutTabViewModel.setPlace(place)
+
+        // If photos weren't loaded yet (placeholder UUID was skipped), load now with the real UUID
+        if let place = place, placePhotosViewModel.externalPhotoItems.isEmpty,
+           !place.hasPlaceholderID {
+            placePhotosViewModel.setPlace(place)
+            placeSaversViewModel.setPlace(place.id.uuidString)
+        }
+    }
+
     /// Called by View when selected place changes.
     func setPlace(_ place: DetailPlace?) {
         // Setting currentPlace triggers the reactive subscription automatically
@@ -349,6 +364,18 @@ class PlaceDetailTabsViewModel: ObservableObject {
             print("❌ [PlaceDetailTabsVM] Error checking place list membership: \(error)")
             // On error, default to false (don't show bookmark as filled)
             isPlaceInList = false
+        }
+    }
+
+    /// Manually refreshes all place data (posts, photos, savers, list membership).
+    func manualRefresh() {
+        guard let place = currentPlace else { return }
+        let placeId = place.id.uuidString
+        postsCacheService.loadPosts(forPlaceId: placeId)
+        placePhotosViewModel.setPlace(place)
+        placeSaversViewModel.setPlace(placeId)
+        Task {
+            await checkPlaceListMembership(place: place)
         }
     }
 

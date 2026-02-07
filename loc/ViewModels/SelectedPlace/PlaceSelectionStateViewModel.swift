@@ -49,17 +49,23 @@ class PlaceSelectionStateViewModel: ObservableObject {
     /// Selects a place that already has complete data.
     /// Use this when selecting from map annotations where data was already fetched from backend.
     func selectPlace(_ place: DetailPlace, shouldAnimateMap: Bool = true) {
-        shouldAnimateMapToPlace = shouldAnimateMap
+        // Set selectedPlace FIRST so coordinate is available when onChange observer fires
         selectedPlace = place
+        // Only animate if we have valid coordinates (not 0,0)
+        let hasValidCoordinates = place.coordinate?.isValidForNavigation == true
+        shouldAnimateMapToPlace = shouldAnimateMap && hasValidCoordinates
         onPlaceSelected?(place)
     }
 
     /// Selects a place and triggers a fresh details fetch from backend.
     /// Use this when selecting from search results or other sources with potentially stale data.
     func selectPlaceAndFetchDetails(_ place: DetailPlace, shouldAnimateMap: Bool = true) {
-        shouldAnimateMapToPlace = shouldAnimateMap
-        isFetchingFreshDetails = true
+        // Set selectedPlace FIRST so coordinate is available when onChange observer fires
         selectedPlace = place
+        isFetchingFreshDetails = true
+        // Only animate if we have valid coordinates; otherwise wait for fresh details
+        let hasValidCoordinates = place.coordinate?.isValidForNavigation == true
+        shouldAnimateMapToPlace = shouldAnimateMap && hasValidCoordinates
         onPlaceSelected?(place)
         onFetchFreshDetails?(place)
     }

@@ -32,8 +32,7 @@ struct ExternalReviewsListPopupView: View {
             cardBuilder: { place, navigate in
                 PopupPlaceCard(
                     place: place,
-                    preferTikTokThumbnail: false, // Reviews prioritize review photos
-                    allowDelete: false, // Can't delete other user's reviews
+                    preferTikTokThumbnail: false,
                     onNavigate: navigate
                 )
             }

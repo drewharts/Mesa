@@ -10,17 +10,13 @@ import SwiftUI
 /// Displays a tappable row that allows users to correct place detection for TikTok videos.
 struct TikTokPlaceFlaggingView: View {
     let place: DetailPlace
+    let externalPlaceId: String?
     @EnvironmentObject var profile: ProfileViewModel
 
     @State private var showingPlaceCorrectionSheet = false
 
     /// Callback when user changes the place association - parent should navigate to new place.
-    var onPlaceChanged: ((String) -> Void)?
-
-    /// Returns the external place ID needed for place correction.
-    private var externalPlaceId: String? {
-        profile.getExternalPlace(for: place.id.uuidString)?.id
-    }
+    var onPlaceChanged: ((DetailPlace) -> Void)?
 
     var body: some View {
         Button(action: {
@@ -48,9 +44,9 @@ struct TikTokPlaceFlaggingView: View {
                 placeId: place.id.uuidString,
                 placeName: place.name,
                 externalPlaceId: externalPlaceId,
-                onPlaceChanged: { newPlaceId in
-                    profile.recordPlaceCorrectionFlag(for: place.id.uuidString, newPlaceId: newPlaceId)
-                    onPlaceChanged?(newPlaceId)
+                onPlaceChanged: { newPlace in
+                    profile.recordPlaceCorrectionFlag(for: place.id.uuidString, newPlaceId: newPlace.id.uuidString)
+                    onPlaceChanged?(newPlace)
                 }
             )
             .environmentObject(profile)

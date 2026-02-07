@@ -74,6 +74,7 @@ struct SharedListInfo: Codable, Identifiable {
     let image: String?
     let placeCount: Int
     let city: String?
+    let averageLocation: String?
     let ownerId: String
     let ownerName: String?
     let ownerPhotoUrl: String?
@@ -91,6 +92,7 @@ struct SharedListInfo: Codable, Identifiable {
         case image
         case placeCount = "place_count"
         case city
+        case averageLocation = "average_location"
         case ownerId = "owner_id"
         case ownerName = "owner_name"
         case ownerPhotoUrl = "owner_photo_url"
@@ -99,11 +101,11 @@ struct SharedListInfo: Codable, Identifiable {
         case collaboratorPhotos = "collaborator_photos"
         case collaboratorCount = "collaborator_count"
     }
-    
+
     var collaboratorRole: CollaboratorRole {
         CollaboratorRole(rawValue: userRole) ?? .editor
     }
-    
+
     /// Convert to LightweightPlaceList for unified display
     func toLightweightPlaceList() -> LightweightPlaceList {
         return LightweightPlaceList(
@@ -116,6 +118,7 @@ struct SharedListInfo: Codable, Identifiable {
             distance_meters: nil,
             place_count: placeCount,
             city: city,
+            average_location_raw: averageLocation,
             collaborator_count: collaboratorCount,
             is_shared: true,
             owner_name: ownerName,
@@ -136,11 +139,12 @@ struct CollaborativeOwnedList: Codable, Identifiable {
     let image: String?
     let placeCount: Int
     let city: String?
+    let averageLocation: String?
     let collaboratorPhotos: [String]?
     let collaboratorCount: Int
-    
+
     var id: String { listId }
-    
+
     enum CodingKeys: String, CodingKey {
         case listId = "list_id"
         case name
@@ -148,10 +152,11 @@ struct CollaborativeOwnedList: Codable, Identifiable {
         case image
         case placeCount = "place_count"
         case city
+        case averageLocation = "average_location"
         case collaboratorPhotos = "collaborator_photos"
         case collaboratorCount = "collaborator_count"
     }
-    
+
     /// Convert to LightweightPlaceList for unified display
     /// Note: is_shared = false because user OWNS this list (they shared it with others)
     func toLightweightPlaceList() -> LightweightPlaceList {
@@ -165,6 +170,7 @@ struct CollaborativeOwnedList: Codable, Identifiable {
             distance_meters: nil,
             place_count: placeCount,
             city: city,
+            average_location_raw: averageLocation,
             collaborator_count: collaboratorCount,
             is_shared: false, // User owns this list
             owner_name: nil,  // User is the owner

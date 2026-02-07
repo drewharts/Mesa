@@ -78,7 +78,6 @@ class CollaborationService {
             .execute()
             .value
         
-        print("✅ [CollaborationService] Fetched \(lists.count) shared lists for user")
         return lists
         } catch {
             print("❌ [CollaborationService] Failed to fetch shared lists: \(error)")
@@ -97,7 +96,6 @@ class CollaborationService {
                 .execute()
                 .value
             
-            print("✅ [CollaborationService] Fetched \(lists.count) collaborative owned lists for user")
             return lists
         } catch {
             print("❌ [CollaborationService] Failed to fetch collaborative owned lists: \(error)")

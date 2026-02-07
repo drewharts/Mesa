@@ -13,18 +13,20 @@ RETURNS TABLE (
     image TEXT,
     place_count BIGINT,
     city TEXT,
+    average_location TEXT,
     collaborator_photos TEXT[],
     collaborator_count BIGINT
 ) AS $$
 BEGIN
     RETURN QUERY
-    SELECT 
+    SELECT
         pl.id AS list_id,
         pl.name,
         pl.is_public,
         pl.image AS image,
         (SELECT COUNT(*) FROM place_list_items pli WHERE pli.list_id = pl.id) AS place_count,
         NULL::TEXT AS city,
+        ST_AsText(pl.average_location) AS average_location,
         -- Get array of collaborator profile photos (limit to 5)
         (
             SELECT ARRAY_AGG(collab_user.profile_photo_url)

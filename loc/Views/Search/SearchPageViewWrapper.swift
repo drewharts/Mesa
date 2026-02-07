@@ -91,15 +91,15 @@ private struct SearchPageViewContent: View {
                 }
 
                 viewModel.onPlaceSelected = { place in
-                    // Start map animation immediately (runs parallel to search dismiss)
+                    // Set the place and start map animation FIRST (before any dismiss)
                     searchCoordinator.prepareMapForPlace(place)
+                    searchCoordinator.presentPlaceDetail()
 
-                    // Dismiss search page
-                    showSearchPage = false
-
-                    // Present detail sheet after dismiss animation starts (avoids iOS sheet conflict)
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                        searchCoordinator.presentPlaceDetail()
+                    // Then dismiss search (no animation)
+                    var transaction = Transaction()
+                    transaction.disablesAnimations = true
+                    withTransaction(transaction) {
+                        showSearchPage = false
                     }
                 }
 

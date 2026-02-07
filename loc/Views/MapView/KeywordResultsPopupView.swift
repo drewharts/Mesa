@@ -47,7 +47,6 @@ struct KeywordResultsPopupView: View {
                 PopupPlaceCard(
                     place: place,
                     preferTikTokThumbnail: false,
-                    allowDelete: false,
                     onNavigate: navigate
                 )
             }

@@ -353,13 +353,13 @@ class UserService: ObservableObject {
         }
     }
     
-    // Helper method to process direct external places response (from your table structure)
+    /// Converts raw external places response rows into ExternalPlace models
     private func processDirectExternalPlacesResponse(_ externalPlacesResponse: [ExternalPlaceDirectResponse]) async throws -> [ExternalPlace] {
         let externalPlaces = externalPlacesResponse.compactMap { response -> ExternalPlace? in
-            // Use joined place data from places table
-            guard let placeData = response.places else {
-                print("⚠️ [UserService] No place data found for external place \(response.id)")
-                return nil
+            // Use joined place data when available, fall back to defaults when place is missing
+            let placeData = response.places
+            if placeData == nil {
+                print("⚠️ [UserService] No place data found for external place \(response.id) — using fallback values")
             }
 
             // Coordinates are not critical for TikTok lookups - use defaults
@@ -368,21 +368,21 @@ class UserService: ObservableObject {
                 latitude: 0.0,
                 longitude: 0.0
             )
-            
+
             let externalPlace = ExternalPlace(
                 id: response.id,
                 addedAt: response.addedAt ?? Date(),
-                address: placeData.address ?? "",
+                address: placeData?.address ?? "",
                 coordinates: coordinates,
-                name: placeData.name ?? "Unknown Place",
+                name: placeData?.name ?? "Unknown Place",
                 placeId: response.placeId ?? response.id,
                 source: response.source ?? "unknown",
                 url: response.url // Store URL only - TikTok metadata fetched on-demand via oEmbed
             )
-            
+
             return externalPlace
         }
-        
+
         return externalPlaces
     }
     
