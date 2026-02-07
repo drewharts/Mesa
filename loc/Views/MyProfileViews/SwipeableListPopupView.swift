@@ -12,17 +12,22 @@ struct SwipeableListPopupView: View {
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
-    
+
+    @ObservedObject var listsVM: ProfileListsViewModel
+    @ObservedObject var reviewsVM: ProfileReviewsViewModel
+
     @StateObject private var viewModel: SwipeableListPopupViewModel
     @Binding var placeColors: [UUID: Color]
-    
+
     private let lists: [PlaceList]
     private let initialListIndex: Int
-    
-    init(lists: [PlaceList], initialListIndex: Int, placeColors: Binding<[UUID: Color]>) {
+
+    init(lists: [PlaceList], initialListIndex: Int, placeColors: Binding<[UUID: Color]>, listsVM: ProfileListsViewModel, reviewsVM: ProfileReviewsViewModel) {
         self.lists = lists
         self.initialListIndex = initialListIndex
         self._placeColors = placeColors
+        self.listsVM = listsVM
+        self.reviewsVM = reviewsVM
         self._viewModel = StateObject(wrappedValue: SwipeableListPopupViewModel(
             lists: lists,
             initialListIndex: initialListIndex
@@ -41,7 +46,7 @@ struct SwipeableListPopupView: View {
                 
                 TabView(selection: $viewModel.currentListIndex) {
                     ForEach(viewModel.lists.indices, id: \.self) { index in
-                        ListPlacesPopUpListView(list: viewModel.lists[index])
+                        ListPlacesPopUpListView(list: viewModel.lists[index], listsVM: listsVM, reviewsVM: reviewsVM)
                             .tag(index)
                     }
                 }
@@ -123,17 +128,3 @@ struct SwipeableListPopupHeaderView: View {
     }
 }
 
-// Preview
-struct SwipeableListPopupView_Previews: PreviewProvider {
-    static var previews: some View {
-        SwipeableListPopupView(
-            lists: [
-                PlaceList(name: "Restaurants", places: [], city: "NYC", emoji: ""),
-                PlaceList(name: "Coffee Shops", places: [], city: "SF", emoji: ""),
-                PlaceList(name: "Bars", places: [], city: "LA", emoji: "")
-            ],
-            initialListIndex: 0,
-            placeColors: .constant([:])
-        )
-    }
-}

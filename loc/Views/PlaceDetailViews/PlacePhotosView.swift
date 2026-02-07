@@ -64,11 +64,29 @@ struct PlacePhotosView: View {
                 photosViewModel: viewModel
             )
         } else if viewModel.isAnyPhotosLoading {
-            ProgressView("Loading Photos...")
-                .frame(maxWidth: .infinity)
-                .padding()
+            photoShimmerPlaceholder
         } else {
             emptyStateView
+        }
+    }
+
+    // MARK: - Shimmer Placeholder
+
+    /// Shimmer placeholder matching the ModernPhotoGallery layout (hero + double row).
+    private var photoShimmerPlaceholder: some View {
+        VStack(spacing: 8) {
+            ShimmerView()
+                .frame(height: 200)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+
+            HStack(spacing: 8) {
+                ShimmerView()
+                    .aspectRatio(5/4, contentMode: .fill)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                ShimmerView()
+                    .aspectRatio(5/4, contentMode: .fill)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+            }
         }
     }
 

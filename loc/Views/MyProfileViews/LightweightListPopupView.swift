@@ -21,6 +21,9 @@ struct LightweightListPopupView: View {
     let lists: [LightweightPlaceList]
     let initialListIndex: Int
 
+    @ObservedObject var listsVM: ProfileListsViewModel
+    @ObservedObject var reviewsVM: ProfileReviewsViewModel
+
     @State private var currentListIndex: Int
     @State private var showOnlyUnvisited: Bool = false
     @State private var showCollaboratorsSheet: Bool = false
@@ -28,24 +31,22 @@ struct LightweightListPopupView: View {
     @State private var showAddPlaceSheet: Bool = false
     @State private var navigationPath = NavigationPath() // Navigation path for place detail navigation
 
-    /// Convenience accessor for reviews view model.
-    private var reviewsVM: ProfileReviewsViewModel { profile.reviewsViewModel }
-
-    /// Convenience accessor for lists view model.
-    private var listsVM: ProfileListsViewModel { profile.listsViewModel }
-
     // Convenience initializer for single list (backward compatibility)
-    init(list: LightweightPlaceList, places: [LightweightPlace] = []) {
+    init(list: LightweightPlaceList, listsVM: ProfileListsViewModel, reviewsVM: ProfileReviewsViewModel, places: [LightweightPlace] = []) {
         self.lists = [list]
         self.initialListIndex = 0
         self._currentListIndex = State(initialValue: 0)
+        self.listsVM = listsVM
+        self.reviewsVM = reviewsVM
     }
 
     // Initializer for multiple lists with swiping
-    init(lists: [LightweightPlaceList], initialListIndex: Int) {
+    init(lists: [LightweightPlaceList], initialListIndex: Int, listsVM: ProfileListsViewModel, reviewsVM: ProfileReviewsViewModel) {
         self.lists = lists
         self.initialListIndex = initialListIndex
         self._currentListIndex = State(initialValue: initialListIndex)
+        self.listsVM = listsVM
+        self.reviewsVM = reviewsVM
     }
 
     // Current list being displayed (uses passed lists, not profile.lightweightPlaceLists for filtered support)
@@ -260,7 +261,9 @@ struct LightweightListPopupView: View {
                 },
                 onRemovePlace: { placeId in
                     profile.removePlaceFromLightweightList(listId: listId, placeId: placeId)
-                }
+                },
+                listsVM: listsVM,
+                reviewsVM: reviewsVM
             )
         }
         .frame(maxWidth: .infinity, alignment: .top)
@@ -290,13 +293,8 @@ struct ListContentView: View {
     let onNavigateToPlace: ((String) -> Void)?
     let onRemovePlace: ((String) -> Void)?
 
-    @EnvironmentObject var profile: ProfileViewModel
-
-    /// Convenience accessor for reviews view model.
-    private var reviewsVM: ProfileReviewsViewModel { profile.reviewsViewModel }
-
-    /// Convenience accessor for lists view model.
-    private var listsVM: ProfileListsViewModel { profile.listsViewModel }
+    @ObservedObject var listsVM: ProfileListsViewModel
+    @ObservedObject var reviewsVM: ProfileReviewsViewModel
 
     // Grid layout matching ProfileView lists (consistent spacing)
     private let columns = [
@@ -464,22 +462,3 @@ private struct CollaboratorAvatarsButton: View {
 }
 
 // MARK: - Block Horizontal Swipe Modifier
-
-// Preview
-struct LightweightListPopupView_Previews: PreviewProvider {
-    static var previews: some View {
-        LightweightListPopupView(
-            list: LightweightPlaceList(
-                list_id: "test-id",
-                name: "Test List",
-                is_public: true,
-                image: nil,
-                created_at: "2025-01-20",
-                updated_at: "2025-01-20",
-                distance_meters: 100.0,
-                place_count: 5,
-                city: "Test City"
-            )
-        )
-    }
-}

@@ -20,6 +20,8 @@ struct ProfileData: Codable, Identifiable, Hashable {
     var fcmToken: String?
     var firebaseUid: String?
     var supabaseUid: String?
+    var instagramUsername: String?
+    var tiktokUsername: String?
 
     // Map camelCase properties to snake_case database columns
     enum CodingKeys: String, CodingKey {
@@ -34,5 +36,7 @@ struct ProfileData: Codable, Identifiable, Hashable {
         case fcmToken = "fcm_token"
         case firebaseUid = "firebase_uid"
         case supabaseUid = "supabase_uid"
+        case instagramUsername = "instagram_username"
+        case tiktokUsername = "tiktok_username"
     }
 }

@@ -73,7 +73,7 @@ struct ProfileView: View {
                     Group {
                         switch destination {
                         case .followers:
-                            FollowersListView()
+                            FollowersListView(socialVM: profile.socialViewModel)
                                 .environmentObject(profile)
                                 .environmentObject(userProfileNavigationViewModel)
                                 .environmentObject(dataManager)
@@ -81,7 +81,7 @@ struct ProfileView: View {
                                 .environmentObject(placeVM)
                                 .environmentObject(selectedPlaceVM)
                         case .following:
-                            FollowingListView()
+                            FollowingListView(socialVM: profile.socialViewModel)
                                 .environmentObject(profile)
                                 .environmentObject(userProfileNavigationViewModel)
                                 .environmentObject(dataManager)
@@ -96,6 +96,7 @@ struct ProfileView: View {
                 photoImportVM: photoImportVM,
                 profile: profile,
                 placeVM: placeVM,
+                tikTokVM: profile.tikTokViewModel,
                 showCreatePost: $showCreatePost,
                 postWasSubmitted: $postWasSubmitted
             ))
@@ -144,7 +145,16 @@ struct ProfileView: View {
     private var mainContent: some View {
         ZStack {
             // Main Content
-            ProfileContentView(photoImportVM: photoImportVM, navigationPath: $navigationPath)
+            ProfileContentView(
+                socialVM: profile.socialViewModel,
+                myPlacesVM: profile.myPlacesViewModel,
+                favoritesVM: profile.favoritesViewModel,
+                tikTokVM: profile.tikTokViewModel,
+                reviewsVM: profile.reviewsViewModel,
+                listsVM: profile.listsViewModel,
+                photoImportVM: photoImportVM,
+                navigationPath: $navigationPath
+            )
             
             // TikTok Processing Overlay
             if tikTokVM.isProcessingTikTok || tikTokVM.isWaitingForPlaceDetail || deepLinkViewModel.isProcessingDeepLink {
@@ -289,14 +299,12 @@ struct SheetsModifier: ViewModifier {
     @ObservedObject var photoImportVM: PhotoImportViewModel
     @ObservedObject var profile: ProfileViewModel
     @ObservedObject var placeVM: DetailPlaceViewModel
+    @ObservedObject var tikTokVM: ProfileTikTokViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @Binding var showCreatePost: Bool
     @EnvironmentObject var userSession: UserSession
     @EnvironmentObject var dataManager: DataManager
     @Binding var postWasSubmitted: Bool
-
-    /// Convenience accessor for TikTok view model.
-    private var tikTokVM: ProfileTikTokViewModel { profile.tikTokViewModel }
 
     func body(content: Content) -> some View {
         content

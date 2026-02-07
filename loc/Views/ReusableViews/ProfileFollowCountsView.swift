@@ -2,10 +2,10 @@
 //  ProfileFollowCountsView.swift
 //  loc
 //
-//  Created by Claude on 1/27/25.
-//
 //  Unified follow counts view that works for both current user profile and external profiles.
-//  Uses closures for navigation to support different navigation patterns.
+//  Displays follower/following counts and optional social link icons.
+//
+//  Single Responsibility: Display follow counts and social link icons with consistent styling.
 //
 
 import SwiftUI
@@ -14,20 +14,25 @@ import SwiftUI
 struct ProfileFollowCountsData {
     let followersCount: Int
     let followingCount: Int
-    let myPlacesCount: Int?
     let isFollowersLoading: Bool
     let isFollowingLoading: Bool
-    let isMyPlacesLoading: Bool
+    let instagramUsername: String?
+    let tiktokUsername: String?
 
-    /// Creates data for external profiles (no My Places).
-    static func external(followers: Int, following: Int) -> ProfileFollowCountsData {
+    /// Creates data for external profiles.
+    static func external(
+        followers: Int,
+        following: Int,
+        instagramUsername: String?,
+        tiktokUsername: String?
+    ) -> ProfileFollowCountsData {
         ProfileFollowCountsData(
             followersCount: followers,
             followingCount: following,
-            myPlacesCount: nil,
             isFollowersLoading: false,
             isFollowingLoading: false,
-            isMyPlacesLoading: false
+            instagramUsername: instagramUsername,
+            tiktokUsername: tiktokUsername
         )
     }
 
@@ -35,43 +40,55 @@ struct ProfileFollowCountsData {
     static func myProfile(
         followers: Int,
         following: Int,
-        myPlaces: Int,
         isFollowersLoading: Bool,
         isFollowingLoading: Bool,
-        isMyPlacesLoading: Bool
+        instagramUsername: String?,
+        tiktokUsername: String?
     ) -> ProfileFollowCountsData {
         ProfileFollowCountsData(
             followersCount: followers,
             followingCount: following,
-            myPlacesCount: myPlaces,
             isFollowersLoading: isFollowersLoading,
             isFollowingLoading: isFollowingLoading,
-            isMyPlacesLoading: isMyPlacesLoading
+            instagramUsername: instagramUsername,
+            tiktokUsername: tiktokUsername
         )
     }
 }
 
-/// Displays clickable follower, following, and optionally My Places counts.
+/// Displays clickable follower/following counts and social link icons.
 struct ProfileFollowCountsView: View {
     let data: ProfileFollowCountsData
     let onFollowersTap: () -> Void
     let onFollowingTap: () -> Void
-    let onMyPlacesTap: (() -> Void)?
 
     @State private var refreshToggle = false
+
+    /// Whether the user has a non-empty Instagram username.
+    private var hasInstagram: Bool {
+        guard let handle = data.instagramUsername else { return false }
+        return !handle.trimmingCharacters(in: .whitespaces).isEmpty
+    }
+
+    /// Whether the user has a non-empty TikTok username.
+    private var hasTikTok: Bool {
+        guard let handle = data.tiktokUsername else { return false }
+        return !handle.trimmingCharacters(in: .whitespaces).isEmpty
+    }
 
     var body: some View {
         HStack(spacing: 24) {
             followersButton
             followingButton
 
-            if let myPlacesCount = data.myPlacesCount {
-                myPlacesButton(count: myPlacesCount)
+            if hasInstagram || hasTikTok {
+                socialLinksSection
             }
         }
         .padding(.vertical, 10)
     }
 
+    /// Displays the followers count with loading state.
     private var followersButton: some View {
         Button(action: onFollowersTap) {
             VStack {
@@ -92,6 +109,7 @@ struct ProfileFollowCountsView: View {
         }
     }
 
+    /// Displays the following count with loading state.
     private var followingButton: some View {
         Button(action: onFollowingTap) {
             VStack {
@@ -112,23 +130,26 @@ struct ProfileFollowCountsView: View {
         }
     }
 
-    /// Creates the My Places button for current user profile.
-    private func myPlacesButton(count: Int) -> some View {
-        Button(action: { onMyPlacesTap?() }) {
-            VStack {
-                if data.isMyPlacesLoading {
-                    ProgressView()
-                        .frame(width: 20, height: 20)
-                } else {
-                    Text("\(count)")
-                        .font(.headline)
-                        .foregroundColor(.black)
-                        .fontWeight(.regular)
-                        .id("myPlaces_\(refreshToggle)")
-                }
-                Text("My Places")
-                    .font(.caption)
-                    .foregroundColor(.gray)
+    // MARK: - Social Links
+
+    /// Displays Instagram and TikTok social link icon buttons.
+    private var socialLinksSection: some View {
+        HStack(spacing: 28) {
+            if hasInstagram, let handle = data.instagramUsername {
+                SocialLinkButton(
+                    imageName: "Instagram_Glyph_Black",
+                    systemFallback: "camera",
+                    appURL: "instagram://user?username=\(handle)",
+                    webURL: "https://instagram.com/\(handle)"
+                )
+            }
+            if hasTikTok, let handle = data.tiktokUsername {
+                SocialLinkButton(
+                    imageName: "tiktok",
+                    systemFallback: "music.note",
+                    appURL: "tiktok://user?username=\(handle)",
+                    webURL: "https://tiktok.com/@\(handle)"
+                )
             }
         }
     }

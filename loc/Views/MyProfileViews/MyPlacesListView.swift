@@ -10,9 +10,7 @@ import SwiftUI
 struct MyPlacesListView: View {
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
-
-    /// Convenience accessor for my places view model
-    private var myPlacesVM: ProfileMyPlacesViewModel { profile.myPlacesViewModel }
+    @ObservedObject var myPlacesVM: ProfileMyPlacesViewModel
 
     var body: some View {
         PlaceListPopupView(

@@ -105,8 +105,7 @@ struct ProfileGridPlaceCard: View {
     }
 
     private var coloredPlaceholder: some View {
-        Rectangle()
-            .foregroundColor(placeColor)
+        ShimmerView()
             .frame(maxWidth: .infinity, maxHeight: height)
     }
 

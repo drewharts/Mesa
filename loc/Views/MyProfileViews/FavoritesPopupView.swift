@@ -11,13 +11,14 @@ import SwiftUI
 struct FavoritesPopupView: View {
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
+    @ObservedObject var favoritesVM: ProfileFavoritesViewModel
 
     var body: some View {
         PlaceListPopupView(
             title: "Favorites",
             isLoading: false, // Favorites are loaded with profile
             isLoadingMore: false, // No pagination for favorites
-            places: profile.favoritesViewModel.favoritesAsLightweight,
+            places: favoritesVM.favoritesAsLightweight,
             hasMore: false, // No pagination for favorites
             emptyIcon: "heart",
             emptyTitle: "No Favorites Yet",

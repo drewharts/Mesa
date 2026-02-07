@@ -59,13 +59,21 @@ struct ProfilePictureView: View {
                         .clipShape(Circle())
                         .shadow(radius: 4)
                 } else {
-                    Image(systemName: "person.crop.circle.fill")
-                        .resizable()
-                        .scaledToFit()
-                        .foregroundColor(.blue)
-                        .frame(width: profileSize, height: profileSize)
-                        .clipShape(Circle())
-                        .shadow(radius: 4)
+                    ZStack(alignment: .bottomTrailing) {
+                        Image(systemName: "person.crop.circle.fill")
+                            .resizable()
+                            .scaledToFit()
+                            .foregroundColor(.blue)
+                            .frame(width: profileSize, height: profileSize)
+                            .clipShape(Circle())
+                            .shadow(radius: 4)
+
+                        Image(systemName: "plus.circle.fill")
+                            .font(.system(size: 24))
+                            .foregroundColor(.blue)
+                            .background(Circle().fill(.white).frame(width: 20, height: 20))
+                            .offset(x: -4, y: -4)
+                    }
                 }
             }
             .onTapGesture {

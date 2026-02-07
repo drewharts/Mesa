@@ -84,12 +84,14 @@ struct PlaceDetailView: View {
         .modifier(FavoritesChangeHandler(
             tabsViewModel: $tabsViewModel,
             selectedPlaceVM: selectedPlaceVM,
-            profile: profile
+            profile: profile,
+            favoritesVM: profile.favoritesViewModel
         ))
         .modifier(TikTokChangeHandler(
             tabsViewModel: $tabsViewModel,
             selectedPlaceVM: selectedPlaceVM,
-            profile: profile
+            profile: profile,
+            tikTokVM: profile.tikTokViewModel
         ))
     }
 
@@ -215,6 +217,7 @@ struct PlaceDetailView: View {
             ListSelectionSheet(
                 viewModel: viewModel,
                 place: selectedPlace,
+                listsVM: profile.listsViewModel,
                 isPresented: $showListSelection
             )
         } else {

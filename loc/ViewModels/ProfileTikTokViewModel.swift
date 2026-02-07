@@ -175,7 +175,11 @@ class ProfileTikTokViewModel: ObservableObject {
                 }
             }
 
-            lightweightExternalPlaces = lightweightPlaces
+            // Deduplicate by place_id (safety net in case SQL returns duplicates)
+            var seenIds = Set<String>()
+            let uniquePlaces = lightweightPlaces.filter { seenIds.insert($0.place_id).inserted }
+
+            lightweightExternalPlaces = uniquePlaces
             totalExternalPlacesCount = totalCount
             hasMoreExternalPlaces = !lightweightPlaces.isEmpty && lightweightPlaces.count >= 8
         } catch {
@@ -247,7 +251,11 @@ class ProfileTikTokViewModel: ObservableObject {
             let lightweightPlaces = try await placesTask
             let totalCount = (try? await countTask) ?? 0
 
-            lightweightExternalPlaces = lightweightPlaces
+            // Deduplicate by place_id (safety net in case SQL returns duplicates)
+            var seenIds = Set<String>()
+            let uniquePlaces = lightweightPlaces.filter { seenIds.insert($0.place_id).inserted }
+
+            lightweightExternalPlaces = uniquePlaces
             totalExternalPlacesCount = totalCount
             hasMoreExternalPlaces = !lightweightPlaces.isEmpty && lightweightPlaces.count >= 8
         } catch {

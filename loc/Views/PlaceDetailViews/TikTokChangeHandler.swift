@@ -14,9 +14,7 @@ struct TikTokChangeHandler: ViewModifier {
 
     @ObservedObject var selectedPlaceVM: SelectedPlaceViewModel
     @ObservedObject var profile: ProfileViewModel
-
-    /// Convenience accessor for TikTok view model.
-    private var tikTokVM: ProfileTikTokViewModel { profile.tikTokViewModel }
+    @ObservedObject var tikTokVM: ProfileTikTokViewModel
 
     func body(content: Content) -> some View {
         content

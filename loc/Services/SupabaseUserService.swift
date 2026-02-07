@@ -793,7 +793,9 @@ class SupabaseUserService: ObservableObject {
             phoneNumber: record.phone_number ?? "",
             fullNameLower: fullName.lowercased(),
             fullName: fullName,
-            fcmToken: record.fcm_token
+            fcmToken: record.fcm_token,
+            instagramUsername: record.instagram_username,
+            tiktokUsername: record.tiktok_username
         )
     }
 
@@ -809,7 +811,9 @@ class SupabaseUserService: ObservableObject {
             fullName: record.full_name,
             fcmToken: record.fcm_token,
             firebaseUid: nil,
-            supabaseUid: record.supabase_uid
+            supabaseUid: record.supabase_uid,
+            instagramUsername: record.instagram_username,
+            tiktokUsername: record.tiktok_username
         )
     }
 
@@ -1009,6 +1013,8 @@ struct ProfileDataRecord: Codable {
     let phone_number: String?
     let full_name: String
     let fcm_token: String?
+    let instagram_username: String?
+    let tiktok_username: String?
 }
 
 /// Response type for following/followers RPC calls - handles nullable database fields
@@ -1024,6 +1030,8 @@ private struct FollowingProfileRecord: Codable {
     let fcm_token: String?
     let created_at: String?       // Returned by DB but not needed
     let supabase_uid: String?
+    let instagram_username: String?
+    let tiktok_username: String?
 }
 
 /// Lightweight favorite place data for display

@@ -186,12 +186,7 @@ struct PopupPlaceCard: View {
     }
     
     private var loadingPlaceholder: some View {
-        Color.gray.opacity(0.3)
-            .overlay(
-                ProgressView()
-                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                    .scaleEffect(0.8)
-            )
+        ShimmerView()
     }
 }
 
