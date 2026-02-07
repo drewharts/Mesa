@@ -195,7 +195,6 @@ class DetailPlaceViewModel: ObservableObject {
                     } else if let images = images, !images.isEmpty {
                         self.placeImages[placeId] = images[0]
                     } else {
-                        print("⚠️ [DetailPlaceViewModel] No images found in place's photoUrls for \(placeId)")
                         self.placeImages[placeId] = UIImage()
                     }
                     // Mark loading as complete

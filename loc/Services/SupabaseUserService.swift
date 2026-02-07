@@ -533,7 +533,6 @@ class SupabaseUserService: ObservableObject {
         // Convert lat/lng to PostGIS POINT geometry in EWKT format with SRID
         // Use SRID 4326 (WGS84) for GPS coordinates
         let userLocation = "SRID=4326;POINT(\(userLongitude) \(userLatitude))"
-        print("📍 [Supabase] Using PostGIS POINT: \(userLocation)")
         
         let params = Params(
             p_user_id: userId,
@@ -548,17 +547,9 @@ class SupabaseUserService: ObservableObject {
                 .execute()
                 .value
             
-            print("✅ [Supabase] Fetched \(lists.count) place lists")
-            if lists.count > 0 {
-                print("   First list: \(lists[0].name) (ID: \(lists[0].list_id), distance: \(lists[0].distance_meters ?? 0)m)")
-            } else {
-                print("⚠️ [Supabase] No place lists found for user \(userId)")
-            }
-            
             return lists
         } catch {
-            print("❌ [Supabase] Error fetching place lists: \(error)")
-            print("   Error details: \(error.localizedDescription)")
+            print("❌ [Supabase] Error fetching place lists: \(error.localizedDescription)")
             throw error
         }
     }
@@ -578,7 +569,6 @@ class SupabaseUserService: ObservableObject {
                 .execute()
                 .value
             
-            print("✅ [Supabase] Fetched place list by ID: \(listId), found: \(lists.first?.name ?? "nil")")
             return lists.first
         } catch {
             print("❌ [Supabase] Error fetching place list by ID: \(error)")
@@ -623,8 +613,6 @@ class SupabaseUserService: ObservableObject {
             .range(from: (page - 1) * pageSize, to: page * pageSize - 1)
             .execute()
             .value
-
-        print("✅ [Supabase] Fetched \(response.count) lists without proximity sorting")
 
         return response.map { record in
             LightweightPlaceList(

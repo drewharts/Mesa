@@ -56,17 +56,9 @@ class ListPopupPaginationViewModel: ObservableObject {
 
     /// Loads more places for a list if conditions are met.
     func loadMoreIfNeeded(for listId: String) {
-        print("📄 [ListPopupPaginationViewModel] loadMoreIfNeeded called for list \(listId)")
+        guard listsVM != nil else { return }
 
-        // Ensure dependencies are set
-        guard listsVM != nil else {
-            print("⚠️ [ListPopupPaginationViewModel] listsVM not set, skipping load")
-            return
-        }
-
-        // Initialize state if needed (don't return early)
         if paginationStates[listId] == nil {
-            print("📄 [ListPopupPaginationViewModel] Initializing state for list \(listId)")
             initializeStateIfNeeded(for: listId)
         }
 
@@ -74,16 +66,11 @@ class ListPopupPaginationViewModel: ObservableObject {
 
         guard state.hasMorePlaces, !state.isLoadingMore else {
             if state.isLoadingMore {
-                print("📄 [ListPopupPaginationViewModel] Already loading, marking pending request")
                 state.pendingLoadRequest = true
                 paginationStates[listId] = state
-            } else {
-                print("📄 [ListPopupPaginationViewModel] No more places to load (hasMorePlaces=\(state.hasMorePlaces))")
             }
             return
         }
-
-        print("📄 [ListPopupPaginationViewModel] Starting load for page \(state.currentPage + 1)")
 
         state.isLoadingMore = true
         state.pendingLoadRequest = false
@@ -138,12 +125,9 @@ class ListPopupPaginationViewModel: ObservableObject {
     /// Performs the actual load more operation.
     private func performLoadMore(for listId: String, nextPage: Int) async {
         guard let listsVM = listsVM else {
-            print("⚠️ [ListPopupPaginationViewModel] listsVM is nil in performLoadMore")
             updateState(for: listId) { state in state.isLoadingMore = false }
             return
         }
-
-        print("📄 [ListPopupPaginationViewModel] Loading page \(nextPage) for list \(listId)")
 
         do {
             let morePlaces = try await listsVM.loadMorePlacesForList(
@@ -152,12 +136,7 @@ class ListPopupPaginationViewModel: ObservableObject {
                 pageSize: 6
             )
 
-            print("📄 [ListPopupPaginationViewModel] Loaded \(morePlaces.count) more places for list \(listId)")
-
             listsVM.appendPlacesForList(listId: listId, newPlaces: morePlaces)
-
-            let totalPlaces = listsVM.lightweightPlaceListPlaces[listId]?.count ?? 0
-            print("📄 [ListPopupPaginationViewModel] Total places now: \(totalPlaces)")
 
             updateState(for: listId) { state in
                 state.currentPage = nextPage
