@@ -604,6 +604,7 @@ class ProfileTikTokViewModel: ObservableObject {
                 videos.append(video)
             } else {
                 let videoId = extractVideoIdFromTikTokURL(url) ?? UUID().uuidString
+                let detectedContentType = url.contains("/photo/") ? "photo" : "video"
                 var basicVideo = TikTokVideo(
                     videoID: videoId,
                     url: url,
@@ -613,7 +614,8 @@ class ProfileTikTokViewModel: ObservableObject {
                     thumbnailURL: "",
                     author: TikTokAuthor(displayName: "", url: "", username: ""),
                     hashtags: [],
-                    createdAt: ISO8601DateFormatter().string(from: Date())
+                    createdAt: ISO8601DateFormatter().string(from: Date()),
+                    contentType: detectedContentType
                 )
                 basicVideo.savedByUserId = currentUserId
                 basicVideo.externalPlaceId = externalPlace.id

@@ -313,6 +313,7 @@ class SupabasePostService: ObservableObject {
                 username: ""
             )
 
+            let detectedContentType = videoUrl.contains("/photo/") ? "photo" : "video"
             var video = TikTokVideo(
                 videoID: videoId,
                 url: videoUrl,
@@ -322,7 +323,8 @@ class SupabasePostService: ObservableObject {
                 thumbnailURL: "", // Fetched on-demand via TikTokMetadataCache
                 author: author,
                 hashtags: [],
-                createdAt: dict["added_at"] as? String ?? ""
+                createdAt: dict["added_at"] as? String ?? "",
+                contentType: detectedContentType
             )
 
             // Attach saved_by info for display
