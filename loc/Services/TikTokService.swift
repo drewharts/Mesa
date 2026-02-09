@@ -320,6 +320,9 @@ class TikTokService: ObservableObject {
                     username: videoDict["author_username"] as? String ?? ""
                 )
                 
+                let dictContentType = videoDict["contentType"] as? String
+                    ?? videoDict["content_type"] as? String
+                    ?? (url.contains("/photo/") ? "photo" : "video")
                 return TikTokVideo(
                     videoID: videoID,
                     url: url,
@@ -329,7 +332,8 @@ class TikTokService: ObservableObject {
                     thumbnailURL: videoDict["thumbnailURL"] as? String ?? "",
                     author: author,
                     hashtags: videoDict["hashtags"] as? [String] ?? [],
-                    createdAt: videoDict["createdAt"] as? String ?? ISO8601DateFormatter().string(from: Date())
+                    createdAt: videoDict["createdAt"] as? String ?? ISO8601DateFormatter().string(from: Date()),
+                    contentType: dictContentType
                 )
             }
         }
@@ -351,7 +355,10 @@ class TikTokService: ObservableObject {
         guard let url = data["url"] as? String else {
             return nil
         }
-        
+
+        // Determine content type from backend response
+        let contentType = data["type"] as? String ?? data["content_type"] as? String ?? "video"
+
         // Extract video ID from URL or photo ID
         let videoID: String
         if let photoId = data["photo_id"] as? String {
@@ -361,15 +368,15 @@ class TikTokService: ObservableObject {
         } else {
             videoID = UUID().uuidString // Fallback
         }
-        
+
         // Create author
         let author = TikTokAuthor(
             displayName: data["author_name"] as? String ?? "",
             url: data["author_url"] as? String ?? "",
             username: extractUsernameFromURL(data["author_url"] as? String)
         )
-        
-        // Create video
+
+        // Create TikTok content (video or photo)
         return TikTokVideo(
             videoID: videoID,
             url: url,
@@ -379,7 +386,8 @@ class TikTokService: ObservableObject {
             thumbnailURL: data["thumbnail_url"] as? String ?? "",
             author: author,
             hashtags: data["hashtags"] as? [String] ?? [],
-            createdAt: ISO8601DateFormatter().string(from: Date())
+            createdAt: ISO8601DateFormatter().string(from: Date()),
+            contentType: contentType
         )
     }
     

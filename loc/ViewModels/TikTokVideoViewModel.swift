@@ -40,10 +40,14 @@ class TikTokVideoViewModel: ObservableObject {
     
     // MARK: - Video Opening Logic
     
+    /// Opens the TikTok content in the best available method.
     func openVideo() {
         if tryOpenInTikTokApp() { return }
         if tryOpenInBrowser() { return }
-        showFullVideoModal()
+        // Only show embedded WebView if we have embed HTML (videos only, not photos)
+        if !tikTokVideo.embedHTML.isEmpty {
+            showFullVideoModal()
+        }
     }
     
     private func showFullVideoModal() {
@@ -87,14 +91,16 @@ class TikTokVideoViewModel: ObservableObject {
         }
     }
     
+    /// Adds TikTok app deep link scheme URLs for the content type.
     private func addVideoSchemeURLs(to urls: inout [URL]) {
         guard let videoId = extractVideoId(from: tikTokVideo.url) else { return }
-        
+
+        let contentPath = tikTokVideo.contentType == "photo" ? "photo" : "video"
         let schemeURLs = [
-            "tiktok://video/\(videoId)",
-            "snssdk1233://video?id=\(videoId)"
+            "tiktok://\(contentPath)/\(videoId)",
+            "snssdk1233://\(contentPath)?id=\(videoId)"
         ]
-        
+
         for urlString in schemeURLs {
             if let url = URL(string: urlString) {
                 urls.append(url)
@@ -153,14 +159,14 @@ class TikTokVideoViewModel: ObservableObject {
         return string.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
     }
     
+    /// Extracts the content ID from a regular TikTok URL (video or photo).
     private func extractFromRegularURL(_ urlString: String) -> String? {
-        guard urlString.contains("/video/"),
-              let range = urlString.range(of: "/video/") else {
+        guard let range = urlString.range(of: "/video/") ?? urlString.range(of: "/photo/") else {
             return nil
         }
-        
-        let afterVideo = String(urlString[range.upperBound...])
-        return afterVideo.components(separatedBy: "?").first?.components(separatedBy: "/").first
+
+        let afterPath = String(urlString[range.upperBound...])
+        return afterPath.components(separatedBy: "?").first?.components(separatedBy: "/").first
     }
     
     // MARK: - Thumbnail Management
@@ -202,6 +208,7 @@ class TikTokVideoViewModel: ObservableObject {
         updateTikTokVideoWithNewThumbnail(newThumbnailURL)
     }
     
+    /// Updates the TikTok video with a refreshed thumbnail URL.
     private func updateTikTokVideoWithNewThumbnail(_ newThumbnailURL: String) {
         let updatedVideo = TikTokVideo(
             id: tikTokVideo.id,
@@ -213,9 +220,10 @@ class TikTokVideoViewModel: ObservableObject {
             thumbnailURL: newThumbnailURL,
             author: tikTokVideo.author,
             hashtags: tikTokVideo.hashtags,
-            createdAt: tikTokVideo.createdAt
+            createdAt: tikTokVideo.createdAt,
+            contentType: tikTokVideo.contentType
         )
-        
+
         tikTokVideo = updatedVideo
         thumbnailLoadError = false
     }
