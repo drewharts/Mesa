@@ -14,7 +14,7 @@
 	</array>
 	<key>com.apple.developer.associated-domains</key>
 	<array>
-		<string>applinks:mesa-backend-staging.up.railway.app</string>
+		<string>applinks:mesa.drewharts.com</string>
 	</array>
 </dict>
 </plist>
