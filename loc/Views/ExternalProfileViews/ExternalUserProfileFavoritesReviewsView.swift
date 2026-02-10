@@ -27,6 +27,7 @@ struct ExternalUserProfileFavoritesReviewsView: View {
     @State private var showFavoritesPopup = false
     @State private var showReviewsPopup = false
     @State private var hasSetInitialTab: Bool = false
+    @State private var computedInitialTab: String = "favorites"
 
     // MARK: - Computed Properties
 
@@ -54,6 +55,7 @@ struct ExternalUserProfileFavoritesReviewsView: View {
         ProfileFavoritesReviewsSection(
             data: sectionData,
             config: sectionConfig,
+            initialTabId: computedInitialTab,
             onFavoritesTap: { showFavoritesPopup = true },
             onTikToksTap: nil,  // No TikToks tab for external profiles
             onReviewsTap: { showReviewsPopup = true },
@@ -83,8 +85,11 @@ struct ExternalUserProfileFavoritesReviewsView: View {
         .onAppear {
             loadDataIfNeeded()
         }
-        .onChange(of: viewModel.isLoadingFavorites) { _, isLoading in
-            handleFavoritesLoadingChange(isLoading: isLoading)
+        .onChange(of: viewModel.isLoadingFavorites) { _, _ in
+            updateInitialTabIfReady()
+        }
+        .onChange(of: viewModel.isLoadingReviewedPlaces) { _, _ in
+            updateInitialTabIfReady()
         }
     }
 
@@ -99,11 +104,15 @@ struct ExternalUserProfileFavoritesReviewsView: View {
         }
     }
 
-    /// Handles initial tab selection when favorites finish loading.
-    private func handleFavoritesLoadingChange(isLoading: Bool) {
-        if !isLoading && !hasSetInitialTab {
-            hasSetInitialTab = true
-            // Note: Tab selection is now handled internally by ProfileFavoritesReviewsSection
+    /// Selects the reviews tab when favorites are empty but reviews have content.
+    private func updateInitialTabIfReady() {
+        guard !hasSetInitialTab,
+              !viewModel.isLoadingFavorites,
+              !viewModel.isLoadingReviewedPlaces else { return }
+
+        hasSetInitialTab = true
+        if viewModel.userFavorites.isEmpty && !viewModel.lightweightReviewedPlaces.isEmpty {
+            computedInitialTab = "reviews"
         }
     }
 }
