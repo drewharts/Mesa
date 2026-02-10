@@ -51,22 +51,6 @@ struct ProfileView: View {
                     photoImportVM: photoImportVM,
                     profile: profile
                 ))
-                .navigationDestination(isPresented: $userProfileNavigationViewModel.isUserDetailPresented) {
-                    if let selectedUser = userProfileNavigationViewModel.selectedUser {
-                        ExternalUserProfileViewWrapper(
-                            user: selectedUser,
-                            pendingListId: userProfileNavigationViewModel.pendingListIdToOpen
-                        )
-                        .environmentObject(profile)
-                        .environmentObject(selectedPlaceVM)
-                        .environmentObject(placeVM)
-                        .environmentObject(userSession)
-                        .environmentObject(userProfileNavigationViewModel)
-                        .environmentObject(mapDisplayCoordinatorViewModel)
-                        .environmentObject(locationManager)
-                        .environmentObject(dataManager)
-                    }
-                }
                 .navigationDestination(for: FollowListDestination.self) { destination in
                     // Navigate to followers or following list
                     // MVVM: View coordinates navigation based on destination

@@ -158,6 +158,7 @@ class ExternalUserProfileViewModel: ObservableObject {
     /// Loads all initial data for the profile. Called once when view appears.
     func loadInitialData(currentUserId: String) async {
         // Run all initial fetches in parallel
+        async let profileRefresh: () = refreshUserProfile()
         async let followingCheck: () = checkIfFollowing(currentUserId: currentUserId)
         async let favoritesLoad: () = fetchProfileFavorites()
         async let listsLoad: () = fetchLists()
@@ -165,7 +166,18 @@ class ExternalUserProfileViewModel: ObservableObject {
         async let followingCountLoad: () = fetchFollowingCount()
         async let placesCountLoad: () = fetchTotalPlacesCount()
 
-        _ = await (followingCheck, favoritesLoad, listsLoad, followersLoad, followingCountLoad, placesCountLoad)
+        _ = await (profileRefresh, followingCheck, favoritesLoad, listsLoad, followersLoad, followingCountLoad, placesCountLoad)
+    }
+
+    /// Refreshes the user profile data to ensure all fields (including social links) are current.
+    private func refreshUserProfile() async {
+        do {
+            let refreshedProfile = try await userService.fetchUserById(userId: userId)
+            self.user = refreshedProfile
+        } catch {
+            // Non-fatal: keep existing user data if refresh fails
+            print("ExternalUserProfileViewModel Error refreshing profile: \(error)")
+        }
     }
 
     // MARK: - Following Status

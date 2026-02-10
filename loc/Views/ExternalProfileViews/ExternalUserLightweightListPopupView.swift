@@ -85,11 +85,9 @@ struct ExternalUserLightweightListPopupView: View {
         Button(action: {
             presentationMode.wrappedValue.dismiss()
         }) {
-            HStack(spacing: 4) {
-                Image(systemName: "chevron.left")
-                Text("Back")
-            }
-            .foregroundColor(.primary)
+            Image(systemName: "xmark")
+                .font(.body)
+                .foregroundColor(.gray)
         }
     }
 

@@ -27,7 +27,7 @@ struct TikTokAuthor: Codable, Equatable {
 
 // MARK: - TikTok Service
 class TikTokService: ObservableObject {
-    private let baseURL = "https://mesa-backend-staging.up.railway.app"
+    private let baseURL = MesaBackendConfig.baseURL
     private let placeService = PlaceService.shared
     
     @Published var isProcessing = false

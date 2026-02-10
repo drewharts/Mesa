@@ -165,7 +165,7 @@ enum MesaBackendError: Error, LocalizedError {
 class MesaBackendService {
     static let shared = MesaBackendService()
 
-    private let baseURL = "https://mesa-backend-staging.up.railway.app"
+    private let baseURL = MesaBackendConfig.baseURL
     private let session: URLSession
 
     init() {
