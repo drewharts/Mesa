@@ -13,9 +13,11 @@ import SwiftUI
 struct AccountMenuView: View {
     @EnvironmentObject var profile: ProfileViewModel
     @State private var showEditProfile = false
+    @State private var showGoogleMapsImport = false
 
     var body: some View {
         Menu {
+            importFromGoogleMapsButton
             editProfileButton
             logoutButton
             deleteAccountButton
@@ -29,9 +31,21 @@ struct AccountMenuView: View {
                 }
             }
         }
+        .sheet(isPresented: $showGoogleMapsImport) {
+            GoogleMapsImportView()
+                .environmentObject(profile)
+        }
     }
 
     // MARK: - Menu Items
+
+    private var importFromGoogleMapsButton: some View {
+        Button {
+            showGoogleMapsImport = true
+        } label: {
+            Label("Import from Google Maps", systemImage: "square.and.arrow.down")
+        }
+    }
 
     private var editProfileButton: some View {
         Button {
