@@ -37,7 +37,7 @@ class ListStoryCardViewModel: ObservableObject {
     private let placeService = SupabasePlaceService.shared
 
     // Universal link host for QR code generation
-    private let universalLinkHost = "mesa-backend-staging.up.railway.app"
+    private let universalLinkHost = MesaBackendConfig.universalLinkHost
 
     // Instagram Story dimensions (9:16 aspect ratio)
     private let storyWidth: CGFloat = 1080

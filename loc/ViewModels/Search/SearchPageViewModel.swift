@@ -75,15 +75,25 @@ class SearchPageViewModel: ObservableObject {
         onPlaceSelected?(place)
     }
 
-    /// Handle user selection from search results
+    /// Handle user selection from search results — dismisses search and navigates via MainView
     func handleUserSelection(_ user: ProfileData) {
         guard let currentUserId = userSession?.currentUserId else { return }
 
         // Save to recent searches
         searchViewModel.saveUserSelection(user)
 
-        // Navigate via UserProfileNavigationViewModel
-        userProfileNavigationViewModel?.selectUser(user, currentUserId: currentUserId)
+        // Dismiss search sheet for all user selections
+        onDismiss?()
+
+        if user.id == currentUserId {
+            // Own profile: selectUser sets shouldNavigateToOwnProfile, fullScreenCover handles it
+            userProfileNavigationViewModel?.selectUser(user, currentUserId: currentUserId, shouldPresent: false)
+        } else {
+            // External user: navigate in MainView after sheet dismissal (PlaceSavers pattern)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+                self?.userProfileNavigationViewModel?.selectUser(user, currentUserId: currentUserId)
+            }
+        }
 
         // Notify callback
         onUserSelected?(user)

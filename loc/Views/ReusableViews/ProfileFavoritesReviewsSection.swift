@@ -49,6 +49,7 @@ struct ProfileFavoritesReviewsSectionData {
 struct ProfileFavoritesReviewsSection: View {
     let data: ProfileFavoritesReviewsSectionData
     let config: ProfileFavoritesReviewsSectionConfig
+    var initialTabId: String = "favorites"
 
     // Callbacks
     let onFavoritesTap: () -> Void
@@ -85,6 +86,9 @@ struct ProfileFavoritesReviewsSection: View {
             contentGrid
             Divider()
                 .padding(.horizontal, 20)
+        }
+        .onChange(of: initialTabId) { _, newValue in
+            selectedTabId = newValue
         }
     }
 

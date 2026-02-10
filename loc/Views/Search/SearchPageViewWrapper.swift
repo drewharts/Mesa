@@ -103,13 +103,8 @@ private struct SearchPageViewContent: View {
                     }
                 }
 
-                viewModel.onUserSelected = { user in
-                    // Dismiss search page if navigating to own profile
-                    // (own profile navigation is handled by UserProfileNavigationViewModel)
-                    if user.id == userSession.currentUserId {
-                        showSearchPage = false
-                    }
-                    // External user navigation stays within search NavigationStack
+                viewModel.onUserSelected = { _ in
+                    // Dismissal and navigation are handled by the ViewModel
                 }
 
                 viewModel.onViewAllKeywords = { keyword, types in

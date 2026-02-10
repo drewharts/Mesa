@@ -30,6 +30,7 @@ struct ExternalUserProfileListsView: View {
     @EnvironmentObject var userSession: UserSession
     @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
     @EnvironmentObject var dataManager: DataManager
+    @EnvironmentObject var mapDisplayCoordinatorVM: MapDisplayCoordinatorViewModel
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -57,6 +58,7 @@ struct ExternalUserProfileListsView: View {
                 .environmentObject(detailPlaceViewModel)
                 .environmentObject(ServiceContainer.shared)
                 .environmentObject(dataManager)
+                .environmentObject(mapDisplayCoordinatorVM)
             }
         }
     }
@@ -145,6 +147,7 @@ struct ExternalUserProfileListsView: View {
             .environmentObject(detailPlaceViewModel)
             .environmentObject(ServiceContainer.shared)
             .environmentObject(dataManager)
+            .environmentObject(mapDisplayCoordinatorVM)
         }
     }
 
@@ -182,6 +185,7 @@ struct ExternalUserListPopupView: View {
     @EnvironmentObject var userProfileNavigationVM: UserProfileNavigationViewModel
     @EnvironmentObject var userSession: UserSession
     @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
+    @EnvironmentObject var mapDisplayCoordinatorVM: MapDisplayCoordinatorViewModel
     @Environment(\.presentationMode) var presentationMode
     @State private var currentListIndex: Int
     @State private var isLoadingMore: Bool = false
@@ -241,16 +245,9 @@ struct ExternalUserListPopupView: View {
     private var popupHeader: some View {
         VStack(spacing: 12) {
             HStack {
-                Button(action: {
-                    presentationMode.wrappedValue.dismiss()
-                }) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "chevron.left")
-                        Text("Profile")
-                    }
-                    .foregroundColor(.primary)
-                }
+                dismissButton
                 Spacer()
+                viewOnMapButton
             }
             .padding(.horizontal, 20)
             .padding(.top, 20)
@@ -268,6 +265,39 @@ struct ExternalUserListPopupView: View {
             .padding(.horizontal, 20)
         }
         .padding(.bottom, 10)
+    }
+
+    /// Button that dismisses the list popup sheet.
+    private var dismissButton: some View {
+        Button(action: {
+            presentationMode.wrappedValue.dismiss()
+        }) {
+            Image(systemName: "xmark")
+                .font(.body)
+                .foregroundColor(.gray)
+        }
+    }
+
+    /// Button that dismisses the popup and shows this list's places on the map.
+    private var viewOnMapButton: some View {
+        Button(action: {
+            let list = currentList
+            let navVM = userProfileNavigationVM
+            presentationMode.wrappedValue.dismiss()
+            mapDisplayCoordinatorVM.triggerExternalListOnMap(
+                listId: list.list_id,
+                userId: viewModel.userId,
+                userName: viewModel.user.fullName,
+                userPhotoUrl: viewModel.user.profilePhotoURL?.absoluteString,
+                lists: lists,
+                listPlaces: viewModel.placeListPlaces,
+                dismissProfile: { navVM.clearSelection() }
+            )
+        }) {
+            Image(systemName: "map")
+                .font(.body)
+                .foregroundColor(.gray)
+        }
     }
 
     // MARK: - Popup Content

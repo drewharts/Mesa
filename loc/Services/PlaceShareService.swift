@@ -12,7 +12,7 @@ import SwiftUI
 class PlaceShareService: ObservableObject {
     
     // MARK: - Universal Links Base URL
-    private let universalLinkHost = "mesa-backend-staging.up.railway.app"
+    private let universalLinkHost = MesaBackendConfig.universalLinkHost
     
     // MARK: - Share Place Methods
     
@@ -274,7 +274,7 @@ class PlaceShareService: ObservableObject {
     }
 
     /// Generates a Universal Link URL for a profile
-    /// Format: https://mesa-backend-staging.up.railway.app/profile/[userId]?name=...
+    /// Format: https://mesa.drewharts.com/profile/[userId]?name=...
     private func generateUniversalLinkURL(for profile: ShareableProfile) -> URL? {
         var components = URLComponents()
         components.scheme = "https"

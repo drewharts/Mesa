@@ -20,6 +20,7 @@ struct ProfileContentView: View {
     @ObservedObject var photoImportVM: PhotoImportViewModel
     @Binding var navigationPath: NavigationPath
     @Environment(\.presentationMode) var presentationMode
+    @State private var showEditProfileForSocials = false
 
     var body: some View {
         ZStack {
@@ -51,6 +52,9 @@ struct ProfileContentView: View {
                         },
                         onFollowingTap: {
                             navigationPath.append(ProfileView.FollowListDestination.following)
+                        },
+                        onAddSocialsTap: {
+                            showEditProfileForSocials = true
                         }
                     )
                     .onAppear {
@@ -179,6 +183,14 @@ struct ProfileContentView: View {
                 .padding(.bottom, 40)
             }
         }
+        .sheet(isPresented: $showEditProfileForSocials) {
+            if let user = profile.user {
+                EditProfileView(user: user) { updatedUser in
+                    profile.user = updatedUser
+                }
+            }
+        }
     }
+
 }
 

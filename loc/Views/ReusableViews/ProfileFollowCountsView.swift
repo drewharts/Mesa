@@ -61,6 +61,7 @@ struct ProfileFollowCountsView: View {
     let data: ProfileFollowCountsData
     let onFollowersTap: () -> Void
     let onFollowingTap: () -> Void
+    var onAddSocialsTap: (() -> Void)? = nil
 
     @State private var refreshToggle = false
 
@@ -76,12 +77,17 @@ struct ProfileFollowCountsView: View {
         return !handle.trimmingCharacters(in: .whitespaces).isEmpty
     }
 
+    /// Whether the social icons section should be visible.
+    private var shouldShowSocialIcons: Bool {
+        hasInstagram || hasTikTok || onAddSocialsTap != nil
+    }
+
     var body: some View {
         HStack(spacing: 24) {
             followersButton
             followingButton
 
-            if hasInstagram || hasTikTok {
+            if shouldShowSocialIcons {
                 socialLinksSection
             }
         }
@@ -134,7 +140,25 @@ struct ProfileFollowCountsView: View {
 
     /// Displays Instagram and TikTok social link icon buttons.
     private var socialLinksSection: some View {
-        HStack(spacing: 28) {
+        VStack(spacing: 4) {
+            HStack(spacing: 28) {
+                instagramIcon
+                tiktokIcon
+            }
+
+            if let onTap = onAddSocialsTap, !hasInstagram && !hasTikTok {
+                Button(action: onTap) {
+                    Text("Add your socials")
+                        .font(.system(size: 10))
+                        .foregroundColor(.gray)
+                }
+            }
+        }
+    }
+
+    /// Displays the Instagram icon, opening the app/web if set or Edit Profile if empty.
+    private var instagramIcon: some View {
+        Group {
             if hasInstagram, let handle = data.instagramUsername {
                 SocialLinkButton(
                     imageName: "Instagram_Glyph_Black",
@@ -142,14 +166,36 @@ struct ProfileFollowCountsView: View {
                     appURL: "instagram://user?username=\(handle)",
                     webURL: "https://instagram.com/\(handle)"
                 )
+            } else if let onTap = onAddSocialsTap {
+                Button(action: onTap) {
+                    Image("Instagram_Glyph_Black")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 18, height: 18)
+                        .opacity(0.3)
+                }
             }
+        }
+    }
+
+    /// Displays the TikTok icon, opening the app/web if set or Edit Profile if empty.
+    private var tiktokIcon: some View {
+        Group {
             if hasTikTok, let handle = data.tiktokUsername {
                 SocialLinkButton(
                     imageName: "tiktok",
                     systemFallback: "music.note",
-                    appURL: "tiktok://user?username=\(handle)",
+                    appURL: "https://tiktok.com/@\(handle)",
                     webURL: "https://tiktok.com/@\(handle)"
                 )
+            } else if let onTap = onAddSocialsTap {
+                Button(action: onTap) {
+                    Image("tiktok")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 18, height: 18)
+                        .opacity(0.3)
+                }
             }
         }
     }

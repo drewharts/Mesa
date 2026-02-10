@@ -18,17 +18,6 @@ struct SearchPageView: View {
 
     @FocusState private var isSearchFocused: Bool
 
-    // MARK: - Environment
-
-    @EnvironmentObject var userProfileNavigationViewModel: UserProfileNavigationViewModel
-    @EnvironmentObject var profileViewModel: ProfileViewModel
-    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
-    @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
-    @EnvironmentObject var userSession: UserSession
-    @EnvironmentObject var mapDisplayCoordinatorViewModel: MapDisplayCoordinatorViewModel
-    @EnvironmentObject var locationManager: LocationManager
-    @EnvironmentObject var dataManager: DataManager
-
     // MARK: - Computed Properties
 
     /// Binding to searchText through the ViewModel chain
@@ -70,22 +59,6 @@ struct SearchPageView: View {
             }
             .background(Color(UIColor.systemBackground))
             .navigationBarHidden(true)
-            .navigationDestination(isPresented: $userProfileNavigationViewModel.isUserDetailPresented) {
-                if let selectedUser = userProfileNavigationViewModel.selectedUser {
-                    ExternalUserProfileViewWrapper(
-                        user: selectedUser,
-                        pendingListId: userProfileNavigationViewModel.pendingListIdToOpen
-                    )
-                    .environmentObject(profileViewModel)
-                    .environmentObject(selectedPlaceVM)
-                    .environmentObject(detailPlaceViewModel)
-                    .environmentObject(userSession)
-                    .environmentObject(userProfileNavigationViewModel)
-                    .environmentObject(mapDisplayCoordinatorViewModel)
-                    .environmentObject(locationManager)
-                    .environmentObject(dataManager)
-                }
-            }
         }
         .onAppear {
             viewModel.searchViewModel.setupIfNeeded()

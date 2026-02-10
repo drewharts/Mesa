@@ -189,7 +189,7 @@ struct locApp: App {
                         }
                     }
                     // Handle Universal Links (https:// from our domain)
-                    else if url.scheme == "https" && url.host == "mesa-backend-staging.up.railway.app" {
+                    else if url.scheme == "https" && url.host == MesaBackendConfig.universalLinkHost {
                         if let deepLinkURL = convertUniversalLinkToDeepLink(url) {
                             Task {
                                 await deepLinkViewModel.processIncomingURL(deepLinkURL)
@@ -252,7 +252,7 @@ struct locApp: App {
     }
     
     /// Converts a Universal Link URL to the internal deep link format
-    /// Example: https://mesa-backend-staging.up.railway.app/place/abc123?name=... -> loc://place/abc123?name=...
+    /// Example: https://mesa.drewharts.com/place/abc123?name=... -> loc://place/abc123?name=...
     private func convertUniversalLinkToDeepLink(_ url: URL) -> URL? {
         let path = url.path
         
