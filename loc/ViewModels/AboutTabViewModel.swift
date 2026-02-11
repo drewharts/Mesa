@@ -16,6 +16,7 @@ class AboutTabViewModel: ObservableObject {
     @Published var place: DetailPlace?
     @Published var placeId: String = ""
     @Published var isDescriptionLoading: Bool = false
+    @Published var wouldReturnStats: WouldReturnStats = WouldReturnStats(wouldReturnCount: 0, wouldNotReturnCount: 0)
 
     // MARK: - Child ViewModels
     let tikTokVideosViewModel: TikTokVideosViewModel

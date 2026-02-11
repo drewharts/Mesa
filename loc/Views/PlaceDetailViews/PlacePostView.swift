@@ -66,9 +66,6 @@ struct PlacePostView: View {
                 Text(formattedTimestamp(post.timestamp))
                     .font(.caption)
                     .foregroundColor(.gray)
-                
-                // Likes
-                likesSection
             }
             
             Spacer()
@@ -149,7 +146,7 @@ struct PlacePostView: View {
                     .foregroundColor(.gray)
                     .padding(.top, 8)
             }
-            .frame(height: 150)
+            .frame(height: 250)
             
         case .loaded:
             if !postPhotos.isEmpty {
@@ -159,7 +156,7 @@ struct PlacePostView: View {
                             Image(uiImage: photo)
                                 .resizable()
                                 .scaledToFill()
-                                .frame(width: 150, height: 150)
+                                .frame(width: 250, height: 250)
                                 .clipShape(RoundedRectangle(cornerRadius: 10))
                                 .shadow(radius: 2)
                                 .onTapGesture {

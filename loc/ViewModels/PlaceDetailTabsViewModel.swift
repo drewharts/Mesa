@@ -253,6 +253,7 @@ class PlaceDetailTabsViewModel: ObservableObject {
         placePhotosViewModel.setPostsLoadingFinished(postsFinished)
         placePhotosViewModel.setPosts(posts)
         postsViewModel.setPosts(posts)
+        aboutTabViewModel.wouldReturnStats = WouldReturnStats.from(posts: posts)
         postsViewModel.setLoadingState(mapLoadingState(loadingState))
 
         if posts.isEmpty && selectedTab == .reviews {
@@ -321,6 +322,7 @@ class PlaceDetailTabsViewModel: ObservableObject {
         // Update child ViewModels with posts data
         placePhotosViewModel.setPosts(posts)
         postsViewModel.setPosts(posts)
+        aboutTabViewModel.wouldReturnStats = WouldReturnStats.from(posts: posts)
 
         // Set default tab based on posts
         if posts.isEmpty && selectedTab == .reviews {
