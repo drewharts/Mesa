@@ -47,7 +47,12 @@ struct AboutTabContent: View {
                 onEditTapped: { showingNoteSheet = true }
             )
             
-            // 3. SMART COMPONENT: TikTok videos with their own ViewModel
+            // 3. Would Go Back scale (only shown if reviews have sentiment data)
+            if viewModel.wouldReturnStats.hasData {
+                WouldReturnScaleView(stats: viewModel.wouldReturnStats)
+            }
+
+            // 4. SMART COMPONENT: TikTok videos with their own ViewModel
             TikTokVideosSection(
                 viewModel: viewModel.tikTokVideosViewModel,
                 placeId: viewModel.placeId,
@@ -56,8 +61,8 @@ struct AboutTabContent: View {
             )
             .environmentObject(profile)
             .environmentObject(userSession)
-            
-            // 4. SMART COMPONENT: Photos with its own ViewModel
+
+            // 5. SMART COMPONENT: Photos with its own ViewModel
             PlacePhotosView(
                 viewModel: viewModel.placePhotosViewModel,
                 onPhotoTapped: onPhotoTapped
