@@ -49,7 +49,8 @@ struct PinterestPhotoGalleryView: View {
         GeometryReader { geometry in
             ZStack {
                 // Background - tappable to dismiss
-                Color.black
+                Rectangle()
+                    .fill(.ultraThinMaterial)
                     .opacity(backgroundOpacity)
                     .onTapGesture { dismissGallery() }
 
