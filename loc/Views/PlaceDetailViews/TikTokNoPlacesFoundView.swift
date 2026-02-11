@@ -6,13 +6,10 @@
 //
 
 import SwiftUI
-import CoreLocation
 
 struct TikTokNoPlacesFoundView: View {
     let tikTokUrl: String
     @EnvironmentObject var profile: ProfileViewModel
-    @EnvironmentObject var userSession: UserSession
-    @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
     @Environment(\.presentationMode) var presentationMode
 
     /// Convenience accessor for TikTok view model.
@@ -24,30 +21,20 @@ struct TikTokNoPlacesFoundView: View {
     @State private var showingSuccessAlert = false
     @State private var showingErrorAlert = false
     @State private var errorMessage = ""
-
-    // Place search functionality
-    @State private var searchText: String = ""
-    @State private var searchResults: [MesaPlaceSuggestion] = []
-    @State private var isSearching = false
-    @State private var showingPlaceAssignment = false
-    @State private var selectedSuggestion: MesaPlaceSuggestion?
-    @State private var showingAssignmentConfirmation = false
+    @State private var showingCorrectionSheet = false
 
     var body: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 0) {
+            dragIndicator
+            Spacer().frame(height: 32)
             headerSection
-            searchSection
-            flaggingSection
+            Spacer().frame(height: 28)
+            actionButtons
             Spacer()
-            closeButton
         }
-        .padding(.vertical, 30)
         .onAppear {
-            // Ensure all processing states are cleared when this view appears
             tikTokVM.isProcessingTikTok = false
             tikTokVM.isWaitingForPlaceDetail = false
-            // Also clear DeepLinkViewModel state directly if we have access to it
-            print("✅ [TikTokNoPlacesFoundView] onAppear: Cleared all processing states")
         }
         .alert("Help Improve Detection", isPresented: $showingCommentDialog) {
             TextField("Describe the place that should have been detected...", text: $userComment, axis: .vertical)
@@ -56,7 +43,18 @@ struct TikTokNoPlacesFoundView: View {
                 userComment = ""
             }
             Button("Submit Flag") {
-                submitFlag()
+                let success = tikTokVM.submitNoPlacesFoundFlag(tikTokUrl: tikTokUrl, userComment: userComment)
+                if success {
+                    isSubmitting = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                        isSubmitting = false
+                        userComment = ""
+                        showingSuccessAlert = true
+                    }
+                } else {
+                    errorMessage = "You must be logged in to submit flags"
+                    showingErrorAlert = true
+                }
             }
             .disabled(isSubmitting)
         } message: {
@@ -64,7 +62,7 @@ struct TikTokNoPlacesFoundView: View {
         }
         .alert("Success", isPresented: $showingSuccessAlert) {
             Button("OK") {
-                self.profile.clearNoPlacesFound()
+                profile.clearNoPlacesFound()
             }
         } message: {
             Text("Operation completed successfully!")
@@ -74,272 +72,96 @@ struct TikTokNoPlacesFoundView: View {
         } message: {
             Text(errorMessage)
         }
-        .alert("Assign TikTok to Place", isPresented: $showingAssignmentConfirmation) {
-            Button("Cancel", role: .cancel) { }
-            Button("Assign") {
-                assignTikTokToPlace()
-            }
-        } message: {
-            if let suggestion = selectedSuggestion {
-                Text("Assign this TikTok video to '\(suggestion.name)'?")
-            }
+        .sheet(isPresented: $showingCorrectionSheet) {
+            TikTokPlaceCorrectionSheet(
+                mode: .newAssignment(tikTokUrl: tikTokUrl),
+                onPlaceChanged: { _ in
+                    profile.clearNoPlacesFound()
+                }
+            )
+            .environmentObject(profile)
         }
     }
-    
+
+    /// Displays a subtle drag indicator at the top of the sheet.
+    private var dragIndicator: some View {
+        RoundedRectangle(cornerRadius: 2.5)
+            .fill(Color(.systemGray4))
+            .frame(width: 36, height: 5)
+            .padding(.top, 8)
+    }
+
+    /// Displays the header with icon and description text.
     private var headerSection: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "map.slash")
-                .font(.system(size: 50))
-                .foregroundColor(.gray.opacity(0.6))
-            
-            VStack(spacing: 8) {
-                Text("No Places Found")
-                    .font(.title2)
+        VStack(spacing: 12) {
+            Image(systemName: "mappin.slash")
+                .font(.system(size: 40, weight: .light))
+                .foregroundColor(.secondary)
+
+            VStack(spacing: 6) {
+                Text("No Place Found")
+                    .font(.title3)
                     .fontWeight(.semibold)
                     .foregroundColor(.primary)
-                
-                Text("We couldn't identify any specific places in this TikTok video")
-                    .font(.body)
+
+                Text("We couldn't identify a place in this TikTok")
+                    .font(.subheadline)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
-                    .padding(.horizontal, 20)
             }
-        }
-    }
-    
-    private var searchSection: some View {
-        VStack(spacing: 16) {
-            Text("Search for the place shown in this TikTok")
-                .font(.headline)
-                .fontWeight(.medium)
-                .multilineTextAlignment(.center)
-            
-            searchField
-            searchResultsView
         }
         .padding(.horizontal, 20)
     }
-    
-    private var searchField: some View {
-        HStack {
-            Image(systemName: "magnifyingglass")
-                .foregroundColor(.gray)
-            
-            TextField("Search for a place...", text: $searchText)
-                .textFieldStyle(PlainTextFieldStyle())
-                .onSubmit {
-                    performSearch()
+
+    /// Displays the action buttons for finding a place or flagging.
+    private var actionButtons: some View {
+        VStack(spacing: 10) {
+            Button(action: {
+                showingCorrectionSheet = true
+            }) {
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 15, weight: .medium))
+                    Text("Find Place")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
                 }
-            
-            if !searchText.isEmpty {
-                Button(action: {
-                    searchText = ""
-                    searchResults = []
-                }) {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundColor(.gray)
-                }
+                .foregroundColor(.primary)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .background(Color(.systemGray5))
+                .cornerRadius(12)
             }
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(Color(.systemGray6))
-        .cornerRadius(8)
-    }
-    
-    private var searchResultsView: some View {
-        Group {
-            if isSearching {
-                ProgressView("Searching...")
-                    .padding()
-            } else if !searchResults.isEmpty {
-                ScrollView {
-                    LazyVStack(spacing: 8) {
-                        ForEach(searchResults, id: \.id) { suggestion in
-                            PlaceSearchResultRow(suggestion: suggestion) {
-                                selectedSuggestion = suggestion
-                                showingAssignmentConfirmation = true
-                            }
-                        }
-                    }
-                }
-                .frame(maxHeight: 200)
-            }
-        }
-    }
-    
-    private var flaggingSection: some View {
-        VStack(spacing: 12) {
-            Text("Still can't find it?")
-                .font(.subheadline)
-                .fontWeight(.medium)
-            
+            .buttonStyle(.plain)
+
             Button(action: {
                 showingCommentDialog = true
             }) {
-                HStack {
+                HStack(spacing: 8) {
                     Image(systemName: "flag")
-                        .font(.system(size: 16))
-                    Text("Flag as Unable to Identify")
+                        .font(.system(size: 15, weight: .medium))
+                    Text("Flag for Review")
                         .font(.subheadline)
                         .fontWeight(.medium)
                 }
-                .foregroundColor(.white)
-                .padding(.horizontal, 20)
-                .padding(.vertical, 12)
-                .background(Color.orange)
-                .cornerRadius(8)
+                .foregroundColor(.secondary)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .background(Color(.systemGray6))
+                .cornerRadius(12)
             }
-            .buttonStyle(PlainButtonStyle())
+            .buttonStyle(.plain)
+
+            Button(action: {
+                profile.clearNoPlacesFound()
+            }) {
+                Text("Dismiss")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 4)
         }
         .padding(.horizontal, 20)
-    }
-    
-    private var closeButton: some View {
-        Button("Close") {
-            self.profile.clearNoPlacesFound()
-        }
-        .font(.headline)
-        .foregroundColor(.white)
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 12)
-        .background(Color.blue)
-        .cornerRadius(10)
-        .padding(.horizontal, 20)
-        .buttonStyle(.plain)
-    }
-    
-    // MARK: - Search Functions
-    
-    private func performSearch() {
-        guard !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-        
-        isSearching = true
-        
-        let placeSearchService = PlaceSearchService()
-        placeSearchService.searchPlaces(
-            query: searchText,
-            onResultsUpdated: { suggestions in
-                DispatchQueue.main.async {
-                    searchResults = suggestions
-                    isSearching = false
-                }
-            },
-            onError: { error in
-                DispatchQueue.main.async {
-                    isSearching = false
-                    errorMessage = "Search failed: \(error)"
-                    showingErrorAlert = true
-                }
-            }
-        )
-    }
-    
-    private func assignTikTokToPlace() {
-        guard let suggestion = selectedSuggestion else {
-            errorMessage = "Unable to assign TikTok to place"
-            showingErrorAlert = true
-            return
-        }
-        
-        isSubmitting = true
-
-        // Create DetailPlace from suggestion using Model initializer
-        let detailPlace = DetailPlace(
-            googlePlaceId: suggestion.id,
-            name: suggestion.name,
-            address: suggestion.address,
-            coordinate: suggestion.coordinate,
-            source: suggestion.source
-        )
-
-        // Add place to places dictionary so it's available for the map/UI
-        detailPlaceViewModel.places[detailPlace.id.uuidString] = detailPlace
-
-        isSubmitting = false
-
-        // Refresh TikTok places list
-        profile.refreshTikTokPlacesAfterImport()
-        showingSuccessAlert = true
-    }
-    
-    private func submitFlag() {
-        guard let userId = userSession.currentUserId else {
-            errorMessage = "You must be logged in to submit flags"
-            showingErrorAlert = true
-            return
-        }
-        
-        isSubmitting = true
-        
-        // Create a temporary place ID for this flag since no place was found
-        let tempPlaceId = "no_place_found_\(UUID().uuidString)"
-        
-        profile.flagTikTokPlace(for: tempPlaceId, flagType: .unableToIdentify, tikTokUrl: tikTokUrl, userComment: userComment)
-        
-        // Simulate delay for better UX
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            isSubmitting = false
-            userComment = ""
-            showingSuccessAlert = true
-        }
-    }
-}
-
-// MARK: - PlaceSearchResultRow Component
-struct PlaceSearchResultRow: View {
-    let suggestion: MesaPlaceSuggestion
-    let onTap: () -> Void
-    
-    var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: 12) {
-                // Place image placeholder
-                Rectangle()
-                    .fill(Color.gray.opacity(0.3))
-                    .frame(width: 50, height: 50)
-                    .cornerRadius(8)
-                    .overlay(
-                        Image(systemName: "photo")
-                            .foregroundColor(.gray)
-                    )
-                
-                // Place info
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(suggestion.name)
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                        .foregroundColor(.primary)
-                        .lineLimit(1)
-                    
-                    if let address = suggestion.address {
-                        Text(address)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .lineLimit(2)
-                    }
-                    
-                    Text(suggestion.source.capitalized)
-                        .font(.caption)
-                        .foregroundColor(.blue)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(Color.blue.opacity(0.1))
-                        .cornerRadius(4)
-                }
-                
-                Spacer()
-                
-                // Selection indicator
-                Image(systemName: "chevron.right")
-                    .font(.caption)
-                    .foregroundColor(.gray)
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(Color(.systemGray6))
-            .cornerRadius(8)
-        }
-        .buttonStyle(PlainButtonStyle())
     }
 }

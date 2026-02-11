@@ -1175,5 +1175,24 @@ extension SupabaseUserService {
 
         print("✅ [SupabaseUserService] Updated external place \(externalPlaceId) to place \(newPlaceId)")
     }
+
+    // MARK: - External Place Insert
+
+    /// Inserts a new external_places record for a TikTok place assignment.
+    func insertExternalPlace(userId: String, placeId: String, url: String) async throws {
+        let id = UUID().uuidString
+        try await supabase.client
+            .from("external_places")
+            .insert([
+                "id": id,
+                "user_id": userId,
+                "place_id": placeId,
+                "url": url,
+                "source": "tiktok"
+            ])
+            .execute()
+
+        print("✅ [SupabaseUserService] Inserted external place for user \(userId), place \(placeId)")
+    }
 }
 

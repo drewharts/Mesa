@@ -2,29 +2,24 @@
 //  TikTokPlaceCorrectionSheet.swift
 //  loc
 //
-//  Single Responsibility: Allow user to search and select the correct place for a TikTok
-//  MVVM: Uses PlaceSearchService for search, ProfileViewModel for updating association
+//  Single Responsibility: Purely declarative UI for TikTok place correction/assignment.
+//  MVVM: All business logic lives in TikTokPlaceCorrectionViewModel.
 
 import SwiftUI
 
 struct TikTokPlaceCorrectionSheet: View {
-    let placeId: String
-    let placeName: String
-    let externalPlaceId: String?
+    @StateObject private var viewModel: TikTokPlaceCorrectionViewModel
 
-    /// Callback when place is successfully changed - passes the resolved DetailPlace
+    /// Callback when place is successfully changed - passes the resolved DetailPlace.
     var onPlaceChanged: ((DetailPlace) -> Void)?
 
     @EnvironmentObject var profile: ProfileViewModel
     @Environment(\.dismiss) var dismiss
 
-    @State private var searchText = ""
-    @State private var searchResults: [MesaPlaceSuggestion] = []
-    @State private var isSearching = false
-    @State private var isUpdating = false
-    @State private var errorMessage: String?
-
-    private let searchService = PlaceSearchService()
+    init(mode: TikTokPlaceAssignmentMode, onPlaceChanged: ((DetailPlace) -> Void)? = nil) {
+        self._viewModel = StateObject(wrappedValue: TikTokPlaceCorrectionViewModel(mode: mode))
+        self.onPlaceChanged = onPlaceChanged
+    }
 
     var body: some View {
         NavigationStack {
@@ -33,7 +28,7 @@ struct TikTokPlaceCorrectionSheet: View {
                 searchSection
                 searchResultsList
             }
-            .navigationTitle("Change Place")
+            .navigationTitle(viewModel.navigationTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -42,10 +37,17 @@ struct TikTokPlaceCorrectionSheet: View {
                     }
                 }
             }
-            .disabled(isUpdating)
+            .disabled(viewModel.isUpdating)
             .overlay {
-                if isUpdating {
+                if viewModel.isUpdating {
                     updatingOverlay
+                }
+            }
+            .onChange(of: viewModel.didComplete) { _, completed in
+                if completed, let place = viewModel.resolvedPlace {
+                    profile.refreshTikTokPlacesAfterImport()
+                    dismiss()
+                    onPlaceChanged?(place)
                 }
             }
         }
@@ -53,9 +55,10 @@ struct TikTokPlaceCorrectionSheet: View {
 
     // MARK: - Current Place Header
 
+    /// Displays context about the current place (correction) or missing place (new assignment).
     private var currentPlaceHeader: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Current Place")
+            Text(viewModel.headerLabelText)
                 .font(.caption)
                 .foregroundColor(.secondary)
 
@@ -64,17 +67,17 @@ struct TikTokPlaceCorrectionSheet: View {
                     .fill(Color.gray.opacity(0.3))
                     .frame(width: 60, height: 60)
                     .overlay(
-                        Image(systemName: "mappin.circle.fill")
+                        Image(systemName: viewModel.headerIconName)
                             .foregroundColor(.gray)
                             .font(.title2)
                     )
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(placeName)
+                    Text(viewModel.headerTitle)
                         .font(.headline)
                         .lineLimit(2)
 
-                    Text("Search below to find the correct place")
+                    Text(viewModel.headerSubtitle)
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -88,6 +91,7 @@ struct TikTokPlaceCorrectionSheet: View {
 
     // MARK: - Search Section
 
+    /// Displays the search input field with live results.
     private var searchSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Search for correct place")
@@ -100,24 +104,23 @@ struct TikTokPlaceCorrectionSheet: View {
                 Image(systemName: "magnifyingglass")
                     .foregroundColor(.gray)
 
-                TextField("Search places...", text: $searchText)
+                TextField("Search places...", text: $viewModel.searchText)
                     .textFieldStyle(.plain)
                     .autocorrectionDisabled()
-                    .onChange(of: searchText) { _, newValue in
-                        performSearch(query: newValue)
+                    .onChange(of: viewModel.searchText) { _, newValue in
+                        viewModel.performSearch(query: newValue)
                     }
 
-                if !searchText.isEmpty {
+                if !viewModel.searchText.isEmpty {
                     Button {
-                        searchText = ""
-                        searchResults = []
+                        viewModel.clearSearch()
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                             .foregroundColor(.gray)
                     }
                 }
 
-                if isSearching {
+                if viewModel.isSearching {
                     ProgressView()
                         .scaleEffect(0.8)
                 }
@@ -131,17 +134,18 @@ struct TikTokPlaceCorrectionSheet: View {
 
     // MARK: - Search Results
 
+    /// Displays search results as a selectable list.
     private var searchResultsList: some View {
         List {
-            if searchResults.isEmpty && !searchText.isEmpty && !isSearching {
+            if viewModel.searchResults.isEmpty && !viewModel.searchText.isEmpty && !viewModel.isSearching {
                 Text("No results found")
                     .foregroundColor(.secondary)
                     .frame(maxWidth: .infinity, alignment: .center)
                     .listRowBackground(Color.clear)
             } else {
-                ForEach(searchResults, id: \.id) { suggestion in
+                ForEach(viewModel.searchResults, id: \.id) { suggestion in
                     Button {
-                        selectPlace(suggestion)
+                        viewModel.selectPlace(suggestion)
                     } label: {
                         HStack {
                             VStack(alignment: .leading, spacing: 4) {
@@ -167,7 +171,7 @@ struct TikTokPlaceCorrectionSheet: View {
                 }
             }
 
-            if let error = errorMessage {
+            if let error = viewModel.errorMessage {
                 Text(error)
                     .foregroundColor(.red)
                     .font(.caption)
@@ -180,6 +184,7 @@ struct TikTokPlaceCorrectionSheet: View {
 
     // MARK: - Updating Overlay
 
+    /// Shows a loading overlay while the place association is being persisted.
     private var updatingOverlay: some View {
         ZStack {
             Color.black.opacity(0.3)
@@ -194,74 +199,6 @@ struct TikTokPlaceCorrectionSheet: View {
             .padding(24)
             .background(Color(.systemGray2))
             .cornerRadius(12)
-        }
-    }
-
-    // MARK: - Actions
-
-    private func performSearch(query: String) {
-        guard !query.isEmpty else {
-            searchResults = []
-            return
-        }
-
-        isSearching = true
-        errorMessage = nil
-
-        searchService.searchPlaces(
-            query: query,
-            onResultsUpdated: { results in
-                self.searchResults = results
-                self.isSearching = false
-            },
-            onError: { error in
-                self.errorMessage = error
-                self.isSearching = false
-            }
-        )
-    }
-
-    /// Selects a suggestion, ensures the place exists in the DB, then updates the TikTok association
-    private func selectPlace(_ suggestion: MesaPlaceSuggestion) {
-        guard let extPlaceId = externalPlaceId else {
-            errorMessage = "Cannot update: missing external place reference"
-            return
-        }
-
-        isUpdating = true
-        errorMessage = nil
-
-        // Get full place details first
-        searchService.selectSuggestion(
-            suggestion,
-            onError: { error in
-                self.isUpdating = false
-                self.errorMessage = "Failed to load place details: \(error)"
-            }
-        ) { detailPlace in
-            Task {
-                do {
-                    // Upsert into places table so the FK constraint is satisfied
-                    try await SupabasePlaceService.shared.ensurePlaceExists(place: detailPlace)
-
-                    let newPlaceId = detailPlace.id.uuidString
-                    await profile.updateTikTokPlaceById(
-                        externalPlaceId: extPlaceId,
-                        newPlaceId: newPlaceId,
-                        newPlaceName: detailPlace.name
-                    )
-                    await MainActor.run {
-                        isUpdating = false
-                        dismiss()
-                        onPlaceChanged?(detailPlace)
-                    }
-                } catch {
-                    await MainActor.run {
-                        isUpdating = false
-                        errorMessage = "Failed to save place: \(error.localizedDescription)"
-                    }
-                }
-            }
         }
     }
 }
