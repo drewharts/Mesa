@@ -10,6 +10,7 @@ import SwiftUI
 struct TikTokNoPlacesFoundView: View {
     let tikTokUrl: String
     @EnvironmentObject var profile: ProfileViewModel
+    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @Environment(\.presentationMode) var presentationMode
 
     /// Convenience accessor for TikTok view model.
@@ -75,8 +76,12 @@ struct TikTokNoPlacesFoundView: View {
         .sheet(isPresented: $showingCorrectionSheet) {
             TikTokPlaceCorrectionSheet(
                 mode: .newAssignment(tikTokUrl: tikTokUrl),
-                onPlaceChanged: { _ in
+                onPlaceChanged: { place in
                     profile.clearNoPlacesFound()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        selectedPlaceVM.selectPlaceAndFetchDetails(place, shouldAnimateMap: true)
+                        selectedPlaceVM.isDetailSheetPresented = true
+                    }
                 }
             )
             .environmentObject(profile)

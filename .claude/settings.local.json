@@ -21,7 +21,17 @@
       "mcp__supabase__apply_migration",
       "WebFetch(domain:mesa-backend-staging.up.railway.app)",
       "Bash(curl:*)",
-      "Bash(git log:*)"
+      "Bash(git log:*)",
+      "mcp__supabase__list_edge_functions",
+      "mcp__supabase__list_tables",
+      "WebFetch(domain:mesa.drewharts.com)",
+      "Bash(gh repo view:*)",
+      "Bash(gh search:*)",
+      "Bash(gh api:*)",
+      "Bash(git stash:*)",
+      "Bash(git status:*)",
+      "Bash(git push:*)",
+      "Bash(git pull:*)"
     ],
     "deny": []
   },

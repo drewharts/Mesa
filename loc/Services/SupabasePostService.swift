@@ -118,7 +118,7 @@ class SupabasePostService: ObservableObject {
                 userLastName: record.user_last_name ?? "",
                 placeId: placeId,
                 placeName: "",
-                text: record.review_text,
+                text: record.review_text ?? "",
                 timestamp: timestamp,
                 images: record.review_images ?? [],
                 likes: record.review_likes ?? 0,
@@ -376,7 +376,7 @@ struct PostRecord: Codable {
 struct PostWithUserRecord: Codable {
     let review_id: String
     let review_user_id: String
-    let review_text: String
+    let review_text: String?
     let review_images: [String]?
     let review_timestamp: String
     let review_type: String?
