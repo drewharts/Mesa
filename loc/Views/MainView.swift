@@ -237,6 +237,9 @@ struct MainView: View {
                 keywordResultsSheet(keyword: keyword, types: types)
 
             // Onboarding
+            case .profilePhotoOnboarding:
+                profilePhotoOnboardingSheet
+
             case .suggestedProfiles:
                 suggestedProfilesSheet
             }
@@ -385,6 +388,15 @@ struct MainView: View {
             .applyMapPopupEnvironment(from: self)
             .applyMapPopupPresentation()
             .onDisappear { handleMapPopupDisappear() }
+    }
+
+    /// Profile photo onboarding sheet content.
+    private var profilePhotoOnboardingSheet: some View {
+        ProfilePhotoOnboardingView()
+            .environmentObject(userSession)
+            .presentationDetents([.medium])
+            .presentationDragIndicator(.hidden)
+            .interactiveDismissDisabled(true)
     }
 
     /// Suggested profiles popup sheet content.

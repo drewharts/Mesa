@@ -40,6 +40,7 @@ enum AppSheetType: Identifiable, Equatable {
 
     // MARK: - Onboarding
 
+    case profilePhotoOnboarding
     case suggestedProfiles
 
     // MARK: - Identifiable
@@ -70,6 +71,8 @@ enum AppSheetType: Identifiable, Equatable {
             return "externalFavorites"
         case .keywordResults(let keyword, _):
             return "keywordResults-\(keyword)"
+        case .profilePhotoOnboarding:
+            return "profilePhotoOnboarding"
         case .suggestedProfiles:
             return "suggestedProfiles"
         }
@@ -103,6 +106,8 @@ enum AppSheetType: Identifiable, Equatable {
             return true
         case (.keywordResults(let lhsKeyword, let lhsTypes), .keywordResults(let rhsKeyword, let rhsTypes)):
             return lhsKeyword == rhsKeyword && lhsTypes == rhsTypes
+        case (.profilePhotoOnboarding, .profilePhotoOnboarding):
+            return true
         case (.suggestedProfiles, .suggestedProfiles):
             return true
         default:

@@ -71,10 +71,14 @@ struct ContentView: View {
             Text(navigationErrorMessage)
         }
         .onChange(of: userSession.isUserLoggedIn) { oldValue, newValue in
-            // Show suggested profiles popup on first login via PresentationService
-            if !oldValue && newValue && SuggestedProfilesViewModel.shouldShowPopup {
+            // Show onboarding sheets on first login via PresentationService
+            if !oldValue && newValue {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    PresentationService.shared.present(.suggestedProfiles)
+                    if ProfilePhotoOnboardingViewModel.shouldShowOnboarding {
+                        PresentationService.shared.present(.profilePhotoOnboarding)
+                    } else if SuggestedProfilesViewModel.shouldShowPopup {
+                        PresentationService.shared.present(.suggestedProfiles)
+                    }
                 }
             }
         }
