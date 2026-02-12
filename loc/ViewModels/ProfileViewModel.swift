@@ -11,145 +11,17 @@ import UIKit
 import CoreLocation
 
 
-// MARK: - Profile Data Loading State
-enum ProfileDataLoadingState {
-    case idle
-    case loading
-    case loaded
-    case error
-}
-
-// MARK: - List Place Pagination Model
-struct ListPlacePagination {
-    var allPlaceIds: [String] = []
-    var loadedPlaceIds: [String] = []
-    var currentPage: Int = 0
-    var placesPerPage: Int = 5
-    var isLoadingMore: Bool = false
-    var hasMorePlaces: Bool = true
-    
-    var displayedPlaceIds: [String] {
-        return loadedPlaceIds
-    }
-    
-    var totalPlaces: Int {
-        return allPlaceIds.count
-    }
-    
-    var loadedCount: Int {
-        return loadedPlaceIds.count
-    }
-}
-
 @MainActor
 class ProfileViewModel: ObservableObject {
     @Published var user: ProfileData?
     @Published var userPicture: UIImage?
 
-    // MARK: - Lists Properties (Proxies to listsViewModel for backwards compatibility)
-
-    /// User's place lists (legacy) - proxies to listsViewModel
-    var userLists: [PlaceList] {
-        get { listsViewModel.userLists }
-        set { listsViewModel.userLists = newValue }
-    }
-
-    /// Places in each list by list ID - proxies to listsViewModel
-    var userListsPlaces: [String: [String]] {
-        get { listsViewModel.userListsPlaces }
-        set { listsViewModel.userListsPlaces = newValue }
-    }
-
-    /// Place counts per list - proxies to listsViewModel
-    var placeListCounts: [UUID: Int] {
-        get { listsViewModel.placeListCounts }
-        set { listsViewModel.placeListCounts = newValue }
-    }
-
-    /// Lightweight place lists by proximity - proxies to listsViewModel
-    var lightweightPlaceLists: [LightweightPlaceList] {
-        get { listsViewModel.lightweightPlaceLists }
-        set { listsViewModel.lightweightPlaceLists = newValue }
-    }
-
-    /// Places in each lightweight list - proxies to listsViewModel
-    var lightweightPlaceListPlaces: [String: [LightweightPlace]] {
-        get { listsViewModel.lightweightPlaceListPlaces }
-        set { listsViewModel.lightweightPlaceListPlaces = newValue }
-    }
-
-    /// Place counts for lightweight lists - proxies to listsViewModel
-    var lightweightPlaceListCounts: [String: Int] {
-        get { listsViewModel.lightweightPlaceListCounts }
-        set { listsViewModel.lightweightPlaceListCounts = newValue }
-    }
     // Map filtering triggers
     @Published var selectedListIdForMap: String? = nil // When set, triggers map to show only this list's annotations (String because LightweightPlaceList.id is String)
     @Published var showTikToksOnMap: Bool = false // When set, triggers map to show TikTok places
     @Published var showReviewsOnMap: Bool = false // When set, triggers map to show reviewed places
     @Published var showFavoritesOnMap: Bool = false // When set, triggers map to show favorite places
     @Published var showMyPlacesOnMap: Bool = false // When set, triggers map to show user's created places
-    /// Loading more lists (pagination) - proxies to listsViewModel
-    var isLoadingMorePlaceLists: Bool {
-        get { listsViewModel.isLoadingMorePlaceLists }
-        set { listsViewModel.isLoadingMorePlaceLists = newValue }
-    }
-
-    /// Has more lists to load - proxies to listsViewModel
-    var hasMorePlaceLists: Bool {
-        get { listsViewModel.hasMorePlaceLists }
-        set { listsViewModel.hasMorePlaceLists = newValue }
-    }
-
-    /// Current page for list pagination - proxies to listsViewModel
-    var placeListsCurrentPage: Int {
-        get { listsViewModel.placeListsCurrentPage }
-        set { listsViewModel.placeListsCurrentPage = newValue }
-    }
-
-    /// Loading initial lists - proxies to listsViewModel
-    var isLoadingInitialLists: Bool {
-        get { listsViewModel.isLoadingInitialLists }
-        set { listsViewModel.isLoadingInitialLists = newValue }
-    }
-
-    /// Show only shared/collaborative lists - proxies to listsViewModel
-    var showOnlySharedLists: Bool {
-        get { listsViewModel.showOnlySharedLists }
-        set { listsViewModel.showOnlySharedLists = newValue }
-    }
-
-    /// Searching lists state - proxies to listsViewModel
-    var isSearchingLists: Bool {
-        get { listsViewModel.isSearchingLists }
-        set { listsViewModel.isSearchingLists = newValue }
-    }
-
-    /// List search text - proxies to listsViewModel
-    var listSearchText: String {
-        get { listsViewModel.listSearchText }
-        set { listsViewModel.listSearchText = newValue }
-    }
-
-    /// Count of collaborative lists - proxies to listsViewModel
-    var collaborativeListCount: Int {
-        listsViewModel.collaborativeListCount
-    }
-
-    /// Whether there are any collaborative lists - proxies to listsViewModel
-    var hasSharedLists: Bool {
-        listsViewModel.hasSharedLists
-    }
-
-    /// Whether the Shared filter can be interacted with - proxies to listsViewModel
-    var canInteractWithSharedFilter: Bool {
-        listsViewModel.canInteractWithSharedFilter
-    }
-
-    /// Filtered place lists based on current filter state - proxies to listsViewModel
-    var filteredPlaceLists: [LightweightPlaceList] {
-        listsViewModel.filteredPlaceLists
-    }
 
     // MARK: - Child ViewModels (Composition)
 
@@ -177,12 +49,6 @@ class ProfileViewModel: ObservableObject {
     /// Child ViewModel for place notes management
     let notesViewModel: ProfileNotesViewModel
 
-    /// Recently created list ID - proxies to listsViewModel
-    var recentlyCreatedListId: UUID? {
-        get { listsViewModel.recentlyCreatedListId }
-        set { listsViewModel.recentlyCreatedListId = newValue }
-    }
-
     private let userService: UserService
     private let imageService: ImageService
     private let placeService: PlaceService
@@ -196,47 +62,13 @@ class ProfileViewModel: ObservableObject {
 
      @Published var isLoading: Bool = true
      @Published var isUploadingProfilePhoto: Bool = false
-     @Published var profileCountsLoadingState: ProfileDataLoadingState = .idle
-
-     /// Total list count - proxies to listsViewModel
-     var totalListCount: Int {
-         get { listsViewModel.totalListCount }
-         set { listsViewModel.totalListCount = newValue }
-     }
+     var profileCountsLoadingState: ProfileDataLoadingState = .idle
 
      @Published var totalUniquePlacesCount: Int = 0  // Total unique places (saved + reviewed + created)
-
-    // Lazy loading state for lists - proxies to listsViewModel
-    /// Loaded list IDs - proxies to listsViewModel
-    var loadedListIds: Set<UUID> {
-        get { listsViewModel.loadedListIds }
-        set { listsViewModel.loadedListIds = newValue }
-    }
-
-    /// Currently loading list IDs - proxies to listsViewModel
-    var loadingListIds: Set<UUID> {
-        get { listsViewModel.loadingListIds }
-        set { listsViewModel.loadingListIds = newValue }
-    }
-
-    /// Pagination state for places within each list - proxies to listsViewModel
-    var listPlacePagination: [String: ListPlacePagination] {
-        get { listsViewModel.listPlacePagination }
-        set { listsViewModel.listPlacePagination = newValue }
-    }
-
-    // Performance optimization: image preloading cache
-    @Published var preloadedImages: [String: Bool] = [:] // [imageURL: isPreloaded]
 
     // List search cancellable
     private var listSearchCancellable: AnyCancellable?
 
-    // Place notes - proxied to notesViewModel
-    var placeNotes: [String: PlaceNote] {
-        get { notesViewModel.placeNotes }
-        set { notesViewModel.placeNotes = newValue }
-    }
-    
     // Location manager for distance calculations
     private let locationManager: LocationManager
     private var cancellables = Set<AnyCancellable>()
@@ -404,7 +236,7 @@ class ProfileViewModel: ObservableObject {
     /// Wires up callbacks from tikTokViewModel for cross-cutting concerns.
     private func setupTikTokCallbacks() {
         tikTokViewModel.onRefreshTikTokPlaces = { [weak self] in
-            self?.refreshTikTokPlacesAfterImport()
+            self?.tikTokViewModel.refreshTikTokPlacesAfterImport()
         }
 
         tikTokViewModel.onPlaceImageLoaded = { [weak self] placeId, image in
@@ -441,9 +273,9 @@ class ProfileViewModel: ObservableObject {
         locationManager.$currentLocation
             .dropFirst() // Skip the initial nil value
             .sink { [weak self] location in
-                if location != nil && !(self?.hasPerformedInitialSort ?? false) {
+                if location != nil && !(self?.listsViewModel.hasCompletedInitialSort ?? false) {
                     Task { @MainActor in
-                        self?.sortListsByDistance()
+                        self?.listsViewModel.sortListsByDistance()
                     }
                 }
             }
@@ -470,16 +302,15 @@ class ProfileViewModel: ObservableObject {
             .compactMap { $0 }      // Filter out nil AFTER deduplication
             .sink { [weak self] userId in
                 guard let self = self else { return }
-                
-                
+
                 // Automatically load TikToks and reviews when user becomes available
                 // This happens after login, ensuring data is ready for views
                 // Note: fetchUserExternalPlaces() is NOT called here - it's loaded on-demand
                 // when navigating to PlaceDetailView to avoid unnecessary startup load
                 Task {
-                    async let tikToksLoad: () = self.loadInitialExternalPlaces()
-                    async let reviewsLoad: () = self.loadMyReviewedPlacesWithPagination()
-                    async let myPlacesLoad: () = self.loadInitialMyPlaces()
+                    async let tikToksLoad: () = self.tikTokViewModel.loadInitialExternalPlaces()
+                    async let reviewsLoad: () = self.reviewsViewModel.loadMyReviewedPlacesWithPagination()
+                    async let myPlacesLoad: () = self.myPlacesViewModel.loadInitialMyPlaces()
 
                     // Run in parallel for efficiency
                     _ = await (tikToksLoad, reviewsLoad, myPlacesLoad)
@@ -488,12 +319,30 @@ class ProfileViewModel: ObservableObject {
             .store(in: &cancellables)
     }
 
-    /// Forwards child ViewModel objectWillChange to parent for SwiftUI observation.
-    /// Only forwards VMs not directly observed by views via @ObservedObject.
-    /// tikTokViewModel is forwarded because ProfileView (profile coordinator) accesses it
-    /// via convenience accessor and receives profile as @EnvironmentObject (not init-injected).
-    /// tikTokVM changes are rare (user-initiated TikTok import) so impact is minimal.
+    /// Forwards all child ViewModel objectWillChange to parent for SwiftUI observation.
+    /// Views that access child VMs via @EnvironmentObject var profile: ProfileViewModel
+    /// (rather than direct @ObservedObject) need this forwarding to detect child changes.
     private func setupChildViewModelObservers() {
+        socialViewModel.objectWillChange.sink { [weak self] _ in
+            self?.objectWillChange.send()
+        }.store(in: &cancellables)
+
+        favoritesViewModel.objectWillChange.sink { [weak self] _ in
+            self?.objectWillChange.send()
+        }.store(in: &cancellables)
+
+        listsViewModel.objectWillChange.sink { [weak self] _ in
+            self?.objectWillChange.send()
+        }.store(in: &cancellables)
+
+        reviewsViewModel.objectWillChange.sink { [weak self] _ in
+            self?.objectWillChange.send()
+        }.store(in: &cancellables)
+
+        myPlacesViewModel.objectWillChange.sink { [weak self] _ in
+            self?.objectWillChange.send()
+        }.store(in: &cancellables)
+
         accountViewModel.objectWillChange.sink { [weak self] _ in
             self?.objectWillChange.send()
         }.store(in: &cancellables)
@@ -597,37 +446,16 @@ class ProfileViewModel: ObservableObject {
         socialViewModel.toggleFollowUser(userId: userId, currentUserId: user?.id)
     }
 
-    /// Updates local following state after external follow/unfollow action - delegates to socialViewModel.
-    /// This does NOT make an API call - it only updates local state.
-    func updateFollowingState(userId: String, isFollowing: Bool) {
-        socialViewModel.updateFollowingState(userId: userId, isFollowing: isFollowing)
-    }
-    
     /// Checks if a place is in a specific list - delegates to listsViewModel.
     func isPlaceInList(listId: UUID, placeId: String) -> Bool {
         return listsViewModel.isPlaceInList(listId: listId, placeId: placeId)
     }
     
-    // MARK: - Add to List Functions (Delegates to listsViewModel)
-
-    /// Add a place to a lightweight list - delegates to listsViewModel.
-    func addPlaceToLightweightList(listId: String, place: DetailPlace, updatedCount: Int? = nil) {
-        listsViewModel.addPlaceToLightweightList(listId: listId, place: place, updatedCount: updatedCount)
-    }
+    // MARK: - Legacy List Methods (kept until legacy removal)
 
     /// Add a place to a list (old UUID-based format) - delegates to listsViewModel.
     func addPlaceToList(listId: UUID, place: DetailPlace) {
         listsViewModel.addPlaceToList(listId: listId, place: place)
-    }
-
-    /// Remove a place from a lightweight list using a DetailPlace reference.
-    func removePlaceFromLightweightList(listId: String, place: DetailPlace, updatedCount: Int? = nil) {
-        listsViewModel.removePlaceFromLightweightList(listId: listId, place: place, updatedCount: updatedCount)
-    }
-
-    /// Remove a place from a lightweight list by place ID.
-    func removePlaceFromLightweightList(listId: String, placeId: String) {
-        listsViewModel.removePlaceFromLightweightList(listId: listId, placeId: placeId)
     }
 
     /// Remove a place from a list (old UUID-based format) - delegates to listsViewModel.
@@ -635,23 +463,6 @@ class ProfileViewModel: ObservableObject {
         listsViewModel.removePlaceFromList(listId: listId, place: place)
     }
     
-    // MARK: - Favorites (Delegates to favoritesViewModel)
-
-    /// Adds a place to favorites - delegates to favoritesViewModel.
-    func addFavoritePlace(place: DetailPlace) {
-        favoritesViewModel.addFavoritePlace(place: place)
-    }
-
-    /// Removes a place from favorites - delegates to favoritesViewModel.
-    func removeFavoritePlace(place: DetailPlace) {
-        favoritesViewModel.removeFavoritePlace(place: place)
-    }
-
-    /// Checks if a place is in the user's favorites - delegates to favoritesViewModel.
-    func isPlaceFavorite(placeId: String) -> Bool {
-        return favoritesViewModel.isPlaceFavorite(placeId: placeId)
-    }
-
     /// Updates placeSavers dictionary for map display (cross-cutting concern kept in parent).
     private func updatePlaceSavers(placeId: String, userId: String, isAdding: Bool) {
         if isAdding {
@@ -668,30 +479,6 @@ class ProfileViewModel: ObservableObject {
         }
     }
 
-    // MARK: - Place Notes (Delegates to notesViewModel)
-
-    /// Saves a place note - delegates to notesViewModel.
-    func savePlaceNote(for placeId: String, note: String?, link: String?) {
-        notesViewModel.savePlaceNote(for: placeId, note: note, link: link)
-    }
-
-    /// Loads a place note - delegates to notesViewModel.
-    func loadPlaceNote(for placeId: String) {
-        notesViewModel.loadPlaceNote(for: placeId)
-    }
-
-    /// Deletes a place note - delegates to notesViewModel.
-    func deletePlaceNote(for placeId: String) {
-        notesViewModel.deletePlaceNote(for: placeId)
-    }
-    
-    // MARK: - TikTok Place Flagging (Delegates to tikTokViewModel)
-
-    /// Flags a TikTok place - delegates to tikTokViewModel.
-    func flagTikTokPlace(for placeId: String, flagType: TikTokPlaceFlagType, tikTokUrl: String? = nil, userComment: String? = nil) {
-        tikTokViewModel.flagTikTokPlace(for: placeId, flagType: flagType, tikTokUrl: tikTokUrl, userComment: userComment)
-    }
-
     /// Records a place correction flag for analytics after user corrects a TikTok place association.
     func recordPlaceCorrectionFlag(for placeId: String, newPlaceId: String) {
         let tikTokUrl = tikTokViewModel.getExternalPlace(for: placeId)?.url
@@ -703,42 +490,6 @@ class ProfileViewModel: ObservableObject {
         )
     }
 
-    /// Loads a TikTok place flag - delegates to tikTokViewModel.
-    func loadTikTokPlaceFlag(for placeId: String) {
-        tikTokViewModel.loadTikTokPlaceFlag(for: placeId)
-    }
-
-    /// Removes a TikTok place flag - delegates to tikTokViewModel.
-    func removeTikTokPlaceFlag(for placeId: String) {
-        tikTokViewModel.removeTikTokPlaceFlag(for: placeId)
-    }
-
-    /// Gets a TikTok place flag - delegates to tikTokViewModel.
-    func getTikTokPlaceFlag(for placeId: String) -> TikTokPlaceFlag? {
-        return tikTokViewModel.getTikTokPlaceFlag(for: placeId)
-    }
-
-    /// Checks if a TikTok place has been flagged - delegates to tikTokViewModel.
-    func hasFlaggedTikTokPlace(placeId: String) -> Bool {
-        return tikTokViewModel.hasFlaggedTikTokPlace(placeId: placeId)
-    }
-    /// Creates a new place list - delegates to listsViewModel.
-    func addNewPlaceList(named name: String, city: String, emoji: String, image: String) async -> Result<PlaceList, Error> {
-        return await listsViewModel.addNewPlaceList(named: name, city: city, emoji: emoji, image: image)
-    }
-
-    /// Deletes a lightweight place list - delegates to listsViewModel.
-    func deleteLightweightList(_ list: LightweightPlaceList) async -> Result<Void, Error> {
-        return await listsViewModel.deleteLightweightList(list)
-    }
-
-    /// Removes a place list (legacy) - delegates to listsViewModel.
-    func removePlaceList(placeList: PlaceList) {
-        listsViewModel.removePlaceList(placeList: placeList)
-    }
-
-    
-    
      // Returns unique users who saved a place, excluding the current logged-in user
      func getUniquePlaceSaversExcludingCurrentUser(forPlaceId placeId: String) -> [ProfileData] {
          guard let userIds = detailPlaceViewModel.placeSavers[placeId], let currentUserId = user?.id else { return [] }
@@ -753,18 +504,8 @@ class ProfileViewModel: ObservableObject {
          return uniqueUsers
      }
     
-    /// Checks if a place is in any of the user's lists - delegates to listsViewModel.
-    func isPlaceInAnyList(placeId: String) async -> Bool {
-        return await listsViewModel.isPlaceInAnyList(placeId: placeId)
-    }
-
-    /// Returns the count of places in the PlaceList with the given id, or 0 if not found
-    func placeCount(forListId listId: UUID) -> Int {
-        return userLists.first(where: { $0.id == listId })?.places.count ?? 0
-    }
-    
+    /// Refreshes place data for all saved places across favorites and lists.
     func refreshUserPlaces() async {
-        // Combine all place IDs from favorites and all lists, then de-duplicate
         var allPlaceIds = Set(favoritesViewModel.userFavorites)
         for list in listsViewModel.userListsPlaces.values {
             allPlaceIds.formUnion(list)
@@ -772,87 +513,6 @@ class ProfileViewModel: ObservableObject {
         await detailPlaceViewModel.refreshPlaces(detailPlaces: Array(allPlaceIds))
     }
 
-    // MARK: - Reviews (Delegates to reviewsViewModel)
-
-    /// Loads initial reviewed places - delegates to reviewsViewModel.
-    func loadMyReviewedPlacesWithPagination() async {
-        await reviewsViewModel.loadMyReviewedPlacesWithPagination()
-    }
-
-    /// Loads more reviewed places (pagination) - delegates to reviewsViewModel.
-    func loadMoreMyReviews() async {
-        await reviewsViewModel.loadMoreMyReviews()
-    }
-
-    /// Gets reviewed places for display (uses cross-cutting detailPlaceViewModel data).
-    func getMyReviewedPlaces() -> [DetailPlace] {
-        return reviewsViewModel.lightweightReviewedPlaces.compactMap { detailPlaceViewModel.places[$0.place_id] }
-    }
-
-    // MARK: - TikTok Places Refresh After Import
-    
-    // MARK: - External Places (Delegates to tikTokViewModel)
-
-    /// Refreshes TikTok places list after a successful import - delegates to tikTokViewModel.
-    func refreshTikTokPlacesAfterImport() {
-        tikTokViewModel.refreshTikTokPlacesAfterImport()
-    }
-
-    /// Loads initial external places (TikTok places) - delegates to tikTokViewModel.
-    func loadInitialExternalPlaces() async {
-        await tikTokViewModel.loadInitialExternalPlaces()
-    }
-
-    /// Loads more external places (pagination) - delegates to tikTokViewModel.
-    func loadMoreExternalPlaces() async {
-        await tikTokViewModel.loadMoreExternalPlaces()
-    }
-    
-    // MARK: - My Places (Delegates to myPlacesViewModel)
-
-    /// Loads initial my places - delegates to myPlacesViewModel.
-    func loadInitialMyPlaces() async {
-        await myPlacesViewModel.loadInitialMyPlaces()
-    }
-
-    /// Loads more my places (pagination) - delegates to myPlacesViewModel.
-    func loadMoreMyPlaces() async {
-        await myPlacesViewModel.loadMoreMyPlaces()
-    }
-
-    // MARK: - TikTok Place Deletion (Delegates to tikTokViewModel)
-
-    /// Deletes a TikTok place with completion handler - delegates to tikTokViewModel.
-    func deleteTikTokPlace(_ place: DetailPlace, completion: @escaping (Bool) -> Void) {
-        tikTokViewModel.deleteTikTokPlace(place, completion: completion)
-    }
-
-    /// Delete a TikTok place using LightweightPlace - delegates to tikTokViewModel.
-    func deleteTikTokPlace(_ place: LightweightPlace) {
-        tikTokViewModel.deleteTikTokPlace(place)
-    }
-
-    /// Updates a TikTok place association by external place ID - delegates to tikTokViewModel.
-    func updateTikTokPlaceById(externalPlaceId: String, newPlaceId: String, newPlaceName: String) async {
-        await tikTokViewModel.updateTikTokPlaceById(externalPlaceId: externalPlaceId, newPlaceId: newPlaceId, newPlaceName: newPlaceName)
-    }
-    // MARK: - List Sorting by Distance (Delegates to listsViewModel)
-
-    /// Sorts userLists by their distance from the user's current location - delegates to listsViewModel.
-    func sortListsByDistance() {
-        listsViewModel.sortListsByDistance()
-    }
-
-    /// Recalculates the average coordinates for a specific list - delegates to listsViewModel.
-    func recalculateAverageCoordinates(for listId: UUID) {
-        listsViewModel.recalculateAverageCoordinates(for: listId)
-    }
-
-    /// Whether the initial sort has been performed - delegates to listsViewModel.
-    var hasPerformedInitialSort: Bool {
-        listsViewModel.hasCompletedInitialSort
-    }
-    
     // MARK: - TikTok Processing (Delegation to tikTokViewModel)
 
     /// Processes a shared TikTok URL - delegates to tikTokViewModel.
@@ -872,11 +532,6 @@ class ProfileViewModel: ObservableObject {
         )
     }
 
-    /// Clears TikTok import error - delegates to tikTokViewModel.
-    func clearTikTokImportError() {
-        tikTokViewModel.clearTikTokImportError()
-    }
-
     /// Clears place selection state - delegates to tikTokViewModel.
     func clearPlaceSelection() {
         tikTokViewModel.clearPlaceSelection()
@@ -892,77 +547,6 @@ class ProfileViewModel: ObservableObject {
         tikTokViewModel.placeSelectionViewAppeared(deepLinkManager: deepLinkManager, deepLinkViewModel: deepLinkViewModel)
     }
 
-    // MARK: - Legacy List Loading (Delegates to listsViewModel)
-
-    /// Ensures lists are loaded with DetailPlace data - delegates to listsViewModel.
-    func ensureListsLoaded() {
-        listsViewModel.ensureListsLoaded()
-    }
-
-    /// Loads list data if needed for a specific list - delegates to listsViewModel.
-    func loadListDataIfNeeded(listId: UUID) {
-        listsViewModel.loadListDataIfNeeded(listId: listId)
-    }
-
-    /// Load more lists when user scrolls - delegates to listsViewModel.
-    func loadMoreListsIfNeeded() {
-        listsViewModel.loadMoreListsIfNeeded()
-    }
-    
-    // MARK: - List Place Pagination Methods (Delegates to listsViewModel)
-
-    /// Initialize pagination if needed - delegates to listsViewModel.
-    func initializeListPaginationIfNeeded(listId: UUID) {
-        listsViewModel.initializeListPaginationIfNeeded(listId: listId)
-    }
-
-    /// Load the next page of places for a specific list - delegates to listsViewModel.
-    func loadNextPageForList(listId: UUID) {
-        listsViewModel.loadNextPageForList(listId: listId)
-    }
-
-    /// Get the displayed place IDs for a list (respecting pagination) - delegates to listsViewModel.
-    func getDisplayedPlaceIds(for listId: UUID) -> [String] {
-        listsViewModel.getDisplayedPlaceIds(for: listId)
-    }
-
-    /// Check if a list has more places to load - delegates to listsViewModel.
-    func hasMorePlaces(for listId: UUID) -> Bool {
-        listsViewModel.hasMorePlaces(for: listId)
-    }
-
-    /// Check if a list is currently loading more places - delegates to listsViewModel.
-    func isLoadingMorePlaces(for listId: UUID) -> Bool {
-        listsViewModel.isLoadingMorePlaces(for: listId)
-    }
-
-    /// Get the total number of places in a list - delegates to listsViewModel.
-    func getTotalPlaceCount(for listId: UUID) -> Int {
-        listsViewModel.getTotalPlaceCount(for: listId)
-    }
-
-    /// Reset pagination for a list - delegates to listsViewModel.
-    func resetListPagination(listId: UUID) {
-        listsViewModel.resetListPagination(listId: listId)
-    }
-
-    /// Smart image preloading for visible places (simplified).
-    func preloadImagesForVisiblePlaces(listId: UUID) {
-        let displayedPlaceIds = listsViewModel.getDisplayedPlaceIds(for: listId)
-
-        // Simple preloading without complex async - just mark as ready
-        for placeId in displayedPlaceIds {
-            if let place = detailPlaceViewModel.places[placeId] {
-                // Preload TikTok thumbnails
-                if let tikTokVideos = place.tikTokVideos,
-                   let firstVideo = tikTokVideos.first,
-                   !firstVideo.thumbnailURL.isEmpty {
-                    preloadedImages[firstVideo.thumbnailURL] = true
-                }
-            }
-        }
-    }
-    
     // MARK: - Place Conversion
     
     func convertToDetailPlace(_ nearbyPlace: NearbyPlaceFeature) -> DetailPlace {
@@ -1031,19 +615,8 @@ class ProfileViewModel: ObservableObject {
         // Clear place notes (delegated to child ViewModel)
         notesViewModel.resetAllData()
 
-        // Reset loading states
-        isLoadingInitialLists = false
-        isLoadingMorePlaceLists = false
-        // Note: TikTok loading states are reset via tikTokViewModel.resetAllData() above
-        // Note: Social loading states are reset via socialViewModel.resetAllData() above
-        // Note: My Places loading states are reset via myPlacesViewModel.resetAllData() above
-        // Note: Reviews loading states are reset via reviewsViewModel.resetAllData() above
-        // Note: Lists loading states are reset via listsViewModel.resetAllData() above
-
         // Clear other state
-        preloadedImages.removeAll()
         totalUniquePlacesCount = 0
-        // Note: hasPerformedInitialSort is reset via listsViewModel.resetAllData() above
 
         // Clear UI state flags
         isUploadingProfilePhoto = false
@@ -1059,39 +632,70 @@ class ProfileViewModel: ObservableObject {
 
     // MARK: - Profile Counts Loading
 
-    /// Loads all profile counts, favorites, and place lists in parallel.
-    /// Guards against redundant loads — only fires when state is .idle.
+    /// Runs an async operation, returning the fallback on any error including task cancellation.
+    private func resilientFetch<T>(_ fallback: T, _ operation: () async throws -> T) async -> T {
+        do {
+            return try await operation()
+        } catch {
+            if !(error is CancellationError) && (error as? URLError)?.code != .cancelled {
+                print("⚠️ [resilientFetch] Error (keeping current value): \(error)")
+            }
+            return fallback
+        }
+    }
+
+    /// Fetches profile counts and favorites in parallel, preserving current values on cancellation.
     func loadProfileCounts() async {
         guard profileCountsLoadingState == .idle else { return }
         guard let userId = user?.id ?? userSession.currentUserId else { return }
 
         profileCountsLoadingState = .loading
+        let fallbacks = captureCurrentCountFallbacks()
+        showLoadingIndicatorsIfInitialLoad(fallbacks)
 
-        socialViewModel.isFollowersLoading = true
-        socialViewModel.isFollowingLoading = true
-        myPlacesViewModel.isMyPlacesLoading = true
+        async let followers: Int = resilientFetch(fallbacks.followers) { try await self.userService.getNumberFollowers(forUserId: userId) }
+        async let following: Int = resilientFetch(fallbacks.following) { try await self.userService.getNumberFollowing(forUserId: userId) }
+        async let favorites: [FavoritePlace] = resilientFetch(fallbacks.favorites) { try await self.userService.fetchUserFavorites(userId: userId) }
+        async let totalUniquePlaces: Int = resilientFetch(fallbacks.uniquePlaces) { try await self.userService.getTotalPlacesCount(forUserId: userId) }
 
-        async let followers: Int = (try? await userService.getNumberFollowers(forUserId: userId)) ?? 0
-        async let following: Int = (try? await userService.getNumberFollowing(forUserId: userId)) ?? 0
-        async let myPlaces: Int = (try? await userService.getNumberMyPlaces(forUserId: userId)) ?? 0
-        async let totalLists: Int = (try? await userService.getTotalListCount(forUserId: userId)) ?? 0
-        async let favorites: [FavoritePlace] = (try? await userService.fetchUserFavorites(userId: userId)) ?? []
-        async let totalUniquePlaces: Int = (try? await userService.getTotalPlacesCount(forUserId: userId)) ?? 0
-
-        let (followersCount, followingCount, myPlacesCount, totalListCount, favoritePlaces, uniquePlacesCount) = await (followers, following, myPlaces, totalLists, favorites, totalUniquePlaces)
+        let (followersCount, followingCount, favoritePlaces, uniquePlacesCount) = await (followers, following, favorites, totalUniquePlaces)
 
         socialViewModel.followersCount = followersCount
         socialViewModel.followingCount = followingCount
-        listsViewModel.totalListCount = totalListCount
         totalUniquePlacesCount = uniquePlacesCount
-        myPlacesViewModel.myPlaces = Array(repeating: "", count: myPlacesCount)
         favoritesViewModel.lightweightFavorites = favoritePlaces
         socialViewModel.isFollowersLoading = false
         socialViewModel.isFollowingLoading = false
-        myPlacesViewModel.isMyPlacesLoading = false
 
-        // Update placeSavers for favorites so "Saved By" feature works
-        for favorite in favoritePlaces {
+        addCurrentUserToPlaceSavers(for: favoritePlaces, userId: userId)
+        profileCountsLoadingState = .loaded
+
+        Task.detached(priority: .userInitiated) { [weak self] in
+            await self?.listsViewModel.loadInitialLists()
+        }
+    }
+
+    /// Captures current count values as fallbacks so cancelled queries preserve existing data.
+    private func captureCurrentCountFallbacks() -> (followers: Int, following: Int, favorites: [FavoritePlace], uniquePlaces: Int) {
+        return (
+            socialViewModel.followersCount,
+            socialViewModel.followingCount,
+            favoritesViewModel.lightweightFavorites,
+            totalUniquePlacesCount
+        )
+    }
+
+    /// Shows loading indicators only on initial load (refresh already shows pull-to-refresh spinner).
+    private func showLoadingIndicatorsIfInitialLoad(_ fallbacks: (followers: Int, following: Int, favorites: [FavoritePlace], uniquePlaces: Int)) {
+        if fallbacks.followers == 0 && fallbacks.following == 0 {
+            socialViewModel.isFollowersLoading = true
+            socialViewModel.isFollowingLoading = true
+        }
+    }
+
+    /// Marks the current user as a saver for each favorited place (for "Saved By" map display).
+    private func addCurrentUserToPlaceSavers(for favorites: [FavoritePlace], userId: String) {
+        for favorite in favorites {
             let placeId = favorite.place_id
             if detailPlaceViewModel.placeSavers[placeId] == nil {
                 detailPlaceViewModel.placeSavers[placeId] = [userId]
@@ -1099,18 +703,23 @@ class ProfileViewModel: ObservableObject {
                 detailPlaceViewModel.placeSavers[placeId]!.append(userId)
             }
         }
-
-        profileCountsLoadingState = .loaded
-
-        // Load lists in background — don't block profile display
-        Task.detached(priority: .userInitiated) { [weak self] in
-            await self?.listsViewModel.loadInitialLists()
-        }
     }
 
     /// Resets profile counts loading state to allow a fresh fetch (e.g. pull-to-refresh).
     func invalidateProfileCounts() {
         profileCountsLoadingState = .idle
+    }
+
+    /// Refreshes all profile data for pull-to-refresh.
+    func refreshProfile() async {
+        invalidateProfileCounts()
+        await loadProfileCounts()
+
+        async let reviews: Void = reviewsViewModel.refreshReviewedPlaces()
+        async let tiktoks: Void = tikTokViewModel.reloadLightweightExternalPlaces()
+        async let myPlaces: Void = myPlacesViewModel.refreshMyPlaces()
+
+        _ = await (reviews, tiktoks, myPlaces)
     }
 
     /// Handles a TikTok notification by processing the URL - delegates to tikTokViewModel.
@@ -1200,34 +809,9 @@ class ProfileViewModel: ObservableObject {
         return tikTokViewModel.hasTikTokVideos(for: placeId)
     }
 
-    /// Gets TikTok videos for a place using cached metadata - delegates to tikTokViewModel.
-    func getTikTokVideosSync(for placeId: String) -> [TikTokVideo] {
-        return tikTokViewModel.getTikTokVideosSync(for: placeId)
-    }
-
     /// Gets the external place data for a specific place ID - delegates to tikTokViewModel.
     func getExternalPlace(for placeId: String) -> ExternalPlace? {
         return tikTokViewModel.getExternalPlace(for: placeId)
-    }
-
-    /// Gets first TikTok thumbnail URL for a place - delegates to tikTokViewModel.
-    func getFirstTikTokThumbnailURL(for placeId: String) -> String? {
-        return tikTokViewModel.getFirstTikTokThumbnailURL(for: placeId)
-    }
-
-    /// Loads images for places with prioritization - delegates to tikTokViewModel.
-    func loadPriorityImagesForPlaces(_ places: [DetailPlace], priorityCount: Int = 8) {
-        tikTokViewModel.loadPriorityImagesForPlaces(places, priorityCount: priorityCount)
-    }
-
-    /// Deletes a user-created place (DetailPlace version) - delegates to myPlacesViewModel.
-    func deleteMyPlace(_ place: DetailPlace, completion: @escaping (Bool) -> Void) {
-        myPlacesViewModel.deleteMyPlace(place, completion: completion)
-    }
-
-    /// Deletes a user-created place (LightweightPlace version) - delegates to myPlacesViewModel.
-    func deleteMyPlace(_ place: LightweightPlace) {
-        myPlacesViewModel.deleteMyPlace(place)
     }
 
 }

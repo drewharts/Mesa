@@ -66,7 +66,7 @@ struct TikTokPlaceSelectionView: View {
                                 place: place,
                                 onBookmarkTapped: {
                                     print("🔍 [TikTokPlaceSelectionView] Bookmark tapped for place: \(place.name)")
-                                    profile.ensureListsLoaded()
+                                    profile.listsViewModel.ensureListsLoaded()
                                     selectedPlaceForList = place
                                     showingListSelection = true
                                 },
@@ -114,7 +114,7 @@ struct TikTokPlaceSelectionView: View {
             .navigationBarBackButtonHidden(true)
             .onAppear {
                 // Ensure user's lists are loaded before showing list selection sheets
-                profile.ensureListsLoaded()
+                profile.listsViewModel.ensureListsLoaded()
                 profile.placeSelectionViewAppeared()
             }
         }
@@ -210,7 +210,7 @@ struct PlaceRowView: View {
                 onBookmarkTapped()
                 // Refresh state after bookmark action (optimistic update)
                 Task {
-                    isInList = await profile.isPlaceInAnyList(placeId: place.id.uuidString)
+                    isInList = await profile.listsViewModel.isPlaceInAnyList(placeId: place.id.uuidString)
                 }
             }) {
                 Image(systemName: isInList ? "bookmark.fill" : "bookmark")
@@ -228,13 +228,13 @@ struct PlaceRowView: View {
             onPlaceTapped()
         }
         .task {
-            isInList = await profile.isPlaceInAnyList(placeId: place.id.uuidString)
+            isInList = await profile.listsViewModel.isPlaceInAnyList(placeId: place.id.uuidString)
         }
         // ✅ SRP: View observes ViewModel's published state (proper MVVM)
         // Update when list membership changes (reactive to ViewModel state)
         .onChange(of: listsVM.lightweightPlaceListPlaces) { _ in
             Task {
-                isInList = await profile.isPlaceInAnyList(placeId: place.id.uuidString)
+                isInList = await profile.listsViewModel.isPlaceInAnyList(placeId: place.id.uuidString)
             }
         }
     }

@@ -129,6 +129,30 @@ class ProfileReviewsViewModel: ObservableObject {
         await loadInitialReviewedPlaces()
     }
 
+    /// Refreshes reviewed places data for pull-to-refresh (bypasses initial-load guards).
+    func refreshReviewedPlaces() async {
+        guard let userId = userSession?.currentUserId else { return }
+
+        do {
+            async let placesTask = userService.fetchUserReviewedPlaces(userId: userId, limit: reviewsPerPage, offset: 0)
+            async let countTask = SupabaseUserService.shared.getNumberReviewedPlaces(forUserId: userId)
+
+            let lightweightPlaces = try await placesTask
+            let totalCount = (try? await countTask) ?? 0
+
+            lightweightReviewedPlaces = lightweightPlaces
+            totalReviewedPlacesCount = totalCount
+            hasMoreReviews = !lightweightPlaces.isEmpty && lightweightPlaces.count >= reviewsPerPage
+            hasAttemptedInitialReviewsLoad = true
+
+            Task {
+                await loadPlaceDetailsForReviews(lightweightPlaces, userId: userId)
+            }
+        } catch {
+            print("❌ [ProfileReviewsViewModel] Error refreshing reviewed places: \(error.localizedDescription)")
+        }
+    }
+
     /// Loads more reviewed places (pagination).
     func loadMoreMyReviews() async {
         guard let userId = userSession?.currentUserId else {

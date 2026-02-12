@@ -104,10 +104,10 @@ class PlaceDetailTabsViewModel: ObservableObject {
 
         // Wire up notes callbacks to sync with ProfileViewModel
         self.notesTabViewModel.onNoteSaved = { [weak profileVM] placeId, note in
-            profileVM?.placeNotes[placeId] = note
+            profileVM?.notesViewModel.placeNotes[placeId] = note
         }
         self.notesTabViewModel.onNoteDeleted = { [weak profileVM] placeId in
-            profileVM?.placeNotes.removeValue(forKey: placeId)
+            profileVM?.notesViewModel.placeNotes.removeValue(forKey: placeId)
         }
 
         // Store photosVM for data-driven updates
@@ -136,9 +136,9 @@ class PlaceDetailTabsViewModel: ObservableObject {
         // Wire up posts callbacks
         self.postsViewModel.onToggleFavorite = { [weak profileVM] place, shouldFavorite in
             if shouldFavorite {
-                profileVM?.addFavoritePlace(place: place)
+                profileVM?.favoritesViewModel.addFavoritePlace(place: place)
             } else {
-                profileVM?.removeFavoritePlace(place: place)
+                profileVM?.favoritesViewModel.removeFavoritePlace(place: place)
             }
         }
         self.postsViewModel.onCheckLikeStatuses = { [weak selectedPlaceVM] userId in

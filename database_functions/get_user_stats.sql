@@ -5,20 +5,20 @@
 -- followers, following, and my_places
 -- ============================================================================
 
-CREATE OR REPLACE FUNCTION public.get_user_stats(p_user_id uuid)
+CREATE OR REPLACE FUNCTION public.get_user_stats(p_user_id text)
 RETURNS TABLE(
-    favorites_count bigint, 
-    lists_count bigint, 
-    reviews_count bigint, 
-    followers_count bigint, 
-    following_count bigint, 
+    favorites_count bigint,
+    lists_count bigint,
+    reviews_count bigint,
+    followers_count bigint,
+    following_count bigint,
     my_places_count bigint
 )
 LANGUAGE plpgsql
 AS $function$
 BEGIN
     RETURN QUERY
-    SELECT 
+    SELECT
         (SELECT COUNT(*) FROM favorites WHERE user_id = p_user_id) AS favorites_count,
         (SELECT COUNT(*) FROM place_lists WHERE user_id = p_user_id) AS lists_count,
         (SELECT COUNT(*) FROM reviews WHERE user_id = p_user_id) AS reviews_count,

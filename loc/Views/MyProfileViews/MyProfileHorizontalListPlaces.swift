@@ -36,7 +36,7 @@ struct MyProfileHorizontalListPlaces: View {
         }
         
         // Check user's TikTok videos for this place (uses cached data)
-        return viewModel.getFirstTikTokThumbnailURL(for: place.id.uuidString)
+        return viewModel.tikTokViewModel.getFirstTikTokThumbnailURL(for: place.id.uuidString)
     }
     
     // Check if a place should load its image (only if actually visible on screen and not already loaded)
@@ -101,8 +101,8 @@ struct MyProfileHorizontalListPlaces: View {
     
     var places: [DetailPlace] {
         // Use paginated place IDs instead of all place IDs
-        let placeIds = viewModel.getDisplayedPlaceIds(for: listId)
-        let allPlaceIds = viewModel.userListsPlaces[listId.uuidString] ?? []
+        let placeIds = viewModel.listsViewModel.getDisplayedPlaceIds(for: listId)
+        let allPlaceIds = viewModel.listsViewModel.userListsPlaces[listId.uuidString] ?? []
         
         // If pagination hasn't loaded yet but we have places, show first 5
         if placeIds.isEmpty && !allPlaceIds.isEmpty {
@@ -117,8 +117,8 @@ struct MyProfileHorizontalListPlaces: View {
     private func handleScrollDetection() {
         scrollDebounceTimer?.invalidate()
         scrollDebounceTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: false) { _ in
-            if isNearEnd && viewModel.hasMorePlaces(for: listId) && !viewModel.isLoadingMorePlaces(for: listId) {
-                viewModel.loadNextPageForList(listId: listId)
+            if isNearEnd && viewModel.listsViewModel.hasMorePlaces(for: listId) && !viewModel.listsViewModel.isLoadingMorePlaces(for: listId) {
+                viewModel.listsViewModel.loadNextPageForList(listId: listId)
             }
         }
     }
@@ -295,13 +295,13 @@ struct MyProfileHorizontalListPlaces: View {
                 }
                 
                 // Show a smooth "more places" indicator if there are more places to load
-                if viewModel.hasMorePlaces(for: listId) {
+                if viewModel.listsViewModel.hasMorePlaces(for: listId) {
                     VStack {
                         Image(systemName: "ellipsis")
                             .font(.title2)
                             .foregroundColor(.gray)
-                            .scaleEffect(viewModel.isLoadingMorePlaces(for: listId) ? 1.2 : 1.0)
-                            .animation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true), value: viewModel.isLoadingMorePlaces(for: listId))
+                            .scaleEffect(viewModel.listsViewModel.isLoadingMorePlaces(for: listId) ? 1.2 : 1.0)
+                            .animation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true), value: viewModel.listsViewModel.isLoadingMorePlaces(for: listId))
                         Text("More")
                             .font(.caption)
                             .foregroundColor(.gray)
@@ -319,7 +319,7 @@ struct MyProfileHorizontalListPlaces: View {
                 }
                 
                 // Show smooth loading indicator if loading more places
-                if viewModel.isLoadingMorePlaces(for: listId) {
+                if viewModel.listsViewModel.isLoadingMorePlaces(for: listId) {
                     VStack(spacing: 4) {
                         ProgressView()
                             .scaleEffect(0.8)
@@ -363,11 +363,11 @@ struct MyProfileHorizontalListPlaces: View {
         }
         .onAppear {
             // Smart initialization: only initialize if needed
-            let allPlaceIds = viewModel.userListsPlaces[listId.uuidString] ?? []
+            let allPlaceIds = viewModel.listsViewModel.userListsPlaces[listId.uuidString] ?? []
             
-            if !allPlaceIds.isEmpty && viewModel.getDisplayedPlaceIds(for: listId).isEmpty {
+            if !allPlaceIds.isEmpty && viewModel.listsViewModel.getDisplayedPlaceIds(for: listId).isEmpty {
                 // Only initialize if we have places but haven't loaded any yet
-                viewModel.initializeListPaginationIfNeeded(listId: listId)
+                viewModel.listsViewModel.initializeListPaginationIfNeeded(listId: listId)
             }
             
             // Batch color assignment for better performance

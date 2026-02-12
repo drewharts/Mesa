@@ -205,7 +205,7 @@ struct PlaceDetailViewContent: View {
             }
             .onAppear {
                 // Refresh TikTok places when place detail view appears
-                profile.refreshTikTokPlacesAfterImport()
+                profile.tikTokViewModel.refreshTikTokPlacesAfterImport()
             }
             // MARK: - Data-Driven Updates (View drives ViewModel state via modifiers)
             .modifier(PlaceChangeHandler(
@@ -271,11 +271,11 @@ struct PlaceDetailViewContent: View {
             vm.setPosts(selectedPlaceVM.posts, rating: selectedPlaceVM.placeRating)
 
             // Set favorite status
-            let isFavorited = profile.isPlaceFavorite(placeId: place.id.uuidString)
+            let isFavorited = profile.favoritesViewModel.isPlaceFavorite(placeId: place.id.uuidString)
             vm.setFavoriteStatus(isFavorited)
 
             // Set TikTok videos
-            let userVideos = profile.getTikTokVideosSync(for: place.id.uuidString)
+            let userVideos = profile.tikTokViewModel.getTikTokVideosSync(for: place.id.uuidString)
             vm.setTikTokVideos(placeVideos: selectedPlaceVM.tiktokVideos, userVideos: userVideos)
 
             // Set post loading state

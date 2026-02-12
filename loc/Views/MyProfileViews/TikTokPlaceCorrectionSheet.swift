@@ -45,7 +45,7 @@ struct TikTokPlaceCorrectionSheet: View {
             }
             .onChange(of: viewModel.didComplete) { _, completed in
                 if completed, let place = viewModel.resolvedPlace {
-                    profile.refreshTikTokPlacesAfterImport()
+                    profile.tikTokViewModel.refreshTikTokPlacesAfterImport()
                     dismiss()
                     onPlaceChanged?(place)
                 }

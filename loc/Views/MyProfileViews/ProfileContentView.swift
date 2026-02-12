@@ -182,6 +182,9 @@ struct ProfileContentView: View {
                 .padding(.top, 20)
                 .padding(.bottom, 40)
             }
+            .refreshable {
+                await profile.refreshProfile()
+            }
         }
         .sheet(isPresented: $showEditProfileForSocials) {
             if let user = profile.user {

@@ -58,7 +58,7 @@ class SwipeableListPopupViewModel: ObservableObject {
     
     func deleteCurrentList(profileViewModel: ProfileViewModel) -> Bool {
         let listToDelete = currentList
-        profileViewModel.removePlaceList(placeList: listToDelete)
+        profileViewModel.listsViewModel.removePlaceList(placeList: listToDelete)
         
         // Handle navigation after deletion
         if lists.count <= 1 {

@@ -31,14 +31,14 @@ struct TikTokChangeHandler: ViewModifier {
     /// Handles TikTok videos changes from the place.
     private func handleTikTokVideosChanged(_ newVideos: [TikTokVideo]) {
         guard let place = selectedPlaceVM.selectedPlace else { return }
-        let userVideos = profile.getTikTokVideosSync(for: place.id.uuidString)
+        let userVideos = profile.tikTokViewModel.getTikTokVideosSync(for: place.id.uuidString)
         tabsViewModel?.setTikTokVideos(placeVideos: newVideos, userVideos: userVideos)
     }
 
     /// Handles external places changes (user's TikTok associations).
     private func handleExternalPlacesChanged() {
         guard let place = selectedPlaceVM.selectedPlace else { return }
-        let userVideos = profile.getTikTokVideosSync(for: place.id.uuidString)
+        let userVideos = profile.tikTokViewModel.getTikTokVideosSync(for: place.id.uuidString)
         tabsViewModel?.setTikTokVideos(placeVideos: selectedPlaceVM.tiktokVideos, userVideos: userVideos)
     }
 }

@@ -61,13 +61,13 @@ struct PlaceChangeHandler: ViewModifier {
 
     /// Updates favorite status for the given place.
     private func updateFavoriteStatus(for place: DetailPlace) {
-        let isFavorited = profile.isPlaceFavorite(placeId: place.id.uuidString)
+        let isFavorited = profile.favoritesViewModel.isPlaceFavorite(placeId: place.id.uuidString)
         tabsViewModel?.setFavoriteStatus(isFavorited)
     }
 
     /// Updates user TikTok videos for the given place (place TikToks handled by PlacePostsCacheService).
     private func updateUserTikTokVideos(for place: DetailPlace) {
-        let userVideos = profile.getTikTokVideosSync(for: place.id.uuidString)
+        let userVideos = profile.tikTokViewModel.getTikTokVideosSync(for: place.id.uuidString)
         tabsViewModel?.aboutTabViewModel.tikTokVideosViewModel.setUserVideos(userVideos)
     }
 }

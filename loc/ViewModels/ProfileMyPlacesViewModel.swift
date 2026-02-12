@@ -110,6 +110,30 @@ class ProfileMyPlacesViewModel: ObservableObject {
         }
     }
 
+    /// Refreshes my places data for pull-to-refresh (bypasses initial-load guards).
+    func refreshMyPlaces() async {
+        guard let userId = userSession?.currentUserId else { return }
+
+        do {
+            async let placesTask = userService.fetchUserCreatedPlaces(userId: userId, limit: placesPerPage, offset: 0)
+            async let countTask = userService.getNumberCreatedPlaces(forUserId: userId)
+
+            let lightweightPlaces = try await placesTask
+            let totalCount = (try? await countTask) ?? 0
+
+            lightweightMyPlaces = lightweightPlaces
+            myPlaces = lightweightPlaces.map { $0.place_id }
+            totalMyPlacesCount = totalCount
+            hasMoreMyPlaces = !lightweightPlaces.isEmpty && lightweightPlaces.count >= placesPerPage
+
+            for place in lightweightPlaces {
+                onPlaceSaversUpdate?(place.place_id, userId, true)
+            }
+        } catch {
+            print("❌ [ProfileMyPlacesViewModel] Error refreshing my places: \(error.localizedDescription)")
+        }
+    }
+
     /// Loads more my places (pagination).
     func loadMoreMyPlaces() async {
         guard let userId = userSession?.currentUserId else {
