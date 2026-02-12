@@ -15,8 +15,6 @@ struct PlaceSelectionView: View {
     @EnvironmentObject var detailPlaceVM: DetailPlaceViewModel
     
     @State private var showCreatePlacePopup = false
-    @State private var newPlaceName = ""
-    @State private var newPlaceDescription = ""
     
     var body: some View {
         NavigationView {
@@ -162,30 +160,20 @@ struct PlaceSelectionView: View {
                     }
                 }
             }
-            .overlay(
-                // Create place popup overlay
-                Group {
-                    if showCreatePlacePopup, let coordinate = photoImportVM.detectedCoordinates {
-                        Color.black.opacity(0.3)
-                            .edgesIgnoringSafeArea(.all)
-                            .onTapGesture { showCreatePlacePopup = false }
-                        
-                        CreatePlacePopupView(
-                            isPresented: $showCreatePlacePopup,
-                            placeName: $newPlaceName,
-                            placeDescription: $newPlaceDescription,
-                            coordinate: CLLocationCoordinate2D(
-                                latitude: coordinate.latitude,
-                                longitude: coordinate.longitude
-                            )
-                        ) { name, description in
-                            createNewPlace(name: name, description: description, coordinate: coordinate)
-                        }
-                        .frame(maxWidth: 400)
-                        .zIndex(2)
+            .sheet(isPresented: $showCreatePlacePopup) {
+                if let coordinate = photoImportVM.detectedCoordinates {
+                    CreatePlacePopupView(
+                        coordinate: CLLocationCoordinate2D(
+                            latitude: coordinate.latitude,
+                            longitude: coordinate.longitude
+                        )
+                    ) { name, description in
+                        createNewPlace(name: name, description: description, coordinate: coordinate)
                     }
+                    .presentationDetents([.medium])
+                    .presentationDragIndicator(.visible)
                 }
-            )
+            }
         }
     }
     
@@ -218,9 +206,6 @@ struct PlaceSelectionView: View {
                 await photoImportVM.selectPlace(newNearbyPlace)
             }
 
-            // Reset popup fields
-            newPlaceName = ""
-            newPlaceDescription = ""
         }
     }
     

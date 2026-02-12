@@ -277,6 +277,17 @@ struct ListsInSelectionSheet: View {
     
     private var listContent: some View {
         LazyVStack(spacing: 0) {
+            // Favorites row pinned at top
+            FavoritesSelectionRow(
+                isFavorited: viewModel.isFavorited,
+                onToggle: {
+                    viewModel.toggleFavorite(place: place)
+                }
+            )
+
+            Divider()
+                .padding(.horizontal, 16)
+
             ForEach(Array(viewModel.filteredLists.enumerated()), id: \.element.id) { index, list in
                     LightweightListSelectionRowView(
                         list: list,

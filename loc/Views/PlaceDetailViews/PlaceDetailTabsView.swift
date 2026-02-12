@@ -61,13 +61,6 @@ struct PlaceDetailTabsView: View {
                 dismissButton: .default(Text("OK"))
             )
         }
-        .alert("Max Favorites Reached", isPresented: $viewModel.showMaxFavoritesAlert) {
-            Button("OK", role: .cancel) {
-                viewModel.dismissMaxFavoritesAlert()
-            }
-        } message: {
-            Text("You already have 6 favorites. Remove one before adding a new one.")
-        }
         // Savers Sheet - View owns presentation state (Enterprise Pattern)
         .sheet(isPresented: $showingSaversSheet) {
             PlaceSaversSheetView(
@@ -183,18 +176,6 @@ struct PlaceDetailTabsView: View {
             tabButton(title: "FEED", tab: DetailTab.reviews)
             
             Spacer()
-            
-            // Favorite Button
-            Button(action: {
-                viewModel.postsViewModel.toggleFavorite()
-            }) {
-                Image(systemName: viewModel.postsViewModel.isFavorited ? "star.fill" : "star")
-                    .font(.body)
-                    .foregroundColor(viewModel.postsViewModel.isFavorited ? .yellow : .gray)
-                    .frame(width: 32, height: 32)
-                    .background(viewModel.postsViewModel.isFavorited ? Color.yellow.opacity(0.15) : Color.gray.opacity(0.1))
-                    .cornerRadius(16)
-            }
             
             // Private Note Button
             Button(action: {
@@ -493,7 +474,6 @@ private struct SavedByIndicator: View {
             // Set initial data
             tabsViewModel.setPlace(mockPlace)
             tabsViewModel.setPosts([], rating: 0)
-            tabsViewModel.setFavoriteStatus(false)
             tabsViewModel.setTikTokVideos(placeVideos: [], userVideos: [])
             
             return PlaceDetailTabsView(
