@@ -22,8 +22,6 @@ struct MapView: View {
 
     private let defaultCenter = CLLocationCoordinate2D(latitude: 39.5, longitude: -98.0)
     @State private var showCreatePlacePopup = false
-    @State private var newPlaceName = ""
-    @State private var newPlaceDescription = ""
     @State private var newPlaceCoordinate: CLLocationCoordinate2D?
     @State private var mapRefreshToggle = false
     @State private var showVisiblePlacesPopup = false
@@ -325,29 +323,19 @@ struct MapView: View {
                 Spacer()
             }
             
-            // Show the create place popup if needed
-            if showCreatePlacePopup, let coordinate = newPlaceCoordinate {
-                Color.black.opacity(0.3)
-                    .edgesIgnoringSafeArea(.all)
-                    .onTapGesture { showCreatePlacePopup = false }
-                CreatePlacePopupView(
-                    isPresented: $showCreatePlacePopup,
-                    placeName: $newPlaceName,
-                    placeDescription: $newPlaceDescription,
-                    coordinate: coordinate
-                ) { name, description in
+        }
+        .sheet(isPresented: $showCreatePlacePopup) {
+            if let coordinate = newPlaceCoordinate {
+                CreatePlacePopupView(coordinate: coordinate) { name, description in
                     if let userId = profile.user?.id {
                         let generatedId = UUID().uuidString
-                        selectedPlaceVM.allowAutoPresent = true // Allow auto-present for newly created places
+                        selectedPlaceVM.allowAutoPresent = true
                         selectedPlaceVM.createNewPlace(idString: generatedId, name: name, description: description, coordinate: coordinate, userId: userId, profileVM: profile, detailPlaceVM: detailPlaceVM)
-                        // Reset fields
-                        newPlaceName = ""
-                        newPlaceDescription = ""
                         newPlaceCoordinate = nil
                     }
                 }
-                .frame(maxWidth: 400)
-                .zIndex(2)
+                .presentationDetents([.medium])
+                .presentationDragIndicator(.visible)
             }
         }
         .onAppear {

@@ -332,6 +332,8 @@ class MesaBackendService {
         detailPlace.X = placeDict["twitter"] as? String
         detailPlace.menuUrl = placeDict["menuUrl"] as? String
         detailPlace.websiteUrl = placeDict["website"] as? String
+        detailPlace.isCustom = placeDict["isCustom"] as? Bool
+        detailPlace.googlePlaceId = placeDict["googlePlacesId"] as? String
 
         // Extract thumbnail URL for photos
         if let thumbnailUrl = placeDict["thumbnailUrl"] as? String {

@@ -83,8 +83,6 @@ struct PlaceDetailView: View {
         ))
         .modifier(FavoritesChangeHandler(
             tabsViewModel: $tabsViewModel,
-            selectedPlaceVM: selectedPlaceVM,
-            profile: profile,
             favoritesVM: profile.favoritesViewModel
         ))
         .modifier(TikTokChangeHandler(
@@ -317,10 +315,6 @@ struct PlaceDetailView: View {
             selectedPlaceVM: selectedPlaceVM
         )
 
-        vm.onDismissMaxFavoritesAlert = { [weak profile] in
-            profile?.favoritesViewModel.showMaxFavoritesAlert = false
-        }
-
         vm.configureSaversViewModel(userProfileNavigationViewModel: userProfileNavigationViewModel)
 
         configureInitialData(for: vm)
@@ -334,9 +328,6 @@ struct PlaceDetailView: View {
 
         vm.setPlace(place)
         vm.setPosts(selectedPlaceVM.posts, rating: selectedPlaceVM.placeRating)
-
-        let isFavorited = profile.isPlaceFavorite(placeId: place.id.uuidString)
-        vm.setFavoriteStatus(isFavorited)
 
         let userVideos = profile.getTikTokVideosSync(for: place.id.uuidString)
         vm.setTikTokVideos(placeVideos: selectedPlaceVM.tiktokVideos, userVideos: userVideos)

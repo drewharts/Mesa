@@ -8,19 +8,13 @@
 
 import SwiftUI
 
-/// Handles onChange events for favorites updates.
+/// Handles onChange events for favorites updates — refreshes bookmark icon.
 struct FavoritesChangeHandler: ViewModifier {
     @Binding var tabsViewModel: PlaceDetailTabsViewModel?
-
-    @ObservedObject var selectedPlaceVM: SelectedPlaceViewModel
-    @ObservedObject var profile: ProfileViewModel
     @ObservedObject var favoritesVM: ProfileFavoritesViewModel
 
     func body(content: Content) -> some View {
         content
-            .onChange(of: favoritesVM.showMaxFavoritesAlert) { _, showAlert in
-                handleMaxFavoritesAlert(showAlert)
-            }
             .onChange(of: favoritesVM.lightweightFavorites) { _, _ in
                 handleFavoritesChanged()
             }
@@ -31,17 +25,8 @@ struct FavoritesChangeHandler: ViewModifier {
 
     // MARK: - Handler Methods
 
-    /// Handles max favorites alert from ProfileViewModel.
-    private func handleMaxFavoritesAlert(_ showAlert: Bool) {
-        guard showAlert else { return }
-        tabsViewModel?.handleMaxFavoritesAlert()
-        favoritesVM.showMaxFavoritesAlert = false
-    }
-
-    /// Handles favorites list changes.
+    /// Refreshes bookmark icon when favorites change.
     private func handleFavoritesChanged() {
-        guard let place = selectedPlaceVM.selectedPlace else { return }
-        let isFavorited = favoritesVM.isPlaceFavorite(placeId: place.id.uuidString)
-        tabsViewModel?.setFavoriteStatus(isFavorited)
+        tabsViewModel?.refreshPlaceListMembership()
     }
 }

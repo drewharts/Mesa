@@ -77,6 +77,11 @@ class ExternalUserProfileViewModel: ObservableObject {
     @Published var pendingListIndex: Int?
     private var pendingListIdToOpen: String?
 
+    // MARK: - List Search State
+    @Published var isSearchingLists: Bool = false
+    @Published var listSearchText: String = ""
+    private var listSearchCancellable: AnyCancellable?
+
     // MARK: - Error Handling
     @Published var showFollowError = false
     @Published var followErrorMessage = ""
@@ -131,6 +136,9 @@ class ExternalUserProfileViewModel: ObservableObject {
 
         // Set up Combine subscriptions for change propagation
         setupListsViewModelObservers()
+
+        // Set up debounced list search observer
+        setupListSearchObserver()
     }
 
     // MARK: - Child ViewModel Change Propagation
@@ -510,6 +518,65 @@ class ExternalUserProfileViewModel: ObservableObject {
             let places = await listsLoadingViewModel.loadMorePlacesForList(listId: list.list_id, page: page)
             completion(places)
         }
+    }
+
+    // MARK: - List Search
+
+    /// Sets up debounced observer for list search text changes.
+    private func setupListSearchObserver() {
+        listSearchCancellable = $listSearchText
+            .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
+            .sink { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    await self?.performListSearch()
+                }
+            }
+    }
+
+    /// Performs server-side search across the user's lists by name.
+    func performListSearch() async {
+        let searchTerm = listSearchText.trimmingCharacters(in: .whitespaces)
+        guard !searchTerm.isEmpty else { return }
+
+        do {
+            let searchResults = try await PlaceListService.shared.searchListsByName(
+                userId: userId,
+                searchTerm: searchTerm
+            )
+
+            listsDataViewModel.userLists = searchResults
+
+            // Load places for search results in parallel
+            await withTaskGroup(of: (String, [LightweightPlace]?).self) { group in
+                for list in searchResults {
+                    group.addTask {
+                        do {
+                            let places = try await self.userService.fetchPlacesForPlaceList(
+                                listId: list.list_id,
+                                page: 1,
+                                pageSize: 6
+                            )
+                            return (list.list_id, places)
+                        } catch {
+                            return (list.list_id, nil)
+                        }
+                    }
+                }
+
+                for await (listId, places) in group {
+                    if let places = places {
+                        self.listsDataViewModel.setPlacesForList(listId: listId, places: places)
+                    }
+                }
+            }
+        } catch {
+            print("ExternalUserProfileViewModel Error searching lists: \(error)")
+        }
+    }
+
+    /// Reloads lists when exiting search mode, restoring proximity-sorted results.
+    func reloadListsAfterSearch() async {
+        await listsLoadingViewModel.loadInitialLists()
     }
 
     // MARK: - List Popup

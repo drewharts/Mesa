@@ -16,7 +16,6 @@ class PlacePostsViewModel: ObservableObject {
     @Published var loadingState: LoadingState = .idle
     @Published var place: DetailPlace?
     @Published var highlightedPostId: String?
-    @Published var isFavorited: Bool = false
 
     // MARK: - Dependencies (Services only)
     private let postService: PostService
@@ -27,8 +26,6 @@ class PlacePostsViewModel: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
 
     // MARK: - Callbacks
-    /// Called when user toggles favorite status
-    var onToggleFavorite: ((DetailPlace, Bool) -> Void)?
     /// Called when like statuses need to be checked
     var onCheckLikeStatuses: ((String) -> Void)?
 
@@ -88,14 +85,6 @@ class PlacePostsViewModel: ObservableObject {
         self.loadingState = state
     }
 
-    /// Sets the favorite status for the current place.
-    func setFavoriteStatus(_ isFavorited: Bool) {
-        if self.isFavorited != isFavorited {
-            print("⭐ [PlacePostsVM] Favorite status changed: \(self.isFavorited) → \(isFavorited)")
-            self.isFavorited = isFavorited
-        }
-    }
-
     // MARK: - Computed Properties
     var hasPosts: Bool {
         !posts.isEmpty
@@ -115,12 +104,6 @@ class PlacePostsViewModel: ObservableObject {
     func checkLikeStatuses() {
         guard let userId = userSession.currentUserId else { return }
         onCheckLikeStatuses?(userId)
-    }
-
-    /// Toggles the favorite status for the current place via callback.
-    func toggleFavorite() {
-        guard let place = place else { return }
-        onToggleFavorite?(place, !isFavorited)
     }
 
     // MARK: - Photo Management

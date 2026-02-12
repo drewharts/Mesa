@@ -18,8 +18,6 @@ class ProfileFavoritesViewModel: ObservableObject {
     /// Lightweight favorites data for display
     @Published var lightweightFavorites: [FavoritePlace] = []
 
-    /// Alert shown when max favorites limit is reached
-    @Published var showMaxFavoritesAlert: Bool = false
 
     // MARK: - Callbacks for Cross-Cutting Concerns
 
@@ -100,12 +98,6 @@ class ProfileFavoritesViewModel: ObservableObject {
                     // Success - optimistic update was correct
                     self.onAnnotationPlacesRecalculate?()
 
-                case .maxLimit:
-                    // Server says max limit - revert and show alert
-                    print("⚠️ [ProfileFavoritesViewModel] Server rejected: max favorites reached")
-                    self.revertFavoriteAdd(placeId: placeId, userId: userId)
-                    self.showMaxFavoritesAlert = true
-
                 case .duplicate:
                     // Already favorited on server - keep local state as is
                     break
@@ -163,7 +155,6 @@ class ProfileFavoritesViewModel: ObservableObject {
     func resetAllData() {
         userFavorites.removeAll()
         lightweightFavorites.removeAll()
-        showMaxFavoritesAlert = false
     }
 
     // MARK: - Private Methods
