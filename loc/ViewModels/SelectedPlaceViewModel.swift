@@ -346,15 +346,16 @@ class SelectedPlaceViewModel: ObservableObject {
 
     /// Continues with place setup after data is ready.
     private func continueWithPlaceSetup(place: DetailPlace, currentLocation: CLLocationCoordinate2D?) {
-        // Compute metadata (only if location available)
         metadata.computeMetadata(for: place)
+        loadPostsIfReady(for: place)
+        selectionState.presentDetailSheet()
+    }
 
-        // Load posts (doesn't require location)
+    /// Loads posts for the place if it has a real Supabase UUID (skips placeholder IDs from search).
+    private func loadPostsIfReady(for place: DetailPlace) {
+        guard !place.hasPlaceholderID else { return }
         postsCacheService.clearLikedPosts()
         postsCacheService.loadPosts(forPlaceId: place.id.uuidString)
-
-        // Present sheet
-        selectionState.presentDetailSheet()
     }
 
     /// Fetches complete place details when missing.
@@ -380,7 +381,7 @@ class SelectedPlaceViewModel: ObservableObject {
         }
     }
 
-    /// Fetches fresh details in background.
+    /// Fetches fresh place details in background and loads posts once the real UUID is resolved.
     private func fetchFreshDetailsInBackground(for place: DetailPlace) {
         // Use googlePlaceId for external places, fall back to UUID for custom places
         let placeId = place.googlePlaceId ?? place.id.uuidString
@@ -396,6 +397,8 @@ class SelectedPlaceViewModel: ObservableObject {
 
                     let mergedPlace = self.mergePlaceData(original: place, fresh: freshPlace)
                     self.selectionState.updatePlaceDetails(mergedPlace)
+
+                    self.loadPostsIfReady(for: mergedPlace)
 
                     // If original had invalid coordinates but fresh has valid ones, animate now
                     let originalWasInvalid = place.coordinate == nil || !place.coordinate!.isValidForNavigation
