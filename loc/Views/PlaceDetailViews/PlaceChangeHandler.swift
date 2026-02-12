@@ -46,7 +46,6 @@ struct PlaceChangeHandler: ViewModifier {
         guard let place = newPlace else { return }
 
         updateTravelTime(for: place)
-        updateFavoriteStatus(for: place)
         updateUserTikTokVideos(for: place)
 
         // Set rating from metadata (posts handled by PlacePostsCacheService subscription)
@@ -57,12 +56,6 @@ struct PlaceChangeHandler: ViewModifier {
     private func updateTravelTime(for place: DetailPlace) {
         guard let currentLocation = locationManager.currentLocation?.coordinate else { return }
         tabsViewModel?.travelTimeViewModel.updateTravelTime(for: place, from: currentLocation)
-    }
-
-    /// Updates favorite status for the given place.
-    private func updateFavoriteStatus(for place: DetailPlace) {
-        let isFavorited = profile.isPlaceFavorite(placeId: place.id.uuidString)
-        tabsViewModel?.setFavoriteStatus(isFavorited)
     }
 
     /// Updates user TikTok videos for the given place (place TikToks handled by PlacePostsCacheService).

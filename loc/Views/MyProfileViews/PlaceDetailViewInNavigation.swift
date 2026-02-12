@@ -216,8 +216,6 @@ struct PlaceDetailViewContent: View {
             ))
             .modifier(FavoritesChangeHandler(
                 tabsViewModel: $tabsViewModel,
-                selectedPlaceVM: selectedPlaceVM,
-                profile: profile,
                 favoritesVM: profile.favoritesViewModel
             ))
             .modifier(TikTokChangeHandler(
@@ -257,11 +255,6 @@ struct PlaceDetailViewContent: View {
             selectedPlaceVM: selectedPlaceVM
         )
 
-        // Wire up callback to dismiss max favorites alert in ProfileViewModel
-        vm.onDismissMaxFavoritesAlert = { [weak profile] in
-            profile?.favoritesViewModel.showMaxFavoritesAlert = false
-        }
-
         // Configure savers VM for navigation
         vm.configureSaversViewModel(userProfileNavigationViewModel: userProfileNavigationVM)
 
@@ -269,10 +262,6 @@ struct PlaceDetailViewContent: View {
         if let place = selectedPlaceVM.selectedPlace {
             vm.setPlace(place)
             vm.setPosts(selectedPlaceVM.posts, rating: selectedPlaceVM.placeRating)
-
-            // Set favorite status
-            let isFavorited = profile.isPlaceFavorite(placeId: place.id.uuidString)
-            vm.setFavoriteStatus(isFavorited)
 
             // Set TikTok videos
             let userVideos = profile.getTikTokVideosSync(for: place.id.uuidString)

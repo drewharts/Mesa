@@ -11,17 +11,14 @@ import Foundation
 // MARK: - Favorites Error Types
 
 enum FavoritesError: LocalizedError {
-    case maxLimitReached
     case alreadyFavorited
     case notFavorited
     case databaseError(underlying: Error)
     case userNotAuthenticated
     case invalidResponse
-    
+
     var errorDescription: String? {
         switch self {
-        case .maxLimitReached:
-            return "You already have 6 favorites. Remove one before adding a new one."
         case .alreadyFavorited:
             return "This place is already in your favorites."
         case .notFavorited:
@@ -40,7 +37,6 @@ enum FavoritesError: LocalizedError {
 
 enum AddFavoriteResult {
     case success
-    case maxLimit
     case duplicate
     case error(Error)
 }
@@ -54,9 +50,6 @@ class FavoritesService {
     
     // MARK: - Singleton
     static let shared = FavoritesService()
-    
-    // MARK: - Constants
-    static let maxFavorites = 6
     
     // MARK: - Dependencies
     private let supabase: SupabaseManager
@@ -90,9 +83,6 @@ class FavoritesService {
             case "success":
                 print("✅ [FavoritesService] Successfully added favorite for place: \(placeId)")
                 return .success
-            case "max_limit":
-                print("⚠️ [FavoritesService] Max favorites limit reached for user: \(userId)")
-                return .maxLimit
             case "duplicate":
                 print("⚠️ [FavoritesService] Place already favorited: \(placeId)")
                 return .duplicate

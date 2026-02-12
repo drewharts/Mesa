@@ -1049,7 +1049,6 @@ class ProfileViewModel: ObservableObject {
         isUploadingProfilePhoto = false
         // Note: TikTok UI flags are reset via tikTokViewModel.resetAllData() above
         // Note: showFollowError and followErrorMessage are reset via socialViewModel.resetAllData() above
-        // Note: showMaxFavoritesAlert is reset via favoritesViewModel.resetAllData() above
 
         // Reset profile counts loading state
         profileCountsLoadingState = .idle
