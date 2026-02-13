@@ -12,10 +12,11 @@ import Combine
 class PlacePostViewModel: ObservableObject {
     // MARK: - Published Properties
     @Published var postText: String = ""
-    @Published var images: [UIImage] = []
+    @Published var selectedMedia: [SelectedMediaItem] = []
     @Published var wouldReturn: Bool? = nil
-    
+
     @Published var isLoading: Bool = false
+    @Published var uploadProgress: Double = 0.0
     @Published var errorMessage: String?
     
     // MARK: - UI State (owned by ViewModel for testability)
@@ -36,9 +37,19 @@ class PlacePostViewModel: ObservableObject {
     
     // MARK: - Computed Properties
     
-    /// Whether the post can be submitted (has content)
+    /// Whether the post can be submitted (has content).
     var canSubmit: Bool {
-        !images.isEmpty || !postText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        !selectedMedia.isEmpty || !postText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// Returns only the image items from selected media.
+    private var selectedImages: [UIImage] {
+        selectedMedia.compactMap { $0.type == .image ? $0.image : nil }
+    }
+
+    /// Returns only the video local URLs from selected media.
+    private var selectedVideoURLs: [URL] {
+        selectedMedia.compactMap { $0.type == .video ? $0.videoURL : nil }
     }
     
     /// Whether to show the caption add button
@@ -66,21 +77,22 @@ class PlacePostViewModel: ObservableObject {
         self.userFirstName = userFirstName
         self.userLastName = userLastName
         self.profilePhotoUrl = profilePhotoUrl
-        self.images = preselectedImages
         self.postService = postService
         self.imageService = imageService
         self.placeService = placeService
+
+        // Convert preselected images to SelectedMediaItems
+        self.selectedMedia = preselectedImages.map { image in
+            SelectedMediaItem(type: .image, image: image, videoURL: nil, thumbnail: nil, duration: nil)
+        }
     }
-    
-    // MARK: - Image Management
-    
-    func addImages(_ newImages: [UIImage]) {
-        images.append(contentsOf: newImages)
-    }
-    
-    func removeImage(at index: Int) {
-        guard index >= 0 && index < images.count else { return }
-        images.remove(at: index)
+
+    // MARK: - Media Management
+
+    /// Removes a media item at the given index.
+    func removeMedia(at index: Int) {
+        guard index >= 0 && index < selectedMedia.count else { return }
+        selectedMedia.remove(at: index)
     }
     
     // MARK: - Section Management
@@ -108,20 +120,29 @@ class PlacePostViewModel: ObservableObject {
     }
     
     // MARK: - Post Submission
-    
+
+    /// Submits the post by uploading all media then saving to the database.
     func submitPost(completion: @escaping (Result<PlacePost, Error>) -> Void) {
         isLoading = true
         errorMessage = nil
-        
-        var post = createPost()
-        
-        if !images.isEmpty {
-            uploadImagesAndSavePost(&post, completion: completion)
-        } else {
-            savePost(post, completion: completion)
+        uploadProgress = 0.0
+
+        Task {
+            do {
+                var post = createPost()
+                try await uploadMedia(for: &post)
+                try await savePostAsync(post)
+                addPhotosToPlace(from: post)
+                completion(.success(post))
+            } catch {
+                errorMessage = "Failed to create post: \(error.localizedDescription)"
+                completion(.failure(error))
+            }
+            isLoading = false
         }
     }
-    
+
+    /// Creates an empty PlacePost with no media URLs yet.
     private func createPost() -> PlacePost {
         PlacePost(
             id: UUID().uuidString,
@@ -138,45 +159,58 @@ class PlacePostViewModel: ObservableObject {
             wouldReturn: wouldReturn
         )
     }
-    
-    private func uploadImagesAndSavePost(_ post: inout PlacePost, completion: @escaping (Result<PlacePost, Error>) -> Void) {
-        var mutablePost = post
-        imageService.uploadImagesForPost(post: mutablePost, images: images) { [weak self] result in
-            guard let self = self else { return }
-            
-            Task { @MainActor in
-                switch result {
-                case .success(let imageUrls):
-                    mutablePost.images = imageUrls
-                    self.savePost(mutablePost, completion: completion)
-                case .failure(let error):
-                    self.isLoading = false
-                    self.errorMessage = "Failed to upload images: \(error.localizedDescription)"
-                    completion(.failure(error))
-                }
-            }
+
+    /// Uploads images and videos, then updates the post with resulting URLs.
+    private func uploadMedia(for post: inout PlacePost) async throws {
+        let images = selectedImages
+        let videoURLs = selectedVideoURLs
+        let totalItems = Double(images.count + videoURLs.count)
+        guard totalItems > 0 else { return }
+
+        var uploadedCount = 0.0
+
+        // Upload images
+        if !images.isEmpty {
+            let imageUrls = try await imageService.uploadImagesForPostAsync(
+                post: post,
+                images: images
+            )
+            post.images = imageUrls
+            uploadedCount += Double(images.count)
+            uploadProgress = uploadedCount / totalItems
+        }
+
+        // Upload videos
+        if !videoURLs.isEmpty {
+            let videoResults = try await imageService.uploadVideosForPostAsync(
+                post: post,
+                videoURLs: videoURLs
+            )
+            post.videoUrls = videoResults.map { $0.videoURL }
+            post.videoThumbnailUrls = videoResults.map { $0.thumbnailURL }
+            uploadedCount += Double(videoURLs.count)
+            uploadProgress = uploadedCount / totalItems
         }
     }
-    
-    private func savePost(_ post: PlacePost, completion: @escaping (Result<PlacePost, Error>) -> Void) {
-        postService.savePost(post, forPlace: place) { [weak self] result in
-            Task { @MainActor in
-                self?.isLoading = false
+
+    /// Saves the post to the database via PostService.
+    private func savePostAsync(_ post: PlacePost) async throws {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            postService.savePost(post, forPlace: place) { result in
                 switch result {
                 case .success:
-                    self?.addPhotosToPlace(from: post)
-                    completion(.success(post))
+                    continuation.resume()
                 case .failure(let error):
-                    self?.errorMessage = "Failed to save post: \(error.localizedDescription)"
-                    completion(.failure(error))
+                    continuation.resume(throwing: error)
                 }
             }
         }
     }
-    
+
+    /// Adds photo URLs from the post to the place's photo collection.
     private func addPhotosToPlace(from post: PlacePost) {
         guard !post.images.isEmpty else { return }
-        
+
         placeService.addPhotosToPlace(placeId: post.placeId, photoURLs: post.images) { error in
             if let error = error {
                 print("Failed to add photos to place: \(error.localizedDescription)")

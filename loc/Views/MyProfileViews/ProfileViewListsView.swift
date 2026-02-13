@@ -59,7 +59,7 @@ struct ProfileViewListsView: View {
         }
         .sheet(isPresented: $showingNewListSheet) {
             NewListSheetView(onSave: { listName in
-                let _ = await profile.addNewPlaceList(named: listName, city: "", emoji: "", image: "")
+                let _ = await profile.listsViewModel.addNewPlaceList(named: listName, city: "", emoji: "", image: "")
             })
             .presentationDetents([.height(200)])
             .presentationDragIndicator(.visible)
@@ -89,7 +89,7 @@ struct ProfileViewListsView: View {
             Button("Delete", role: .destructive) {
                 if let list = listToDelete {
                     Task {
-                        let result = await profile.deleteLightweightList(list)
+                        let result = await profile.listsViewModel.deleteLightweightList(list)
                         if case .failure = result {
                             // Could show error alert here if needed
                         }

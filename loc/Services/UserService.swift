@@ -14,7 +14,9 @@ struct AnyCodable: Codable {
     init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
         
-        if let string = try? container.decode(String.self) {
+        if container.decodeNil() {
+            value = NSNull()
+        } else if let string = try? container.decode(String.self) {
             value = string
         } else if let int = try? container.decode(Int.self) {
             value = int
@@ -630,6 +632,11 @@ class UserService: ObservableObject {
                 }
             }
         }
+    }
+
+    /// Creates a new external_places record for a TikTok place assignment.
+    func createExternalPlace(userId: String, placeId: String, url: String) async throws {
+        try await supabase.insertExternalPlace(userId: userId, placeId: placeId, url: url)
     }
 
     /// Updates the place association for a TikTok (external place) - for correcting wrong places

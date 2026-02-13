@@ -147,7 +147,7 @@ class PlaceListSelectionViewModel: ObservableObject {
         }
 
         // Check if place is in user's favorites
-        isFavorited = profile.isPlaceFavorite(placeId: place.id.uuidString)
+        isFavorited = profile.favoritesViewModel.isPlaceFavorite(placeId: place.id.uuidString)
 
         isLoadingInitial = false
     }
@@ -401,28 +401,28 @@ class PlaceListSelectionViewModel: ObservableObject {
             // Calculate new count from CURRENT state (not stale parameter)
             let newCount = max(0, currentList.place_count - 1)
             updateLocalListCount(listId: currentList.list_id, delta: -1)
-            profile.removePlaceFromLightweightList(listId: currentList.list_id, place: place, updatedCount: newCount)
+            profile.listsViewModel.removePlaceFromLightweightList(listId: currentList.list_id, place: place, updatedCount: newCount)
             placeMembership[currentList.list_id] = false
         } else {
             // Calculate new count from CURRENT state (not stale parameter)
             let newCount = currentList.place_count + 1
             updateLocalListCount(listId: currentList.list_id, delta: +1)
-            profile.addPlaceToLightweightList(listId: currentList.list_id, place: place, updatedCount: newCount)
+            profile.listsViewModel.addPlaceToLightweightList(listId: currentList.list_id, place: place, updatedCount: newCount)
             placeMembership[currentList.list_id] = true
         }
         
         // ✅ STAFF ENGINEER: Clear recently created flag on user interaction
         // This is event-driven, not time-driven. Once user interacts with any list,
         // they've acknowledged the new list and we can clear the highlight state.
-        profile.clearRecentlyCreatedList()
+        profile.listsViewModel.clearRecentlyCreatedList()
     }
 
     /// Toggles the favorite status for a place via ProfileViewModel.
     func toggleFavorite(place: DetailPlace) {
         if isFavorited {
-            profile.removeFavoritePlace(place: place)
+            profile.favoritesViewModel.removeFavoritePlace(place: place)
         } else {
-            profile.addFavoritePlace(place: place)
+            profile.favoritesViewModel.addFavoritePlace(place: place)
         }
         isFavorited.toggle()
     }
@@ -462,7 +462,7 @@ class PlaceListSelectionViewModel: ObservableObject {
     /// and updates local selection state
     func addNewListToSelection(named name: String, city: String, emoji: String, image: String) async -> Result<Void, Error> {
         // Delegate to ProfileViewModel - it owns list creation logic
-        let result = await profile.addNewPlaceList(named: name, city: city, emoji: emoji, image: image)
+        let result = await profile.listsViewModel.addNewPlaceList(named: name, city: city, emoji: emoji, image: image)
         
         switch result {
         case .success(let createdList):

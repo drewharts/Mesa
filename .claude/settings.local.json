@@ -21,7 +21,20 @@
       "mcp__supabase__apply_migration",
       "WebFetch(domain:mesa-backend-staging.up.railway.app)",
       "Bash(curl:*)",
-      "Bash(git log:*)"
+      "Bash(git log:*)",
+      "mcp__supabase__list_edge_functions",
+      "mcp__supabase__list_tables",
+      "WebFetch(domain:mesa.drewharts.com)",
+      "Bash(gh repo view:*)",
+      "Bash(gh search:*)",
+      "Bash(gh api:*)",
+      "Bash(git stash:*)",
+      "Bash(git status:*)",
+      "Bash(git push:*)",
+      "Bash(git pull:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nFix TikTok no-places-found flow: navigation, post loading, and review schema\n\n- Navigate to place detail after manual place assignment via SelectedPlaceViewModel\n- Update get_place_reviews_with_tiktoks to match current schema \\(text, photo_urls, would_recommend\\)\n- Make review_text optional in PostWithUserRecord to handle NULL values\n- Fix AnyCodable null decoding \\(decodeNil → NSNull\\) to prevent \"data not in correct format\" errors\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(cat:*)",
+      "Bash(gh pr view:*)"
     ],
     "deny": []
   },

@@ -25,7 +25,7 @@ struct ListPlaceGridCell: View {
         }
         
         // Check user's TikTok videos for this place (uses cached data)
-        return profile.getFirstTikTokThumbnailURL(for: place.id.uuidString)
+        return profile.tikTokViewModel.getFirstTikTokThumbnailURL(for: place.id.uuidString)
     }
 
     var body: some View {

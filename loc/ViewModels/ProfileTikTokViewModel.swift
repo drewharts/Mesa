@@ -339,6 +339,14 @@ class ProfileTikTokViewModel: ObservableObject {
         return tikTokPlaceFlags[placeId] != nil
     }
 
+    /// Submits a flag for a TikTok where no place could be identified.
+    func submitNoPlacesFoundFlag(tikTokUrl: String, userComment: String) -> Bool {
+        guard getCurrentUserId?() != nil else { return false }
+        let tempPlaceId = "no_place_found_\(UUID().uuidString)"
+        flagTikTokPlace(for: tempPlaceId, flagType: .unableToIdentify, tikTokUrl: tikTokUrl, userComment: userComment)
+        return true
+    }
+
     // MARK: - TikTok Video Access
 
     /// Checks if user has TikTok videos for a place using cached data.

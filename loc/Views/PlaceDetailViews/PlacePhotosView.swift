@@ -11,7 +11,9 @@ import CoreLocation
 struct PlacePhotosView: View {
     @ObservedObject var viewModel: PlacePhotosViewModel
 
-    let onPhotoTapped: ([String], Int) -> Void  // Now passes URLs instead of UIImages
+    let onPhotoTapped: ([String], Int) -> Void
+
+    @State private var fullscreenVideoURL: URL?
 
     var body: some View {
         VStack(spacing: 16) {
@@ -43,6 +45,9 @@ struct PlacePhotosView: View {
         .onAppear {
             viewModel.loadInitialExternalReviewPhotos()
         }
+        .fullScreenCover(item: $fullscreenVideoURL) { url in
+            FullscreenVideoPlayerView(url: url)
+        }
     }
 
     // MARK: - Photo Gallery Content
@@ -59,6 +64,9 @@ struct PlacePhotosView: View {
                 onImageTapped: { index in
                     let allURLs = viewModel.combinedPhotoURLs
                     onPhotoTapped(allURLs, index)
+                },
+                onVideoTapped: { videoUrlString in
+                    fullscreenVideoURL = URL(string: videoUrlString)
                 },
                 overflowCount: overflowCount,
                 photosViewModel: viewModel

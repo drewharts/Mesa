@@ -36,7 +36,7 @@ struct CardBasedListPreview: View {
     // Preload images for the first 6 priority tiles
     private func preloadPriorityImages() {
         // Use the optimized priority loading method
-        profile.loadPriorityImagesForPlaces(previewPlaces, priorityCount: 6)
+        profile.tikTokViewModel.loadPriorityImagesForPlaces(previewPlaces, priorityCount: 6)
     }
     
     var body: some View {
@@ -285,7 +285,7 @@ struct PlacePreviewCard: View {
         }
         
         // Check user's TikTok videos for this place (uses cached data)
-        return profile.getFirstTikTokThumbnailURL(for: place.id.uuidString)
+        return profile.tikTokViewModel.getFirstTikTokThumbnailURL(for: place.id.uuidString)
     }
     
     private func getFirstPhotoUrl(for place: DetailPlace) -> String? {

@@ -298,8 +298,15 @@ class DeepLinkManager: ObservableObject {
             
         case .failure(let error):
             print("❌ [DeepLinkManager] Result is .failure: \(error.localizedDescription)")
+            await MainActor.run {
+                if let tikTokVM = self.profileViewModel?.tikTokViewModel {
+                    tikTokVM.noPlacesFoundTikTokUrl = urlString
+                    tikTokVM.isShowingNoPlacesFound = true
+                } else {
+                    self.onNoLocationFound?("We couldn't identify a place in this TikTok video.")
+                }
+            }
             currentProcessingTikTokUrl = nil
-            break
         }
     }
     

@@ -58,9 +58,11 @@ struct PlaceChangeHandler: ViewModifier {
         tabsViewModel?.travelTimeViewModel.updateTravelTime(for: place, from: currentLocation)
     }
 
+
+
     /// Updates user TikTok videos for the given place (place TikToks handled by PlacePostsCacheService).
     private func updateUserTikTokVideos(for place: DetailPlace) {
-        let userVideos = profile.getTikTokVideosSync(for: place.id.uuidString)
+        let userVideos = profile.tikTokViewModel.getTikTokVideosSync(for: place.id.uuidString)
         tabsViewModel?.aboutTabViewModel.tikTokVideosViewModel.setUserVideos(userVideos)
     }
 }

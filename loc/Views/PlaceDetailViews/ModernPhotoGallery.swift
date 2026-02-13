@@ -10,6 +10,7 @@ import SwiftUI
 struct ModernPhotoGallery: View {
     let items: [PhotoItem]
     let onImageTapped: (Int) -> Void
+    var onVideoTapped: ((String) -> Void)? = nil
     var overflowCount: Int = 0
 
     @ObservedObject var photosViewModel: PlacePhotosViewModel
@@ -88,6 +89,32 @@ struct ModernPhotoGallery: View {
         }
     }
 
+    /// Returns the index into photo-only items for the photo viewer.
+    private func photoOnlyIndex(for galleryIndex: Int) -> Int {
+        return items.prefix(galleryIndex + 1).filter { !$0.isVideo }.count - 1
+    }
+
+    /// Handles tap on a gallery item, routing to photo or video handler.
+    private func handleItemTap(at index: Int) {
+        let item = items[index]
+        if item.isVideo, let videoUrl = item.videoUrl {
+            onVideoTapped?(videoUrl)
+        } else {
+            onImageTapped(photoOnlyIndex(for: index))
+        }
+    }
+
+    /// Play button overlay for video items.
+    @ViewBuilder
+    private func videoPlayOverlay(at index: Int) -> some View {
+        if items[index].isVideo {
+            Image(systemName: "play.circle.fill")
+                .font(.system(size: 36))
+                .foregroundColor(.white)
+                .shadow(color: .black.opacity(0.3), radius: 4)
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             if items.isEmpty {
@@ -150,11 +177,12 @@ struct ModernPhotoGallery: View {
                     cornerRadius: cornerRadius
                 )
                 .overlay(overflowOverlay(at: 0))
+                .overlay(videoPlayOverlay(at: 0))
                 .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 4)
             }
             .frame(height: heroImageHeight)
             .onTapGesture {
-                onImageTapped(0)
+                handleItemTap(at: 0)
             }
             .transition(.opacity.combined(with: .scale))
         }
@@ -184,11 +212,12 @@ struct ModernPhotoGallery: View {
                 cornerRadius: cornerRadius
             )
             .overlay(overflowOverlay(at: actualIndex))
+            .overlay(videoPlayOverlay(at: actualIndex))
             .shadow(color: Color.black.opacity(0.08), radius: 6, x: 0, y: 2)
         }
         .aspectRatio(5/3, contentMode: .fill)
         .onTapGesture {
-            onImageTapped(actualIndex)
+            handleItemTap(at: actualIndex)
         }
         .onAppear {
             if actualIndex == items.count - 3 && !photosViewModel.allPhotosLoadedForCurrentPlace {
@@ -211,11 +240,12 @@ struct ModernPhotoGallery: View {
                         cornerRadius: cornerRadius
                     )
                     .overlay(overflowOverlay(at: actualIndex))
+                    .overlay(videoPlayOverlay(at: actualIndex))
                     .shadow(color: Color.black.opacity(0.08), radius: 6, x: 0, y: 2)
                 }
                 .aspectRatio(5/4, contentMode: .fill)
                 .onTapGesture {
-                    onImageTapped(actualIndex)
+                    handleItemTap(at: actualIndex)
                 }
                 .transition(.opacity.combined(with: .scale(scale: 0.9)))
             }

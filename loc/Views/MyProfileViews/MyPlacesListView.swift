@@ -32,7 +32,7 @@ struct MyPlacesListView: View {
                 )
                 .contextMenu {
                     Button(role: .destructive) {
-                        profile.deleteMyPlace(place)
+                        profile.myPlacesViewModel.deleteMyPlace(place)
                     } label: {
                         Label("Delete Place", systemImage: "trash")
                     }

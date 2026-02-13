@@ -469,12 +469,12 @@ class DataManager: ObservableObject {
                 // If we used proximity sorting, lists are already sorted by distance
                 // If we used regular sorting, sort by distance after loading
                 if userLocation == nil {
-                    self.profileViewModel.sortListsByDistance()
+                    self.profileViewModel.listsViewModel.sortListsByDistance()
                 }
 
                 // Use the optimized loading method instead of the old preloading
                 print("📍 [DataManager] Triggering optimized list loading...")
-                self.profileViewModel.ensureListsLoaded()
+                self.profileViewModel.listsViewModel.ensureListsLoaded()
             }
         } catch {
             print("Error loading user place lists: \(error.localizedDescription)")
