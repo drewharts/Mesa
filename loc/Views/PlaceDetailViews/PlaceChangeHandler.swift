@@ -46,7 +46,6 @@ struct PlaceChangeHandler: ViewModifier {
         guard let place = newPlace else { return }
 
         updateTravelTime(for: place)
-        updateFavoriteStatus(for: place)
         updateUserTikTokVideos(for: place)
 
         // Set rating from metadata (posts handled by PlacePostsCacheService subscription)

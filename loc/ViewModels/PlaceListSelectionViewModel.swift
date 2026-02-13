@@ -26,6 +26,7 @@ class PlaceListSelectionViewModel: ObservableObject {
     @Published var isLoadingMore: Bool = false
     @Published var hasMore: Bool = true
     @Published var placeMembership: [String: Bool] = [:] // listId -> isPlaceInList
+    @Published var isFavorited: Bool = false
     
     // MARK: - Filter State
     @Published var showOnlyShared: Bool = false
@@ -144,7 +145,10 @@ class PlaceListSelectionViewModel: ObservableObject {
         if !uniqueLists.isEmpty {
             await loadPlaceMembershipForLists(uniqueLists, placeId: place.id.uuidString)
         }
-        
+
+        // Check if place is in user's favorites
+        isFavorited = profile.isPlaceFavorite(placeId: place.id.uuidString)
+
         isLoadingInitial = false
     }
     
@@ -411,6 +415,16 @@ class PlaceListSelectionViewModel: ObservableObject {
         // This is event-driven, not time-driven. Once user interacts with any list,
         // they've acknowledged the new list and we can clear the highlight state.
         profile.listsViewModel.clearRecentlyCreatedList()
+    }
+
+    /// Toggles the favorite status for a place via ProfileViewModel.
+    func toggleFavorite(place: DetailPlace) {
+        if isFavorited {
+            profile.removeFavoritePlace(place: place)
+        } else {
+            profile.addFavoritePlace(place: place)
+        }
+        isFavorited.toggle()
     }
     
     /// Update the place count for a list in our local state

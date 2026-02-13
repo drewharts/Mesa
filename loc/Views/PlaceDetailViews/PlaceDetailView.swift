@@ -83,8 +83,6 @@ struct PlaceDetailView: View {
         ))
         .modifier(FavoritesChangeHandler(
             tabsViewModel: $tabsViewModel,
-            selectedPlaceVM: selectedPlaceVM,
-            profile: profile,
             favoritesVM: profile.favoritesViewModel
         ))
         .modifier(TikTokChangeHandler(
@@ -316,10 +314,6 @@ struct PlaceDetailView: View {
             detailPlaceViewModel: detailPlaceViewModel,
             selectedPlaceVM: selectedPlaceVM
         )
-
-        vm.onDismissMaxFavoritesAlert = { [weak profile] in
-            profile?.favoritesViewModel.showMaxFavoritesAlert = false
-        }
 
         vm.configureSaversViewModel(userProfileNavigationViewModel: userProfileNavigationViewModel)
 

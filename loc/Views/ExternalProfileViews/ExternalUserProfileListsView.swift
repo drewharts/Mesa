@@ -35,7 +35,20 @@ struct ExternalUserProfileListsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             sectionHeader
+
+            if viewModel.isSearchingLists {
+                searchBar
+            }
+
             listContent
+        }
+        .onChange(of: viewModel.isSearchingLists) { _, isSearching in
+            if !isSearching {
+                viewModel.listSearchText = ""
+                Task {
+                    await viewModel.reloadListsAfterSearch()
+                }
+            }
         }
         .sheet(isPresented: $viewModel.shouldShowListPopup, onDismiss: {
             viewModel.onListPopupDismissed()
@@ -65,13 +78,61 @@ struct ExternalUserProfileListsView: View {
 
     // MARK: - View Components
 
+    /// Header with "Lists" label and search toggle button.
     private var sectionHeader: some View {
-        Text("Lists")
-            .font(.headline)
-            .fontWeight(.semibold)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.leading, 16)
-            .foregroundColor(.primary)
+        HStack {
+            Text("Lists")
+                .font(.headline)
+                .fontWeight(.semibold)
+                .foregroundColor(.primary)
+
+            Spacer()
+
+            Button {
+                withAnimation {
+                    viewModel.isSearchingLists.toggle()
+                }
+            } label: {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(viewModel.isSearchingLists ? .white : .gray)
+                    .frame(width: 32, height: 32)
+                    .background(Circle().fill(viewModel.isSearchingLists ? Color.primary : Color(.systemGray5)))
+                    .contentShape(Circle())
+            }
+        }
+        .padding(.horizontal, 16)
+    }
+
+    /// Inline search bar for filtering lists by name.
+    private var searchBar: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .foregroundColor(.gray)
+                .font(.system(size: 14))
+
+            TextField("Search lists...", text: $viewModel.listSearchText)
+                .font(.subheadline)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .submitLabel(.search)
+
+            if !viewModel.listSearchText.isEmpty {
+                Button {
+                    viewModel.listSearchText = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundColor(.gray)
+                        .font(.system(size: 14))
+                }
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(Color(.systemGray6))
+        .cornerRadius(10)
+        .padding(.horizontal, 20)
+        .padding(.bottom, 4)
     }
 
     @ViewBuilder
@@ -159,6 +220,9 @@ struct ExternalUserProfileListsView: View {
         if viewModel.placeListPlaces[list.list_id] == nil {
             viewModel.loadPlacesForList(list)
         }
+
+        // Don't paginate during search
+        guard !viewModel.isSearchingLists else { return }
 
         // Use child ViewModel's shouldLoadMoreLists check (triggers at last 5 items)
         if viewModel.listsLoadingViewModel.shouldLoadMoreLists(

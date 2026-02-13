@@ -336,8 +336,9 @@ class SelectedPlaceViewModel: ObservableObject {
         }
     }
 
-    /// Checks if a place needs complete details.
+    /// Checks if a place needs complete details (custom places never need external details).
     private func placeNeedsCompleteDetails(_ place: DetailPlace) -> Bool {
+        if place.isCustom == true { return false }
         let missingRating = place.rating == nil
         let missingReviewCount = place.userRatingsTotal == nil
         let missingCategories = place.categories == nil || place.categories?.isEmpty == true
@@ -358,9 +359,12 @@ class SelectedPlaceViewModel: ObservableObject {
         postsCacheService.loadPosts(forPlaceId: place.id.uuidString)
     }
 
-    /// Fetches complete place details when missing.
+    /// Fetches complete place details when missing (skips custom places).
     private func fetchCompletePlaceDetails(for place: DetailPlace, currentLocation: CLLocationCoordinate2D?) {
-        // Use googlePlaceId for external places, fall back to UUID for custom places
+        guard place.isCustom != true else {
+            continueWithPlaceSetup(place: place, currentLocation: currentLocation)
+            return
+        }
         let placeId = place.googlePlaceId ?? place.id.uuidString
 
         mesaBackendService.fetchPlaceDetails(placeId: placeId, source: "google") { [weak self] result in
@@ -383,7 +387,7 @@ class SelectedPlaceViewModel: ObservableObject {
 
     /// Fetches fresh place details in background and loads posts once the real UUID is resolved.
     private func fetchFreshDetailsInBackground(for place: DetailPlace) {
-        // Use googlePlaceId for external places, fall back to UUID for custom places
+        guard place.isCustom != true else { return }
         let placeId = place.googlePlaceId ?? place.id.uuidString
 
         Task {

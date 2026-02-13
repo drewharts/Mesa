@@ -31,8 +31,8 @@ class PlaceDetailTabsViewModel: ObservableObject {
     private let postsCacheService = ServiceContainer.shared.postsCacheService
 
     // MARK: - Callbacks (replaces ViewModel observations)
-    /// Called when max favorites alert should be dismissed in ProfileViewModel
-    var onDismissMaxFavoritesAlert: (() -> Void)?
+    /// Checks if a place is in the user's favorites (injected from ProfileViewModel)
+    var isFavoriteCheck: ((String) -> Bool)?
 
     // MARK: - Child ViewModels
     let aboutTabViewModel: AboutTabViewModel
@@ -51,7 +51,6 @@ class PlaceDetailTabsViewModel: ObservableObject {
     @Published var hasPosts: Bool = false
     @Published var postCount: Int = 0
     @Published var selectedTab: DetailTab = .about
-    @Published var showMaxFavoritesAlert: Bool = false
     @Published var currentPlace: DetailPlace?
 
     // Forwarded from PlaceSaversViewModel (enables view re-render when savers change)
@@ -62,7 +61,7 @@ class PlaceDetailTabsViewModel: ObservableObject {
     @Published var openStatus: OpenStatus = .unknown
 
     // MARK: - Place Actions State
-    /// Whether the current place is saved in any of the user's lists
+    /// Whether the current place is saved in any of the user's lists or favorites
     @Published var isPlaceInList: Bool = false
 
     private var cancellables = Set<AnyCancellable>()
@@ -141,6 +140,8 @@ class PlaceDetailTabsViewModel: ObservableObject {
                 profileVM?.favoritesViewModel.removeFavoritePlace(place: place)
             }
         }
+
+        // Wire up posts callbacks
         self.postsViewModel.onCheckLikeStatuses = { [weak selectedPlaceVM] userId in
             selectedPlaceVM?.checkLikeStatuses(userId: userId)
         }
@@ -335,11 +336,6 @@ class PlaceDetailTabsViewModel: ObservableObject {
         self.placeRating = rating
     }
 
-    /// Called by View when favorite status changes.
-    func setFavoriteStatus(_ isFavorited: Bool) {
-        postsViewModel.setFavoriteStatus(isFavorited)
-    }
-
     /// Called by View when TikTok videos change.
     func setTikTokVideos(placeVideos: [TikTokVideo], userVideos: [TikTokVideo]) {
         aboutTabViewModel.tikTokVideosViewModel.setPlaceVideos(placeVideos)
@@ -351,29 +347,27 @@ class PlaceDetailTabsViewModel: ObservableObject {
         postsViewModel.setLoadingState(state)
     }
 
-    /// Called by View when max favorites alert should be shown
-    func handleMaxFavoritesAlert() {
-        showMaxFavoritesAlert = true
-    }
-    
-    /// Check if the current place is saved in any of the user's lists (database call)
-    /// Only checks place_list_items table, NOT external_places (TikToks)
+    /// Check if the current place is saved in any of the user's lists OR favorites.
     private func checkPlaceListMembership(place: DetailPlace?) async {
         guard let place = place, let userId = userSession.currentUserId else {
             isPlaceInList = false
             return
         }
-        
+
+        let placeId = place.id.uuidString
+
+        // Check favorites via callback (synchronous, client-side)
+        let isFavorite = isFavoriteCheck?(placeId) ?? false
+
         do {
             let isSaved = try await placeListService.isPlaceInAnyUserList(
                 userId: userId,
-                placeId: place.id.uuidString
+                placeId: placeId
             )
-            isPlaceInList = isSaved
+            isPlaceInList = isSaved || isFavorite
         } catch {
             print("❌ [PlaceDetailTabsVM] Error checking place list membership: \(error)")
-            // On error, default to false (don't show bookmark as filled)
-            isPlaceInList = false
+            isPlaceInList = isFavorite
         }
     }
 
@@ -425,12 +419,6 @@ class PlaceDetailTabsViewModel: ObservableObject {
     func sharePlace() {
         guard let place = currentPlace else { return }
         placeShareService.sharePlace(place)
-    }
-    
-    /// Resets the max favorites alert state in both this ViewModel and calls callback to notify parent
-    func dismissMaxFavoritesAlert() {
-        showMaxFavoritesAlert = false
-        onDismissMaxFavoritesAlert?()
     }
     
     func openGoogleMaps() {
