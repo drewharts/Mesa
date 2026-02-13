@@ -6,7 +6,7 @@
 //
 
 import SwiftUI
-import AVKit
+import AVFoundation
 
 struct FullscreenVideoPlayerView: View {
     @StateObject private var viewModel: FullscreenVideoPlayerViewModel
@@ -22,16 +22,17 @@ struct FullscreenVideoPlayerView: View {
 
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            Rectangle()
+                .fill(.ultraThinMaterial)
+                .ignoresSafeArea()
 
-            VideoPlayer(player: viewModel.player)
+            AVPlayerFillView(player: viewModel.player)
                 .ignoresSafeArea()
                 .onTapGesture { viewModel.togglePlayPause() }
 
             controlsOverlay
         }
         .gesture(dismissDragGesture)
-        .statusBarHidden(true)
     }
 
     // MARK: - Controls Overlay
@@ -55,7 +56,7 @@ struct FullscreenVideoPlayerView: View {
             Button(action: { dismiss() }) {
                 Image(systemName: "xmark")
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.white)
+                    .foregroundColor(.secondary)
                     .frame(width: 32, height: 32)
                     .background(.ultraThinMaterial)
                     .clipShape(Circle())
@@ -69,7 +70,7 @@ struct FullscreenVideoPlayerView: View {
     private var pauseIndicator: some View {
         Image(systemName: "play.fill")
             .font(.system(size: 48))
-            .foregroundColor(.white.opacity(0.7))
+            .foregroundColor(.secondary.opacity(0.7))
             .allowsHitTesting(false)
     }
 
@@ -85,7 +86,7 @@ struct FullscreenVideoPlayerView: View {
                     }
                 }
             )
-            .tint(.white)
+            .tint(.primary)
 
             HStack {
                 Text(formatTime(viewModel.currentTime))
@@ -93,7 +94,7 @@ struct FullscreenVideoPlayerView: View {
                 Text(formatTime(viewModel.duration))
             }
             .font(.caption2)
-            .foregroundColor(.white.opacity(0.7))
+            .foregroundColor(.secondary)
         }
         .padding(.horizontal, 16)
         .padding(.bottom, 24)
