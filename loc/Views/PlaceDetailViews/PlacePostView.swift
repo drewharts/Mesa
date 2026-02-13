@@ -7,20 +7,30 @@
 
 import SwiftUI
 
+extension URL: @retroactive Identifiable {
+    public var id: String { absoluteString }
+}
+
 struct PlacePostView: View {
     let post: PlacePost
     @ObservedObject var viewModel: PlacePostsViewModel
-    let onPhotoTapped: ([String], Int) -> Void  // URLs instead of UIImages
-    
+    let onPhotoTapped: ([String], Int) -> Void
+
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var userProfileNavigationVM: UserProfileNavigationViewModel
     @EnvironmentObject var userSession: UserSession
-    
+
+    @State private var fullscreenVideoURL: URL?
+
+    private var mediaWidth: CGFloat {
+        UIScreen.main.bounds.width - 56
+    }
+
     private var postPhotos: [UIImage] {
         viewModel.getPhotos(for: post)
     }
-    
+
     private var loadingState: PlacePhotosViewModel.LoadingState {
         viewModel.getPhotoLoadingState(for: post)
     }
@@ -38,10 +48,13 @@ struct PlacePostView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             
-            // Photos
-            photoSection
+            // Media (photos + videos)
+            mediaSection
         }
         .padding(.vertical, 12)
+        .fullScreenCover(item: $fullscreenVideoURL) { url in
+            FullscreenVideoPlayerView(url: url)
+        }
     }
     
     // MARK: - Header Section
@@ -132,76 +145,112 @@ struct PlacePostView: View {
         userSession.currentUserId != nil && post.userId == userSession.currentUserId
     }
     
-    // MARK: - Photo Section
-    
+    // MARK: - Media Section
+
+    private var hasMedia: Bool {
+        !post.images.isEmpty || !post.videoUrls.isEmpty
+    }
+
     @ViewBuilder
-    private var photoSection: some View {
+    private var mediaSection: some View {
         switch loadingState {
         case .loading:
-            VStack {
-                ProgressView()
-                    .scaleEffect(1.2)
-                Text("Loading photos...")
-                    .font(.caption)
-                    .foregroundColor(.gray)
-                    .padding(.top, 8)
-            }
-            .frame(height: 250)
-            
+            mediaLoadingView
+
         case .loaded:
-            if !postPhotos.isEmpty {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    LazyHStack(spacing: 12) {
-                        ForEach(Array(postPhotos.enumerated()), id: \.offset) { index, photo in
-                            Image(uiImage: photo)
-                                .resizable()
-                                .scaledToFill()
-                                .frame(width: 250, height: 250)
-                                .clipShape(RoundedRectangle(cornerRadius: 10))
-                                .shadow(radius: 2)
-                                .onTapGesture {
-                                    onPhotoTapped(post.images, index)
-                                }
-                                .onAppear {
-                                    if index == postPhotos.count - 1 {
-                                        viewModel.loadMorePhotos(for: post.id, allImageUrls: post.images)
-                                    }
-                                }
-                        }
+            loadedMediaContent
+
+        case .error:
+            mediaErrorView
+
+        case .idle:
+            if hasMedia {
+                ProgressView().padding()
+            }
+        }
+    }
+
+    private var mediaLoadingView: some View {
+        VStack {
+            ProgressView().scaleEffect(1.2)
+            Text("Loading media...")
+                .font(.caption)
+                .foregroundColor(.gray)
+                .padding(.top, 8)
+        }
+        .frame(height: 250)
+    }
+
+    @ViewBuilder
+    private var loadedMediaContent: some View {
+        let photos = postPhotos
+
+        if !photos.isEmpty || !post.videoUrls.isEmpty {
+            ScrollView(.horizontal, showsIndicators: false) {
+                LazyHStack(spacing: 12) {
+                    // Image items (backed by loaded UIImages)
+                    ForEach(Array(photos.enumerated()), id: \.offset) { index, photo in
+                        imageMediaCell(photo: photo, index: index)
+                    }
+                    // Video items
+                    ForEach(Array(post.videoUrls.enumerated()), id: \.element) { index, videoUrlString in
+                        let thumbnail = index < post.videoThumbnailUrls.count ? post.videoThumbnailUrls[index] : nil
+                        videoMediaCell(urlString: videoUrlString, thumbnailUrlString: thumbnail)
                     }
                 }
             }
-            
-        case .error(let error):
-            VStack(spacing: 8) {
-                HStack {
-                    Image(systemName: "exclamationmark.triangle")
-                        .foregroundColor(.orange)
-                    Text("Failed to load photos")
-                        .font(.caption)
-                        .foregroundColor(.red)
-                }
-                
-                Button(action: {
-                    viewModel.reloadPhotos(for: post)
-                }) {
-                    Text("Retry")
-                        .font(.caption)
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(Color.blue)
-                        .cornerRadius(8)
+        }
+    }
+
+    private func imageMediaCell(photo: UIImage, index: Int) -> some View {
+        Image(uiImage: photo)
+            .resizable()
+            .scaledToFill()
+            .frame(width: mediaWidth, height: mediaWidth)
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .shadow(radius: 2)
+            .onTapGesture {
+                onPhotoTapped(post.images, index)
+            }
+            .onAppear {
+                if index == postPhotos.count - 1 {
+                    viewModel.loadMorePhotos(for: post.id, allImageUrls: post.images)
                 }
             }
-            .padding()
-            
-        case .idle:
-            if !post.images.isEmpty {
-                ProgressView()
-                    .padding()
+    }
+
+    @ViewBuilder
+    private func videoMediaCell(urlString: String, thumbnailUrlString: String?) -> some View {
+        if let videoURL = URL(string: urlString) {
+            let thumbURL = thumbnailUrlString.flatMap { URL(string: $0) }
+            InlineVideoPlayerView(url: videoURL, thumbnailURL: thumbURL) {
+                fullscreenVideoURL = videoURL
+            }
+            .frame(width: mediaWidth, height: mediaWidth)
+            .shadow(radius: 2)
+        }
+    }
+
+    private var mediaErrorView: some View {
+        VStack(spacing: 8) {
+            HStack {
+                Image(systemName: "exclamationmark.triangle")
+                    .foregroundColor(.orange)
+                Text("Failed to load media")
+                    .font(.caption)
+                    .foregroundColor(.red)
+            }
+            Button(action: { viewModel.reloadPhotos(for: post) }) {
+                Text("Retry")
+                    .font(.caption)
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(Color.blue)
+                    .cornerRadius(8)
             }
         }
+        .padding()
     }
     
     // MARK: - Helpers

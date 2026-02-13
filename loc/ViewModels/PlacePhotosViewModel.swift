@@ -146,9 +146,9 @@ class PlacePhotosViewModel: ObservableObject {
         return photoItems + externalPhotoItems
     }
 
-    /// URLs for all combined photos (for photo viewer).
+    /// URLs for combined photos only, excluding videos (for photo viewer).
     var combinedPhotoURLs: [String] {
-        return combinedPhotoItems.map { $0.url }
+        return combinedPhotoItems.filter { !$0.isVideo }.map { $0.url }
     }
 
     /// Total count of all available photos.
@@ -276,8 +276,9 @@ class PlacePhotosViewModel: ObservableObject {
         photoLoadingStates[placeId] = .loading
 
         let urlsToFetch = collectUniquePhotoURLs(for: placeId)
+        let videoItems = collectUniqueVideoItems(for: placeId)
 
-        if urlsToFetch.isEmpty {
+        if urlsToFetch.isEmpty && videoItems.isEmpty {
             photoLoadingStates[placeId] = .loaded
             if placePhotoItems[placeId] == nil {
                 placePhotoItems[placeId] = []
@@ -286,11 +287,12 @@ class PlacePhotosViewModel: ObservableObject {
             return
         }
 
-        let newItems = urlsToFetch.map { PhotoItem(url: $0) }
+        let newPhotoItems = urlsToFetch.map { PhotoItem(url: $0) }
         let existingItems = placePhotoItems[placeId] ?? []
-        placePhotoItems[placeId] = existingItems + newItems
+        placePhotoItems[placeId] = existingItems + newPhotoItems + videoItems
 
-        markURLsAsLoaded(urlsToFetch, for: placeId)
+        let allNewURLs = urlsToFetch + videoItems.compactMap { $0.videoUrl }
+        markURLsAsLoaded(allNewURLs, for: placeId)
         photoLoadingStates[placeId] = .loaded
     }
 
@@ -312,6 +314,22 @@ class PlacePhotosViewModel: ObservableObject {
 
         let limit = min(photoPageLimit, uniqueURLs.count)
         return Array(uniqueURLs.prefix(limit))
+    }
+
+    /// Collects unique video items from posts, excluding already-loaded video URLs.
+    private func collectUniqueVideoItems(for placeId: String) -> [PhotoItem] {
+        let loadedURLs = loadedPlacePhotoURLs[placeId] ?? []
+        var items: [PhotoItem] = []
+
+        for post in currentPosts {
+            for (index, videoUrl) in post.videoUrls.enumerated() {
+                guard !loadedURLs.contains(videoUrl) else { continue }
+                let thumbnail = index < post.videoThumbnailUrls.count ? post.videoThumbnailUrls[index] : nil
+                items.append(PhotoItem(videoUrl: videoUrl, thumbnailUrl: thumbnail))
+            }
+        }
+
+        return items
     }
 
     /// Marks URLs as loaded to prevent future duplicate loads.

@@ -18,10 +18,22 @@ struct PlacePost: Codable, Identifiable {
     let text: String              // Can be empty if only photos
     let timestamp: Date
     var images: [String]          // Can be empty if only text
+    var videoUrls: [String]
+    var videoThumbnailUrls: [String]
     var likes: Int
     let wouldReturn: Bool?        // nil = not specified, true = would go back, false = wouldn't revisit
-    
-    init(id: String, userId: String, profilePhotoUrl: String, userFirstName: String, userLastName: String, placeId: String, placeName: String, text: String, timestamp: Date, images: [String], likes: Int, wouldReturn: Bool? = nil) {
+
+    /// Merges images and videos into a unified media list for display.
+    var allMediaItems: [PostMediaItem] {
+        var items: [PostMediaItem] = images.map { PostMediaItem(imageUrl: $0) }
+        for (index, videoUrl) in videoUrls.enumerated() {
+            let thumbnail = index < videoThumbnailUrls.count ? videoThumbnailUrls[index] : nil
+            items.append(PostMediaItem(videoUrl: videoUrl, thumbnailUrl: thumbnail))
+        }
+        return items
+    }
+
+    init(id: String, userId: String, profilePhotoUrl: String, userFirstName: String, userLastName: String, placeId: String, placeName: String, text: String, timestamp: Date, images: [String], videoUrls: [String] = [], videoThumbnailUrls: [String] = [], likes: Int, wouldReturn: Bool? = nil) {
         self.id = id
         self.userId = userId
         self.profilePhotoUrl = profilePhotoUrl
@@ -32,6 +44,8 @@ struct PlacePost: Codable, Identifiable {
         self.text = text
         self.timestamp = timestamp
         self.images = images
+        self.videoUrls = videoUrls
+        self.videoThumbnailUrls = videoThumbnailUrls
         self.likes = likes
         self.wouldReturn = wouldReturn
     }

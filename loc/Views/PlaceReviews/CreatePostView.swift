@@ -14,7 +14,7 @@ struct CreatePostView: View {
     
     @StateObject private var viewModel: PlacePostViewModel
     
-    @State private var showingImagePicker = false
+    @State private var showingMediaPicker = false
     @State private var showAlert = false
     @State private var alertMessage = ""
     
@@ -48,7 +48,12 @@ struct CreatePostView: View {
         NavigationView {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
-                    PostPhotoSection(viewModel: viewModel, showingImagePicker: $showingImagePicker)
+                    PostMediaSection(viewModel: viewModel, showingMediaPicker: $showingMediaPicker)
+
+                    if viewModel.isLoading {
+                        uploadProgressBar
+                    }
+
                     PostOptionalSections(viewModel: viewModel)
                     Spacer(minLength: 40)
                 }
@@ -85,16 +90,27 @@ struct CreatePostView: View {
                 Text(alertMessage)
             }
         }
-        .sheet(isPresented: $showingImagePicker) {
-            MultiImagePicker(images: Binding(
-                get: { viewModel.images },
-                set: { viewModel.images = $0 }
-            ), selectionLimit: 0)
+        .sheet(isPresented: $showingMediaPicker) {
+            MultiMediaPicker(
+                selectedMedia: $viewModel.selectedMedia,
+                selectionLimit: 0
+            )
         }
     }
     
+    /// Upload progress bar shown during media upload.
+    private var uploadProgressBar: some View {
+        VStack(spacing: 4) {
+            ProgressView(value: viewModel.uploadProgress, total: 1.0)
+                .tint(.blue)
+            Text("Uploading media...")
+                .font(.caption)
+                .foregroundColor(.gray)
+        }
+    }
+
     // MARK: - Actions
-    
+
     private func submitPost() {
         viewModel.submitPost { result in
             switch result {
@@ -111,60 +127,108 @@ struct CreatePostView: View {
     }
 }
 
-// MARK: - Photo Section
+// MARK: - Media Section
 
-private struct PostPhotoSection: View {
+private struct PostMediaSection: View {
     @ObservedObject var viewModel: PlacePostViewModel
-    @Binding var showingImagePicker: Bool
-    
+    @Binding var showingMediaPicker: Bool
+
     private let cornerRadius: CGFloat = 16
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Selected images
-            if !viewModel.images.isEmpty {
+            if !viewModel.selectedMedia.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 12) {
-                        ForEach(Array(viewModel.images.enumerated()), id: \.offset) { index, image in
-                            imageCell(image: image, index: index)
+                        ForEach(Array(viewModel.selectedMedia.enumerated()), id: \.element.id) { index, item in
+                            mediaCell(item: item, index: index)
                         }
-                        addPhotoButton(compact: true)
+                        addMediaButton(compact: true)
                     }
                 }
             } else {
-                addPhotoButton(compact: false)
+                addMediaButton(compact: false)
             }
         }
     }
-    
-    private func imageCell(image: UIImage, index: Int) -> some View {
+
+    @ViewBuilder
+    private func mediaCell(item: SelectedMediaItem, index: Int) -> some View {
         ZStack(alignment: .topTrailing) {
-            Image(uiImage: image)
-                .resizable()
-                .aspectRatio(contentMode: .fill)
-                .frame(width: 100, height: 100)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-            
-            Button(action: { viewModel.removeImage(at: index) }) {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.title2)
-                    .symbolRenderingMode(.palette)
-                    .foregroundStyle(.white, .black.opacity(0.6))
-            }
-            .offset(x: 8, y: -8)
+            mediaThumbnail(for: item)
+            removeButton(index: index)
         }
         .padding(.top, 10)
         .padding(.trailing, 10)
     }
-    
-    private func addPhotoButton(compact: Bool) -> some View {
-        Button(action: { showingImagePicker = true }) {
+
+    @ViewBuilder
+    private func mediaThumbnail(for item: SelectedMediaItem) -> some View {
+        switch item.type {
+        case .image:
+            if let image = item.image {
+                Image(uiImage: image)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: 100, height: 100)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+            }
+        case .video:
+            ZStack(alignment: .bottomLeading) {
+                if let thumbnail = item.thumbnail {
+                    Image(uiImage: thumbnail)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: 100, height: 100)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                } else {
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.gray.opacity(0.3))
+                        .frame(width: 100, height: 100)
+                }
+                // Play icon overlay
+                Image(systemName: "play.fill")
+                    .font(.title3)
+                    .foregroundColor(.white)
+                    .shadow(radius: 2)
+                    .padding(6)
+                // Duration badge
+                if let duration = item.duration {
+                    HStack {
+                        Spacer()
+                        Text(formatDuration(duration))
+                            .font(.caption2)
+                            .fontWeight(.medium)
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 2)
+                            .background(Color.black.opacity(0.6))
+                            .cornerRadius(4)
+                            .padding(4)
+                    }
+                }
+            }
+        }
+    }
+
+    private func removeButton(index: Int) -> some View {
+        Button(action: { viewModel.removeMedia(at: index) }) {
+            Image(systemName: "xmark.circle.fill")
+                .font(.title2)
+                .symbolRenderingMode(.palette)
+                .foregroundStyle(.white, .black.opacity(0.6))
+        }
+        .offset(x: 8, y: -8)
+    }
+
+    private func addMediaButton(compact: Bool) -> some View {
+        Button(action: { showingMediaPicker = true }) {
             VStack(spacing: 8) {
                 Image(systemName: "plus")
                     .font(.system(size: compact ? 20 : 24, weight: .medium))
                     .foregroundColor(.secondary)
                 if !compact {
-                    Text("Add Photos")
+                    Text("Add Photos & Videos")
                         .font(.subheadline)
                         .fontWeight(.medium)
                         .foregroundColor(.secondary)
@@ -181,6 +245,13 @@ private struct PostPhotoSection: View {
                     .strokeBorder(.quaternary, lineWidth: 0.5)
             )
         }
+    }
+
+    /// Formats seconds into m:ss display string for duration badges.
+    private func formatDuration(_ seconds: TimeInterval) -> String {
+        let mins = Int(seconds) / 60
+        let secs = Int(seconds) % 60
+        return "\(mins):\(String(format: "%02d", secs))"
     }
 }
 
