@@ -147,7 +147,7 @@ class PlaceListSelectionViewModel: ObservableObject {
         }
 
         // Check if place is in user's favorites
-        isFavorited = profile.isPlaceFavorite(placeId: place.id.uuidString)
+        isFavorited = profile.favoritesViewModel.isPlaceFavorite(placeId: place.id.uuidString)
 
         isLoadingInitial = false
     }
@@ -420,9 +420,9 @@ class PlaceListSelectionViewModel: ObservableObject {
     /// Toggles the favorite status for a place via ProfileViewModel.
     func toggleFavorite(place: DetailPlace) {
         if isFavorited {
-            profile.removeFavoritePlace(place: place)
+            profile.favoritesViewModel.removeFavoritePlace(place: place)
         } else {
-            profile.addFavoritePlace(place: place)
+            profile.favoritesViewModel.addFavoritePlace(place: place)
         }
         isFavorited.toggle()
     }

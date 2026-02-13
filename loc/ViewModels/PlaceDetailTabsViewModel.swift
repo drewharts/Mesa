@@ -133,15 +133,6 @@ class PlaceDetailTabsViewModel: ObservableObject {
         )
 
         // Wire up posts callbacks
-        self.postsViewModel.onToggleFavorite = { [weak profileVM] place, shouldFavorite in
-            if shouldFavorite {
-                profileVM?.favoritesViewModel.addFavoritePlace(place: place)
-            } else {
-                profileVM?.favoritesViewModel.removeFavoritePlace(place: place)
-            }
-        }
-
-        // Wire up posts callbacks
         self.postsViewModel.onCheckLikeStatuses = { [weak selectedPlaceVM] userId in
             selectedPlaceVM?.checkLikeStatuses(userId: userId)
         }

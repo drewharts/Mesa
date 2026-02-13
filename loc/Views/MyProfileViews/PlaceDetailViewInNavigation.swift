@@ -263,10 +263,6 @@ struct PlaceDetailViewContent: View {
             vm.setPlace(place)
             vm.setPosts(selectedPlaceVM.posts, rating: selectedPlaceVM.placeRating)
 
-            // Set favorite status
-            let isFavorited = profile.favoritesViewModel.isPlaceFavorite(placeId: place.id.uuidString)
-            vm.setFavoriteStatus(isFavorited)
-
             // Set TikTok videos
             let userVideos = profile.tikTokViewModel.getTikTokVideosSync(for: place.id.uuidString)
             vm.setTikTokVideos(placeVideos: selectedPlaceVM.tiktokVideos, userVideos: userVideos)
