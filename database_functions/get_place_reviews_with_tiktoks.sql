@@ -8,48 +8,56 @@
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION public.get_place_reviews_with_tiktoks(
-    p_place_id text, 
-    p_limit integer DEFAULT 4, 
+    p_place_id uuid,
+    p_limit integer DEFAULT 4,
     p_offset integer DEFAULT 0
 )
 RETURNS TABLE(
-    review_id text, 
-    review_user_id text, 
-    review_text text, 
-    review_images text[], 
-    review_timestamp timestamp without time zone, 
-    review_type text, 
-    review_likes integer, 
-    user_first_name text, 
-    user_last_name text, 
-    user_profile_photo_url text, 
-    tiktok_videos jsonb[]
+    review_id text,
+    review_user_id text,
+    review_text text,
+    review_images text[],
+    review_timestamp timestamp without time zone,
+    review_type text,
+    review_likes integer,
+    user_first_name text,
+    user_last_name text,
+    user_profile_photo_url text,
+    tiktok_videos jsonb[],
+    would_return boolean,
+    review_video_urls text[],
+    review_video_thumbnails text[]
 )
 LANGUAGE plpgsql
 AS $function$
 BEGIN
     RETURN QUERY
-    SELECT 
+    SELECT
         -- Reviews columns
         r.id AS review_id,
         r.user_id AS review_user_id,
-        r.review_text,
+        r.review_text AS review_text,
         r.images AS review_images,
         r.timestamp AS review_timestamp,
         r.type AS review_type,
         r.likes AS review_likes,
-        
+
         -- User information (CURRENT from users table via JOIN)
         u.first_name AS user_first_name,
         u.last_name AS user_last_name,
         u.profile_photo_url AS user_profile_photo_url,
-        
+
         -- TikTok videos - now returns empty array since metadata is fetched on-demand
         -- TikTok URLs are stored in external_places.url, but metadata is fetched via oEmbed
-        '{}'::jsonb[] AS tiktok_videos
+        '{}'::jsonb[] AS tiktok_videos,
+
+        r.would_return AS would_return,
+
+        COALESCE(r.video_urls, '{}') AS review_video_urls,
+        COALESCE(r.video_thumbnail_urls, '{}') AS review_video_thumbnails
     FROM reviews r
     INNER JOIN users u ON r.user_id = u.id
-    WHERE r.place_id = p_place_id
+    WHERE r.place_id = UPPER(p_place_id::text)
     ORDER BY r.timestamp DESC
     LIMIT p_limit
     OFFSET p_offset;

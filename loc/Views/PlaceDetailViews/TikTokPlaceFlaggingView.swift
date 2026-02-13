@@ -41,9 +41,7 @@ struct TikTokPlaceFlaggingView: View {
         }
         .sheet(isPresented: $showingPlaceCorrectionSheet) {
             TikTokPlaceCorrectionSheet(
-                placeId: place.id.uuidString,
-                placeName: place.name,
-                externalPlaceId: externalPlaceId,
+                mode: .correction(externalPlaceId: externalPlaceId ?? "", currentPlaceName: place.name),
                 onPlaceChanged: { newPlace in
                     profile.recordPlaceCorrectionFlag(for: place.id.uuidString, newPlaceId: newPlace.id.uuidString)
                     onPlaceChanged?(newPlace)

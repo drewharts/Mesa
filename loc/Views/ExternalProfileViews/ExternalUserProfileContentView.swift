@@ -36,7 +36,7 @@ struct ExternalUserProfileContentView: View {
                             guard let currentUserId = userSession.currentUserId else { return }
                             viewModel.toggleFollowUser(currentUserId: currentUserId) { success, newFollowingState in
                                 if success {
-                                    profileVM.updateFollowingState(
+                                    profileVM.socialViewModel.updateFollowingState(
                                         userId: viewModel.userId,
                                         isFollowing: newFollowingState
                                     )

@@ -19,7 +19,7 @@ struct ListDescription: View {
                 .font(.body)
                 .foregroundStyle(Color.primary.opacity(1.0)) // Ensures black in light mode, white in dark mode
 
-            Text("\(profile.placeCount(forListId: placeList.id)) Places")
+            Text("\(profile.listsViewModel.placeCount(forListId: placeList.id)) Places")
                 .font(.caption)
                 .foregroundStyle(Color.secondary.opacity(1.0)) // Slightly lighter, adapts to mode
         }

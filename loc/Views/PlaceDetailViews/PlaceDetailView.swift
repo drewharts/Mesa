@@ -258,7 +258,7 @@ struct PlaceDetailView: View {
     /// Handles view appearance - initializes ViewModel and refreshes TikTok data.
     private func handleAppear() {
         initializeViewModelIfNeeded()
-        profile.refreshTikTokPlacesAfterImport()
+        profile.tikTokViewModel.refreshTikTokPlacesAfterImport()
 
         // Fetch user's external places on-demand so getTikTokVideosSync() has data
         Task {
@@ -267,7 +267,7 @@ struct PlaceDetailView: View {
             // After fetch completes, force TikTok update since data is now available
             await MainActor.run {
                 guard let place = selectedPlaceVM.selectedPlace else { return }
-                let userVideos = profile.getTikTokVideosSync(for: place.id.uuidString)
+                let userVideos = profile.tikTokViewModel.getTikTokVideosSync(for: place.id.uuidString)
                 print("🎬 [PlaceDetailView] handleAppear - after fetchUserExternalPlaces, userVideos: \(userVideos.count)")
                 tabsViewModel?.setTikTokVideos(placeVideos: selectedPlaceVM.tiktokVideos, userVideos: userVideos)
             }
@@ -329,7 +329,10 @@ struct PlaceDetailView: View {
         vm.setPlace(place)
         vm.setPosts(selectedPlaceVM.posts, rating: selectedPlaceVM.placeRating)
 
-        let userVideos = profile.getTikTokVideosSync(for: place.id.uuidString)
+        let isFavorited = profile.favoritesViewModel.isPlaceFavorite(placeId: place.id.uuidString)
+        vm.setFavoriteStatus(isFavorited)
+
+        let userVideos = profile.tikTokViewModel.getTikTokVideosSync(for: place.id.uuidString)
         vm.setTikTokVideos(placeVideos: selectedPlaceVM.tiktokVideos, userVideos: userVideos)
 
         let loadingState = selectedPlaceVM.postLoadingState(forPlaceId: place.id.uuidString)

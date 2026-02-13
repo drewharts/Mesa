@@ -33,7 +33,7 @@ struct TikToksPopupView: View {
                 )
                 .contextMenu {
                     Button(role: .destructive) {
-                        profile.deleteTikTokPlace(place)
+                        profile.tikTokViewModel.deleteTikTokPlace(place)
                     } label: {
                         Label("Delete TikTok Place", systemImage: "trash")
                     }
@@ -44,7 +44,7 @@ struct TikToksPopupView: View {
             // Only load if not already loaded (same pattern as list sheets)
             // This preserves scroll position on back navigation
             if tikTokVM.lightweightExternalPlaces.isEmpty {
-                profile.refreshTikTokPlacesAfterImport()
+                profile.tikTokViewModel.refreshTikTokPlacesAfterImport()
             }
         }
     }

@@ -279,6 +279,7 @@ struct MainView: View {
     private func tikTokNoPlacesFoundSheet(tikTokUrl: String) -> some View {
         TikTokNoPlacesFoundView(tikTokUrl: tikTokUrl)
             .environmentObject(profileViewModel)
+            .environmentObject(selectedPlaceVM)
             .environmentObject(userSession)
             .environmentObject(detailPlaceViewModel)
             .presentationDragIndicator(.visible)

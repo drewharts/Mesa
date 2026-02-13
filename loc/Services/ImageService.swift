@@ -1,6 +1,7 @@
 import Foundation
 import UIKit
 import Supabase
+import AVFoundation
 
 class ImageService {
     static let shared = ImageService()
@@ -331,6 +332,99 @@ class ImageService {
             }
             throw error
         }
+    }
+
+    // MARK: - Video Upload
+
+    /// Uploads videos for a post and returns paired (videoURL, thumbnailURL) for each.
+    func uploadVideosForPostAsync(
+        post: PlacePost,
+        videoURLs: [URL]
+    ) async throws -> [(videoURL: String, thumbnailURL: String)] {
+        let supabase = await SupabaseManager.shared
+
+        guard !videoURLs.isEmpty else { return [] }
+
+        let currentUser = try await supabase.auth.user()
+        let supabaseUserId = currentUser.id.uuidString
+        let videoBucket = await supabase.storage.from("review-videos")
+        let photoBucket = await supabase.storage.from("review-photos")
+
+        var results: [(videoURL: String, thumbnailURL: String)] = []
+
+        for (index, localURL) in videoURLs.enumerated() {
+            let videoData = try Data(contentsOf: localURL)
+            let videoPath = "\(supabaseUserId)/\(post.id)/video_\(index).mp4"
+
+            _ = try await videoBucket.upload(
+                videoPath,
+                data: videoData,
+                options: FileOptions(
+                    cacheControl: "3600",
+                    contentType: "video/mp4",
+                    upsert: true
+                )
+            )
+            let videoPublicURL = try videoBucket.getPublicURL(path: videoPath)
+
+            let thumbnail = try await generateVideoThumbnail(from: localURL)
+            let thumbURL = try await uploadThumbnail(
+                thumbnail,
+                bucket: photoBucket,
+                userId: supabaseUserId,
+                postId: post.id,
+                index: index
+            )
+
+            results.append((
+                videoURL: videoPublicURL.absoluteString,
+                thumbnailURL: thumbURL
+            ))
+        }
+
+        return results
+    }
+
+    /// Generates a thumbnail UIImage from a local video file at 0.5 seconds.
+    func generateVideoThumbnail(from url: URL) async throws -> UIImage {
+        let asset = AVURLAsset(url: url)
+        let generator = AVAssetImageGenerator(asset: asset)
+        generator.appliesPreferredTrackTransform = true
+        generator.maximumSize = CGSize(width: 600, height: 600)
+
+        let time = CMTime(seconds: 0.5, preferredTimescale: 600)
+        let (cgImage, _) = try await generator.image(at: time)
+        return UIImage(cgImage: cgImage)
+    }
+
+    /// Uploads a thumbnail image to the photo bucket and returns its public URL string.
+    private func uploadThumbnail(
+        _ image: UIImage,
+        bucket: StorageFileApi,
+        userId: String,
+        postId: String,
+        index: Int
+    ) async throws -> String {
+        guard let data = image.jpegData(compressionQuality: 0.7) else {
+            throw NSError(domain: "ImageService", code: -1, userInfo: [
+                NSLocalizedDescriptionKey: "Failed to convert thumbnail to JPEG"
+            ])
+        }
+
+        let path = "\(userId)/\(postId)/thumb_\(index).jpg"
+
+        _ = try await bucket.upload(
+            path,
+            data: data,
+            options: FileOptions(
+                cacheControl: "3600",
+                contentType: "image/jpeg",
+                upsert: true
+            )
+        )
+
+        let publicURL = try bucket.getPublicURL(path: path)
+        return publicURL.absoluteString
     }
 
     // Function to upload an image and update the PlaceList's image field

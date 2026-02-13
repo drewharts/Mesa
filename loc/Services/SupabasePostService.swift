@@ -30,6 +30,8 @@ class SupabasePostService: ObservableObject {
                     place_name: post.placeName,
                     review_text: post.text,
                     images: post.images,
+                    video_urls: post.videoUrls.isEmpty ? nil : post.videoUrls,
+                    video_thumbnail_urls: post.videoThumbnailUrls.isEmpty ? nil : post.videoThumbnailUrls,
                     timestamp: post.timestamp,
                     likes: post.likes,
                     type: "generic",
@@ -118,9 +120,11 @@ class SupabasePostService: ObservableObject {
                 userLastName: record.user_last_name ?? "",
                 placeId: placeId,
                 placeName: "",
-                text: record.review_text,
+                text: record.review_text ?? "",
                 timestamp: timestamp,
                 images: record.review_images ?? [],
+                videoUrls: record.review_video_urls ?? [],
+                videoThumbnailUrls: record.review_video_thumbnails ?? [],
                 likes: record.review_likes ?? 0,
                 wouldReturn: record.would_return
             )
@@ -156,6 +160,8 @@ class SupabasePostService: ObservableObject {
                 text: record.review_text ?? "",
                 timestamp: record.timestamp,
                 images: record.images ?? [],
+                videoUrls: record.video_urls ?? [],
+                videoThumbnailUrls: record.video_thumbnail_urls ?? [],
                 likes: record.likes ?? 0,
                 wouldReturn: record.would_return
             )
@@ -367,6 +373,8 @@ struct PostRecord: Codable {
     let place_name: String?
     let review_text: String?
     let images: [String]?
+    let video_urls: [String]?
+    let video_thumbnail_urls: [String]?
     let timestamp: Date
     let likes: Int?
     let type: String?
@@ -376,7 +384,7 @@ struct PostRecord: Codable {
 struct PostWithUserRecord: Codable {
     let review_id: String
     let review_user_id: String
-    let review_text: String
+    let review_text: String?
     let review_images: [String]?
     let review_timestamp: String
     let review_type: String?
@@ -386,5 +394,7 @@ struct PostWithUserRecord: Codable {
     let user_profile_photo_url: String?
     let tiktok_videos: [AnyCodable]?
     let would_return: Bool?
+    let review_video_urls: [String]?
+    let review_video_thumbnails: [String]?
 }
 

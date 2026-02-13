@@ -10,7 +10,7 @@ import UIKit
 
 struct PlacePostsListView: View {
     @ObservedObject var viewModel: PlacePostsViewModel
-    let onPhotoTapped: ([String], Int) -> Void  // URLs instead of UIImages
+    let onPhotoTapped: ([String], Int) -> Void
     let scrollProxy: ScrollViewProxy
     
     @EnvironmentObject var userProfileNavigationVM: UserProfileNavigationViewModel

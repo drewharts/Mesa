@@ -260,7 +260,7 @@ struct LightweightListPopupView: View {
                     navigationPath.append(placeId)
                 },
                 onRemovePlace: { placeId in
-                    profile.removePlaceFromLightweightList(listId: listId, placeId: placeId)
+                    profile.listsViewModel.removePlaceFromLightweightList(listId: listId, placeId: placeId)
                 },
                 listsVM: listsVM,
                 reviewsVM: reviewsVM
