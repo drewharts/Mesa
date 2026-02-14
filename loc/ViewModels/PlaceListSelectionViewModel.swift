@@ -144,6 +144,12 @@ class PlaceListSelectionViewModel: ObservableObject {
         // Load place membership data for all lists (so we can show checkmarks)
         if !uniqueLists.isEmpty {
             await loadPlaceMembershipForLists(uniqueLists, placeId: place.id.uuidString)
+
+            // Re-apply filters now that membership data is available
+            // This ensures "already saved" lists sort to the top
+            if searchText.trimmingCharacters(in: .whitespaces).isEmpty {
+                filteredLists = applyLocalFilters(to: lists)
+            }
         }
 
         // Check if place is in user's favorites
@@ -231,16 +237,21 @@ class PlaceListSelectionViewModel: ObservableObject {
         isSearching = false
     }
     
-    /// Applies local filters (shared filter) to a list of lists
-    /// Single Responsibility: Filter application logic
+    /// Applies local filters and sorts lists that already contain the place to the top.
     private func applyLocalFilters(to sourceLists: [LightweightPlaceList]) -> [LightweightPlaceList] {
         var result = sourceLists
-        
+
         // Apply shared filter if enabled
         if showOnlyShared {
             result = result.filter { $0.isCollaborative }
         }
-        
+
+        // Sort lists that already contain the place to the top
+        // Swift sort is stable — preserves proximity order within each group
+        result.sort { list1, _ in
+            placeMembership[list1.list_id] == true
+        }
+
         return result
     }
     
@@ -292,7 +303,12 @@ class PlaceListSelectionViewModel: ObservableObject {
                     // Follows Single Responsibility: Pagination ≠ Data Enrichment
                     if let placeId = currentPlace?.id.uuidString {
                         Task {
-                            await loadPlaceMembershipForLists(newUniqueLists, placeId: placeId)
+                            await self.loadPlaceMembershipForLists(newUniqueLists, placeId: placeId)
+
+                            // Re-apply filters after membership loads so new pages sort correctly
+                            if self.searchText.trimmingCharacters(in: .whitespaces).isEmpty {
+                                self.filteredLists = self.applyLocalFilters(to: self.lists)
+                            }
                         }
                     }
                 }
