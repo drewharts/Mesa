@@ -136,7 +136,12 @@ struct MainView: View {
                     userProfileNavigationViewModel.navigatedFromPlaceDetail = false
                 }
             }
-            .fullScreenCover(isPresented: $shouldNavigateToProfile) {
+            .fullScreenCover(isPresented: $shouldNavigateToProfile, onDismiss: {
+                // Present pending list sheet after profile is fully dismissed
+                if let listId = profileViewModel.selectedListIdForMap {
+                    PresentationService.shared.present(.list(listId: listId))
+                }
+            }) {
                 ProfileView()
                     .environmentObject(userProfileNavigationViewModel)
                     .environmentObject(mapDisplayCoordinatorViewModel)

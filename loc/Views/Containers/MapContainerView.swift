@@ -143,7 +143,9 @@ struct MapContainerView: View {
     /// Handles list selection changes from ProfileViewModel
     private func handleListSelectionChange(_ newValue: String?) {
         if let listId = newValue {
-            mapViewModel.selectList(listId, availableLists: profileViewModel.listsViewModel.lightweightPlaceLists)
+            // Apply filter only — sheet presentation is handled by MainView's
+            // fullScreenCover onDismiss to avoid presenting over the profile
+            mapViewModel.applyListFilter(listId, availableLists: profileViewModel.listsViewModel.lightweightPlaceLists)
 
             if let listCenter = profileViewModel.listsViewModel.lightweightPlaceLists
                 .first(where: { $0.list_id == listId })?.averageLocation {
