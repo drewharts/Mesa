@@ -1360,32 +1360,45 @@ class SupabasePlaceService: ObservableObject {
         }
     }
 
-    /// Fetch keyword annotations for map viewport - returns PlaceAnnotation for map display
-    /// Uses searchPlacesByTypes internally and converts results to annotations
+    /// Fetches keyword annotations in the viewport with user_ids from save sources
     func fetchKeywordAnnotationsInViewport(
         northLat: Double,
         southLat: Double,
         eastLng: Double,
         westLng: Double,
-        types: [String]
+        types: [String],
+        userId: String
     ) async throws -> [PlaceAnnotation] {
-        let places = try await searchPlacesByTypes(
-            types: types,
-            bounds: (northLat: northLat, southLat: southLat,
-                     eastLng: eastLng, westLng: westLng),
-            limit: 100,
-            offset: 0
-        )
+        do {
+            struct ViewportParams: Encodable {
+                let p_user_id: String
+                let p_types: [String]
+                let p_min_lon: Double
+                let p_min_lat: Double
+                let p_max_lon: Double
+                let p_max_lat: Double
+            }
 
-        return places.compactMap { place -> PlaceAnnotation? in
-            guard let coord = place.coordinate else { return nil }
-            return PlaceAnnotation(
-                id: place.id.uuidString,
-                name: place.name,
-                coordinate: coord,
-                userIds: [],
-                placeType: place.categories?.first ?? "restaurant"
+            let params = ViewportParams(
+                p_user_id: userId,
+                p_types: types,
+                p_min_lon: westLng,
+                p_min_lat: southLat,
+                p_max_lon: eastLng,
+                p_max_lat: northLat
             )
+
+            let response: [PlaceAnnotation] = try await supabase.client
+                .rpc("get_keyword_annotations_with_users", params: params)
+                .execute()
+                .value
+
+            return response
+        } catch {
+            if !Task.isCancelled && !(error is CancellationError) && (error as NSError).code != NSURLErrorCancelled {
+                print("❌ [Supabase] Error fetching keyword annotations: \(error)")
+            }
+            throw error
         }
     }
 

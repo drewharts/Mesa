@@ -134,9 +134,10 @@ struct KeywordResultsView: View {
                     Spacer()
 
                     Button(action: onViewAll) {
-                        Image(systemName: "list.bullet")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(.primary)
+                        Text("View on Map")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                            .foregroundColor(.accentColor)
                     }
                     .buttonStyle(PlainButtonStyle())
                 }

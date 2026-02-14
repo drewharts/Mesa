@@ -348,7 +348,7 @@ private struct SheetOnChangeModifiers: ViewModifier {
     let selectedPlaceViewModel: SelectedPlaceViewModel
     @ObservedObject var userProfileNavigationViewModel: UserProfileNavigationViewModel
     let mapViewModel: MapViewModel
-    let appCoordinator: AppCoordinator
+    @ObservedObject var appCoordinator: AppCoordinator
     let userSession: UserSession
 
     func body(content: Content) -> some View {

@@ -153,12 +153,6 @@ struct MainView: View {
                     .environmentObject(dataManager)
                     .environmentObject(serviceContainer)
             }
-            .sheet(isPresented: $showSearchPage) {
-                searchPageView
-                    .presentationDetents([.large])
-                    .presentationDragIndicator(.hidden)
-                    .interactiveDismissDisabled()
-            }
             .alert("No Location Found", isPresented: $deepLinkViewModel.showNoLocationAlert) {
                 Button("OK") {
                     deepLinkViewModel.dismissNoLocationAlert()
@@ -458,6 +452,19 @@ struct MainView: View {
             Spacer()
         }
         .overlay(floatingActionButtons)
+        .sheet(isPresented: $showSearchPage, onDismiss: {
+            if appCoordinator.hasPendingKeywordPopup {
+                appCoordinator.hasPendingKeywordPopup = false
+                DispatchQueue.main.async {
+                    appCoordinator.showKeywordResultsPopup = true
+                }
+            }
+        }) {
+            searchPageView
+                .presentationDetents([.large])
+                .presentationDragIndicator(.hidden)
+                .interactiveDismissDisabled()
+        }
     }
 
     // MARK: - Floating Action Buttons
