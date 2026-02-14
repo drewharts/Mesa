@@ -26,6 +26,9 @@ class ServiceContainer: ObservableObject {
     // MARK: - Cache Services
     lazy var postsCacheService = PlacePostsCacheService.shared
 
+    // MARK: - Repositories
+    lazy var placeRepository = PlaceRepository.shared
+
     // MARK: - Presentation Service (centralized sheet/modal management)
     let presentationService = PresentationService.shared
     

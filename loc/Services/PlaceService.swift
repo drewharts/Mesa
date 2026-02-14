@@ -406,11 +406,6 @@ class PlaceService: ObservableObject {
         completion(nil)
     }
     
-    func updatePlace(place: DetailPlace, completion: @escaping (Error?) -> Void) {
-        print("⚠️ [PlaceService] updatePlace not fully implemented")
-        completion(nil)
-    }
-    
     func createNewList(userId: String, listName: String, city: String, emoji: String, image: String, completion: @escaping (PlaceList?, Error?) -> Void) {
         Task { @MainActor in
             do {

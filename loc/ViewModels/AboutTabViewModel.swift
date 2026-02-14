@@ -73,6 +73,12 @@ class AboutTabViewModel: ObservableObject {
             return
         }
 
+        // Placeholder UUIDs don't exist in Supabase — skip polling
+        guard !place.hasPlaceholderID else {
+            isDescriptionLoading = false
+            return
+        }
+
         // If description is nil/empty and not a custom place, start polling
         let hasDescription = place.description != nil && !place.description!.isEmpty
         if !hasDescription && place.isCustom != true {

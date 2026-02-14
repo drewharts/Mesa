@@ -1510,64 +1510,9 @@ class SupabasePlaceService: ObservableObject {
     
     // MARK: - Helper Methods
     
+    /// Converts a Supabase PlaceRecord to DetailPlace via PlaceDataAssembler.
     private func convertToDetailPlace(_ record: PlaceRecord) -> DetailPlace {
-        // Create a DetailPlace with the basic required fields
-        var place = DetailPlace(
-            id: UUID(uuidString: record.id) ?? UUID(),
-            name: record.name,
-            address: record.address,
-            city: record.city
-        )
-        
-        // Set optional fields
-        place.mapboxId = record.mapbox_id
-        place.categories = record.categories
-        place.phone = record.phone
-        place.rating = record.rating
-        place.userRatingsTotal = record.rating_count
-        // Convert open_hours from AnyCodable to [String] if possible
-        if let openHoursData = record.open_hours {
-            if let stringArray = openHoursData.value as? [String] {
-                place.openHours = stringArray
-            } else if let dictArray = openHoursData.value as? [[String: String]] {
-                // Convert from [{ day: "Monday", hours: "11 AM–11 PM" }] to ["Monday: 11 AM–11 PM"]
-                place.openHours = dictArray.compactMap { dict in
-                    guard let day = dict["day"], let hours = dict["hours"] else { return nil }
-                    return "\(day): \(hours)"
-                }
-            } else {
-                print("⚠️ [Supabase] Could not convert open_hours to [String]: \(openHoursData.value)")
-                place.openHours = nil
-            }
-        } else {
-            place.openHours = nil
-        }
-        place.description = record.description
-        place.priceLevel = record.price_level
-        place.reservable = record.reservable
-        place.servesBreakfast = record.serves_breakfast
-        place.serversLunch = record.serves_lunch
-        place.serversDinner = record.serves_dinner
-        place.Instagram = record.instagram
-        place.X = record.twitter // Note: DetailPlace doesn't have twitter field, using x instead
-        place.photoUrls = record.photo_urls
-        place.googlePlaceId = record.google_places_id
-        place.source = record.source
-        place.isCustom = record.is_custom
-        place.menuUrl = record.menu_url
-        place.websiteUrl = record.website
-
-        // Handle coordinate from PostGIS geometry
-        if let locationData = record.location {
-            // Try to parse the GeoJSON format: {"type":"Point","coordinates":[-122.4,37.8]}
-            if let coords = locationData.coordinates, coords.count >= 2 {
-                place.coordinate = CLLocationCoordinate2D(latitude: coords[1], longitude: coords[0])
-            } else {
-                print("⚠️ [Supabase] Could not parse location coordinates: \(locationData.coordinates ?? [])")
-            }
-        }
-        
-        return place
+        PlaceDataAssembler.assemble(from: record)
     }
     
     private func convertToPlaceList(_ record: PlaceListRecord) -> PlaceList {

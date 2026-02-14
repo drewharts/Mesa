@@ -11,6 +11,7 @@ import SwiftUI
 struct PlaceInfoSection: View {
     let place: DetailPlace
     let isDescriptionLoading: Bool
+    var isRefreshing: Bool = false
     var onRefresh: (() -> Void)? = nil
 
     @State private var showingMenu = false
@@ -68,11 +69,17 @@ struct PlaceInfoSection: View {
 
                         if let onRefresh {
                             Button(action: onRefresh) {
-                                Image(systemName: "arrow.clockwise")
-                                    .font(.caption)
-                                    .foregroundColor(.gray.opacity(0.5))
+                                if isRefreshing {
+                                    ProgressView()
+                                        .scaleEffect(0.6)
+                                } else {
+                                    Image(systemName: "arrow.clockwise")
+                                        .font(.caption)
+                                        .foregroundColor(.gray.opacity(0.5))
+                                }
                             }
                             .buttonStyle(.plain)
+                            .disabled(isRefreshing)
                         }
                     }
                 }
