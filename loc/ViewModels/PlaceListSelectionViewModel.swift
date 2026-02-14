@@ -404,12 +404,9 @@ class PlaceListSelectionViewModel: ObservableObject {
     }
     
     func toggle(place: DetailPlace, in list: LightweightPlaceList) {
-        // Look up current state from our array (not the stale captured parameter)
-        // Since LightweightPlaceList is a struct (value type), the parameter may be a stale snapshot
-        // from when the closure was created. Always read from the source of truth: lists array.
-        guard let currentList = lists.first(where: { $0.list_id == list.list_id }) else {
-            return
-        }
+        // Prefer the freshest data from our paginated lists array, but fall back to the
+        // passed-in list for search results that exist beyond the loaded page.
+        let currentList = lists.first(where: { $0.list_id == list.list_id }) ?? list
 
         let wasInList = isPlace(place, in: currentList)
         
