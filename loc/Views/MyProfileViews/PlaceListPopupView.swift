@@ -117,11 +117,8 @@ struct PlaceListPopupView<CardView: View>: View {
                         presentationMode.wrappedValue.dismiss()
                         backAction()
                     }) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "chevron.left")
-                            Text("Profile")
-                        }
-                        .foregroundColor(.primary)
+                        Image(systemName: "chevron.left")
+                            .foregroundColor(.primary)
                     }
                 } else {
                     Button(action: { presentationMode.wrappedValue.dismiss() }) {
