@@ -273,6 +273,18 @@ class SupabasePostService: ObservableObject {
         return (imageUrls, nextOffset, hasMore)
     }
     
+    // MARK: - Delete External Review Image
+
+    /// Deletes a specific image from external reviews for a place via RPC.
+    func deleteExternalReviewImage(placeId: String, imageUrl: String) async throws {
+        try await supabase.client
+            .rpc("delete_external_review_image", params: [
+                "p_place_id": placeId,
+                "p_image_url": imageUrl
+            ])
+            .execute()
+    }
+
     // MARK: - Helper Methods
     
     private func parseTimestamp(_ timestampString: String) -> Date {

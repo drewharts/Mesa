@@ -69,6 +69,11 @@ struct PlacePhotosView: View {
                     fullscreenVideoURL = URL(string: videoUrlString)
                 },
                 overflowCount: overflowCount,
+                onDeletePhoto: { item in
+                    Task {
+                        await viewModel.deleteExternalReviewPhoto(url: item.url)
+                    }
+                },
                 photosViewModel: viewModel
             )
         } else if viewModel.isAnyPhotosLoading {
