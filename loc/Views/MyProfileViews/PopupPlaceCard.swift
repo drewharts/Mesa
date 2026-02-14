@@ -125,52 +125,29 @@ struct PopupPlaceCard: View {
     
     @ViewBuilder
     private func tiktokThumbnailView(thumbnailURL: String, tiktokUrl: String?, size: CGSize) -> some View {
-        AsyncImage(url: URL(string: thumbnailURL)) { phase in
-            switch phase {
-            case .success(let image):
-                image
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(width: size.width, height: size.height)
-                    .clipped()
-            case .failure:
-                Color.clear
-            case .empty:
-                loadingPlaceholder
-                    .frame(width: size.width, height: size.height)
-                    .onAppear {
-                        // Prefetch metadata if tiktokUrl is provided
-                        if let tiktokUrl = tiktokUrl {
-                            Task {
-                                _ = await TikTokMetadataCache.shared.getMetadata(for: tiktokUrl)
-                            }
+        CachedAsyncImage(url: URL(string: thumbnailURL), targetSize: size) {
+            ShimmerView()
+                .onAppear {
+                    if let tiktokUrl = tiktokUrl {
+                        Task {
+                            _ = await TikTokMetadataCache.shared.getMetadata(for: tiktokUrl)
                         }
                     }
-            @unknown default:
-                Color.clear
-            }
+                }
         }
+        .aspectRatio(contentMode: .fill)
+        .frame(width: size.width, height: size.height)
+        .clipped()
     }
     
     @ViewBuilder
     private func reviewPhotoView(url: URL, size: CGSize) -> some View {
-        AsyncImage(url: url) { phase in
-            switch phase {
-            case .success(let image):
-                image
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(width: size.width, height: size.height)
-                    .clipped()
-            case .failure:
-                Color.clear
-            case .empty:
-                loadingPlaceholder
-                    .frame(width: size.width, height: size.height)
-            @unknown default:
-                Color.clear
-            }
+        CachedAsyncImage(url: url, targetSize: size) {
+            ShimmerView()
         }
+        .aspectRatio(contentMode: .fill)
+        .frame(width: size.width, height: size.height)
+        .clipped()
     }
     
     private var placeholderView: some View {
@@ -184,10 +161,4 @@ struct PopupPlaceCard: View {
                 }
             }
     }
-    
-    private var loadingPlaceholder: some View {
-        ShimmerView()
-    }
 }
-
-

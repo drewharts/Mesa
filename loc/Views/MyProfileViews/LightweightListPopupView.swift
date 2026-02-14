@@ -71,6 +71,11 @@ struct LightweightListPopupView: View {
     var allPlaces: [LightweightPlace] {
         return listsVM.lightweightPlaceListPlaces[currentList.list_id] ?? []
     }
+
+    /// Reactive place count that reflects optimistic cache updates, not the stale snapshot.
+    private var displayedPlaceCount: Int {
+        listsVM.lightweightPlaceListCounts[currentList.list_id] ?? currentList.place_count
+    }
     
     var body: some View {
         NavigationStack(path: $navigationPath) {
@@ -109,8 +114,10 @@ struct LightweightListPopupView: View {
             // Set dependencies for pagination ViewModel
             paginationVM.setDependencies(listsVM: listsVM, reviewsVM: reviewsVM)
 
-            // Load places for the current list
-            loadPlacesForCurrentList()
+            // Load places for the current list if not already fully cached
+            Task {
+                await listsVM.loadPlacesForListIfNeeded(listId: currentList.list_id, fallbackCount: currentList.place_count)
+            }
 
             // Initialize pagination state and load reviewed IDs via ViewModel
             Task {
@@ -144,9 +151,9 @@ struct LightweightListPopupView: View {
                     listId: currentList.list_id,
                     listName: currentList.name,
                     userId: userId,
-                    onPlaceAdded: { _ in
-                        // Refresh the list places when a new place is added
-                        loadPlacesForCurrentList()
+                    onPlaceAdded: { _, place in
+                        // Optimistically insert the place into the local cache
+                        listsVM.addPlaceToLightweightList(listId: currentList.list_id, place: place)
                     }
                 )
             }
@@ -168,7 +175,7 @@ struct LightweightListPopupView: View {
                         .fontWeight(.bold)
                         .foregroundColor(.black)
                     
-                    Text("\(currentList.place_count) place\(currentList.place_count == 1 ? "" : "s")")
+                    Text("\(displayedPlaceCount) place\(displayedPlaceCount == 1 ? "" : "s")")
                         .font(.caption)
                         .foregroundColor(.gray)
                 }
@@ -267,17 +274,6 @@ struct LightweightListPopupView: View {
             )
         }
         .frame(maxWidth: .infinity, alignment: .top)
-    }
-    
-    // MARK: - Helper Methods
-    
-    /// Loads places for the current list if not already cached.
-    private func loadPlacesForCurrentList() {
-        if listsVM.lightweightPlaceListPlaces[currentList.list_id] == nil {
-            Task {
-                await listsVM.loadPlacesForList(listId: currentList.list_id)
-            }
-        }
     }
 }
 

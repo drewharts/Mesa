@@ -13,13 +13,13 @@ struct AddPlaceToListSheet: View {
     let listName: String
     let userId: String
 
-    /// Callback when a place is successfully added - parent can refresh list
-    var onPlaceAdded: ((String) -> Void)?
+    /// Callback when a place is successfully added - passes placeId and DetailPlace for optimistic cache update.
+    var onPlaceAdded: ((String, DetailPlace) -> Void)?
 
     @StateObject private var viewModel: AddPlaceToListViewModel
     @Environment(\.dismiss) private var dismiss
 
-    init(listId: String, listName: String, userId: String, onPlaceAdded: ((String) -> Void)? = nil) {
+    init(listId: String, listName: String, userId: String, onPlaceAdded: ((String, DetailPlace) -> Void)? = nil) {
         self.listId = listId
         self.listName = listName
         self.userId = userId
@@ -50,8 +50,8 @@ struct AddPlaceToListSheet: View {
                 }
             }
             .onChange(of: viewModel.addedPlaceId) { _, newPlaceId in
-                if let placeId = newPlaceId {
-                    onPlaceAdded?(placeId)
+                if let placeId = newPlaceId, let place = viewModel.addedPlace {
+                    onPlaceAdded?(placeId, place)
                     dismiss()
                 }
             }
