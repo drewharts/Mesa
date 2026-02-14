@@ -36,7 +36,7 @@ struct SearchResultsView: View {
     let onSelectAIPlace: (DetailPlace) -> Void
 
     @State private var isUsersCollapsed: Bool = false
-    @State private var isKeywordCollapsed: Bool = false
+    @State private var isKeywordCollapsed: Bool = true
     @State private var isAICollapsed: Bool = false
 
     var body: some View {
@@ -59,6 +59,12 @@ struct SearchResultsView: View {
                             isCollapsed: $isAICollapsed,
                             onSelectPlace: onSelectAIPlace
                         )
+                        PlaceResultsView(
+                            placeResults: placeResults,
+                            showNoPlaceFound: showNoPlaceFound,
+                            searchText: searchText,
+                            onSelectPlace: onSelectPlace
+                        )
                         KeywordResultsView(
                             keywordResults: keywordResults,
                             matchedKeyword: matchedKeyword,
@@ -68,12 +74,6 @@ struct SearchResultsView: View {
                             onSelectPlace: onSelectKeywordPlace,
                             onLoadMore: onLoadMoreKeywords,
                             onViewAll: onViewAllKeywords
-                        )
-                        PlaceResultsView(
-                            placeResults: placeResults,
-                            showNoPlaceFound: showNoPlaceFound,
-                            searchText: searchText,
-                            onSelectPlace: onSelectPlace
                         )
                     }
                 }
