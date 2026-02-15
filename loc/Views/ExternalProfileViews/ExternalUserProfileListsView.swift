@@ -342,12 +342,11 @@ struct ExternalUserListPopupView: View {
         }
     }
 
-    /// Button that dismisses the popup and shows this list's places on the map.
+    /// Button that dismisses the profile and shows this list's places on the map.
     private var viewOnMapButton: some View {
         Button(action: {
             let list = currentList
             let navVM = userProfileNavigationVM
-            presentationMode.wrappedValue.dismiss()
             mapDisplayCoordinatorVM.triggerExternalListOnMap(
                 listId: list.list_id,
                 userId: viewModel.userId,

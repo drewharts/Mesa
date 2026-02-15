@@ -301,10 +301,12 @@ private struct ExternalProfileOnChangeModifiers: ViewModifier {
 
             if let listCenter = mapDisplayCoordinatorViewModel.mapDisplayLists
                 .first(where: { $0.list_id == listId })?.averageLocation {
-                mapPosition = .region(MKCoordinateRegion(
-                    center: listCenter,
-                    span: MKCoordinateSpan(latitudeDelta: 0.08, longitudeDelta: 0.08)
-                ))
+                withAnimation(.easeInOut(duration: 0.5)) {
+                    mapPosition = .region(MKCoordinateRegion(
+                        center: listCenter,
+                        span: MKCoordinateSpan(latitudeDelta: 0.08, longitudeDelta: 0.08)
+                    ))
+                }
             }
 
             if let currentUserId = userSession.currentUserId {
