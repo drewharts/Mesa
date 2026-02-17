@@ -114,62 +114,67 @@ struct PlaceListPopupView<CardView: View, HeaderAccessory: View>: View {
     // MARK: - Header
 
     private var header: some View {
-        HStack(alignment: .firstTextBaseline) {
-            // Back button on left (external profile popups only)
-            if let backAction = onBackToProfile {
-                Button(action: {
-                    presentationMode.wrappedValue.dismiss()
-                    backAction()
-                }) {
-                    Image(systemName: "chevron.left")
-                        .foregroundColor(.primary)
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .center) {
+                // Back button on left (external profile popups only)
+                if let backAction = onBackToProfile {
+                    Button(action: {
+                        presentationMode.wrappedValue.dismiss()
+                        backAction()
+                    }) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 20, weight: .regular))
+                            .foregroundColor(.primary)
+                    }
+                    .frame(width: 44, height: 44)
                 }
-                .frame(minWidth: 44, minHeight: 44)
-            }
 
-            // Title and count on the left
-            VStack(alignment: .leading, spacing: 4) {
+                // Title
                 Text(title)
                     .font(.title2)
                     .fontWeight(.bold)
                     .foregroundColor(.black)
 
-                if let count = count {
-                    Text("\(count) place\(count == 1 ? "" : "s")")
-                        .font(.caption)
-                        .foregroundColor(.gray)
-                }
-            }
+                Spacer()
 
-            Spacer()
+                // Header accessory inline (e.g. filter buttons)
+                headerAccessory()
 
-            // Header accessory inline (e.g. filter buttons)
-            headerAccessory()
-
-            // View on Map button (profile popups only)
-            if let viewOnMap = onViewOnMap {
-                Button(action: viewOnMap) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "map")
-                        Text("Map")
+                // Action buttons
+                HStack(alignment: .center, spacing: 12) {
+                    // View on Map button (profile popups only)
+                    if let viewOnMap = onViewOnMap {
+                        Button(action: viewOnMap) {
+                            Image(systemName: "map")
+                                .font(.system(size: 20, weight: .regular))
+                                .foregroundColor(.primary)
+                        }
+                        .frame(width: 44, height: 44)
                     }
-                    .font(.subheadline.weight(.medium))
-                    .foregroundColor(.primary)
+
+                    // Close button on right (current user popups only)
+                    if onBackToProfile == nil {
+                        Button(action: { presentationMode.wrappedValue.dismiss() }) {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 20, weight: .regular))
+                                .foregroundColor(.primary)
+                        }
+                        .frame(width: 44, height: 44)
+                    }
                 }
             }
 
-            // Close button on right (current user popups only)
-            if onBackToProfile == nil {
-                Button(action: { presentationMode.wrappedValue.dismiss() }) {
-                    Image(systemName: "xmark")
-                        .foregroundColor(.primary)
-                }
-                .frame(minWidth: 44, minHeight: 44)
+            // Place count below the title row
+            if let count = count {
+                Text("\(count) place\(count == 1 ? "" : "s")")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+                    .padding(.top, -8)
             }
         }
         .padding(.horizontal, 20)
-        .padding(.top, 24)
-        .padding(.bottom, 10)
+        .padding(.top, 12)
+        .padding(.bottom, 28)
     }
 
     // MARK: - Content
