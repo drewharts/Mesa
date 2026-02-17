@@ -32,6 +32,7 @@ class AppCoordinator: ObservableObject {
     @Published var showKeywordResultsPopup: Bool = false
     @Published var keywordForPopup: String? = nil
     @Published var keywordTypesForPopup: [String] = []
+    @Published var hasPendingKeywordPopup: Bool = false
 
     // MARK: - Loading States
     @Published var isProcessingDeepLink = false

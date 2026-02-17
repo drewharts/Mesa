@@ -23,7 +23,7 @@
 
 import SwiftUI
 
-struct PlaceListPopupView<CardView: View>: View {
+struct PlaceListPopupView<CardView: View, HeaderAccessory: View>: View {
     // MARK: - Configuration
     let title: String
     let count: Int?
@@ -36,14 +36,16 @@ struct PlaceListPopupView<CardView: View>: View {
     let emptyMessage: String
     let loadMore: () async -> Void
     let onBackToProfile: (() -> Void)?  // Optional: Shows "Profile" button when provided
+    let onViewOnMap: (() -> Void)?  // Optional: Shows "Map" button when provided
     @ViewBuilder let cardBuilder: (LightweightPlace, @escaping (String) -> Void) -> CardView
+    @ViewBuilder let headerAccessory: () -> HeaderAccessory
 
     @Environment(\.presentationMode) var presentationMode
 
     /// Observed for pending place navigation when map annotation is tapped while sheet is open.
     @ObservedObject private var presentationService = PresentationService.shared
 
-    // Default initializer with optional onBackToProfile
+    /// Initializes the popup view with all configuration options.
     init(
         title: String,
         count: Int? = nil,
@@ -56,7 +58,9 @@ struct PlaceListPopupView<CardView: View>: View {
         emptyMessage: String,
         loadMore: @escaping () async -> Void,
         onBackToProfile: (() -> Void)? = nil,
-        @ViewBuilder cardBuilder: @escaping (LightweightPlace, @escaping (String) -> Void) -> CardView
+        onViewOnMap: (() -> Void)? = nil,
+        @ViewBuilder cardBuilder: @escaping (LightweightPlace, @escaping (String) -> Void) -> CardView,
+        @ViewBuilder headerAccessory: @escaping () -> HeaderAccessory
     ) {
         self.title = title
         self.count = count
@@ -69,7 +73,9 @@ struct PlaceListPopupView<CardView: View>: View {
         self.emptyMessage = emptyMessage
         self.loadMore = loadMore
         self.onBackToProfile = onBackToProfile
+        self.onViewOnMap = onViewOnMap
         self.cardBuilder = cardBuilder
+        self.headerAccessory = headerAccessory
     }
 
     // Navigation state for place detail navigation
@@ -85,13 +91,13 @@ struct PlaceListPopupView<CardView: View>: View {
 
     var body: some View {
         NavigationStack(path: $navigationPath) {
-            ScrollView {
-                VStack(spacing: 0) {
-                    header
+            VStack(spacing: 0) {
+                header
+                ScrollView {
                     content
                 }
             }
-            .navigationBarHidden(true)
+            .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: String.self) { placeId in
                 PlaceDetailViewInNavigation(placeId: placeId, minSheetHeight: 250)
             }
@@ -104,52 +110,73 @@ struct PlaceListPopupView<CardView: View>: View {
             }
         }
     }
-    
+
     // MARK: - Header
 
     private var header: some View {
-        VStack(spacing: 12) {
-            HStack {
-                // For external user popups: show "< Profile" back button
-                // For current user popups: show X close button
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .center) {
+                // Back button on left (external profile popups only)
                 if let backAction = onBackToProfile {
                     Button(action: {
                         presentationMode.wrappedValue.dismiss()
                         backAction()
                     }) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "chevron.left")
-                            Text("Profile")
-                        }
-                        .foregroundColor(.primary)
-                    }
-                } else {
-                    Button(action: { presentationMode.wrappedValue.dismiss() }) {
-                        Image(systemName: "xmark")
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 20, weight: .regular))
                             .foregroundColor(.primary)
                     }
+                    .frame(width: 44, height: 44)
                 }
-                Spacer()
-            }
-            .padding(.horizontal, 20)
-            .padding(.top, 20)
 
-            VStack(spacing: 4) {
+                // Title
                 Text(title)
                     .font(.title2)
                     .fontWeight(.bold)
                     .foregroundColor(.black)
 
-                if let count = count {
-                    Text("\(count) place\(count == 1 ? "" : "s")")
-                        .font(.caption)
-                        .foregroundColor(.gray)
+                Spacer()
+
+                // Header accessory inline (e.g. filter buttons)
+                headerAccessory()
+
+                // Action buttons
+                HStack(alignment: .center, spacing: 12) {
+                    // View on Map button (profile popups only)
+                    if let viewOnMap = onViewOnMap {
+                        Button(action: viewOnMap) {
+                            Image(systemName: "map")
+                                .font(.system(size: 20, weight: .regular))
+                                .foregroundColor(.primary)
+                        }
+                        .frame(width: 44, height: 44)
+                    }
+
+                    // Close button on right (current user popups only)
+                    if onBackToProfile == nil {
+                        Button(action: { presentationMode.wrappedValue.dismiss() }) {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 20, weight: .regular))
+                                .foregroundColor(.primary)
+                        }
+                        .frame(width: 44, height: 44)
+                    }
                 }
             }
+
+            // Place count below the title row
+            if let count = count {
+                Text("\(count) place\(count == 1 ? "" : "s")")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+                    .padding(.top, -8)
+            }
         }
-        .padding(.bottom, 10)
+        .padding(.horizontal, 20)
+        .padding(.top, 12)
+        .padding(.bottom, 28)
     }
-    
+
     // MARK: - Content
 
     @ViewBuilder
@@ -172,9 +199,9 @@ struct PlaceListPopupView<CardView: View>: View {
             }
         }
     }
-    
+
     // MARK: - Loading View
-    
+
     private var loadingView: some View {
         VStack {
             Spacer()
@@ -186,9 +213,9 @@ struct PlaceListPopupView<CardView: View>: View {
             Spacer()
         }
     }
-    
+
     // MARK: - Empty View
-    
+
     private var emptyView: some View {
         VStack(spacing: 16) {
             Spacer()
@@ -207,10 +234,8 @@ struct PlaceListPopupView<CardView: View>: View {
             Spacer()
         }
     }
-    
+
     // MARK: - Grid View
-    // Note: No ScrollView or VStack wrapper - allows LazyVGrid to load items lazily
-    // Parent body provides the ScrollView for scroll position preservation
 
     private var gridView: some View {
         LazyVGrid(columns: columns, spacing: 16) {
@@ -226,9 +251,10 @@ struct PlaceListPopupView<CardView: View>: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
     }
-    
+
     // MARK: - Pagination Helper
-    
+
+    /// Triggers pagination when scrolling near the end of the list.
     private func triggerPaginationIfNeeded(index: Int) {
         // Trigger at exactly the 3rd-to-last item (matches LightweightListPopupView pattern)
         // Exact match prevents auto-re-triggering after loads complete
@@ -237,3 +263,40 @@ struct PlaceListPopupView<CardView: View>: View {
     }
 }
 
+// MARK: - Convenience Init (No Header Accessory)
+
+extension PlaceListPopupView where HeaderAccessory == EmptyView {
+    /// Convenience initializer without header accessory (backward compatible).
+    init(
+        title: String,
+        count: Int? = nil,
+        isLoading: Bool,
+        isLoadingMore: Bool,
+        places: [LightweightPlace],
+        hasMore: Bool,
+        emptyIcon: String,
+        emptyTitle: String,
+        emptyMessage: String,
+        loadMore: @escaping () async -> Void,
+        onBackToProfile: (() -> Void)? = nil,
+        onViewOnMap: (() -> Void)? = nil,
+        @ViewBuilder cardBuilder: @escaping (LightweightPlace, @escaping (String) -> Void) -> CardView
+    ) {
+        self.init(
+            title: title,
+            count: count,
+            isLoading: isLoading,
+            isLoadingMore: isLoadingMore,
+            places: places,
+            hasMore: hasMore,
+            emptyIcon: emptyIcon,
+            emptyTitle: emptyTitle,
+            emptyMessage: emptyMessage,
+            loadMore: loadMore,
+            onBackToProfile: onBackToProfile,
+            onViewOnMap: onViewOnMap,
+            cardBuilder: cardBuilder,
+            headerAccessory: { EmptyView() }
+        )
+    }
+}

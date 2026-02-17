@@ -83,19 +83,6 @@ class ListPopupPaginationViewModel: ObservableObject {
         }
     }
 
-    /// Calculates height for a list considering the filter state.
-    func calculateHeight(for listId: String, showOnlyUnvisited: Bool) -> CGFloat {
-        guard let listsVM = listsVM, let reviewsVM = reviewsVM else { return 300 }
-
-        let allPlaces = listsVM.lightweightPlaceListPlaces[listId] ?? []
-        let filteredCount = showOnlyUnvisited
-            ? allPlaces.filter { !reviewsVM.hasVerifiedReviewedPlace(placeId: $0.place_id) }.count
-            : allPlaces.count
-
-        let rows = ceil(Double(filteredCount) / 2.0)
-        return max(300, min(rows * 200 + 100, 2000))
-    }
-
     /// Resets pagination state for a specific list.
     func resetState(for listId: String) {
         paginationStates[listId] = ListPaginationState()

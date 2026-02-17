@@ -80,19 +80,113 @@ struct GooglePlaceDetails: Codable {
     let website: String?
 }
 
-/// Model for place details from Mesa backend
-struct MesaPlaceDetails: Codable {
-    let additional_data: [String: String]
-    let address: String
+/// DTO matching the exact JSON shape returned by the Mesa backend for place data.
+/// Used by both /search/place-details and /search/ai-suggestions endpoints.
+/// JSONDecoder handles type coercion (Int/Double) correctly, unlike manual `as?` casts.
+struct BackendPlaceDTO: Codable {
     let id: String
-    let location: MesaLocation
     let name: String
-    let provider: String
+    let address: String?
+    let city: String?
+    let description: String?
+    let mapboxId: String?
+    let categories: [String]?
+    let openHours: [String]?
+    let phone: String?
+    let priceLevel: String?
+    let rating: Double?
+    let ratingCount: Int?
+    let reservable: Bool?
+    let servesBreakfast: Bool?
+    let servesLunch: Bool?
+    let servesDinner: Bool?
+    let instagram: String?
+    let twitter: String?
+    let menuUrl: String?
+    let website: String?
+    let isCustom: Bool?
+    let googlePlacesId: String?
+    let thumbnailUrl: String?
+    let coordinate: BackendCoordinateDTO?
+    let location: BackendCoordinateDTO?
+    let aiSuggestionReason: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case id, name, address, city, description, mapboxId, categories, openHours
+        case phone, priceLevel, rating, ratingCount, reservable
+        case servesBreakfast, servesLunch, servesDinner
+        case instagram, twitter, menuUrl, website
+        case isCustom, googlePlacesId, thumbnailUrl
+        case coordinate, location, aiSuggestionReason
+    }
+
+    /// Helper DTO for decoding openHours when the backend returns objects instead of strings.
+    private struct OpenHoursEntry: Decodable {
+        let day: String
+        let hours: String
+    }
+
+    /// Decodes all fields, delegating openHours to a flexible decoder.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        address = try container.decodeIfPresent(String.self, forKey: .address)
+        city = try container.decodeIfPresent(String.self, forKey: .city)
+        description = try container.decodeIfPresent(String.self, forKey: .description)
+        mapboxId = try container.decodeIfPresent(String.self, forKey: .mapboxId)
+        categories = try container.decodeIfPresent([String].self, forKey: .categories)
+        openHours = Self.decodeOpenHours(from: container)
+        phone = try container.decodeIfPresent(String.self, forKey: .phone)
+        priceLevel = try container.decodeIfPresent(String.self, forKey: .priceLevel)
+        rating = try container.decodeIfPresent(Double.self, forKey: .rating)
+        ratingCount = try container.decodeIfPresent(Int.self, forKey: .ratingCount)
+        reservable = try container.decodeIfPresent(Bool.self, forKey: .reservable)
+        servesBreakfast = try container.decodeIfPresent(Bool.self, forKey: .servesBreakfast)
+        servesLunch = try container.decodeIfPresent(Bool.self, forKey: .servesLunch)
+        servesDinner = try container.decodeIfPresent(Bool.self, forKey: .servesDinner)
+        instagram = try container.decodeIfPresent(String.self, forKey: .instagram)
+        twitter = try container.decodeIfPresent(String.self, forKey: .twitter)
+        menuUrl = try container.decodeIfPresent(String.self, forKey: .menuUrl)
+        website = try container.decodeIfPresent(String.self, forKey: .website)
+        isCustom = try container.decodeIfPresent(Bool.self, forKey: .isCustom)
+        googlePlacesId = try container.decodeIfPresent(String.self, forKey: .googlePlacesId)
+        thumbnailUrl = try container.decodeIfPresent(String.self, forKey: .thumbnailUrl)
+        coordinate = try container.decodeIfPresent(BackendCoordinateDTO.self, forKey: .coordinate)
+        location = try container.decodeIfPresent(BackendCoordinateDTO.self, forKey: .location)
+        aiSuggestionReason = try container.decodeIfPresent(String.self, forKey: .aiSuggestionReason)
+    }
+
+    /// Decodes openHours flexibly: tries [String] first, falls back to [{day, hours}] objects.
+    private static func decodeOpenHours(from container: KeyedDecodingContainer<CodingKeys>) -> [String]? {
+        if let strings = try? container.decodeIfPresent([String].self, forKey: .openHours) {
+            return strings
+        } else if let entries = try? container.decodeIfPresent([OpenHoursEntry].self, forKey: .openHours) {
+            return entries.map { "\($0.day): \($0.hours)" }
+        }
+        return nil
+    }
+
+    /// Converts this DTO into a DetailPlace domain model via PlaceDataAssembler.
+    func toDetailPlace() -> DetailPlace? {
+        PlaceDataAssembler.assemble(from: self)
+    }
 }
 
-/// Response model for Mesa backend place details endpoint
-struct MesaPlaceDetailsResponse: Codable {
-    let place: MesaPlaceDetails
+/// DTO for coordinate objects in backend responses.
+struct BackendCoordinateDTO: Codable {
+    let latitude: Double?
+    let longitude: Double?
+}
+
+/// Response wrapper for the /search/place-details endpoint.
+struct BackendPlaceDetailsResponse: Codable {
+    let place: BackendPlaceDTO
+}
+
+/// Response wrapper for the /search/ai-suggestions endpoint.
+struct BackendAISuggestionsResponse: Codable {
+    let suggestions: [BackendPlaceDTO]
 }
 
 /// Model for suggestion data from Mesa backend
@@ -299,56 +393,20 @@ class MesaBackendService {
 
     // MARK: - Response Parsing
 
-    /// Parses place details response from backend.
+    /// Parses place details response from backend, logging raw response on failure.
     private func parsePlaceDetailsResponse(data: Data) throws -> DetailPlace {
-        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let placeDict = json["place"] as? [String: Any] else {
-            throw MesaBackendError.invalidJSON
+        do {
+            let response = try JSONDecoder().decode(BackendPlaceDetailsResponse.self, from: data)
+            guard let place = response.place.toDetailPlace() else {
+                throw MesaBackendError.invalidPlaceId
+            }
+            return place
+        } catch {
+            let rawResponse = String(data: data, encoding: .utf8) ?? "<non-UTF8 data>"
+            print("❌ [MesaBackendService] Failed to decode place details response: \(error)")
+            print("❌ [MesaBackendService] Raw response: \(rawResponse)")
+            throw error
         }
-
-        guard let idString = placeDict["id"] as? String,
-              let placeId = UUID(uuidString: idString) else {
-            throw MesaBackendError.invalidPlaceId
-        }
-
-        var detailPlace = DetailPlace()
-        detailPlace.id = placeId
-        detailPlace.name = placeDict["name"] as? String ?? ""
-        detailPlace.address = placeDict["address"] as? String
-        detailPlace.city = placeDict["city"] as? String
-        detailPlace.description = placeDict["description"] as? String
-        detailPlace.mapboxId = placeDict["mapboxId"] as? String
-        detailPlace.categories = placeDict["categories"] as? [String]
-        detailPlace.openHours = placeDict["openHours"] as? [String]
-        detailPlace.phone = placeDict["phone"] as? String
-        detailPlace.priceLevel = placeDict["priceLevel"] as? String
-        detailPlace.rating = placeDict["rating"] as? Double
-        detailPlace.userRatingsTotal = placeDict["ratingCount"] as? Int
-        detailPlace.reservable = placeDict["reservable"] as? Bool
-        detailPlace.servesBreakfast = placeDict["servesBreakfast"] as? Bool
-        detailPlace.serversLunch = placeDict["servesLunch"] as? Bool
-        detailPlace.serversDinner = placeDict["servesDinner"] as? Bool
-        detailPlace.Instagram = placeDict["instagram"] as? String
-        detailPlace.X = placeDict["twitter"] as? String
-        detailPlace.menuUrl = placeDict["menuUrl"] as? String
-        detailPlace.websiteUrl = placeDict["website"] as? String
-        detailPlace.isCustom = placeDict["isCustom"] as? Bool
-        detailPlace.googlePlaceId = placeDict["googlePlacesId"] as? String
-
-        // Extract thumbnail URL for photos
-        if let thumbnailUrl = placeDict["thumbnailUrl"] as? String {
-            detailPlace.photoUrls = [thumbnailUrl]
-        }
-
-        // Extract coordinates
-        let coordDict = placeDict["coordinate"] as? [String: Any] ?? placeDict["location"] as? [String: Any]
-        if let coordDict = coordDict,
-           let latitude = coordDict["latitude"] as? Double,
-           let longitude = coordDict["longitude"] as? Double {
-            detailPlace.coordinate = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
-        }
-
-        return detailPlace
     }
     
     // MARK: - Legacy Callback API (for backwards compatibility)
@@ -470,56 +528,9 @@ class MesaBackendService {
 
     // MARK: - Private Response Parsing
 
-    /// Parses AI suggestions response into DetailPlace array.
+    /// Decodes AI suggestions response using type-safe JSONDecoder.
     private func parseAISuggestionsResponse(data: Data) throws -> [DetailPlace] {
-        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let suggestionsArray = json["suggestions"] as? [[String: Any]] else {
-            throw MesaBackendError.invalidJSON
-        }
-
-        return suggestionsArray.compactMap { suggestionDict -> DetailPlace? in
-            guard let idString = suggestionDict["id"] as? String,
-                  let placeId = UUID(uuidString: idString),
-                  let name = suggestionDict["name"] as? String else {
-                return nil
-            }
-
-            var detailPlace = DetailPlace()
-            detailPlace.id = placeId
-            detailPlace.name = name
-            detailPlace.address = suggestionDict["address"] as? String
-            detailPlace.city = suggestionDict["city"] as? String
-            detailPlace.description = suggestionDict["description"] as? String
-            detailPlace.mapboxId = suggestionDict["mapboxId"] as? String
-            detailPlace.categories = suggestionDict["categories"] as? [String]
-            detailPlace.openHours = suggestionDict["openHours"] as? [String]
-            detailPlace.phone = suggestionDict["phone"] as? String
-            detailPlace.priceLevel = suggestionDict["priceLevel"] as? String
-            detailPlace.rating = suggestionDict["rating"] as? Double
-            detailPlace.userRatingsTotal = suggestionDict["ratingCount"] as? Int
-            detailPlace.reservable = suggestionDict["reservable"] as? Bool
-            detailPlace.servesBreakfast = suggestionDict["servesBreakfast"] as? Bool
-            detailPlace.serversLunch = suggestionDict["servesLunch"] as? Bool
-            detailPlace.serversDinner = suggestionDict["servesDinner"] as? Bool
-            detailPlace.Instagram = suggestionDict["instagram"] as? String
-            detailPlace.X = suggestionDict["twitter"] as? String
-            detailPlace.menuUrl = suggestionDict["menuUrl"] as? String
-            detailPlace.websiteUrl = suggestionDict["website"] as? String
-            detailPlace.aiSuggestionReason = suggestionDict["aiSuggestionReason"] as? String
-
-            // Extract thumbnail URL for photos
-            if let thumbnailUrl = suggestionDict["thumbnailUrl"] as? String {
-                detailPlace.photoUrls = [thumbnailUrl]
-            }
-
-            // Extract coordinates
-            if let coordDict = suggestionDict["coordinate"] as? [String: Any],
-               let latitude = coordDict["latitude"] as? Double,
-               let longitude = coordDict["longitude"] as? Double {
-                detailPlace.coordinate = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
-            }
-
-            return detailPlace
-        }
+        let response = try JSONDecoder().decode(BackendAISuggestionsResponse.self, from: data)
+        return response.suggestions.compactMap { $0.toDetailPlace() }
     }
 }

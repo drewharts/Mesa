@@ -122,6 +122,11 @@ class MapViewModel: ObservableObject {
         PresentationService.shared.present(.list(listId: listId))
     }
 
+    /// Applies list filter to the map without presenting a sheet.
+    func applyListFilter(_ listId: String, availableLists: [LightweightPlaceList]) {
+        _ = filteringViewModel.selectList(listId, availableLists: availableLists)
+    }
+
     /// Clears the list filter and restores all annotations.
     /// Note: Does NOT dismiss the sheet - that's handled by the sheet's own dismissal flow.
     func clearListFilter() {

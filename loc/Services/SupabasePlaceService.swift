@@ -1360,32 +1360,45 @@ class SupabasePlaceService: ObservableObject {
         }
     }
 
-    /// Fetch keyword annotations for map viewport - returns PlaceAnnotation for map display
-    /// Uses searchPlacesByTypes internally and converts results to annotations
+    /// Fetches keyword annotations in the viewport with user_ids from save sources
     func fetchKeywordAnnotationsInViewport(
         northLat: Double,
         southLat: Double,
         eastLng: Double,
         westLng: Double,
-        types: [String]
+        types: [String],
+        userId: String
     ) async throws -> [PlaceAnnotation] {
-        let places = try await searchPlacesByTypes(
-            types: types,
-            bounds: (northLat: northLat, southLat: southLat,
-                     eastLng: eastLng, westLng: westLng),
-            limit: 100,
-            offset: 0
-        )
+        do {
+            struct ViewportParams: Encodable {
+                let p_user_id: String
+                let p_types: [String]
+                let p_min_lon: Double
+                let p_min_lat: Double
+                let p_max_lon: Double
+                let p_max_lat: Double
+            }
 
-        return places.compactMap { place -> PlaceAnnotation? in
-            guard let coord = place.coordinate else { return nil }
-            return PlaceAnnotation(
-                id: place.id.uuidString,
-                name: place.name,
-                coordinate: coord,
-                userIds: [],
-                placeType: place.categories?.first ?? "restaurant"
+            let params = ViewportParams(
+                p_user_id: userId,
+                p_types: types,
+                p_min_lon: westLng,
+                p_min_lat: southLat,
+                p_max_lon: eastLng,
+                p_max_lat: northLat
             )
+
+            let response: [PlaceAnnotation] = try await supabase.client
+                .rpc("get_keyword_annotations_with_users", params: params)
+                .execute()
+                .value
+
+            return response
+        } catch {
+            if !Task.isCancelled && !(error is CancellationError) && (error as NSError).code != NSURLErrorCancelled {
+                print("❌ [Supabase] Error fetching keyword annotations: \(error)")
+            }
+            throw error
         }
     }
 
@@ -1497,64 +1510,9 @@ class SupabasePlaceService: ObservableObject {
     
     // MARK: - Helper Methods
     
+    /// Converts a Supabase PlaceRecord to DetailPlace via PlaceDataAssembler.
     private func convertToDetailPlace(_ record: PlaceRecord) -> DetailPlace {
-        // Create a DetailPlace with the basic required fields
-        var place = DetailPlace(
-            id: UUID(uuidString: record.id) ?? UUID(),
-            name: record.name,
-            address: record.address,
-            city: record.city
-        )
-        
-        // Set optional fields
-        place.mapboxId = record.mapbox_id
-        place.categories = record.categories
-        place.phone = record.phone
-        place.rating = record.rating
-        place.userRatingsTotal = record.rating_count
-        // Convert open_hours from AnyCodable to [String] if possible
-        if let openHoursData = record.open_hours {
-            if let stringArray = openHoursData.value as? [String] {
-                place.openHours = stringArray
-            } else if let dictArray = openHoursData.value as? [[String: String]] {
-                // Convert from [{ day: "Monday", hours: "11 AM–11 PM" }] to ["Monday: 11 AM–11 PM"]
-                place.openHours = dictArray.compactMap { dict in
-                    guard let day = dict["day"], let hours = dict["hours"] else { return nil }
-                    return "\(day): \(hours)"
-                }
-            } else {
-                print("⚠️ [Supabase] Could not convert open_hours to [String]: \(openHoursData.value)")
-                place.openHours = nil
-            }
-        } else {
-            place.openHours = nil
-        }
-        place.description = record.description
-        place.priceLevel = record.price_level
-        place.reservable = record.reservable
-        place.servesBreakfast = record.serves_breakfast
-        place.serversLunch = record.serves_lunch
-        place.serversDinner = record.serves_dinner
-        place.Instagram = record.instagram
-        place.X = record.twitter // Note: DetailPlace doesn't have twitter field, using x instead
-        place.photoUrls = record.photo_urls
-        place.googlePlaceId = record.google_places_id
-        place.source = record.source
-        place.isCustom = record.is_custom
-        place.menuUrl = record.menu_url
-        place.websiteUrl = record.website
-
-        // Handle coordinate from PostGIS geometry
-        if let locationData = record.location {
-            // Try to parse the GeoJSON format: {"type":"Point","coordinates":[-122.4,37.8]}
-            if let coords = locationData.coordinates, coords.count >= 2 {
-                place.coordinate = CLLocationCoordinate2D(latitude: coords[1], longitude: coords[0])
-            } else {
-                print("⚠️ [Supabase] Could not parse location coordinates: \(locationData.coordinates ?? [])")
-            }
-        }
-        
-        return place
+        PlaceDataAssembler.assemble(from: record)
     }
     
     private func convertToPlaceList(_ record: PlaceListRecord) -> PlaceList {

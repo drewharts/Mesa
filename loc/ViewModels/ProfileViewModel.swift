@@ -23,6 +23,14 @@ class ProfileViewModel: ObservableObject {
     @Published var showFavoritesOnMap: Bool = false // When set, triggers map to show favorite places
     @Published var showMyPlacesOnMap: Bool = false // When set, triggers map to show user's created places
 
+    /// Deferred map filter: stores which sheet to present after the profile fullScreenCover dismisses.
+    /// Unlike the showXOnMap flags, this does NOT trigger MapContainerView's onChange handlers,
+    /// so no sheet is presented while the profile is still visible.
+    enum PendingMapFilter {
+        case tiktoks, reviews, favorites, myPlaces
+    }
+    @Published var pendingMapFilter: PendingMapFilter? = nil
+
     // MARK: - Child ViewModels (Composition)
 
     /// Child ViewModel for social features (followers, following, follow actions)

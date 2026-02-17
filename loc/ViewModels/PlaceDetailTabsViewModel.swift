@@ -29,10 +29,14 @@ class PlaceDetailTabsViewModel: ObservableObject {
     private let userSession: UserSession
     private let placeListService = PlaceListService.shared
     private let postsCacheService = ServiceContainer.shared.postsCacheService
+    private let placeRepository = PlaceRepository.shared
 
     // MARK: - Callbacks (replaces ViewModel observations)
     /// Checks if a place is in the user's favorites (injected from ProfileViewModel)
     var isFavoriteCheck: ((String) -> Bool)?
+
+    /// Called when manual refresh fetches updated place metadata from the backend.
+    var onPlaceMetadataRefreshed: ((DetailPlace) -> Void)?
 
     // MARK: - Child ViewModels
     let aboutTabViewModel: AboutTabViewModel
@@ -63,6 +67,9 @@ class PlaceDetailTabsViewModel: ObservableObject {
     // MARK: - Place Actions State
     /// Whether the current place is saved in any of the user's lists or favorites
     @Published var isPlaceInList: Bool = false
+
+    /// Whether a manual refresh is currently in progress
+    @Published var isRefreshing: Bool = false
 
     private var cancellables = Set<AnyCancellable>()
 
@@ -149,6 +156,11 @@ class PlaceDetailTabsViewModel: ObservableObject {
         // Wire up savers callback to sync with DetailPlaceViewModel
         self.placeSaversViewModel.onSaversUpdated = { [weak detailPlaceViewModel] placeId, saverIds in
             detailPlaceViewModel?.placeSavers[placeId] = saverIds
+        }
+
+        // Wire up metadata refresh callback to update SelectedPlaceViewModel
+        self.onPlaceMetadataRefreshed = { [weak selectedPlaceVM] refreshedPlace in
+            selectedPlaceVM?.selectionState.updatePlaceDetails(refreshedPlace)
         }
 
         setupObservers()
@@ -362,15 +374,39 @@ class PlaceDetailTabsViewModel: ObservableObject {
         }
     }
 
-    /// Manually refreshes all place data (posts, photos, savers, list membership).
+    /// Triggers a full refresh of place data (metadata, posts, photos, savers, list membership) and sets isRefreshing until complete.
     func manualRefresh() {
         guard let place = currentPlace else { return }
+        isRefreshing = true
         let placeId = place.id.uuidString
         postsCacheService.loadPosts(forPlaceId: placeId)
         placePhotosViewModel.setPlace(place)
         placeSaversViewModel.setPlace(placeId)
         Task {
             await checkPlaceListMembership(place: place)
+        }
+        refreshPlaceMetadata(for: place)
+    }
+
+    /// Re-fetches place metadata from the backend, propagates the update, and clears the isRefreshing flag when complete.
+    private func refreshPlaceMetadata(for place: DetailPlace) {
+        guard place.isCustom != true else {
+            isRefreshing = false
+            return
+        }
+        Task {
+            defer { isRefreshing = false }
+            do {
+                let refreshed = try await placeRepository.resolvePlace(
+                    googlePlaceId: place.googlePlaceId,
+                    fallbackId: place.id.uuidString,
+                    existingPlace: place
+                )
+                self.refreshPlaceData(refreshed)
+                self.onPlaceMetadataRefreshed?(refreshed)
+            } catch {
+                print("⚠️ [PlaceDetailTabsVM] Metadata refresh failed: \(error.localizedDescription)")
+            }
         }
     }
 

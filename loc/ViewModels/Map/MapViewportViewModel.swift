@@ -273,7 +273,8 @@ class MapViewportViewModel: ObservableObject {
                 southLat: bounds.southLat,
                 eastLng: bounds.eastLng,
                 westLng: bounds.westLng,
-                types: types
+                types: types,
+                userId: userId
             )
         } else {
             return try await placeService.fetchPlacesInViewportWithUserId(

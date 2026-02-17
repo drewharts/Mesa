@@ -12,10 +12,12 @@ struct FavoritesPopupView: View {
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @ObservedObject var favoritesVM: ProfileFavoritesViewModel
+    var onViewOnMap: (() -> Void)? = nil
 
     var body: some View {
         PlaceListPopupView(
             title: "Favorites",
+            count: favoritesVM.lightweightFavorites.count,
             isLoading: false, // Favorites are loaded with profile
             isLoadingMore: false, // No pagination for favorites
             places: favoritesVM.favoritesAsLightweight,
@@ -24,6 +26,7 @@ struct FavoritesPopupView: View {
             emptyTitle: "No Favorites Yet",
             emptyMessage: "Add places to your favorites to see them here",
             loadMore: { }, // No pagination needed
+            onViewOnMap: onViewOnMap,
             cardBuilder: { place, navigate in
                 PopupPlaceCard(
                     place: place,

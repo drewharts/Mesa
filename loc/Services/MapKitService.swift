@@ -157,42 +157,45 @@ class MapKitService {
         transportTypes: [TransportType] = [.automobile, .walking, .transit, .bicycle],
         completion: @escaping ([TransportType: TimeInterval]?, Error?) -> Void
     ) {
-        // Calculate distance to determine if transit makes sense
         let originLocation = CLLocation(latitude: origin.latitude, longitude: origin.longitude)
         let destinationLocation = CLLocation(latitude: destination.latitude, longitude: destination.longitude)
-        let distanceInMeters = originLocation.distance(from: destinationLocation)
-        let distanceInMiles = distanceInMeters * 0.000621371 // Convert to miles
+        let distanceInMiles = originLocation.distance(from: destinationLocation) * 0.000621371
 
+        // Serial queue protects shared mutable state across concurrent MapKit callbacks
+        let aggregationQueue = DispatchQueue(label: "com.loc.traveltime.aggregation")
         var results: [TransportType: TimeInterval] = [:]
         var errors: [Error] = []
         var completedCount = 0
         let totalCount = transportTypes.count
 
         for transportType in transportTypes {
-            // Skip transit for very short distances (less than 0.5 miles)
-            // Transit doesn't make sense for walking distances
+            // Skip transit for very short distances — walking is always faster
             if transportType == .transit && distanceInMiles < 0.5 {
-                completedCount += 1
-                if completedCount == totalCount {
-                    completion(results, nil)
+                aggregationQueue.async {
+                    completedCount += 1
+                    if completedCount == totalCount {
+                        completion(results.isEmpty ? nil : results, nil)
+                    }
                 }
                 continue
             }
 
             calculateTravelTime(from: origin, to: destination, transportType: transportType) { timeInterval, error in
-                completedCount += 1
+                aggregationQueue.async {
+                    completedCount += 1
 
-                if let error = error {
-                    errors.append(error)
-                } else if let timeInterval = timeInterval {
-                    results[transportType] = timeInterval
-                }
+                    if let error = error {
+                        errors.append(error)
+                    } else if let timeInterval = timeInterval {
+                        results[transportType] = timeInterval
+                    }
 
-                if completedCount == totalCount {
-                    if !errors.isEmpty && results.isEmpty {
-                        completion(nil, errors.first!)
-                    } else {
-                        completion(results, nil)
+                    if completedCount == totalCount {
+                        if !errors.isEmpty && results.isEmpty {
+                            completion(nil, errors.first)
+                        } else {
+                            completion(results.isEmpty ? nil : results, nil)
+                        }
                     }
                 }
             }

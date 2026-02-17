@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import MapKit
 
 /// Manages TikTok/external places for the current user's profile.
 @MainActor
@@ -32,6 +33,20 @@ class ProfileTikTokViewModel: ObservableObject {
 
     /// Loading more TikTok places state
     @Published var isLoadingMoreTikTokPlaces: Bool = false
+
+    // MARK: - Published Properties - Nearby Filter
+
+    /// Whether the "Nearby" viewport filter is active
+    @Published var isNearbyFilterEnabled: Bool = false
+
+    /// Current map region for viewport-based filtering
+    var currentMapRegion: MKCoordinateRegion?
+
+    /// All nearby places with coordinates for client-side viewport filtering
+    private var allNearbyPlaces: [LightweightPlace] = []
+
+    /// Whether the full nearby dataset has been loaded
+    private var hasLoadedAllNearbyPlaces: Bool = false
 
     // MARK: - Published Properties - TikTok Import
 
@@ -137,6 +152,98 @@ class ProfileTikTokViewModel: ObservableObject {
         self.userSession = userSession
     }
 
+    // MARK: - Nearby Filter
+
+    /// Toggles the nearby filter between Recent (paginated) and Nearby (client-side filtered) modes.
+    func toggleNearbyFilter() {
+        isNearbyFilterEnabled.toggle()
+        lightweightExternalPlaces = []
+        totalExternalPlacesCount = 0
+
+        if isNearbyFilterEnabled {
+            hasMoreExternalPlaces = false
+            Task {
+                await loadAllNearbyPlaces()
+            }
+        } else {
+            allNearbyPlaces = []
+            hasLoadedAllNearbyPlaces = false
+            hasMoreExternalPlaces = true
+            Task {
+                await reloadLightweightExternalPlaces()
+            }
+        }
+    }
+
+    /// Disables the nearby filter if active, resetting to paginated "Recent" mode.
+    func disableNearbyFilter() {
+        guard isNearbyFilterEnabled else { return }
+        isNearbyFilterEnabled = false
+        allNearbyPlaces = []
+        hasLoadedAllNearbyPlaces = false
+        lightweightExternalPlaces = []
+        hasMoreExternalPlaces = true
+        Task {
+            await reloadLightweightExternalPlaces()
+        }
+    }
+
+    /// Filters displayed places to the current map viewport (instant, no network call).
+    func reloadForRegionChange(newRegion: MKCoordinateRegion) {
+        guard isNearbyFilterEnabled else { return }
+        currentMapRegion = newRegion
+        filterPlacesToViewport()
+    }
+
+    /// Fetches ALL user's TikTok places with coordinates for client-side filtering.
+    private func loadAllNearbyPlaces() async {
+        guard let userId = userSession?.currentUserId else { return }
+
+        isLoadingTikTokPlaces = true
+        defer { isLoadingTikTokPlaces = false }
+
+        do {
+            let places = try await userService.fetchUserExternalPlaces(
+                userId: userId, limit: 500, offset: 0, viewport: nil
+            )
+            allNearbyPlaces = places
+            hasLoadedAllNearbyPlaces = true
+            hasMoreExternalPlaces = false
+
+            // Prefetch TikTok metadata for new URLs
+            let tiktokUrls = places.compactMap { $0.tiktok_url }.filter { !$0.isEmpty }
+            let newUrls = tiktokUrls.filter { !prefetchedMetadataForSession.contains($0) }
+            if !newUrls.isEmpty {
+                prefetchedMetadataForSession.formUnion(newUrls)
+                Task {
+                    await TikTokMetadataCache.shared.prefetchMetadata(for: newUrls)
+                }
+            }
+
+            filterPlacesToViewport()
+        } catch {
+            print("❌ [ProfileTikTokViewModel] Error loading all nearby places: \(error.localizedDescription)")
+        }
+    }
+
+    /// Filters allNearbyPlaces to those within the current map viewport and updates displayed places.
+    private func filterPlacesToViewport() {
+        guard isNearbyFilterEnabled, let region = currentMapRegion else { return }
+
+        let minLat = region.center.latitude - region.span.latitudeDelta / 2
+        let maxLat = region.center.latitude + region.span.latitudeDelta / 2
+        let minLon = region.center.longitude - region.span.longitudeDelta / 2
+        let maxLon = region.center.longitude + region.span.longitudeDelta / 2
+
+        let filtered = allNearbyPlaces.filter { place in
+            guard let lat = place.latitude, let lon = place.longitude else { return false }
+            return lat >= minLat && lat <= maxLat && lon >= minLon && lon <= maxLon
+        }
+
+        lightweightExternalPlaces = filtered
+        totalExternalPlacesCount = filtered.count
+    }
+
     // MARK: - External Places Loading
 
     /// Loads initial external places (TikTok places).
@@ -159,8 +266,8 @@ class ProfileTikTokViewModel: ObservableObject {
 
         do {
             // Fetch first page and total count in parallel
-            async let placesTask = userService.fetchUserExternalPlaces(userId: userId, limit: 8, offset: 0)
-            async let countTask = userService.getNumberExternalPlaces(forUserId: userId)
+            async let placesTask = userService.fetchUserExternalPlaces(userId: userId, limit: 8, offset: 0, viewport: nil)
+            async let countTask = userService.getNumberExternalPlaces(forUserId: userId, viewport: nil)
 
             let lightweightPlaces = try await placesTask
             let totalCount = (try? await countTask) ?? 0
@@ -208,7 +315,7 @@ class ProfileTikTokViewModel: ObservableObject {
         }
 
         do {
-            let lightweightPlaces = try await userService.fetchUserExternalPlaces(userId: userId, limit: 8, offset: offset)
+            let lightweightPlaces = try await userService.fetchUserExternalPlaces(userId: userId, limit: 8, offset: offset, viewport: nil)
 
             // Prefetch TikTok metadata (non-blocking) - only for URLs not already prefetched
             let tiktokUrls = lightweightPlaces.compactMap { $0.tiktok_url }.filter { !$0.isEmpty }
@@ -237,6 +344,11 @@ class ProfileTikTokViewModel: ObservableObject {
 
     /// Reloads lightweight external places from database.
     func reloadLightweightExternalPlaces() async {
+        if isNearbyFilterEnabled {
+            await loadAllNearbyPlaces()
+            return
+        }
+
         guard let userId = userSession?.currentUserId else {
             print("⚠️ [ProfileTikTokViewModel] Cannot reload external places: no user ID")
             return
@@ -245,8 +357,8 @@ class ProfileTikTokViewModel: ObservableObject {
         isLoadingTikTokPlaces = true
 
         do {
-            async let placesTask = userService.fetchUserExternalPlaces(userId: userId, limit: 8, offset: 0)
-            async let countTask = userService.getNumberExternalPlaces(forUserId: userId)
+            async let placesTask = userService.fetchUserExternalPlaces(userId: userId, limit: 8, offset: 0, viewport: nil)
+            async let countTask = userService.getNumberExternalPlaces(forUserId: userId, viewport: nil)
 
             let lightweightPlaces = try await placesTask
             let totalCount = (try? await countTask) ?? 0
@@ -379,6 +491,7 @@ class ProfileTikTokViewModel: ObservableObject {
     /// Removes a place from local TikTok state.
     func removeFromLocalTikTokState(placeId: String) {
         lightweightExternalPlaces.removeAll { $0.place_id == placeId }
+        allNearbyPlaces.removeAll { $0.place_id == placeId }
         allTikTokPlaceIds.removeAll { $0 == placeId }
         loadedTikTokPlaceIds.removeAll { $0 == placeId }
 
@@ -665,6 +778,10 @@ class ProfileTikTokViewModel: ObservableObject {
         isLoadingMoreExternalPlaces = false
         hasMoreExternalPlaces = true
         isLoadingMoreTikTokPlaces = false
+        isNearbyFilterEnabled = false
+        currentMapRegion = nil
+        allNearbyPlaces = []
+        hasLoadedAllNearbyPlaces = false
         isProcessingTikTok = false
         isWaitingForPlaceDetail = false
         tikTokImportError = nil

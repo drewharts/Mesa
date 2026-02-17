@@ -108,12 +108,10 @@ private struct SearchPageViewContent: View {
                 }
 
                 viewModel.onViewAllKeywords = { keyword, types in
-                    print("🔍 [SearchPageViewWrapper] onViewAllKeywords callback triggered")
-                    print("   - keyword: \(keyword)")
-                    print("   - types: \(types)")
+                    appCoordinator.keywordForPopup = keyword
+                    appCoordinator.keywordTypesForPopup = types
+                    appCoordinator.hasPendingKeywordPopup = true
                     showSearchPage = false
-                    appCoordinator.triggerKeywordResultsPopup(keyword: keyword, types: types)
-                    print("   ✅ triggerKeywordResultsPopup called")
                 }
 
                 // Set map region for viewport-based searches

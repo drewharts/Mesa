@@ -6,8 +6,8 @@
 //
 import SwiftUI
 
-// DUMB Component: Displays list places in grid with unvisited filtering
-// Uses ProfileReviewsViewModel for reviewed place state (no local business logic)
+// DUMB Component: Displays list places in a grid layout
+// Uses ProfileReviewsViewModel for reviewed place state
 struct ListPlacesPopUpListView: View {
     let list: PlaceList
 
@@ -17,8 +17,6 @@ struct ListPlacesPopUpListView: View {
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
     @Environment(\.presentationMode) var presentationMode
-
-    @State private var showOnlyUnvisited: Bool = false
 
     // Reduced width to create more space between cards
     private let cardWidth: CGFloat = UIScreen.main.bounds.width / 2 - 35 // Increased spacing from edges
@@ -35,51 +33,14 @@ struct ListPlacesPopUpListView: View {
         return placeIds.compactMap { detailPlaceViewModel.places[$0] }
     }
 
-    // Filtered places based on visited status (uses ViewModel's database-verified reviewed IDs)
-    var filteredPlaces: [DetailPlace] {
-        guard showOnlyUnvisited else { return places }
-
-        // Filter out places that the current user has reviewed (checked against ViewModel)
-        return places.filter { place in
-            !reviewsVM.hasVerifiedReviewedPlace(placeId: place.id.uuidString)
-        }
-    }
-
     var body: some View {
         VStack(spacing: 0) {
-            // Filter button in top left corner
-            HStack {
-                Button(action: {
-                    showOnlyUnvisited.toggle()
-                }) {
-                    HStack(spacing: 6) {
-                        Image(systemName: showOnlyUnvisited ? "eye.slash.fill" : "list.bullet")
-                            .foregroundColor(showOnlyUnvisited ? .white : .secondary)
-                            .font(.caption)
-                        Text(showOnlyUnvisited ? "Unvisited" : "All")
-                            .font(.caption)
-                            .fontWeight(.medium)
-                            .foregroundColor(showOnlyUnvisited ? .white : .secondary)
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(
-                        RoundedRectangle(cornerRadius: 16)
-                            .fill(showOnlyUnvisited ? Color.blue : Color(.systemGray5))
-                    )
-                }
-                .buttonStyle(PlainButtonStyle())
-                Spacer()
-            }
-            .padding(.horizontal, 20)
-            .padding(.bottom, 10)
-            
             // Content
             if let _ = listsVM.userListsPlaces[list.id.uuidString] {
-                if !filteredPlaces.isEmpty {
+                if !places.isEmpty {
                     ScrollView {
                         LazyVGrid(columns: columns, spacing: 15) {
-                            ForEach(filteredPlaces, id: \.id) { place in
+                            ForEach(places, id: \.id) { place in
                                 ListPlaceGridCell(
                                     place: place,
                                     list: list,
@@ -94,16 +55,8 @@ struct ListPlacesPopUpListView: View {
                 } else {
                     VStack(spacing: 8) {
                         Spacer()
-                        if showOnlyUnvisited {
-                            Text("No unvisited places in this list")
-                                .foregroundColor(.gray)
-                            Text("All places have been reviewed")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        } else {
-                            Text("No places in this list")
-                                .foregroundColor(.gray)
-                        }
+                        Text("No places in this list")
+                            .foregroundColor(.gray)
                         Spacer()
                     }
                     .padding(.vertical, 30)
