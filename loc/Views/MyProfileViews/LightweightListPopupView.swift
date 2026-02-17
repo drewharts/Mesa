@@ -17,6 +17,7 @@ struct LightweightListPopupView: View {
 
     /// Per-list pagination state management.
     @StateObject private var paginationVM = ListPopupPaginationViewModel()
+    @StateObject private var storyViewModel = ListStoryCardViewModel()
 
     let lists: [LightweightPlaceList]
     let initialListIndex: Int
@@ -29,6 +30,7 @@ struct LightweightListPopupView: View {
     @State private var showCollaboratorsSheet: Bool = false
     @State private var showSettingsSheet: Bool = false
     @State private var showAddPlaceSheet: Bool = false
+    @State private var showPhotoSelector: Bool = false
     @State private var navigationPath = NavigationPath() // Navigation path for place detail navigation
 
     // Convenience initializer for single list (backward compatibility)
@@ -160,6 +162,27 @@ struct LightweightListPopupView: View {
                 )
             }
         }
+        .sheet(isPresented: $showPhotoSelector) {
+            StoryPhotoSelectorView(
+                viewModel: storyViewModel,
+                onShareInstagram: {
+                    if let userId = profile.user?.id {
+                        shareToInstagram(userId: userId)
+                    }
+                },
+                onShareGeneral: {
+                    if let userId = profile.user?.id {
+                        shareGeneral(userId: userId)
+                    }
+                }
+            )
+            .presentationDetents([.medium, .large])
+        }
+        .alert("Link Copied!", isPresented: $storyViewModel.showLinkCopiedInstruction) {
+            Button("Got it", role: .cancel) { }
+        } message: {
+            Text("Tap the sticker icon in Instagram, select \"Link\", and paste to add a clickable link to your story.")
+        }
     }
 
     // MARK: - View Components
@@ -168,81 +191,95 @@ struct LightweightListPopupView: View {
     /// Single Responsibility: Display list header UI
     private var headerSection: some View {
         VStack(spacing: 12) {
-            // Top bar with list title on left, buttons on right
-            HStack(alignment: .center) {
-                // List name and place count on the left
-                VStack(alignment: .leading, spacing: 4) {
+            // Top bar with list title and buttons aligned, place count below
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(alignment: .center) {
                     Text(currentList.name)
                         .font(.title2)
                         .fontWeight(.bold)
                         .foregroundColor(.black)
-                    
-                    Text("\(displayedPlaceCount) place\(displayedPlaceCount == 1 ? "" : "s")")
-                        .font(.caption)
-                        .foregroundColor(.gray)
-                }
-                
-                Spacer()
-                
-                // Action buttons: map, unified "+" menu, share, and settings
-                if let userId = profile.user?.id {
-                    HStack(alignment: .center, spacing: 12) {
-                        // View on Map button (profile popups only)
-                        if let viewOnMap = onViewOnMap {
-                            Button(action: viewOnMap) {
-                                Image(systemName: "map")
-                                    .font(.system(size: 20, weight: .regular))
-                                    .foregroundColor(.primary)
-                            }
-                            .frame(minWidth: 44, minHeight: 44)
-                        }
 
-                        // Unified "+" menu for adding places or collaborators
-                        Menu {
-                            Button {
-                                showAddPlaceSheet = true
+                    Spacer()
+
+                    // Action buttons: map and overflow menu
+                    if let userId = profile.user?.id {
+                        HStack(alignment: .center, spacing: 12) {
+                            // View on Map button (profile popups only)
+                            if let viewOnMap = onViewOnMap {
+                                Button(action: viewOnMap) {
+                                    Image(systemName: "map")
+                                        .font(.system(size: 20, weight: .regular))
+                                        .foregroundColor(.primary)
+                                }
+                                .frame(width: 44, height: 44)
+                            }
+
+                            // Overflow menu consolidating add, share, and settings actions
+                            Menu {
+                                Button {
+                                    showAddPlaceSheet = true
+                                } label: {
+                                    Label("Add Place", systemImage: "mappin.and.ellipse")
+                                }
+
+                                Button {
+                                    showCollaboratorsSheet = true
+                                } label: {
+                                    Label("Add Collaborator", systemImage: "person.badge.plus")
+                                }
+
+                                Divider()
+
+                                Button {
+                                    shareLink(userId: userId)
+                                } label: {
+                                    Label("Share Link", systemImage: "link")
+                                }
+
+                                Button {
+                                    prepareAndShowPhotoSelector()
+                                } label: {
+                                    Label("Create Story Card", systemImage: "camera.fill")
+                                }
+
+                                if currentList.user_role == "owner" || !currentList.isSharedWithMe {
+                                    Divider()
+
+                                    Button {
+                                        showSettingsSheet = true
+                                    } label: {
+                                        Label("List Settings", systemImage: "gearshape")
+                                    }
+                                }
                             } label: {
-                                Label("Add Place", systemImage: "mappin.and.ellipse")
+                                ZStack {
+                                    if storyViewModel.isGenerating {
+                                        ProgressView()
+                                            .progressViewStyle(CircularProgressViewStyle(tint: .primary))
+                                    } else {
+                                        Image(systemName: "ellipsis")
+                                            .font(.system(size: 20, weight: .regular))
+                                            .foregroundColor(.primary)
+                                    }
+                                }
+                                .frame(width: 44, height: 44)
+                                .contentShape(Rectangle())
                             }
-
-                            Button {
-                                showCollaboratorsSheet = true
-                            } label: {
-                                Label("Add Collaborator", systemImage: "person.badge.plus")
-                            }
-                        } label: {
-                            Image(systemName: "plus")
-                                .font(.system(size: 20, weight: .regular))
-                                .foregroundColor(.primary)
-                        }
-                        .frame(minWidth: 44, minHeight: 44)
-
-                        // Unified share button with menu for link sharing and story cards
-                        ListShareMenuButton(
-                            list: currentList,
-                            places: allPlaces,
-                            userId: userId
-                        )
-
-                        // Settings button (only show if user is owner)
-                        if currentList.user_role == "owner" || !currentList.isSharedWithMe {
-                            Button {
-                                showSettingsSheet = true
-                            } label: {
-                                Image(systemName: "gearshape")
-                                    .font(.system(size: 20, weight: .regular))
-                                    .foregroundColor(.primary)
-                            }
-                            .frame(minWidth: 44, minHeight: 44)
+                            .disabled(storyViewModel.isGenerating)
                         }
                     }
                 }
+
+                Text("\(displayedPlaceCount) place\(displayedPlaceCount == 1 ? "" : "s")")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+                    .padding(.top, -8)
             }
             .padding(.horizontal, 20)
-            .padding(.top, 24)
+            .padding(.top, 12)
             
         }
-        .padding(.bottom, 12)
+        .padding(.bottom, 28)
     }
     
     /// Content section displaying the current list's places.
@@ -267,6 +304,44 @@ struct LightweightListPopupView: View {
             )
         }
         .frame(maxWidth: .infinity, alignment: .top)
+    }
+
+    // MARK: - Share Helpers
+
+    /// Shares the list link via system share sheet.
+    private func shareLink(userId: String) {
+        ServiceContainer.shared.placeShareService.shareLightweightList(currentList, userId: userId)
+    }
+
+    /// Prepares photo options and shows the photo selector sheet.
+    private func prepareAndShowPhotoSelector() {
+        Task {
+            await storyViewModel.preparePhotoOptions(places: allPlaces)
+            showPhotoSelector = true
+        }
+    }
+
+    /// Shares the story card to Instagram Stories.
+    private func shareToInstagram(userId: String) {
+        Task {
+            await storyViewModel.shareToInstagram(
+                list: currentList,
+                places: allPlaces,
+                userId: userId
+            )
+        }
+    }
+
+    /// Shares the story card via system share sheet.
+    private func shareGeneral(userId: String) {
+        Task {
+            await storyViewModel.shareGeneral(
+                list: currentList,
+                places: allPlaces,
+                userId: userId,
+                shareService: ServiceContainer.shared.placeShareService
+            )
+        }
     }
 }
 
