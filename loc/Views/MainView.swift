@@ -137,9 +137,17 @@ struct MainView: View {
                 }
             }
             .fullScreenCover(isPresented: $shouldNavigateToProfile, onDismiss: {
-                // Present pending list sheet after profile is fully dismissed
+                // Present pending map sheets after profile is fully dismissed
                 if let listId = profileViewModel.selectedListIdForMap {
                     PresentationService.shared.present(.list(listId: listId))
+                } else if let pending = profileViewModel.pendingMapFilter {
+                    profileViewModel.pendingMapFilter = nil
+                    switch pending {
+                    case .tiktoks: profileViewModel.showTikToksOnMap = true
+                    case .reviews: profileViewModel.showReviewsOnMap = true
+                    case .favorites: profileViewModel.showFavoritesOnMap = true
+                    case .myPlaces: profileViewModel.showMyPlacesOnMap = true
+                    }
                 }
             }) {
                 ProfileView()
@@ -426,6 +434,8 @@ struct MainView: View {
         // This prevents clearing state during fullScreenCover transitions
         guard presentationService.activeSheet == nil else { return }
         profileViewModel.selectedListIdForMap = nil
+        profileViewModel.pendingMapFilter = nil
+        profileViewModel.tikTokViewModel.disableNearbyFilter()
         // Note: Map filter clearing is now handled by MapContainerView's onChange of activeSheet
     }
 

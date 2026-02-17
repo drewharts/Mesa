@@ -433,9 +433,9 @@ class UserService: ObservableObject {
         return try await supabase.getNumberMyPlaces(forUserId: userId)
     }
     
-    // COUNT ONLY - Super fast! (~20-50ms)
-    func getNumberExternalPlaces(forUserId userId: String) async throws -> Int {
-        return try await supabase.getNumberExternalPlaces(forUserId: userId)
+    /// Gets count of external places, optionally filtered to a map viewport.
+    func getNumberExternalPlaces(forUserId userId: String, viewport: (minLon: Double, minLat: Double, maxLon: Double, maxLat: Double)? = nil) async throws -> Int {
+        return try await supabase.getNumberExternalPlaces(forUserId: userId, viewport: viewport)
     }
     
     // COUNT ONLY - Super fast! (~20-50ms)
@@ -483,9 +483,9 @@ class UserService: ObservableObject {
         return try await supabase.fetchUserCreatedPlaces(userId: userId, limit: limit, offset: offset)
     }
     
-    /// Fetch user's external places (TikTok places, lightweight data for tiles, paginated)
-    func fetchUserExternalPlaces(userId: String, limit: Int = 8, offset: Int = 0) async throws -> [LightweightPlace] {
-        return try await supabase.fetchUserExternalPlaces(userId: userId, limit: limit, offset: offset)
+    /// Fetches user's external places, optionally filtered to a map viewport.
+    func fetchUserExternalPlaces(userId: String, limit: Int = 8, offset: Int = 0, viewport: (minLon: Double, minLat: Double, maxLon: Double, maxLat: Double)? = nil) async throws -> [LightweightPlace] {
+        return try await supabase.fetchUserExternalPlaces(userId: userId, limit: limit, offset: offset, viewport: viewport)
     }
     
     /// Fetch user's reviewed places (lightweight data for tiles, paginated - server-side)

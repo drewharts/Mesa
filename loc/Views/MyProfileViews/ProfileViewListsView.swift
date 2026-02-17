@@ -17,6 +17,12 @@
 import SwiftUI
 import PhotosUI
 
+/// Identifiable wrapper for Int index, used for sheet(item:) presentation.
+private struct IdentifiableIndex: Identifiable {
+    let value: Int
+    var id: Int { value }
+}
+
 struct ProfileViewListsView: View {
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
@@ -32,6 +38,8 @@ struct ProfileViewListsView: View {
     @State private var placeColors: [UUID: Color] = [:]
     @State private var listToDelete: LightweightPlaceList?
     @State private var showDeleteConfirmation = false
+    @State private var selectedListIndex: Int? = nil
+    @State private var pendingMapListId: String? = nil
 
     // MARK: - Body
 
@@ -101,6 +109,21 @@ struct ProfileViewListsView: View {
             if let list = listToDelete {
                 Text("Are you sure you want to delete \"\(list.name)\"? This action cannot be undone.")
             }
+        }
+        .sheet(item: Binding<IdentifiableIndex?>(
+            get: { selectedListIndex.map { IdentifiableIndex(value: $0) } },
+            set: { selectedListIndex = $0?.value }
+        ), onDismiss: handleListPopupDismiss) { item in
+            LightweightListPopupView(
+                lists: listsVM.filteredPlaceLists,
+                initialListIndex: item.value,
+                listsVM: listsVM,
+                reviewsVM: profile.reviewsViewModel,
+                onViewOnMap: {
+                    pendingMapListId = listsVM.filteredPlaceLists[item.value].list_id
+                    selectedListIndex = nil
+                }
+            )
         }
     }
     
@@ -207,7 +230,8 @@ struct ProfileViewListsView: View {
                     places: listsVM.lightweightPlaceListPlaces[list.list_id] ?? [],
                     allLists: listsVM.filteredPlaceLists,
                     currentIndex: index,
-                    placeColors: $placeColors
+                    placeColors: $placeColors,
+                    onTap: { selectedListIndex = index }
                 )
                 .contextMenu {
                     Button(role: .destructive) {
@@ -291,7 +315,15 @@ struct ProfileViewListsView: View {
     }
     
     // MARK: - Actions
-    
+
+    /// Called when list popup sheet is dismissed - navigates to map if user tapped "Map".
+    private func handleListPopupDismiss() {
+        guard let listId = pendingMapListId else { return }
+        pendingMapListId = nil
+        profile.selectedListIdForMap = listId
+        presentationMode.wrappedValue.dismiss()
+    }
+
     /// Handle list appearing - triggers pagination when approaching end
     private func handleListAppear(list: LightweightPlaceList) {
         // Don't paginate during search or shared filter

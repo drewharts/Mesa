@@ -396,14 +396,35 @@ class SupabaseUserService: ObservableObject {
         return count
     }
     
-    /// Get external places (TikTok) count - FAST! (count query only, no place data)
-    func getNumberExternalPlaces(forUserId userId: String) async throws -> Int {
-        let response: Int = try await supabase.client
-            .rpc("get_user_external_places_count", params: ["p_user_id": userId])
-            .execute()
-            .value
-        
-        return response
+    /// Gets external places count, optionally filtered to a map viewport.
+    func getNumberExternalPlaces(forUserId userId: String, viewport: (minLon: Double, minLat: Double, maxLon: Double, maxLat: Double)? = nil) async throws -> Int {
+        if let viewport = viewport {
+            struct ViewportCountParams: Encodable {
+                let p_user_id: String
+                let p_min_lon: Double
+                let p_min_lat: Double
+                let p_max_lon: Double
+                let p_max_lat: Double
+            }
+            let params = ViewportCountParams(
+                p_user_id: userId,
+                p_min_lon: viewport.minLon,
+                p_min_lat: viewport.minLat,
+                p_max_lon: viewport.maxLon,
+                p_max_lat: viewport.maxLat
+            )
+            let response: Int = try await supabase.client
+                .rpc("get_user_external_places_count", params: params)
+                .execute()
+                .value
+            return response
+        } else {
+            let response: Int = try await supabase.client
+                .rpc("get_user_external_places_count", params: ["p_user_id": userId])
+                .execute()
+                .value
+            return response
+        }
     }
     
     /// Get created places (my places) count - FAST! (count query only, no place data)
@@ -838,26 +859,49 @@ class SupabaseUserService: ObservableObject {
         }
     }
     
-    /// Fetch user's external places (TikTok places, lightweight data for tiles, paginated)
-    func fetchUserExternalPlaces(userId: String, limit: Int = 8, offset: Int = 0) async throws -> [LightweightPlace] {
-        struct Params: Encodable {
-            let p_user_id: String
-            let p_limit: Int
-            let p_offset: Int
+    /// Fetches user's external places, optionally filtered to a map viewport.
+    func fetchUserExternalPlaces(userId: String, limit: Int = 8, offset: Int = 0, viewport: (minLon: Double, minLat: Double, maxLon: Double, maxLat: Double)? = nil) async throws -> [LightweightPlace] {
+        if let viewport = viewport {
+            struct ViewportParams: Encodable {
+                let p_user_id: String
+                let p_limit: Int
+                let p_offset: Int
+                let p_min_lon: Double
+                let p_min_lat: Double
+                let p_max_lon: Double
+                let p_max_lat: Double
+            }
+            let params = ViewportParams(
+                p_user_id: userId,
+                p_limit: limit,
+                p_offset: offset,
+                p_min_lon: viewport.minLon,
+                p_min_lat: viewport.minLat,
+                p_max_lon: viewport.maxLon,
+                p_max_lat: viewport.maxLat
+            )
+            let places: [LightweightPlace] = try await supabase.client
+                .rpc("get_user_external_places", params: params)
+                .execute()
+                .value
+            return places
+        } else {
+            struct Params: Encodable {
+                let p_user_id: String
+                let p_limit: Int
+                let p_offset: Int
+            }
+            let params = Params(
+                p_user_id: userId,
+                p_limit: limit,
+                p_offset: offset
+            )
+            let places: [LightweightPlace] = try await supabase.client
+                .rpc("get_user_external_places", params: params)
+                .execute()
+                .value
+            return places
         }
-        
-        let params = Params(
-            p_user_id: userId,
-            p_limit: limit,
-            p_offset: offset
-        )
-        
-        let places: [LightweightPlace] = try await supabase.client
-            .rpc("get_user_external_places", params: params)
-            .execute()
-            .value
-        
-        return places
     }
     
     /// Fetch user's reviewed places (lightweight data for tiles, paginated - server-side)
