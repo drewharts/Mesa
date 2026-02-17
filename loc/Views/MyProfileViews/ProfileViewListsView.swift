@@ -44,7 +44,7 @@ struct ProfileViewListsView: View {
     // MARK: - Body
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 12) {
             headerView
 
             // Simple inline search bar
