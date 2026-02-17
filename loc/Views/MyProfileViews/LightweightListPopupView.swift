@@ -20,33 +20,35 @@ struct LightweightListPopupView: View {
 
     let lists: [LightweightPlaceList]
     let initialListIndex: Int
+    let onViewOnMap: (() -> Void)?
 
     @ObservedObject var listsVM: ProfileListsViewModel
     @ObservedObject var reviewsVM: ProfileReviewsViewModel
 
     @State private var currentListIndex: Int
-    @State private var showOnlyUnvisited: Bool = false
     @State private var showCollaboratorsSheet: Bool = false
     @State private var showSettingsSheet: Bool = false
     @State private var showAddPlaceSheet: Bool = false
     @State private var navigationPath = NavigationPath() // Navigation path for place detail navigation
 
     // Convenience initializer for single list (backward compatibility)
-    init(list: LightweightPlaceList, listsVM: ProfileListsViewModel, reviewsVM: ProfileReviewsViewModel, places: [LightweightPlace] = []) {
+    init(list: LightweightPlaceList, listsVM: ProfileListsViewModel, reviewsVM: ProfileReviewsViewModel, places: [LightweightPlace] = [], onViewOnMap: (() -> Void)? = nil) {
         self.lists = [list]
         self.initialListIndex = 0
         self._currentListIndex = State(initialValue: 0)
         self.listsVM = listsVM
         self.reviewsVM = reviewsVM
+        self.onViewOnMap = onViewOnMap
     }
 
     // Initializer for multiple lists with swiping
-    init(lists: [LightweightPlaceList], initialListIndex: Int, listsVM: ProfileListsViewModel, reviewsVM: ProfileReviewsViewModel) {
+    init(lists: [LightweightPlaceList], initialListIndex: Int, listsVM: ProfileListsViewModel, reviewsVM: ProfileReviewsViewModel, onViewOnMap: (() -> Void)? = nil) {
         self.lists = lists
         self.initialListIndex = initialListIndex
         self._currentListIndex = State(initialValue: initialListIndex)
         self.listsVM = listsVM
         self.reviewsVM = reviewsVM
+        self.onViewOnMap = onViewOnMap
     }
 
     // Current list being displayed (uses passed lists, not profile.lightweightPlaceLists for filtered support)
@@ -162,7 +164,7 @@ struct LightweightListPopupView: View {
 
     // MARK: - View Components
     
-    /// Header section with list name, controls, and filter toggle
+    /// Header section with list name, place count, and action buttons.
     /// Single Responsibility: Display list header UI
     private var headerSection: some View {
         VStack(spacing: 12) {
@@ -182,9 +184,19 @@ struct LightweightListPopupView: View {
                 
                 Spacer()
                 
-                // Action buttons: unified "+" menu, share, and settings
+                // Action buttons: map, unified "+" menu, share, and settings
                 if let userId = profile.user?.id {
                     HStack(alignment: .center, spacing: 12) {
+                        // View on Map button (profile popups only)
+                        if let viewOnMap = onViewOnMap {
+                            Button(action: viewOnMap) {
+                                Image(systemName: "map")
+                                    .font(.system(size: 20, weight: .regular))
+                                    .foregroundColor(.primary)
+                            }
+                            .frame(minWidth: 44, minHeight: 44)
+                        }
+
                         // Unified "+" menu for adding places or collaborators
                         Menu {
                             Button {
@@ -229,24 +241,6 @@ struct LightweightListPopupView: View {
             .padding(.horizontal, 20)
             .padding(.top, 24)
             
-            // Filter toggle
-            HStack {
-                Button(action: {
-                    showOnlyUnvisited.toggle()
-                }) {
-                    HStack(spacing: 8) {
-                        Image(systemName: showOnlyUnvisited ? "checkmark.circle.fill" : "circle")
-                            .foregroundColor(showOnlyUnvisited ? .blue : .gray)
-                        
-                        Text("Show only unvisited")
-                            .font(.subheadline)
-                            .foregroundColor(.primary)
-                    }
-                }
-                
-                Spacer()
-            }
-            .padding(.horizontal, 20)
         }
         .padding(.bottom, 12)
     }
@@ -259,7 +253,6 @@ struct LightweightListPopupView: View {
         return VStack(alignment: .leading, spacing: 0) {
             ListContentView(
                 list: currentList,
-                showOnlyUnvisited: $showOnlyUnvisited,
                 isLoadingMore: paginationState.isLoadingMore,
                 hasMorePlaces: paginationState.hasMorePlaces,
                 onLoadMore: { paginationVM.loadMoreIfNeeded(for: listId) },
@@ -282,7 +275,6 @@ struct LightweightListPopupView: View {
 /// Single Responsibility: Render place grid with pagination, delegate loading
 struct ListContentView: View {
     let list: LightweightPlaceList
-    @Binding var showOnlyUnvisited: Bool
     let isLoadingMore: Bool
     let hasMorePlaces: Bool
     let onLoadMore: () -> Void
@@ -303,15 +295,10 @@ struct ListContentView: View {
         return listsVM.lightweightPlaceListPlaces[list.list_id] ?? []
     }
 
-    /// Returns filtered and deduplicated places based on visited status.
+    /// Returns deduplicated places for this list.
     var filteredPlaces: [LightweightPlace] {
-        let toFilter = showOnlyUnvisited ?
-            allPlaces.filter { !reviewsVM.hasVerifiedReviewedPlace(placeId: $0.place_id) } :
-            allPlaces
-
-        // Deduplicate by place_id
         var seenIds = Set<String>()
-        return toFilter.filter { place in
+        return allPlaces.filter { place in
             guard !seenIds.contains(place.place_id) else { return false }
             seenIds.insert(place.place_id)
             return true
@@ -359,16 +346,8 @@ struct ListContentView: View {
         } else {
             VStack(spacing: 8) {
                 Spacer()
-                if showOnlyUnvisited {
-                    Text("No unvisited places in this list")
-                        .foregroundColor(.gray)
-                    Text("All places have been reviewed")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                } else {
-                    Text("No places in this list")
-                        .foregroundColor(.gray)
-                }
+                Text("No places in this list")
+                    .foregroundColor(.gray)
                 Spacer()
             }
             .padding(.vertical, 30)
