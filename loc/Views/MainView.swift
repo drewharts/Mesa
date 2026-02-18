@@ -41,6 +41,7 @@ struct MainView: View {
     @State private var recenterMap = false
     @State private var isCreatePlacePopupActive = false
     @State private var mapPosition = MapCameraPosition.automatic
+    @State private var annotationDisplayMode: AnnotationDisplayMode = .everyone
 
     /// Convenience accessor for TikTok view model.
     private var tikTokVM: ProfileTikTokViewModel { profileViewModel.tikTokViewModel }
@@ -82,6 +83,7 @@ struct MainView: View {
                     mapPosition: $mapPosition,
                     recenterMap: $recenterMap,
                     isCreatePlacePopupActive: $isCreatePlacePopupActive,
+                    annotationDisplayMode: $annotationDisplayMode,
                     selectedPlaceViewModel: selectedPlaceVM,
                     detailPlaceViewModel: detailPlaceViewModel,
                     placeService: serviceContainer.placeService,
@@ -454,9 +456,25 @@ struct MainView: View {
                             .overlay(Circle().stroke(Color.gray.opacity(0.3), lineWidth: 1))
                             .shadow(radius: 4)
                     }
-                    .padding(.top, 10)
-                    .padding(.trailing, 20)
+
+                    Menu {
+                        Picker("Display", selection: $annotationDisplayMode) {
+                            ForEach(AnnotationDisplayMode.allCases, id: \.self) { mode in
+                                Label(mode.label, systemImage: mode.iconName).tag(mode)
+                            }
+                        }
+                    } label: {
+                        Image(systemName: annotationDisplayMode.iconName)
+                            .foregroundColor(.secondary)
+                            .frame(width: 36, height: 36)
+                            .background(.ultraThinMaterial)
+                            .clipShape(Circle())
+                            .overlay(Circle().stroke(Color.gray.opacity(0.3), lineWidth: 1))
+                            .shadow(radius: 4)
+                    }
                 }
+                .padding(.top, 10)
+                .padding(.trailing, 20)
             }
 
             Spacer()

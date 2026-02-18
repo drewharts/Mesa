@@ -37,9 +37,9 @@ class PlacePostViewModel: ObservableObject {
     
     // MARK: - Computed Properties
     
-    /// Whether the post can be submitted (has content).
+    /// Whether the post can be submitted (has content or a would-return sentiment).
     var canSubmit: Bool {
-        !selectedMedia.isEmpty || !postText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        !selectedMedia.isEmpty || !postText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || wouldReturn != nil
     }
 
     /// Returns only the image items from selected media.

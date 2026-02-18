@@ -47,13 +47,19 @@ struct MapView: View {
     // Sort annotations so selected one renders last (on top)
     // MapKit renders annotations in ForEach order, so last = topmost
     // Also includes preserved annotation if it was culled by density reduction
+    // In "My Places" mode, filters to only annotations containing the current user
     private var sortedAnnotations: [PlaceAnnotation] {
         let selectedId = selectedPlaceVM.selectedPlace?.id.uuidString
 
-        // Start with viewport annotations
-        var annotations = mapViewModel.viewportAnnotations
+        // Start with viewport annotations, filtered by display mode
+        var annotations: [PlaceAnnotation]
+        if mapViewModel.showMyPlacesOnly, let userId = mapViewModel.currentUserId {
+            annotations = mapViewModel.viewportAnnotations.filter { $0.userIds.contains(userId) }
+        } else {
+            annotations = mapViewModel.viewportAnnotations
+        }
 
-        // Add preserved annotation if not already present (survives zoom-out culling)
+        // Add preserved annotation if not already present (survives zoom-out culling and My Places filter)
         if let preserved = mapViewModel.preservedSelectedAnnotation,
            !annotations.contains(where: { $0.id == preserved.id }) {
             annotations.append(preserved)
@@ -71,16 +77,19 @@ struct MapView: View {
     private var mapContentView: some View {
         Map(position: $mapPosition) {
             // Community places as small emoji markers (shown behind network places)
+            // Hidden in "My Places" mode since community markers are not user-specific
             // Filter out the community marker that's currently selected (to avoid duplicate with preserved annotation)
-            ForEach(mapViewModel.communityMarkers.filter { marker in
-                selectedPlaceVM.selectedPlace?.id.uuidString != marker.id
-            }) { marker in
-                Annotation(
-                    "",
-                    coordinate: marker.coordinate,
-                    anchor: .center
-                ) {
-                    communityMarkerView(for: marker)
+            if !mapViewModel.showMyPlacesOnly {
+                ForEach(mapViewModel.communityMarkers.filter { marker in
+                    selectedPlaceVM.selectedPlace?.id.uuidString != marker.id
+                }) { marker in
+                    Annotation(
+                        "",
+                        coordinate: marker.coordinate,
+                        anchor: .center
+                    ) {
+                        communityMarkerView(for: marker)
+                    }
                 }
             }
 
@@ -116,7 +125,7 @@ struct MapView: View {
                         selectedPlaceVM.selectedPlace?.id.uuidString == annotation.id
         return CustomPlaceAnnotationView(
             annotation: annotation,
-            annotationImage: mapViewModel.annotationImages[annotation.id],
+            annotationImage: mapViewModel.showEmojiAnnotations ? nil : mapViewModel.annotationImages[annotation.id],
             isSelected: isSelected
         )
         .onTapGesture {
