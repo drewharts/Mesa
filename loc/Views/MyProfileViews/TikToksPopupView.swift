@@ -11,7 +11,10 @@ import SwiftUI
 struct TikToksPopupView: View {
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
+    @EnvironmentObject var appCoordinator: AppCoordinator
     @ObservedObject var tikTokVM: ProfileTikTokViewModel
+    var showNearbyFilter: Bool = true
+    var onViewOnMap: (() -> Void)? = nil
 
     var body: some View {
         PlaceListPopupView(
@@ -22,9 +25,12 @@ struct TikToksPopupView: View {
             places: tikTokVM.lightweightExternalPlaces,
             hasMore: tikTokVM.hasMoreExternalPlaces,
             emptyIcon: "video",
-            emptyTitle: "No TikToks Yet",
-            emptyMessage: "Places you add from TikTok videos will appear here",
+            emptyTitle: tikTokVM.isNearbyFilterEnabled ? "No Nearby TikToks" : "No TikToks Yet",
+            emptyMessage: tikTokVM.isNearbyFilterEnabled
+                ? "No TikTok places found in the current map area"
+                : "Places you add from TikTok videos will appear here",
             loadMore: { await tikTokVM.loadMoreExternalPlaces() },
+            onViewOnMap: onViewOnMap,
             cardBuilder: { place, navigate in
                 PopupPlaceCard(
                     place: place,
@@ -38,13 +44,56 @@ struct TikToksPopupView: View {
                         Label("Delete TikTok Place", systemImage: "trash")
                     }
                 }
+            },
+            headerAccessory: {
+                if showNearbyFilter {
+                    nearbyFilterToggle
+                }
             }
         )
         .onAppear {
-            // Only load if not already loaded (same pattern as list sheets)
-            // This preserves scroll position on back navigation
+            tikTokVM.currentMapRegion = appCoordinator.currentMapRegion
             if tikTokVM.lightweightExternalPlaces.isEmpty {
                 profile.tikTokViewModel.refreshTikTokPlacesAfterImport()
+            }
+        }
+        .onChange(of: appCoordinator.currentMapRegion?.center.latitude) { _, _ in
+            guard let region = appCoordinator.currentMapRegion else { return }
+            tikTokVM.reloadForRegionChange(newRegion: region)
+        }
+        .onChange(of: appCoordinator.currentMapRegion?.center.longitude) { _, _ in
+            guard let region = appCoordinator.currentMapRegion else { return }
+            tikTokVM.reloadForRegionChange(newRegion: region)
+        }
+        .onChange(of: appCoordinator.currentMapRegion?.span.latitudeDelta) { _, _ in
+            guard let region = appCoordinator.currentMapRegion else { return }
+            tikTokVM.reloadForRegionChange(newRegion: region)
+        }
+        .onChange(of: appCoordinator.currentMapRegion?.span.longitudeDelta) { _, _ in
+            guard let region = appCoordinator.currentMapRegion else { return }
+            tikTokVM.reloadForRegionChange(newRegion: region)
+        }
+    }
+
+    // MARK: - Nearby Filter Toggle
+
+    private var nearbyFilterToggle: some View {
+        HStack(spacing: 8) {
+            NearbyFilterButton(
+                title: "Recent",
+                isSelected: !tikTokVM.isNearbyFilterEnabled
+            ) {
+                guard tikTokVM.isNearbyFilterEnabled else { return }
+                tikTokVM.currentMapRegion = appCoordinator.currentMapRegion
+                tikTokVM.toggleNearbyFilter()
+            }
+            NearbyFilterButton(
+                title: "Nearby",
+                isSelected: tikTokVM.isNearbyFilterEnabled
+            ) {
+                guard !tikTokVM.isNearbyFilterEnabled else { return }
+                tikTokVM.currentMapRegion = appCoordinator.currentMapRegion
+                tikTokVM.toggleNearbyFilter()
             }
         }
     }

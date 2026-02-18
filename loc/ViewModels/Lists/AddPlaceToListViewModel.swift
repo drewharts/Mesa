@@ -21,6 +21,7 @@ class AddPlaceToListViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var successMessage: String?
     @Published var addedPlaceId: String?
+    @Published var addedPlace: DetailPlace?
 
     // MARK: - Dependencies
 
@@ -128,6 +129,7 @@ class AddPlaceToListViewModel: ObservableObject {
 
             successMessage = "Added \(place.name) to list"
             addedPlaceId = placeId
+            addedPlace = place
             isAddingPlace = false
 
             // Clear search after successful add

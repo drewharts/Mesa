@@ -90,8 +90,9 @@ struct ListHeaderView: View {
                 Capsule()
                     .fill(buttonBackgroundColor)
             )
-            .contentShape(Capsule())
         }
+        .frame(minHeight: 44)
+        .contentShape(Rectangle())
         .disabled(!isFilterEnabled)
     }
     

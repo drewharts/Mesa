@@ -225,6 +225,7 @@ struct PlaceDetailTabsView: View {
                 viewModel: viewModel.aboutTabViewModel,
                 onPhotoTapped: onPhotoTapped,
                 onPlaceChanged: onPlaceChanged,
+                isRefreshing: viewModel.isRefreshing,
                 onRefresh: viewModel.manualRefresh
             )
             .environmentObject(profile)

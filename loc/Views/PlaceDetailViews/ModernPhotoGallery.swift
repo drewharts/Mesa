@@ -12,8 +12,12 @@ struct ModernPhotoGallery: View {
     let onImageTapped: (Int) -> Void
     var onVideoTapped: ((String) -> Void)? = nil
     var overflowCount: Int = 0
+    var onDeletePhoto: ((PhotoItem) -> Void)? = nil
 
     @ObservedObject var photosViewModel: PlacePhotosViewModel
+
+    // Confirmation state for photo deletion
+    @State private var photoToDelete: PhotoItem?
 
     // Configuration
     private let heroImageHeight: CGFloat = 200
@@ -123,6 +127,22 @@ struct ModernPhotoGallery: View {
                 photoGalleryView
             }
         }
+        .alert("Delete Photo", isPresented: Binding(
+            get: { photoToDelete != nil },
+            set: { if !$0 { photoToDelete = nil } }
+        )) {
+            Button("Delete", role: .destructive) {
+                if let item = photoToDelete {
+                    onDeletePhoto?(item)
+                }
+                photoToDelete = nil
+            }
+            Button("Cancel", role: .cancel) {
+                photoToDelete = nil
+            }
+        } message: {
+            Text("This photo will be permanently removed.")
+        }
     }
 
     // MARK: - Empty State View
@@ -184,6 +204,15 @@ struct ModernPhotoGallery: View {
             .onTapGesture {
                 handleItemTap(at: 0)
             }
+            .contextMenu {
+                if firstItem.source == .externalReview, onDeletePhoto != nil {
+                    Button(role: .destructive) {
+                        photoToDelete = firstItem
+                    } label: {
+                        Label("Delete Photo", systemImage: "trash")
+                    }
+                }
+            }
             .transition(.opacity.combined(with: .scale))
         }
     }
@@ -219,6 +248,15 @@ struct ModernPhotoGallery: View {
         .onTapGesture {
             handleItemTap(at: actualIndex)
         }
+        .contextMenu {
+            if items[actualIndex].source == .externalReview, onDeletePhoto != nil {
+                Button(role: .destructive) {
+                    photoToDelete = items[actualIndex]
+                } label: {
+                    Label("Delete Photo", systemImage: "trash")
+                }
+            }
+        }
         .onAppear {
             if actualIndex == items.count - 3 && !photosViewModel.allPhotosLoadedForCurrentPlace {
                 photosViewModel.loadMorePhotos()
@@ -246,6 +284,15 @@ struct ModernPhotoGallery: View {
                 .aspectRatio(5/4, contentMode: .fill)
                 .onTapGesture {
                     handleItemTap(at: actualIndex)
+                }
+                .contextMenu {
+                    if items[actualIndex].source == .externalReview, onDeletePhoto != nil {
+                        Button(role: .destructive) {
+                            photoToDelete = items[actualIndex]
+                        } label: {
+                            Label("Delete Photo", systemImage: "trash")
+                        }
+                    }
                 }
                 .transition(.opacity.combined(with: .scale(scale: 0.9)))
             }

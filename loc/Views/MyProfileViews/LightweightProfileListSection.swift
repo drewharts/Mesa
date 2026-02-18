@@ -20,31 +20,20 @@ struct LightweightProfileListSection: View {
     let allLists: [LightweightPlaceList]
     let currentIndex: Int
     @Binding var placeColors: [UUID: Color]
-    
-    @EnvironmentObject var profile: ProfileViewModel
-    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
-    @Environment(\.presentationMode) var presentationMode
-    @EnvironmentObject var appCoordinator: AppCoordinator
-    
-    @State private var showingListPopup = false
-    
+    let onTap: () -> Void
+
     private var totalPlaceCount: Int {
         return list.place_count
     }
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             // Photo collage button
-            Button(action: {
-                // Set list filter and navigate to map
-                profile.selectedListIdForMap = list.id
-                // Dismiss profile view to show map
-                presentationMode.wrappedValue.dismiss()
-            }) {
+            Button(action: onTap) {
                 ListCardImage(places: places, placeColors: $placeColors)
             }
             .buttonStyle(PlainButtonStyle())
-            
+
             // List info
             ListCardInfo(
                 list: list,

@@ -191,6 +191,11 @@ class PlacePhotosViewModel: ObservableObject {
         externalReviewPhotosVM.reportImageLoadFailure(url: url)
     }
 
+    /// Deletes an external review photo (delegated to child VM).
+    func deleteExternalReviewPhoto(url: String) async {
+        await externalReviewPhotosVM.deletePhoto(url: url)
+    }
+
     // MARK: - Post & Profile Photo Accessors (Delegated to PostPhotosVM)
 
     /// Loads photos for a specific post.

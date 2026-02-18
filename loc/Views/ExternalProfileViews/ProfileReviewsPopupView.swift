@@ -54,11 +54,8 @@ struct ProfileReviewsPopupView: View {
                 Button(action: {
                     presentationMode.wrappedValue.dismiss()
                 }) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "chevron.left")
-                        Text("Profile")
-                    }
-                    .foregroundColor(.primary)
+                    Image(systemName: "chevron.left")
+                        .foregroundColor(.primary)
                 }
                 Spacer()
             }

@@ -11,6 +11,7 @@ struct MyPlacesListView: View {
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @ObservedObject var myPlacesVM: ProfileMyPlacesViewModel
+    var onViewOnMap: (() -> Void)? = nil
 
     var body: some View {
         PlaceListPopupView(
@@ -24,6 +25,7 @@ struct MyPlacesListView: View {
             emptyTitle: "No Places Created Yet",
             emptyMessage: "Press and hold on the map to create a place at any location",
             loadMore: { await myPlacesVM.loadMoreMyPlaces() },
+            onViewOnMap: onViewOnMap,
             cardBuilder: { place, navigate in
                 PopupPlaceCard(
                     place: place,

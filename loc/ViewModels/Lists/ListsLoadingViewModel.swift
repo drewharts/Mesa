@@ -113,6 +113,7 @@ class ListsLoadingViewModel: ObservableObject {
         dataVM.lightweightPlaceLists = allLists
         dataVM.placeListsCurrentPage = 1
         dataVM.hasMorePlaceLists = ownedLists.count >= pageSize
+        dataVM.initializePlaceCountsFromMetadata(for: allLists)
 
         // Load places for each list
         if !allLists.isEmpty {
@@ -144,6 +145,7 @@ class ListsLoadingViewModel: ObservableObject {
             )
 
             dataVM.appendPlaceLists(moreLists, nextPage: nextPage, pageSize: pageSize)
+            dataVM.initializePlaceCountsFromMetadata(for: moreLists)
 
             if !moreLists.isEmpty {
                 await loadPlacesForLists(moreLists)
@@ -252,6 +254,14 @@ class ListsLoadingViewModel: ObservableObject {
             }
         }
 
+    }
+
+    /// Loads the first page of places for a list if no places are cached yet.
+    func loadPlacesForListIfNeeded(listId: String, fallbackCount: Int) async {
+        guard let dataVM = dataViewModel else { return }
+        if dataVM.lightweightPlaceListPlaces[listId] == nil {
+            await loadPlacesForList(listId: listId)
+        }
     }
 
     /// Loads places for a single list.

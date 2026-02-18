@@ -143,7 +143,9 @@ struct MapContainerView: View {
     /// Handles list selection changes from ProfileViewModel
     private func handleListSelectionChange(_ newValue: String?) {
         if let listId = newValue {
-            mapViewModel.selectList(listId, availableLists: profileViewModel.listsViewModel.lightweightPlaceLists)
+            // Apply filter only — sheet presentation is handled by MainView's
+            // fullScreenCover onDismiss to avoid presenting over the profile
+            mapViewModel.applyListFilter(listId, availableLists: profileViewModel.listsViewModel.lightweightPlaceLists)
 
             if let listCenter = profileViewModel.listsViewModel.lightweightPlaceLists
                 .first(where: { $0.list_id == listId })?.averageLocation {
@@ -299,10 +301,12 @@ private struct ExternalProfileOnChangeModifiers: ViewModifier {
 
             if let listCenter = mapDisplayCoordinatorViewModel.mapDisplayLists
                 .first(where: { $0.list_id == listId })?.averageLocation {
-                mapPosition = .region(MKCoordinateRegion(
-                    center: listCenter,
-                    span: MKCoordinateSpan(latitudeDelta: 0.08, longitudeDelta: 0.08)
-                ))
+                withAnimation(.easeInOut(duration: 0.5)) {
+                    mapPosition = .region(MKCoordinateRegion(
+                        center: listCenter,
+                        span: MKCoordinateSpan(latitudeDelta: 0.08, longitudeDelta: 0.08)
+                    ))
+                }
             }
 
             if let currentUserId = userSession.currentUserId {
@@ -346,7 +350,7 @@ private struct SheetOnChangeModifiers: ViewModifier {
     let selectedPlaceViewModel: SelectedPlaceViewModel
     @ObservedObject var userProfileNavigationViewModel: UserProfileNavigationViewModel
     let mapViewModel: MapViewModel
-    let appCoordinator: AppCoordinator
+    @ObservedObject var appCoordinator: AppCoordinator
     let userSession: UserSession
 
     func body(content: Content) -> some View {

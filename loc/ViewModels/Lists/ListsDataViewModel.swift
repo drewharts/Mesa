@@ -220,6 +220,15 @@ class ListsDataViewModel: ObservableObject {
         hasMorePlaceLists = newLists.count >= pageSize
     }
 
+    /// Initializes place counts from list metadata for lists that don't already have a cached count.
+    func initializePlaceCountsFromMetadata(for lists: [LightweightPlaceList]) {
+        for list in lists {
+            if lightweightPlaceListCounts[list.list_id] == nil {
+                lightweightPlaceListCounts[list.list_id] = list.place_count
+            }
+        }
+    }
+
     /// Sets places for a list with deduplication.
     func setPlacesForList(listId: String, places: [LightweightPlace]) {
         var seenIds = Set<String>()

@@ -24,6 +24,10 @@ class TravelTimeViewModel: ObservableObject {
     /// Currently highlighted menu item index during drag gesture
     @Published private(set) var selectedMenuIndex: Int? = nil
 
+    // MARK: - Private State
+    /// Tracks the place ID of the most recent request to discard stale results.
+    private var currentRequestPlaceId: UUID?
+
     // MARK: - Initialization
     init() {
         loadDefaultTransportType()
@@ -31,57 +35,65 @@ class TravelTimeViewModel: ObservableObject {
 
     // MARK: - Public Methods
 
-    /// Sets the current place and resets travel time state
+    /// Sets the current place, resetting travel time state when the place changes.
     func setPlace(_ place: DetailPlace?) {
+        let isNewPlace = self.place?.id != place?.id
         self.place = place
-        if place == nil {
+        if isNewPlace {
+            currentRequestPlaceId = place?.id
             travelTime = "Calculating..."
             travelTimes = [:]
+            collapseMenu()
         }
     }
     
     // MARK: - Travel Time Management
+
+    /// Fetches travel times for all transport modes and updates published state.
     func updateTravelTime(for place: DetailPlace, from userCoordinate: CLLocationCoordinate2D) {
-        // Unwrap the coordinate; if it's nil, set travelTime to "N/A" and return.
+        let requestPlaceId = place.id
+        currentRequestPlaceId = requestPlaceId
+
         guard let placeCoordinate = place.coordinate else {
-            print("⚠️ [TravelTimeViewModel] Cannot calculate travel time - place '\(place.name)' has no coordinates")
             travelTime = "N/A"
             travelTimes = [:]
             return
         }
-        
 
-        // Calculate travel times for all transport types
         MapKitService.shared.calculateTravelTimes(from: userCoordinate, to: placeCoordinate) { [weak self] results, error in
             DispatchQueue.main.async {
-                guard let self = self else { return }
-                if let error = error {
-                    self.travelTime = "N/A"
-                    self.travelTimes = [:]
-                } else if let results = results {
-                    var times: [MapKitService.TransportType: String] = [:]
-
-                    for (transportType, timeInterval) in results {
-                        let minutes = timeInterval / 60.0
-                        let timeString = minutes > 60 ? "60+ min" : String(format: "%.0f min", minutes)
-                        times[transportType] = timeString
-                    }
-
-                    self.travelTimes = times
-
-                    // Set the current travel time based on current transport type
-                    if let currentTime = times[self.currentTransportType] {
-                        self.travelTime = currentTime
-                    } else {
-                        // Default transport type not available - find best alternative
-                        self.selectBestAvailableTransportMode()
-                    }
-                } else {
-                    self.travelTime = "N/A"
-                    self.travelTimes = [:]
-                }
+                guard let self = self, self.currentRequestPlaceId == requestPlaceId else { return }
+                self.applyTravelTimeResults(results, error: error)
             }
         }
+    }
+
+    /// Applies API results to published state, selecting the best transport mode when needed.
+    private func applyTravelTimeResults(_ results: [MapKitService.TransportType: TimeInterval]?, error: Error?) {
+        guard let results = results, error == nil else {
+            travelTime = "N/A"
+            travelTimes = [:]
+            return
+        }
+
+        var times: [MapKitService.TransportType: String] = [:]
+        for (transportType, timeInterval) in results {
+            times[transportType] = formattedTime(from: timeInterval)
+        }
+
+        travelTimes = times
+
+        if let currentTime = times[currentTransportType] {
+            travelTime = currentTime
+        } else {
+            selectBestAvailableTransportMode()
+        }
+    }
+
+    /// Formats a time interval in seconds into a human-readable string (e.g. "15 min", "60+ min").
+    private func formattedTime(from timeInterval: TimeInterval) -> String {
+        let minutes = timeInterval / 60.0
+        return minutes > 60 ? "60+ min" : String(format: "%.0f min", minutes)
     }
     
     func switchTransportType(to transportType: MapKitService.TransportType) {

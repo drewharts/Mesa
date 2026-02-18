@@ -12,6 +12,7 @@ struct ReviewsListPopupView: View {
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @ObservedObject var reviewsVM: ProfileReviewsViewModel
+    var onViewOnMap: (() -> Void)? = nil
 
     var body: some View {
         PlaceListPopupView(
@@ -25,6 +26,7 @@ struct ReviewsListPopupView: View {
             emptyTitle: "No Reviews Yet",
             emptyMessage: "Places you've reviewed will appear here",
             loadMore: { await reviewsVM.loadMoreMyReviews() },
+            onViewOnMap: onViewOnMap,
             cardBuilder: { place, navigate in
                 PopupPlaceCard(
                     place: place,

@@ -77,7 +77,12 @@ class MapDisplayCoordinatorViewModel: ObservableObject {
         mapDisplayReviewsCount = totalCount
 
         dismissProfile()
-        showExternalReviewsOnMap = true
+
+        // Defer map trigger to allow profile dismiss animation to complete before presenting new sheet
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(350))
+            showExternalReviewsOnMap = true
+        }
     }
 
     /// Shows external user's list on the map (dismisses profile, shows map sheet).
@@ -105,7 +110,12 @@ class MapDisplayCoordinatorViewModel: ObservableObject {
         mapDisplayListPlaces = listPlaces
 
         dismissProfile()
-        showExternalListOnMap = listId
+
+        // Defer map trigger to allow profile dismiss animation to complete before presenting new sheet
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(350))
+            showExternalListOnMap = listId
+        }
     }
 
     /// Shows external user's favorites on the map (dismisses profile, shows map sheet).
@@ -140,7 +150,12 @@ class MapDisplayCoordinatorViewModel: ObservableObject {
         }
 
         dismissProfile()
-        showExternalFavoritesOnMap = true
+
+        // Defer map trigger to allow profile dismiss animation to complete before presenting new sheet
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(350))
+            showExternalFavoritesOnMap = true
+        }
     }
 
     /// Clears all map display state.

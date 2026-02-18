@@ -134,9 +134,14 @@ class PostService: ObservableObject {
     }
     
     // MARK: - External Review Media
-    
+
     func fetchExternalReviewMedia(placeId: String, reviewOffset: Int, reviewLimit: Int) async throws -> (urls: [String], nextReviewOffset: Int, hasMore: Bool) {
         return try await supabase.fetchExternalReviewMedia(placeId: placeId, reviewOffset: reviewOffset, reviewLimit: reviewLimit)
+    }
+
+    /// Deletes a specific image from external reviews for a place.
+    func deleteExternalReviewImage(placeId: String, imageUrl: String) async throws {
+        try await supabase.deleteExternalReviewImage(placeId: placeId, imageUrl: imageUrl)
     }
 }
 

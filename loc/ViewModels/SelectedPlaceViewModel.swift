@@ -30,12 +30,11 @@ class SelectedPlaceViewModel: ObservableObject {
     // MARK: - Services
 
     private let postsCacheService = ServiceContainer.shared.postsCacheService
+    private let placeRepository = ServiceContainer.shared.placeRepository
 
     // MARK: - Dependencies
 
     private let locationManager: LocationManager
-    private let mesaBackendService: MesaBackendService
-    private let placeService: PlaceService
     private weak var detailPlaceViewModel: DetailPlaceViewModel?
 
     private var cancellables = Set<AnyCancellable>()
@@ -50,17 +49,14 @@ class SelectedPlaceViewModel: ObservableObject {
         placeService: PlaceService,
         userService: UserService,
         imageService: ImageService,
-        mesaBackendService: MesaBackendService = .shared,
         detailPlaceViewModel: DetailPlaceViewModel? = nil
     ) {
         self.locationManager = locationManager
-        self.mesaBackendService = mesaBackendService
-        self.placeService = placeService
         self.detailPlaceViewModel = detailPlaceViewModel
 
         // Initialize child ViewModels
         self.selectionState = PlaceSelectionStateViewModel()
-        self.metadata = PlaceMetadataViewModel(mesaBackendService: mesaBackendService, placeService: placeService)
+        self.metadata = PlaceMetadataViewModel()
         self.creation = PlaceCreationViewModel(placeService: placeService)
 
         setupChildCallbacks()
@@ -321,8 +317,8 @@ class SelectedPlaceViewModel: ObservableObject {
     private func handlePlaceSelected(_ place: DetailPlace) {
         let currentCoordinate = locationManager.currentLocation?.coordinate
 
-        if placeNeedsCompleteDetails(place) && !selectionState.isFetchingFreshDetails {
-            fetchCompletePlaceDetails(for: place, currentLocation: currentCoordinate)
+        if PlaceDataAssembler.needsEnrichment(place) && !selectionState.isFetchingFreshDetails {
+            enrichAndSetup(place: place, currentLocation: currentCoordinate)
         } else {
             continueWithPlaceSetup(place: place, currentLocation: currentCoordinate)
         }
@@ -334,15 +330,6 @@ class SelectedPlaceViewModel: ObservableObject {
         if allowAutoPresent {
             selectionState.forcePresentDetailSheet()
         }
-    }
-
-    /// Checks if a place needs complete details (custom places never need external details).
-    private func placeNeedsCompleteDetails(_ place: DetailPlace) -> Bool {
-        if place.isCustom == true { return false }
-        let missingRating = place.rating == nil
-        let missingReviewCount = place.userRatingsTotal == nil
-        let missingCategories = place.categories == nil || place.categories?.isEmpty == true
-        return missingRating || missingReviewCount || missingCategories
     }
 
     /// Continues with place setup after data is ready.
@@ -359,28 +346,24 @@ class SelectedPlaceViewModel: ObservableObject {
         postsCacheService.loadPosts(forPlaceId: place.id.uuidString)
     }
 
-    /// Fetches complete place details when missing (skips custom places).
-    private func fetchCompletePlaceDetails(for place: DetailPlace, currentLocation: CLLocationCoordinate2D?) {
+    /// Enriches a place with backend data and continues with setup.
+    private func enrichAndSetup(place: DetailPlace, currentLocation: CLLocationCoordinate2D?) {
         guard place.isCustom != true else {
             continueWithPlaceSetup(place: place, currentLocation: currentLocation)
             return
         }
-        let placeId = place.googlePlaceId ?? place.id.uuidString
-
-        mesaBackendService.fetchPlaceDetails(placeId: placeId, source: "google") { [weak self] result in
-            guard let self = self else { return }
-
-            DispatchQueue.main.async {
-                switch result {
-                case .success(let freshPlace):
-                    let mergedPlace = self.mergePlaceData(original: place, fresh: freshPlace)
-                    self.selectionState.updatePlaceDetails(mergedPlace)
-                    self.continueWithPlaceSetup(place: mergedPlace, currentLocation: currentLocation)
-
-                case .failure:
-                    print("❌ [SelectedPlaceViewModel] Failed to get complete details, continuing with current data")
-                    self.continueWithPlaceSetup(place: place, currentLocation: currentLocation)
-                }
+        Task {
+            do {
+                let enriched = try await placeRepository.resolvePlace(
+                    googlePlaceId: place.googlePlaceId,
+                    fallbackId: place.id.uuidString,
+                    existingPlace: place
+                )
+                selectionState.updatePlaceDetails(enriched)
+                continueWithPlaceSetup(place: enriched, currentLocation: currentLocation)
+            } catch {
+                print("❌ [SelectedPlaceViewModel] Failed to get complete details, continuing with current data")
+                continueWithPlaceSetup(place: place, currentLocation: currentLocation)
             }
         }
     }
@@ -388,71 +371,29 @@ class SelectedPlaceViewModel: ObservableObject {
     /// Fetches fresh place details in background and loads posts once the real UUID is resolved.
     private func fetchFreshDetailsInBackground(for place: DetailPlace) {
         guard place.isCustom != true else { return }
-        let placeId = place.googlePlaceId ?? place.id.uuidString
-
         Task {
             do {
-                let freshPlace = try await mesaBackendService.fetchPlaceDetails(placeId: placeId)
+                let enriched = try await placeRepository.resolvePlace(
+                    googlePlaceId: place.googlePlaceId,
+                    fallbackId: place.id.uuidString,
+                    existingPlace: place
+                )
+                guard self.selectedPlace?.id == place.id else { return }
+                selectionState.markFetchComplete()
+                selectionState.updatePlaceDetails(enriched)
+                loadPostsIfReady(for: enriched)
 
-                await MainActor.run {
-                    guard self.selectedPlace?.id == place.id else { return }
-
-                    self.selectionState.markFetchComplete()
-
-                    let mergedPlace = self.mergePlaceData(original: place, fresh: freshPlace)
-                    self.selectionState.updatePlaceDetails(mergedPlace)
-
-                    self.loadPostsIfReady(for: mergedPlace)
-
-                    // If original had invalid coordinates but fresh has valid ones, animate now
-                    let originalWasInvalid = place.coordinate == nil || !place.coordinate!.isValidForNavigation
-                    let freshIsValid = mergedPlace.coordinate?.isValidForNavigation == true
-                    if originalWasInvalid && freshIsValid {
-                        self.selectionState.shouldAnimateMapToPlace = true
-                    }
-
-                    // Update database in background
-                    self.updatePlaceInDatabase(mergedPlace)
+                // Animate map if coordinates were resolved
+                let originalWasInvalid = place.coordinate == nil || !place.coordinate!.isValidForNavigation
+                let freshIsValid = enriched.coordinate?.isValidForNavigation == true
+                if originalWasInvalid && freshIsValid {
+                    selectionState.shouldAnimateMapToPlace = true
                 }
             } catch {
                 print("❌ [SelectedPlaceViewModel] fetchPlaceDetails failed for '\(place.name)': \(error.localizedDescription)")
-
-                await MainActor.run {
-                    guard self.selectedPlace?.id == place.id else { return }
-                    self.selectionState.markFetchComplete()
-                }
-            }
-        }
-    }
-
-    /// Merges fresh backend data with original place, preserving local-only properties.
-    /// Uses fresh.id (the Supabase UUID from the backend) instead of original.id,
-    /// because places created from search have a locally-generated random UUID that
-    /// won't match the Supabase UUID used to store external reviews.
-    private func mergePlaceData(original: DetailPlace, fresh: DetailPlace) -> DetailPlace {
-        var merged = fresh
-        // Keep fresh.id — it's the authoritative Supabase UUID from the backend.
-        // original.id may be a random UUID (generated when googlePlaceId fails UUID parsing).
-        merged.isCustom = original.isCustom
-
-        // Use original coordinate only if valid; otherwise use fresh coordinate
-        if let originalCoord = original.coordinate, originalCoord.isValidForNavigation {
-            merged.coordinate = original.coordinate
-        }
-        // If original is invalid/nil, keep fresh.coordinate (already in merged)
-
-        if merged.openHours == nil || merged.openHours?.isEmpty == true {
-            merged.openHours = original.openHours
-        }
-
-        return merged
-    }
-
-    /// Updates place in database.
-    private func updatePlaceInDatabase(_ place: DetailPlace) {
-        placeService.updatePlace(place: place) { error in
-            if let error = error {
-                print("❌ [SelectedPlaceViewModel] Failed to update place in database: \(error.localizedDescription)")
+                guard self.selectedPlace?.id == place.id else { return }
+                selectionState.markFetchComplete()
+                metadata.computeMetadata(for: place)
             }
         }
     }

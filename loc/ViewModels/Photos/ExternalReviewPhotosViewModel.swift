@@ -146,6 +146,34 @@ class ExternalReviewPhotosViewModel: ObservableObject {
         }
     }
 
+    /// Deletes an external review photo optimistically, then calls the backend RPC.
+    func deletePhoto(url: String) async {
+        guard let placeId = place?.id.uuidString else { return }
+
+        let removedItem = externalReviewPhotoItems[placeId]?.first { $0.url == url }
+        let removedIndex = externalReviewPhotoItems[placeId]?.firstIndex { $0.url == url }
+
+        // Optimistic removal
+        externalReviewPhotoItems[placeId]?.removeAll { $0.url == url }
+        loadedExternalPhotoURLs[placeId]?.remove(url)
+        externalSeenURLs[placeId]?.remove(url)
+        externalReviewImageURLCache[placeId]?.removeAll { $0 == url }
+
+        do {
+            try await postService.deleteExternalReviewImage(placeId: placeId, imageUrl: url)
+            print("📸 [ExternalReviewPhotosVM] Deleted external review image: \(url.prefix(60))...")
+        } catch {
+            print("📸 [ExternalReviewPhotosVM] Failed to delete image, restoring: \(error)")
+            // Re-insert at original position on failure
+            if let item = removedItem, let index = removedIndex {
+                let safeIndex = min(index, externalReviewPhotoItems[placeId]?.count ?? 0)
+                externalReviewPhotoItems[placeId]?.insert(item, at: safeIndex)
+                loadedExternalPhotoURLs[placeId]?.insert(url)
+                externalSeenURLs[placeId]?.insert(url)
+            }
+        }
+    }
+
     // MARK: - Private Methods
 
     /// Resets all external review photo state for a given place ID.
@@ -298,7 +326,7 @@ class ExternalReviewPhotosViewModel: ObservableObject {
             state.photoCursor += candidateURLs.count
             persistPaginationState(state, loadingState: .loaded)
         } else {
-            let newItems = urlsToAdd.map { PhotoItem(url: $0) }
+            let newItems = urlsToAdd.map { PhotoItem(url: $0, source: .externalReview) }
             let existingItems = self.externalReviewPhotoItems[placeId] ?? []
             self.externalReviewPhotoItems[placeId] = existingItems + newItems
 

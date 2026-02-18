@@ -17,36 +17,40 @@ struct LightweightListPopupView: View {
 
     /// Per-list pagination state management.
     @StateObject private var paginationVM = ListPopupPaginationViewModel()
+    @StateObject private var storyViewModel = ListStoryCardViewModel()
 
     let lists: [LightweightPlaceList]
     let initialListIndex: Int
+    let onViewOnMap: (() -> Void)?
 
     @ObservedObject var listsVM: ProfileListsViewModel
     @ObservedObject var reviewsVM: ProfileReviewsViewModel
 
     @State private var currentListIndex: Int
-    @State private var showOnlyUnvisited: Bool = false
     @State private var showCollaboratorsSheet: Bool = false
     @State private var showSettingsSheet: Bool = false
     @State private var showAddPlaceSheet: Bool = false
+    @State private var showPhotoSelector: Bool = false
     @State private var navigationPath = NavigationPath() // Navigation path for place detail navigation
 
     // Convenience initializer for single list (backward compatibility)
-    init(list: LightweightPlaceList, listsVM: ProfileListsViewModel, reviewsVM: ProfileReviewsViewModel, places: [LightweightPlace] = []) {
+    init(list: LightweightPlaceList, listsVM: ProfileListsViewModel, reviewsVM: ProfileReviewsViewModel, places: [LightweightPlace] = [], onViewOnMap: (() -> Void)? = nil) {
         self.lists = [list]
         self.initialListIndex = 0
         self._currentListIndex = State(initialValue: 0)
         self.listsVM = listsVM
         self.reviewsVM = reviewsVM
+        self.onViewOnMap = onViewOnMap
     }
 
     // Initializer for multiple lists with swiping
-    init(lists: [LightweightPlaceList], initialListIndex: Int, listsVM: ProfileListsViewModel, reviewsVM: ProfileReviewsViewModel) {
+    init(lists: [LightweightPlaceList], initialListIndex: Int, listsVM: ProfileListsViewModel, reviewsVM: ProfileReviewsViewModel, onViewOnMap: (() -> Void)? = nil) {
         self.lists = lists
         self.initialListIndex = initialListIndex
         self._currentListIndex = State(initialValue: initialListIndex)
         self.listsVM = listsVM
         self.reviewsVM = reviewsVM
+        self.onViewOnMap = onViewOnMap
     }
 
     // Current list being displayed (uses passed lists, not profile.lightweightPlaceLists for filtered support)
@@ -70,6 +74,11 @@ struct LightweightListPopupView: View {
     // Get all places for the current list (from profile state) - used for filtering logic
     var allPlaces: [LightweightPlace] {
         return listsVM.lightweightPlaceListPlaces[currentList.list_id] ?? []
+    }
+
+    /// Reactive place count that reflects optimistic cache updates, not the stale snapshot.
+    private var displayedPlaceCount: Int {
+        listsVM.lightweightPlaceListCounts[currentList.list_id] ?? currentList.place_count
     }
     
     var body: some View {
@@ -109,8 +118,10 @@ struct LightweightListPopupView: View {
             // Set dependencies for pagination ViewModel
             paginationVM.setDependencies(listsVM: listsVM, reviewsVM: reviewsVM)
 
-            // Load places for the current list
-            loadPlacesForCurrentList()
+            // Load places for the current list if not already fully cached
+            Task {
+                await listsVM.loadPlacesForListIfNeeded(listId: currentList.list_id, fallbackCount: currentList.place_count)
+            }
 
             // Initialize pagination state and load reviewed IDs via ViewModel
             Task {
@@ -144,104 +155,131 @@ struct LightweightListPopupView: View {
                     listId: currentList.list_id,
                     listName: currentList.name,
                     userId: userId,
-                    onPlaceAdded: { _ in
-                        // Refresh the list places when a new place is added
-                        loadPlacesForCurrentList()
+                    onPlaceAdded: { _, place in
+                        // Optimistically insert the place into the local cache
+                        listsVM.addPlaceToLightweightList(listId: currentList.list_id, place: place)
                     }
                 )
             }
+        }
+        .sheet(isPresented: $showPhotoSelector) {
+            StoryPhotoSelectorView(
+                viewModel: storyViewModel,
+                onShareInstagram: {
+                    if let userId = profile.user?.id {
+                        shareToInstagram(userId: userId)
+                    }
+                },
+                onShareGeneral: {
+                    if let userId = profile.user?.id {
+                        shareGeneral(userId: userId)
+                    }
+                }
+            )
+            .presentationDetents([.medium, .large])
+        }
+        .alert("Link Copied!", isPresented: $storyViewModel.showLinkCopiedInstruction) {
+            Button("Got it", role: .cancel) { }
+        } message: {
+            Text("Tap the sticker icon in Instagram, select \"Link\", and paste to add a clickable link to your story.")
         }
     }
 
     // MARK: - View Components
     
-    /// Header section with list name, controls, and filter toggle
+    /// Header section with list name, place count, and action buttons.
     /// Single Responsibility: Display list header UI
     private var headerSection: some View {
         VStack(spacing: 12) {
-            // Top bar with list title on left, buttons on right
-            HStack(alignment: .center) {
-                // List name and place count on the left
-                VStack(alignment: .leading, spacing: 4) {
+            // Top bar with list title and buttons aligned, place count below
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(alignment: .center) {
                     Text(currentList.name)
                         .font(.title2)
                         .fontWeight(.bold)
                         .foregroundColor(.black)
-                    
-                    Text("\(currentList.place_count) place\(currentList.place_count == 1 ? "" : "s")")
-                        .font(.caption)
-                        .foregroundColor(.gray)
-                }
-                
-                Spacer()
-                
-                // Action buttons: unified "+" menu, share, and settings
-                if let userId = profile.user?.id {
-                    HStack(alignment: .center, spacing: 12) {
-                        // Unified "+" menu for adding places or collaborators
-                        Menu {
-                            Button {
-                                showAddPlaceSheet = true
-                            } label: {
-                                Label("Add Place", systemImage: "mappin.and.ellipse")
+
+                    Spacer()
+
+                    // Action buttons: map and overflow menu
+                    if let userId = profile.user?.id {
+                        HStack(alignment: .center, spacing: 12) {
+                            // View on Map button (profile popups only)
+                            if let viewOnMap = onViewOnMap {
+                                Button(action: viewOnMap) {
+                                    Image(systemName: "map")
+                                        .font(.system(size: 20, weight: .regular))
+                                        .foregroundColor(.primary)
+                                }
+                                .frame(width: 44, height: 44)
                             }
 
-                            Button {
-                                showCollaboratorsSheet = true
-                            } label: {
-                                Label("Add Collaborator", systemImage: "person.badge.plus")
-                            }
-                        } label: {
-                            Image(systemName: "plus")
-                                .font(.system(size: 20, weight: .regular))
-                                .foregroundColor(.primary)
-                        }
-                        .frame(minWidth: 44, minHeight: 44)
+                            // Overflow menu consolidating add, share, and settings actions
+                            Menu {
+                                Button {
+                                    showAddPlaceSheet = true
+                                } label: {
+                                    Label("Add Place", systemImage: "mappin.and.ellipse")
+                                }
 
-                        // Unified share button with menu for link sharing and story cards
-                        ListShareMenuButton(
-                            list: currentList,
-                            places: allPlaces,
-                            userId: userId
-                        )
+                                Button {
+                                    showCollaboratorsSheet = true
+                                } label: {
+                                    Label("Add Collaborator", systemImage: "person.badge.plus")
+                                }
 
-                        // Settings button (only show if user is owner)
-                        if currentList.user_role == "owner" || !currentList.isSharedWithMe {
-                            Button {
-                                showSettingsSheet = true
+                                Divider()
+
+                                Button {
+                                    shareLink(userId: userId)
+                                } label: {
+                                    Label("Share Link", systemImage: "link")
+                                }
+
+                                Button {
+                                    prepareAndShowPhotoSelector()
+                                } label: {
+                                    Label("Create Story Card", systemImage: "camera.fill")
+                                }
+
+                                if currentList.user_role == "owner" || !currentList.isSharedWithMe {
+                                    Divider()
+
+                                    Button {
+                                        showSettingsSheet = true
+                                    } label: {
+                                        Label("List Settings", systemImage: "gearshape")
+                                    }
+                                }
                             } label: {
-                                Image(systemName: "gearshape")
-                                    .font(.system(size: 20, weight: .regular))
-                                    .foregroundColor(.primary)
+                                ZStack {
+                                    if storyViewModel.isGenerating {
+                                        ProgressView()
+                                            .progressViewStyle(CircularProgressViewStyle(tint: .primary))
+                                    } else {
+                                        Image(systemName: "ellipsis")
+                                            .font(.system(size: 20, weight: .regular))
+                                            .foregroundColor(.primary)
+                                    }
+                                }
+                                .frame(width: 44, height: 44)
+                                .contentShape(Rectangle())
                             }
-                            .frame(minWidth: 44, minHeight: 44)
+                            .disabled(storyViewModel.isGenerating)
                         }
                     }
                 }
+
+                Text("\(displayedPlaceCount) place\(displayedPlaceCount == 1 ? "" : "s")")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+                    .padding(.top, -8)
             }
             .padding(.horizontal, 20)
-            .padding(.top, 24)
+            .padding(.top, 12)
             
-            // Filter toggle
-            HStack {
-                Button(action: {
-                    showOnlyUnvisited.toggle()
-                }) {
-                    HStack(spacing: 8) {
-                        Image(systemName: showOnlyUnvisited ? "checkmark.circle.fill" : "circle")
-                            .foregroundColor(showOnlyUnvisited ? .blue : .gray)
-                        
-                        Text("Show only unvisited")
-                            .font(.subheadline)
-                            .foregroundColor(.primary)
-                    }
-                }
-                
-                Spacer()
-            }
-            .padding(.horizontal, 20)
         }
-        .padding(.bottom, 12)
+        .padding(.bottom, 28)
     }
     
     /// Content section displaying the current list's places.
@@ -252,7 +290,6 @@ struct LightweightListPopupView: View {
         return VStack(alignment: .leading, spacing: 0) {
             ListContentView(
                 list: currentList,
-                showOnlyUnvisited: $showOnlyUnvisited,
                 isLoadingMore: paginationState.isLoadingMore,
                 hasMorePlaces: paginationState.hasMorePlaces,
                 onLoadMore: { paginationVM.loadMoreIfNeeded(for: listId) },
@@ -268,15 +305,42 @@ struct LightweightListPopupView: View {
         }
         .frame(maxWidth: .infinity, alignment: .top)
     }
-    
-    // MARK: - Helper Methods
-    
-    /// Loads places for the current list if not already cached.
-    private func loadPlacesForCurrentList() {
-        if listsVM.lightweightPlaceListPlaces[currentList.list_id] == nil {
-            Task {
-                await listsVM.loadPlacesForList(listId: currentList.list_id)
-            }
+
+    // MARK: - Share Helpers
+
+    /// Shares the list link via system share sheet.
+    private func shareLink(userId: String) {
+        ServiceContainer.shared.placeShareService.shareLightweightList(currentList, userId: userId)
+    }
+
+    /// Prepares photo options and shows the photo selector sheet.
+    private func prepareAndShowPhotoSelector() {
+        Task {
+            await storyViewModel.preparePhotoOptions(places: allPlaces)
+            showPhotoSelector = true
+        }
+    }
+
+    /// Shares the story card to Instagram Stories.
+    private func shareToInstagram(userId: String) {
+        Task {
+            await storyViewModel.shareToInstagram(
+                list: currentList,
+                places: allPlaces,
+                userId: userId
+            )
+        }
+    }
+
+    /// Shares the story card via system share sheet.
+    private func shareGeneral(userId: String) {
+        Task {
+            await storyViewModel.shareGeneral(
+                list: currentList,
+                places: allPlaces,
+                userId: userId,
+                shareService: ServiceContainer.shared.placeShareService
+            )
         }
     }
 }
@@ -286,7 +350,6 @@ struct LightweightListPopupView: View {
 /// Single Responsibility: Render place grid with pagination, delegate loading
 struct ListContentView: View {
     let list: LightweightPlaceList
-    @Binding var showOnlyUnvisited: Bool
     let isLoadingMore: Bool
     let hasMorePlaces: Bool
     let onLoadMore: () -> Void
@@ -307,15 +370,10 @@ struct ListContentView: View {
         return listsVM.lightweightPlaceListPlaces[list.list_id] ?? []
     }
 
-    /// Returns filtered and deduplicated places based on visited status.
+    /// Returns deduplicated places for this list.
     var filteredPlaces: [LightweightPlace] {
-        let toFilter = showOnlyUnvisited ?
-            allPlaces.filter { !reviewsVM.hasVerifiedReviewedPlace(placeId: $0.place_id) } :
-            allPlaces
-
-        // Deduplicate by place_id
         var seenIds = Set<String>()
-        return toFilter.filter { place in
+        return allPlaces.filter { place in
             guard !seenIds.contains(place.place_id) else { return false }
             seenIds.insert(place.place_id)
             return true
@@ -363,16 +421,8 @@ struct ListContentView: View {
         } else {
             VStack(spacing: 8) {
                 Spacer()
-                if showOnlyUnvisited {
-                    Text("No unvisited places in this list")
-                        .foregroundColor(.gray)
-                    Text("All places have been reviewed")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                } else {
-                    Text("No places in this list")
-                        .foregroundColor(.gray)
-                }
+                Text("No places in this list")
+                    .foregroundColor(.gray)
                 Spacer()
             }
             .padding(.vertical, 30)

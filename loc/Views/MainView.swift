@@ -136,7 +136,20 @@ struct MainView: View {
                     userProfileNavigationViewModel.navigatedFromPlaceDetail = false
                 }
             }
-            .fullScreenCover(isPresented: $shouldNavigateToProfile) {
+            .fullScreenCover(isPresented: $shouldNavigateToProfile, onDismiss: {
+                // Present pending map sheets after profile is fully dismissed
+                if let listId = profileViewModel.selectedListIdForMap {
+                    PresentationService.shared.present(.list(listId: listId))
+                } else if let pending = profileViewModel.pendingMapFilter {
+                    profileViewModel.pendingMapFilter = nil
+                    switch pending {
+                    case .tiktoks: profileViewModel.showTikToksOnMap = true
+                    case .reviews: profileViewModel.showReviewsOnMap = true
+                    case .favorites: profileViewModel.showFavoritesOnMap = true
+                    case .myPlaces: profileViewModel.showMyPlacesOnMap = true
+                    }
+                }
+            }) {
                 ProfileView()
                     .environmentObject(userProfileNavigationViewModel)
                     .environmentObject(mapDisplayCoordinatorViewModel)
@@ -147,12 +160,6 @@ struct MainView: View {
                     .environmentObject(deepLinkManager)
                     .environmentObject(dataManager)
                     .environmentObject(serviceContainer)
-            }
-            .sheet(isPresented: $showSearchPage) {
-                searchPageView
-                    .presentationDetents([.large])
-                    .presentationDragIndicator(.hidden)
-                    .interactiveDismissDisabled()
             }
             .alert("No Location Found", isPresented: $deepLinkViewModel.showNoLocationAlert) {
                 Button("OK") {
@@ -427,6 +434,8 @@ struct MainView: View {
         // This prevents clearing state during fullScreenCover transitions
         guard presentationService.activeSheet == nil else { return }
         profileViewModel.selectedListIdForMap = nil
+        profileViewModel.pendingMapFilter = nil
+        profileViewModel.tikTokViewModel.disableNearbyFilter()
         // Note: Map filter clearing is now handled by MapContainerView's onChange of activeSheet
     }
 
@@ -453,6 +462,19 @@ struct MainView: View {
             Spacer()
         }
         .overlay(floatingActionButtons)
+        .sheet(isPresented: $showSearchPage, onDismiss: {
+            if appCoordinator.hasPendingKeywordPopup {
+                appCoordinator.hasPendingKeywordPopup = false
+                DispatchQueue.main.async {
+                    appCoordinator.showKeywordResultsPopup = true
+                }
+            }
+        }) {
+            searchPageView
+                .presentationDetents([.large])
+                .presentationDragIndicator(.hidden)
+                .interactiveDismissDisabled()
+        }
     }
 
     // MARK: - Floating Action Buttons

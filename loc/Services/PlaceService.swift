@@ -295,14 +295,15 @@ class PlaceService: ObservableObject {
         )
     }
 
-    /// Fetches map annotations for keyword search results (filtered by place types)
-    func fetchKeywordAnnotationsInViewport(northLat: Double, southLat: Double, eastLng: Double, westLng: Double, types: [String]) async throws -> [PlaceAnnotation] {
+    /// Fetches map annotations for keyword search results with user_ids from save sources
+    func fetchKeywordAnnotationsInViewport(northLat: Double, southLat: Double, eastLng: Double, westLng: Double, types: [String], userId: String) async throws -> [PlaceAnnotation] {
         return try await supabase.fetchKeywordAnnotationsInViewport(
             northLat: northLat,
             southLat: southLat,
             eastLng: eastLng,
             westLng: westLng,
-            types: types
+            types: types,
+            userId: userId
         )
     }
 
@@ -402,11 +403,6 @@ class PlaceService: ObservableObject {
     
     func removePlaceFromList(userId: String, listId: String, placeId: String, completion: @escaping (Error?) -> Void) {
         print("⚠️ [PlaceService] removePlaceFromList not fully implemented")
-        completion(nil)
-    }
-    
-    func updatePlace(place: DetailPlace, completion: @escaping (Error?) -> Void) {
-        print("⚠️ [PlaceService] updatePlace not fully implemented")
         completion(nil)
     }
     

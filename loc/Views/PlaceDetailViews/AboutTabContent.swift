@@ -22,6 +22,9 @@ struct AboutTabContent: View {
     /// Callback when user changes a TikTok's place association - parent should navigate to new place
     var onPlaceChanged: ((DetailPlace) -> Void)?
 
+    /// Whether a manual refresh is currently in progress
+    var isRefreshing: Bool = false
+
     /// Callback to manually refresh place data
     var onRefresh: (() -> Void)? = nil
 
@@ -37,6 +40,7 @@ struct AboutTabContent: View {
                 PlaceInfoSection(
                     place: place,
                     isDescriptionLoading: viewModel.isDescriptionLoading,
+                    isRefreshing: isRefreshing,
                     onRefresh: onRefresh
                 )
             }

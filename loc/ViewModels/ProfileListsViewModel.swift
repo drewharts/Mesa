@@ -476,6 +476,11 @@ class ProfileListsViewModel: ObservableObject {
         await loadingViewModel.loadPlacesForLists(lists)
     }
 
+    /// Loads places for a list if not cached or if the cache is partial (e.g. from an optimistic insert).
+    func loadPlacesForListIfNeeded(listId: String, fallbackCount: Int) async {
+        await loadingViewModel.loadPlacesForListIfNeeded(listId: listId, fallbackCount: fallbackCount)
+    }
+
     /// Loads places for a single list.
     func loadPlacesForList(listId: String) async {
         await loadingViewModel.loadPlacesForList(listId: listId)
