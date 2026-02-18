@@ -49,6 +49,18 @@ class MapViewModel: ObservableObject {
         set { PresentationService.shared.pendingPlaceNavigation = newValue }
     }
 
+    /// Controls how map annotations are displayed (everyone, categories, or my places).
+    @Published var annotationDisplayMode: AnnotationDisplayMode = .everyone
+
+    /// The current user's ID, used for "My Places" filtering.
+    var currentUserId: String?
+
+    /// Whether annotations show category emojis instead of profile photos.
+    var showEmojiAnnotations: Bool { annotationDisplayMode == .categories }
+
+    /// Whether only the current user's annotations should be shown.
+    var showMyPlacesOnly: Bool { annotationDisplayMode == .myPlaces }
+
     // MARK: - Computed Sheet Properties (Read from PresentationService)
 
     var showingListPopup: Bool {

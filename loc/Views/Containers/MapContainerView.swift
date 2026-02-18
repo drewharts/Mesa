@@ -19,6 +19,7 @@ struct MapContainerView: View {
     @Binding var mapPosition: MapCameraPosition
     @Binding var recenterMap: Bool
     @Binding var isCreatePlacePopupActive: Bool
+    @Binding var annotationDisplayMode: AnnotationDisplayMode
 
     let selectedPlaceViewModel: SelectedPlaceViewModel
     let detailPlaceViewModel: DetailPlaceViewModel
@@ -34,6 +35,7 @@ struct MapContainerView: View {
         mapPosition: Binding<MapCameraPosition>,
         recenterMap: Binding<Bool>,
         isCreatePlacePopupActive: Binding<Bool>,
+        annotationDisplayMode: Binding<AnnotationDisplayMode>,
         selectedPlaceViewModel: SelectedPlaceViewModel,
         detailPlaceViewModel: DetailPlaceViewModel,
         placeService: PlaceService,
@@ -48,6 +50,7 @@ struct MapContainerView: View {
         self._mapPosition = mapPosition
         self._recenterMap = recenterMap
         self._isCreatePlacePopupActive = isCreatePlacePopupActive
+        self._annotationDisplayMode = annotationDisplayMode
         self.selectedPlaceViewModel = selectedPlaceViewModel
         self.detailPlaceViewModel = detailPlaceViewModel
         self.profileViewModel = profileViewModel
@@ -73,6 +76,15 @@ struct MapContainerView: View {
         mapContent
             .ignoresSafeArea()
             .edgesIgnoringSafeArea(.all)
+            .onChange(of: annotationDisplayMode) { _, newValue in
+                mapViewModel.annotationDisplayMode = newValue
+            }
+            .onAppear {
+                mapViewModel.currentUserId = userSession.currentUserId
+            }
+            .onChange(of: userSession.currentUserId) { _, newValue in
+                mapViewModel.currentUserId = newValue
+            }
             .modifier(ExternalProfileOnChangeModifiers(
                 mapDisplayCoordinatorViewModel: mapDisplayCoordinatorViewModel,
                 selectedPlaceViewModel: selectedPlaceViewModel,
