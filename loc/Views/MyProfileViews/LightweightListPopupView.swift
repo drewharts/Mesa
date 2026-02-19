@@ -31,6 +31,7 @@ struct LightweightListPopupView: View {
     @State private var showSettingsSheet: Bool = false
     @State private var showAddPlaceSheet: Bool = false
     @State private var showPhotoSelector: Bool = false
+    @State private var showDeleteConfirmation: Bool = false
     @State private var navigationPath = NavigationPath() // Navigation path for place detail navigation
 
     // Convenience initializer for single list (backward compatibility)
@@ -183,6 +184,19 @@ struct LightweightListPopupView: View {
         } message: {
             Text("Tap the sticker icon in Instagram, select \"Link\", and paste to add a clickable link to your story.")
         }
+        .alert("Delete List", isPresented: $showDeleteConfirmation) {
+            Button("Cancel", role: .cancel) { }
+            Button("Delete", role: .destructive) {
+                Task {
+                    let result = await listsVM.deleteLightweightList(currentList)
+                    if case .success = result {
+                        presentationMode.wrappedValue.dismiss()
+                    }
+                }
+            }
+        } message: {
+            Text("Are you sure you want to delete \"\(currentList.name)\"? This action cannot be undone.")
+        }
     }
 
     // MARK: - View Components
@@ -249,6 +263,12 @@ struct LightweightListPopupView: View {
                                         showSettingsSheet = true
                                     } label: {
                                         Label("List Settings", systemImage: "gearshape")
+                                    }
+
+                                    Button(role: .destructive) {
+                                        showDeleteConfirmation = true
+                                    } label: {
+                                        Label("Delete List", systemImage: "trash")
                                     }
                                 }
                             } label: {
