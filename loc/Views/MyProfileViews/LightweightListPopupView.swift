@@ -32,6 +32,8 @@ struct LightweightListPopupView: View {
     @State private var showAddPlaceSheet: Bool = false
     @State private var showPhotoSelector: Bool = false
     @State private var showDeleteConfirmation: Bool = false
+    @State private var showDeleteError: Bool = false
+    @State private var deleteErrorMessage: String = ""
     @State private var navigationPath = NavigationPath() // Navigation path for place detail navigation
 
     // Convenience initializer for single list (backward compatibility)
@@ -189,13 +191,22 @@ struct LightweightListPopupView: View {
             Button("Delete", role: .destructive) {
                 Task {
                     let result = await listsVM.deleteLightweightList(currentList)
-                    if case .success = result {
+                    switch result {
+                    case .success:
                         presentationMode.wrappedValue.dismiss()
+                    case .failure(let error):
+                        deleteErrorMessage = error.localizedDescription
+                        showDeleteError = true
                     }
                 }
             }
         } message: {
             Text("Are you sure you want to delete \"\(currentList.name)\"? This action cannot be undone.")
+        }
+        .alert("Unable to Delete", isPresented: $showDeleteError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(deleteErrorMessage)
         }
     }
 

@@ -254,10 +254,25 @@ struct ListsInSelectionSheet: View {
         ScrollView {
             if viewModel.isLoadingInitial {
                 loadingView
-            } else if !viewModel.filteredLists.isEmpty {
-                listContent
             } else {
-                emptyStateView
+                LazyVStack(spacing: 0) {
+                    // Favorites row always visible regardless of list count
+                    FavoritesSelectionRow(
+                        isFavorited: viewModel.isFavorited,
+                        onToggle: {
+                            viewModel.toggleFavorite(place: place)
+                        }
+                    )
+
+                    Divider()
+                        .padding(.horizontal, 16)
+
+                    if !viewModel.filteredLists.isEmpty {
+                        listContent
+                    } else {
+                        emptyStateView
+                    }
+                }
             }
         }
     }
@@ -276,44 +291,33 @@ struct ListsInSelectionSheet: View {
     }
     
     private var listContent: some View {
-        LazyVStack(spacing: 0) {
-            // Favorites row pinned at top
-            FavoritesSelectionRow(
-                isFavorited: viewModel.isFavorited,
-                onToggle: {
-                    viewModel.toggleFavorite(place: place)
-                }
-            )
-
-            Divider()
-                .padding(.horizontal, 16)
-
+        Group {
             ForEach(Array(viewModel.filteredLists.enumerated()), id: \.element.id) { index, list in
-                    LightweightListSelectionRowView(
-                        list: list,
-                        place: place,
-                        isInList: viewModel.isPlace(place, in: list),
-                        onToggle: {
-                            viewModel.toggle(place: place, in: list)
-                        },
-                        listsVM: listsVM
-                    )
-                        .onAppear {
-                            Task {
-                                await viewModel.loadMoreListsIfNeeded(currentIndex: index)
-                            }
-                        }
-                }
-                
-                // Loading indicator at the bottom
-                if viewModel.isLoadingMore {
-                    HStack {
-                        Spacer()
-                        ProgressView()
-                            .padding()
-                        Spacer()
+                LightweightListSelectionRowView(
+                    list: list,
+                    place: place,
+                    isInList: viewModel.isPlace(place, in: list),
+                    onToggle: {
+                        viewModel.toggle(place: place, in: list)
+                    },
+                    listsVM: listsVM
+                )
+                .onAppear {
+                    Task {
+                        await viewModel.loadMoreListsIfNeeded(currentIndex: index)
                     }
                 }
+            }
+
+            // Loading indicator at the bottom
+            if viewModel.isLoadingMore {
+                HStack {
+                    Spacer()
+                    ProgressView()
+                        .padding()
+                    Spacer()
+                }
+            }
         }
         // Force complete rebuild when filter changes to fix LazyVStack layout issues
         .id(viewModel.showOnlyShared)
@@ -332,8 +336,9 @@ struct ListsInSelectionSheet: View {
                     .font(.caption)
                     .foregroundColor(.gray.opacity(0.7))
             } else {
-                    Text("No lists available")
-                        .foregroundColor(.gray)
+                Text("Create a list with the + button")
+                    .font(.subheadline)
+                    .foregroundColor(.gray)
             }
         }
         .padding(.vertical, 40)
