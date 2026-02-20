@@ -501,6 +501,19 @@ struct MainView: View {
                     appCoordinator.showKeywordResultsPopup = true
                 }
             }
+            if let coordinate = appCoordinator.coordinateForPlaceCreation {
+                appCoordinator.coordinateForPlaceCreation = nil
+                withAnimation(.easeOut(duration: 0.25)) {
+                    mapPosition = .region(MKCoordinateRegion(
+                        center: coordinate,
+                        span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
+                    ))
+                }
+                // After map settles, drop pin and show place detail
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                    selectedPlaceVM.selectDroppedPin(at: coordinate)
+                }
+            }
         }) {
             searchPageView
                 .presentationDetents([.large])

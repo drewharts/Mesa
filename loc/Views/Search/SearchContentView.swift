@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import CoreLocation
 
 /// SMART Component: Displays search content based on current state
 /// Single Responsibility: Coordinate display of recent searches vs search results
@@ -19,6 +20,7 @@ struct SearchContentView: View {
     let onSelectPlace: (DetailPlace) -> Void
     let onSelectUser: (ProfileData) -> Void
     let onViewAllKeywords: () -> Void
+    let onSelectCoordinate: (CLLocationCoordinate2D) -> Void
 
     // MARK: - Body
 
@@ -43,6 +45,7 @@ struct SearchContentView: View {
     }
 
     private var shouldShowSearchResults: Bool {
+        searchViewModel.parsedCoordinate != nil ||
         !searchViewModel.searchResults.isEmpty ||
         !searchViewModel.userResults.isEmpty ||
         !searchViewModel.keywordResults.isEmpty ||
@@ -92,39 +95,84 @@ struct SearchContentView: View {
     // MARK: - Search Results Section
 
     private var searchResultsSection: some View {
-        SearchResultsView(
-            placeResults: searchViewModel.searchResults,
-            userResults: searchViewModel.userResults,
-            userPhotos: searchViewModel.userPhotosSnapshot,
-            showNoPlaceFound: searchViewModel.showNoPlaceFound,
-            searchText: searchViewModel.searchText,
-            isSearching: searchViewModel.isSearching,
-            onSelectPlace: { suggestion in
-                searchViewModel.selectSuggestion(suggestion)
-            },
-            onSelectUser: { user in
-                searchViewModel.saveUserSelection(user)
-                onSelectUser(user)
-            },
-            keywordResults: searchViewModel.keywordResults,
-            matchedKeyword: searchViewModel.matchedKeyword,
-            hasMoreKeywordResults: searchViewModel.hasMoreKeywordResults,
-            isLoadingMoreKeywords: searchViewModel.isLoadingMoreKeywords,
-            onSelectKeywordPlace: { place in
-                onSelectPlace(place)
-            },
-            onLoadMoreKeywords: {
-                searchViewModel.loadMoreKeywordResults()
-            },
-            onViewAllKeywords: onViewAllKeywords,
-            aiSuggestions: searchViewModel.aiSuggestionsViewModel.suggestions,
-            isAILoading: searchViewModel.aiSuggestionsViewModel.isLoading,
-            aiError: searchViewModel.aiSuggestionsViewModel.error,
-            onSelectAIPlace: { place in
-                searchViewModel.saveAIPlaceSelection(place)
-                onSelectPlace(place)
+        VStack(spacing: 0) {
+            coordinateRow
+
+            SearchResultsView(
+                placeResults: searchViewModel.searchResults,
+                userResults: searchViewModel.userResults,
+                userPhotos: searchViewModel.userPhotosSnapshot,
+                showNoPlaceFound: searchViewModel.showNoPlaceFound,
+                searchText: searchViewModel.searchText,
+                isSearching: searchViewModel.isSearching,
+                onSelectPlace: { suggestion in
+                    searchViewModel.selectSuggestion(suggestion)
+                },
+                onSelectUser: { user in
+                    searchViewModel.saveUserSelection(user)
+                    onSelectUser(user)
+                },
+                keywordResults: searchViewModel.keywordResults,
+                matchedKeyword: searchViewModel.matchedKeyword,
+                hasMoreKeywordResults: searchViewModel.hasMoreKeywordResults,
+                isLoadingMoreKeywords: searchViewModel.isLoadingMoreKeywords,
+                onSelectKeywordPlace: { place in
+                    onSelectPlace(place)
+                },
+                onLoadMoreKeywords: {
+                    searchViewModel.loadMoreKeywordResults()
+                },
+                onViewAllKeywords: onViewAllKeywords,
+                aiSuggestions: searchViewModel.aiSuggestionsViewModel.suggestions,
+                isAILoading: searchViewModel.aiSuggestionsViewModel.isLoading,
+                aiError: searchViewModel.aiSuggestionsViewModel.error,
+                onSelectAIPlace: { place in
+                    searchViewModel.saveAIPlaceSelection(place)
+                    onSelectPlace(place)
+                }
+            )
+        }
+    }
+
+    // MARK: - Coordinate Row
+
+    /// Row displayed when the user types GPS coordinates in the search bar
+    @ViewBuilder
+    private var coordinateRow: some View {
+        if let coordinate = searchViewModel.parsedCoordinate {
+            VStack(spacing: 0) {
+                Button {
+                    onSelectCoordinate(coordinate)
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "mappin.circle.fill")
+                            .font(.title2)
+                            .foregroundColor(.red)
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Go to coordinate")
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                                .foregroundColor(.primary)
+
+                            Text(String(format: "%.4f, %.4f", coordinate.latitude, coordinate.longitude))
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+
+                        Spacer()
+
+                        Image(systemName: "arrow.right.circle")
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                }
+
+                Divider()
+                    .padding(.leading, 16)
             }
-        )
+        }
     }
 
     // MARK: - Empty State

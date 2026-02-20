@@ -178,6 +178,16 @@ class SelectedPlaceViewModel: ObservableObject {
         selectionState.selectPlace(place, shouldAnimateMap: shouldAnimateMap)
     }
 
+    /// Selects a temporary dropped pin at the given coordinate for place creation.
+    func selectDroppedPin(at coordinate: CLLocationCoordinate2D) {
+        var place = DetailPlace()
+        place.name = "Dropped Pin"
+        place.coordinate = coordinate
+        place.isCustom = true
+        selectPlace(place, shouldAnimateMap: false)
+        isDetailSheetPresented = true
+    }
+
     /// Selects a place and fetches fresh details.
     func selectPlaceAndFetchDetails(_ place: DetailPlace, shouldAnimateMap: Bool = true) {
         selectionState.selectPlaceAndFetchDetails(place, shouldAnimateMap: shouldAnimateMap)
