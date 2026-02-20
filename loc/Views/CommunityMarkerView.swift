@@ -14,6 +14,11 @@ struct CommunityMarkerView: View {
 
     @State private var isPulsing = false
 
+    /// Background circle diameter scaled from the emoji font size.
+    private var circleSize: CGFloat {
+        fontSize + 14
+    }
+
     var body: some View {
         ZStack {
             // Pulsing rings when selected
@@ -21,12 +26,27 @@ struct CommunityMarkerView: View {
                 pulsingRings
             }
 
+            // Google-style white circle background
+            Circle()
+                .fill(.white)
+                .frame(width: circleSize, height: circleSize)
+                .overlay(
+                    Circle()
+                        .strokeBorder(.white, lineWidth: 1.5)
+                )
+                .shadow(
+                    color: Color.black.opacity(0.25),
+                    radius: isSelected ? 5 : 3,
+                    x: 0,
+                    y: 1.5
+                )
+
             // Emoji marker
             Text(emoji)
-                .font(.system(size: isSelected ? fontSize * 1.3 : fontSize))
-                .shadow(color: isSelected ? Color.blue.opacity(0.8) : .black.opacity(0.3), radius: isSelected ? 8 : 2, x: 0, y: isSelected ? 0 : 1)
-                .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isSelected)
+                .font(.system(size: fontSize * 0.85))
         }
+        .scaleEffect(isSelected ? 1.2 : 1.0)
+        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isSelected)
         .onChange(of: isSelected) { _, newValue in
             if newValue {
                 isPulsing = false
@@ -51,14 +71,14 @@ struct CommunityMarkerView: View {
             // Outer pulsing ring
             Circle()
                 .stroke(Color.blue.opacity(0.4), lineWidth: 2)
-                .frame(width: 40, height: 40)
+                .frame(width: circleSize + 8, height: circleSize + 8)
                 .scaleEffect(isPulsing ? 1.6 : 1)
                 .opacity(isPulsing ? 0 : 0.8)
 
             // Inner pulsing ring
             Circle()
                 .stroke(Color.blue.opacity(0.6), lineWidth: 2)
-                .frame(width: 30, height: 30)
+                .frame(width: circleSize + 4, height: circleSize + 4)
                 .scaleEffect(isPulsing ? 1.4 : 1)
                 .opacity(isPulsing ? 0 : 0.8)
         }
