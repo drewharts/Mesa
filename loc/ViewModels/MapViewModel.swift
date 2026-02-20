@@ -52,6 +52,9 @@ class MapViewModel: ObservableObject {
     /// Controls how map annotations are displayed (everyone, categories, or my places).
     @Published var annotationDisplayMode: AnnotationDisplayMode = .everyone
 
+    /// Whether to show hybrid (satellite + labels) map style instead of standard.
+    @Published var isSatelliteMap: Bool = false
+
     /// The current user's ID, used for "My Places" filtering.
     var currentUserId: String?
 

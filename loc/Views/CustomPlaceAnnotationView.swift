@@ -38,20 +38,27 @@ struct CustomPlaceAnnotationView: View {
                     .zIndex(isSelected ? 100 : 0)
                     .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isSelected)
             } else {
-                // Fallback: show category emoji based on place type
-                Text(PlaceTypeEmoji.emoji(for: annotation.placeType))
-                    .font(.system(size: isSelected ? 32 : 24))
-                    .shadow(color: isSelected ? Color.blue.opacity(0.8) : .clear, radius: 15)
-                    .shadow(color: isSelected ? Color.blue.opacity(0.5) : .clear, radius: 25)
-                    .shadow(color: isSelected ? Color.blue.opacity(0.3) : .clear, radius: 35)
-                    .shadow(
-                        color: Color.black.opacity(isSelected ? 0.5 : 0.3),
-                        radius: isSelected ? 8 : 4,
-                        x: 0,
-                        y: isSelected ? 4 : 2
-                    )
-                    .scaleEffect(isSelected ? 1.2 : 1.0)
-                    .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isSelected)
+                // Fallback: show category emoji in a Google-style filled circle
+                ZStack {
+                    Circle()
+                        .fill(.white)
+                        .frame(width: isSelected ? 46 : 38, height: isSelected ? 46 : 38)
+                        .overlay(
+                            Circle()
+                                .strokeBorder(.white, lineWidth: 2)
+                        )
+                        .shadow(
+                            color: Color.black.opacity(0.25),
+                            radius: isSelected ? 6 : 4,
+                            x: 0,
+                            y: 2
+                        )
+
+                    Text(PlaceTypeEmoji.emoji(for: annotation.placeType))
+                        .font(.system(size: isSelected ? 24 : 19))
+                }
+                .scaleEffect(isSelected ? 1.15 : 1.0)
+                .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isSelected)
             }
         }
     }

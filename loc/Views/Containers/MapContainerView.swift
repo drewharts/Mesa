@@ -20,6 +20,7 @@ struct MapContainerView: View {
     @Binding var recenterMap: Bool
     @Binding var isCreatePlacePopupActive: Bool
     @Binding var annotationDisplayMode: AnnotationDisplayMode
+    @Binding var isSatelliteMap: Bool
 
     let selectedPlaceViewModel: SelectedPlaceViewModel
     let detailPlaceViewModel: DetailPlaceViewModel
@@ -36,6 +37,7 @@ struct MapContainerView: View {
         recenterMap: Binding<Bool>,
         isCreatePlacePopupActive: Binding<Bool>,
         annotationDisplayMode: Binding<AnnotationDisplayMode>,
+        isSatelliteMap: Binding<Bool>,
         selectedPlaceViewModel: SelectedPlaceViewModel,
         detailPlaceViewModel: DetailPlaceViewModel,
         placeService: PlaceService,
@@ -51,6 +53,7 @@ struct MapContainerView: View {
         self._recenterMap = recenterMap
         self._isCreatePlacePopupActive = isCreatePlacePopupActive
         self._annotationDisplayMode = annotationDisplayMode
+        self._isSatelliteMap = isSatelliteMap
         self.selectedPlaceViewModel = selectedPlaceViewModel
         self.detailPlaceViewModel = detailPlaceViewModel
         self.profileViewModel = profileViewModel
@@ -78,6 +81,9 @@ struct MapContainerView: View {
             .edgesIgnoringSafeArea(.all)
             .onChange(of: annotationDisplayMode) { _, newValue in
                 mapViewModel.annotationDisplayMode = newValue
+            }
+            .onChange(of: isSatelliteMap) { _, newValue in
+                mapViewModel.isSatelliteMap = newValue
             }
             .onAppear {
                 mapViewModel.currentUserId = userSession.currentUserId

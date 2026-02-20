@@ -31,6 +31,7 @@ class ListStoryCardViewModel: ObservableObject {
     @Published var showPhotoSelector: Bool = false
 
     private let imageCacheService = ImageCacheService.shared
+    private let imageService = ImageService.shared
     private let tikTokMetadataCache = TikTokMetadataCache.shared
     private let instagramService = InstagramStoriesService()
     private let mapSnapshotService = MapSnapshotService()
@@ -162,6 +163,9 @@ class ListStoryCardViewModel: ObservableObject {
             // 8. Show instruction to add link sticker
             showLinkCopiedInstruction = true
 
+            // 9. Fire-and-forget: upload story card as list cover for rich link previews
+            uploadListCover(listId: list.list_id, image: storyImage)
+
         } catch {
             self.error = error.localizedDescription
         }
@@ -232,6 +236,9 @@ class ListStoryCardViewModel: ObservableObject {
             // 7. Share the image with the universal link
             let shareText = "Check out my list \"\(list.name)\" on Mesa!"
             shareService.shareImage(storyImage, with: shareText)
+
+            // 8. Fire-and-forget: upload story card as list cover for rich link previews
+            uploadListCover(listId: list.list_id, image: storyImage)
 
         } catch {
             self.error = error.localizedDescription
@@ -317,6 +324,17 @@ class ListStoryCardViewModel: ObservableObject {
 
         let loadedImages = await imageCacheService.loadImages(from: [url.absoluteString])
         return loadedImages[url.absoluteString]
+    }
+
+    /// Uploads the story card image as a list cover for rich link previews (fire-and-forget).
+    private func uploadListCover(listId: String, image: UIImage) {
+        Task {
+            do {
+                _ = try await imageService.uploadListCoverImage(listId: listId, image: image)
+            } catch {
+                print("⚠️ [ListStoryCardViewModel] Failed to upload list cover: \(error.localizedDescription)")
+            }
+        }
     }
 
     /// Renders the story card view to a UIImage using ImageRenderer.

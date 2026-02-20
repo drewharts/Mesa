@@ -49,10 +49,31 @@ class SearchViewModel: ObservableObject {
     private let recentSearchesService = RecentSearchesService.shared
     
     // MARK: - Computed Properties
-    
+
     /// Recent selections (places & users) - delegated to service (no local state duplication)
     var recentSelections: [RecentSelection] {
         recentSearchesService.getRecentSelections()
+    }
+
+    /// Parses searchText as GPS coordinates (e.g. "40.71, -74.00" / "40.71,-74.00" / "40.71 -74.00")
+    var parsedCoordinate: CLLocationCoordinate2D? {
+        let trimmed = searchText.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return nil }
+
+        // Split on comma (with optional spaces) or whitespace between two numbers
+        // Matches: "40.71, -74.00", "40.71,-74.00", "40.71 -74.00"
+        let pattern = #"^(-?\d+\.?\d*)[,\s]+(-?\d+\.?\d*)$"#
+        guard let regex = try? NSRegularExpression(pattern: pattern),
+              let match = regex.firstMatch(in: trimmed, range: NSRange(trimmed.startIndex..., in: trimmed)),
+              let latRange = Range(match.range(at: 1), in: trimmed),
+              let lonRange = Range(match.range(at: 2), in: trimmed),
+              let lat = Double(trimmed[latRange]),
+              let lon = Double(trimmed[lonRange]) else {
+            return nil
+        }
+
+        guard lat >= -90, lat <= 90, lon >= -180, lon <= 180 else { return nil }
+        return CLLocationCoordinate2D(latitude: lat, longitude: lon)
     }
     
     // MARK: - Private State

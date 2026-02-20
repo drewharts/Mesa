@@ -229,6 +229,7 @@ struct MapView: View {
         ZStack {
             MapReader { mapProxy in
                 mapContentView
+                .mapStyle(mapViewModel.isSatelliteMap ? .hybrid : .standard)
                 .mapControlVisibility(.hidden)
                 .ignoresSafeArea()
                 .onMapCameraChange(frequency: .onEnd) { context in

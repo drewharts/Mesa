@@ -7,6 +7,7 @@
 
 import SwiftUI
 import Combine
+import CoreLocation
 import MapKit
 
 /// ViewModel for the full-screen search page
@@ -23,6 +24,7 @@ class SearchPageViewModel: ObservableObject {
     var onPlaceSelected: ((DetailPlace) -> Void)?
     var onUserSelected: ((ProfileData) -> Void)?
     var onViewAllKeywords: ((String, [String]) -> Void)?
+    var onCoordinateSelected: ((CLLocationCoordinate2D) -> Void)?
 
     // MARK: - Dependencies
 
@@ -97,6 +99,11 @@ class SearchPageViewModel: ObservableObject {
 
         // Notify callback
         onUserSelected?(user)
+    }
+
+    /// Handle coordinate selection from search results
+    func handleCoordinateSelection(_ coordinate: CLLocationCoordinate2D) {
+        onCoordinateSelected?(coordinate)
     }
 
     /// Handle view all keywords action

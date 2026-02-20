@@ -427,12 +427,38 @@ class ImageService {
         return publicURL.absoluteString
     }
 
-    // Function to upload an image and update the PlaceList's image field
-    func uploadImageAndUpdatePlaceList(userId: String, placeList: PlaceList, image: UIImage, completion: @escaping (Error?) -> Void) {
-        // TODO: Implement with Supabase Storage
-        print("⚠️ [ImageService] uploadImageAndUpdatePlaceList - Not yet implemented")
-        let error = NSError(domain: "ImageService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Not yet implemented"])
-        completion(error)
+    /// Uploads a cover image for a list to Supabase Storage and updates the place_lists.image column.
+    func uploadListCoverImage(listId: String, image: UIImage) async throws -> URL {
+        let supabase = await SupabaseManager.shared
+
+        guard let imageData = compressImageTo1MB(image) ?? image.jpegData(compressionQuality: 0.8) else {
+            throw NSError(domain: "ImageService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to convert image to JPEG data"])
+        }
+
+        let filePath = "\(listId)/cover.jpg"
+        let bucket = await supabase.storage.from("list_covers")
+
+        _ = try await bucket.upload(
+            filePath,
+            data: imageData,
+            options: FileOptions(
+                cacheControl: "3600",
+                contentType: "image/jpeg",
+                upsert: true
+            )
+        )
+
+        let publicURL = try bucket.getPublicURL(path: filePath)
+
+        // Update the place_lists.image column with the public URL
+        try await supabase.client
+            .from("place_lists")
+            .update(["image": publicURL.absoluteString])
+            .eq("id", value: listId)
+            .execute()
+
+        print("✅ [ImageService] Uploaded list cover for \(listId): \(publicURL.absoluteString)")
+        return publicURL
     }
 
     func uploadImagesForComment(comment: Comment, images: [UIImage], completion: @escaping (Result<[String], Error>) -> Void) {

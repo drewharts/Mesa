@@ -27,6 +27,9 @@ class AppCoordinator: ObservableObject {
     /// Used for viewport-based keyword search filtering
     @Published var currentMapRegion: MKCoordinateRegion?
 
+    /// Coordinate from search input — triggers map navigation and create-place popup
+    @Published var coordinateForPlaceCreation: CLLocationCoordinate2D?
+
     // MARK: - Keyword Results Popup Trigger
     /// Used to trigger keyword results popup from search (SearchContainerView -> MainView -> MapContainerView)
     @Published var showKeywordResultsPopup: Bool = false

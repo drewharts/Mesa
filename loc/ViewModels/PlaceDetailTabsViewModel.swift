@@ -51,6 +51,8 @@ class PlaceDetailTabsViewModel: ObservableObject {
     @Published var placeName: String = "Loading..."
     @Published var restaurantType: String?
     @Published var isCustomPlace: Bool = false
+    /// Indicates the place is a temporary dropped pin that has not been saved to the database.
+    @Published var isDroppedPin: Bool = false
     @Published var placeRating: Double = 0.0
     @Published var hasPosts: Bool = false
     @Published var postCount: Int = 0
@@ -426,6 +428,7 @@ class PlaceDetailTabsViewModel: ObservableObject {
         currentPlace = place
         placeName = place?.name ?? "Loading..."
         isCustomPlace = place?.isCustom == true
+        isDroppedPin = place?.isCustom == true && place?.createdAt == nil
 
         if let place = place {
             // For custom places, view shows "Created by [photo]" instead of type
