@@ -53,7 +53,11 @@ struct SearchPageView: View {
                         isSearchFocused = false
                         viewModel.handleUserSelection(user)
                     },
-                    onViewAllKeywords: viewModel.handleViewAllKeywords
+                    onViewAllKeywords: viewModel.handleViewAllKeywords,
+                    onSelectCoordinate: { coordinate in
+                        isSearchFocused = false
+                        viewModel.handleCoordinateSelection(coordinate)
+                    }
                 )
                 .padding(.top, 8)
             }

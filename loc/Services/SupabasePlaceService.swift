@@ -79,7 +79,6 @@ class SupabasePlaceService: ObservableObject {
         let city: String?
         let description: String?
         let location: String? // PostGIS geometry as WKT string
-        let geohash: String?
         let rating: Double?
         let rating_count: Int?
         let price_level: String?
@@ -120,7 +119,6 @@ class SupabasePlaceService: ObservableObject {
             city: place.city,
             description: place.description,
             location: locationString,
-            geohash: nil, // Not available in DetailPlace
             rating: place.rating,
             rating_count: place.userRatingsTotal,
             price_level: place.priceLevel,
@@ -1918,7 +1916,6 @@ struct PlaceRecord: Codable {
     let city: String?
     let description: String?
     let location: LocationData? // PostGIS geometry as custom struct
-    let geohash: String?
     let rating: Double?
     let rating_count: Int?
     let price_level: String?
@@ -1944,7 +1941,7 @@ struct PlaceRecord: Codable {
     let is_custom: Bool?
     
     enum CodingKeys: String, CodingKey {
-        case id, name, address, city, description, location, geohash, rating, rating_count, price_level
+        case id, name, address, city, description, location, rating, rating_count, price_level
         case categories, phone, website, menu_url, instagram, twitter, google_places_id, mapbox_id
         case fid, cid, thumbnail_url, photo_urls, open_hours, reservable
         case serves_breakfast, serves_lunch, serves_dinner, source, updated_at, is_custom
@@ -1959,7 +1956,6 @@ struct PlaceRecord: Codable {
         city = try container.decodeIfPresent(String.self, forKey: .city)
         description = try container.decodeIfPresent(String.self, forKey: .description)
         location = try container.decodeIfPresent(LocationData.self, forKey: .location)
-        geohash = try container.decodeIfPresent(String.self, forKey: .geohash)
         rating = try container.decodeIfPresent(Double.self, forKey: .rating)
         rating_count = try container.decodeIfPresent(Int.self, forKey: .rating_count)
         price_level = try container.decodeIfPresent(String.self, forKey: .price_level)

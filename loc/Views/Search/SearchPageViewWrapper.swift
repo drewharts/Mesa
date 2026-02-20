@@ -114,6 +114,15 @@ private struct SearchPageViewContent: View {
                     showSearchPage = false
                 }
 
+                viewModel.onCoordinateSelected = { coordinate in
+                    appCoordinator.coordinateForPlaceCreation = coordinate
+                    var transaction = Transaction()
+                    transaction.disablesAnimations = true
+                    withTransaction(transaction) {
+                        showSearchPage = false
+                    }
+                }
+
                 // Set map region for viewport-based searches
                 viewModel.setMapRegion(appCoordinator.currentMapRegion)
             }

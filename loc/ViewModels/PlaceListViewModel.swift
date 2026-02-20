@@ -84,17 +84,18 @@ class PlaceListViewModel: ObservableObject, Identifiable {
         }.resume()
     }
 
+    /// Uploads a photo as the list cover image and reloads lists on success.
     func addPhotoToList(image: UIImage) {
-        self.image = image // Set the image in the view model
+        self.image = image
 
-        // Upload image to storage
-        imageService.uploadImageAndUpdatePlaceList(userId: userId, placeList: placeList, image: image) { [weak self] error in
-            if let error = error {
-                print("Error adding photo to list: \(error.localizedDescription)")
-                // Handle error (e.g., display an error message to the user)
-            } else {
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                _ = try await imageService.uploadListCoverImage(listId: placeList.id.uuidString, image: image)
                 print("Photo added to list successfully")
-                self?.loadPlaceLists() // Reload the list to get the new image URL
+                self.loadPlaceLists()
+            } catch {
+                print("Error adding photo to list: \(error.localizedDescription)")
             }
         }
     }

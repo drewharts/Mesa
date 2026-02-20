@@ -27,6 +27,7 @@ struct PlaceDetailTabsView: View {
     // MARK: - Action Callbacks (passed from parent)
     let onAddToList: () -> Void
     let onAddReview: () -> Void
+    var onCreatePlace: (() -> Void)?
 
     /// Callback when user changes a TikTok's place association - parent should navigate to new place
     var onPlaceChanged: ((DetailPlace) -> Void)?
@@ -112,21 +113,34 @@ struct PlaceDetailTabsView: View {
                     .foregroundColor(.black)
             }
             .buttonStyle(.plain)
-            
-            Spacer()
-            
-            Button(action: onAddToList) {
-                Image(systemName: viewModel.isPlaceInList ? "bookmark.fill" : "bookmark")
-                    .font(.title3)
-                    .foregroundColor(.gray)
-                    .frame(width: 32, height: 32)
-            }
 
-            Button(action: viewModel.sharePlace) {
-                Image(systemName: "square.and.arrow.up")
-                    .font(.title3)
-                    .foregroundColor(.gray)
-                    .frame(width: 32, height: 32)
+            Spacer()
+
+            if viewModel.isDroppedPin {
+                Button(action: { onCreatePlace?() }) {
+                    Text("Create Place")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(Color.blue)
+                        .cornerRadius(20)
+                }
+            } else {
+                Button(action: onAddToList) {
+                    Image(systemName: viewModel.isPlaceInList ? "bookmark.fill" : "bookmark")
+                        .font(.title3)
+                        .foregroundColor(.gray)
+                        .frame(width: 32, height: 32)
+                }
+
+                Button(action: viewModel.sharePlace) {
+                    Image(systemName: "square.and.arrow.up")
+                        .font(.title3)
+                        .foregroundColor(.gray)
+                        .frame(width: 32, height: 32)
+                }
             }
         }
         .padding(.bottom, 3)

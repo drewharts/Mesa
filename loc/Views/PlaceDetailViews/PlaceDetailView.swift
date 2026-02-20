@@ -19,6 +19,7 @@ struct PlaceDetailView: View {
     @State private var showNoPhoneNumberAlert = false
     @State private var showListSelection = false
     @State private var showCreatePost = false
+    @State private var showCreatePlace = false
     @State private var listSelectionViewModel: PlaceListSelectionViewModel?
     @State private var tabsViewModel: PlaceDetailTabsViewModel?
 
@@ -71,6 +72,9 @@ struct PlaceDetailView: View {
         }
         .sheet(isPresented: $showCreatePost) {
             createPostSheetContent
+        }
+        .sheet(isPresented: $showCreatePlace) {
+            createPlaceSheetContent
         }
         .onChange(of: showListSelection) { _, newValue in
             handleListSelectionChanged(newValue)
@@ -183,6 +187,7 @@ struct PlaceDetailView: View {
             onPhotoTapped: handlePhotoTapped,
             onAddToList: { showListSelection = true },
             onAddReview: { showCreatePost = true },
+            onCreatePlace: { showCreatePlace = true },
             onPlaceChanged: handlePlaceNavigation
         )
         .environmentObject(userProfileNavigationViewModel)
@@ -239,6 +244,29 @@ struct PlaceDetailView: View {
             .presentationDragIndicator(.visible)
         } else {
             Text("No place selected")
+        }
+    }
+
+    /// Content for the create place sheet (shown for dropped pin coordinates).
+    @ViewBuilder
+    private var createPlaceSheetContent: some View {
+        if let coordinate = selectedPlaceVM.selectedPlace?.coordinate {
+            CreatePlacePopupView(coordinate: coordinate) { name, description in
+                if let userId = profile.user?.id {
+                    let generatedId = UUID().uuidString
+                    selectedPlaceVM.createNewPlace(
+                        idString: generatedId,
+                        name: name,
+                        description: description,
+                        coordinate: coordinate,
+                        userId: userId,
+                        profileVM: profile,
+                        detailPlaceVM: detailPlaceViewModel
+                    )
+                }
+            }
+            .presentationDetents([.medium])
+            .presentationDragIndicator(.visible)
         }
     }
 
