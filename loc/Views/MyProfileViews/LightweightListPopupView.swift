@@ -34,6 +34,10 @@ struct LightweightListPopupView: View {
     @State private var showDeleteConfirmation: Bool = false
     @State private var showDeleteError: Bool = false
     @State private var deleteErrorMessage: String = ""
+    @State private var showRenameAlert: Bool = false
+    @State private var renameText: String = ""
+    @State private var showRenameError: Bool = false
+    @State private var renameErrorMessage: String = ""
     @State private var navigationPath = NavigationPath() // Navigation path for place detail navigation
 
     // Convenience initializer for single list (backward compatibility)
@@ -208,6 +212,28 @@ struct LightweightListPopupView: View {
         } message: {
             Text(deleteErrorMessage)
         }
+        .alert("Rename List", isPresented: $showRenameAlert) {
+            TextField("List name", text: $renameText)
+            Button("Cancel", role: .cancel) { }
+            Button("Save") {
+                let trimmed = renameText.trimmingCharacters(in: .whitespaces)
+                guard !trimmed.isEmpty else { return }
+                Task {
+                    let result = await listsVM.renameList(currentList, newName: trimmed)
+                    if case .failure(let error) = result {
+                        renameErrorMessage = error.localizedDescription
+                        showRenameError = true
+                    }
+                }
+            }
+        } message: {
+            Text("Enter a new name for this list.")
+        }
+        .alert("Unable to Rename", isPresented: $showRenameError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(renameErrorMessage)
+        }
     }
 
     // MARK: - View Components
@@ -269,6 +295,13 @@ struct LightweightListPopupView: View {
 
                                 if currentList.user_role == "owner" || !currentList.isSharedWithMe {
                                     Divider()
+
+                                    Button {
+                                        renameText = currentList.name
+                                        showRenameAlert = true
+                                    } label: {
+                                        Label("Rename List", systemImage: "pencil")
+                                    }
 
                                     Button {
                                         showSettingsSheet = true
