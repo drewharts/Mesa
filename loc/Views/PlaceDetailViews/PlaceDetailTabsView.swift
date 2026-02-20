@@ -238,6 +238,7 @@ struct PlaceDetailTabsView: View {
             AboutTabContent(
                 viewModel: viewModel.aboutTabViewModel,
                 onPhotoTapped: onPhotoTapped,
+                onAddPost: onAddReview,
                 onPlaceChanged: onPlaceChanged,
                 isRefreshing: viewModel.isRefreshing,
                 onRefresh: viewModel.manualRefresh

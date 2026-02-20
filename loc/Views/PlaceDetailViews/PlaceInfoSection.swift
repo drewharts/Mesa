@@ -13,6 +13,7 @@ struct PlaceInfoSection: View {
     let isDescriptionLoading: Bool
     var isRefreshing: Bool = false
     var onRefresh: (() -> Void)? = nil
+    var onAddPost: (() -> Void)? = nil
 
     @State private var showingMenu = false
     @State private var showingWebsite = false
@@ -104,10 +105,18 @@ struct PlaceInfoSection: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.bottom, 12)
 
-                // Action buttons (Menu, Website) - horizontal scroll if both present
-                if hasActionButtons {
+                // Action buttons row - horizontal scroll
+                if hasActionButtons || onAddPost != nil {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 10) {
+                            // Post button
+                            if let onAddPost {
+                                Button(action: onAddPost) {
+                                    actionButtonLabel(icon: "plus", text: "Post")
+                                }
+                                .buttonStyle(.plain)
+                            }
+
                             // Menu button
                             if let menuUrl = place.menuUrl, !menuUrl.isEmpty, let url = URL(string: menuUrl) {
                                 Button {

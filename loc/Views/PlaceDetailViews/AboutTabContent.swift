@@ -19,6 +19,9 @@ struct AboutTabContent: View {
     
     let onPhotoTapped: ([String], Int) -> Void  // URLs instead of UIImages
 
+    /// Callback when user taps the "Share something..." button to create a post
+    let onAddPost: () -> Void
+
     /// Callback when user changes a TikTok's place association - parent should navigate to new place
     var onPlaceChanged: ((DetailPlace) -> Void)?
 
@@ -41,7 +44,8 @@ struct AboutTabContent: View {
                     place: place,
                     isDescriptionLoading: viewModel.isDescriptionLoading,
                     isRefreshing: isRefreshing,
-                    onRefresh: onRefresh
+                    onRefresh: onRefresh,
+                    onAddPost: onAddPost
                 )
             }
             
@@ -149,7 +153,8 @@ struct AboutTabContent: View {
         viewModel: aboutVM,
         onPhotoTapped: { photos, index in
             print("Tapped photo at index: \(index)")
-        }
+        },
+        onAddPost: { print("Add post tapped") }
     )
     .environmentObject(profileVM)
     .environmentObject(userSession)
