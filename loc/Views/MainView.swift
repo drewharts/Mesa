@@ -42,6 +42,7 @@ struct MainView: View {
     @State private var isCreatePlacePopupActive = false
     @State private var mapPosition = MapCameraPosition.automatic
     @State private var annotationDisplayMode: AnnotationDisplayMode = .everyone
+    @State private var isSatelliteMap: Bool = false
 
     /// Convenience accessor for TikTok view model.
     private var tikTokVM: ProfileTikTokViewModel { profileViewModel.tikTokViewModel }
@@ -84,6 +85,7 @@ struct MainView: View {
                     recenterMap: $recenterMap,
                     isCreatePlacePopupActive: $isCreatePlacePopupActive,
                     annotationDisplayMode: $annotationDisplayMode,
+                    isSatelliteMap: $isSatelliteMap,
                     selectedPlaceViewModel: selectedPlaceVM,
                     detailPlaceViewModel: detailPlaceViewModel,
                     placeService: serviceContainer.placeService,
@@ -465,6 +467,18 @@ struct MainView: View {
                         }
                     } label: {
                         Image(systemName: annotationDisplayMode.iconName)
+                            .foregroundColor(.secondary)
+                            .frame(width: 36, height: 36)
+                            .background(.ultraThinMaterial)
+                            .clipShape(Circle())
+                            .overlay(Circle().stroke(Color.gray.opacity(0.3), lineWidth: 1))
+                            .shadow(radius: 4)
+                    }
+
+                    Button(action: {
+                        isSatelliteMap.toggle()
+                    }) {
+                        Image(systemName: isSatelliteMap ? "globe.americas.fill" : "globe.americas")
                             .foregroundColor(.secondary)
                             .frame(width: 36, height: 36)
                             .background(.ultraThinMaterial)
