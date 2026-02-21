@@ -1,5 +1,5 @@
 //
-//  TikTokNoPlacesFoundView.swift
+//  NoPlacesFoundView.swift
 //  loc
 //
 //  Created by Andrew Hartsfield II on 1/29/25.
@@ -7,14 +7,14 @@
 
 import SwiftUI
 
-struct TikTokNoPlacesFoundView: View {
-    let tikTokUrl: String
+struct NoPlacesFoundView: View {
+    let contentUrl: String
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @Environment(\.presentationMode) var presentationMode
 
-    /// Convenience accessor for TikTok view model.
-    private var tikTokVM: ProfileTikTokViewModel { profile.tikTokViewModel }
+    /// Convenience accessor for external content view model.
+    private var externalContentVM: ProfileExternalContentViewModel { profile.externalContentViewModel }
 
     @State private var userComment: String = ""
     @State private var showingCommentDialog = false
@@ -34,8 +34,8 @@ struct TikTokNoPlacesFoundView: View {
             Spacer()
         }
         .onAppear {
-            tikTokVM.isProcessingTikTok = false
-            tikTokVM.isWaitingForPlaceDetail = false
+            externalContentVM.isProcessingContent = false
+            externalContentVM.isWaitingForPlaceDetail = false
         }
         .alert("Help Improve Detection", isPresented: $showingCommentDialog) {
             TextField("Describe the place that should have been detected...", text: $userComment, axis: .vertical)
@@ -44,7 +44,7 @@ struct TikTokNoPlacesFoundView: View {
                 userComment = ""
             }
             Button("Submit Flag") {
-                let success = tikTokVM.submitNoPlacesFoundFlag(tikTokUrl: tikTokUrl, userComment: userComment)
+                let success = externalContentVM.submitNoPlacesFoundFlag(contentUrl: contentUrl, userComment: userComment)
                 if success {
                     isSubmitting = true
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
@@ -59,7 +59,7 @@ struct TikTokNoPlacesFoundView: View {
             }
             .disabled(isSubmitting)
         } message: {
-            Text("Help us understand what place should have been detected from this TikTok video.")
+            Text("Help us understand what place should have been detected from this video.")
         }
         .alert("Success", isPresented: $showingSuccessAlert) {
             Button("OK") {
@@ -74,8 +74,8 @@ struct TikTokNoPlacesFoundView: View {
             Text(errorMessage)
         }
         .sheet(isPresented: $showingCorrectionSheet) {
-            TikTokPlaceCorrectionSheet(
-                mode: .newAssignment(tikTokUrl: tikTokUrl),
+            PlaceCorrectionSheet(
+                mode: .newAssignment(contentUrl: contentUrl),
                 onPlaceChanged: { place in
                     profile.clearNoPlacesFound()
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
@@ -109,7 +109,7 @@ struct TikTokNoPlacesFoundView: View {
                     .fontWeight(.semibold)
                     .foregroundColor(.primary)
 
-                Text("We couldn't identify a place in this TikTok")
+                Text("We couldn't identify a place in this video")
                     .font(.subheadline)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)

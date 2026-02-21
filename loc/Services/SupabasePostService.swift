@@ -73,7 +73,7 @@ class SupabasePostService: ObservableObject {
     
     // MARK: - Fetch Place Posts
     
-    func fetchPlacePosts(placeId: String, latestOnly: Bool = false) async throws -> ([PlacePost], [TikTokVideo]) {
+    func fetchPlacePosts(placeId: String, latestOnly: Bool = false) async throws -> ([PlacePost], [ExternalVideo]) {
         // Convert placeId to UUID to avoid function ambiguity in Postgres
         guard let placeUUID = UUID(uuidString: placeId) else {
             print("❌ [SupabasePostService] Invalid place ID format: \(placeId)")
@@ -86,26 +86,26 @@ class SupabasePostService: ObservableObject {
             .execute()
             .value
         
-        // Fetch TikToks separately
-        struct TikTokArrayRecord: Codable {
+        // Fetch external videos separately
+        struct ExternalVideoArrayRecord: Codable {
             let tiktok_videos: [AnyCodable]?
         }
-        
-        let tiktokResponse: [TikTokArrayRecord] = try await supabase.client
+
+        let externalVideoResponse: [ExternalVideoArrayRecord] = try await supabase.client
             .rpc("get_place_tiktoks", params: ["p_place_id": placeUUID])
             .execute()
             .value
-        
-        var tiktokVideos: [TikTokVideo] = []
 
-        if let firstRecord = tiktokResponse.first,
-           let tiktokArray = firstRecord.tiktok_videos {
-            let tiktokData = tiktokArray.compactMap { $0.value as? [String: Any] }
-            tiktokVideos = parseTikTokData(tiktokData)
+        var externalVideos: [ExternalVideo] = []
+
+        if let firstRecord = externalVideoResponse.first,
+           let externalVideoArray = firstRecord.tiktok_videos {
+            let externalVideoData = externalVideoArray.compactMap { $0.value as? [String: Any] }
+            externalVideos = parseExternalVideoData(externalVideoData)
         }
 
         if response.isEmpty {
-            return ([], tiktokVideos)
+            return ([], externalVideos)
         }
         
         // Convert records to PlacePost objects
@@ -131,10 +131,10 @@ class SupabasePostService: ObservableObject {
         }
         
         if latestOnly && !posts.isEmpty {
-            return ([posts[0]], tiktokVideos)
+            return ([posts[0]], externalVideos)
         }
-        
-        return (posts, tiktokVideos)
+
+        return (posts, externalVideos)
     }
     
     // MARK: - Fetch User Posts
@@ -309,36 +309,37 @@ class SupabasePostService: ObservableObject {
         return Date()
     }
     
-    /// Parses TikTok data from the database into TikTokVideo objects.
-    /// The database returns basic info; full metadata is fetched on-demand via TikTokMetadataCache.
-    private func parseTikTokData(_ tiktokData: [[String: Any]]) -> [TikTokVideo] {
-        return tiktokData.compactMap { dict -> TikTokVideo? in
+    /// Parses external video data from the database into ExternalVideo objects.
+    /// The database returns basic info; full metadata is fetched on-demand via ExternalMetadataCache.
+    private func parseExternalVideoData(_ videoData: [[String: Any]]) -> [ExternalVideo] {
+        return videoData.compactMap { dict -> ExternalVideo? in
             guard let videoUrl = dict["url"] as? String, !videoUrl.isEmpty else {
                 return nil
             }
 
             // Extract video ID from URL or use external_place_id as fallback
-            let videoId = extractVideoIdFromTikTokURL(videoUrl) ?? (dict["external_place_id"] as? String ?? UUID().uuidString)
+            let videoId = extractVideoIdFromURL(videoUrl) ?? (dict["external_place_id"] as? String ?? UUID().uuidString)
 
-            // Build author from saved_by fields (the user who saved this TikTok)
+            // Build author from saved_by fields (the user who saved this video)
             let savedByFirstName = dict["saved_by_first_name"] as? String ?? ""
             let savedByLastName = dict["saved_by_last_name"] as? String ?? ""
             let displayName = [savedByFirstName, savedByLastName].filter { !$0.isEmpty }.joined(separator: " ")
 
-            let author = TikTokAuthor(
+            let author = ExternalVideoAuthor(
                 displayName: displayName,
                 url: "",
                 username: ""
             )
 
             let detectedContentType = videoUrl.contains("/photo/") ? "photo" : "video"
-            var video = TikTokVideo(
+            var video = ExternalVideo(
                 videoID: videoId,
                 url: videoUrl,
                 title: nil,
                 caption: nil,
                 embedHTML: "",
-                thumbnailURL: "", // Fetched on-demand via TikTokMetadataCache
+                thumbnailURL: "", // Fetched on-demand via ExternalMetadataCache
+
                 author: author,
                 hashtags: [],
                 createdAt: dict["added_at"] as? String ?? "",
@@ -353,12 +354,15 @@ class SupabasePostService: ObservableObject {
         }
     }
 
-    /// Extracts video ID from a TikTok URL.
-    private func extractVideoIdFromTikTokURL(_ url: String) -> String? {
+    /// Extracts video ID from an external video URL (TikTok or Instagram).
+    private func extractVideoIdFromURL(_ url: String) -> String? {
         let patterns = [
             "/photo/([0-9]+)",
             "/video/([0-9]+)",
-            "@[^/]+/video/([0-9]+)"
+            "@[^/]+/video/([0-9]+)",
+            "/reel/([\\w-]+)",
+            "/reels/([\\w-]+)",
+            "/p/([\\w-]+)"
         ]
 
         for pattern in patterns {

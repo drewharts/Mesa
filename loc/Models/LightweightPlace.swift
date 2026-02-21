@@ -8,8 +8,8 @@ struct LightweightPlace: Codable, Identifiable, Equatable {
     let latitude: Double?
     let longitude: Double?
     let latest_review_photo: String?
-    let external_place_id: String? // UUID from external_places table (row ID, unique per TikTok video)
-    let tiktok_url: String? // TikTok video URL from external_places table
+    let external_place_id: String? // UUID from external_places table (row ID, unique per external video)
+    let content_url: String? // External video URL from external_places table
 
     // MARK: - Added By Info (for collaborative lists)
     // These fields are only populated when fetching places from a collaborative list
@@ -27,7 +27,7 @@ struct LightweightPlace: Codable, Identifiable, Equatable {
         case longitude
         case latest_review_photo
         case external_place_id
-        case tiktok_url
+        case content_url = "tiktok_url"
         case added_by_user_id
         case added_by_name
         case added_by_photo_url
@@ -42,7 +42,7 @@ struct LightweightPlace: Codable, Identifiable, Equatable {
         longitude: Double? = nil,
         latest_review_photo: String?,
         external_place_id: String? = nil,
-        tiktok_url: String? = nil,
+        content_url: String? = nil,
         added_by_user_id: String? = nil,
         added_by_name: String? = nil,
         added_by_photo_url: String? = nil
@@ -53,7 +53,7 @@ struct LightweightPlace: Codable, Identifiable, Equatable {
         self.longitude = longitude
         self.latest_review_photo = latest_review_photo
         self.external_place_id = external_place_id
-        self.tiktok_url = tiktok_url
+        self.content_url = content_url
         self.added_by_user_id = added_by_user_id
         self.added_by_name = added_by_name
         self.added_by_photo_url = added_by_photo_url

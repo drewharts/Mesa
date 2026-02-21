@@ -155,11 +155,11 @@ struct ListPhotoCollage: View {
 }
 
 // MARK: - Collage Photo View
-/// Individual photo in the collage with reactive TikTok thumbnail loading
+/// Individual photo in the collage with reactive external thumbnail loading
 struct CollagePhotoView: View {
     let place: LightweightPlace
     @Binding var placeColors: [UUID: Color]
-    @ObservedObject var tikTokCache = TikTokMetadataCache.shared
+    @ObservedObject var externalMetadataCache = ExternalMetadataCache.shared
     
     private var placeColor: Color {
         let hash = place.place_id.hashValue
@@ -177,8 +177,8 @@ struct CollagePhotoView: View {
     
     @ViewBuilder
     private var photoOverlay: some View {
-        if let tiktokUrl = place.tiktok_url,
-           let thumbnailURL = TikTokMetadataCache.shared.getCachedThumbnailUrl(for: tiktokUrl) {
+        if let contentUrl = place.content_url,
+           let thumbnailURL = ExternalMetadataCache.shared.getCachedThumbnailUrl(for: contentUrl) {
             AsyncImage(url: URL(string: thumbnailURL)) { phase in
                 switch phase {
                 case .success(let image):
@@ -191,9 +191,9 @@ struct CollagePhotoView: View {
                     Color.gray.opacity(0.3)
                         .onAppear {
                             // Only fetch if not already cached
-                            if TikTokMetadataCache.shared.getCachedMetadata(for: tiktokUrl) == nil {
+                            if ExternalMetadataCache.shared.getCachedMetadata(for: contentUrl) == nil {
                                 Task {
-                                    _ = await TikTokMetadataCache.shared.getMetadata(for: tiktokUrl)
+                                    _ = await ExternalMetadataCache.shared.getMetadata(for: contentUrl)
                                 }
                             }
                         }
@@ -216,14 +216,14 @@ struct CollagePhotoView: View {
                     EmptyView()
                 }
             }
-        } else if let tiktokUrl = place.tiktok_url {
+        } else if let contentUrl = place.content_url {
             // No cached thumbnail yet - show placeholder while fetching
             Color.gray.opacity(0.3)
                 .onAppear {
                     // Only fetch if not already cached
-                    if TikTokMetadataCache.shared.getCachedMetadata(for: tiktokUrl) == nil {
+                    if ExternalMetadataCache.shared.getCachedMetadata(for: contentUrl) == nil {
                         Task {
-                            _ = await TikTokMetadataCache.shared.getMetadata(for: tiktokUrl)
+                            _ = await ExternalMetadataCache.shared.getMetadata(for: contentUrl)
                         }
                     }
                 }
@@ -232,7 +232,7 @@ struct CollagePhotoView: View {
 }
 
 // MARK: - Lightweight Place Preview Card
-/// Displays a place preview with photo and name overlay with reactive TikTok thumbnail loading
+/// Displays a place preview with photo and name overlay with reactive external thumbnail loading
 struct LightweightPlacePreviewCard: View {
     let place: LightweightPlace
     @Binding var placeColors: [UUID: Color]
@@ -240,7 +240,7 @@ struct LightweightPlacePreviewCard: View {
     
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @Environment(\.presentationMode) var presentationMode
-    @ObservedObject var tikTokCache = TikTokMetadataCache.shared
+    @ObservedObject var externalMetadataCache = ExternalMetadataCache.shared
     
     private var placeColor: Color {
         let hash = place.place_id.hashValue
@@ -298,8 +298,8 @@ struct LightweightPlacePreviewCard: View {
     
     @ViewBuilder
     private var photoContent: some View {
-        if let tiktokUrl = place.tiktok_url,
-           let thumbnailURL = TikTokMetadataCache.shared.getCachedThumbnailUrl(for: tiktokUrl) {
+        if let contentUrl = place.content_url,
+           let thumbnailURL = ExternalMetadataCache.shared.getCachedThumbnailUrl(for: contentUrl) {
             AsyncImage(url: URL(string: thumbnailURL)) { phase in
                 switch phase {
                 case .success(let image):
@@ -314,9 +314,9 @@ struct LightweightPlacePreviewCard: View {
                     Color.gray.opacity(0.3)
                         .onAppear {
                             // Only fetch if not already cached
-                            if TikTokMetadataCache.shared.getCachedMetadata(for: tiktokUrl) == nil {
+                            if ExternalMetadataCache.shared.getCachedMetadata(for: contentUrl) == nil {
                                 Task {
-                                    _ = await TikTokMetadataCache.shared.getMetadata(for: tiktokUrl)
+                                    _ = await ExternalMetadataCache.shared.getMetadata(for: contentUrl)
                                 }
                             }
                         }
@@ -341,14 +341,14 @@ struct LightweightPlacePreviewCard: View {
                     EmptyView()
                 }
             }
-        } else if let tiktokUrl = place.tiktok_url {
+        } else if let contentUrl = place.content_url {
             // No cached thumbnail yet - show placeholder while fetching
             Color.gray.opacity(0.3)
                 .onAppear {
                     // Only fetch if not already cached
-                    if TikTokMetadataCache.shared.getCachedMetadata(for: tiktokUrl) == nil {
+                    if ExternalMetadataCache.shared.getCachedMetadata(for: contentUrl) == nil {
                         Task {
-                            _ = await TikTokMetadataCache.shared.getMetadata(for: tiktokUrl)
+                            _ = await ExternalMetadataCache.shared.getMetadata(for: contentUrl)
                         }
                     }
                 }

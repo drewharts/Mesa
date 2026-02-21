@@ -16,7 +16,7 @@ struct ExternalPlace: Codable, Identifiable {
     let name: String
     let placeId: String
     let source: String
-    let url: String? // TikTok video URL - metadata fetched on-demand via oEmbed
+    let url: String? // External video URL - metadata fetched on-demand via oEmbed
     
     enum CodingKeys: String, CodingKey {
         case id

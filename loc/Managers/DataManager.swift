@@ -281,25 +281,25 @@ class DataManager: ObservableObject {
         await loadUserMyPlaces(userId: userId, offset: offset)
     }
     
-    /// Load user external places (TikTok places) - lightweight with pagination
+    /// Load user external places - lightweight with pagination
     /// ⚠️ DEPRECATED: Use ProfileViewModel.loadInitialExternalPlaces() and loadMoreExternalPlaces() instead
     /// This method is kept for backward compatibility but should not be used in new code.
     /// MVVM architecture: ViewModel should own pagination state and logic.
     func loadUserExternalPlaces(userId: String, offset: Int = 0) async {
         if offset == 0 {
-            profileViewModel.tikTokViewModel.isLoadingTikTokPlaces = true
+            profileViewModel.externalContentViewModel.isLoadingExternalPlaces = true
         } else {
             await MainActor.run {
-                profileViewModel.tikTokViewModel.isLoadingMoreExternalPlaces = true
+                profileViewModel.externalContentViewModel.isLoadingMoreExternalPlaces = true
             }
         }
 
         defer {
             if offset == 0 {
-                profileViewModel.tikTokViewModel.isLoadingTikTokPlaces = false
+                profileViewModel.externalContentViewModel.isLoadingExternalPlaces = false
             } else {
                 Task { @MainActor in
-                    profileViewModel.tikTokViewModel.isLoadingMoreExternalPlaces = false
+                    profileViewModel.externalContentViewModel.isLoadingMoreExternalPlaces = false
                 }
             }
         }
@@ -308,12 +308,12 @@ class DataManager: ObservableObject {
             // Load 8 places at a time
             let lightweightPlaces = try await userService.fetchUserExternalPlaces(userId: userId, limit: 8, offset: offset)
 
-            // Prefetch TikTok metadata for all TikTok URLs to populate cache
-            let tiktokUrls = lightweightPlaces.compactMap { $0.tiktok_url }.filter { !$0.isEmpty }
-            if !tiktokUrls.isEmpty {
+            // Prefetch metadata for all content URLs to populate cache
+            let contentUrls = lightweightPlaces.compactMap { $0.content_url }.filter { !$0.isEmpty }
+            if !contentUrls.isEmpty {
                 Task {
-                    await TikTokMetadataCache.shared.prefetchMetadata(for: tiktokUrls)
-                    print("✅ [DataManager] Prefetched TikTok metadata for \(tiktokUrls.count) URLs")
+                    await ExternalMetadataCache.shared.prefetchMetadata(for: contentUrls)
+                    print("✅ [DataManager] Prefetched external metadata for \(contentUrls.count) URLs")
                 }
             }
 
@@ -322,24 +322,24 @@ class DataManager: ObservableObject {
                 if offset == 0 {
                     // Initial load - replace existing, dedup by place_id
                     var seenIds = Set<String>()
-                    self.profileViewModel.tikTokViewModel.lightweightExternalPlaces = lightweightPlaces.filter { seenIds.insert($0.place_id).inserted }
+                    self.profileViewModel.externalContentViewModel.lightweightExternalPlaces = lightweightPlaces.filter { seenIds.insert($0.place_id).inserted }
                 } else {
                     // Pagination - append only places not already present
-                    let existingIds = Set(self.profileViewModel.tikTokViewModel.lightweightExternalPlaces.map { $0.place_id })
+                    let existingIds = Set(self.profileViewModel.externalContentViewModel.lightweightExternalPlaces.map { $0.place_id })
                     let newPlaces = lightweightPlaces.filter { !existingIds.contains($0.place_id) }
-                    self.profileViewModel.tikTokViewModel.lightweightExternalPlaces.append(contentsOf: newPlaces)
+                    self.profileViewModel.externalContentViewModel.lightweightExternalPlaces.append(contentsOf: newPlaces)
                 }
 
                 // Update hasMore flag: false if empty or if we got less than a full page
-                self.profileViewModel.tikTokViewModel.hasMoreExternalPlaces = !lightweightPlaces.isEmpty && lightweightPlaces.count >= 8
+                self.profileViewModel.externalContentViewModel.hasMoreExternalPlaces = !lightweightPlaces.isEmpty && lightweightPlaces.count >= 8
             }
 
-            print("✅ [DataManager] Loaded \(lightweightPlaces.count) lightweight external places (offset: \(offset), hasMore: \(profileViewModel.tikTokViewModel.hasMoreExternalPlaces))")
+            print("✅ [DataManager] Loaded \(lightweightPlaces.count) lightweight external places (offset: \(offset), hasMore: \(profileViewModel.externalContentViewModel.hasMoreExternalPlaces))")
         } catch {
             print("❌ [DataManager] Error loading external places: \(error.localizedDescription)")
             // Set hasMore to false on error to prevent infinite retry loops
             await MainActor.run {
-                profileViewModel.tikTokViewModel.hasMoreExternalPlaces = false
+                profileViewModel.externalContentViewModel.hasMoreExternalPlaces = false
             }
         }
     }
@@ -350,9 +350,9 @@ class DataManager: ObservableObject {
     /// MVVM architecture: ViewModel should own pagination state and logic.
     @MainActor
     func loadMoreExternalPlaces(userId: String) async {
-        guard !profileViewModel.tikTokViewModel.isLoadingMoreExternalPlaces && profileViewModel.tikTokViewModel.hasMoreExternalPlaces else { return }
+        guard !profileViewModel.externalContentViewModel.isLoadingMoreExternalPlaces && profileViewModel.externalContentViewModel.hasMoreExternalPlaces else { return }
 
-        let offset = profileViewModel.tikTokViewModel.lightweightExternalPlaces.count
+        let offset = profileViewModel.externalContentViewModel.lightweightExternalPlaces.count
         await loadUserExternalPlaces(userId: userId, offset: offset)
     }
     
@@ -873,12 +873,12 @@ class DataManager: ObservableObject {
 
     /// Get external places for a specific place ID
     func getExternalPlace(for placeId: String) -> ExternalPlace? {
-        return profileViewModel.tikTokViewModel.userExternalPlaces[placeId]
+        return profileViewModel.externalContentViewModel.userExternalPlaces[placeId]
     }
 
     /// Get all external places
     func getAllExternalPlaces() -> [String: ExternalPlace] {
-        return profileViewModel.tikTokViewModel.userExternalPlaces
+        return profileViewModel.externalContentViewModel.userExternalPlaces
     }
 }
 

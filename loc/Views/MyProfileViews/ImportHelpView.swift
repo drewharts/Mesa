@@ -1,13 +1,13 @@
 //
-//  TikTokImportHelpView.swift
+//  ImportHelpView.swift
 //  loc
 //
-//  Displays an infographic explaining how to import TikToks into the app
+//  Displays an infographic explaining how to import content into the app
 //
 
 import SwiftUI
 
-struct TikTokImportHelpView: View {
+struct ImportHelpView: View {
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
@@ -22,7 +22,7 @@ struct TikTokImportHelpView: View {
                 .padding(.vertical, 20)
             }
             .background(Color(.systemGroupedBackground))
-            .navigationTitle("Import TikToks")
+            .navigationTitle("Import Content")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -49,11 +49,11 @@ struct TikTokImportHelpView: View {
                     )
                 )
             
-            Text("Save Places from TikTok")
+            Text("Save Places from Videos")
                 .font(.title2)
                 .fontWeight(.bold)
             
-            Text("Discover a restaurant or place on TikTok? Save it directly to your collection!")
+            Text("Discover a restaurant or place in a video? Save it directly to your collection!")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
@@ -73,8 +73,8 @@ struct TikTokImportHelpView: View {
                 stepNumber: 1,
                 icon: "play.rectangle.fill",
                 iconColor: .pink,
-                title: "Find a TikTok",
-                description: "Open TikTok and find a video featuring a place you want to save"
+                title: "Find a Video",
+                description: "Find a video featuring a place you want to save"
             )
             
             StepRow(
@@ -82,7 +82,7 @@ struct TikTokImportHelpView: View {
                 icon: "arrowshape.turn.up.right.fill",
                 iconColor: .blue,
                 title: "Tap Share",
-                description: "Tap the share button on the TikTok video"
+                description: "Tap the share button on the video"
             )
             
             StepRow(
@@ -201,5 +201,5 @@ private struct TipRow: View {
 // MARK: - Preview
 
 #Preview {
-    TikTokImportHelpView()
+    ImportHelpView()
 }

@@ -1,5 +1,5 @@
 //
-//  TikTokWebView.swift
+//  ExternalWebView.swift
 //  loc
 //
 //  Created by Mesa on 7/2/25.
@@ -8,11 +8,16 @@
 import SwiftUI
 import WebKit
 
-struct TikTokWebView: UIViewRepresentable {
+struct ExternalWebView: UIViewRepresentable {
     let embedHTML: String
     let videoURL: String
     @Environment(\.presentationMode) var presentationMode
-    
+
+    /// Whether the video is from Instagram based on the video URL.
+    private var isInstagram: Bool {
+        videoURL.contains("instagram.com") || videoURL.contains("instagr.am")
+    }
+
     func makeUIView(context: Context) -> WKWebView {
         let configuration = createWebViewConfiguration()
         let webView = WKWebView(frame: .zero, configuration: configuration)
@@ -22,7 +27,8 @@ struct TikTokWebView: UIViewRepresentable {
     
     func updateUIView(_ webView: WKWebView, context: Context) {
         let fullHTML = createFullHTMLPage()
-        webView.loadHTMLString(fullHTML, baseURL: URL(string: "https://www.tiktok.com"))
+        let baseURLString = isInstagram ? "https://www.instagram.com" : "https://www.tiktok.com"
+        webView.loadHTMLString(fullHTML, baseURL: URL(string: baseURLString))
     }
     
     func makeCoordinator() -> Coordinator {
@@ -85,6 +91,12 @@ struct TikTokWebView: UIViewRepresentable {
             width: 100% !important;
             margin: 0 auto;
         }
+        .instagram-media {
+            max-width: 100% !important;
+            width: 100% !important;
+            margin: 0 auto !important;
+            min-width: 0 !important;
+        }
         .close-button {
             position: fixed;
             top: 50px;
@@ -104,10 +116,18 @@ struct TikTokWebView: UIViewRepresentable {
         """
     }
     
+    /// Returns the URL for the platform-specific embed script.
+    private var embedScriptURL: String {
+        isInstagram
+            ? "https://www.instagram.com/embed.js"
+            : "https://www.tiktok.com/embed.js"
+    }
+
     private func createHTMLBody() -> String {
         return """
         <button class="close-button" onclick="window.webkit.messageHandlers.closeVideo.postMessage('')">×</button>
         \(embedHTML)
+        <script async src="\(embedScriptURL)"></script>
         <script>
             \(createJavaScript())
         </script>
@@ -119,7 +139,8 @@ struct TikTokWebView: UIViewRepresentable {
         // Prevent external navigation
         document.addEventListener('click', function(e) {
             var target = e.target;
-            if (target.tagName === 'A' && target.href && target.href.includes('tiktok.com')) {
+            if (target.tagName === 'A' && target.href &&
+                (target.href.includes('tiktok.com') || target.href.includes('instagram.com'))) {
                 e.preventDefault();
                 return false;
             }
@@ -130,11 +151,11 @@ struct TikTokWebView: UIViewRepresentable {
 
 // MARK: - Coordinator
 
-extension TikTokWebView {
+extension ExternalWebView {
     class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
-        let parent: TikTokWebView
+        let parent: ExternalWebView
         
-        init(_ parent: TikTokWebView) {
+        init(_ parent: ExternalWebView) {
             self.parent = parent
             super.init()
         }
@@ -187,8 +208,11 @@ extension TikTokWebView {
             let allowedPatterns = [
                 "about:blank",
                 "www.tiktok.com",
+                "www.instagram.com",
+                "cdninstagram.com",
                 "embed.js",
-                "tiktok"
+                "tiktok",
+                "instagram"
             ]
             
             return allowedPatterns.contains { pattern in

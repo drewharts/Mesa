@@ -131,7 +131,7 @@ struct ProfileReviewsPopupView: View {
             ForEach(Array(viewModel.lightweightReviewedPlaces.enumerated()), id: \.element.id) { index, place in
                 PopupPlaceCard(
                     place: place,
-                    preferTikTokThumbnail: false,
+                    preferExternalThumbnail: false,
                     onNavigate: { placeId in
                         navigationPath.append(placeId)
                     }

@@ -11,7 +11,7 @@
 //  - creation: Manages custom place creation
 //
 //  Services:
-//  - postsCacheService: Manages posts/TikToks caching, loading, likes (singleton service)
+//  - postsCacheService: Manages posts/external videos caching, loading, likes (singleton service)
 //
 
 import Foundation
@@ -165,10 +165,10 @@ class SelectedPlaceViewModel: ObservableObject {
         return postsCacheService.posts(forPlaceId: placeId)
     }
 
-    /// TikToks for the currently selected place.
-    var tiktokVideos: [TikTokVideo] {
+    /// External videos for the currently selected place.
+    var externalVideos: [ExternalVideo] {
         guard let placeId = selectedPlace?.id.uuidString else { return [] }
-        return postsCacheService.tiktoks(forPlaceId: placeId)
+        return postsCacheService.externalVideos(forPlaceId: placeId)
     }
 
     // MARK: - Public Methods (Delegation to Children)
@@ -184,6 +184,7 @@ class SelectedPlaceViewModel: ObservableObject {
         place.name = "Dropped Pin"
         place.coordinate = coordinate
         place.isCustom = true
+        place.isDroppedPin = true
         selectPlace(place, shouldAnimateMap: false)
         isDetailSheetPresented = true
     }

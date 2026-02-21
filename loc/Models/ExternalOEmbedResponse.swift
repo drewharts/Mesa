@@ -1,14 +1,14 @@
 //
-//  TikTokOEmbedResponse.swift
+//  ExternalOEmbedResponse.swift
 //  loc
 //
-//  TikTok oEmbed API response model
+//  External oEmbed API response model
 //
 
 import Foundation
 
-/// Response from the TikTok oEmbed endpoint
-struct TikTokOEmbedResponse: Codable {
+/// Response from external oEmbed endpoints (TikTok and Instagram)
+struct ExternalOEmbedResponse: Codable {
     let title: String
     let authorName: String
     let authorUniqueId: String
@@ -18,7 +18,9 @@ struct TikTokOEmbedResponse: Codable {
     let html: String
     let embedProductId: String
     let embedType: String
-    
+    let providerName: String?
+    let authorUrl: String?
+
     enum CodingKeys: String, CodingKey {
         case title
         case authorName = "author_name"
@@ -29,17 +31,31 @@ struct TikTokOEmbedResponse: Codable {
         case html
         case embedProductId = "embed_product_id"
         case embedType = "embed_type"
+        case providerName = "provider_name"
+        case authorUrl = "author_url"
     }
-    
-    /// Convert oEmbed response to TikTokVideo for compatibility with existing views
-    func toTikTokVideo(videoUrl: String) -> TikTokVideo {
-        let author = TikTokAuthor(
+
+    /// Whether this oEmbed response is from Instagram.
+    private var isInstagram: Bool {
+        providerName?.lowercased() == "instagram" || embedType.hasPrefix("instagram")
+    }
+
+    /// Convert oEmbed response to ExternalVideo for compatibility with existing views.
+    func toExternalVideo(videoUrl: String) -> ExternalVideo {
+        let authorProfileUrl: String
+        if isInstagram {
+            authorProfileUrl = authorUrl ?? "https://www.instagram.com/\(authorUniqueId)"
+        } else {
+            authorProfileUrl = authorUrl ?? "https://www.tiktok.com/@\(authorUniqueId)"
+        }
+
+        let author = ExternalVideoAuthor(
             displayName: authorName,
-            url: "https://www.tiktok.com/@\(authorUniqueId)",
+            url: authorProfileUrl,
             username: authorUniqueId
         )
-        
-        return TikTokVideo(
+
+        return ExternalVideo(
             videoID: embedProductId,
             url: videoUrl,
             title: title,
@@ -52,4 +68,3 @@ struct TikTokOEmbedResponse: Codable {
         )
     }
 }
-

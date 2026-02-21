@@ -1,5 +1,5 @@
 //
-//  TikTokService.swift
+//  ExternalContentService.swift
 //  loc
 //
 //  Created by Mesa on 7/2/25.
@@ -8,12 +8,12 @@
 import Foundation
 import CoreLocation
 
-// MARK: - TikTok Data Models
-// NOTE: Most TikTok-specific data models are no longer needed since the backend 
-// now returns DetailPlace format directly. Only keeping TikTokAuthor and TikTokVideo
+// MARK: - External Video Data Models
+// NOTE: Most data models are no longer needed since the backend
+// now returns DetailPlace format directly. Only keeping ExternalVideoAuthor and ExternalVideo
 // since they're still used in the DetailPlace model.
 
-struct TikTokAuthor: Codable, Equatable {
+struct ExternalVideoAuthor: Codable, Equatable {
     let displayName: String
     let url: String
     let username: String
@@ -25,30 +25,30 @@ struct TikTokAuthor: Codable, Equatable {
     }
 }
 
-// MARK: - TikTok Service
-class TikTokService: ObservableObject {
+// MARK: - External Content Service
+class ExternalContentService: ObservableObject {
     private let baseURL = MesaBackendConfig.baseURL
     private let placeService = PlaceService.shared
     
     @Published var isProcessing = false
     @Published var errorMessage: String?
     
-    func processTikTokURL(_ url: String) async -> Result<[DetailPlace], Error> {
+    func processURL(_ url: String) async -> Result<[DetailPlace], Error> {
         guard let requestURL = URL(string: "\(baseURL)/process-url") else {
-            print("❌ [TikTokService] Invalid base URL")
-            return .failure(TikTokError.invalidURL)
+            print("❌ [ExternalContentService] Invalid base URL")
+            return .failure(ExternalContentError.invalidURL)
         }
         
         isProcessing = true
         defer { isProcessing = false }
         
-        let request = await createRequest(url: requestURL, tikTokURL: url)
+        let request = await createRequest(url: requestURL, contentURL: url)
         
         do {
             let (data, response) = try await NetworkSessionManager.shared.apiSession.data(for: request)
 
             if let error = validateResponse(response) {
-                print("❌ [TikTokService] Response validation failed")
+                print("❌ [ExternalContentService] Response validation failed")
                 return .failure(error)
             }
             
@@ -74,34 +74,34 @@ class TikTokService: ObservableObject {
                             return .success([]) // Return empty array to indicate no places found
                         }
                         
-                        // Check if it's the TikTok response format with saved_places array (multiple places)
+                        // Check if response contains saved_places array (multiple places)
                         if let savedPlacesArray = json?["saved_places"] as? [[String: Any]] {
                             var detailPlaces: [DetailPlace] = []
-                            
+
                             for placeDict in savedPlacesArray {
                                 var detailPlace = try parseDetailPlaceFromDictionary(placeDict)
-                                
-                                // Also extract TikTok video data from the response
-                                if let tikTokData = json?["data"] as? [String: Any] {
-                                    if let tikTokVideo = createTikTokVideoFromResponseData(tikTokData) {
-                                        detailPlace.tikTokVideos = [tikTokVideo]
+
+                                // Also extract video data from the response
+                                if let videoData = json?["data"] as? [String: Any] {
+                                    if let externalVideo = createExternalVideoFromResponseData(videoData) {
+                                        detailPlace.externalVideos = [externalVideo]
                                     }
                                 }
-                                
+
                                 detailPlaces.append(detailPlace)
                             }
-                            
+
                             return .success(detailPlaces)
                         }
-                        
-                        // Check if it's the TikTok response format with saved_place (single place)
+
+                        // Check if response contains saved_place (single place)
                         if let savedPlaceDict = json?["saved_place"] as? [String: Any] {
                             var detailPlace = try parseDetailPlaceFromDictionary(savedPlaceDict)
-                            
-                            // Also extract TikTok video data from the response
-                            if let tikTokData = json?["data"] as? [String: Any] {
-                                if let tikTokVideo = createTikTokVideoFromResponseData(tikTokData) {
-                                    detailPlace.tikTokVideos = [tikTokVideo]
+
+                            // Also extract video data from the response
+                            if let videoData = json?["data"] as? [String: Any] {
+                                if let externalVideo = createExternalVideoFromResponseData(videoData) {
+                                    detailPlace.externalVideos = [externalVideo]
                                 }
                             }
                             
@@ -120,7 +120,7 @@ class TikTokService: ObservableObject {
                             return .success([detailPlace]) // Wrap in array
                         }
                         
-                        throw NSError(domain: "TikTokService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Unable to parse response"])
+                        throw NSError(domain: "ExternalContentService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Unable to parse response"])
                     } catch {
                         return .failure(error)
                     }
@@ -132,11 +132,11 @@ class TikTokService: ObservableObject {
         }
     }
     
-    func getTikTokOEmbed(url: String) async -> Result<TikTokOEmbedResponse, Error> {
+    func getTikTokOEmbed(url: String) async -> Result<ExternalOEmbedResponse, Error> {
         guard let encodedURL = url.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
               let requestURL = URL(string: "\(baseURL)/tiktok/oembed?url=\(encodedURL)") else {
-            print("❌ [TikTokService] Invalid URL for oEmbed request")
-            return .failure(TikTokError.invalidURL)
+            print("❌ [ExternalContentService] Invalid URL for oEmbed request")
+            return .failure(ExternalContentError.invalidURL)
         }
         
         var request = URLRequest(url: requestURL)
@@ -147,30 +147,30 @@ class TikTokService: ObservableObject {
             let (data, response) = try await NetworkSessionManager.shared.apiSession.data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse else {
-                return .failure(TikTokError.invalidResponse)
+                return .failure(ExternalContentError.invalidResponse)
             }
 
             guard httpResponse.statusCode == 200 else {
                 if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                    let errorMsg = json["error"] as? String {
-                    print("❌ [TikTokService] oEmbed error: \(errorMsg)")
-                    return .failure(NSError(domain: "TikTokService", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: errorMsg]))
+                    print("❌ [ExternalContentService] oEmbed error: \(errorMsg)")
+                    return .failure(NSError(domain: "ExternalContentService", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: errorMsg]))
                 }
-                return .failure(TikTokError.serverError(httpResponse.statusCode))
+                return .failure(ExternalContentError.serverError(httpResponse.statusCode))
             }
 
-            let oembedResponse = try JSONDecoder().decode(TikTokOEmbedResponse.self, from: data)
+            let oembedResponse = try JSONDecoder().decode(ExternalOEmbedResponse.self, from: data)
             return .success(oembedResponse)
 
         } catch {
-            print("❌ [TikTokService] oEmbed request failed: \(error.localizedDescription)")
+            print("❌ [ExternalContentService] oEmbed request failed: \(error.localizedDescription)")
             return .failure(error)
         }
     }
 
     func refreshTikTokThumbnail(for url: String, userId: String?, externalPlaceId: String? = nil) async -> Result<String, Error> {
         guard let requestURL = URL(string: "\(baseURL)/refresh-thumbnail") else {
-            return .failure(TikTokError.invalidURL)
+            return .failure(ExternalContentError.invalidURL)
         }
         
         var request = URLRequest(url: requestURL)
@@ -186,7 +186,7 @@ class TikTokService: ObservableObject {
         }
         
         guard let httpBody = try? JSONSerialization.data(withJSONObject: body) else {
-            return .failure(TikTokError.invalidURL)
+            return .failure(ExternalContentError.invalidURL)
         }
         
         request.httpBody = httpBody
@@ -195,23 +195,23 @@ class TikTokService: ObservableObject {
             let (data, _) = try await NetworkSessionManager.shared.apiSession.data(for: request)
 
             guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-                return .failure(TikTokError.invalidResponse)
+                return .failure(ExternalContentError.invalidResponse)
             }
 
             // Check for thumbnail URL (support both snake_case and camelCase)
             if let thumbnailURL = json["thumbnail_url"] as? String ?? json["thumbnailURL"] as? String {
                 return .success(thumbnailURL)
             } else if let errorMsg = json["error"] as? String {
-                return .failure(NSError(domain: "TikTokService", code: 1, userInfo: [NSLocalizedDescriptionKey: errorMsg]))
+                return .failure(NSError(domain: "ExternalContentService", code: 1, userInfo: [NSLocalizedDescriptionKey: errorMsg]))
             } else {
-                return .failure(TikTokError.invalidResponse)
+                return .failure(ExternalContentError.invalidResponse)
             }
         } catch {
             return .failure(error)
         }
     }
 
-    private func createRequest(url: URL, tikTokURL: String) async -> URLRequest {
+    private func createRequest(url: URL, contentURL: String) async -> URLRequest {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -220,7 +220,7 @@ class TikTokService: ObservableObject {
         await addAuthenticationToken(to: &request)
         
         // Set request body
-        let requestBody = ["url": tikTokURL]
+        let requestBody = ["url": contentURL]
         if let jsonData = try? JSONEncoder().encode(requestBody) {
             request.httpBody = jsonData
         }
@@ -238,7 +238,7 @@ class TikTokService: ObservableObject {
         }
     }
     
-    private func validateResponse(_ response: URLResponse?) -> TikTokError? {
+    private func validateResponse(_ response: URLResponse?) -> ExternalContentError? {
         guard let httpResponse = response as? HTTPURLResponse else {
             return nil
         }
@@ -263,7 +263,7 @@ class TikTokService: ObservableObject {
         // Creating a new ID will orphan the place
         guard let idString = dict["id"] as? String,
               let placeId = UUID(uuidString: idString) else {
-            throw NSError(domain: "TikTokService", code: -2, userInfo: [NSLocalizedDescriptionKey: "Invalid place ID from backend"])
+            throw NSError(domain: "ExternalContentService", code: -2, userInfo: [NSLocalizedDescriptionKey: "Invalid place ID from backend"])
         }
         detailPlace.id = placeId
         detailPlace.name = dict["name"] as? String ?? ""
@@ -306,15 +306,15 @@ class TikTokService: ObservableObject {
             detailPlace.coordinate = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
         }
         
-        // Handle TikTok videos if present
-        if let tikTokVideosArray = dict["tikTokVideos"] as? [[String: Any]] {
-            detailPlace.tikTokVideos = tikTokVideosArray.compactMap { videoDict in
+        // Handle external videos if present (check both old and new JSON keys)
+        if let externalVideosArray = (dict["externalVideos"] ?? dict["tikTokVideos"]) as? [[String: Any]] {
+            detailPlace.externalVideos = externalVideosArray.compactMap { videoDict in
                 guard let videoID = videoDict["videoID"] as? String,
                       let url = videoDict["url"] as? String else {
                     return nil
                 }
                 
-                let author = TikTokAuthor(
+                let author = ExternalVideoAuthor(
                     displayName: videoDict["author_display_name"] as? String ?? "",
                     url: videoDict["author_url"] as? String ?? "",
                     username: videoDict["author_username"] as? String ?? ""
@@ -323,7 +323,7 @@ class TikTokService: ObservableObject {
                 let dictContentType = videoDict["contentType"] as? String
                     ?? videoDict["content_type"] as? String
                     ?? (url.contains("/photo/") ? "photo" : "video")
-                return TikTokVideo(
+                return ExternalVideo(
                     videoID: videoID,
                     url: url,
                     title: videoDict["title"] as? String,
@@ -350,8 +350,8 @@ class TikTokService: ObservableObject {
         return detailPlace
     }
     
-    /// Create TikTok video from response data
-    private func createTikTokVideoFromResponseData(_ data: [String: Any]) -> TikTokVideo? {
+    /// Create external video from response data
+    private func createExternalVideoFromResponseData(_ data: [String: Any]) -> ExternalVideo? {
         guard let url = data["url"] as? String else {
             return nil
         }
@@ -370,14 +370,14 @@ class TikTokService: ObservableObject {
         }
 
         // Create author
-        let author = TikTokAuthor(
+        let author = ExternalVideoAuthor(
             displayName: data["author_name"] as? String ?? "",
             url: data["author_url"] as? String ?? "",
             username: extractUsernameFromURL(data["author_url"] as? String)
         )
 
         // Create TikTok content (video or photo)
-        return TikTokVideo(
+        return ExternalVideo(
             videoID: videoID,
             url: url,
             title: data["title"] as? String,
@@ -435,7 +435,7 @@ class TikTokService: ObservableObject {
     ]
 }
 
-enum TikTokError: Error, LocalizedError {
+enum ExternalContentError: Error, LocalizedError {
     case invalidURL
     case serverError(Int)
     case processingFailed
@@ -449,7 +449,7 @@ enum TikTokError: Error, LocalizedError {
         case .serverError(let code):
             return "Server error: \(code)"
         case .processingFailed:
-            return "Failed to process TikTok video"
+            return "Failed to process video"
         case .authenticationRequired:
             return "Authentication required to save place"
         case .invalidResponse:

@@ -18,7 +18,7 @@ class ProfileViewModel: ObservableObject {
 
     // Map filtering triggers
     @Published var selectedListIdForMap: String? = nil // When set, triggers map to show only this list's annotations (String because LightweightPlaceList.id is String)
-    @Published var showTikToksOnMap: Bool = false // When set, triggers map to show TikTok places
+    @Published var showExternalPlacesOnMap: Bool = false // When set, triggers map to show external places
     @Published var showReviewsOnMap: Bool = false // When set, triggers map to show reviewed places
     @Published var showFavoritesOnMap: Bool = false // When set, triggers map to show favorite places
     @Published var showMyPlacesOnMap: Bool = false // When set, triggers map to show user's created places
@@ -27,7 +27,7 @@ class ProfileViewModel: ObservableObject {
     /// Unlike the showXOnMap flags, this does NOT trigger MapContainerView's onChange handlers,
     /// so no sheet is presented while the profile is still visible.
     enum PendingMapFilter {
-        case tiktoks, reviews, favorites, myPlaces
+        case externalPlaces, reviews, favorites, myPlaces
     }
     @Published var pendingMapFilter: PendingMapFilter? = nil
 
@@ -48,8 +48,8 @@ class ProfileViewModel: ObservableObject {
     /// Child ViewModel for reviewed places
     let reviewsViewModel: ProfileReviewsViewModel
 
-    /// Child ViewModel for TikTok/external places
-    let tikTokViewModel: ProfileTikTokViewModel
+    /// Child ViewModel for external content places
+    let externalContentViewModel: ProfileExternalContentViewModel
 
     /// Child ViewModel for place lists management
     let listsViewModel: ProfileListsViewModel
@@ -89,7 +89,7 @@ class ProfileViewModel: ObservableObject {
 
         self.myPlacesViewModel = ProfileMyPlacesViewModel(userService: userService, userSession: userSession, placeService: placeService)
         self.reviewsViewModel = ProfileReviewsViewModel(userService: userService, userSession: userSession, placeService: placeService, postService: postService)
-        self.tikTokViewModel = ProfileTikTokViewModel(userService: userService, userSession: userSession)
+        self.externalContentViewModel = ProfileExternalContentViewModel(userService: userService, userSession: userSession)
         self.listsViewModel = ProfileListsViewModel(userService: userService, placeService: placeService, userSession: userSession, locationManager: locationManager)
         self.notesViewModel = ProfileNotesViewModel(userService: userService, userSession: userSession)
 
@@ -108,7 +108,7 @@ class ProfileViewModel: ObservableObject {
         setupMyPlacesCallbacks()
         setupReviewsCallbacks()
         setupListsCallbacks()
-        setupTikTokCallbacks()
+        setupExternalContentCallbacks()
 
         // Observe location changes using Combine
         setupLocationObserver()
@@ -122,20 +122,20 @@ class ProfileViewModel: ObservableObject {
         // Forward child ViewModel changes to parent for SwiftUI observation
         setupChildViewModelObservers()
 
-        // Observe TikTok multiple places notifications
+        // Observe external content multiple places notifications
         NotificationCenter.default.addObserver(
-            forName: NSNotification.Name("TikTokMultiplePlacesFound"),
+            forName: NSNotification.Name("ExternalContentMultiplePlacesFound"),
             object: nil,
             queue: .main
         ) { [weak self] notification in
             if let places = notification.userInfo?["places"] as? [DetailPlace],
-               let tikTokUrl = notification.userInfo?["tikTokUrl"] as? String {
+               let contentUrl = notification.userInfo?["tikTokUrl"] as? String {
                 Task { @MainActor in
-                    self?.tikTokViewModel.handleMultiplePlacesNotification(places: places, tikTokUrl: tikTokUrl)
+                    self?.externalContentViewModel.handleMultiplePlacesNotification(places: places, contentUrl: contentUrl)
                 }
             } else if let places = notification.userInfo?["places"] as? [DetailPlace] {
                 Task { @MainActor in
-                    self?.tikTokViewModel.handleMultiplePlaces(places)
+                    self?.externalContentViewModel.handleMultiplePlaces(places)
                 }
             }
         }
@@ -241,37 +241,37 @@ class ProfileViewModel: ObservableObject {
         }
     }
 
-    /// Wires up callbacks from tikTokViewModel for cross-cutting concerns.
-    private func setupTikTokCallbacks() {
-        tikTokViewModel.onRefreshTikTokPlaces = { [weak self] in
-            self?.tikTokViewModel.refreshTikTokPlacesAfterImport()
+    /// Wires up callbacks from externalContentViewModel for cross-cutting concerns.
+    private func setupExternalContentCallbacks() {
+        externalContentViewModel.onRefreshExternalPlaces = { [weak self] in
+            self?.externalContentViewModel.refreshExternalPlacesAfterImport()
         }
 
-        tikTokViewModel.onPlaceImageLoaded = { [weak self] placeId, image in
+        externalContentViewModel.onPlaceImageLoaded = { [weak self] placeId, image in
             self?.detailPlaceViewModel.placeImages[placeId] = image
         }
 
-        tikTokViewModel.hasPlaceImage = { [weak self] placeId in
+        externalContentViewModel.hasPlaceImage = { [weak self] placeId in
             self?.detailPlaceViewModel.placeImages[placeId] != nil
         }
 
-        tikTokViewModel.onFetchPlaceImage = { [weak self] placeId in
+        externalContentViewModel.onFetchPlaceImage = { [weak self] placeId in
             self?.detailPlaceViewModel.fetchPlaceImage(for: placeId)
         }
 
-        tikTokViewModel.getCurrentUserId = { [weak self] in
+        externalContentViewModel.getCurrentUserId = { [weak self] in
             self?.user?.id
         }
 
-        tikTokViewModel.onPlaceSaversUpdate = { [weak self] placeId, userId, isAdding in
+        externalContentViewModel.onPlaceSaversUpdate = { [weak self] placeId, userId, isAdding in
             self?.updatePlaceSavers(placeId: placeId, userId: userId, isAdding: isAdding)
         }
 
-        tikTokViewModel.onPlacesRemove = { [weak self] placeId in
+        externalContentViewModel.onPlacesRemove = { [weak self] placeId in
             self?.detailPlaceViewModel.places.removeValue(forKey: placeId)
         }
 
-        tikTokViewModel.onAnnotationPlacesRecalculate = { [weak self] in
+        externalContentViewModel.onAnnotationPlacesRecalculate = { [weak self] in
             self?.detailPlaceViewModel.calculateAnnotationPlaces()
         }
     }
@@ -311,17 +311,17 @@ class ProfileViewModel: ObservableObject {
             .sink { [weak self] userId in
                 guard let self = self else { return }
 
-                // Automatically load TikToks and reviews when user becomes available
+                // Automatically load external places and reviews when user becomes available
                 // This happens after login, ensuring data is ready for views
                 // Note: fetchUserExternalPlaces() is NOT called here - it's loaded on-demand
                 // when navigating to PlaceDetailView to avoid unnecessary startup load
                 Task {
-                    async let tikToksLoad: () = self.tikTokViewModel.loadInitialExternalPlaces()
+                    async let externalPlacesLoad: () = self.externalContentViewModel.loadInitialExternalPlaces()
                     async let reviewsLoad: () = self.reviewsViewModel.loadMyReviewedPlacesWithPagination()
                     async let myPlacesLoad: () = self.myPlacesViewModel.loadInitialMyPlaces()
 
                     // Run in parallel for efficiency
-                    _ = await (tikToksLoad, reviewsLoad, myPlacesLoad)
+                    _ = await (externalPlacesLoad, reviewsLoad, myPlacesLoad)
                 }
             }
             .store(in: &cancellables)
@@ -359,7 +359,7 @@ class ProfileViewModel: ObservableObject {
             self?.objectWillChange.send()
         }.store(in: &cancellables)
 
-        tikTokViewModel.objectWillChange.sink { [weak self] _ in
+        externalContentViewModel.objectWillChange.sink { [weak self] _ in
             self?.objectWillChange.send()
         }.store(in: &cancellables)
     }
@@ -487,13 +487,13 @@ class ProfileViewModel: ObservableObject {
         }
     }
 
-    /// Records a place correction flag for analytics after user corrects a TikTok place association.
+    /// Records a place correction flag for analytics after user corrects an external place association.
     func recordPlaceCorrectionFlag(for placeId: String, newPlaceId: String) {
-        let tikTokUrl = tikTokViewModel.getExternalPlace(for: placeId)?.url
-        tikTokViewModel.flagTikTokPlace(
+        let contentUrl = externalContentViewModel.getExternalPlace(for: placeId)?.url
+        externalContentViewModel.flagPlace(
             for: placeId,
             flagType: .wrongSuggestion,
-            tikTokUrl: tikTokUrl,
+            contentUrl: contentUrl,
             userComment: "Corrected to place: \(newPlaceId)"
         )
     }
@@ -521,18 +521,18 @@ class ProfileViewModel: ObservableObject {
         await detailPlaceViewModel.refreshPlaces(detailPlaces: Array(allPlaceIds))
     }
 
-    // MARK: - TikTok Processing (Delegation to tikTokViewModel)
+    // MARK: - External Content Processing (Delegation to externalContentViewModel)
 
-    /// Processes a shared TikTok URL - delegates to tikTokViewModel.
-    func processSharedTikTokURL(
+    /// Processes a shared external content URL - delegates to externalContentViewModel.
+    func processSharedContentURL(
         _ urlString: String,
-        tikTokService: TikTokService,
+        externalContentService: ExternalContentService,
         selectedPlaceVM: SelectedPlaceViewModel,
         placeVM: DetailPlaceViewModel
     ) async -> Bool {
-        return await tikTokViewModel.processSharedTikTokURL(
+        return await externalContentViewModel.processSharedContentURL(
             urlString,
-            tikTokService: tikTokService,
+            contentService: externalContentService,
             selectedPlaceVM: selectedPlaceVM,
             placeVM: placeVM,
             deepLinkManager: deepLinkManager,
@@ -540,19 +540,19 @@ class ProfileViewModel: ObservableObject {
         )
     }
 
-    /// Clears place selection state - delegates to tikTokViewModel.
+    /// Clears place selection state - delegates to externalContentViewModel.
     func clearPlaceSelection() {
-        tikTokViewModel.clearPlaceSelection()
+        externalContentViewModel.clearPlaceSelection()
     }
 
-    /// Clears the no places found state - delegates to tikTokViewModel.
+    /// Clears the no places found state - delegates to externalContentViewModel.
     func clearNoPlacesFound() {
-        tikTokViewModel.clearNoPlacesFound(deepLinkManager: deepLinkManager, deepLinkViewModel: deepLinkViewModel)
+        externalContentViewModel.clearNoPlacesFound(deepLinkManager: deepLinkManager, deepLinkViewModel: deepLinkViewModel)
     }
 
-    /// Called when the place selection view appears - delegates to tikTokViewModel.
+    /// Called when the place selection view appears - delegates to externalContentViewModel.
     func placeSelectionViewAppeared() {
-        tikTokViewModel.placeSelectionViewAppeared(deepLinkManager: deepLinkManager, deepLinkViewModel: deepLinkViewModel)
+        externalContentViewModel.placeSelectionViewAppeared(deepLinkManager: deepLinkManager, deepLinkViewModel: deepLinkViewModel)
     }
 
     // MARK: - Place Conversion
@@ -599,8 +599,8 @@ class ProfileViewModel: ObservableObject {
         user = nil
         userPicture = nil
         
-        // Clear TikTok/external places data (delegated to child ViewModel)
-        tikTokViewModel.resetAllData()
+        // Clear external places data (delegated to child ViewModel)
+        externalContentViewModel.resetAllData()
 
         // Clear reviewed places (delegated to child ViewModel)
         reviewsViewModel.resetAllData()
@@ -628,7 +628,7 @@ class ProfileViewModel: ObservableObject {
 
         // Clear UI state flags
         isUploadingProfilePhoto = false
-        // Note: TikTok UI flags are reset via tikTokViewModel.resetAllData() above
+        // Note: External content UI flags are reset via externalContentViewModel.resetAllData() above
         // Note: showFollowError and followErrorMessage are reset via socialViewModel.resetAllData() above
 
         // Reset profile counts loading state
@@ -723,22 +723,22 @@ class ProfileViewModel: ObservableObject {
         await loadProfileCounts()
 
         async let reviews: Void = reviewsViewModel.refreshReviewedPlaces()
-        async let tiktoks: Void = tikTokViewModel.reloadLightweightExternalPlaces()
+        async let externalPlaces: Void = externalContentViewModel.reloadLightweightExternalPlaces()
         async let myPlaces: Void = myPlacesViewModel.refreshMyPlaces()
 
-        _ = await (reviews, tiktoks, myPlaces)
+        _ = await (reviews, externalPlaces, myPlaces)
     }
 
-    /// Handles a TikTok notification by processing the URL - delegates to tikTokViewModel.
-    func handleTikTokNotification(
+    /// Handles an external content notification by processing the URL - delegates to externalContentViewModel.
+    func handleContentNotification(
         url: String,
-        tikTokService: TikTokService,
+        externalContentService: ExternalContentService,
         selectedPlaceVM: SelectedPlaceViewModel,
         placeVM: DetailPlaceViewModel
     ) {
-        tikTokViewModel.handleTikTokNotification(
+        externalContentViewModel.handleContentNotification(
             url: url,
-            tikTokService: tikTokService,
+            contentService: externalContentService,
             selectedPlaceVM: selectedPlaceVM,
             placeVM: placeVM,
             deepLinkManager: deepLinkManager,
@@ -746,14 +746,14 @@ class ProfileViewModel: ObservableObject {
         )
     }
 
-    /// Checks for pending TikTok URL in UserDefaults - delegates to tikTokViewModel.
-    func checkPendingTikTokURL(
-        tikTokService: TikTokService,
+    /// Checks for pending content URL in UserDefaults - delegates to externalContentViewModel.
+    func checkPendingContentURL(
+        externalContentService: ExternalContentService,
         selectedPlaceVM: SelectedPlaceViewModel,
         placeVM: DetailPlaceViewModel
     ) {
-        tikTokViewModel.checkPendingTikTokURL(
-            tikTokService: tikTokService,
+        externalContentViewModel.checkPendingContentURL(
+            contentService: externalContentService,
             selectedPlaceVM: selectedPlaceVM,
             placeVM: placeVM,
             deepLinkManager: deepLinkManager,
@@ -776,18 +776,18 @@ class ProfileViewModel: ObservableObject {
         listsViewModel.clearRecentlyCreatedList()
     }
     
-    // MARK: - External Places (Delegates to tikTokViewModel)
+    // MARK: - External Places (Delegates to externalContentViewModel)
 
-    /// Populates the userExternalPlaces dictionary and loads thumbnails - delegates to tikTokViewModel.
+    /// Populates the userExternalPlaces dictionary and loads thumbnails - delegates to externalContentViewModel.
     func fetchUserExternalPlaces() async {
-        await tikTokViewModel.fetchUserExternalPlaces()
+        await externalContentViewModel.fetchUserExternalPlaces()
 
         // Load thumbnails as place images (cross-cutting concern handled via callback)
-        for externalPlace in tikTokViewModel.userExternalPlaces.values {
+        for externalPlace in externalContentViewModel.userExternalPlaces.values {
             if let url = externalPlace.url,
-               let thumbnailURL = TikTokMetadataCache.shared.getCachedThumbnailUrl(for: url) {
+               let thumbnailURL = ExternalMetadataCache.shared.getCachedThumbnailUrl(for: url) {
                 Task {
-                    await tikTokViewModel.loadTikTokThumbnailAsPlaceImage(
+                    await externalContentViewModel.loadExternalThumbnailAsPlaceImage(
                         placeId: externalPlace.placeId,
                         thumbnailURL: thumbnailURL
                     )
@@ -796,29 +796,29 @@ class ProfileViewModel: ObservableObject {
         }
     }
 
-    /// Ensures TikTok thumbnail is cached - delegates to tikTokViewModel.
-    func ensureTikTokThumbnailCached(for placeId: String) {
-        tikTokViewModel.ensureTikTokThumbnailCached(for: placeId)
+    /// Ensures external thumbnail is cached - delegates to externalContentViewModel.
+    func ensureExternalThumbnailCached(for placeId: String) {
+        externalContentViewModel.ensureExternalThumbnailCached(for: placeId)
     }
 
-    /// Fetches fallback images for places - delegates to tikTokViewModel.
+    /// Fetches fallback images for places - delegates to externalContentViewModel.
     func fetchFallbackImages(for placeIds: [String]) async {
-        await tikTokViewModel.fetchFallbackImages(for: placeIds)
+        await externalContentViewModel.fetchFallbackImages(for: placeIds)
     }
 
-    /// Gets external_place_id for a TikTok video URL - delegates to tikTokViewModel.
+    /// Gets external_place_id for a video URL - delegates to externalContentViewModel.
     func getExternalPlaceId(for placeId: String, videoUrl: String) async -> String? {
-        return await tikTokViewModel.getExternalPlaceId(for: placeId, videoUrl: videoUrl)
+        return await externalContentViewModel.getExternalPlaceId(for: placeId, videoUrl: videoUrl)
     }
 
-    /// Checks if user has TikTok videos for a specific place - delegates to tikTokViewModel.
-    func hasTikTokVideos(for placeId: String) -> Bool {
-        return tikTokViewModel.hasTikTokVideos(for: placeId)
+    /// Checks if user has external videos for a specific place - delegates to externalContentViewModel.
+    func hasExternalVideos(for placeId: String) -> Bool {
+        return externalContentViewModel.hasExternalVideos(for: placeId)
     }
 
-    /// Gets the external place data for a specific place ID - delegates to tikTokViewModel.
+    /// Gets the external place data for a specific place ID - delegates to externalContentViewModel.
     func getExternalPlace(for placeId: String) -> ExternalPlace? {
-        return tikTokViewModel.getExternalPlace(for: placeId)
+        return externalContentViewModel.getExternalPlace(for: placeId)
     }
 
 }

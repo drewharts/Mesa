@@ -8,7 +8,7 @@
 
 import SwiftUI
 
-/// Tab selection for external user profile (no TikToks tab).
+/// Tab selection for external user profile (no external places tab).
 enum UserFavoritesReviewsTab: String, CaseIterable {
     case favorites = "FAVORITES"
     case reviews = "REVIEWS"
@@ -35,16 +35,16 @@ struct ExternalUserProfileFavoritesReviewsView: View {
     private var sectionData: ProfileFavoritesReviewsSectionData {
         ProfileFavoritesReviewsSectionData(
             favorites: viewModel.userFavorites,
-            tiktokPlaces: [],  // External profiles don't show TikToks tab
+            externalPlaces: [],  // External profiles don't show external places tab
             reviewedPlaces: viewModel.lightweightReviewedPlaces,
             myPlaces: [],  // External profiles don't show My Places tab
-            isLoadingTikToks: false,
+            isLoadingExternalPlaces: false,
             isLoadingReviews: viewModel.isLoadingReviewedPlaces,
             isLoadingMyPlaces: false
         )
     }
 
-    /// Configuration for external profile (no TikToks tab).
+    /// Configuration for external profile (no external places tab).
     private var sectionConfig: ProfileFavoritesReviewsSectionConfig {
         .external(ownerName: viewModel.user.firstName)
     }
@@ -57,10 +57,10 @@ struct ExternalUserProfileFavoritesReviewsView: View {
             config: sectionConfig,
             initialTabId: computedInitialTab,
             onFavoritesTap: { showFavoritesPopup = true },
-            onTikToksTap: nil,  // No TikToks tab for external profiles
+            onExternalPlacesTap: nil,  // No external places tab for external profiles
             onReviewsTap: { showReviewsPopup = true },
             onMyPlacesTap: nil,  // No My Places tab for external profiles
-            onTikTokHelpTap: nil
+            onExternalPlacesHelpTap: nil
         )
         .sheet(isPresented: $showFavoritesPopup) {
             ProfileFavoritesPopupView(viewModel: viewModel)

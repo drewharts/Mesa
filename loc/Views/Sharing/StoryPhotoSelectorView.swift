@@ -164,7 +164,7 @@ private struct PhotoOptionCell: View {
 
                 // Source badge
                 HStack(spacing: 4) {
-                    Image(systemName: photo.source == .tiktok ? "play.rectangle.fill" : "camera.fill")
+                    Image(systemName: photo.source == .externalVideo ? "play.rectangle.fill" : "camera.fill")
                         .font(.system(size: 10))
                     Text(photo.placeName)
                         .font(.system(size: 10, weight: .medium))

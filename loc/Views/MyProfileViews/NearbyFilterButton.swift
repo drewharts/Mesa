@@ -3,7 +3,7 @@
 //  loc
 //
 //  DUMB Component: Capsule-style filter toggle button
-//  Used by: TikToksPopupView for Recent/Nearby filter
+//  Used by: ExternalPlacesPopupView for Recent/Nearby filter
 
 import SwiftUI
 

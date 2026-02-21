@@ -65,7 +65,7 @@ struct ExternalPlaceDirectResponse: Codable {
     let userId: String
     let placeId: String?
     let source: String?
-    let url: String? // TikTok video URL
+    let url: String? // External video URL
     let addedAt: Date?
     let places: PlaceData? // Joined from places table
     
@@ -222,7 +222,7 @@ class UserService: ObservableObject {
     }
     
     /// Fetch external places for a specific place ID and user
-    /// Returns tuples of (external_place_id, url) for TikTok videos
+    /// Returns tuples of (external_place_id, url) for external videos
     func fetchExternalPlaceURLs(placeId: String, userId: String) async throws -> [(id: String, url: String)] {
         do {
             let response: [ExternalPlaceDirectResponse] = try await SupabaseManager.shared.client
@@ -288,6 +288,7 @@ class UserService: ObservableObject {
     
     /// Fetch all external places for a user (full objects with place data joined)
     /// Use fetchUserExternalPlaces(userId:limit:offset:) for paginated lightweight results
+
     func fetchAllUserExternalPlaces(userId: String) async throws -> [ExternalPlace] {
         do {
             // Fetch external places for the specific user, joining with places table for name/address
@@ -364,7 +365,7 @@ class UserService: ObservableObject {
                 print("⚠️ [UserService] No place data found for external place \(response.id) — using fallback values")
             }
 
-            // Coordinates are not critical for TikTok lookups - use defaults
+            // Coordinates are not critical for external place lookups - use defaults
             // The places table uses PostGIS 'location' geometry, not separate lat/lng columns
             let coordinates = ExternalPlaceCoordinates(
                 latitude: 0.0,
@@ -379,7 +380,7 @@ class UserService: ObservableObject {
                 name: placeData?.name ?? "Unknown Place",
                 placeId: response.placeId ?? response.id,
                 source: response.source ?? "unknown",
-                url: response.url // Store URL only - TikTok metadata fetched on-demand via oEmbed
+                url: response.url // Store URL only - metadata fetched on-demand via oEmbed
             )
 
             return externalPlace
@@ -597,28 +598,28 @@ class UserService: ObservableObject {
         completion(true, nil)
     }
     
-    func saveTikTokPlaceFlag(flag: TikTokPlaceFlag, completion: @escaping (Bool, Error?) -> Void) {
-        print("⚠️ [UserService] saveTikTokPlaceFlag not fully implemented")
+    func savePlaceFlag(flag: PlaceFlag, completion: @escaping (Bool, Error?) -> Void) {
+        print("⚠️ [UserService] savePlaceFlag not fully implemented")
         completion(true, nil)
     }
     
-    func hasUserFlaggedPlace(userId: String, placeId: String, completion: @escaping (TikTokPlaceFlag?, Error?) -> Void) {
+    func hasUserFlaggedPlace(userId: String, placeId: String, completion: @escaping (PlaceFlag?, Error?) -> Void) {
         print("⚠️ [UserService] hasUserFlaggedPlace not fully implemented")
         completion(nil, nil)
     }
     
-    func deleteTikTokPlaceFlag(userId: String, placeId: String, completion: @escaping (Bool, Error?) -> Void) {
-        print("⚠️ [UserService] deleteTikTokPlaceFlag not fully implemented")
+    func deletePlaceFlag(userId: String, placeId: String, completion: @escaping (Bool, Error?) -> Void) {
+        print("⚠️ [UserService] deletePlaceFlag not fully implemented")
         completion(true, nil)
     }
     
-    /// Deletes a TikTok place (external place) from the user's saved places
+    /// Deletes an external place from the user's saved places
     /// Single Responsibility: Coordinate deletion via SupabaseUserService
     /// - Parameters:
     ///   - userId: The user's ID
     ///   - placeId: The place ID to delete
     ///   - completion: Callback with optional error
-    func deleteTikTokPlace(userId: String, placeId: String, completion: @escaping (Error?) -> Void) {
+    func deleteExternalPlace(userId: String, placeId: String, completion: @escaping (Error?) -> Void) {
         Task {
             do {
                 try await supabase.deleteExternalPlaces(userId: userId, placeId: placeId)
@@ -626,7 +627,7 @@ class UserService: ObservableObject {
                     completion(nil)
                 }
             } catch {
-                print("❌ [UserService] Error deleting TikTok place: \(error)")
+                print("❌ [UserService] Error deleting external place: \(error)")
                 await MainActor.run {
                     completion(error)
                 }
@@ -634,18 +635,18 @@ class UserService: ObservableObject {
         }
     }
 
-    /// Creates a new external_places record for a TikTok place assignment.
+    /// Creates a new external_places record for a place assignment.
     func createExternalPlace(userId: String, placeId: String, url: String) async throws {
         try await supabase.insertExternalPlace(userId: userId, placeId: placeId, url: url)
     }
 
-    /// Updates the place association for a TikTok (external place) - for correcting wrong places
+    /// Updates the place association for an external place - for correcting wrong places
     /// Single Responsibility: Coordinate update via SupabaseUserService
     /// - Parameters:
     ///   - externalPlaceId: The external_places row ID to update
     ///   - newPlaceId: The new place ID to associate with
     ///   - userId: The user's ID for verification
-    func updateTikTokPlaceAssociation(externalPlaceId: String, newPlaceId: String, userId: String) async throws {
+    func updateExternalPlaceAssociation(externalPlaceId: String, newPlaceId: String, userId: String) async throws {
         try await supabase.updateExternalPlaceAssociation(
             externalPlaceId: externalPlaceId,
             newPlaceId: newPlaceId,
@@ -674,7 +675,7 @@ class UserService: ObservableObject {
     
     // MARK: - Place Savers
     
-    /// Fetches all users who have saved a specific place (via favorites, lists, TikToks, or reviews)
+    /// Fetches all users who have saved a specific place (via favorites, lists, external content, or reviews)
     /// - Parameters:
     ///   - placeId: The ID of the place to check
     ///   - requestingUserId: Optional - filters to only show the user + users they follow

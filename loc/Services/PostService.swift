@@ -19,7 +19,7 @@ class PostService: ObservableObject {
     
     // MARK: - Fetch Posts
     
-    func fetchPosts(placeId: String, latestOnly: Bool = false) async throws -> ([PlacePost], [TikTokVideo]) {
+    func fetchPosts(placeId: String, latestOnly: Bool = false) async throws -> ([PlacePost], [ExternalVideo]) {
         return try await supabase.fetchPlacePosts(placeId: placeId, latestOnly: latestOnly)
     }
     

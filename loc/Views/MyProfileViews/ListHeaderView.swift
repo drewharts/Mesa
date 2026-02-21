@@ -6,7 +6,7 @@
 //  Single Responsibility: Display header with title, shared filter, and add list actions
 //
 //  Layout: [LISTS label] ... [Shared button] [Plus button]
-//  Matches FAVORITES and TIKTOKS header style
+//  Matches FAVORITES and VIDEOS header style
 //
 //  Accepts state from ViewModel, contains no business logic
 //
@@ -30,7 +30,7 @@ struct ListHeaderView: View {
     
     var body: some View {
         HStack {
-            // Lists label on left (matches Favorites/TikToks style)
+            // Lists label on left (matches Favorites/Videos style)
             Text("Lists")
                 .font(.headline)
                 .fontWeight(.semibold)

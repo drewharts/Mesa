@@ -36,7 +36,7 @@ struct CardBasedListPreview: View {
     // Preload images for the first 6 priority tiles
     private func preloadPriorityImages() {
         // Use the optimized priority loading method
-        profile.tikTokViewModel.loadPriorityImagesForPlaces(previewPlaces, priorityCount: 6)
+        profile.externalContentViewModel.loadPriorityImagesForPlaces(previewPlaces, priorityCount: 6)
     }
     
     var body: some View {
@@ -162,8 +162,8 @@ struct PlacePreviewCard: View {
                 .overlay(
                     Group {
                         // Image loading matching popup view implementation
-                        if let thumbnailURL = getFirstTikTokThumbnail(for: place) {
-                            // Show TikTok thumbnail with proper phase handling
+                        if let thumbnailURL = getFirstExternalThumbnail(for: place) {
+                            // Show external video thumbnail with proper phase handling
                             AsyncImage(url: URL(string: thumbnailURL)) { phase in
                                 switch phase {
                                 case .success(let image):
@@ -276,16 +276,16 @@ struct PlacePreviewCard: View {
         .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
     }
     
-    private func getFirstTikTokThumbnail(for place: DetailPlace) -> String? {
-        // Check place's own TikTok videos first
-        if let placeTikTokVideos = place.tikTokVideos,
-           let firstVideo = placeTikTokVideos.first,
+    private func getFirstExternalThumbnail(for place: DetailPlace) -> String? {
+        // Check place's own external videos first
+        if let placeExternalVideos = place.externalVideos,
+           let firstVideo = placeExternalVideos.first,
            !firstVideo.thumbnailURL.isEmpty {
             return firstVideo.thumbnailURL
         }
         
-        // Check user's TikTok videos for this place (uses cached data)
-        return profile.tikTokViewModel.getFirstTikTokThumbnailURL(for: place.id.uuidString)
+        // Check user's external videos for this place (uses cached data)
+        return profile.externalContentViewModel.getFirstExternalThumbnailURL(for: place.id.uuidString)
     }
     
     private func getFirstPhotoUrl(for place: DetailPlace) -> String? {

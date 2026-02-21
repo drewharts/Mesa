@@ -450,7 +450,7 @@ struct ListContentView: View {
                 ForEach(Array(filteredPlaces.enumerated()), id: \.element.id) { index, place in
                     PopupPlaceCard(
                         place: place,
-                        preferTikTokThumbnail: true,
+                        preferExternalThumbnail: true,
                         onNavigate: onNavigateToPlace,
                         showAddedBy: list.isCollaborative
                     )

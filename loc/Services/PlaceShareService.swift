@@ -300,9 +300,9 @@ class PlaceShareService: ObservableObject {
             return photoUrls.first
         }
         
-        // Try to get image from TikTok videos
-        if let tikTokVideos = detailPlace.tikTokVideos, !tikTokVideos.isEmpty {
-            return tikTokVideos.first?.thumbnailURL
+        // Try to get image from external videos
+        if let externalVideos = detailPlace.externalVideos, !externalVideos.isEmpty {
+            return externalVideos.first?.thumbnailURL
         }
         
         return nil

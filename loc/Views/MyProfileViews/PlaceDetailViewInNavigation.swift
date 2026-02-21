@@ -142,7 +142,7 @@ struct PlaceDetailViewContent: View {
                         onAddToList: { showListSelection = true },
                         onAddReview: { showCreatePost = true },
                         onPlaceChanged: { newPlace in
-                            // Navigate to the new place after TikTok association change
+                            // Navigate to the new place after video association change
                             selectedPlaceVM.selectPlaceAndFetchDetails(newPlace, shouldAnimateMap: true)
                         }
                     )
@@ -204,8 +204,8 @@ struct PlaceDetailViewContent: View {
                 }
             }
             .onAppear {
-                // Refresh TikTok places when place detail view appears
-                profile.tikTokViewModel.refreshTikTokPlacesAfterImport()
+                // Refresh external places when place detail view appears
+                profile.externalContentViewModel.refreshExternalPlacesAfterImport()
             }
             // MARK: - Data-Driven Updates (View drives ViewModel state via modifiers)
             .modifier(PlaceChangeHandler(
@@ -218,11 +218,11 @@ struct PlaceDetailViewContent: View {
                 tabsViewModel: $tabsViewModel,
                 favoritesVM: profile.favoritesViewModel
             ))
-            .modifier(TikTokChangeHandler(
+            .modifier(ExternalContentChangeHandler(
                 tabsViewModel: $tabsViewModel,
                 selectedPlaceVM: selectedPlaceVM,
                 profile: profile,
-                tikTokVM: profile.tikTokViewModel
+                externalContentVM: profile.externalContentViewModel
             ))
 
             // Photo Gallery Overlay (Pinterest-style) - fills entire sheet
@@ -263,9 +263,9 @@ struct PlaceDetailViewContent: View {
             vm.setPlace(place)
             vm.setPosts(selectedPlaceVM.posts, rating: selectedPlaceVM.placeRating)
 
-            // Set TikTok videos
-            let userVideos = profile.tikTokViewModel.getTikTokVideosSync(for: place.id.uuidString)
-            vm.setTikTokVideos(placeVideos: selectedPlaceVM.tiktokVideos, userVideos: userVideos)
+            // Set external videos
+            let userVideos = profile.externalContentViewModel.getExternalVideosSync(for: place.id.uuidString)
+            vm.setExternalVideos(placeVideos: selectedPlaceVM.externalVideos, userVideos: userVideos)
 
             // Set post loading state
             let loadingState = selectedPlaceVM.postLoadingState(forPlaceId: place.id.uuidString)

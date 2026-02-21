@@ -60,7 +60,7 @@ struct locApp: App {
             placeService: services.placeService,
             userService: services.userService,
             selectedPlaceViewModel: selectedPlaceVM,
-            tikTokService: services.tikTokService,
+            externalContentService: services.externalContentService,
             detailPlaceViewModel: detailVM,
             profileViewModel: nil // Will be set after ProfileViewModel is created
         )
@@ -198,54 +198,54 @@ struct locApp: App {
                     }
                 }
                 .onContinueUserActivity("com.mesa.share.tiktok") { userActivity in
-                    // Handle TikTok share via NSUserActivity
-                    if let tikTokURL = userActivity.userInfo?["tikTokURL"] as? String {
-                        let deepLinkURL = URL(string: "loc://share/tiktok?url=\(tikTokURL.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")")!
+                    // Handle content share via NSUserActivity
+                    if let contentURL = userActivity.userInfo?["tikTokURL"] as? String {
+                        let deepLinkURL = URL(string: "loc://share/content?url=\(contentURL.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")")!
                         Task {
                             await deepLinkViewModel.processIncomingURL(deepLinkURL)
                         }
                     }
                 }
                 .onAppear {
-                    // Check for shared TikTok URLs on app launch
-                    checkForSharedTikTokURL()
+                    // Check for shared content URLs on app launch
+                    checkForSharedContentURL()
                 }
                 .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
-                    // Check for shared TikTok URLs when app becomes active
-                    checkForSharedTikTokURL()
+                    // Check for shared content URLs when app becomes active
+                    checkForSharedContentURL()
                 }
         }
     }
     
-    private func checkForSharedTikTokURL() {
+    private func checkForSharedContentURL() {
         // Check App Group first (preferred method)
         if let sharedDefaults = UserDefaults(suiteName: "group.com.drewhartsfield.mesa"),
            let appGroupURL = sharedDefaults.string(forKey: "sharedTikTokURL") {
             sharedDefaults.removeObject(forKey: "sharedTikTokURL")
             sharedDefaults.synchronize()
-            
-            print("🔗 [locApp] Found TikTok URL in App Group: \(appGroupURL)")
-            processSharedTikTokURL(appGroupURL)
+
+            print("🔗 [locApp] Found content URL in App Group: \(appGroupURL)")
+            processSharedContentURL(appGroupURL)
             return
         }
-        
+
         // Fallback: Check standard UserDefaults
         if let standardURL = UserDefaults.standard.string(forKey: "sharedTikTokURL") {
             UserDefaults.standard.removeObject(forKey: "sharedTikTokURL")
             UserDefaults.standard.synchronize()
-            
-            print("🔗 [locApp] Found TikTok URL in standard UserDefaults: \(standardURL)")
-            processSharedTikTokURL(standardURL)
+
+            print("🔗 [locApp] Found content URL in standard UserDefaults: \(standardURL)")
+            processSharedContentURL(standardURL)
         }
     }
-    
-    private func processSharedTikTokURL(_ urlString: String) {
+
+    private func processSharedContentURL(_ urlString: String) {
         guard let encodedURL = urlString.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
-              let deepLinkURL = URL(string: "loc://share/tiktok?url=\(encodedURL)") else {
+              let deepLinkURL = URL(string: "loc://share/content?url=\(encodedURL)") else {
             print("❌ [locApp] Failed to create deep link URL from: \(urlString)")
             return
         }
-        
+
         Task {
             await deepLinkViewModel.processIncomingURL(deepLinkURL)
         }
