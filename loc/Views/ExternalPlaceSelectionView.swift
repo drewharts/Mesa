@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct TikTokPlaceSelectionView: View {
+struct ExternalPlaceSelectionView: View {
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
@@ -10,27 +10,27 @@ struct TikTokPlaceSelectionView: View {
     @State private var showingListSelection = false
     @State private var listSelectionViewModel: PlaceListSelectionViewModel?
 
-    /// Convenience accessor for TikTok view model.
-    private var tikTokVM: ProfileTikTokViewModel { profile.tikTokViewModel }
+    /// Convenience accessor for external content view model.
+    private var externalContentVM: ProfileExternalContentViewModel { profile.externalContentViewModel }
 
     var body: some View {
         NavigationView {
             VStack(spacing: 0) {
-                // TikTok Thumbnail Header
-                if let firstPlace = tikTokVM.importedPlaces.first,
-                   let firstTikTokVideo = firstPlace.tikTokVideos?.first,
-                   !firstTikTokVideo.thumbnailURL.isEmpty {
+                // Video Thumbnail Header
+                if let firstPlace = externalContentVM.importedPlaces.first,
+                   let firstExternalVideo = firstPlace.externalVideos?.first,
+                   !firstExternalVideo.thumbnailURL.isEmpty {
                     
                     VStack(spacing: 12) {
-                        Text("Found Places in TikTok")
+                        Text("Detected Places")
                             .font(.headline)
                             .padding(.top, 16)
                         
-                        Text("Found \(tikTokVM.importedPlaces.count) place\(tikTokVM.importedPlaces.count == 1 ? "" : "s")")
+                        Text("Found \(externalContentVM.importedPlaces.count) place\(externalContentVM.importedPlaces.count == 1 ? "" : "s")")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                         
-                        AsyncImage(url: URL(string: firstTikTokVideo.thumbnailURL)) { image in
+                        AsyncImage(url: URL(string: firstExternalVideo.thumbnailURL)) { image in
                             image
                                 .resizable()
                                 .aspectRatio(contentMode: .fill)
@@ -49,8 +49,8 @@ struct TikTokPlaceSelectionView: View {
                                 .stroke(Color.gray.opacity(0.3), lineWidth: 1)
                         )
                         
-                        if !firstTikTokVideo.author.displayName.isEmpty {
-                            Text("@\(firstTikTokVideo.author.displayName)")
+                        if !firstExternalVideo.author.displayName.isEmpty {
+                            Text("@\(firstExternalVideo.author.displayName)")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
@@ -61,24 +61,24 @@ struct TikTokPlaceSelectionView: View {
                 // Places List
                 ScrollView {
                     LazyVStack(spacing: 12) {
-                        ForEach(tikTokVM.importedPlaces, id: \.id) { place in
+                        ForEach(externalContentVM.importedPlaces, id: \.id) { place in
                             PlaceRowView(
                                 place: place,
                                 onBookmarkTapped: {
-                                    print("🔍 [TikTokPlaceSelectionView] Bookmark tapped for place: \(place.name)")
+                                    print("🔍 [ExternalPlaceSelectionView] Bookmark tapped for place: \(place.name)")
                                     profile.listsViewModel.ensureListsLoaded()
                                     selectedPlaceForList = place
                                     showingListSelection = true
                                 },
                                 onPlaceTapped: {
-                                    print("📍 [TikTokPlaceSelectionView] Place tapped: \(place.name)")
+                                    print("📍 [ExternalPlaceSelectionView] Place tapped: \(place.name)")
                                     
                                     // First dismiss this sheet, then navigate to place detail
                                     profile.clearPlaceSelection()
 
                                     // Use a small delay to ensure sheet dismissal completes before navigation
                                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                        // Animate map to place location when tapping from TikTok selection
+                                        // Animate map to place location when tapping from video selection
                                         selectedPlaceVM.selectPlaceAndFetchDetails(place, shouldAnimateMap: true)
                                         selectedPlaceVM.isDetailSheetPresented = true
                                     }
@@ -109,7 +109,7 @@ struct TikTokPlaceSelectionView: View {
                 }
                 .padding(.bottom, 20)
             }
-            .navigationTitle("TikTok Places")
+            .navigationTitle("Detected Places")
             .navigationBarTitleDisplayMode(.inline)
             .navigationBarBackButtonHidden(true)
             .onAppear {

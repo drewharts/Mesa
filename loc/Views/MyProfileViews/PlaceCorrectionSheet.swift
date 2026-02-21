@@ -1,14 +1,14 @@
 //
-//  TikTokPlaceCorrectionSheet.swift
+//  PlaceCorrectionSheet.swift
 //  loc
 //
-//  Single Responsibility: Purely declarative UI for TikTok place correction/assignment.
-//  MVVM: All business logic lives in TikTokPlaceCorrectionViewModel.
+//  Single Responsibility: Purely declarative UI for place correction/assignment.
+//  MVVM: All business logic lives in PlaceCorrectionViewModel.
 
 import SwiftUI
 
-struct TikTokPlaceCorrectionSheet: View {
-    @StateObject private var viewModel: TikTokPlaceCorrectionViewModel
+struct PlaceCorrectionSheet: View {
+    @StateObject private var viewModel: PlaceCorrectionViewModel
 
     /// Callback when place is successfully changed - passes the resolved DetailPlace.
     var onPlaceChanged: ((DetailPlace) -> Void)?
@@ -16,17 +16,21 @@ struct TikTokPlaceCorrectionSheet: View {
     @EnvironmentObject var profile: ProfileViewModel
     @Environment(\.dismiss) var dismiss
 
-    init(mode: TikTokPlaceAssignmentMode, onPlaceChanged: ((DetailPlace) -> Void)? = nil) {
-        self._viewModel = StateObject(wrappedValue: TikTokPlaceCorrectionViewModel(mode: mode))
+    init(mode: PlaceAssignmentMode, onPlaceChanged: ((DetailPlace) -> Void)? = nil) {
+        self._viewModel = StateObject(wrappedValue: PlaceCorrectionViewModel(mode: mode))
         self.onPlaceChanged = onPlaceChanged
     }
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                currentPlaceHeader
-                searchSection
-                searchResultsList
+                if viewModel.needsVideoSelection && !viewModel.hasSelectedVideo {
+                    videoSelectorContent
+                } else {
+                    currentPlaceHeader
+                    searchSection
+                    searchResultsList
+                }
             }
             .navigationTitle(viewModel.navigationTitle)
             .navigationBarTitleDisplayMode(.inline)
@@ -45,11 +49,50 @@ struct TikTokPlaceCorrectionSheet: View {
             }
             .onChange(of: viewModel.didComplete) { _, completed in
                 if completed, let place = viewModel.resolvedPlace {
-                    profile.tikTokViewModel.refreshTikTokPlacesAfterImport()
+                    profile.externalContentViewModel.refreshExternalPlacesAfterImport()
                     dismiss()
                     onPlaceChanged?(place)
                 }
             }
+        }
+    }
+
+    // MARK: - Video Selector
+
+    /// Displays video thumbnails so the user can pick which video to correct.
+    private var videoSelectorContent: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Which video has the wrong place?")
+                .font(.headline)
+                .padding(.horizontal)
+                .padding(.top, 16)
+
+            Text("Tap the video you'd like to correct")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+                .padding(.horizontal)
+
+            videosGrid
+        }
+    }
+
+    /// Displays a scrollable grid of video thumbnails for selection.
+    private var videosGrid: some View {
+        ScrollView {
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                ForEach(viewModel.enrichedVideos, id: \.videoID) { video in
+                    Button {
+                        viewModel.selectVideo(video)
+                    } label: {
+                        VideoThumbnailCard(video: video)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal)
+        }
+        .onAppear {
+            viewModel.loadVideoThumbnails()
         }
     }
 

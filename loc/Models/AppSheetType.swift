@@ -15,15 +15,15 @@ enum AppSheetType: Identifiable, Equatable {
 
     case placeDetail
 
-    // MARK: - TikTok Import
+    // MARK: - External Content Import
 
-    case tikTokPlaceSelection
-    case tikTokNoPlacesFound(tikTokUrl: String)
+    case externalPlaceSelection
+    case noPlacesFound(contentUrl: String)
 
     // MARK: - Map Popups (User's Own Data)
 
     case list(listId: String)
-    case tiktoks
+    case externalVideos
     case reviews
     case favorites
     case myPlaces
@@ -48,14 +48,14 @@ enum AppSheetType: Identifiable, Equatable {
         switch self {
         case .placeDetail:
             return "placeDetail"
-        case .tikTokPlaceSelection:
-            return "tikTokPlaceSelection"
-        case .tikTokNoPlacesFound(let tikTokUrl):
-            return "tikTokNoPlacesFound-\(tikTokUrl)"
+        case .externalPlaceSelection:
+            return "externalPlaceSelection"
+        case .noPlacesFound(let contentUrl):
+            return "noPlacesFound-\(contentUrl)"
         case .list(let listId):
             return "list-\(listId)"
-        case .tiktoks:
-            return "tiktoks"
+        case .externalVideos:
+            return "externalVideos"
         case .reviews:
             return "reviews"
         case .favorites:
@@ -81,13 +81,13 @@ enum AppSheetType: Identifiable, Equatable {
         switch (lhs, rhs) {
         case (.placeDetail, .placeDetail):
             return true
-        case (.tikTokPlaceSelection, .tikTokPlaceSelection):
+        case (.externalPlaceSelection, .externalPlaceSelection):
             return true
-        case (.tikTokNoPlacesFound(let lhsUrl), .tikTokNoPlacesFound(let rhsUrl)):
+        case (.noPlacesFound(let lhsUrl), .noPlacesFound(let rhsUrl)):
             return lhsUrl == rhsUrl
         case (.list(let lhsId), .list(let rhsId)):
             return lhsId == rhsId
-        case (.tiktoks, .tiktoks):
+        case (.externalVideos, .externalVideos):
             return true
         case (.reviews, .reviews):
             return true

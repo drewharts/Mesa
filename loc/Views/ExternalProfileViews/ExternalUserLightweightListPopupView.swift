@@ -177,7 +177,7 @@ struct ExternalUserLightweightListContentScrollView: View {
                 ForEach(Array(places.enumerated()), id: \.element.id) { _, place in
                     PopupPlaceCard(
                         place: place,
-                        preferTikTokThumbnail: true,
+                        preferExternalThumbnail: true,
                         onNavigate: onNavigateToPlace
                     )
                 }

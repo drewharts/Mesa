@@ -35,7 +35,7 @@ struct MapView: View {
     private var isPlaceSelected: Bool {
         selectedPlaceVM.isDetailSheetPresented ||
         mapViewModel.showingListPopup ||
-        mapViewModel.showingTikToksPopup ||
+        mapViewModel.showingExternalPlacesPopup ||
         mapViewModel.showingReviewsPopup ||
         mapViewModel.showingFavoritesPopup ||
         mapViewModel.showingExternalListPopup ||
@@ -204,7 +204,7 @@ struct MapView: View {
                     // Check if any popup sheet is open - if so, navigate within the sheet instead
                     // MVVM: View coordinates navigation based on ViewModel state
                     if mapViewModel.showingListPopup ||
-                       mapViewModel.showingTikToksPopup ||
+                       mapViewModel.showingExternalPlacesPopup ||
                        mapViewModel.showingReviewsPopup ||
                        mapViewModel.showingFavoritesPopup ||
                        mapViewModel.showingExternalListPopup ||

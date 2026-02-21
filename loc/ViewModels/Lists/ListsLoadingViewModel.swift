@@ -232,11 +232,11 @@ class ListsLoadingViewModel: ObservableObject {
             }
         }
 
-        // Prefetch TikTok metadata
-        let allTiktokUrls = allPlaces.values.flatMap { $0.compactMap { $0.tiktok_url } }.filter { !$0.isEmpty }
-        if !allTiktokUrls.isEmpty {
+        // Prefetch external content metadata
+        let allContentUrls = allPlaces.values.flatMap { $0.compactMap { $0.content_url } }.filter { !$0.isEmpty }
+        if !allContentUrls.isEmpty {
             Task {
-                await TikTokMetadataCache.shared.prefetchMetadata(for: Array(allTiktokUrls))
+                await ExternalMetadataCache.shared.prefetchMetadata(for: Array(allContentUrls))
             }
         }
 

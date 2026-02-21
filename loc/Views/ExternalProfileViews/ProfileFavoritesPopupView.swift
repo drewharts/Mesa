@@ -126,7 +126,7 @@ struct ProfileFavoritesPopupView: View {
             ForEach(viewModel.lightweightFavorites, id: \.id) { place in
                 PopupPlaceCard(
                     place: place,
-                    preferTikTokThumbnail: false,
+                    preferExternalThumbnail: false,
                     onNavigate: { placeId in
                         navigationPath.append(placeId)
                     }

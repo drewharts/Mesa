@@ -2,8 +2,8 @@
 //  ProfileGridPlaceCard.swift
 //  loc
 //
-//  Unified 90px-height place card for all profile preview grids (Favorites, TikToks, Reviews).
-//  Replaces LightweightFavoritePlaceCard, TikTokPlaceCard, ReviewsPlaceCard, and ExternalReviewPlaceCardView.
+//  Unified 90px-height place card for all profile preview grids (Favorites, Videos, Reviews).
+//  Replaces LightweightFavoritePlaceCard, ExternalPlaceCard, ReviewsPlaceCard, and ExternalReviewPlaceCardView.
 //
 //  Single Responsibility: Display a compact place card with photo, gradient overlay, and name.
 //
@@ -16,11 +16,11 @@ struct ProfileGridPlaceCard: View {
     let name: String
     let photoUrl: String?
     let placeId: String
-    var tiktokUrl: String? = nil
-    var preferTikTokThumbnail: Bool = false
+    var contentUrl: String? = nil
+    var preferExternalThumbnail: Bool = false
     var height: CGFloat = 90
 
-    @ObservedObject private var tikTokCache = TikTokMetadataCache.shared
+    @ObservedObject private var externalMetadataCache = ExternalMetadataCache.shared
 
     // MARK: - Computed Properties
 
@@ -57,8 +57,8 @@ struct ProfileGridPlaceCard: View {
             .frame(height: height)
             .overlay(
                 Group {
-                    if preferTikTokThumbnail {
-                        tiktokFirstImageContent
+                    if preferExternalThumbnail {
+                        externalFirstImageContent
                     } else {
                         photoFirstImageContent
                     }
@@ -67,9 +67,9 @@ struct ProfileGridPlaceCard: View {
             )
     }
 
-    /// Displays TikTok thumbnail first, falling back to review photo.
+    /// Displays external video thumbnail first, falling back to review photo.
     @ViewBuilder
-    private var tiktokFirstImageContent: some View {
+    private var externalFirstImageContent: some View {
         if let thumbnailURL = thumbnailURL {
             asyncImageView(url: thumbnailURL)
         } else if let photoURL = photoURL {
@@ -79,7 +79,7 @@ struct ProfileGridPlaceCard: View {
         }
     }
 
-    /// Displays review photo first, falling back to TikTok thumbnail.
+    /// Displays review photo first, falling back to external video thumbnail.
     @ViewBuilder
     private var photoFirstImageContent: some View {
         if let photoURL = photoURL {
@@ -136,8 +136,8 @@ struct ProfileGridPlaceCard: View {
     // MARK: - Computed URLs
 
     private var thumbnailURL: URL? {
-        guard let tiktokUrl = tiktokUrl,
-              let urlString = TikTokMetadataCache.shared.getCachedThumbnailUrl(for: tiktokUrl)
+        guard let contentUrl = contentUrl,
+              let urlString = ExternalMetadataCache.shared.getCachedThumbnailUrl(for: contentUrl)
         else { return nil }
         return URL(string: urlString)
     }
@@ -147,10 +147,10 @@ struct ProfileGridPlaceCard: View {
         return URL(string: urlString)
     }
 
-    /// Prefetches TikTok thumbnail metadata if applicable.
+    /// Prefetches external video thumbnail metadata if applicable.
     private func prefetchThumbnailIfNeeded() {
-        guard let tiktokUrl = tiktokUrl else { return }
-        Task { _ = await TikTokMetadataCache.shared.getMetadata(for: tiktokUrl) }
+        guard let contentUrl = contentUrl else { return }
+        Task { _ = await ExternalMetadataCache.shared.getMetadata(for: contentUrl) }
     }
 }
 
@@ -162,18 +162,18 @@ extension ProfileGridPlaceCard {
         self.name = favoritePlace.name
         self.photoUrl = favoritePlace.latest_review_photo
         self.placeId = favoritePlace.place_id
-        self.tiktokUrl = nil
-        self.preferTikTokThumbnail = false
+        self.contentUrl = nil
+        self.preferExternalThumbnail = false
         self.height = 90
     }
 
     /// Creates a card from a LightweightPlace model.
-    init(place: LightweightPlace, preferTikTokThumbnail: Bool = false) {
+    init(place: LightweightPlace, preferExternalThumbnail: Bool = false) {
         self.name = place.name
         self.photoUrl = place.latest_review_photo
         self.placeId = place.place_id
-        self.tiktokUrl = place.tiktok_url
-        self.preferTikTokThumbnail = preferTikTokThumbnail
+        self.contentUrl = place.content_url
+        self.preferExternalThumbnail = preferExternalThumbnail
         self.height = 90
     }
 }

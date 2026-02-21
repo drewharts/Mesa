@@ -80,7 +80,7 @@ class PresentationService: ObservableObject {
     var isShowingMapPopup: Bool {
         guard let sheet = activeSheet else { return false }
         switch sheet {
-        case .list, .tiktoks, .reviews, .favorites, .myPlaces,
+        case .list, .externalVideos, .reviews, .favorites, .myPlaces,
              .externalReviews, .externalList, .externalFavorites, .keywordResults:
             return true
         default:

@@ -142,7 +142,7 @@ class MapDisplayCoordinatorViewModel: ObservableObject {
                 name: fav.name,
                 latest_review_photo: fav.latest_review_photo,
                 external_place_id: nil,
-                tiktok_url: nil,
+                content_url: nil,
                 added_by_user_id: nil,
                 added_by_name: nil,
                 added_by_photo_url: nil

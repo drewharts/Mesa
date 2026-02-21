@@ -14,6 +14,6 @@ struct ReviewsPlaceCard: View {
     let place: LightweightPlace
 
     var body: some View {
-        ProfileGridPlaceCard(place: place, preferTikTokThumbnail: false)
+        ProfileGridPlaceCard(place: place, preferExternalThumbnail: false)
     }
 }

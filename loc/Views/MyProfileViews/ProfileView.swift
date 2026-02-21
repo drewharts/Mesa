@@ -20,10 +20,10 @@ struct ProfileView: View {
     @EnvironmentObject var serviceContainer: ServiceContainer
     @EnvironmentObject var locationManager: LocationManager
     @StateObject private var photoImportVM = PhotoImportViewModel()
-    @StateObject private var tikTokService = TikTokService()
+    @StateObject private var externalContentService = ExternalContentService()
 
-    /// Convenience accessor for TikTok view model.
-    private var tikTokVM: ProfileTikTokViewModel { profile.tikTokViewModel }
+    /// Convenience accessor for external content view model.
+    private var externalContentVM: ProfileExternalContentViewModel { profile.externalContentViewModel }
 
     @State private var showCreatePost = false
     @State private var postWasSubmitted = false
@@ -80,7 +80,7 @@ struct ProfileView: View {
                 photoImportVM: photoImportVM,
                 profile: profile,
                 placeVM: placeVM,
-                tikTokVM: profile.tikTokViewModel,
+                externalContentVM: profile.externalContentViewModel,
                 showCreatePost: $showCreatePost,
                 postWasSubmitted: $postWasSubmitted
             ))
@@ -90,7 +90,7 @@ struct ProfileView: View {
                 placeVM: placeVM,
                 showCreatePost: $showCreatePost,
                 postWasSubmitted: $postWasSubmitted,
-                tikTokService: tikTokService,
+                externalContentService: externalContentService,
                 hasRefreshedPlaces: $hasRefreshedPlaces
             ))
             .alert("No Location Found", isPresented: $deepLinkViewModel.showNoLocationAlert) {
@@ -101,10 +101,10 @@ struct ProfileView: View {
                 Text(deepLinkViewModel.noLocationAlertMessage)
             }
             .sheet(isPresented: Binding(
-                get: { tikTokVM.isShowingNoPlacesFound },
-                set: { tikTokVM.isShowingNoPlacesFound = $0 }
+                get: { externalContentVM.isShowingNoPlacesFound },
+                set: { externalContentVM.isShowingNoPlacesFound = $0 }
             )) {
-                TikTokNoPlacesFoundView(tikTokUrl: tikTokVM.noPlacesFoundTikTokUrl)
+                NoPlacesFoundView(contentUrl: externalContentVM.noPlacesFoundContentUrl)
                     .environmentObject(profile)
                     .environmentObject(userSession)
                     .environmentObject(placeVM)
@@ -133,27 +133,27 @@ struct ProfileView: View {
                 socialVM: profile.socialViewModel,
                 myPlacesVM: profile.myPlacesViewModel,
                 favoritesVM: profile.favoritesViewModel,
-                tikTokVM: profile.tikTokViewModel,
+                externalContentVM: profile.externalContentViewModel,
                 reviewsVM: profile.reviewsViewModel,
                 listsVM: profile.listsViewModel,
                 photoImportVM: photoImportVM,
                 navigationPath: $navigationPath
             )
             
-            // TikTok Processing Overlay
-            if tikTokVM.isProcessingTikTok || tikTokVM.isWaitingForPlaceDetail || deepLinkViewModel.isProcessingDeepLink {
-                tikTokOverlay
+            // Content Processing Overlay
+            if externalContentVM.isProcessingContent || externalContentVM.isWaitingForPlaceDetail || deepLinkViewModel.isProcessingDeepLink {
+                externalContentOverlay
             }
         }
     }
     
-    private var tikTokOverlay: some View {
+    private var externalContentOverlay: some View {
         ZStack {
             Color.black.opacity(0.4)
                 .ignoresSafeArea()
             
             VStack(spacing: 16) {
-                if tikTokVM.tikTokImportError != nil {
+                if externalContentVM.importError != nil {
                     errorContent
                 } else {
                     loadingContent
@@ -175,14 +175,14 @@ struct ProfileView: View {
                 .font(.headline)
                 .foregroundColor(.white)
             
-            Text(tikTokVM.tikTokImportError ?? "")
+            Text(externalContentVM.importError ?? "")
                 .font(.subheadline)
                 .foregroundColor(.white.opacity(0.8))
                 .multilineTextAlignment(.center)
                 .padding(.horizontal)
 
             Button("OK") {
-                tikTokVM.clearTikTokImportError()
+                externalContentVM.clearImportError()
             }
             .foregroundColor(.white)
             .padding(.horizontal, 24)
@@ -198,7 +198,7 @@ struct ProfileView: View {
                 .scaleEffect(1.5)
                 .progressViewStyle(CircularProgressViewStyle(tint: .white))
             
-            Text("Processing TikTok Video...")
+            Text("Processing Video...")
                 .font(.headline)
                 .foregroundColor(.white)
             
@@ -283,7 +283,7 @@ struct SheetsModifier: ViewModifier {
     @ObservedObject var photoImportVM: PhotoImportViewModel
     @ObservedObject var profile: ProfileViewModel
     @ObservedObject var placeVM: DetailPlaceViewModel
-    @ObservedObject var tikTokVM: ProfileTikTokViewModel
+    @ObservedObject var externalContentVM: ProfileExternalContentViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @Binding var showCreatePost: Bool
     @EnvironmentObject var userSession: UserSession
@@ -296,10 +296,10 @@ struct SheetsModifier: ViewModifier {
                 PlaceSelectionView(photoImportVM: photoImportVM)
             }
             .sheet(isPresented: Binding(
-                get: { tikTokVM.isShowingPlaceSelection },
-                set: { tikTokVM.isShowingPlaceSelection = $0 }
+                get: { externalContentVM.isShowingPlaceSelection },
+                set: { externalContentVM.isShowingPlaceSelection = $0 }
             )) {
-                TikTokPlaceSelectionView()
+                ExternalPlaceSelectionView()
                     .environmentObject(profile)
                     .environmentObject(selectedPlaceVM)
                     .environmentObject(placeVM)
@@ -308,10 +308,10 @@ struct SheetsModifier: ViewModifier {
                     .presentationDragIndicator(.visible)
             }
             .sheet(isPresented: Binding(
-                get: { tikTokVM.isShowingNoPlacesFound },
-                set: { tikTokVM.isShowingNoPlacesFound = $0 }
+                get: { externalContentVM.isShowingNoPlacesFound },
+                set: { externalContentVM.isShowingNoPlacesFound = $0 }
             )) {
-                TikTokNoPlacesFoundView(tikTokUrl: tikTokVM.noPlacesFoundTikTokUrl)
+                NoPlacesFoundView(contentUrl: externalContentVM.noPlacesFoundContentUrl)
                     .environmentObject(profile)
                     .environmentObject(userSession)
                     .environmentObject(placeVM)
@@ -394,7 +394,7 @@ struct StateChangesModifier: ViewModifier {
     @EnvironmentObject var deepLinkViewModel: DeepLinkViewModel
     @Binding var showCreatePost: Bool
     @Binding var postWasSubmitted: Bool
-    @ObservedObject var tikTokService: TikTokService
+    @ObservedObject var externalContentService: ExternalContentService
     @Binding var hasRefreshedPlaces: Bool  // Track if refresh already happened
     
     func body(content: Content) -> some View {
@@ -402,7 +402,7 @@ struct StateChangesModifier: ViewModifier {
             .onAppear {
                 // Places are already loaded in startup phase - no need to refresh again
                 // This was causing 1.7s delay on profile view appearance
-                // External places (TikTok) are loaded on-demand when user swipes to that tab
+                // External places are loaded on-demand when user swipes to that tab
             }
             .onChange(of: photoImportVM.selectedItems) {
                 Task {
@@ -411,8 +411,8 @@ struct StateChangesModifier: ViewModifier {
             }
             .onAppear {
                 setupCallbacks()
-                profile.checkPendingTikTokURL(
-                    tikTokService: tikTokService,
+                profile.checkPendingContentURL(
+                    externalContentService: externalContentService,
                     selectedPlaceVM: selectedPlaceVM,
                     placeVM: placeVM
                 )
@@ -429,8 +429,8 @@ struct StateChangesModifier: ViewModifier {
             .onChange(of: photoImportVM.shouldNavigateToPlaceDetail) {
                 handlePlaceDetailNavigation()
             }
-            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ProcessSharedTikTok"))) { notification in
-                handleTikTokNotification(notification)
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ProcessSharedContent"))) { notification in
+                handleExternalContentNotification(notification)
             }
     }
     
@@ -475,11 +475,11 @@ struct StateChangesModifier: ViewModifier {
         }
     }
     
-    private func handleTikTokNotification(_ notification: Notification) {
+    private func handleExternalContentNotification(_ notification: Notification) {
         if let url = notification.userInfo?["url"] as? String {
-            profile.handleTikTokNotification(
+            profile.handleContentNotification(
                 url: url,
-                tikTokService: tikTokService,
+                externalContentService: externalContentService,
                 selectedPlaceVM: selectedPlaceVM,
                 placeVM: placeVM
             )

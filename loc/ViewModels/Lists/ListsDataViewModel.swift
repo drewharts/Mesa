@@ -135,6 +135,21 @@ class ListsDataViewModel: ObservableObject {
         }
     }
 
+    /// Renames a lightweight place list in the database and updates local state.
+    func renameList(_ list: LightweightPlaceList, newName: String) async -> Result<Void, Error> {
+        do {
+            try await PlaceListService.shared.updateListName(listId: list.list_id, name: newName)
+
+            if let index = lightweightPlaceLists.firstIndex(where: { $0.list_id == list.list_id }) {
+                lightweightPlaceLists[index].name = newName
+            }
+
+            return .success(())
+        } catch {
+            return .failure(error)
+        }
+    }
+
     /// Deletes a lightweight place list from database and removes from local state.
     func deleteLightweightList(_ list: LightweightPlaceList) async -> Result<Void, Error> {
         do {

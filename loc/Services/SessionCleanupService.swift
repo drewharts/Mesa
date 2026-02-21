@@ -72,7 +72,7 @@ final class SessionCleanupService {
     // MARK: - Private Methods
     
     private func clearViewModelCaches() {
-        // Clear ProfileViewModel's user-specific data (profile picture, TikToks, reviewed places, etc.)
+        // Clear ProfileViewModel's user-specific data (profile picture, external content, reviewed places, etc.)
         profileViewModel?.clearAllUserData()
 
         // Clear navigation ViewModel's cached user data
@@ -84,7 +84,7 @@ final class SessionCleanupService {
         // Clear DetailPlaceViewModel's user-specific data (profile pictures, places, annotations)
         detailPlaceViewModel?.clearAllUserData()
 
-        // Clear SelectedPlaceViewModel's cached posts and TikToks
+        // Clear SelectedPlaceViewModel's cached posts and external videos
         selectedPlaceViewModel?.clearAllUserData()
     }
     
@@ -95,8 +95,8 @@ final class SessionCleanupService {
     }
     
     private func clearMetadataCaches() {
-        // Clear TikTok metadata cache
-        TikTokMetadataCache.shared.clearCache()
+        // Clear external metadata cache
+        ExternalMetadataCache.shared.clearCache()
     }
     
     private func clearUserActivityCaches() {

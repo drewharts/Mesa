@@ -9,7 +9,7 @@ import Foundation
 
 struct MesaBackendConfig {
     /// Base URL for all Mesa backend API requests.
-    static let baseURL = "https://mesa.drewharts.com"
+    static let baseURL = "https://mesa-backend-staging.up.railway.app"
 
     /// Host used for universal links and associated domains.
     static let universalLinkHost = "mesa.drewharts.com"

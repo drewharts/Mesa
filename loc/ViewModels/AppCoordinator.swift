@@ -39,7 +39,7 @@ class AppCoordinator: ObservableObject {
 
     // MARK: - Loading States
     @Published var isProcessingDeepLink = false
-    @Published var isProcessingTikTok = false
+    @Published var isProcessingContent = false
     
     // MARK: - Alert State
     @Published var showAlert = false

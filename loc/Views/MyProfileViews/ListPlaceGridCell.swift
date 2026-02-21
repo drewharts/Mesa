@@ -17,15 +17,15 @@ struct ListPlaceGridCell: View {
     @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
     @Environment(\.presentationMode) var presentationMode
 
-    private var firstTikTokThumbnail: String? {
-        // Check place's own TikTok videos first
-        if let placeTikTokVideos = place.tikTokVideos,
-           let firstVideo = placeTikTokVideos.first {
+    private var firstExternalThumbnail: String? {
+        // Check place's own external videos first
+        if let placeExternalVideos = place.externalVideos,
+           let firstVideo = placeExternalVideos.first {
             return firstVideo.thumbnailURL
         }
         
-        // Check user's TikTok videos for this place (uses cached data)
-        return profile.tikTokViewModel.getFirstTikTokThumbnailURL(for: place.id.uuidString)
+        // Check user's external videos for this place (uses cached data)
+        return profile.externalContentViewModel.getFirstExternalThumbnailURL(for: place.id.uuidString)
     }
 
     var body: some View {
@@ -36,8 +36,8 @@ struct ListPlaceGridCell: View {
         }) {
             VStack(alignment: .leading, spacing: 0) {
                 ZStack(alignment: .bottom) {
-                    if let thumbnailURL = firstTikTokThumbnail {
-                        // Show TikTok thumbnail
+                    if let thumbnailURL = firstExternalThumbnail {
+                        // Show external video thumbnail
                         AsyncImage(url: URL(string: thumbnailURL)) { image in
                             image
                                 .resizable()

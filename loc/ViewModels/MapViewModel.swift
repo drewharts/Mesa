@@ -30,7 +30,7 @@ class MapViewModel: ObservableObject {
     var hasLoadedPhotos: Bool { photoViewModel.hasLoadedPhotos }
 
     var selectedListId: String? { filteringViewModel.selectedListId }
-    var showingTikToksOnMap: Bool { filteringViewModel.showingTikToksOnMap }
+    var showingExternalPlacesOnMap: Bool { filteringViewModel.showingExternalPlacesOnMap }
     var showingReviewsOnMap: Bool { filteringViewModel.showingReviewsOnMap }
     var showingFavoritesOnMap: Bool { filteringViewModel.showingFavoritesOnMap }
     var showingMyPlacesOnMap: Bool { filteringViewModel.showingMyPlacesOnMap }
@@ -71,7 +71,7 @@ class MapViewModel: ObservableObject {
         if case .list = sheet { return true }
         return false
     }
-    var showingTikToksPopup: Bool { PresentationService.shared.activeSheet == .tiktoks }
+    var showingExternalPlacesPopup: Bool { PresentationService.shared.activeSheet == .externalVideos }
     var showingReviewsPopup: Bool { PresentationService.shared.activeSheet == .reviews }
     var showingExternalReviewsPopup: Bool { PresentationService.shared.activeSheet == .externalReviews }
     var showingExternalListPopup: Bool {
@@ -150,10 +150,10 @@ class MapViewModel: ObservableObject {
         // when handleMapPopupDisappear() sets selectedListIdForMap = nil
     }
 
-    /// Sets the map to show only TikTok places.
-    func selectTikToks() {
-        filteringViewModel.selectTikToks()
-        PresentationService.shared.present(.tiktoks)
+    /// Sets the map to show only external places.
+    func selectExternalPlaces() {
+        filteringViewModel.selectExternalPlaces()
+        PresentationService.shared.present(.externalVideos)
     }
 
     /// Sets the map to show only reviewed places.
@@ -208,7 +208,7 @@ class MapViewModel: ObservableObject {
     /// Returns true if the given sheet type requires clearing map filters when dismissed.
     func isFilterRelatedSheet(_ sheet: AppSheetType) -> Bool {
         switch sheet {
-        case .list, .tiktoks, .reviews, .favorites, .myPlaces,
+        case .list, .externalVideos, .reviews, .favorites, .myPlaces,
              .externalReviews, .externalList, .externalFavorites,
              .keywordResults:
             return true
@@ -217,7 +217,7 @@ class MapViewModel: ObservableObject {
         }
     }
 
-    /// Clears all special filters (list, TikToks, reviews, favorites, my places, external).
+    /// Clears all special filters (list, external places, reviews, favorites, my places, external).
     func clearAllFilters() {
         filteringViewModel.clearAllFilters()
         externalUserViewModel.clearAllFilters()
@@ -292,7 +292,7 @@ class MapViewModel: ObservableObject {
     private func buildFilterState() -> MapFilterState {
         return MapFilterState(
             selectedListId: filteringViewModel.selectedListId,
-            showingTikToksOnMap: filteringViewModel.showingTikToksOnMap,
+            showingExternalPlacesOnMap: filteringViewModel.showingExternalPlacesOnMap,
             showingReviewsOnMap: filteringViewModel.showingReviewsOnMap,
             showingFavoritesOnMap: filteringViewModel.showingFavoritesOnMap,
             showingMyPlacesOnMap: filteringViewModel.showingMyPlacesOnMap,

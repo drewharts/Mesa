@@ -3,7 +3,7 @@ import CoreLocation
 
 struct LightweightPlaceList: Identifiable {
     let list_id: String
-    let name: String
+    var name: String
     let is_public: Bool
     let image: String?
     let created_at: String?

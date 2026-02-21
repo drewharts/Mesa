@@ -1,5 +1,5 @@
 //
-//  TikTokVideoViewModel.swift
+//  ExternalVideoViewModel.swift
 //  loc
 //
 
@@ -23,29 +23,29 @@ func debugLog(_ message: String) {
 }
 
 @MainActor
-class TikTokVideoViewModel: ObservableObject {
-    @Published var tikTokVideo: TikTokVideo
+class ExternalVideoViewModel: ObservableObject {
+    @Published var externalVideo: ExternalVideo
     @Published var thumbnailLoadError: Bool = false
     @Published var hasAttemptedRefresh: Bool = false
     @Published var showingFullVideo = false
     
-    private let tikTokService = TikTokService()
+    private let externalContentService = ExternalContentService()
     private var isRefreshing: Bool = false
     private let externalPlaceId: String? // External place UUID for refresh
     
-    init(tikTokVideo: TikTokVideo, externalPlaceId: String? = nil) {
-        self.tikTokVideo = tikTokVideo
+    init(externalVideo: ExternalVideo, externalPlaceId: String? = nil) {
+        self.externalVideo = externalVideo
         self.externalPlaceId = externalPlaceId
     }
     
     // MARK: - Video Opening Logic
     
-    /// Opens the TikTok content in the best available method.
+    /// Opens the external video content in the best available method.
     func openVideo() {
         if tryOpenInTikTokApp() { return }
         if tryOpenInBrowser() { return }
         // Only show embedded WebView if we have embed HTML (videos only, not photos)
-        if !tikTokVideo.embedHTML.isEmpty {
+        if !externalVideo.embedHTML.isEmpty {
             showFullVideoModal()
         }
     }
@@ -86,16 +86,16 @@ class TikTokVideoViewModel: ObservableObject {
     }
     
     private func addOriginalURL(to urls: inout [URL]) {
-        if let originalURL = URL(string: tikTokVideo.url) {
+        if let originalURL = URL(string: externalVideo.url) {
             urls.append(originalURL)
         }
     }
     
     /// Adds TikTok app deep link scheme URLs for the content type.
     private func addVideoSchemeURLs(to urls: inout [URL]) {
-        guard let videoId = extractVideoId(from: tikTokVideo.url) else { return }
+        guard let videoId = extractVideoId(from: externalVideo.url) else { return }
 
-        let contentPath = tikTokVideo.contentType == "photo" ? "photo" : "video"
+        let contentPath = externalVideo.contentType == "photo" ? "photo" : "video"
         let schemeURLs = [
             "tiktok://\(contentPath)/\(videoId)",
             "snssdk1233://\(contentPath)?id=\(videoId)"
@@ -109,7 +109,7 @@ class TikTokVideoViewModel: ObservableObject {
     }
     
     private func tryOpenInBrowser() -> Bool {
-        guard let webURL = URL(string: tikTokVideo.url),
+        guard let webURL = URL(string: externalVideo.url),
               UIApplication.shared.canOpenURL(webURL) else {
             return false
         }
@@ -183,12 +183,12 @@ class TikTokVideoViewModel: ObservableObject {
         let userId = SupabaseAuthService.shared.currentUserId
         
         // 🔍 Log what external_place_id we have before calling refresh
-        debugLog("🎬 [TikTokVideoViewModel] Calling refreshThumbnail")
-        debugLog("   Video ID: \(tikTokVideo.videoID)")
+        debugLog("🎬 [ExternalVideoViewModel] Calling refreshThumbnail")
+        debugLog("   Video ID: \(externalVideo.videoID)")
         debugLog("   External Place ID: \(externalPlaceId ?? "nil")")
         
-        let result = await tikTokService.refreshTikTokThumbnail(
-            for: tikTokVideo.url, 
+        let result = await externalContentService.refreshTikTokThumbnail(
+            for: externalVideo.url, 
             userId: userId,
             externalPlaceId: externalPlaceId
         )
@@ -205,31 +205,31 @@ class TikTokVideoViewModel: ObservableObject {
     
     private func handleSuccessfulThumbnailRefresh(_ newThumbnailURL: String) async {
         await testThumbnailURL(newThumbnailURL)
-        updateTikTokVideoWithNewThumbnail(newThumbnailURL)
+        updateExternalVideoWithNewThumbnail(newThumbnailURL)
     }
     
-    /// Updates the TikTok video with a refreshed thumbnail URL.
-    private func updateTikTokVideoWithNewThumbnail(_ newThumbnailURL: String) {
-        let updatedVideo = TikTokVideo(
-            id: tikTokVideo.id,
-            videoID: tikTokVideo.videoID,
-            url: tikTokVideo.url,
-            title: tikTokVideo.title,
-            caption: tikTokVideo.caption,
-            embedHTML: tikTokVideo.embedHTML,
+    /// Updates the external video with a refreshed thumbnail URL.
+    private func updateExternalVideoWithNewThumbnail(_ newThumbnailURL: String) {
+        let updatedVideo = ExternalVideo(
+            id: externalVideo.id,
+            videoID: externalVideo.videoID,
+            url: externalVideo.url,
+            title: externalVideo.title,
+            caption: externalVideo.caption,
+            embedHTML: externalVideo.embedHTML,
             thumbnailURL: newThumbnailURL,
-            author: tikTokVideo.author,
-            hashtags: tikTokVideo.hashtags,
-            createdAt: tikTokVideo.createdAt,
-            contentType: tikTokVideo.contentType
+            author: externalVideo.author,
+            hashtags: externalVideo.hashtags,
+            createdAt: externalVideo.createdAt,
+            contentType: externalVideo.contentType
         )
 
-        tikTokVideo = updatedVideo
+        externalVideo = updatedVideo
         thumbnailLoadError = false
     }
     
     private func handleThumbnailRefreshError(_ error: Error) {
-        debugLog("❌ [TikTokVideoViewModel] Thumbnail refresh failed: \(error.localizedDescription)")
+        debugLog("❌ [ExternalVideoViewModel] Thumbnail refresh failed: \(error.localizedDescription)")
     }
 
     private func testThumbnailURL(_ urlString: String) async {
@@ -241,7 +241,7 @@ class TikTokVideoViewModel: ObservableObject {
             let (_, response) = try await URLSession.shared.data(from: url)
 
             if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode != 200 {
-                debugLog("❌ [TikTokVideoViewModel] Thumbnail URL returned status: \(httpResponse.statusCode)")
+                debugLog("❌ [ExternalVideoViewModel] Thumbnail URL returned status: \(httpResponse.statusCode)")
             }
         } catch {
             // URL test failed, but this is not critical - continue silently

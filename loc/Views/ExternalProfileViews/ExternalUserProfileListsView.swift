@@ -467,7 +467,7 @@ struct ExternalUserListContentScrollView: View {
                     ForEach(Array(places.enumerated()), id: \.element.id) { index, place in
                         PopupPlaceCard(
                             place: place,
-                            preferTikTokThumbnail: true,
+                            preferExternalThumbnail: true,
                             onNavigate: { placeId in
                                 onNavigateToPlace?(placeId)
                             }

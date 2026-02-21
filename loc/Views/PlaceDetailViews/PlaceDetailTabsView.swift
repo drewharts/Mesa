@@ -29,14 +29,18 @@ struct PlaceDetailTabsView: View {
     let onAddReview: () -> Void
     var onCreatePlace: (() -> Void)?
 
-    /// Callback when user changes a TikTok's place association - parent should navigate to new place
+    /// Callback when user changes a video's place association - parent should navigate to new place
     var onPlaceChanged: ((DetailPlace) -> Void)?
     
+    // MARK: - Story Card ViewModel
+    @StateObject private var placeStoryCardVM = PlaceStoryCardViewModel()
+
     // MARK: - View-Owned Presentation State (Enterprise Pattern)
     // Sheet presentation is a UI concern, owned by View not ViewModel
     @State private var showingSaversSheet = false
     @State private var showingHoursSheet = false
     @State private var showingNoteSheet = false
+    @State private var showPlacePhotoSelector = false
     @State private var travelSelectorState: TravelTimeSelectorState?
     
     var body: some View {
@@ -88,6 +92,31 @@ struct PlaceDetailTabsView: View {
                 .presentationDetents([.medium])
                 .presentationDragIndicator(.visible)
         }
+        // Place Story Card Photo Selector Sheet
+        .sheet(isPresented: $showPlacePhotoSelector) {
+            PlaceStoryPhotoSelectorView(
+                viewModel: placeStoryCardVM,
+                onShareInstagram: {
+                    guard let place = viewModel.currentPlace else { return }
+                    Task { await placeStoryCardVM.shareToInstagram(place: place) }
+                },
+                onShareGeneral: {
+                    guard let place = viewModel.currentPlace else { return }
+                    Task { await placeStoryCardVM.shareGeneral(place: place) }
+                }
+            )
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+        }
+        // Link Copied Instruction Alert (shown after Instagram share)
+        .alert(
+            "Link Copied",
+            isPresented: $placeStoryCardVM.showLinkCopiedInstruction
+        ) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("Add a link sticker in Instagram and paste the copied link so viewers can find this place on Mesa.")
+        }
         // Travel Time Selector - capture state from child via PreferenceKey
         .onPreferenceChange(TravelTimeSelectorStateKey.self) { state in
             travelSelectorState = state
@@ -135,17 +164,57 @@ struct PlaceDetailTabsView: View {
                         .frame(width: 32, height: 32)
                 }
 
-                Button(action: viewModel.sharePlace) {
-                    Image(systemName: "square.and.arrow.up")
-                        .font(.title3)
-                        .foregroundColor(.gray)
-                        .frame(width: 32, height: 32)
-                }
+                shareButton
             }
         }
         .padding(.bottom, 3)
     }
     
+    // MARK: - Share Button (Conditional: Menu for custom places, simple button otherwise)
+
+    @ViewBuilder
+    private var shareButton: some View {
+        if viewModel.isCustomPlace {
+            customPlaceShareMenu
+        } else {
+            Button(action: viewModel.sharePlace) {
+                shareIcon
+            }
+        }
+    }
+
+    /// Menu with "Share Link" and "Create Story Card" options for custom places.
+    private var customPlaceShareMenu: some View {
+        Menu {
+            Button {
+                viewModel.sharePlace()
+            } label: {
+                Label("Share Link", systemImage: "link")
+            }
+
+            Button {
+                guard let place = viewModel.currentPlace else { return }
+                let posts = viewModel.currentPlacePosts
+                Task {
+                    await placeStoryCardVM.preparePhotoOptions(place: place, posts: posts)
+                    showPlacePhotoSelector = true
+                }
+            } label: {
+                Label("Create Story Card", systemImage: "rectangle.portrait.on.rectangle.portrait")
+            }
+        } label: {
+            shareIcon
+        }
+    }
+
+    /// Shared share icon used by both simple button and menu.
+    private var shareIcon: some View {
+        Image(systemName: "square.and.arrow.up")
+            .font(.title3)
+            .foregroundColor(.gray)
+            .frame(width: 32, height: 32)
+    }
+
     // MARK: - Info Row (Extracted for compiler performance)
     
     @ViewBuilder
@@ -238,6 +307,7 @@ struct PlaceDetailTabsView: View {
             AboutTabContent(
                 viewModel: viewModel.aboutTabViewModel,
                 onPhotoTapped: onPhotoTapped,
+                onAddPost: onAddReview,
                 onPlaceChanged: onPlaceChanged,
                 isRefreshing: viewModel.isRefreshing,
                 onRefresh: viewModel.manualRefresh
@@ -489,7 +559,7 @@ private struct SavedByIndicator: View {
             // Set initial data
             tabsViewModel.setPlace(mockPlace)
             tabsViewModel.setPosts([], rating: 0)
-            tabsViewModel.setTikTokVideos(placeVideos: [], userVideos: [])
+            tabsViewModel.setExternalVideos(placeVideos: [], userVideos: [])
             
             return PlaceDetailTabsView(
                 viewModel: tabsViewModel,

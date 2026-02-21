@@ -89,11 +89,11 @@ struct PlaceDetailView: View {
             tabsViewModel: $tabsViewModel,
             favoritesVM: profile.favoritesViewModel
         ))
-        .modifier(TikTokChangeHandler(
+        .modifier(ExternalContentChangeHandler(
             tabsViewModel: $tabsViewModel,
             selectedPlaceVM: selectedPlaceVM,
             profile: profile,
-            tikTokVM: profile.tikTokViewModel
+            externalContentVM: profile.externalContentViewModel
         ))
     }
 
@@ -283,21 +283,21 @@ struct PlaceDetailView: View {
 
     // MARK: - Event Handlers
 
-    /// Handles view appearance - initializes ViewModel and refreshes TikTok data.
+    /// Handles view appearance - initializes ViewModel and refreshes external content data.
     private func handleAppear() {
         initializeViewModelIfNeeded()
-        profile.tikTokViewModel.refreshTikTokPlacesAfterImport()
+        profile.externalContentViewModel.refreshExternalPlacesAfterImport()
 
-        // Fetch user's external places on-demand so getTikTokVideosSync() has data
+        // Fetch user's external places on-demand so getExternalVideosSync() has data
         Task {
             await profile.fetchUserExternalPlaces()
 
-            // After fetch completes, force TikTok update since data is now available
+            // After fetch completes, force external videos update since data is now available
             await MainActor.run {
                 guard let place = selectedPlaceVM.selectedPlace else { return }
-                let userVideos = profile.tikTokViewModel.getTikTokVideosSync(for: place.id.uuidString)
+                let userVideos = profile.externalContentViewModel.getExternalVideosSync(for: place.id.uuidString)
                 print("🎬 [PlaceDetailView] handleAppear - after fetchUserExternalPlaces, userVideos: \(userVideos.count)")
-                tabsViewModel?.setTikTokVideos(placeVideos: selectedPlaceVM.tiktokVideos, userVideos: userVideos)
+                tabsViewModel?.setExternalVideos(placeVideos: selectedPlaceVM.externalVideos, userVideos: userVideos)
             }
         }
     }
@@ -310,7 +310,7 @@ struct PlaceDetailView: View {
         showPhotoGallery = true
     }
 
-    /// Handles navigation to a different place (e.g., after TikTok association change).
+    /// Handles navigation to a different place (e.g., after video association change).
     private func handlePlaceNavigation(_ newPlace: DetailPlace) {
         selectedPlaceVM.selectPlaceAndFetchDetails(newPlace, shouldAnimateMap: true)
     }
@@ -357,8 +357,8 @@ struct PlaceDetailView: View {
         vm.setPlace(place)
         vm.setPosts(selectedPlaceVM.posts, rating: selectedPlaceVM.placeRating)
 
-        let userVideos = profile.tikTokViewModel.getTikTokVideosSync(for: place.id.uuidString)
-        vm.setTikTokVideos(placeVideos: selectedPlaceVM.tiktokVideos, userVideos: userVideos)
+        let userVideos = profile.externalContentViewModel.getExternalVideosSync(for: place.id.uuidString)
+        vm.setExternalVideos(placeVideos: selectedPlaceVM.externalVideos, userVideos: userVideos)
 
         let loadingState = selectedPlaceVM.postLoadingState(forPlaceId: place.id.uuidString)
         vm.setPostLoadingState(mapLoadingState(loadingState))

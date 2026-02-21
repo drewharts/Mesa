@@ -1,8 +1,8 @@
 //
-//  ProfileFavoritesTikToksView.swift
+//  ProfileFavoritesExternalPlacesView.swift
 //  loc
 //
-//  Displays the Favorites, TikToks, Reviews, and My Places sections for the current user's profile.
+//  Displays the Favorites, Videos, Reviews, and My Places sections for the current user's profile.
 //  Tapping a section shows a popup sheet over the profile. A "View on Map" button in the popup
 //  transitions to the map-layer sheet presentation.
 //
@@ -11,16 +11,16 @@ import SwiftUI
 
 /// Identifies which popup sheet is currently presented over the profile.
 enum ProfilePopupSheet: String, Identifiable {
-    case myPlaces, favorites, tiktoks, reviews, help
+    case myPlaces, favorites, externalPlaces, reviews, help
     var id: String { rawValue }
 }
 
-struct ProfileFavoritesTikToksView: View {
+struct ProfileFavoritesExternalPlacesView: View {
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var places: DetailPlaceViewModel
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @ObservedObject var favoritesVM: ProfileFavoritesViewModel
-    @ObservedObject var tikTokVM: ProfileTikTokViewModel
+    @ObservedObject var externalContentVM: ProfileExternalContentViewModel
     @ObservedObject var reviewsVM: ProfileReviewsViewModel
     @ObservedObject var myPlacesVM: ProfileMyPlacesViewModel
     @Environment(\.presentationMode) var presentationMode
@@ -34,10 +34,10 @@ struct ProfileFavoritesTikToksView: View {
     private var sectionData: ProfileFavoritesReviewsSectionData {
         ProfileFavoritesReviewsSectionData(
             favorites: favoritesVM.lightweightFavorites,
-            tiktokPlaces: tikTokVM.lightweightExternalPlaces,
+            externalPlaces: externalContentVM.lightweightExternalPlaces,
             reviewedPlaces: reviewsVM.lightweightReviewedPlaces,
             myPlaces: myPlacesVM.lightweightMyPlaces,
-            isLoadingTikToks: tikTokVM.isLoadingTikTokPlaces,
+            isLoadingExternalPlaces: externalContentVM.isLoadingExternalPlaces,
             isLoadingReviews: reviewsVM.isLoadingReviewedPlaces,
             isLoadingMyPlaces: myPlacesVM.isMyPlacesLoading
         )
@@ -50,10 +50,10 @@ struct ProfileFavoritesTikToksView: View {
             data: sectionData,
             config: .myProfile,
             onFavoritesTap: handleFavoritesTap,
-            onTikToksTap: handleTikToksTap,
+            onExternalPlacesTap: handleExternalContentTap,
             onReviewsTap: handleReviewsTap,
             onMyPlacesTap: handleMyPlacesTap,
-            onTikTokHelpTap: { activePopupSheet = .help }
+            onExternalPlacesHelpTap: { activePopupSheet = .help }
         )
         .sheet(item: $activePopupSheet, onDismiss: handlePopupDismiss) { sheet in
             popupContent(for: sheet)
@@ -76,11 +76,11 @@ struct ProfileFavoritesTikToksView: View {
                 favoritesVM: favoritesVM,
                 onViewOnMap: { requestMapNavigation(.favorites) }
             )
-        case .tiktoks:
-            TikToksPopupView(
-                tikTokVM: tikTokVM,
+        case .externalPlaces:
+            ExternalPlacesPopupView(
+                externalContentVM: externalContentVM,
                 showNearbyFilter: false,
-                onViewOnMap: { requestMapNavigation(.tiktoks) }
+                onViewOnMap: { requestMapNavigation(.externalPlaces) }
             )
         case .reviews:
             ReviewsListPopupView(
@@ -88,7 +88,7 @@ struct ProfileFavoritesTikToksView: View {
                 onViewOnMap: { requestMapNavigation(.reviews) }
             )
         case .help:
-            TikTokImportHelpView()
+            ImportHelpView()
         }
     }
 
@@ -99,9 +99,9 @@ struct ProfileFavoritesTikToksView: View {
         activePopupSheet = .favorites
     }
 
-    /// Handles tap on TikToks section - shows popup over profile.
-    private func handleTikToksTap() {
-        activePopupSheet = .tiktoks
+    /// Handles tap on external content section - shows popup over profile.
+    private func handleExternalContentTap() {
+        activePopupSheet = .externalPlaces
     }
 
     /// Handles tap on reviews section - shows popup over profile.
@@ -132,8 +132,8 @@ struct ProfileFavoritesTikToksView: View {
             profile.pendingMapFilter = .myPlaces
         case .favorites:
             profile.pendingMapFilter = .favorites
-        case .tiktoks:
-            profile.pendingMapFilter = .tiktoks
+        case .externalPlaces:
+            profile.pendingMapFilter = .externalPlaces
         case .reviews:
             profile.pendingMapFilter = .reviews
         case .help:

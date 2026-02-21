@@ -251,9 +251,9 @@ class PlaceService: ObservableObject {
         )
     }
 
-    /// Fetches map annotations for user's TikTok/external places
-    func fetchTikTokAnnotationsInViewport(northLat: Double, southLat: Double, eastLng: Double, westLng: Double, userId: String) async throws -> [PlaceAnnotation] {
-        return try await supabase.fetchTikTokAnnotationsInViewport(
+    /// Fetches map annotations for user's external places
+    func fetchExternalAnnotationsInViewport(northLat: Double, southLat: Double, eastLng: Double, westLng: Double, userId: String) async throws -> [PlaceAnnotation] {
+        return try await supabase.fetchExternalAnnotationsInViewport(
             northLat: northLat,
             southLat: southLat,
             eastLng: eastLng,

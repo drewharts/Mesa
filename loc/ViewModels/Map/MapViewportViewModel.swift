@@ -235,8 +235,8 @@ class MapViewportViewModel: ObservableObject {
                 userId: userId,
                 listId: listId
             )
-        } else if filterState.showingTikToksOnMap {
-            return try await placeService.fetchTikTokAnnotationsInViewport(
+        } else if filterState.showingExternalPlacesOnMap {
+            return try await placeService.fetchExternalAnnotationsInViewport(
                 northLat: bounds.northLat,
                 southLat: bounds.southLat,
                 eastLng: bounds.eastLng,
@@ -354,7 +354,7 @@ struct ViewportBounds {
 /// Represents the current filter state for map annotations.
 struct MapFilterState {
     let selectedListId: String?
-    let showingTikToksOnMap: Bool
+    let showingExternalPlacesOnMap: Bool
     let showingReviewsOnMap: Bool
     let showingFavoritesOnMap: Bool
     let showingMyPlacesOnMap: Bool
@@ -367,7 +367,7 @@ struct MapFilterState {
 
     var hasActiveFilter: Bool {
         selectedListId != nil ||
-        showingTikToksOnMap ||
+        showingExternalPlacesOnMap ||
         showingReviewsOnMap ||
         showingFavoritesOnMap ||
         showingMyPlacesOnMap ||

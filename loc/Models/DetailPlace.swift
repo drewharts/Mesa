@@ -34,7 +34,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
     var serversDinner: Bool?
     var Instagram: String?
     var X: String?
-    var tikTokVideos: [TikTokVideo]?
+    var externalVideos: [ExternalVideo]?
     var photoUrls: [String]? = []
     var menuUrl: String?
     var websiteUrl: String?
@@ -47,7 +47,11 @@ struct DetailPlace: Codable, Identifiable, Equatable {
     var source: String?
     var createdAt: String?
     var isCustom: Bool?
-    
+
+    /// Local-only flag: true only for temporary dropped pins before the place is saved.
+    /// Not persisted to the database.
+    var isDroppedPin: Bool = false
+
     enum CodingKeys: String, CodingKey {
         case id
         case name
@@ -70,7 +74,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         case serversDinner
         case Instagram
         case X
-        case tikTokVideos = "tiktok_videos"
+        case externalVideos = "tiktok_videos"  // Keep backend JSON key for backward compat
         case menuUrl = "menu_url"
         case websiteUrl = "website"
         case googlePlaceId = "google_place_id"
@@ -109,7 +113,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         self.serversDinner = nil
         self.Instagram = nil
         self.X = nil
-        self.tikTokVideos = nil
+        self.externalVideos = nil
         self.photoUrls = nil
         self.menuUrl = nil
         self.websiteUrl = nil
@@ -117,12 +121,13 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         self.source = nil
         self.createdAt = nil
         self.isCustom = nil
+        self.isDroppedPin = false
         self.aiSuggestionReason = nil
 
         // Now decode all the optional properties
         try decodeBasicProperties(from: container)
         try decodeExtendedProperties(from: container)
-        try decodeTikTokProperties(from: container)
+        try decodeExternalVideoProperties(from: container)
         self.coordinate = try Self.decodeCoordinates(from: container)
     }
     
@@ -166,8 +171,8 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         self.websiteUrl = try container.decodeIfPresent(String.self, forKey: .websiteUrl)
     }
 
-    private mutating func decodeTikTokProperties(from container: KeyedDecodingContainer<CodingKeys>) throws {
-        self.tikTokVideos = try container.decodeIfPresent([TikTokVideo].self, forKey: .tikTokVideos)
+    private mutating func decodeExternalVideoProperties(from container: KeyedDecodingContainer<CodingKeys>) throws {
+        self.externalVideos = try container.decodeIfPresent([ExternalVideo].self, forKey: .externalVideos)
         
         // Try both field names for Google Place ID (backend uses google_place_id, legacy uses googlePlacesId)
         let googlePlaceIdBackend = try container.decodeIfPresent(String.self, forKey: .googlePlaceId)
@@ -249,7 +254,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         try container.encodeIfPresent(serversDinner, forKey: .serversDinner)
         try container.encodeIfPresent(Instagram, forKey: .Instagram)
         try container.encodeIfPresent(X, forKey: .X)
-        try container.encodeIfPresent(tikTokVideos, forKey: .tikTokVideos)
+        try container.encodeIfPresent(externalVideos, forKey: .externalVideos)
         try container.encodeIfPresent(menuUrl, forKey: .menuUrl)
         try container.encodeIfPresent(websiteUrl, forKey: .websiteUrl)
         try container.encodeIfPresent(googlePlaceId, forKey: .googlePlaceId)
@@ -280,7 +285,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         self.serversDinner = nil
         self.Instagram = nil
         self.X = nil
-        self.tikTokVideos = nil
+        self.externalVideos = nil
         self.photoUrls = nil
         self.menuUrl = nil
         self.websiteUrl = nil
@@ -310,7 +315,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         self.serversDinner = nil
         self.Instagram = nil
         self.X = nil
-        self.tikTokVideos = nil
+        self.externalVideos = nil
         self.photoUrls = nil
         self.menuUrl = nil
         self.websiteUrl = nil
@@ -341,7 +346,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         self.serversDinner = nil
         self.Instagram = nil
         self.X = nil
-        self.tikTokVideos = nil
+        self.externalVideos = nil
         self.photoUrls = nil
         self.menuUrl = nil
         self.websiteUrl = nil
@@ -380,7 +385,7 @@ struct DetailPlace: Codable, Identifiable, Equatable {
         self.serversDinner = nil
         self.Instagram = nil
         self.X = nil
-        self.tikTokVideos = nil
+        self.externalVideos = nil
         self.photoUrls = nil
         self.menuUrl = nil
         self.websiteUrl = nil

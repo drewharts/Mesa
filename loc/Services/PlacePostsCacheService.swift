@@ -2,8 +2,8 @@
 //  PlacePostsCacheService.swift
 //  loc
 //
-//  Singleton service for managing posts and TikToks caching, loading states, and like tracking.
-//  Single Responsibility: Only handles post/TikTok data management.
+//  Singleton service for managing posts and external videos caching, loading states, and like tracking.
+//  Single Responsibility: Only handles post/external video data management.
 //  ViewModels subscribe to this service via Combine to react to cache changes.
 //
 
@@ -19,8 +19,8 @@ class PlacePostsCacheService: ObservableObject {
     /// Cache for posts by placeId - published so subscribers get updates.
     @Published private(set) var postsCache: [String: [PlacePost]] = [:]
 
-    /// Cache for TikToks by placeId - published so subscribers get updates.
-    @Published private(set) var tiktoksCache: [String: [TikTokVideo]] = [:]
+    /// Cache for external videos by placeId - published so subscribers get updates.
+    @Published private(set) var externalVideosCache: [String: [ExternalVideo]] = [:]
 
     /// Loading states for posts by placeId - published so subscribers get updates.
     @Published private(set) var loadingStates: [String: LoadingState] = [:]
@@ -69,9 +69,9 @@ class PlacePostsCacheService: ObservableObject {
         return postsCache[placeId] ?? []
     }
 
-    /// Returns TikToks for a specific place.
-    func tiktoks(forPlaceId placeId: String) -> [TikTokVideo] {
-        return tiktoksCache[placeId] ?? []
+    /// Returns external videos for a specific place.
+    func externalVideos(forPlaceId placeId: String) -> [ExternalVideo] {
+        return externalVideosCache[placeId] ?? []
     }
 
     /// Returns the loading state for posts of a specific place.
@@ -107,7 +107,7 @@ class PlacePostsCacheService: ObservableObject {
 
     // MARK: - Loading Methods
 
-    /// Loads posts and TikToks for a place.
+    /// Loads posts and external videos for a place.
     func loadPosts(forPlaceId placeId: String) {
         loadingStates[placeId] = .loading
         objectWillChange.send()
@@ -115,7 +115,7 @@ class PlacePostsCacheService: ObservableObject {
         Task {
             guard let currentUserId = authService.currentUserId else {
                 self.loadingStates[placeId] = .error(NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "User not logged in"]))
-                self.updateCache(placeId: placeId, posts: [], tiktoks: [])
+                self.updateCache(placeId: placeId, posts: [], externalVideos: [])
                 return
             }
 
@@ -126,14 +126,14 @@ class PlacePostsCacheService: ObservableObject {
     /// Fetches posts from the service and updates the cache.
     private func loadPostsInternal(placeId: String) async {
         do {
-            let (posts, tiktoks) = try await postService.fetchPosts(placeId: placeId, latestOnly: false)
+            let (posts, externalVideos) = try await postService.fetchPosts(placeId: placeId, latestOnly: false)
 
-            self.updateCache(placeId: placeId, posts: posts, tiktoks: tiktoks)
+            self.updateCache(placeId: placeId, posts: posts, externalVideos: externalVideos)
             self.loadingStates[placeId] = .loaded
         } catch {
-            print("❌ [PlacePostsCacheService] Error fetching posts/TikToks for place \(placeId): \(error.localizedDescription)")
+            print("❌ [PlacePostsCacheService] Error fetching posts/external videos for place \(placeId): \(error.localizedDescription)")
             self.loadingStates[placeId] = .error(error)
-            self.updateCache(placeId: placeId, posts: [], tiktoks: [])
+            self.updateCache(placeId: placeId, posts: [], externalVideos: [])
         }
     }
 
@@ -216,10 +216,10 @@ class PlacePostsCacheService: ObservableObject {
     // MARK: - Private Methods
 
     /// Updates the posts cache for a place. @Published properties automatically notify subscribers.
-    private func updateCache(placeId: String, posts: [PlacePost], tiktoks: [TikTokVideo]? = nil) {
+    private func updateCache(placeId: String, posts: [PlacePost], externalVideos: [ExternalVideo]? = nil) {
         postsCache[placeId] = posts
-        if let tiktoks = tiktoks {
-            tiktoksCache[placeId] = tiktoks
+        if let externalVideos = externalVideos {
+            externalVideosCache[placeId] = externalVideos
         }
     }
 
@@ -228,7 +228,7 @@ class PlacePostsCacheService: ObservableObject {
     /// Clears all cached data.
     func clearAllData() {
         postsCache.removeAll()
-        tiktoksCache.removeAll()
+        externalVideosCache.removeAll()
         loadingStates.removeAll()
         likedPostIds.removeAll()
         lastCreatedPostPlaceId = nil

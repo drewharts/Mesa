@@ -105,7 +105,7 @@ class ListsPlaceMutationsViewModel: ObservableObject {
             name: place.name,
             latest_review_photo: place.photoUrls?.first,
             external_place_id: nil,
-            tiktok_url: nil,
+            content_url: nil,
             added_by_user_id: userId,
             added_by_name: userInfo?.fullName,
             added_by_photo_url: userInfo?.profilePhotoURL?.absoluteString

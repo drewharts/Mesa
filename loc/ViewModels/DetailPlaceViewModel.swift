@@ -179,7 +179,7 @@ class DetailPlaceViewModel: ObservableObject {
         placeImageLoadingStates[placeId] = true
         
         // This method is for normal place tiles that get images from reviews OR place's own photoUrls
-        // TikTok place tiles use AsyncImage directly with TikTok URLs
+        // External video place tiles use AsyncImage directly with thumbnail URLs
         
         // First, check if the place has its own photoUrls (for created places)
         if let place = places[placeId], 
@@ -231,7 +231,7 @@ class DetailPlaceViewModel: ObservableObject {
                 // Get the most recent post with images
                 guard let mostRecentPost = postsWithImages.first else {
                     await MainActor.run {
-                        self.tryTikTokThumbnailAsCover(placeId: placeId)
+                        self.tryExternalThumbnailAsCover(placeId: placeId)
                     }
                     return
                 }
@@ -239,7 +239,7 @@ class DetailPlaceViewModel: ObservableObject {
                 // Only get the first image from the most recent post (most efficient)
                 guard let firstImageUrl = mostRecentPost.images.first else {
                     await MainActor.run {
-                        self.tryTikTokThumbnailAsCover(placeId: placeId)
+                        self.tryExternalThumbnailAsCover(placeId: placeId)
                     }
                     return
                 }
@@ -266,19 +266,19 @@ class DetailPlaceViewModel: ObservableObject {
             } catch {
                 print("❌ [DetailPlaceViewModel] Error fetching posts for place \(placeId): \(error.localizedDescription)")
                 await MainActor.run {
-                    self.tryTikTokThumbnailAsCover(placeId: placeId)
+                    self.tryExternalThumbnailAsCover(placeId: placeId)
                 }
             }
         }
     }
     
-    private func tryTikTokThumbnailAsCover(placeId: String) {
+    private func tryExternalThumbnailAsCover(placeId: String) {
         // Look for place in our cached places
         guard let place = places[placeId],
-              let tikTokVideos = place.tikTokVideos,
-              !tikTokVideos.isEmpty,
-              let firstThumbnailURL = tikTokVideos.first?.thumbnailURL else {
-            print("⚠️ [DetailPlaceViewModel] No TikTok thumbnail available for place \(placeId)")
+              let externalVideos = place.externalVideos,
+              !externalVideos.isEmpty,
+              let firstThumbnailURL = externalVideos.first?.thumbnailURL else {
+            print("⚠️ [DetailPlaceViewModel] No external thumbnail available for place \(placeId)")
             DispatchQueue.main.async {
                 // Set a special "no image" marker instead of nil to prevent infinite loading
                 self.placeImages[placeId] = UIImage()
@@ -288,12 +288,12 @@ class DetailPlaceViewModel: ObservableObject {
             return
         }
         
-        fetchTikTokThumbnailAsImage(thumbnailURL: firstThumbnailURL, placeId: placeId)
+        fetchExternalThumbnailAsImage(thumbnailURL: firstThumbnailURL, placeId: placeId)
     }
     
-    private func fetchTikTokThumbnailAsImage(thumbnailURL: String, placeId: String) {
+    private func fetchExternalThumbnailAsImage(thumbnailURL: String, placeId: String) {
         guard let url = URL(string: thumbnailURL) else {
-            print("❌ [DetailPlaceViewModel] Invalid TikTok thumbnail URL for place \(placeId): \(thumbnailURL)")
+            print("❌ [DetailPlaceViewModel] Invalid external thumbnail URL for place \(placeId): \(thumbnailURL)")
             DispatchQueue.main.async {
                 self.placeImages[placeId] = UIImage()
                 self.placeImageLoadingStates[placeId] = false
@@ -312,7 +312,7 @@ class DetailPlaceViewModel: ObservableObject {
             
             DispatchQueue.main.async {
                 if let error = error {
-                    print("❌ [DetailPlaceViewModel] Error fetching TikTok thumbnail for \(placeId): \(error.localizedDescription)")
+                    print("❌ [DetailPlaceViewModel] Error fetching external thumbnail for \(placeId): \(error.localizedDescription)")
                     self.placeImages[placeId] = UIImage()
                 } else if let httpResponse = response as? HTTPURLResponse {
                     if httpResponse.statusCode == 200, let data = data, !data.isEmpty {

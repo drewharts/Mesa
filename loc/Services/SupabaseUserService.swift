@@ -1187,7 +1187,7 @@ extension SupabaseUserService {
     /// Single Responsibility: Execute Supabase delete operation for external places
     /// - Parameters:
     ///   - userId: The user's ID
-    ///   - placeId: The place ID to remove from user's saved TikToks
+    ///   - placeId: The place ID to remove from user's saved external places
     /// - Throws: Database errors if deletion fails
     func deleteExternalPlaces(userId: String, placeId: String) async throws {
         try await supabase.client
@@ -1202,7 +1202,7 @@ extension SupabaseUserService {
 
     // MARK: - External Place Update
 
-    /// Updates the place_id for an external_places record (TikTok place correction)
+    /// Updates the place_id for an external_places record (place correction)
     /// Single Responsibility: Execute Supabase update operation for external place association
     /// - Parameters:
     ///   - externalPlaceId: The external_places row ID to update
@@ -1222,7 +1222,7 @@ extension SupabaseUserService {
 
     // MARK: - External Place Insert
 
-    /// Inserts a new external_places record for a TikTok place assignment.
+    /// Inserts a new external_places record for a place assignment.
     func insertExternalPlace(userId: String, placeId: String, url: String) async throws {
         let id = UUID().uuidString
         try await supabase.client

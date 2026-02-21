@@ -2,7 +2,7 @@
 //  ProfileFavoritesReviewsSection.swift
 //  loc
 //
-//  Unified tab section for profile Favorites/TikToks/Reviews.
+//  Unified tab section for profile Favorites/Videos/Reviews.
 //  Shared between MyProfile and ExternalProfile with configurable behavior.
 //
 //  Single Responsibility: Display tabbed content grids with proper loading and empty states.
@@ -12,13 +12,13 @@ import SwiftUI
 
 /// Configuration for the profile favorites/reviews section.
 struct ProfileFavoritesReviewsSectionConfig {
-    let showTikToksTab: Bool       // true for MyProfile, false for External
+    let showExternalPlacesTab: Bool       // true for MyProfile, false for External
     let showMyPlacesTab: Bool      // true for MyProfile, false for External
     let ownerName: String?         // nil for MyProfile, user's name for External
     let isMyProfile: Bool          // Affects empty state messaging
 
     static let myProfile = ProfileFavoritesReviewsSectionConfig(
-        showTikToksTab: true,
+        showExternalPlacesTab: true,
         showMyPlacesTab: true,
         ownerName: nil,
         isMyProfile: true
@@ -26,7 +26,7 @@ struct ProfileFavoritesReviewsSectionConfig {
 
     static func external(ownerName: String) -> ProfileFavoritesReviewsSectionConfig {
         ProfileFavoritesReviewsSectionConfig(
-            showTikToksTab: false,
+            showExternalPlacesTab: false,
             showMyPlacesTab: false,
             ownerName: ownerName,
             isMyProfile: false
@@ -37,15 +37,15 @@ struct ProfileFavoritesReviewsSectionConfig {
 /// Data source for the profile favorites/reviews section.
 struct ProfileFavoritesReviewsSectionData {
     let favorites: [FavoritePlace]
-    let tiktokPlaces: [LightweightPlace]
+    let externalPlaces: [LightweightPlace]
     let reviewedPlaces: [LightweightPlace]
     let myPlaces: [LightweightPlace]
-    let isLoadingTikToks: Bool
+    let isLoadingExternalPlaces: Bool
     let isLoadingReviews: Bool
     let isLoadingMyPlaces: Bool
 }
 
-/// Unified tab section for Favorites, TikToks, and Reviews.
+/// Unified tab section for Favorites, External Places, and Reviews.
 struct ProfileFavoritesReviewsSection: View {
     let data: ProfileFavoritesReviewsSectionData
     let config: ProfileFavoritesReviewsSectionConfig
@@ -53,10 +53,10 @@ struct ProfileFavoritesReviewsSection: View {
 
     // Callbacks
     let onFavoritesTap: () -> Void
-    let onTikToksTap: (() -> Void)?
+    let onExternalPlacesTap: (() -> Void)?
     let onReviewsTap: () -> Void
     let onMyPlacesTap: (() -> Void)?
-    let onTikTokHelpTap: (() -> Void)?
+    let onExternalPlacesHelpTap: (() -> Void)?
 
     @State private var selectedTabId: String = "favorites"
 
@@ -64,8 +64,8 @@ struct ProfileFavoritesReviewsSection: View {
 
     private var tabs: [ProfileTab] {
         var result: [ProfileTab] = [.favorites]
-        if config.showTikToksTab {
-            result.append(.tiktoks)
+        if config.showExternalPlacesTab {
+            result.append(.externalPlaces)
         }
         result.append(.reviews)
         if config.showMyPlacesTab {
@@ -81,7 +81,7 @@ struct ProfileFavoritesReviewsSection: View {
             ProfileTabHeader(
                 tabs: tabs,
                 selectedTabId: $selectedTabId,
-                onHelpTap: config.showTikToksTab ? onTikTokHelpTap : nil
+                onHelpTap: config.showExternalPlacesTab ? onExternalPlacesHelpTap : nil
             )
             contentGrid
             Divider()
@@ -102,11 +102,11 @@ struct ProfileFavoritesReviewsSection: View {
                 .allowsHitTesting(selectedTabId == "favorites")
                 .accessibilityHidden(selectedTabId != "favorites")
 
-            if config.showTikToksTab {
-                tiktoksContent
-                    .opacity(selectedTabId == "tiktoks" ? 1 : 0)
-                    .allowsHitTesting(selectedTabId == "tiktoks")
-                    .accessibilityHidden(selectedTabId != "tiktoks")
+            if config.showExternalPlacesTab {
+                externalPlacesContent
+                    .opacity(selectedTabId == "externalPlaces" ? 1 : 0)
+                    .allowsHitTesting(selectedTabId == "externalPlaces")
+                    .accessibilityHidden(selectedTabId != "externalPlaces")
             }
 
             reviewsContent
@@ -150,32 +150,32 @@ struct ProfileFavoritesReviewsSection: View {
         )
     }
 
-    // MARK: - TikToks Content
+    // MARK: - External Places Content
 
     @ViewBuilder
-    private var tiktoksContent: some View {
+    private var externalPlacesContent: some View {
         Group {
-            if data.isLoadingTikToks {
-                loadingState(text: "Loading TikToks...")
-            } else if data.tiktokPlaces.isEmpty {
-                emptyTikToksState
+            if data.isLoadingExternalPlaces {
+                loadingState(text: "Loading saved videos...")
+            } else if data.externalPlaces.isEmpty {
+                emptyExternalPlacesState
             } else {
-                ProfilePlacesPreviewGrid(tiktokPlaces: data.tiktokPlaces)
+                ProfilePlacesPreviewGrid(externalPlaces: data.externalPlaces)
             }
         }
         .contentShape(Rectangle())
         .onTapGesture {
-            onTikToksTap?()
+            onExternalPlacesTap?()
         }
     }
 
-    private var emptyTikToksState: some View {
+    private var emptyExternalPlacesState: some View {
         ProfileEmptyState(
             icon: "video",
-            title: "No TikToks yet",
+            title: "No saved videos yet",
             message: config.isMyProfile
-                ? "Add places from TikTok videos to see them here"
-                : "This user hasn't added any TikTok places yet"
+                ? "Add places from videos to see them here"
+                : "This user hasn't added any video places yet"
         )
     }
 

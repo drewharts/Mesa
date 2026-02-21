@@ -2,7 +2,7 @@
 //  ProfilePlacesPreviewGrid.swift
 //  loc
 //
-//  Shared 3x2 grid for profile preview sections (Favorites, TikToks, Reviews).
+//  Shared 3x2 grid for profile preview sections (Favorites, Videos, Reviews).
 //  Displays up to 6 places with empty slot placeholders.
 //
 //  Single Responsibility: Render a 3-column grid of place cards with consistent styling.
@@ -12,13 +12,13 @@ import SwiftUI
 
 /// Configuration for the profile places preview grid.
 struct ProfilePlacesPreviewGridConfig {
-    let preferTikTokThumbnail: Bool
+    let preferExternalThumbnail: Bool
     let maxItems: Int
 
-    static let favorites = ProfilePlacesPreviewGridConfig(preferTikTokThumbnail: false, maxItems: 6)
-    static let tiktoks = ProfilePlacesPreviewGridConfig(preferTikTokThumbnail: true, maxItems: 6)
-    static let reviews = ProfilePlacesPreviewGridConfig(preferTikTokThumbnail: false, maxItems: 6)
-    static let myPlaces = ProfilePlacesPreviewGridConfig(preferTikTokThumbnail: false, maxItems: 6)
+    static let favorites = ProfilePlacesPreviewGridConfig(preferExternalThumbnail: false, maxItems: 6)
+    static let externalPlaces = ProfilePlacesPreviewGridConfig(preferExternalThumbnail: true, maxItems: 6)
+    static let reviews = ProfilePlacesPreviewGridConfig(preferExternalThumbnail: false, maxItems: 6)
+    static let myPlaces = ProfilePlacesPreviewGridConfig(preferExternalThumbnail: false, maxItems: 6)
 }
 
 /// Shared 3x2 grid for profile preview sections.
@@ -68,24 +68,24 @@ extension ProfilePlacesPreviewGrid where Item == FavoritePlace {
 }
 
 extension ProfilePlacesPreviewGrid where Item == LightweightPlace {
-    /// Creates a grid for LightweightPlace items with TikTok thumbnail priority.
-    init(tiktokPlaces: [LightweightPlace]) {
-        self.items = tiktokPlaces
-        self.config = .tiktoks
-        self.cardBuilder = { ProfileGridPlaceCard(place: $0, preferTikTokThumbnail: true) }
+    /// Creates a grid for LightweightPlace items with external video thumbnail priority.
+    init(externalPlaces: [LightweightPlace]) {
+        self.items = externalPlaces
+        self.config = .externalPlaces
+        self.cardBuilder = { ProfileGridPlaceCard(place: $0, preferExternalThumbnail: true) }
     }
 
     /// Creates a grid for LightweightPlace items with review photo priority.
     init(reviewedPlaces: [LightweightPlace]) {
         self.items = reviewedPlaces
         self.config = .reviews
-        self.cardBuilder = { ProfileGridPlaceCard(place: $0, preferTikTokThumbnail: false) }
+        self.cardBuilder = { ProfileGridPlaceCard(place: $0, preferExternalThumbnail: false) }
     }
 
     /// Creates a grid for LightweightPlace items showing user-created places.
     init(myPlaces: [LightweightPlace]) {
         self.items = myPlaces
         self.config = .myPlaces
-        self.cardBuilder = { ProfileGridPlaceCard(place: $0, preferTikTokThumbnail: false) }
+        self.cardBuilder = { ProfileGridPlaceCard(place: $0, preferExternalThumbnail: false) }
     }
 }

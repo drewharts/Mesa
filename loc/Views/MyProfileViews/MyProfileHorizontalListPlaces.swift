@@ -28,15 +28,15 @@ struct MyProfileHorizontalListPlaces: View {
     @State private var scrollViewFrame: CGRect = .zero
     @State private var placeFrames: [UUID: CGRect] = [:]
     
-    private func getFirstTikTokThumbnail(for place: DetailPlace) -> String? {
-        // Check place's own TikTok videos first
-        if let placeTikTokVideos = place.tikTokVideos,
-           let firstVideo = placeTikTokVideos.first {
+    private func getFirstExternalThumbnail(for place: DetailPlace) -> String? {
+        // Check place's own external videos first
+        if let placeExternalVideos = place.externalVideos,
+           let firstVideo = placeExternalVideos.first {
             return firstVideo.thumbnailURL
         }
         
-        // Check user's TikTok videos for this place (uses cached data)
-        return viewModel.tikTokViewModel.getFirstTikTokThumbnailURL(for: place.id.uuidString)
+        // Check user's external videos for this place (uses cached data)
+        return viewModel.externalContentViewModel.getFirstExternalThumbnailURL(for: place.id.uuidString)
     }
     
     // Check if a place should load its image (only if actually visible on screen and not already loaded)
@@ -137,9 +137,9 @@ struct MyProfileHorizontalListPlaces: View {
                         VStack(spacing: 4) {
                             // Lazy image loading: only load images for visible places
                             if shouldLoadImage(for: place) {
-                                // Load TikTok thumbnail first, then review image, then colored rectangle
-                                if let firstTikTokThumbnail = getFirstTikTokThumbnail(for: place) {
-                                    AsyncImage(url: URL(string: firstTikTokThumbnail)) { image in
+                                // Load external video thumbnail first, then review image, then colored rectangle
+                                if let firstExternalThumbnail = getFirstExternalThumbnail(for: place) {
+                                    AsyncImage(url: URL(string: firstExternalThumbnail)) { image in
                                         image
                                             .resizable()
                                             .scaledToFill()
@@ -180,8 +180,8 @@ struct MyProfileHorizontalListPlaces: View {
                                 }
                             } else if loadedImagePlaceIds.contains(place.id) {
                                 // Show already loaded image
-                                if let firstTikTokThumbnail = getFirstTikTokThumbnail(for: place) {
-                                    AsyncImage(url: URL(string: firstTikTokThumbnail)) { image in
+                                if let firstExternalThumbnail = getFirstExternalThumbnail(for: place) {
+                                    AsyncImage(url: URL(string: firstExternalThumbnail)) { image in
                                         image
                                             .resizable()
                                             .scaledToFill()

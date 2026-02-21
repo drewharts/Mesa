@@ -1,19 +1,19 @@
 //
-//  ProfileTikTokViewModel.swift
+//  ProfileExternalContentViewModel.swift
 //  loc
 //
-//  Extracted from ProfileViewModel for TikTok/external places management.
+//  Extracted from ProfileViewModel for external places management.
 //
 
 import SwiftUI
 import MapKit
 
-/// Manages TikTok/external places for the current user's profile.
+/// Manages external places for the current user's profile.
 @MainActor
-class ProfileTikTokViewModel: ObservableObject {
+class ProfileExternalContentViewModel: ObservableObject {
     // MARK: - Published Properties - External Places
 
-    /// Lightweight external/TikTok places for display
+    /// Lightweight external places for display
     @Published var lightweightExternalPlaces: [LightweightPlace] = []
 
     /// Total external places count from database
@@ -23,16 +23,13 @@ class ProfileTikTokViewModel: ObservableObject {
     @Published var userExternalPlaces: [String: ExternalPlace] = [:]
 
     /// Loading state for initial load
-    @Published var isLoadingTikTokPlaces: Bool = false
+    @Published var isLoadingExternalPlaces: Bool = false
 
     /// Loading state for pagination
     @Published var isLoadingMoreExternalPlaces: Bool = false
 
     /// Whether more external places can be loaded
     @Published var hasMoreExternalPlaces: Bool = true
-
-    /// Loading more TikTok places state
-    @Published var isLoadingMoreTikTokPlaces: Bool = false
 
     // MARK: - Published Properties - Nearby Filter
 
@@ -48,29 +45,29 @@ class ProfileTikTokViewModel: ObservableObject {
     /// Whether the full nearby dataset has been loaded
     private var hasLoadedAllNearbyPlaces: Bool = false
 
-    // MARK: - Published Properties - TikTok Import
+    // MARK: - Published Properties - Content Import
 
-    /// Whether TikTok processing is in progress
-    @Published var isProcessingTikTok: Bool = false
+    /// Whether content processing is in progress
+    @Published var isProcessingContent: Bool = false
 
-    /// Whether waiting for place detail after TikTok import
+    /// Whether waiting for place detail after content import
     @Published var isWaitingForPlaceDetail: Bool = false
 
-    /// TikTok import error message
-    @Published var tikTokImportError: String? = nil
+    /// Import error message
+    @Published var importError: String? = nil
 
-    /// Imported places from TikTok
+    /// Imported places from external content
     @Published var importedPlaces: [DetailPlace] = []
 
     // MARK: - Sheet Presentation (via PresentationService)
 
     /// Whether showing place selection sheet (reads from PresentationService).
     var isShowingPlaceSelection: Bool {
-        get { PresentationService.shared.activeSheet == .tikTokPlaceSelection }
+        get { PresentationService.shared.activeSheet == .externalPlaceSelection }
         set {
             if newValue {
-                PresentationService.shared.present(.tikTokPlaceSelection)
-            } else if PresentationService.shared.activeSheet == .tikTokPlaceSelection {
+                PresentationService.shared.present(.externalPlaceSelection)
+            } else if PresentationService.shared.activeSheet == .externalPlaceSelection {
                 PresentationService.shared.dismiss()
             }
         }
@@ -80,35 +77,35 @@ class ProfileTikTokViewModel: ObservableObject {
     var isShowingNoPlacesFound: Bool {
         get {
             guard let sheet = PresentationService.shared.activeSheet else { return false }
-            if case .tikTokNoPlacesFound = sheet { return true }
+            if case .noPlacesFound = sheet { return true }
             return false
         }
         set {
             if newValue {
-                PresentationService.shared.present(.tikTokNoPlacesFound(tikTokUrl: noPlacesFoundTikTokUrl))
-            } else if case .tikTokNoPlacesFound = PresentationService.shared.activeSheet {
+                PresentationService.shared.present(.noPlacesFound(contentUrl: noPlacesFoundContentUrl))
+            } else if case .noPlacesFound = PresentationService.shared.activeSheet {
                 PresentationService.shared.dismiss()
             }
         }
     }
 
-    /// TikTok URL when no places were found
-    @Published var noPlacesFoundTikTokUrl: String = ""
+    /// Content URL when no places were found
+    @Published var noPlacesFoundContentUrl: String = ""
 
-    // MARK: - Published Properties - TikTok Flags
+    // MARK: - Published Properties - Place Flags
 
-    /// TikTok place flags by place ID
-    @Published var tikTokPlaceFlags: [String: TikTokPlaceFlag] = [:]
+    /// Place flags by place ID
+    @Published var placeFlags: [String: PlaceFlag] = [:]
 
     // MARK: - Private State
 
-    private var currentProcessingTikTokUrl: String? = nil
+    private var currentProcessingUrl: String? = nil
     private var recentlyProcessedURLs: Set<String> = []
-    private var _hasMoreTikTokPlaces: Bool = true
-    private var currentTikTokPage: Int = 0
-    private let tikTokPlacesPerPage: Int = 8
-    var allTikTokPlaceIds: [String] = []
-    private var loadedTikTokPlaceIds: [String] = []
+
+    private var currentExternalPage: Int = 0
+    private let externalPlacesPerPage: Int = 8
+    var allExternalPlaceIds: [String] = []
+    private var loadedExternalPlaceIds: [String] = []
 
     /// Track whether we've already prefetched metadata to avoid duplicate calls
     private var prefetchedMetadataForSession: Set<String> = []
@@ -120,8 +117,8 @@ class ProfileTikTokViewModel: ObservableObject {
 
     // MARK: - Callbacks for Cross-Cutting Concerns
 
-    /// Callback to refresh TikTok places after import (wired by parent ViewModel).
-    var onRefreshTikTokPlaces: (() -> Void)?
+    /// Callback to refresh external places after import (wired by parent ViewModel).
+    var onRefreshExternalPlaces: (() -> Void)?
 
     /// Callback to set a place image (wired by parent ViewModel to update detailPlaceViewModel).
     var onPlaceImageLoaded: ((String, UIImage) -> Void)?
@@ -146,7 +143,7 @@ class ProfileTikTokViewModel: ObservableObject {
 
     // MARK: - Initialization
 
-    /// Initializes the TikTok view model with required dependencies.
+    /// Initializes the external content view model with required dependencies.
     init(userService: UserService, userSession: UserSession) {
         self.userService = userService
         self.userSession = userSession
@@ -195,12 +192,12 @@ class ProfileTikTokViewModel: ObservableObject {
         filterPlacesToViewport()
     }
 
-    /// Fetches ALL user's TikTok places with coordinates for client-side filtering.
+    /// Fetches ALL user's external places with coordinates for client-side filtering.
     private func loadAllNearbyPlaces() async {
         guard let userId = userSession?.currentUserId else { return }
 
-        isLoadingTikTokPlaces = true
-        defer { isLoadingTikTokPlaces = false }
+        isLoadingExternalPlaces = true
+        defer { isLoadingExternalPlaces = false }
 
         do {
             let places = try await userService.fetchUserExternalPlaces(
@@ -210,19 +207,19 @@ class ProfileTikTokViewModel: ObservableObject {
             hasLoadedAllNearbyPlaces = true
             hasMoreExternalPlaces = false
 
-            // Prefetch TikTok metadata for new URLs
-            let tiktokUrls = places.compactMap { $0.tiktok_url }.filter { !$0.isEmpty }
-            let newUrls = tiktokUrls.filter { !prefetchedMetadataForSession.contains($0) }
+            // Prefetch external metadata for new URLs
+            let contentUrls = places.compactMap { $0.content_url }.filter { !$0.isEmpty }
+            let newUrls = contentUrls.filter { !prefetchedMetadataForSession.contains($0) }
             if !newUrls.isEmpty {
                 prefetchedMetadataForSession.formUnion(newUrls)
                 Task {
-                    await TikTokMetadataCache.shared.prefetchMetadata(for: newUrls)
+                    await ExternalMetadataCache.shared.prefetchMetadata(for: newUrls)
                 }
             }
 
             filterPlacesToViewport()
         } catch {
-            print("❌ [ProfileTikTokViewModel] Error loading all nearby places: \(error.localizedDescription)")
+            print("❌ [ProfileExternalContentViewModel] Error loading all nearby places: \(error.localizedDescription)")
         }
     }
 
@@ -246,22 +243,22 @@ class ProfileTikTokViewModel: ObservableObject {
 
     // MARK: - External Places Loading
 
-    /// Loads initial external places (TikTok places).
+    /// Loads initial external places.
     func loadInitialExternalPlaces() async {
         guard let userId = userSession?.currentUserId else {
-            print("⚠️ [ProfileTikTokViewModel] Cannot load initial external places: no user ID")
+            print("⚠️ [ProfileExternalContentViewModel] Cannot load initial external places: no user ID")
             return
         }
 
         // Don't reload if already loading or if we have data
-        guard !isLoadingTikTokPlaces && lightweightExternalPlaces.isEmpty else {
+        guard !isLoadingExternalPlaces && lightweightExternalPlaces.isEmpty else {
             return
         }
 
-        isLoadingTikTokPlaces = true
+        isLoadingExternalPlaces = true
 
         defer {
-            isLoadingTikTokPlaces = false
+            isLoadingExternalPlaces = false
         }
 
         do {
@@ -272,13 +269,13 @@ class ProfileTikTokViewModel: ObservableObject {
             let lightweightPlaces = try await placesTask
             let totalCount = (try? await countTask) ?? 0
 
-            // Prefetch TikTok metadata (non-blocking) - only for URLs not already prefetched
-            let tiktokUrls = lightweightPlaces.compactMap { $0.tiktok_url }.filter { !$0.isEmpty }
-            let newUrls = tiktokUrls.filter { !prefetchedMetadataForSession.contains($0) }
+            // Prefetch external metadata (non-blocking) - only for URLs not already prefetched
+            let contentUrls = lightweightPlaces.compactMap { $0.content_url }.filter { !$0.isEmpty }
+            let newUrls = contentUrls.filter { !prefetchedMetadataForSession.contains($0) }
             if !newUrls.isEmpty {
                 prefetchedMetadataForSession.formUnion(newUrls)
                 Task {
-                    await TikTokMetadataCache.shared.prefetchMetadata(for: newUrls)
+                    await ExternalMetadataCache.shared.prefetchMetadata(for: newUrls)
                 }
             }
 
@@ -290,7 +287,7 @@ class ProfileTikTokViewModel: ObservableObject {
             totalExternalPlacesCount = totalCount
             hasMoreExternalPlaces = !lightweightPlaces.isEmpty && lightweightPlaces.count >= 8
         } catch {
-            print("❌ [ProfileTikTokViewModel] Error loading initial external places: \(error.localizedDescription)")
+            print("❌ [ProfileExternalContentViewModel] Error loading initial external places: \(error.localizedDescription)")
             hasMoreExternalPlaces = false
         }
     }
@@ -298,7 +295,7 @@ class ProfileTikTokViewModel: ObservableObject {
     /// Loads more external places (pagination).
     func loadMoreExternalPlaces() async {
         guard let userId = userSession?.currentUserId else {
-            print("⚠️ [ProfileTikTokViewModel] Cannot load more external places: no user ID")
+            print("⚠️ [ProfileExternalContentViewModel] Cannot load more external places: no user ID")
             return
         }
 
@@ -317,13 +314,13 @@ class ProfileTikTokViewModel: ObservableObject {
         do {
             let lightweightPlaces = try await userService.fetchUserExternalPlaces(userId: userId, limit: 8, offset: offset, viewport: nil)
 
-            // Prefetch TikTok metadata (non-blocking) - only for URLs not already prefetched
-            let tiktokUrls = lightweightPlaces.compactMap { $0.tiktok_url }.filter { !$0.isEmpty }
-            let newUrls = tiktokUrls.filter { !prefetchedMetadataForSession.contains($0) }
+            // Prefetch external metadata (non-blocking) - only for URLs not already prefetched
+            let contentUrls = lightweightPlaces.compactMap { $0.content_url }.filter { !$0.isEmpty }
+            let newUrls = contentUrls.filter { !prefetchedMetadataForSession.contains($0) }
             if !newUrls.isEmpty {
                 prefetchedMetadataForSession.formUnion(newUrls)
                 Task {
-                    await TikTokMetadataCache.shared.prefetchMetadata(for: newUrls)
+                    await ExternalMetadataCache.shared.prefetchMetadata(for: newUrls)
                 }
             }
 
@@ -337,7 +334,7 @@ class ProfileTikTokViewModel: ObservableObject {
 
             hasMoreExternalPlaces = !lightweightPlaces.isEmpty && lightweightPlaces.count >= 8
         } catch {
-            print("❌ [ProfileTikTokViewModel] Error loading more external places: \(error.localizedDescription)")
+            print("❌ [ProfileExternalContentViewModel] Error loading more external places: \(error.localizedDescription)")
             hasMoreExternalPlaces = false
         }
     }
@@ -350,11 +347,11 @@ class ProfileTikTokViewModel: ObservableObject {
         }
 
         guard let userId = userSession?.currentUserId else {
-            print("⚠️ [ProfileTikTokViewModel] Cannot reload external places: no user ID")
+            print("⚠️ [ProfileExternalContentViewModel] Cannot reload external places: no user ID")
             return
         }
 
-        isLoadingTikTokPlaces = true
+        isLoadingExternalPlaces = true
 
         do {
             async let placesTask = userService.fetchUserExternalPlaces(userId: userId, limit: 8, offset: 0, viewport: nil)
@@ -371,98 +368,98 @@ class ProfileTikTokViewModel: ObservableObject {
             totalExternalPlacesCount = totalCount
             hasMoreExternalPlaces = !lightweightPlaces.isEmpty && lightweightPlaces.count >= 8
         } catch {
-            print("❌ [ProfileTikTokViewModel] Error reloading external places: \(error.localizedDescription)")
+            print("❌ [ProfileExternalContentViewModel] Error reloading external places: \(error.localizedDescription)")
         }
 
-        isLoadingTikTokPlaces = false
+        isLoadingExternalPlaces = false
     }
 
-    /// Refreshes TikTok places after import.
-    func refreshTikTokPlacesAfterImport() {
+    /// Refreshes external places after import.
+    func refreshExternalPlacesAfterImport() {
         Task {
             await reloadLightweightExternalPlaces()
         }
     }
 
-    // MARK: - TikTok Place Flagging
+    // MARK: - Place Flagging
 
-    /// Flags a TikTok place.
-    func flagTikTokPlace(for placeId: String, flagType: TikTokPlaceFlagType, tikTokUrl: String? = nil, userComment: String? = nil) {
+    /// Flags a place.
+    func flagPlace(for placeId: String, flagType: PlaceFlagType, contentUrl: String? = nil, userComment: String? = nil) {
         guard let userId = userSession?.currentUserId else { return }
 
-        let flag = TikTokPlaceFlag(
+        let flag = PlaceFlag(
             placeId: placeId,
             userId: userId,
             flagType: flagType,
-            tikTokUrl: tikTokUrl,
+            contentUrl: contentUrl,
             userComment: userComment
         )
 
-        tikTokPlaceFlags[placeId] = flag
+        placeFlags[placeId] = flag
 
-        userService.saveTikTokPlaceFlag(flag: flag) { [weak self] success, error in
+        userService.savePlaceFlag(flag: flag) { [weak self] success, error in
             if !success {
-                print("❌ [ProfileTikTokViewModel] Error flagging TikTok place: \(error?.localizedDescription ?? "unknown")")
+                print("❌ [ProfileExternalContentViewModel] Error flagging place: \(error?.localizedDescription ?? "unknown")")
                 DispatchQueue.main.async {
-                    self?.tikTokPlaceFlags.removeValue(forKey: placeId)
+                    self?.placeFlags.removeValue(forKey: placeId)
                 }
             }
         }
     }
 
-    /// Loads a TikTok place flag.
-    func loadTikTokPlaceFlag(for placeId: String) {
+    /// Loads a place flag.
+    func loadPlaceFlag(for placeId: String) {
         guard let userId = userSession?.currentUserId else { return }
 
         userService.hasUserFlaggedPlace(userId: userId, placeId: placeId) { [weak self] flag, error in
             DispatchQueue.main.async {
                 if let flag = flag {
-                    self?.tikTokPlaceFlags[placeId] = flag
+                    self?.placeFlags[placeId] = flag
                 }
             }
         }
     }
 
-    /// Removes a TikTok place flag.
-    func removeTikTokPlaceFlag(for placeId: String) {
+    /// Removes a place flag.
+    func removePlaceFlag(for placeId: String) {
         guard let userId = userSession?.currentUserId else { return }
 
-        let removedFlag = tikTokPlaceFlags.removeValue(forKey: placeId)
+        let removedFlag = placeFlags.removeValue(forKey: placeId)
 
-        userService.deleteTikTokPlaceFlag(userId: userId, placeId: placeId) { [weak self] success, error in
+        userService.deletePlaceFlag(userId: userId, placeId: placeId) { [weak self] success, error in
             if !success {
-                print("❌ [ProfileTikTokViewModel] Error removing TikTok place flag: \(error?.localizedDescription ?? "unknown")")
+                print("❌ [ProfileExternalContentViewModel] Error removing place flag: \(error?.localizedDescription ?? "unknown")")
                 DispatchQueue.main.async {
                     if let flag = removedFlag {
-                        self?.tikTokPlaceFlags[placeId] = flag
+                        self?.placeFlags[placeId] = flag
                     }
                 }
             }
         }
     }
 
-    /// Gets a TikTok place flag.
-    func getTikTokPlaceFlag(for placeId: String) -> TikTokPlaceFlag? {
-        return tikTokPlaceFlags[placeId]
+    /// Gets a place flag.
+    func getPlaceFlag(for placeId: String) -> PlaceFlag? {
+        return placeFlags[placeId]
     }
 
-    /// Checks if a TikTok place has been flagged.
-    func hasFlaggedTikTokPlace(placeId: String) -> Bool {
-        return tikTokPlaceFlags[placeId] != nil
+    /// Checks if a place has been flagged.
+    func hasFlaggedPlace(placeId: String) -> Bool {
+        return placeFlags[placeId] != nil
     }
 
-    /// Submits a flag for a TikTok where no place could be identified.
-    func submitNoPlacesFoundFlag(tikTokUrl: String, userComment: String) -> Bool {
+    /// Submits a flag for content where no place could be identified.
+    func submitNoPlacesFoundFlag(contentUrl: String, userComment: String) -> Bool {
         guard getCurrentUserId?() != nil else { return false }
         let tempPlaceId = "no_place_found_\(UUID().uuidString)"
-        flagTikTokPlace(for: tempPlaceId, flagType: .unableToIdentify, tikTokUrl: tikTokUrl, userComment: userComment)
+        flagPlace(for: tempPlaceId, flagType: .unableToIdentify, contentUrl: contentUrl, userComment: userComment)
         return true
     }
 
-    // MARK: - TikTok Video Access
+    // MARK: - External Video Access
 
-    /// Checks if user has TikTok videos for a place using cached data.
-    func hasTikTokVideos(for placeId: String) -> Bool {
+    /// Checks if user has external videos for a place using cached data.
+    func hasExternalVideos(for placeId: String) -> Bool {
         return userExternalPlaces.values.contains { $0.placeId == placeId && $0.url != nil && !$0.url!.isEmpty }
     }
 
@@ -471,29 +468,29 @@ class ProfileTikTokViewModel: ObservableObject {
         return userExternalPlaces.values.first { $0.placeId == placeId }
     }
 
-    /// Gets the first TikTok thumbnail URL for a place.
-    func getFirstTikTokThumbnailURL(for placeId: String) -> String? {
+    /// Gets the first external thumbnail URL for a place.
+    func getFirstExternalThumbnailURL(for placeId: String) -> String? {
         guard let externalPlace = userExternalPlaces.values.first(where: { $0.placeId == placeId && $0.url != nil }),
               let url = externalPlace.url,
-              let metadata = TikTokMetadataCache.shared.getCachedMetadata(for: url) else {
+              let metadata = ExternalMetadataCache.shared.getCachedMetadata(for: url) else {
             return nil
         }
         return metadata.thumbnailURL
     }
 
-    // MARK: - TikTok Import State
+    // MARK: - Import State
 
-    /// Clears TikTok import error.
-    func clearTikTokImportError() {
-        tikTokImportError = nil
+    /// Clears import error.
+    func clearImportError() {
+        importError = nil
     }
 
-    /// Removes a place from local TikTok state.
-    func removeFromLocalTikTokState(placeId: String) {
+    /// Removes a place from local external state.
+    func removeFromLocalExternalState(placeId: String) {
         lightweightExternalPlaces.removeAll { $0.place_id == placeId }
         allNearbyPlaces.removeAll { $0.place_id == placeId }
-        allTikTokPlaceIds.removeAll { $0 == placeId }
-        loadedTikTokPlaceIds.removeAll { $0 == placeId }
+        allExternalPlaceIds.removeAll { $0 == placeId }
+        loadedExternalPlaceIds.removeAll { $0 == placeId }
 
         if totalExternalPlacesCount > 0 {
             totalExternalPlacesCount -= 1
@@ -502,10 +499,10 @@ class ProfileTikTokViewModel: ObservableObject {
 
     // MARK: - Fetch User External Places (for dictionary)
 
-    /// Populates the userExternalPlaces dictionary for TikTok place deletion and quick lookups.
+    /// Populates the userExternalPlaces dictionary for external place deletion and quick lookups.
     func fetchUserExternalPlaces() async {
         guard let userId = userSession?.currentUserId else {
-            print("❌ [ProfileTikTokViewModel] No user ID available for fetching external places")
+            print("❌ [ProfileExternalContentViewModel] No user ID available for fetching external places")
             return
         }
 
@@ -519,24 +516,24 @@ class ProfileTikTokViewModel: ObservableObject {
 
             userExternalPlaces = placesDict
 
-            // Prefetch TikTok metadata - only for URLs not already prefetched
-            let tiktokUrls = externalPlaces.compactMap { $0.url }.filter { !$0.isEmpty }
-            let newUrls = tiktokUrls.filter { !prefetchedMetadataForSession.contains($0) }
+            // Prefetch external metadata - only for URLs not already prefetched
+            let contentUrls = externalPlaces.compactMap { $0.url }.filter { !$0.isEmpty }
+            let newUrls = contentUrls.filter { !prefetchedMetadataForSession.contains($0) }
             if !newUrls.isEmpty {
                 prefetchedMetadataForSession.formUnion(newUrls)
                 Task {
-                    await TikTokMetadataCache.shared.prefetchMetadata(for: newUrls)
+                    await ExternalMetadataCache.shared.prefetchMetadata(for: newUrls)
                 }
             }
         } catch {
-            print("❌ [ProfileTikTokViewModel] Error fetching external places: \(error.localizedDescription)")
+            print("❌ [ProfileExternalContentViewModel] Error fetching external places: \(error.localizedDescription)")
         }
     }
 
     // MARK: - External Places Image Loading
 
-    /// Ensures a TikTok thumbnail is cached for display.
-    func ensureTikTokThumbnailCached(for placeId: String) {
+    /// Ensures an external thumbnail is cached for display.
+    func ensureExternalThumbnailCached(for placeId: String) {
         if hasPlaceImage?(placeId) == true {
             return
         }
@@ -553,7 +550,7 @@ class ProfileTikTokViewModel: ObservableObject {
 
         guard let userId = getCurrentUserId?() else { return }
 
-        // Try TikTok thumbnails first
+        // Try external thumbnails first
         do {
             let urlMap = try await SupabaseUserService.shared.fetchExternalPlaceURLs(placeIds: Array(remaining), userId: userId)
 
@@ -561,14 +558,14 @@ class ProfileTikTokViewModel: ObservableObject {
                 guard let url = urlMap[placeId], !url.isEmpty else { continue }
                 guard hasPlaceImage?(placeId) != true else { continue }
 
-                guard let video = await TikTokMetadataCache.shared.getMetadata(for: url) else { continue }
+                guard let video = await ExternalMetadataCache.shared.getMetadata(for: url) else { continue }
                 let thumbnailURL = video.thumbnailURL
                 guard !thumbnailURL.isEmpty else { continue }
 
                 loadRemoteImageAsPlaceImage(placeId: placeId, imageURL: thumbnailURL)
             }
         } catch {
-            print("❌ [ProfileTikTokViewModel] Error fetching TikTok thumbnails: \(error.localizedDescription)")
+            print("❌ [ProfileExternalContentViewModel] Error fetching external thumbnails: \(error.localizedDescription)")
         }
 
         remaining = remaining.filter { hasPlaceImage?($0) != true }
@@ -582,7 +579,7 @@ class ProfileTikTokViewModel: ObservableObject {
                 loadRemoteImageAsPlaceImage(placeId: placeId, imageURL: imageUrl)
             }
         } catch {
-            print("❌ [ProfileTikTokViewModel] Error fetching regular review images: \(error.localizedDescription)")
+            print("❌ [ProfileExternalContentViewModel] Error fetching regular review images: \(error.localizedDescription)")
         }
 
         remaining = remaining.filter { hasPlaceImage?($0) != true }
@@ -596,7 +593,7 @@ class ProfileTikTokViewModel: ObservableObject {
                 loadRemoteImageAsPlaceImage(placeId: placeId, imageURL: imageUrl)
             }
         } catch {
-            print("❌ [ProfileTikTokViewModel] Error fetching external review images: \(error.localizedDescription)")
+            print("❌ [ProfileExternalContentViewModel] Error fetching external review images: \(error.localizedDescription)")
         }
     }
 
@@ -607,18 +604,18 @@ class ProfileTikTokViewModel: ObservableObject {
         }
 
         guard let url = URL(string: imageURL) else {
-            print("❌ [ProfileTikTokViewModel] Invalid image URL for place \(placeId): \(imageURL)")
+            print("❌ [ProfileExternalContentViewModel] Invalid image URL for place \(placeId): \(imageURL)")
             return
         }
 
         URLSession.shared.dataTask(with: url) { [weak self] data, response, error in
             DispatchQueue.main.async {
                 if let error = error {
-                    print("❌ [ProfileTikTokViewModel] Error loading image for \(placeId): \(error.localizedDescription)")
+                    print("❌ [ProfileExternalContentViewModel] Error loading image for \(placeId): \(error.localizedDescription)")
                 } else if let data = data, let image = UIImage(data: data) {
                     self?.onPlaceImageLoaded?(placeId, image)
                 } else {
-                    print("⚠️ [ProfileTikTokViewModel] No image data returned for place \(placeId)")
+                    print("⚠️ [ProfileExternalContentViewModel] No image data returned for place \(placeId)")
                 }
             }
         }.resume()
@@ -627,7 +624,7 @@ class ProfileTikTokViewModel: ObservableObject {
     /// Loads an image from URL asynchronously.
     private func loadImageFromURL(imageUrl: String, placeId: String) async {
         guard let url = URL(string: imageUrl) else {
-            print("❌ [ProfileTikTokViewModel] Invalid image URL for place \(placeId): \(imageUrl)")
+            print("❌ [ProfileExternalContentViewModel] Invalid image URL for place \(placeId): \(imageUrl)")
             return
         }
 
@@ -639,14 +636,14 @@ class ProfileTikTokViewModel: ObservableObject {
                 }
             }
         } catch {
-            print("❌ [ProfileTikTokViewModel] Error loading image for \(placeId): \(error.localizedDescription)")
+            print("❌ [ProfileExternalContentViewModel] Error loading image for \(placeId): \(error.localizedDescription)")
         }
     }
 
-    /// Loads TikTok thumbnail as place image.
-    func loadTikTokThumbnailAsPlaceImage(placeId: String, thumbnailURL: String) async {
+    /// Loads external thumbnail as place image.
+    func loadExternalThumbnailAsPlaceImage(placeId: String, thumbnailURL: String) async {
         guard let url = URL(string: thumbnailURL) else {
-            print("❌ [ProfileTikTokViewModel] Invalid thumbnail URL for place \(placeId): \(thumbnailURL)")
+            print("❌ [ProfileExternalContentViewModel] Invalid thumbnail URL for place \(placeId): \(thumbnailURL)")
             return
         }
 
@@ -657,10 +654,10 @@ class ProfileTikTokViewModel: ObservableObject {
                     self.onPlaceImageLoaded?(placeId, image)
                 }
             } else {
-                print("⚠️ [ProfileTikTokViewModel] No image data returned for TikTok thumbnail \(placeId)")
+                print("⚠️ [ProfileExternalContentViewModel] No image data returned for external thumbnail \(placeId)")
             }
         } catch {
-            print("❌ [ProfileTikTokViewModel] Error loading TikTok thumbnail for \(placeId): \(error.localizedDescription)")
+            print("❌ [ProfileExternalContentViewModel] Error loading external thumbnail for \(placeId): \(error.localizedDescription)")
         }
     }
 
@@ -691,7 +688,7 @@ class ProfileTikTokViewModel: ObservableObject {
 
     // MARK: - External Place Lookups
 
-    /// Gets external_place_id for a TikTok video URL at a specific place.
+    /// Gets external_place_id for a video URL at a specific place.
     func getExternalPlaceId(for placeId: String, videoUrl: String) async -> String? {
         guard let userId = getCurrentUserId?() else {
             return nil
@@ -701,39 +698,39 @@ class ProfileTikTokViewModel: ObservableObject {
             let urlPairs = try await userService.fetchExternalPlaceURLs(placeId: placeId, userId: userId)
             return urlPairs.first(where: { $0.url == videoUrl })?.id
         } catch {
-            print("❌ [ProfileTikTokViewModel] Error fetching external_place_id: \(error)")
+            print("❌ [ProfileExternalContentViewModel] Error fetching external_place_id: \(error)")
             return nil
         }
     }
 
-    /// Gets TikTok videos for a place using cached metadata.
-    func getTikTokVideosSync(for placeId: String) -> [TikTokVideo] {
-        print("🎬 [ProfileTikTokViewModel] getTikTokVideosSync for placeId: \(placeId)")
+    /// Gets external videos for a place using cached metadata.
+    func getExternalVideosSync(for placeId: String) -> [ExternalVideo] {
+        print("🎬 [ProfileExternalContentViewModel] getExternalVideosSync for placeId: \(placeId)")
         print("  - userExternalPlaces count: \(userExternalPlaces.count)")
 
         let matchingPlaces = userExternalPlaces.values.filter { $0.placeId == placeId && $0.url != nil && !$0.url!.isEmpty }
         print("  - matchingPlaces for this placeId: \(matchingPlaces.count)")
         let currentUserId = getCurrentUserId?()
 
-        var videos: [TikTokVideo] = []
+        var videos: [ExternalVideo] = []
         for externalPlace in matchingPlaces {
             guard let url = externalPlace.url else { continue }
 
-            if var video = TikTokMetadataCache.shared.getCachedMetadata(for: url) {
+            if var video = ExternalMetadataCache.shared.getCachedMetadata(for: url) {
                 video.savedByUserId = currentUserId
                 video.externalPlaceId = externalPlace.id
                 videos.append(video)
             } else {
-                let videoId = extractVideoIdFromTikTokURL(url) ?? UUID().uuidString
+                let videoId = extractVideoIdFromURL(url) ?? UUID().uuidString
                 let detectedContentType = url.contains("/photo/") ? "photo" : "video"
-                var basicVideo = TikTokVideo(
+                var basicVideo = ExternalVideo(
                     videoID: videoId,
                     url: url,
                     title: nil,
                     caption: nil,
                     embedHTML: "",
                     thumbnailURL: "",
-                    author: TikTokAuthor(displayName: "", url: "", username: ""),
+                    author: ExternalVideoAuthor(displayName: "", url: "", username: ""),
                     hashtags: [],
                     createdAt: ISO8601DateFormatter().string(from: Date()),
                     contentType: detectedContentType
@@ -748,8 +745,8 @@ class ProfileTikTokViewModel: ObservableObject {
         return videos
     }
 
-    /// Extracts video ID from TikTok URL.
-    private func extractVideoIdFromTikTokURL(_ url: String) -> String? {
+    /// Extracts video ID from URL.
+    private func extractVideoIdFromURL(_ url: String) -> String? {
         let patterns = [
             "/photo/([0-9]+)",
             "/video/([0-9]+)",
@@ -769,40 +766,39 @@ class ProfileTikTokViewModel: ObservableObject {
 
     // MARK: - Reset
 
-    /// Resets all TikTok data (used during logout).
+    /// Resets all external content data (used during logout).
     func resetAllData() {
         lightweightExternalPlaces.removeAll()
         totalExternalPlacesCount = 0
         userExternalPlaces.removeAll()
-        isLoadingTikTokPlaces = false
+        isLoadingExternalPlaces = false
         isLoadingMoreExternalPlaces = false
         hasMoreExternalPlaces = true
-        isLoadingMoreTikTokPlaces = false
         isNearbyFilterEnabled = false
         currentMapRegion = nil
         allNearbyPlaces = []
         hasLoadedAllNearbyPlaces = false
-        isProcessingTikTok = false
+        isProcessingContent = false
         isWaitingForPlaceDetail = false
-        tikTokImportError = nil
+        importError = nil
         importedPlaces.removeAll()
         isShowingPlaceSelection = false
         isShowingNoPlacesFound = false
-        noPlacesFoundTikTokUrl = ""
-        tikTokPlaceFlags.removeAll()
-        currentProcessingTikTokUrl = nil
+        noPlacesFoundContentUrl = ""
+        placeFlags.removeAll()
+        currentProcessingUrl = nil
         recentlyProcessedURLs.removeAll()
-        _hasMoreTikTokPlaces = true
-        currentTikTokPage = 0
-        allTikTokPlaceIds.removeAll()
-        loadedTikTokPlaceIds.removeAll()
+        hasMoreExternalPlaces = true
+        currentExternalPage = 0
+        allExternalPlaceIds.removeAll()
+        loadedExternalPlaceIds.removeAll()
         prefetchedMetadataForSession.removeAll()
     }
 
-    // MARK: - TikTok Place Deletion
+    // MARK: - External Place Deletion
 
-    /// Deletes a TikTok place with completion handler.
-    func deleteTikTokPlace(_ place: DetailPlace, completion: @escaping (Bool) -> Void) {
+    /// Deletes an external place with completion handler.
+    func deleteExternalPlace(_ place: DetailPlace, completion: @escaping (Bool) -> Void) {
         guard let userId = getCurrentUserId?() else {
             completion(false)
             return
@@ -811,13 +807,13 @@ class ProfileTikTokViewModel: ObservableObject {
         let placeId = place.id.uuidString
 
         // Optimistic update: Remove from all local collections immediately
-        removeFromLocalTikTokStateWithMapUpdate(placeId: placeId, userId: userId)
+        removeFromLocalExternalStateWithMapUpdate(placeId: placeId, userId: userId)
 
-        // Call backend to delete the TikTok place
-        userService.deleteTikTokPlace(userId: userId, placeId: placeId) { error in
+        // Call backend to delete the external place
+        userService.deleteExternalPlace(userId: userId, placeId: placeId) { error in
             DispatchQueue.main.async {
                 if let error = error {
-                    print("❌ [ProfileTikTokViewModel] Error deleting TikTok place: \(error.localizedDescription)")
+                    print("❌ [ProfileExternalContentViewModel] Error deleting external place: \(error.localizedDescription)")
                     completion(false)
                 } else {
                     completion(true)
@@ -826,27 +822,27 @@ class ProfileTikTokViewModel: ObservableObject {
         }
     }
 
-    /// Delete a TikTok place using LightweightPlace (for popup views).
-    func deleteTikTokPlace(_ place: LightweightPlace) {
+    /// Deletes an external place using LightweightPlace (for popup views).
+    func deleteExternalPlace(_ place: LightweightPlace) {
         guard let userId = getCurrentUserId?() else { return }
 
         let placeId = place.place_id
 
         // Optimistic update: Remove from all local collections immediately
-        removeFromLocalTikTokStateWithMapUpdate(placeId: placeId, userId: userId)
+        removeFromLocalExternalStateWithMapUpdate(placeId: placeId, userId: userId)
 
         // Persist deletion to backend
-        userService.deleteTikTokPlace(userId: userId, placeId: placeId) { error in
+        userService.deleteExternalPlace(userId: userId, placeId: placeId) { error in
             if let error = error {
-                print("❌ [ProfileTikTokViewModel] Error deleting TikTok place: \(error.localizedDescription)")
+                print("❌ [ProfileExternalContentViewModel] Error deleting external place: \(error.localizedDescription)")
             }
         }
     }
 
-    /// Removes TikTok place from all local state collections and updates map.
-    private func removeFromLocalTikTokStateWithMapUpdate(placeId: String, userId: String) {
-        // Remove from TikTok-specific state
-        removeFromLocalTikTokState(placeId: placeId)
+    /// Removes external place from all local state collections and updates map.
+    private func removeFromLocalExternalStateWithMapUpdate(placeId: String, userId: String) {
+        // Remove from external content state
+        removeFromLocalExternalState(placeId: placeId)
         userExternalPlaces.removeValue(forKey: placeId)
 
         // Cross-cutting map concerns via callbacks
@@ -855,10 +851,10 @@ class ProfileTikTokViewModel: ObservableObject {
         onAnnotationPlacesRecalculate?()
     }
 
-    /// Updates a TikTok place association by external place ID.
-    func updateTikTokPlaceById(externalPlaceId: String, newPlaceId: String, newPlaceName: String) async {
+    /// Updates an external place association by external place ID.
+    func updateExternalPlaceById(externalPlaceId: String, newPlaceId: String, newPlaceName: String) async {
         guard let userId = getCurrentUserId?() else {
-            print("❌ [ProfileTikTokViewModel] Cannot update TikTok place: missing userId")
+            print("❌ [ProfileExternalContentViewModel] Cannot update external place: missing userId")
             return
         }
 
@@ -874,7 +870,7 @@ class ProfileTikTokViewModel: ObservableObject {
                 name: newPlaceName,
                 latest_review_photo: original.latest_review_photo,
                 external_place_id: externalPlaceId,
-                tiktok_url: original.tiktok_url,
+                content_url: original.content_url,
                 added_by_user_id: original.added_by_user_id,
                 added_by_name: original.added_by_name,
                 added_by_photo_url: original.added_by_photo_url
@@ -884,33 +880,33 @@ class ProfileTikTokViewModel: ObservableObject {
 
         // Update ID tracking
         if let old = oldPlaceId {
-            allTikTokPlaceIds.removeAll { $0 == old }
+            allExternalPlaceIds.removeAll { $0 == old }
         }
-        if !allTikTokPlaceIds.contains(newPlaceId) {
-            allTikTokPlaceIds.append(newPlaceId)
+        if !allExternalPlaceIds.contains(newPlaceId) {
+            allExternalPlaceIds.append(newPlaceId)
         }
 
         // Persist to backend
         do {
-            try await userService.updateTikTokPlaceAssociation(
+            try await userService.updateExternalPlaceAssociation(
                 externalPlaceId: externalPlaceId,
                 newPlaceId: newPlaceId,
                 userId: userId
             )
-            print("✅ [ProfileTikTokViewModel] Updated TikTok place to \(newPlaceId)")
+            print("✅ [ProfileExternalContentViewModel] Updated external place to \(newPlaceId)")
         } catch {
-            print("❌ [ProfileTikTokViewModel] Error updating TikTok place: \(error.localizedDescription)")
+            print("❌ [ProfileExternalContentViewModel] Error updating external place: \(error.localizedDescription)")
             // Revert optimistic update on failure
-            onRefreshTikTokPlaces?()
+            onRefreshExternalPlaces?()
         }
     }
 
-    // MARK: - TikTok URL Processing
+    // MARK: - Content URL Processing
 
-    /// Processes a shared TikTok URL and extracts place information.
-    func processSharedTikTokURL(
+    /// Processes a shared content URL and extracts place information.
+    func processSharedContentURL(
         _ urlString: String,
-        tikTokService: TikTokService,
+        contentService: ExternalContentService,
         selectedPlaceVM: SelectedPlaceViewModel,
         placeVM: DetailPlaceViewModel,
         deepLinkManager: DeepLinkManager?,
@@ -918,24 +914,24 @@ class ProfileTikTokViewModel: ObservableObject {
     ) async -> Bool {
         // Check if this URL was recently processed
         if recentlyProcessedURLs.contains(urlString) {
-            print("⚠️ [ProfileTikTokViewModel] URL already processed recently, skipping: \(urlString)")
+            print("⚠️ [ProfileExternalContentViewModel] URL already processed recently, skipping: \(urlString)")
             return false
         }
 
         // Check if already processing
-        if isProcessingTikTok {
-            print("⚠️ [ProfileTikTokViewModel] Already processing a TikTok URL, skipping: \(urlString)")
+        if isProcessingContent {
+            print("⚠️ [ProfileExternalContentViewModel] Already processing a content URL, skipping: \(urlString)")
             return false
         }
 
         // Mark as processing and add to recently processed
         await MainActor.run {
-            isProcessingTikTok = true
+            isProcessingContent = true
             recentlyProcessedURLs.insert(urlString)
-            currentProcessingTikTokUrl = urlString
+            currentProcessingUrl = urlString
         }
 
-        let result = await tikTokService.processTikTokURL(urlString)
+        let result = await contentService.processURL(urlString)
 
         // Clear from recently processed after 30 seconds
         DispatchQueue.main.asyncAfter(deadline: .now() + 30.0) {
@@ -944,9 +940,9 @@ class ProfileTikTokViewModel: ObservableObject {
 
         switch result {
         case .success(let detailPlaces):
-            tikTokImportError = nil
+            importError = nil
 
-            await handleSuccessfulTikTokProcessing(
+            await handleSuccessfulContentProcessing(
                 detailPlaces: detailPlaces,
                 urlString: urlString,
                 selectedPlaceVM: selectedPlaceVM,
@@ -957,21 +953,21 @@ class ProfileTikTokViewModel: ObservableObject {
             return true
 
         case .failure(let error):
-            print("❌ [ProfileTikTokViewModel] TikTok processing failed: \(error.localizedDescription)")
+            print("❌ [ProfileExternalContentViewModel] Content processing failed: \(error.localizedDescription)")
 
             await MainActor.run {
-                setTikTokErrorMessage(from: error)
-                isProcessingTikTok = false
+                setImportErrorMessage(from: error)
+                isProcessingContent = false
                 deepLinkManager?.isProcessingDeepLink = false
-                currentProcessingTikTokUrl = nil
+                currentProcessingUrl = nil
             }
 
             return false
         }
     }
 
-    /// Handles successful TikTok URL processing with extracted places.
-    private func handleSuccessfulTikTokProcessing(
+    /// Handles successful content URL processing with extracted places.
+    private func handleSuccessfulContentProcessing(
         detailPlaces: [DetailPlace],
         urlString: String,
         selectedPlaceVM: SelectedPlaceViewModel,
@@ -1000,7 +996,7 @@ class ProfileTikTokViewModel: ObservableObject {
         }
     }
 
-    /// Handles a single place result from TikTok processing.
+    /// Handles a single place result from content processing.
     private func handleSinglePlace(
         _ detailPlace: DetailPlace,
         urlString: String,
@@ -1010,10 +1006,10 @@ class ProfileTikTokViewModel: ObservableObject {
     ) {
         // Validate place has a name
         if detailPlace.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            print("❌ [ProfileTikTokViewModel] Single place found but has no name")
-            noPlacesFoundTikTokUrl = urlString
+            print("❌ [ProfileExternalContentViewModel] Single place found but has no name")
+            noPlacesFoundContentUrl = urlString
             isShowingNoPlacesFound = true
-            isProcessingTikTok = false
+            isProcessingContent = false
             deepLinkManager?.isProcessingDeepLink = false
             return
         }
@@ -1034,20 +1030,20 @@ class ProfileTikTokViewModel: ObservableObject {
         selectedPlaceVM.isDetailSheetPresented = true
 
         // Clear loading states immediately
-        isProcessingTikTok = false
+        isProcessingContent = false
         isWaitingForPlaceDetail = false
         deepLinkManager?.isProcessingDeepLink = false
-        currentProcessingTikTokUrl = nil
+        currentProcessingUrl = nil
     }
 
-    /// Handles multiple places result from TikTok processing.
+    /// Handles multiple places result from content processing.
     private func handleMultiplePlacesFromProcessing(
         _ detailPlaces: [DetailPlace],
         urlString: String,
         placeVM: DetailPlaceViewModel,
         deepLinkManager: DeepLinkManager?
     ) {
-        print("🎯 [ProfileTikTokViewModel] MULTIPLE PLACES DETECTED: \(detailPlaces.count) places")
+        print("🎯 [ProfileExternalContentViewModel] MULTIPLE PLACES DETECTED: \(detailPlaces.count) places")
 
         // Validate all places have names
         let validPlaces = detailPlaces.filter { !$0.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
@@ -1057,10 +1053,10 @@ class ProfileTikTokViewModel: ObservableObject {
         }
 
         if validPlaces.isEmpty {
-            print("❌ [ProfileTikTokViewModel] No valid places found after filtering")
-            noPlacesFoundTikTokUrl = urlString
+            print("❌ [ProfileExternalContentViewModel] No valid places found after filtering")
+            noPlacesFoundContentUrl = urlString
             isShowingNoPlacesFound = true
-            isProcessingTikTok = false
+            isProcessingContent = false
             deepLinkManager?.isProcessingDeepLink = false
             return
         }
@@ -1074,48 +1070,48 @@ class ProfileTikTokViewModel: ObservableObject {
         isShowingPlaceSelection = true
 
         // Clear loading states
-        isProcessingTikTok = false
+        isProcessingContent = false
         isWaitingForPlaceDetail = false
         deepLinkManager?.isProcessingDeepLink = false
     }
 
-    /// Handles the case when no places are found from TikTok processing.
+    /// Handles the case when no places are found from content processing.
     private func handleNoPlacesFound(urlString: String, deepLinkManager: DeepLinkManager?) {
-        print("❌ [ProfileTikTokViewModel] No places found")
-        noPlacesFoundTikTokUrl = urlString
+        print("❌ [ProfileExternalContentViewModel] No places found")
+        noPlacesFoundContentUrl = urlString
         isShowingNoPlacesFound = true
-        isProcessingTikTok = false
+        isProcessingContent = false
         isWaitingForPlaceDetail = false
         deepLinkManager?.isProcessingDeepLink = false
     }
 
     /// Sets a user-friendly error message based on the error type.
-    private func setTikTokErrorMessage(from error: Error) {
+    private func setImportErrorMessage(from error: Error) {
         if error.localizedDescription.contains("network") || error.localizedDescription.contains("Internet") {
-            tikTokImportError = "Please check your internet connection and try again"
+            importError = "Please check your internet connection and try again"
         } else if error.localizedDescription.contains("invalid") || error.localizedDescription.contains("URL") {
-            tikTokImportError = "This doesn't appear to be a valid TikTok URL"
+            importError = "This doesn't appear to be a valid URL"
         } else {
-            tikTokImportError = "We couldn't find any places in this TikTok video. Try sharing a different video that shows specific locations"
+            importError = "We couldn't find any places in this video. Try sharing a different video that shows specific locations"
         }
     }
 
-    /// Clears place selection state and refreshes TikTok places.
+    /// Clears place selection state and refreshes external places.
     func clearPlaceSelection() {
         importedPlaces = []
         isShowingPlaceSelection = false
-        currentProcessingTikTokUrl = nil
+        currentProcessingUrl = nil
 
-        // Refresh TikTok places list after clearing selection
-        onRefreshTikTokPlaces?()
+        // Refresh external places list after clearing selection
+        onRefreshExternalPlaces?()
     }
 
     /// Clears the no places found state.
     func clearNoPlacesFound(deepLinkManager: DeepLinkManager?, deepLinkViewModel: DeepLinkViewModel?) {
         isShowingNoPlacesFound = false
-        noPlacesFoundTikTokUrl = ""
+        noPlacesFoundContentUrl = ""
         // Ensure processing states are cleared when user closes the view
-        isProcessingTikTok = false
+        isProcessingContent = false
         isWaitingForPlaceDetail = false
         deepLinkManager?.isProcessingDeepLink = false
         deepLinkViewModel?.isProcessingDeepLink = false
@@ -1124,14 +1120,14 @@ class ProfileTikTokViewModel: ObservableObject {
     /// Called when the place selection view appears.
     func placeSelectionViewAppeared(deepLinkManager: DeepLinkManager?, deepLinkViewModel: DeepLinkViewModel?) {
         isWaitingForPlaceDetail = false
-        isProcessingTikTok = false
+        isProcessingContent = false
         deepLinkManager?.isProcessingDeepLink = false
         deepLinkViewModel?.isProcessingDeepLink = false
     }
 
     /// Handles multiple places received from notifications.
     func handleMultiplePlaces(_ places: [DetailPlace]) {
-        print("🎯 [ProfileTikTokViewModel] Received \(places.count) places")
+        print("🎯 [ProfileExternalContentViewModel] Received \(places.count) places")
         for place in places {
             print("   - \(place.name) (ID: \(place.id))")
         }
@@ -1139,31 +1135,31 @@ class ProfileTikTokViewModel: ObservableObject {
         importedPlaces = places
         isShowingPlaceSelection = true
 
-        print("🎯 [ProfileTikTokViewModel] Set isShowingPlaceSelection = true")
+        print("🎯 [ProfileExternalContentViewModel] Set isShowingPlaceSelection = true")
     }
 
-    /// Handles multiple places notification with TikTok URL.
-    func handleMultiplePlacesNotification(places: [DetailPlace], tikTokUrl: String?) {
-        print("🎯 [ProfileTikTokViewModel] Handling multiple places notification with TikTok URL")
-        if let tikTokUrl = tikTokUrl {
-            currentProcessingTikTokUrl = tikTokUrl
+    /// Handles multiple places notification with content URL.
+    func handleMultiplePlacesNotification(places: [DetailPlace], contentUrl: String?) {
+        print("🎯 [ProfileExternalContentViewModel] Handling multiple places notification with content URL")
+        if let contentUrl = contentUrl {
+            currentProcessingUrl = contentUrl
         }
         handleMultiplePlaces(places)
     }
 
-    /// Handles TikTok notification and processes the URL.
-    func handleTikTokNotification(
+    /// Handles content notification and processes the URL.
+    func handleContentNotification(
         url: String,
-        tikTokService: TikTokService,
+        contentService: ExternalContentService,
         selectedPlaceVM: SelectedPlaceViewModel,
         placeVM: DetailPlaceViewModel,
         deepLinkManager: DeepLinkManager?,
         deepLinkViewModel: DeepLinkViewModel?
     ) {
         Task {
-            await processSharedTikTokURL(
+            await processSharedContentURL(
                 url,
-                tikTokService: tikTokService,
+                contentService: contentService,
                 selectedPlaceVM: selectedPlaceVM,
                 placeVM: placeVM,
                 deepLinkManager: deepLinkManager,
@@ -1172,9 +1168,9 @@ class ProfileTikTokViewModel: ObservableObject {
         }
     }
 
-    /// Checks UserDefaults for a pending TikTok URL and processes it.
-    func checkPendingTikTokURL(
-        tikTokService: TikTokService,
+    /// Checks UserDefaults for a pending content URL and processes it.
+    func checkPendingContentURL(
+        contentService: ExternalContentService,
         selectedPlaceVM: SelectedPlaceViewModel,
         placeVM: DetailPlaceViewModel,
         deepLinkManager: DeepLinkManager?,
@@ -1182,9 +1178,9 @@ class ProfileTikTokViewModel: ObservableObject {
     ) {
         if let pendingURL = UserDefaults.standard.string(forKey: "pendingTikTokURL") {
             Task {
-                await processSharedTikTokURL(
+                await processSharedContentURL(
                     pendingURL,
-                    tikTokService: tikTokService,
+                    contentService: contentService,
                     selectedPlaceVM: selectedPlaceVM,
                     placeVM: placeVM,
                     deepLinkManager: deepLinkManager,
