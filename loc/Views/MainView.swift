@@ -351,8 +351,7 @@ struct MainView: View {
     /// External reviews popup sheet content.
     private var externalReviewsSheet: some View {
         ExternalReviewsListPopupView(
-            mapDisplayCoordinatorVM: mapDisplayCoordinatorViewModel,
-            userProfileNavigationVM: userProfileNavigationViewModel
+            mapDisplayCoordinatorVM: mapDisplayCoordinatorViewModel
         )
         .applyMapPopupEnvironment(from: self)
         .applyMapPopupPresentation()
@@ -383,8 +382,7 @@ struct MainView: View {
     /// External favorites popup sheet content.
     private var externalFavoritesSheet: some View {
         ExternalFavoritesListPopupView(
-            mapDisplayCoordinatorVM: mapDisplayCoordinatorViewModel,
-            userProfileNavigationVM: userProfileNavigationViewModel
+            mapDisplayCoordinatorVM: mapDisplayCoordinatorViewModel
         )
         .applyMapPopupEnvironment(from: self)
         .applyMapPopupPresentation()
