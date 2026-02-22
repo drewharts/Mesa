@@ -2,32 +2,25 @@
 //  PostActionBar.swift
 //  loc
 //
-//  Action bar with like button and count for posts
+//  Action bar with comment button for posts
 //
 
 import SwiftUI
 
 struct PostActionBar: View {
-    let likeCount: Int
-    let isLiked: Bool
-    let isOwnPost: Bool
-    let onLikeTapped: () -> Void
+    let commentCount: Int
+    let onCommentTapped: () -> Void
 
     var body: some View {
         HStack(spacing: 6) {
-            Button(action: {
-                if !isOwnPost {
-                    onLikeTapped()
-                }
-            }) {
-                Image(systemName: isLiked ? "heart.fill" : "heart")
-                    .font(.system(size: 22))
-                    .foregroundColor(isOwnPost ? .gray.opacity(0.4) : (isLiked ? .red : .primary))
+            Button(action: onCommentTapped) {
+                Image(systemName: "bubble.right")
+                    .font(.system(size: 20))
+                    .foregroundColor(.primary)
             }
-            .disabled(isOwnPost)
 
-            if likeCount > 0 {
-                Text("\(likeCount) \(likeCount == 1 ? "like" : "likes")")
+            if commentCount > 0 {
+                Text("\(commentCount)")
                     .font(.subheadline)
                     .fontWeight(.semibold)
                     .foregroundColor(.primary)

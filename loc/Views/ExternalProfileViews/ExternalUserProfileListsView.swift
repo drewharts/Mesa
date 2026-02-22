@@ -308,27 +308,30 @@ struct ExternalUserListPopupView: View {
 
     private var popupHeader: some View {
         VStack(spacing: 12) {
-            HStack {
-                dismissButton
-                Spacer()
-                viewOnMapButton
-            }
-            .padding(.horizontal, 20)
-            .padding(.top, 20)
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(alignment: .center) {
+                    Text(currentList.name)
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .foregroundColor(.black)
 
-            VStack(spacing: 4) {
-                Text(currentList.name)
-                    .font(.title2)
-                    .fontWeight(.bold)
-                    .foregroundColor(.black)
+                    Spacer()
+
+                    HStack(alignment: .center, spacing: 12) {
+                        viewOnMapButton
+                        dismissButton
+                    }
+                }
 
                 Text("\(currentList.place_count) place\(currentList.place_count == 1 ? "" : "s")")
                     .font(.caption)
                     .foregroundColor(.gray)
+                    .padding(.top, -8)
             }
             .padding(.horizontal, 20)
+            .padding(.top, 12)
         }
-        .padding(.bottom, 10)
+        .padding(.bottom, 28)
     }
 
     /// Button that dismisses the list popup sheet.
@@ -337,9 +340,10 @@ struct ExternalUserListPopupView: View {
             presentationMode.wrappedValue.dismiss()
         }) {
             Image(systemName: "xmark")
-                .font(.body)
-                .foregroundColor(.gray)
+                .font(.system(size: 20, weight: .regular))
+                .foregroundColor(.primary)
         }
+        .frame(width: 44, height: 44)
     }
 
     /// Button that dismisses the profile and shows this list's places on the map.
@@ -358,9 +362,10 @@ struct ExternalUserListPopupView: View {
             )
         }) {
             Image(systemName: "map")
-                .font(.body)
-                .foregroundColor(.gray)
+                .font(.system(size: 20, weight: .regular))
+                .foregroundColor(.primary)
         }
+        .frame(width: 44, height: 44)
     }
 
     // MARK: - Popup Content

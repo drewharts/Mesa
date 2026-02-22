@@ -16,12 +16,12 @@ struct PlacePostView: View {
     @ObservedObject var viewModel: PlacePostsViewModel
     let onPhotoTapped: ([String], Int) -> Void
 
-    @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var userProfileNavigationVM: UserProfileNavigationViewModel
     @EnvironmentObject var userSession: UserSession
 
     @State private var fullscreenVideoURL: URL?
+    @State private var showCommentsSheet = false
 
     private var mediaWidth: CGFloat {
         UIScreen.main.bounds.width - 56
@@ -39,7 +39,7 @@ struct PlacePostView: View {
         VStack(spacing: 12) {
             // Header: Profile Picture, Name, Timestamp, and Sentiment
             headerSection
-            
+
             // Post Text (if any)
             if !post.text.isEmpty {
                 Text(post.text)
@@ -47,13 +47,22 @@ struct PlacePostView: View {
                     .foregroundColor(.primary)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
-            
+
             // Media (photos + videos)
             mediaSection
+
+            // Like + Comment action bar
+            actionBarSection
         }
         .padding(.vertical, 12)
         .fullScreenCover(item: $fullscreenVideoURL) { url in
             FullscreenVideoPlayerView(url: url)
+        }
+        .sheet(isPresented: $showCommentsSheet) {
+            PostCommentsSheet(
+                post: post,
+                postsViewModel: viewModel
+            )
         }
     }
     
@@ -123,26 +132,13 @@ struct PlacePostView: View {
         .cornerRadius(12)
     }
     
-    private var likesSection: some View {
-        HStack(spacing: 4) {
-            Button(action: {
-                guard let currentUserId = userSession.currentUserId else { return }
-                selectedPlaceVM.likePost(post, userId: currentUserId)
-            }) {
-                Image(systemName: "heart.fill")
-                    .foregroundColor(isOwnPost ? .gray : (selectedPlaceVM.isPostLiked(post.id) ? .red : .gray))
-                    .opacity(isOwnPost ? 0.3 : 0.7)
+    private var actionBarSection: some View {
+        PostActionBar(
+            commentCount: post.commentCount,
+            onCommentTapped: {
+                showCommentsSheet = true
             }
-            .disabled(isOwnPost)
-            
-            Text("\(post.likes)")
-                .font(.caption)
-                .foregroundColor(.gray)
-        }
-    }
-    
-    private var isOwnPost: Bool {
-        userSession.currentUserId != nil && post.userId == userSession.currentUserId
+        )
     }
     
     // MARK: - Media Section

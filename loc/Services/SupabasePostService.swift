@@ -126,6 +126,7 @@ class SupabasePostService: ObservableObject {
                 videoUrls: record.review_video_urls ?? [],
                 videoThumbnailUrls: record.review_video_thumbnails ?? [],
                 likes: record.review_likes ?? 0,
+                commentCount: record.review_comment_count ?? 0,
                 wouldReturn: record.would_return
             )
         }
@@ -285,6 +286,78 @@ class SupabasePostService: ObservableObject {
             .execute()
     }
 
+    // MARK: - Comments
+
+    /// Fetches comments for a review, joined with user info.
+    func fetchComments(reviewId: String) async throws -> [Comment] {
+        let response: [CommentWithUserRecord] = try await supabase.client
+            .from("comments")
+            .select("id, review_id, user_id, text, images, likes, timestamp, users:user_id(first_name, last_name, profile_photo_url)")
+            .eq("review_id", value: reviewId)
+            .order("timestamp", ascending: true)
+            .execute()
+            .value
+
+        return response.map { record in
+            Comment(
+                id: record.id,
+                reviewId: record.review_id,
+                userId: record.user_id,
+                profilePhotoUrl: record.users?.profile_photo_url ?? "",
+                userFirstName: record.users?.first_name ?? "",
+                userLastName: record.users?.last_name ?? "",
+                commentText: record.text,
+                timestamp: record.timestamp,
+                images: record.images ?? [],
+                likes: record.likes ?? 0
+            )
+        }
+    }
+
+    /// Adds a comment to a review and returns the created Comment.
+    func addComment(reviewId: String, placeId: String, userId: String, text: String, userFirstName: String, userLastName: String, profilePhotoUrl: String) async throws -> Comment {
+        let commentId = UUID().uuidString
+        let now = Date()
+
+        let insertRecord = CommentInsertRecord(
+            id: commentId,
+            review_id: reviewId,
+            place_id: placeId,
+            user_id: userId,
+            text: text,
+            images: [],
+            likes: 0,
+            timestamp: now
+        )
+
+        try await supabase.client
+            .from("comments")
+            .insert(insertRecord)
+            .execute()
+
+        return Comment(
+            id: commentId,
+            reviewId: reviewId,
+            userId: userId,
+            profilePhotoUrl: profilePhotoUrl,
+            userFirstName: userFirstName,
+            userLastName: userLastName,
+            commentText: text,
+            timestamp: now,
+            images: [],
+            likes: 0
+        )
+    }
+
+    /// Deletes a comment by its ID.
+    func deleteComment(commentId: String) async throws {
+        try await supabase.client
+            .from("comments")
+            .delete()
+            .eq("id", value: commentId)
+            .execute()
+    }
+
     // MARK: - Helper Methods
     
     private func parseTimestamp(_ timestampString: String) -> Date {
@@ -412,5 +485,36 @@ struct PostWithUserRecord: Codable {
     let would_return: Bool?
     let review_video_urls: [String]?
     let review_video_thumbnails: [String]?
+    let review_comment_count: Int?
+}
+
+// MARK: - Comment Records
+
+struct CommentUserRecord: Codable {
+    let first_name: String?
+    let last_name: String?
+    let profile_photo_url: String?
+}
+
+struct CommentWithUserRecord: Codable {
+    let id: String
+    let review_id: String
+    let user_id: String
+    let text: String
+    let images: [String]?
+    let likes: Int?
+    let timestamp: Date
+    let users: CommentUserRecord?
+}
+
+struct CommentInsertRecord: Codable {
+    let id: String
+    let review_id: String
+    let place_id: String
+    let user_id: String
+    let text: String
+    let images: [String]
+    let likes: Int
+    let timestamp: Date
 }
 
