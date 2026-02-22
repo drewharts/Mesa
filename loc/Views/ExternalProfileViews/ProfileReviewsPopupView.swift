@@ -50,30 +50,34 @@ struct ProfileReviewsPopupView: View {
 
     private var header: some View {
         VStack(spacing: 12) {
-            HStack {
-                Button(action: {
-                    presentationMode.wrappedValue.dismiss()
-                }) {
-                    Image(systemName: "chevron.left")
-                        .foregroundColor(.primary)
-                }
-                Spacer()
-            }
-            .padding(.horizontal, 20)
-            .padding(.top, 20)
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(alignment: .center) {
+                    Text("\(viewModel.user.firstName)'s Reviews")
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .foregroundColor(.black)
 
-            VStack(spacing: 4) {
-                Text("\(viewModel.user.firstName)'s Reviews")
-                    .font(.title2)
-                    .fontWeight(.bold)
-                    .foregroundColor(.black)
+                    Spacer()
+
+                    Button(action: {
+                        presentationMode.wrappedValue.dismiss()
+                    }) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 20, weight: .regular))
+                            .foregroundColor(.primary)
+                    }
+                    .frame(width: 44, height: 44)
+                }
 
                 Text("\(viewModel.totalReviewedPlacesCount) place\(viewModel.totalReviewedPlacesCount == 1 ? "" : "s")")
                     .font(.caption)
                     .foregroundColor(.gray)
+                    .padding(.top, -8)
             }
+            .padding(.horizontal, 20)
+            .padding(.top, 12)
         }
-        .padding(.bottom, 10)
+        .padding(.bottom, 28)
     }
 
     // MARK: - Content

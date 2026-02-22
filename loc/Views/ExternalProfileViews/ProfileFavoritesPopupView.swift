@@ -49,30 +49,34 @@ struct ProfileFavoritesPopupView: View {
 
     private var header: some View {
         VStack(spacing: 12) {
-            HStack {
-                Button(action: {
-                    presentationMode.wrappedValue.dismiss()
-                }) {
-                    Image(systemName: "chevron.left")
-                        .foregroundColor(.primary)
-                }
-                Spacer()
-            }
-            .padding(.horizontal, 20)
-            .padding(.top, 20)
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(alignment: .center) {
+                    Text("\(viewModel.user.firstName)'s Favorites")
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .foregroundColor(.black)
 
-            VStack(spacing: 4) {
-                Text("\(viewModel.user.firstName)'s Favorites")
-                    .font(.title2)
-                    .fontWeight(.bold)
-                    .foregroundColor(.black)
+                    Spacer()
+
+                    Button(action: {
+                        presentationMode.wrappedValue.dismiss()
+                    }) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 20, weight: .regular))
+                            .foregroundColor(.primary)
+                    }
+                    .frame(width: 44, height: 44)
+                }
 
                 Text("\(viewModel.userFavorites.count) place\(viewModel.userFavorites.count == 1 ? "" : "s")")
                     .font(.caption)
                     .foregroundColor(.gray)
+                    .padding(.top, -8)
             }
+            .padding(.horizontal, 20)
+            .padding(.top, 12)
         }
-        .padding(.bottom, 10)
+        .padding(.bottom, 28)
     }
 
     // MARK: - Content
