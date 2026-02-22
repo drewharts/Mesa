@@ -20,6 +20,7 @@ struct ProfileFavoritesPopupView: View {
     @EnvironmentObject var userProfileNavigationVM: UserProfileNavigationViewModel
     @EnvironmentObject var userSession: UserSession
     @EnvironmentObject var detailPlaceViewModel: DetailPlaceViewModel
+    @EnvironmentObject var mapDisplayCoordinatorVM: MapDisplayCoordinatorViewModel
     @Environment(\.presentationMode) var presentationMode
 
     @State private var navigationPath = NavigationPath()
@@ -58,14 +59,23 @@ struct ProfileFavoritesPopupView: View {
 
                     Spacer()
 
-                    Button(action: {
-                        presentationMode.wrappedValue.dismiss()
-                    }) {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 20, weight: .regular))
-                            .foregroundColor(.primary)
+                    HStack(alignment: .center, spacing: 12) {
+                        Button(action: viewFavoritesOnMap) {
+                            Image(systemName: "map")
+                                .font(.system(size: 20, weight: .regular))
+                                .foregroundColor(.primary)
+                        }
+                        .frame(width: 44, height: 44)
+
+                        Button(action: {
+                            presentationMode.wrappedValue.dismiss()
+                        }) {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 20, weight: .regular))
+                                .foregroundColor(.primary)
+                        }
+                        .frame(width: 44, height: 44)
                     }
-                    .frame(width: 44, height: 44)
                 }
 
                 Text("\(viewModel.userFavorites.count) place\(viewModel.userFavorites.count == 1 ? "" : "s")")
@@ -77,6 +87,19 @@ struct ProfileFavoritesPopupView: View {
             .padding(.top, 12)
         }
         .padding(.bottom, 28)
+    }
+
+    /// Dismisses the sheet and shows favorites on the map.
+    private func viewFavoritesOnMap() {
+        let navVM = userProfileNavigationVM
+        mapDisplayCoordinatorVM.triggerExternalFavoritesOnMap(
+            userId: viewModel.userId,
+            userName: viewModel.user.fullName,
+            userPhotoUrl: viewModel.user.profilePhotoURL?.absoluteString,
+            favorites: viewModel.userFavorites,
+            dismissProfile: { navVM.clearSelection() }
+        )
+        presentationMode.wrappedValue.dismiss()
     }
 
     // MARK: - Content
