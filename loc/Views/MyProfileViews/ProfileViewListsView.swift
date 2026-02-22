@@ -40,6 +40,7 @@ struct ProfileViewListsView: View {
     @State private var showDeleteConfirmation = false
     @State private var selectedListIndex: Int? = nil
     @State private var pendingMapListId: String? = nil
+    @State private var showingGoogleMapsImport = false
 
     // MARK: - Body
 
@@ -71,6 +72,21 @@ struct ProfileViewListsView: View {
             })
             .presentationDetents([.height(200)])
             .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $showingGoogleMapsImport) {
+            GoogleMapsImportView(
+                userId: profile.user?.id ?? "",
+                existingLists: listsVM.lightweightPlaceLists,
+                onImportCompleted: { listId in
+                    Task {
+                        await listsVM.reloadListsAfterSearch()
+                        // Open the newly created list
+                        if let index = listsVM.filteredPlaceLists.firstIndex(where: { $0.list_id == listId }) {
+                            selectedListIndex = index
+                        }
+                    }
+                }
+            )
         }
         .sheet(isPresented: .constant(deepLinkManager.hasPendingList()), onDismiss: {
             deepLinkManager.clearPendingList()
@@ -145,6 +161,9 @@ struct ProfileViewListsView: View {
             },
             onAddList: {
                 showingNewListSheet = true
+            },
+            onImportGoogleMapsList: {
+                showingGoogleMapsImport = true
             }
         )
     }
