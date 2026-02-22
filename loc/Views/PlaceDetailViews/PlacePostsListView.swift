@@ -10,7 +10,6 @@ import UIKit
 
 struct PlacePostsListView: View {
     @ObservedObject var viewModel: PlacePostsViewModel
-    let onPhotoTapped: ([String], Int) -> Void
     let scrollProxy: ScrollViewProxy
     
     @EnvironmentObject var userProfileNavigationVM: UserProfileNavigationViewModel
@@ -24,8 +23,7 @@ struct PlacePostsListView: View {
         ForEach(viewModel.posts, id: \.id) { post in
             PlacePostView(
                 post: post,
-                viewModel: viewModel,
-                onPhotoTapped: onPhotoTapped
+                viewModel: viewModel
             )
             .id(post.id)
             .padding(.vertical, 8)

@@ -11,17 +11,30 @@ extension URL: @retroactive Identifiable {
     public var id: String { absoluteString }
 }
 
+/// Wrapper to make an Int index Identifiable for fullScreenCover(item:).
+private struct IdentifiableIndex: Identifiable {
+    let id: Int
+    var index: Int { id }
+}
+
 struct PlacePostView: View {
     let post: PlacePost
     @ObservedObject var viewModel: PlacePostsViewModel
-    let onPhotoTapped: ([String], Int) -> Void
 
     @EnvironmentObject var profile: ProfileViewModel
     @EnvironmentObject var userProfileNavigationVM: UserProfileNavigationViewModel
     @EnvironmentObject var userSession: UserSession
 
-    @State private var fullscreenVideoURL: URL?
+    @State private var selectedMediaIndex: Int?
     @State private var showCommentsSheet = false
+
+    /// Converts selectedMediaIndex to an Identifiable binding for fullScreenCover.
+    private var selectedMediaBinding: Binding<IdentifiableIndex?> {
+        Binding(
+            get: { selectedMediaIndex.map { IdentifiableIndex(id: $0) } },
+            set: { selectedMediaIndex = $0?.id }
+        )
+    }
 
     private var mediaWidth: CGFloat {
         UIScreen.main.bounds.width - 56
@@ -55,8 +68,11 @@ struct PlacePostView: View {
             actionBarSection
         }
         .padding(.vertical, 12)
-        .fullScreenCover(item: $fullscreenVideoURL) { url in
-            FullscreenVideoPlayerView(url: url)
+        .fullScreenCover(item: selectedMediaBinding) { wrapper in
+            FullscreenMediaGalleryView(
+                mediaItems: post.allMediaItems,
+                initialIndex: wrapper.index
+            )
         }
         .sheet(isPresented: $showCommentsSheet) {
             PostCommentsSheet(
@@ -191,7 +207,7 @@ struct PlacePostView: View {
                     // Video items
                     ForEach(Array(post.videoUrls.enumerated()), id: \.element) { index, videoUrlString in
                         let thumbnail = index < post.videoThumbnailUrls.count ? post.videoThumbnailUrls[index] : nil
-                        videoMediaCell(urlString: videoUrlString, thumbnailUrlString: thumbnail)
+                        videoMediaCell(urlString: videoUrlString, thumbnailUrlString: thumbnail, videoIndex: index)
                     }
                 }
             }
@@ -206,7 +222,7 @@ struct PlacePostView: View {
             .clipShape(RoundedRectangle(cornerRadius: 10))
             .shadow(radius: 2)
             .onTapGesture {
-                onPhotoTapped(post.images, index)
+                selectedMediaIndex = index
             }
             .onAppear {
                 if index == postPhotos.count - 1 {
@@ -216,11 +232,11 @@ struct PlacePostView: View {
     }
 
     @ViewBuilder
-    private func videoMediaCell(urlString: String, thumbnailUrlString: String?) -> some View {
+    private func videoMediaCell(urlString: String, thumbnailUrlString: String?, videoIndex: Int) -> some View {
         if let videoURL = URL(string: urlString) {
             let thumbURL = thumbnailUrlString.flatMap { URL(string: $0) }
             InlineVideoPlayerView(url: videoURL, thumbnailURL: thumbURL) {
-                fullscreenVideoURL = videoURL
+                selectedMediaIndex = post.images.count + videoIndex
             }
             .frame(width: mediaWidth, height: mediaWidth)
             .shadow(radius: 2)

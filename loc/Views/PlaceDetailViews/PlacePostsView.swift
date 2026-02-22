@@ -9,7 +9,6 @@ import SwiftUI
 
 struct PlacePostsView: View {
     @ObservedObject var viewModel: PlacePostsViewModel
-    let onPhotoTapped: ([String], Int) -> Void
     let onAddPost: () -> Void
     
     @EnvironmentObject var selectedPlaceVM: SelectedPlaceViewModel
@@ -31,7 +30,6 @@ struct PlacePostsView: View {
                     if viewModel.hasPosts {
                         PlacePostsListView(
                             viewModel: viewModel,
-                            onPhotoTapped: onPhotoTapped,
                             scrollProxy: scrollProxy
                         )
                     } else {

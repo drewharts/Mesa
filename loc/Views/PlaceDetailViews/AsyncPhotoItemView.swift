@@ -31,10 +31,6 @@ struct AsyncPhotoItemView: View {
         .frame(width: width, height: height)
         .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
         .contentShape(RoundedRectangle(cornerRadius: cornerRadius))
-        .overlay(
-            RoundedRectangle(cornerRadius: cornerRadius)
-                .stroke(Color.gray.opacity(0.1), lineWidth: 0.5)
-        )
     }
 
     // MARK: - Progressive Google CDN Image

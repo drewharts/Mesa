@@ -25,13 +25,17 @@ class FullscreenVideoPlayerViewModel: ObservableObject {
     // MARK: - Init
 
     /// Initializes the fullscreen player with a remote video URL, unmuted.
-    init(url: URL) {
+    init(url: URL, autoPlay: Bool = true) {
         self.player = AVPlayer(url: url)
         player.isMuted = false
         activateAudioSession()
         setupTimeObserver()
         loadDuration()
-        player.play()
+        if autoPlay {
+            player.play()
+        } else {
+            isPlaying = false
+        }
     }
 
     deinit {

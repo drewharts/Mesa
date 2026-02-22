@@ -317,7 +317,6 @@ struct PlaceDetailTabsView: View {
         case .reviews:
             PlacePostsView(
                 viewModel: viewModel.postsViewModel,
-                onPhotoTapped: onPhotoTapped,
                 onAddPost: onAddReview
             )
             .environmentObject(selectedPlaceVM)
